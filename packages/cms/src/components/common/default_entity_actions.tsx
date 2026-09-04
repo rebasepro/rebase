@@ -194,7 +194,6 @@ function buildRemoveEntityAction({
                         entityOrEntitiesToDelete={entity}
                         path={path}
                         collection={collection}
-                        callbacks={collection.callbacks}
                         variant={variant}
                         open={open}
                         onEntityDelete={() => {

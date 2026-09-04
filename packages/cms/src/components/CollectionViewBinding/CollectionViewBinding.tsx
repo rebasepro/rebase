@@ -1296,7 +1296,6 @@ parentEntityIds,
                         entityOrEntitiesToDelete={deleteEntityClicked}
                         path={path}
                         collection={collection}
-                        callbacks={collection.callbacks}
                         open={Boolean(deleteEntityClicked)}
                         onEntityDelete={internalOnEntityDelete}
                         onMultipleEntitiesDelete={internalOnMultipleEntitiesDelete}

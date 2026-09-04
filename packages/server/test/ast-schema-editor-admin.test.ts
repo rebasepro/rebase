@@ -156,6 +156,50 @@ export default postsCollection;
         expect(written.match(/admin:/g)).toHaveLength(1);
     });
 
+    /**
+     * Both callback blocks are functions, which JSON cannot carry, so neither
+     * reaches `saveCollection` in the payload — the editor has to preserve them
+     * from the file it is rewriting or they are deleted on the first save from
+     * the panel. `callbacks` was already on the preserve list; `browserCallbacks`
+     * is the panel's own block and had to join it.
+     */
+    it("preserves both callback blocks through a save that never mentions them", async () => {
+        fs.writeFileSync(path.join(dir, "posts.ts"), `import { CollectionConfig } from "@rebasepro/types";
+
+const postsCollection: CollectionConfig = {
+    slug: "posts",
+    name: "Posts",
+    table: "posts",
+    properties: {
+        title: { name: "Title", type: "string" }
+    },
+    callbacks: {
+        beforeSave: async ({ values }) => ({ ...values, slug: slugify(values.title) })
+    },
+    admin: {
+        browserCallbacks: {
+            afterRead: ({ row }) => ({ ...row, label: row.title })
+        }
+    }
+};
+
+export default postsCollection;
+`);
+
+        const editor = new AstSchemaEditor(dir);
+        await editor.saveCollection("posts", {
+            slug: "posts",
+            name: "Posts",
+            table: "posts",
+            properties: { title: { name: "Title", type: "string" } },
+            icon: "FileText"
+        });
+
+        const written = fs.readFileSync(path.join(dir, "posts.ts"), "utf8");
+        expect(written).toContain("slugify(values.title)");
+        expect(written).toContain("afterRead: ({ row }) => ({ ...row, label: row.title })");
+    });
+
     it("leaves securityRules and callbacks at the top level", async () => {
         const editor = new AstSchemaEditor(dir);
         await editor.saveCollection("posts", {

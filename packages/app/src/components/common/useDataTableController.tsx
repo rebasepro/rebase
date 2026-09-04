@@ -275,13 +275,16 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         setDataLoading(true);
 
         const onEntitiesUpdate = async (entities: Entity<M>[]) => {
-            if (collection.callbacks?.afterRead) {
+            // `browserCallbacks`, not `callbacks`: the server has already run
+            // its own `afterRead` before these rows arrived, and running that
+            // one again here applied it twice. This block is the panel's.
+            if (collection.browserCallbacks?.afterRead) {
                 try {
                     // afterRead operates on flat rows; unwrap the Entity view-model
                     // before invoking and re-wrap the processed row after.
                     entities = await Promise.all(
                         entities.map(async (entity) => {
-                            const processedRow = await collection.callbacks!.afterRead!({
+                            const processedRow = await collection.browserCallbacks!.afterRead!({
                                 collection,
                                 path,
                                 row: { id: entity.id, ...entity.values },

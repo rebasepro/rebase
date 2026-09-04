@@ -48,7 +48,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "development": "./dist/index.es.js",
-      "import": "./dist/index.es.js"
+      "import": "./dist/index.es.js",
+      "default": "./dist/index.es.js"
     },
     "./package.json": "./package.json"
   },
@@ -69,6 +70,7 @@
     "ws": "^8.21.1"
   },
   "devDependencies": {
+      "@rebasepro/client": "workspace:*",
     "@hono/node-server": "^2.0.12",
     "@jest/globals": "^30.4.1",
     "@types/jest": "^30.0.0",

@@ -116,7 +116,7 @@ Each callback receives a single props object. Common fields:
 
 ## Blocking vs. Async Semantics
 
-- **`beforeSave`, `beforeDelete`** — blocking. If the callback throws, the operation is rejected with an HTTP 400 error response. The database write never happens.
+- **`beforeSave`, `beforeDelete`** — blocking. If the callback throws, the operation is rejected with an HTTP 400 carrying your message and the code `CALLBACK_REJECTED`, and the database write never happens. Throw a `RebaseApiError` from `@rebasepro/types` to pick the status yourself — see [Entity Callbacks](/docs/collections/callbacks#beforesave).
 - **`afterRead`** — blocking. The returned row (or transformed row) is what the caller receives.
 - **`afterSave`, `afterDelete`, `afterSaveError`** — run after the transaction commits. They do not block the HTTP response.
 

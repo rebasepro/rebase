@@ -258,8 +258,23 @@ export interface PostgresCollectionConfig<M extends Record<string, unknown> = Re
 
     /**
      * The PostgreSQL table name for this collection.
+     *
+     * Optional: it defaults to `toSnakeCase(slug)`, which is what
+     * `getTableName()` has always returned when it was absent. The type simply
+     * demanded what the runtime already derived, so the smallest collection
+     * anyone could write named its table twice —
+     * `{ slug: "todos", table: "todos", … }` — and "why do I write it twice"
+     * is the first question every evaluator asked.
+     *
+     * Set it only when the table name differs from the slug: an existing
+     * database whose table is `blog_posts` while the URL should stay `posts`.
+     *
+     * Note that a **derived** name is still a real name, and nothing yet warns
+     * when one moves. Foreign-key and junction column defaults are derived from
+     * the *slug* rather than from this field, so renaming a slug re-derives
+     * them on the next `db push` even where `table` is pinned.
      */
-    table: string;
+    table?: string;
 
     /**
      * The PostgreSQL schema name for this table.

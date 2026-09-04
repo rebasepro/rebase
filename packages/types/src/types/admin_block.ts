@@ -34,6 +34,7 @@ export const ADMIN_COLLECTION_KEYS = [
     "Actions",
     "additionalFields",
     "alwaysApplyDefaultValues",
+    "browserCallbacks",
     "components",
     "customViews",
     "defaultEntityAction",

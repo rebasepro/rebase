@@ -497,4 +497,80 @@ if (failed > 0) {
     process.exit(1);
 }
 
+/*
+ * A scaffold may not promise a Node it cannot run on.
+ *
+ * The template said `>=18.0.0` while its own frontend depends on
+ * `@rebasepro/app`, whose engines are `>=22.22.0` — so the very first
+ * `pnpm install` broke the promise the `package.json` had just made, and the
+ * README and Quickstart repeated the wrong number to everyone who read them.
+ * Three floors were in play at once (18 in the scaffold, 20 in the driver
+ * packages, 22.22 in the repo and the admin packages) and nothing compared them.
+ *
+ * The rule is not "one number" — a headless project genuinely runs on 20 while a
+ * CMS one needs 22.22. It is that each scaffold's declared floor must be at
+ * least the highest floor among the workspace packages it names.
+ */
+function parseFloor(range) {
+    const m = /^>=\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(range ?? "");
+    return m ? [Number(m[1]), Number(m[2] ?? 0), Number(m[3] ?? 0)] : null;
+}
+const cmpFloor = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+const fmtFloor = (f) => `>=${f[0]}.${f[1]}.${f[2]}`;
+
+const workspaceEngines = new Map();
+for (const dir of fs.readdirSync(path.join(repoRoot, "packages"))) {
+    const manifest = path.join(repoRoot, "packages", dir, "package.json");
+    if (!fs.existsSync(manifest)) continue;
+    const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
+    const floor = parseFloor(pkg.engines?.node);
+    if (pkg.name && floor) workspaceEngines.set(pkg.name, floor);
+}
+
+const engineFindings = [];
+for (const [label, root] of [["template", templateRoot], ["baas overlay", baasOverlay]]) {
+    const manifests = fs.readdirSync(root, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .map((e) => path.join(root, e.name, "package.json"))
+        .concat(path.join(root, "package.json"))
+        .filter((p) => fs.existsSync(p));
+
+    const declared = parseFloor(
+        JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).engines?.node);
+    if (!declared) {
+        engineFindings.push(`${label}: root package.json declares no \`engines.node\``);
+        continue;
+    }
+
+    let required = [0, 0, 0];
+    let requiredBy = "(nothing)";
+    for (const manifest of manifests) {
+        const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
+        for (const dep of Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })) {
+            const floor = workspaceEngines.get(dep);
+            if (floor && cmpFloor(floor, required) > 0) {
+                required = floor;
+                requiredBy = dep;
+            }
+        }
+    }
+
+    if (cmpFloor(declared, required) < 0) {
+        engineFindings.push(
+            `${label}: declares node ${fmtFloor(declared)} but depends on ${requiredBy}, `
+            + `which requires ${fmtFloor(required)}.\n      `
+            + `The first \`pnpm install\` in a scaffolded project would break the promise `
+            + `its own package.json just made.`
+        );
+    }
+}
+
+if (engineFindings.length > 0) {
+    console.error("\nNode floor findings:\n");
+    for (const f of engineFindings) console.error(`  ✗ ${f}`);
+    console.error("");
+    process.exit(1);
+}
+
 console.log(`\nAll ${PRESETS.length} init presets compile, and the baas backend.`);
+console.log("Each scaffold's Node floor covers the packages it depends on.");

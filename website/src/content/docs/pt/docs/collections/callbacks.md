@@ -15,6 +15,62 @@ Callbacks permitem que você se conecte ao ciclo de vida da entidade para:
 - **Filtrar/transformar** dados após a leitura
 - **Operações em cascata** — limpar registros relacionados na exclusão
 
+## Onde os callbacks são executados
+
+Uma coleção tem dois blocos de callbacks, e a única diferença é qual runtime os executa.
+
+| | `callbacks` | `admin.browserCallbacks` |
+|---|---|---|
+| Executa em | o servidor | o painel de administração, no navegador |
+| Dispara para | REST, o SDK, realtime, `dataAsAdmin` | leituras e escritas feitas pelo painel |
+| Chega ao navegador | não — os corpos são removidos do bundle | sim, por inteiro |
+| Usar para | tudo o que segue | coleções com as quais o painel fala diretamente |
+
+**`callbacks` é o que você quer.** Ele roda em todo caminho que chega ao
+servidor, então nada o contorna, e seu corpo nunca deixa a máquina — uma chave
+de API ou uma leitura de `process.env` ali está segura. O resto desta página é
+sobre `callbacks`.
+
+`admin.browserCallbacks` existe para um caso: uma coleção em um transporte
+`direct` ou `custom`, que o painel lê e escreve *sozinho*, sem nenhum servidor
+Rebase no caminho da requisição. Nada do lado do servidor vê essas operações,
+então `callbacks` nunca pode disparar para elas, e este bloco é o único lugar
+onde a lógica de ciclo de vida delas pode viver.
+
+```typescript
+import type { CollectionConfig } from "@rebasepro/types";
+
+const eventsCollection: CollectionConfig = {
+    slug: "events",
+    name: "Events",
+    dataSource: "analytics",      // declarado com transport: "direct"
+    properties: {
+        city: { name: "City", type: "string" },
+        code: { name: "Code", type: "string" }
+    },
+    admin: {
+        browserCallbacks: {
+            afterRead: ({ row }) => ({ ...row, label: [row.city, row.code].join(" · ") })
+        }
+    }
+};
+```
+
+Duas regras decorrem de "chega a todo visitante", e nenhuma delas é estilística:
+
+1. **Sem segredos.** Nenhuma chave de API, nenhum `process.env`, nada que você
+   se importaria que fosse lido no bundle. Isso pertence a `callbacks`.
+2. **Não é uma fronteira de segurança.** Um `browserCallbacks.afterRead` que
+   oculta um campo o oculta *depois* que o navegador já tem a linha — num
+   transporte direto o documento bruto veio direto do armazenamento. É
+   apresentação. A ocultação que precisa se sustentar vai em `callbacks`, ou nas
+   regras do próprio armazenamento.
+
+Numa coleção com transporte de servidor — o padrão, e quase certamente a sua — o
+servidor já executou `callbacks` antes de a linha chegar ao painel, então um
+`browserCallbacks.afterRead` roda *além* dele. Escreva-o idempotente, ou não o
+escreva.
+
 ## Definindo Callbacks
 
 ```typescript

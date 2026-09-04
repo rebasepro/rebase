@@ -12,6 +12,7 @@ import {
     HistoryConfig,
     InitializedDriver,
     isSQLAdmin,
+    MountableRouter,
     RealtimeProvider,
     SecurityRule,
     buildResourceGraph
@@ -1659,10 +1660,30 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
 
         // ── Mount auth & admin routes via the adapter ────────────────────
+        //
+        // The adapter contract returns the structural `MountableRouter` (a
+        // `fetch` and a `routes` array) rather than `Hono`, so that
+        // `@rebasepro/types` needs no hono dependency — that single `import
+        // type` was putting a server framework into every browser app's
+        // lockfile. `.route()` wants the concrete class, and this package
+        // genuinely depends on hono, so the narrowing happens here, once, at
+        // the only place that mounts. `mountAdapterRouter` also duck-checks the
+        // shape rather than trusting it, because an adapter is third-party code.
+        const mountAdapterRouter = (prefix: string, router: MountableRouter, kind: string) => {
+            if (typeof router.fetch !== "function" || !Array.isArray(router.routes)) {
+                throw new Error(
+                    `Auth adapter "${authAdapter?.id}" returned something that is not a mountable router `
+                    + `from create${kind}Routes(): expected an object with a \`fetch\` method and a \`routes\` `
+                    + "array, which is what Hono and every router like it provides."
+                );
+            }
+            config.app.route(prefix, router as unknown as Hono);
+        };
+
         if (authAdapter && authAdapter.createAuthRoutes && surfaces.auth) {
             const authRoutes = authAdapter.createAuthRoutes();
             if (authRoutes) {
-                config.app.route(`${basePath}/auth`, authRoutes);
+                mountAdapterRouter(`${basePath}/auth`, authRoutes, "Auth");
                 logger.debug("Auth routes mounted via adapter", { adapter: authAdapter.id });
             }
         }
@@ -1670,7 +1691,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         if (authAdapter && authAdapter.createAdminRoutes && surfaces.admin) {
             const adminRoutes = authAdapter.createAdminRoutes();
             if (adminRoutes) {
-                config.app.route(`${basePath}/admin`, adminRoutes);
+                mountAdapterRouter(`${basePath}/admin`, adminRoutes, "Admin");
                 logger.debug("Admin routes mounted via adapter", { adapter: authAdapter.id });
             }
         }

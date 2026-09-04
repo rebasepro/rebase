@@ -55,6 +55,7 @@
     "rls:check": "node --import tsx tooling/scripts/rls-scan.mts",
     "check:headless": "node tooling/scripts/headless-guard/check.mjs",
     "check:types-headless": "node tooling/scripts/headless-guard/check-types.mjs",
+    "check:browser-deps": "node tooling/scripts/headless-guard/check-browser-deps.mjs",
     "check:core-types": "tsc --noEmit -p tsconfig.core.json",
     "check:baas-types": "tsc -p tests/e2e/baas-typecheck/tsconfig.json",
     "check:templates": "node tooling/scripts/check-templates.mjs",

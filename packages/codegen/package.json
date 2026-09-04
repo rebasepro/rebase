@@ -52,7 +52,8 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.es.js"
+      "import": "./dist/index.es.js",
+      "default": "./dist/index.es.js"
     }
   },
   "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",

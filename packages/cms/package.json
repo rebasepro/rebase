@@ -48,17 +48,20 @@
     ".": {
       "types": "./dist/index.d.ts",
       "development": "./dist/index.js",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./editor": {
       "types": "./dist/editor/index.d.ts",
       "development": "./dist/editor.js",
-      "import": "./dist/editor.js"
+      "import": "./dist/editor.js",
+      "default": "./dist/editor.js"
     },
     "./collection_editor_ui": {
       "types": "./dist/collection_editor_ui.d.ts",
       "development": "./dist/collection_editor_ui.js",
-      "import": "./dist/collection_editor_ui.js"
+      "import": "./dist/collection_editor_ui.js",
+      "default": "./dist/collection_editor_ui.js"
     },
     "./package.json": "./package.json"
   },
@@ -114,6 +117,7 @@
     "@jest/globals": "^30.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/jest": "^30.0.0",
+    "notistack": "^3.0.2",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^26.1.2",
     "@types/react": "^19.2.17",

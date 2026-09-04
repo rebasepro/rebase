@@ -14,11 +14,16 @@ import { COLLECTION_CODE_HTML, SQL_HTML, SDK_HTML, SAMPLE_ROWS, SAMPLE_ENDPOINTS
 // picture under the same lead — the section-level version of the /features
 // duplicate SITE-STORY §4 deleted.
 //
-// Page ground, not the home figure's raised plate — asked for explicitly
-// (2026-09-03): the ground is part of what makes this section read as a
-// different thing from home beat 01, and the two plates carry their own
-// surface. The fork is CSS, not a measured SVG — the lane centres are known
-// from the grid, so nothing needs a resize handler.
+// The deep-blue slab, asked for explicitly (2026-09-04) after two rounds on the
+// page ground: /product paints every one of its eleven sections on #08090a, so
+// a section with no ground of its own does not read as a beat at all — it reads
+// as more page. The slab is the one thing on the route that stops the scroll,
+// and it separates this figure from home beat 01 by more than its composition.
+// It is the third chapter to carry a `--hue`; see `ground-chroma` in global.css
+// for the deepening rule and for what that costs.
+//
+// The fork is CSS, not a measured SVG — the lane centres are known from the
+// grid, so nothing needs a resize handler.
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 
@@ -27,12 +32,12 @@ const t = useTranslations(lang);
 const DbIcon = Database, RestIcon = Globe, SdkIcon = Code, ViewIcon = TableProperties, FormIcon = LayoutDashboard;
 ---
 
-<section id="collection-layers" class="relative z-0 py-24 sm:py-32">
+<section id="collection-layers" class="chapter ground-chroma ground-claim relative z-0 py-24 sm:py-32" style="--hue: var(--color-primary)">
     <div class="mx-auto max-w-6xl px-6 lg:px-8">
         <div class="max-w-[42rem] animate-on-scroll fade-in-up">
             <p class="eyebrow">{t("productpage.layers.badge")}</p>
-            <h2 class="mt-4 font-headers text-display-2 text-white text-balance">{t("productpage.layers.title")}</h2>
-            <p class="mt-6 max-w-[38rem] text-lg text-surface-400">{t("productpage.layers.subtitle")}</p>
+            <h2 class="mt-4 font-headers text-display-2 text-balance">{t("productpage.layers.title")}</h2>
+            <p class="mt-6 max-w-[38rem] text-lg">{t("productpage.layers.subtitle")}</p>
         </div>
 
         {/* The figure is a picture of the product: nothing in it is a control. */}
@@ -223,7 +228,7 @@ const DbIcon = Database, RestIcon = Globe, SdkIcon = Code, ViewIcon = TablePrope
         margin-left: -3.5px;
         border-radius: 9999px;
         background: var(--color-primary);
-        box-shadow: 0 0 0 3px var(--color-page-ground);
+        box-shadow: 0 0 0 3px var(--ground);
     }
     .cl-node.cl-l { left: 50%; }
 
@@ -240,5 +245,28 @@ const DbIcon = Database, RestIcon = Globe, SdkIcon = Code, ViewIcon = TablePrope
         .cl-l { left: calc(25% - 0.5rem); }
         .cl-r { left: calc(75% + 0.5rem); }
         .cl-node.cl-l { left: calc(25% - 0.5rem); }
+    }
+
+    /* ── The same figure, restated for the slab ──────────────────────────────
+       Every value above is tuned for near-black. Three of them stop working on
+       a saturated blue ground and are restated here rather than re-tuned in
+       place, so the figure keeps one description and the slab keeps one. */
+
+    /* A blue line on blue is not a line, and the glow around it is nothing at
+       all — the fork goes white and drops the halo. */
+    .ground-claim .cl-figure { --cl-line: rgb(255 255 255 / 0.5); }
+    .ground-claim .cl-fork { filter: none; }
+    .ground-claim .cl-node { background: #fff; }
+
+    /* The plates are screens, not tints. `surface-950/70` over the slab reads
+       as blue dirt and drags the product UI inside it along; opaque, with the
+       inset-screen edge `ground-chroma` already gives a `.frame`. */
+    .ground-claim .cl-layer {
+        background-color: var(--color-surface-950);
+        border-color: rgb(8 9 10 / 0.4);
+        box-shadow:
+            inset 0 1px 0 rgb(255 255 255 / 0.05),
+            0 2px 8px rgb(0 0 0 / 0.3),
+            0 40px 80px -20px rgb(0 0 0 / 0.6);
     }
 </style>

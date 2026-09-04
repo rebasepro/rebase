@@ -5,12 +5,17 @@ import {
     canDeleteEntity,
     checkOperation
 } from "../src/util/permissions";
-import { Entity, CollectionConfig, SecurityRule, User } from "@rebasepro/types";
-import { AuthController } from "@rebasepro/cms-types";
+import { AuthState, Entity, CollectionConfig, SecurityRule, User } from "@rebasepro/types";
 
 // ── Helpers ──────────────────────────────────────────────────
 
-function makeAuthController(overrides: Partial<{ uid: string; roles: string[] }> = {}): AuthController<User> {
+// `AuthState`, not `AuthController`. The code under test takes the former on
+// purpose — `permissions.ts` says so in as many words — because the schema
+// generator calls it at build time and had no business satisfying a type with a
+// login method in it. Importing the controller here made `@rebasepro/common`
+// name an admin package, which `check:types-headless` forbids even in a
+// devDependency, and it tested a shape the source had already moved away from.
+function makeAuthController(overrides: Partial<{ uid: string; roles: string[] }> = {}): AuthState<User> {
     const user: User = {
         uid: overrides.uid ?? "user-1",
         email: "test@example.com",
@@ -20,11 +25,11 @@ function makeAuthController(overrides: Partial<{ uid: string; roles: string[] }>
         isAnonymous: false,
         roles: overrides.roles ?? []
     };
-    return { user } as AuthController<User>;
+    return { user };
 }
 
-function noUser(): AuthController<User> {
-    return { user: null } as AuthController<User>;
+function noUser(): AuthState<User> {
+    return { user: null };
 }
 
 function makeCollection(securityRules?: SecurityRule[]): CollectionConfig {

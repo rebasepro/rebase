@@ -590,6 +590,7 @@ interface ManagedCompatibility { eligible, reasons }
 interface ManyToManyRelation { kind, onDelete, onUpdate, overrides, relationName, target, through, validation }
 interface MapProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, keyValue, metadata, name, properties, propertiesOrder, propertyConfig, type, validation }
 interface MongoDBCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, path, properties, securityRules, singularName, slug, strictWrites }
+interface MountableRouter { fetch, routes }
 interface NativeDependency { name, reason }
 interface NotPolicyExpression { kind, operand }
 interface NumberProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, enum, excludeFromApi, isId, metadata, name, propertyConfig, type, validation }
@@ -647,7 +648,7 @@ interface RestFetchService { aggregate, fetchCollectionForRest, fetchOneForRest 
 interface RolesContainPolicyExpression { kind, roles }
 interface RolesOnlySecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface RolesOverlapPolicyExpression { kind, roles }
-interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
+interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
 interface SDKQueryBuilderInterface { count, find, include, limit, listen, offset, orderBy, search, vectorSearch, where, where }
 interface SQLAdmin { executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase }
 interface SaveManyProps { collection, path, rows, upsert }
@@ -807,8 +808,10 @@ type StorageAuthorize
 type StorageConfig { acceptedFiles, fileName, imageResize, includeBucketUrl, maxSize, metadata, postProcess, previewUrl, processFile, public, storagePath, storageSource, storeUrl }
 type StorageOperation
 type StorageSourceTransport
+type StrictProperties
 type TopicDelivery
 type TopicHandler
+type UnknownPropertyKey
 type UpdateOf
 type User { createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, photoURL, providerId, roles, uid }
 type VectorDistance
@@ -845,7 +848,7 @@ interface ChannelHistoryEntry { at, event, payload, senderId, seq }
 interface ChannelHistoryResult { latestSeq, messages, retained }
 interface ChannelOptions { history }
 interface ChannelTransport { onChannelMessage, onReconnect, sendMessage }
-interface CollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, include, iterate, limit, listen, listenById, observe, observeById, offset, orderBy, search, update, updateMany, vectorSearch, where }
+interface CollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, observe, observeById, offset, orderBy, search, update, updateMany, vectorSearch, where }
 interface CookieStorageOptions { domain, maxAge, path, sameSite, secure }
 interface CreateAdminOptions { adminPath }
 interface CreateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
@@ -874,7 +877,7 @@ interface PresenceDiff { joins, leaves }
 interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, onUnauthorized, realtime, storageUrlOrigin, token, websocketUrl }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
 interface RowSnapshotMeta { fromCache, hasPendingWrites }
-interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
+interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
 interface SDKQueryBuilderInterface { count, find, include, limit, listen, offset, orderBy, search, vectorSearch, where, where }
 interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
 type AuthChangeEvent
@@ -896,6 +899,7 @@ class OrderBySpecError { code }
 class QueryBuilder { find, include, limit, listen, offset, orderBy, search, vectorSearch, where }
 class RebasePaginationError { code }
 class UnknownFilterOperatorError { code, details, field, operator, statusCode, validOperators }
+const CALLBACK_REJECTED
 const COLLECTION_PATH_SEPARATOR
 const COMPOSITE_ID_SEPARATOR
 const DEFAULT_FIND_ALL_MAX_ROWS
@@ -1013,6 +1017,7 @@ function sortCollectionsBySlug
 function sortProperties
 function sqlToPolicy
 function stripCollectionPath
+function toCallbackError
 function toFilterTuples
 function traverseValueProperty
 function traverseValuesProperties

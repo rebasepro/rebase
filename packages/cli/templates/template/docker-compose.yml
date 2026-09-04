@@ -12,8 +12,10 @@
 #
 #   rebase build              # produces ./dist-bundle
 #   docker compose up -d db
-#   rebase db push            # create the collection tables, once
-#   docker compose up
+#   docker compose up         # boot creates the tables it is missing
+#
+# `rebase db push` is the separate step for what boot deliberately leaves
+# alone: junction-table RLS, and any change that is not purely additive.
 #
 # One container then serves the API at /api and the admin at / — same origin, so
 # there is no CORS to configure between them and no second web server.
@@ -97,9 +99,14 @@ services:
       # its allowed origins is one that eventually allows the wrong one.
       CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the origin you browse to, e.g. http://localhost:3001}
 
-      # Auth tables are created at boot. Collection tables are not: run
-      # `rebase db push` once, against the database above. A container restart
-      # must not be able to change a schema as a side effect.
+      # `ensure` (the default) creates missing tables and columns at boot —
+      # your collections' as well as auth's — and is additive only: nothing is
+      # dropped, narrowed or rewritten, because that must never happen as a
+      # side effect of a container restart.
+      #
+      # `rebase db push` is still what applies the rest: junction-table RLS on
+      # many-to-many relations, and any change that is not purely additive.
+      # Set this to `none` to take a deployment out of provisioning entirely.
       REBASE_MIGRATE_ON_BOOT: ${REBASE_MIGRATE_ON_BOOT:-ensure}
 
       # Uploads land on the named volume below, which survives restarts. That is

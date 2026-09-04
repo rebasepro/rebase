@@ -46,12 +46,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "development": "./dist/index.es.js",
-      "import": "./dist/index.es.js"
+      "import": "./dist/index.es.js",
+      "default": "./dist/index.es.js"
     },
     "./functions": {
       "types": "./dist/functions/index.d.ts",
       "development": "./dist/functions/index.js",
-      "import": "./dist/functions/index.js"
+      "import": "./dist/functions/index.js",
+      "default": "./dist/functions/index.js"
     },
     "./package.json": "./package.json"
   },

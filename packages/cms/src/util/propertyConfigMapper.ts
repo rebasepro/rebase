@@ -8,6 +8,7 @@
 
 import type { Property, Properties, EnumValues, EnumValueConfig } from "@rebasepro/types";
 import type { CollectionPropertyConfig, CollectionEnumValueConfig } from "@rebasepro/ui";
+import { prettifyIdentifier } from "@rebasepro/utils";
 
 /**
  * Map Rebase property types to headless-supported types.
@@ -30,10 +31,15 @@ const TYPE_MAP: Record<string, CollectionPropertyConfig["type"]> = {
 /**
  * Convert a single Property to a CollectionPropertyConfig.
  */
-export function mapPropertyToConfig(property: Property): CollectionPropertyConfig {
+export function mapPropertyToConfig(property: Property, key?: string): CollectionPropertyConfig {
     const base: CollectionPropertyConfig = {
         type: TYPE_MAP[property.type] ?? "string",
-        name: property.name,
+        // A column header has to say something, and `name` is optional on the
+        // property — a headless project has no UI and no reason to invent
+        // labels. Falling back to the key is what the collection editor already
+        // does when it suggests a name, so a derived label reads the same
+        // wherever it appears: `publishDate` -> "Publish Date".
+        name: property.name ?? (key ? prettifyIdentifier(key) : ""),
         description: property.description,
         columnWidth: property.admin?.columnWidth,
         hideFromCollection: property.admin?.hideFromCollection,
@@ -59,7 +65,7 @@ export function mapPropertyToConfig(property: Property): CollectionPropertyConfi
 
     // Array-specific
     if (property.type === "array" && property.of && !Array.isArray(property.of)) {
-        base.of = mapPropertyToConfig(property.of);
+        base.of = mapPropertyToConfig(property.of, key);
     }
 
     // Map-specific
@@ -92,7 +98,7 @@ export function mapPropertiesToConfigs(
 ): Record<string, CollectionPropertyConfig> {
     const result: Record<string, CollectionPropertyConfig> = {};
     for (const [key, property] of Object.entries(properties)) {
-        result[key] = mapPropertyToConfig(property);
+        result[key] = mapPropertyToConfig(property, key);
     }
     return result;
 }

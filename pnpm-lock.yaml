@@ -816,6 +816,9 @@ importers:
       jest:
         specifier: ^30.4.2
         version: 30.4.2(@types/node@26.1.2)
+      notistack:
+        specifier: ^3.0.2
+        version: 3.0.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-router:
         specifier: '>=8.3.0 <9'
         version: 8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -1504,6 +1507,9 @@ importers:
       '@jest/globals':
         specifier: ^30.4.1
         version: 30.4.1
+      '@rebasepro/client':
+        specifier: workspace:*
+        version: link:../client
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0

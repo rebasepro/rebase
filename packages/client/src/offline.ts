@@ -494,6 +494,21 @@ export class OfflineManager {
                 );
             },
 
+            get: async (id: string | number) => {
+                // Defined in terms of the wrapper's own `findById`, so the whole
+                // offline path — local row, pending write, the "not in the local
+                // database" error — applies unchanged, and only the absent case
+                // differs.
+                const row = await wrapped.findById(id);
+                if (row === undefined) {
+                    throw new RebaseApiError(
+                        `No record with id ${JSON.stringify(String(id))} in "${slug}".`,
+                        { status: 404, code: "NOT_FOUND" }
+                    );
+                }
+                return row;
+            },
+
             create: async (data: Partial<M>, id?: string | number) => {
                 await this.ensureCollection(slug);
                 if (this.connectivity.shouldAttempt()) {

@@ -27,7 +27,7 @@ import {
 import { MongoDataService } from "../db/MongoDataService";
 import { MongoRealtimeService } from "./MongoRealtimeService";
 import { MongoHistoryService } from "./MongoHistoryService";
-import { buildPropertyCallbacks, updateDateAutoValues, buildSdkData, checkOperation, PolicyClauses } from "@rebasepro/common";
+import { buildPropertyCallbacks, buildSdkData, checkOperation, PolicyClauses, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
 import { mergeDeep } from "@rebasepro/utils";
 import { Filter, Document } from "mongodb";
 import { ApiError } from "@rebasepro/server";
@@ -337,45 +337,52 @@ propertyCallbacks: undefined };
             }
         }
 
-        if (globalCallbacks?.beforeSave || callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
-            if (globalCallbacks?.beforeSave) {
-                const result = await globalCallbacks.beforeSave({
-                    collection: resolvedCollection as CollectionConfig<M>,
-                    path,
-                    id,
-                    values: updatedValues,
-                    previousValues: previousValuesForHistory,
-                    status,
-                    context: contextForCallback
-                });
-                if (result) updatedValues = mergeDeep(updatedValues, result);
-            }
+        // A `before*` callback is the application speaking, not the server
+        // failing: a bare `throw` is the documented way to block a write, so it
+        // answers 400 with the author's message rather than a masked 500.
+        try {
+            if (globalCallbacks?.beforeSave || callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
+                if (globalCallbacks?.beforeSave) {
+                    const result = await globalCallbacks.beforeSave({
+                        collection: resolvedCollection as CollectionConfig<M>,
+                        path,
+                        id,
+                        values: updatedValues,
+                        previousValues: previousValuesForHistory,
+                        status,
+                        context: contextForCallback
+                    });
+                    if (result) updatedValues = mergeDeep(updatedValues, result);
+                }
 
-            if (callbacks?.beforeSave) {
-                const result = await callbacks.beforeSave({
-                    collection: resolvedCollection as CollectionConfig<M>,
-                    path,
-                    id,
-                    values: updatedValues,
-                    previousValues: previousValuesForHistory,
-                    status,
-                    context: contextForCallback
-                });
-                if (result) updatedValues = mergeDeep(updatedValues, result);
-            }
+                if (callbacks?.beforeSave) {
+                    const result = await callbacks.beforeSave({
+                        collection: resolvedCollection as CollectionConfig<M>,
+                        path,
+                        id,
+                        values: updatedValues,
+                        previousValues: previousValuesForHistory,
+                        status,
+                        context: contextForCallback
+                    });
+                    if (result) updatedValues = mergeDeep(updatedValues, result);
+                }
 
-            if (propertyCallbacks?.beforeSave) {
-                const result = await propertyCallbacks.beforeSave({
-                    collection: resolvedCollection as CollectionConfig<M>,
-                    path,
-                    id,
-                    values: updatedValues,
-                    previousValues: previousValuesForHistory,
-                    status,
-                    context: contextForCallback
-                });
-                if (result) updatedValues = mergeDeep(updatedValues, result);
+                if (propertyCallbacks?.beforeSave) {
+                    const result = await propertyCallbacks.beforeSave({
+                        collection: resolvedCollection as CollectionConfig<M>,
+                        path,
+                        id,
+                        values: updatedValues,
+                        previousValues: previousValuesForHistory,
+                        status,
+                        context: contextForCallback
+                    });
+                    if (result) updatedValues = mergeDeep(updatedValues, result);
+                }
             }
+        } catch (callbackError) {
+            throw toCallbackError(callbackError, "beforeSave", path);
         }
 
         // Apply autoValue timestamps (on_create / on_update) at the application layer.
@@ -532,47 +539,54 @@ propertyCallbacks: undefined };
             storageSource: this.client?.storage
         } as unknown as RebaseCallContext;
 
-        if (globalCallbacks?.beforeDelete || callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
-            let preventDefault = false;
-            if (globalCallbacks?.beforeDelete) {
-                const result = await globalCallbacks.beforeDelete({
-                    collection: resolvedCollection as CollectionConfig<M>,
-                    path: row.path,
-                    id: row.id,
-                    row: callbackRow,
-                    context: contextForCallback
-                });
-                if (result === false) {
-                    preventDefault = true;
+        // A `before*` callback is the application speaking, not the server
+        // failing: a bare `throw` is the documented way to block a write, so it
+        // answers 400 with the author's message rather than a masked 500.
+        try {
+            if (globalCallbacks?.beforeDelete || callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
+                let preventDefault = false;
+                if (globalCallbacks?.beforeDelete) {
+                    const result = await globalCallbacks.beforeDelete({
+                        collection: resolvedCollection as CollectionConfig<M>,
+                        path: row.path,
+                        id: row.id,
+                        row: callbackRow,
+                        context: contextForCallback
+                    });
+                    if (result === false) {
+                        preventDefault = true;
+                    }
+                }
+                if (callbacks?.beforeDelete) {
+                    const result = await callbacks.beforeDelete({
+                        collection: resolvedCollection as CollectionConfig<M>,
+                        path: row.path,
+                        id: row.id,
+                        row: callbackRow,
+                        context: contextForCallback
+                    });
+                    if (result === false) {
+                        preventDefault = true;
+                    }
+                }
+                if (propertyCallbacks?.beforeDelete) {
+                    const result = await propertyCallbacks.beforeDelete({
+                        collection: resolvedCollection as CollectionConfig<M>,
+                        path: row.path,
+                        id: row.id,
+                        row: callbackRow,
+                        context: contextForCallback
+                    });
+                    if (result === false) {
+                        preventDefault = true;
+                    }
+                }
+                if (preventDefault) {
+                    return;
                 }
             }
-            if (callbacks?.beforeDelete) {
-                const result = await callbacks.beforeDelete({
-                    collection: resolvedCollection as CollectionConfig<M>,
-                    path: row.path,
-                    id: row.id,
-                    row: callbackRow,
-                    context: contextForCallback
-                });
-                if (result === false) {
-                    preventDefault = true;
-                }
-            }
-            if (propertyCallbacks?.beforeDelete) {
-                const result = await propertyCallbacks.beforeDelete({
-                    collection: resolvedCollection as CollectionConfig<M>,
-                    path: row.path,
-                    id: row.id,
-                    row: callbackRow,
-                    context: contextForCallback
-                });
-                if (result === false) {
-                    preventDefault = true;
-                }
-            }
-            if (preventDefault) {
-                return;
-            }
+        } catch (callbackError) {
+            throw toCallbackError(callbackError, "beforeDelete", row.path);
         }
 
         await this.dataService.delete(row.path, row.id);

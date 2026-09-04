@@ -24,6 +24,61 @@ export interface RebaseCollectionsPluginOptions {
 const LAZY_COMPONENT_KEYS = new Set(["Field", "Preview", "Builder", "Filter"]);
 
 /**
+ * `callbacks:` is the server's block, all of it, and none of it may travel to
+ * the browser.
+ *
+ * `config/collections/*.ts` is shared: the backend loads it from disk, and this
+ * plugin globs the same directory into the admin bundle. Everything in those
+ * files therefore shipped to every visitor — including the body of a
+ * `beforeSave` that calls a third-party API with a key from `process.env`. In
+ * the example app's own built bundle you could read the compiled
+ * `beforeSave:({values:e` and the fixed regex beside it.
+ *
+ * Replacing the body with `undefined` also lets Rollup tree-shake whatever the
+ * callback imported, so a server-only dependency reached from one hook stops
+ * being bundled — or stops breaking the build.
+ *
+ * Every key inside a `callbacks:` block is dropped, with no exemptions. Two
+ * used to be exempt — `afterRead` and `afterSave`, because the panel was
+ * believed to run them — and both exemptions were wrong in a different way:
+ *
+ *   - `afterSave` had no client-side call site at all. Nothing invoked
+ *     `collection.callbacks.afterSave` in the browser; the body shipped and
+ *     never ran.
+ *   - `afterRead` did run, unconditionally, on top of the server having already
+ *     run it — so a server-backed collection applied it twice, and a
+ *     `direct`-transport collection got read callbacks while its write
+ *     callbacks were stripped out from under it, silently.
+ *
+ * Callbacks the panel genuinely runs now live under `admin.browserCallbacks`,
+ * which this plugin leaves alone: a separate key, so which runtime a callback
+ * belongs to is a fact about the collection file rather than about a
+ * `dataSources` declaration in some other file — which is the thing a
+ * build-time transform cannot see.
+ *
+ * Dropping the value rather than the key keeps the source's comma structure
+ * intact, and `callbacks.beforeSave === undefined` is what "not present" means
+ * to every consumer. The AST schema editor preserves both blocks verbatim when
+ * it serializes a collection back to TypeScript, so nothing round-trips through
+ * this and no user code can be lost by it.
+ */
+/**
+ * True when `node` is a property of an object that is itself the value of a
+ * `callbacks:` property — i.e. a real lifecycle hook, on a collection or on a
+ * property, and not something that merely shares a name.
+ *
+ * Matches the key exactly, so `admin.browserCallbacks` — the panel's own block,
+ * which is meant to reach the browser — is not caught by it.
+ */
+function isInsideCallbacksBlock(node: ts.PropertyAssignment): boolean {
+    const objectLiteral = node.parent;
+    if (!objectLiteral || !ts.isObjectLiteralExpression(objectLiteral)) return false;
+    const owner = objectLiteral.parent;
+    if (!owner || !ts.isPropertyAssignment(owner)) return false;
+    return getPropertyName(owner) === "callbacks";
+}
+
+/**
  * Walk a TypeScript AST node tree, invoking `visitor` for every node.
  */
 function walkAST(node: ts.Node, visitor: (n: ts.Node) => void): void {
@@ -75,8 +130,18 @@ export function transformCollectionSource(
         // Only look at PropertyAssignment nodes (key: value in object literals)
         if (!ts.isPropertyAssignment(node)) return;
 
+        const name = getPropertyName(node);
+
+        // Server-only lifecycle hooks: keep the key, drop the body.
+        if (name && isInsideCallbacksBlock(node)) {
+            const value = node.initializer;
+            ms.overwrite(value.getStart(sourceFile), value.getEnd(), "undefined");
+            replaced = true;
+            return;
+        }
+
         // Check the property name matches one of the lazy component keys
-        const propName = getPropertyName(node);
+        const propName = name;
         if (!propName || !LAZY_COMPONENT_KEYS.has(propName)) return;
 
         // Check the initializer is a string literal

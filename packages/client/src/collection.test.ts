@@ -291,3 +291,44 @@ deliver: () => emit!(rows) };
         });
     });
 });
+
+/**
+ * `findById` returns `M | undefined`, so every caller had to prove the row was
+ * there before touching a field — `post.title` is TS18048, and the `!` that
+ * follows is the reflex. But a row fetched by an id that came from a link, a
+ * route parameter or another row is *expected* to exist; its absence is the
+ * error case, not a value to thread through the rest of the function.
+ *
+ * `get` is the throwing counterpart. Same split as Prisma's `findUnique` /
+ * `findUniqueOrThrow`: two contracts, both wanted, named so the call site says
+ * which one it means.
+ */
+describe("get", () => {
+    it("returns the row when it is there, typed as present", async () => {
+        const transport = createMockTransport();
+        (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ id: 7, title: "Hello" });
+        const client = createCollectionClient(transport, "posts");
+        const row = await client.get(7);
+        // No `!` and no narrowing: the point of the method.
+        expect(row.title).toBe("Hello");
+    });
+
+    it("throws NOT_FOUND when the row is absent, where findById returns undefined", async () => {
+        const transport = createMockTransport();
+        (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue(undefined);
+        const client = createCollectionClient(transport, "posts");
+
+        await expect(client.findById(7)).resolves.toBeUndefined();
+        await expect(client.get(7)).rejects.toMatchObject({
+            code: "NOT_FOUND",
+            status: 404
+        });
+    });
+
+    it("names the collection and the id, so the message stands alone in a log", async () => {
+        const transport = createMockTransport();
+        (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue(undefined);
+        const client = createCollectionClient(transport, "posts");
+        await expect(client.get("abc")).rejects.toThrow('No record with id "abc" in "posts".');
+    });
+});

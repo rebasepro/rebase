@@ -119,6 +119,63 @@ export type MongoProperties = {
 export type EngineProperties = PostgresProperties | FirebaseProperties | MongoProperties;
 
 /**
+ * What a property key that no property type declares resolves to.
+ *
+ * Nothing is assignable to it — it has a required brand nobody can spell — so
+ * the key errors. It exists as a *named* type rather than `never` purely for the
+ * message: TypeScript prints the target type, so the compiler names the offending
+ * key back to the author instead of saying "not assignable to type 'never'".
+ */
+export type UnknownPropertyKey<K extends PropertyKey> = {
+    readonly __rebaseUnknownPropertyKey: K;
+};
+
+/**
+ * `V`, plus every key it carries that `Shape` does not declare, typed so it
+ * cannot be satisfied.
+ */
+type ExactProperty<V, Shape> = V & {
+    [K in Exclude<keyof V, keyof Shape>]: UnknownPropertyKey<K>;
+};
+
+/**
+ * A property map in which each value is checked against the *concrete* member of
+ * the property union that its own `type` tag selects.
+ *
+ * ### Why this type has to exist
+ *
+ * `defineCollection` takes `properties: P` where `const P extends Properties`.
+ * `Properties` is an index signature, and **every object literal is assignable
+ * to an index signature** — extra keys included — so TypeScript's
+ * excess-property check never ran inside a property. The consequences were not
+ * theoretical:
+ *
+ * - `validation` misspelled `validaton` compiled, and the field was quietly not
+ *   required.
+ * - `multiline: true` and `markdown: true` written flat — the shape the docs
+ *   themselves showed — compiled, and then the backend refused to boot with a
+ *   migration hint pointing at `admin: { … }`.
+ * - `multiSelect: true`, a key that exists nowhere in the codebase, compiled.
+ *
+ * Annotating `const c: PostgresCollectionConfig = { … }` *did* catch all three,
+ * which is the tell: the checking was never missing, only bypassed by the
+ * inference the builder exists to provide.
+ *
+ * The map is homomorphic (`[K in keyof P]`), so it stays invertible and `const P`
+ * inference is unaffected — `admin.display.title` still completes over the
+ * collection's own keys. Verified against the full probe suite before landing.
+ *
+ * Nested shapes (`array.of`, `map.properties`, and the `admin` block's own
+ * options) are not reached by this type; the weak-type check covers an `admin`
+ * block whose keys are *all* unknown, and the boot validator covers the rest.
+ */
+export type StrictProperties<P, AllowedProperty> = {
+    [K in keyof P]: P[K] extends { type: infer T }
+        ? ExactProperty<P[K], Extract<AllowedProperty, { type: T }>>
+        : P[K];
+};
+
+/**
  * A helper type to infer the underlying data type from a Property definition.
  * This is the core of the type inference system.
  */
@@ -182,9 +239,20 @@ export type InferEntityType<P extends Properties> = {
 
 export interface BaseProperty<CustomProps = unknown> {
     /**
-     * Property name (e.g. Product)
+     * The label the admin panel shows for this field — a column header, a form
+     * label, a card caption.
+     *
+     * Optional, and derived from the property key when absent
+     * (`publishDate` -> "Publish Date", via `prettifyIdentifier`, which is the
+     * same derivation the collection editor already uses when it suggests one).
+     *
+     * It was required, and that was a UI concern levied on everyone: a headless
+     * project has no panel and no reason to invent display names, yet could not
+     * declare a property without one. Set it when the derived label is wrong —
+     * `"URL"` rather than "Url", `"Postcode"` rather than "Zip" — which is the
+     * only time it earns the line.
      */
-    name: string;
+    name?: string;
 
     /**
      * Property description, always displayed under the field

@@ -840,3 +840,49 @@ extra: "world" }
         });
     });
 });
+
+// ---------------------------------------------------------------------------
+// Naming a field in a validation message
+// ---------------------------------------------------------------------------
+
+/**
+ * `property.name` is the author's label, and it is optional — a headless
+ * project has no panel and no reason to invent display names. Every message in
+ * this module interpolated it directly, so an unnamed property produced
+ * "undefined must be min 3 characters long" in front of a user.
+ */
+describe("validation messages name the field", () => {
+    const firstMessage = (schema: ReturnType<typeof mapPropertyToZod>, value: unknown) => {
+        const result = schema.safeParse(value);
+        expect(result.success).toBe(false);
+        return result.success ? "" : result.error.issues[0].message;
+    };
+
+    it("uses the author's label when there is one", () => {
+        const property = {
+            type: "string", name: "Job title", validation: { min: 5 }
+        } as StringProperty;
+        expect(firstMessage(mapPropertyToZod({ property, name: "jobTitle" }), "abc"))
+            .toContain("Job title");
+    });
+
+    it("falls back to the field's own key, prettified, when there is not", () => {
+        const property = { type: "string", validation: { min: 5 } } as StringProperty;
+        const message = firstMessage(mapPropertyToZod({ property, name: "jobTitle" }), "abc");
+        expect(message).toContain("Job Title");
+        expect(message).not.toContain("undefined");
+    });
+
+    it("never says `undefined`, even with no name and no key", () => {
+        const property = { type: "string", validation: { min: 5 } } as StringProperty;
+        const message = firstMessage(mapPropertyToZod({ property }), "abc");
+        expect(message).not.toContain("undefined");
+        expect(message).toContain("This field");
+    });
+
+    it("names the field in a number message too", () => {
+        const property = { type: "number", validation: { min: 10 } } as NumberProperty;
+        expect(firstMessage(mapPropertyToZod({ property, name: "unitPrice" }), 3))
+            .toContain("Unit Price");
+    });
+});

@@ -16,18 +16,23 @@
  */
 import type React from "react";
 import type {
+    CollectionCallbacks,
     CollectionConfig,
     ComponentRef,
     FilterPreset,
     FilterValues,
     FirebaseCollectionConfig,
     FirebaseProperties,
+    FirebaseProperty,
     InferEntityType,
     MongoDBCollectionConfig,
     MongoProperties,
+    MongoProperty,
     OrderBySpec,
     PostgresCollectionConfig,
     PostgresProperties,
+    PostgresProperty,
+    StrictProperties,
     User
 } from "@rebasepro/types";
 // A value, not a type: the runtime list core owns.
@@ -165,6 +170,49 @@ export type AdminCollectionOptions<
      * If not specified, the list view uses a smart default (Title, Status, Date).
      */
     listProperties?: ColumnKey<M>[];
+
+    /**
+     * Lifecycle callbacks that run **in the browser**, in the admin panel.
+     *
+     * The twin of the collection's top-level `callbacks`, and the distinction is
+     * only where the code runs — the shape is identical:
+     *
+     * - `callbacks` runs on the server, on every path that reaches it (REST,
+     *   realtime, `dataAsAdmin`). Its bodies are stripped from the admin bundle,
+     *   so a secret read there never leaves the server.
+     * - `browserCallbacks` runs in the panel, and nowhere else. It ships to
+     *   every visitor.
+     *
+     * This exists for collections on a `direct` or `custom` transport — a
+     * Firestore collection the panel talks to itself, with no Rebase server in
+     * the request path. Nothing server-side sees those writes, so `callbacks`
+     * can never fire for them; this block is the only place their lifecycle
+     * logic can live.
+     *
+     * Two rules follow from "ships to every visitor", and neither is a style
+     * preference:
+     *
+     * 1. **No secrets.** No API keys, no `process.env`, no logic you would mind
+     *    a reader of the bundle seeing. Put that in `callbacks`.
+     * 2. **Not a security boundary.** A `browserCallbacks.afterRead` that
+     *    redacts a field redacts it *after* the browser already holds the row —
+     *    for a direct transport the raw document came straight from the store.
+     *    It is presentation. Redaction that has to hold belongs in `callbacks`,
+     *    or in the store's own rules.
+     *
+     * On a server-transport collection (the default) the server has already run
+     * `callbacks` before the row arrives, so a `browserCallbacks.afterRead`
+     * here runs *in addition* — write it to be idempotent, or don't write it.
+     *
+     * ```ts
+     * admin: {
+     *     browserCallbacks: {
+     *         afterRead: ({ row }) => ({ ...row, label: `${row.city} (${row.code})` })
+     *     }
+     * }
+     * ```
+     */
+    browserCallbacks?: CollectionCallbacks<M, USER>;
 
     /**
      * How a record of this collection shows up — its title, subtitle, image,
@@ -631,7 +679,7 @@ export function defineCollection<
     USER extends User = User
 >(
     collection: Omit<PostgresCollectionConfig<InferEntityType<P>, USER>, "properties">
-        & { properties: P }
+        & { properties: StrictProperties<P, PostgresProperty> }
 ): PostgresCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /** Define a Firestore-backed collection with the admin block checked. @group Builder */
@@ -640,7 +688,7 @@ export function defineCollection<
     USER extends User = User
 >(
     collection: Omit<FirebaseCollectionConfig<InferEntityType<P>, USER>, "properties">
-        & { properties: P }
+        & { properties: StrictProperties<P, FirebaseProperty> }
 ): FirebaseCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /** Define a MongoDB-backed collection with the admin block checked. @group Builder */
@@ -649,7 +697,7 @@ export function defineCollection<
     USER extends User = User
 >(
     collection: Omit<MongoDBCollectionConfig<InferEntityType<P>, USER>, "properties">
-        & { properties: P }
+        & { properties: StrictProperties<P, MongoProperty> }
 ): MongoDBCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /** Identity at runtime; the overloads above are the whole point. @group Builder */

@@ -97,11 +97,22 @@ export function getRelationTargetPath(property: RelationProperty): string | unde
     }
 }
 
+/**
+ * The table a collection reads and writes.
+ *
+ * `table` when it is set, otherwise `toSnakeCase(slug)` — which is what made it
+ * safe to drop `table` from the required fields on the config type: the runtime
+ * had always derived it, and the type was demanding a value it did not need.
+ *
+ * The `||` chain is load-bearing. `toSnakeCase(undefined)` returns `""`, not
+ * `undefined`, so the previous `??` chain short-circuited on the empty string
+ * and the name fallback could never run — a safety net that read like one and
+ * caught nothing. It was unreachable while `slug` was required; it stops being
+ * unreachable the moment anything constructs a config without one.
+ */
 export function getTableName(collection: CollectionConfig): string {
-    if (isRelationalCollectionConfig(collection)) {
-        return collection.table ?? toSnakeCase(collection.slug) ?? toSnakeCase(collection.name);
-    }
-    return toSnakeCase(collection.slug) ?? toSnakeCase(collection.name);
+    const declared = isRelationalCollectionConfig(collection) ? collection.table : undefined;
+    return declared || toSnakeCase(collection.slug) || toSnakeCase(collection.name);
 }
 
 /**

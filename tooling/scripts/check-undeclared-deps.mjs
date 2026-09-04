@@ -47,13 +47,30 @@ const ALLOWED = new Map([
     ]
 ]);
 
-function walk(dir, out = []) {
+/**
+ * @param {string} dir
+ * @param {{ includeTests?: boolean }} [opts] When walking a test directory the
+ *   test files are the point, so `.test.` / `.spec.` are kept rather than
+ *   skipped. Declaration files stay excluded either way — they leave no
+ *   runtime require behind.
+ * @param {string[]} [out]
+ */
+function walk(dir, opts = {}, out = []) {
     for (const e of readdirSync(dir)) {
         const f = path.join(dir, e);
         if (statSync(f).isDirectory()) {
-            if (["node_modules", "dist", "__mocks__", "__tests__"].includes(e)) continue;
-            walk(f, out);
-        } else if (/\.(ts|tsx|mts|cts|js|mjs|jsx)$/.test(e) && !/\.(test|spec|d)\./.test(e)) {
+            if (["node_modules", "dist", "__mocks__"].includes(e)) continue;
+            if (!opts.includeTests && e === "__tests__") continue;
+            // `packages/types/__tests__/bivariance/` holds probes that are meant
+            // to fail to compile — they are excluded from `tsconfig.tests.json`
+            // for the same reason. They are assertions about the type system,
+            // not code anything installs, so their imports are not declarations
+            // this package owes anyone.
+            if (e === "bivariance") continue;
+            walk(f, opts, out);
+        } else if (/\.(ts|tsx|mts|cts|js|mjs|jsx)$/.test(e)
+            && !/\.d\./.test(e)
+            && (opts.includeTests || !/\.(test|spec)\./.test(e))) {
             out.push(f);
         }
     }
@@ -107,6 +124,39 @@ for (const d of readdirSync(path.join(ROOT, "packages")).sort()) {
         ...Object.keys(j.optionalDependencies || {})
     ]);
     const dev = new Set(Object.keys(j.devDependencies || {}));
+
+    // Test directories, checked against dependencies *and* devDependencies.
+    //
+    // A test may import a dev-only package — that is what devDependencies are
+    // for — but it may not import one the package never declares at all. That
+    // hole was real: `packages/cms/test/form/undoable_discard.test.tsx` imported
+    // `notistack`, which only `@rebasepro/app` declared, so the suite resolved
+    // it by hoisting on some layouts and failed with "Cannot find module" on
+    // pnpm's isolated one. `Tests: 823 passed` alongside `Test Suites: 1 failed`
+    // is what that looks like, and it is easy to read past.
+    const testRoots = ["test", "tests", "__tests__"]
+        .map((dir) => path.join(ROOT, "packages", d, dir))
+        .filter(existsSync);
+
+    for (const root of testRoots) {
+        for (const file of walk(root, { includeTests: true })) {
+            for (const spec of valueImports(file)) {
+                if (spec.startsWith(".") || spec.startsWith("/")) continue;
+                if (BUILTIN.has(spec) || spec.startsWith("node:")) continue;
+                if (!VALID.test(spec)) continue;
+                const pkg = spec.split("/").slice(0, spec.startsWith("@") ? 2 : 1).join("/");
+                if (pkg === j.name || runtime.has(pkg) || dev.has(pkg)) continue;
+                const key = `${j.name}::${pkg}`;
+                if (ALLOWED.has(key)) { usedAllowances.add(key); continue; }
+                findings.push({
+                    pkg: j.name,
+                    dep: pkg,
+                    where: "not declared at all (imported from a test)",
+                    file: path.relative(ROOT, file)
+                });
+            }
+        }
+    }
 
     for (const file of walk(src)) {
         for (const spec of valueImports(file)) {

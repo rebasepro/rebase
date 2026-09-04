@@ -1,5 +1,5 @@
 
-import { Entity, CollectionCallbacks, User } from "@rebasepro/types";
+import { Entity, User } from "@rebasepro/types";
 import { RebaseContext, AdminCollection } from "@rebasepro/cms-types";
 import { RebaseData } from "@rebasepro/types";
 
@@ -9,21 +9,30 @@ import { RebaseData } from "@rebasepro/types";
 export type DeleteEntityWithCallbacksProps<M extends Record<string, any>, USER extends User = User> = {
     entity: Entity<M>;
     collection?: AdminCollection<M>;
-    callbacks?: CollectionCallbacks<M, USER>;
     onDeleteSuccess?: (entity: Entity<M>) => void;
     onDeleteFailure?: (entity: Entity<M>, e: Error) => void;
 }
 
 /**
  * This function is in charge of deleting a entity.
- * It will run all the delete callbacks specified in the collection.
- * It is also possible to attach callbacks on save success or error, and callback
- * errors.
+ *
+ * It runs the collection's **`admin.browserCallbacks`** around the delete —
+ * `beforeDelete`, then `afterDelete`. Not `callbacks`: that block belongs to
+ * the server, which runs it inside the delete it serves, and its bodies are
+ * stripped from this bundle entirely.
+ *
+ * Which matters most for a collection on a `direct`/`custom` transport, where
+ * the panel talks to the store itself and no server sees the delete at all —
+ * before this ran them, such a collection had no delete callbacks anywhere.
+ * This function has been named `deleteEntityWithCallbacks` since it was written
+ * and did not run any; it even took a `callbacks` prop and ignored it.
+ *
+ * A `beforeDelete` that throws blocks the delete, exactly as the server's does:
+ * nothing is sent, and `onDeleteFailure` hears about it.
  *
  * @param data
  * @param entity
  * @param collection
- * @param callbacks
  * @param onDeleteSuccess
  * @param onDeleteFailure
  * @param context
@@ -33,7 +42,6 @@ export async function deleteEntityWithCallbacks<M extends Record<string, any>, U
     data,
     entity,
     collection,
-    callbacks,
     onDeleteSuccess,
     onDeleteFailure,
     context
@@ -46,7 +54,32 @@ export async function deleteEntityWithCallbacks<M extends Record<string, any>, U
 
     console.debug("Deleting entity", entity.path, entity.id);
 
-    return data.collection(entity.path).delete(entity.id).then(() => {
+    const browserCallbacks = collection.browserCallbacks;
+
+    if (browserCallbacks?.beforeDelete) {
+        try {
+            await browserCallbacks.beforeDelete({
+                collection,
+                path: entity.path,
+                id: entity.id,
+                row: { id: entity.id, ...entity.values },
+                context
+            });
+        } catch (e) {
+            const error = e instanceof Error ? e : new Error(String(e));
+            if (onDeleteFailure) onDeleteFailure(entity, error);
+            return false;
+        }
+    }
+
+    return data.collection(entity.path).delete(entity.id).then(async () => {
+        await browserCallbacks?.afterDelete?.({
+            collection,
+            path: entity.path,
+            id: entity.id,
+            row: { id: entity.id, ...entity.values },
+            context
+        });
         if (onDeleteSuccess) onDeleteSuccess(entity);
         return true;
     }).catch((e) => {

@@ -1,11 +1,26 @@
 ---
 name: rebase-security
-description: Comprehensive guide to the Rebase backend security architecture. Use this skill when the user asks about securing their application, backend-level access control, request interception, global callbacks for security, fail-closed design, or how security works without database-level RLS. Also use when the user needs to implement PII masking, tenant isolation, role-based access control at the API layer, or cross-cutting security concerns.
+description: Comprehensive guide to the Rebase backend security architecture. Use this skill when the user asks about securing their application, how Row-Level Security is the enforcement point, backend-level access control, request interception, global callbacks, or fail-closed design. Also use when the user needs to implement PII masking, tenant isolation, role-based access control, or cross-cutting security concerns.
 ---
 
 # Rebase Security Architecture
 
-Rebase implements a **multi-layered, defense-in-depth** security architecture. Security is enforced at the **application level** — not just at the database level. This means your data is protected regardless of whether the underlying database supports native Row-Level Security (RLS) or not.
+**Authorization is PostgreSQL Row-Level Security.** Every authenticated request
+runs as the `rebase_user` role, which holds table grants precisely so that RLS —
+not the grant — decides which rows it may see. A table with RLS disabled has no
+authorization model at all, so Rebase **does not serve it**, and says so at boot.
+
+Everything below is **defense in depth on top of that**, not a substitute for it.
+The application layers authenticate the caller, scope the driver, enforce API-key
+permissions and let you mask or reject at the edges — but the answer to "who can
+read this row" comes from a policy in the database, and it holds for anything
+that reaches the database, this framework included.
+
+Read that as the correction it is: an earlier version of this page said security
+worked "regardless of whether the underlying database supports native RLS". For
+the Postgres product that is not true, and an agent that believed it would write
+application checks in place of policies and ship a table Rebase refuses to
+serve.
 
 > **IMPORTANT FOR AGENTS:** Always read the `rebase-basics` and `rebase-auth` skills for auth configuration details. This skill focuses on the **security architecture** and **backend-level enforcement mechanisms**.
 
@@ -19,7 +34,7 @@ Rebase implements a **multi-layered, defense-in-depth** security architecture. S
 - [Layer 4: Scoped DataDriver](#layer-4-scoped-datadriver)
 - [Layer 5: Collection Callbacks](#layer-5-collection-callbacks)
 - [Fail-Closed Design](#fail-closed-design)
-- [Securing Without Database RLS](#securing-without-database-rls)
+- [When the database cannot enforce it](#when-the-database-cannot-enforce-it)
 - [Common Security Patterns](#common-security-patterns)
 - [Security Checklist](#security-checklist)
 - [References](#references)
@@ -28,7 +43,7 @@ Rebase implements a **multi-layered, defense-in-depth** security architecture. S
 
 ## Security Architecture Overview
 
-Every request — REST and WebSocket — passes through **5 security layers** before data is returned to the client. These layers are enforced at the **application level** and work independently of any database-native security mechanism.
+Every request — REST and WebSocket — passes through **5 application layers** before it reaches the database, where RLS makes the row-level decision. The layers below are what the framework does with the caller's identity on the way in; they narrow what is asked for, and they never widen what the database will return.
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -297,7 +312,7 @@ SELECT
 
 PostgreSQL RLS policies use `rebase.uid()`, `rebase.roles()`, and `rebase.jwt()` to read these session variables and enforce row-level access control. (The pre-1.0 `auth.*` spellings are rewritten on compile and still work, but the backend names the collections still carrying them at boot — write `rebase.*`.)
 
-> **IMPORTANT:** This layer is database-specific. If your project does not use PostgreSQL RLS, security is still enforced by Layers 1–3 and Layer 5. See [Securing Without Database RLS](#securing-without-database-rls).
+> **IMPORTANT:** On PostgreSQL this layer is where authorization actually happens; the others narrow the request on the way to it. A table with RLS disabled is not served at all. The document engines have no equivalent and rely on Layers 1–3 and 5 — see [When the database cannot enforce it](#when-the-database-cannot-enforce-it).
 
 ---
 
@@ -358,9 +373,23 @@ Rebase follows a **fail-closed** security model throughout the stack:
 
 ---
 
-## Securing Without Database RLS
+## When the database cannot enforce it
 
-If you cannot modify database-level RLS policies — or your database doesn't support them — use **global callbacks** to enforce security entirely at the application level.
+Two cases, and only one of them is a Postgres project.
+
+**Masking within a row you are already allowed to read.** RLS decides *which
+rows*; it does not redact a column. Hiding a phone number from non-admins on
+rows they may otherwise see is exactly what `afterRead` is for, and the pattern
+below is the right one.
+
+**A non-Postgres engine.** `@rebasepro/server-mongo` and `@rebasepro/firebase`
+have no row-level security, and are rated Experimental for that reason. There
+the callbacks below are the only enforcement there is.
+
+What this section is **not** is an alternative to writing policies on Postgres.
+A table without RLS is not served, so "enforce it in the application instead"
+does not produce a working project — it produces a collection that answers
+nothing. Write the `securityRules`.
 
 ### Strategy: global callbacks as your security layer
 

@@ -12,10 +12,12 @@ point for this project.
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org) >= 18
+- [Node.js](https://nodejs.org) >= 22.22
 - [pnpm](https://pnpm.io) or [npm](https://www.npmjs.com) (v7+)
-- [Docker](https://www.docker.com) (to run the included PostgreSQL container),
-  or your own PostgreSQL database
+
+That is the whole list. There is no database to install: with no `DATABASE_URL`
+set, `rebase dev` starts a managed PostgreSQL (PGlite) inside this project, and
+the runtime creates your collections' tables at boot.
 
 ### Run it
 
@@ -25,26 +27,18 @@ point for this project.
 pnpm install   # or: npm install
 ```
 
-2. Start the PostgreSQL database container:
-
-```bash
-docker compose up -d db
-```
-
-3. Create the database tables from your collections:
-
-```bash
-pnpm run db:push   # or: npm run db:push
-```
-
-4. Start the dev servers:
+2. Start the dev servers:
 
 ```bash
 pnpm dev   # or: npm run dev
 ```
 
-`rebase dev` prints the two URLs it actually bound and opens the admin panel
-there. The first account you register becomes the admin.
+That is the whole first run. `rebase dev` generates the Drizzle schema from
+`config/collections`, starts the database, creates the tables — including the
+example `posts`, `authors` and `tags` — and serves the API and the admin panel.
+
+`rebase dev` prints the two URLs it actually bound. The first account you
+register becomes the admin.
 
 Ports are **derived from this project's path**, not fixed at 3001/5173, so
 several Rebase projects can run at once without colliding. That is why the URL
@@ -52,10 +46,30 @@ in your terminal is the one to trust — and why the `PORT` and `VITE_API_URL` i
 `.env` are ignored by `rebase dev` (they apply to `rebase start`, the production
 server). Pin a port with `rebase dev --port 3001` if you need a stable one.
 
-> The `db:push` step is what creates the tables for the example `posts`,
-> `authors`, and `tags` collections. Skip it and the admin panel still opens,
-> but those collections will be empty and their API calls will fail until the
-> tables exist.
+### Variant: your own PostgreSQL
+
+Uncomment `DATABASE_URL` in `.env` and run `pnpm dev` again. Nothing else
+changes. A `DATABASE_URL` that is already set is never touched.
+
+With your own database you also get the migration commands, which the managed
+one cannot offer — they plan changes with Atlas, which needs a second empty
+database to compare against, and PGlite serves exactly one:
+
+```bash
+pnpm run db:push
+```
+
+Boot already creates missing tables and columns additively, so `db push` is for
+what it deliberately leaves alone: junction-table RLS on many-to-many relations,
+and any change that is not purely additive — a renamed column, a narrowed type,
+a removed field.
+
+The `docker-compose.yml` in this project runs PostgreSQL in a container if you
+would rather not install one:
+
+```bash
+docker compose up -d db
+```
 
 ## Project Structure
 

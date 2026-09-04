@@ -342,14 +342,16 @@ values: { ...e.values,
                 });
             }
 
-            // Apply afterRead callbacks if any.
+            // Apply the panel's own afterRead callbacks if any — `browserCallbacks`,
+            // not `callbacks`: the latter already ran on the server before these
+            // rows arrived, and running it again here applied it twice.
             // afterRead operates on flat rows; unwrap the Entity view-model
             // before invoking and re-wrap the processed row after.
-            if (currentCollection.callbacks?.afterRead) {
+            if (currentCollection.browserCallbacks?.afterRead) {
                 try {
                     processed = await Promise.all(
                         processed.map(async (entity) => {
-                            const processedRow = await currentCollection.callbacks!.afterRead!({
+                            const processedRow = await currentCollection.browserCallbacks!.afterRead!({
                                 collection: currentCollection,
                                 path: currentResolvedPath,
                                 row: { id: entity.id, ...entity.values },

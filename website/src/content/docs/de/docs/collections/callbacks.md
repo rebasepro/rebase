@@ -15,6 +15,63 @@ Callbacks ermöglichen es Ihnen, sich in den Entitätslebenszyklus einzuhängen,
 - **Daten filtern/transformieren** nach dem Lesen
 - **Kaskadenoperationen** — verwandte Datensätze beim Löschen bereinigen
 
+## Wo Callbacks laufen
+
+Eine Collection hat zwei Callback-Blöcke, und der einzige Unterschied ist, welche Laufzeitumgebung sie ausführt.
+
+| | `callbacks` | `admin.browserCallbacks` |
+|---|---|---|
+| Läuft auf | dem Server | dem Admin-Panel, im Browser |
+| Feuert für | REST, das SDK, Realtime, `dataAsAdmin` | Lese- und Schreibvorgänge des Panels |
+| Erreicht den Browser | nein — die Rümpfe werden aus dem Bundle entfernt | ja, vollständig |
+| Verwenden für | alles Folgende | Collections, mit denen das Panel direkt spricht |
+
+**`callbacks` ist der, den du willst.** Er läuft auf jedem Pfad, der den Server
+erreicht, also umgeht ihn nichts, und sein Rumpf verlässt die Maschine nie — ein
+API-Schlüssel oder ein `process.env`-Zugriff darin ist sicher. Der Rest dieser
+Seite handelt von `callbacks`.
+
+`admin.browserCallbacks` gibt es für einen Fall: eine Collection auf einem
+`direct`- oder `custom`-Transport, die das Panel *selbst* liest und schreibt,
+ohne Rebase-Server im Anfragepfad. Serverseitig sieht nichts diese Operationen,
+`callbacks` kann für sie also nie feuern, und dieser Block ist der einzige Ort,
+an dem ihre Lebenszyklus-Logik leben kann.
+
+```typescript
+import type { CollectionConfig } from "@rebasepro/types";
+
+const eventsCollection: CollectionConfig = {
+    slug: "events",
+    name: "Events",
+    dataSource: "analytics",      // deklariert mit transport: "direct"
+    properties: {
+        city: { name: "City", type: "string" },
+        code: { name: "Code", type: "string" }
+    },
+    admin: {
+        browserCallbacks: {
+            afterRead: ({ row }) => ({ ...row, label: [row.city, row.code].join(" · ") })
+        }
+    }
+};
+```
+
+Zwei Regeln folgen aus „geht an jeden Besucher", und keine davon ist
+Geschmackssache:
+
+1. **Keine Geheimnisse.** Keine API-Schlüssel, kein `process.env`, nichts, was
+   dich stören würde, wenn jemand es im Bundle liest. Das gehört in `callbacks`.
+2. **Es ist keine Sicherheitsgrenze.** Ein `browserCallbacks.afterRead`, das ein
+   Feld schwärzt, schwärzt es *nachdem* der Browser die Zeile bereits hat — bei
+   einem direkten Transport kam das rohe Dokument direkt aus dem Store. Das ist
+   Darstellung. Schwärzung, die halten muss, gehört in `callbacks` oder in die
+   Regeln des Stores selbst.
+
+Bei einer Collection mit Server-Transport — der Standard, und mit ziemlicher
+Sicherheit deiner — hat der Server `callbacks` bereits ausgeführt, bevor die
+Zeile das Panel erreicht, ein `browserCallbacks.afterRead` läuft also
+*zusätzlich*. Schreibe es idempotent, oder schreibe es nicht.
+
 ## Callbacks definieren
 
 ```typescript

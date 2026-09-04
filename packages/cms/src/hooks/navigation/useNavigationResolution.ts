@@ -1,4 +1,4 @@
-import type { AuthCollectionConfig } from "@rebasepro/types";
+import type { AuthCollectionConfig, CollectionCallbacks } from "@rebasepro/types";
 import type { AppView, AppViewsBuilder, EntityAction, CollectionConfigsBuilder, RebaseContext, RebasePlugin, UserCreationResult, AdminCollection } from "@rebasepro/cms-types";
 import { type User, type RebaseData } from "@rebasepro/types";
 import { type AuthController, resolveAdminCollection } from "@rebasepro/cms-types";
@@ -50,8 +50,9 @@ export function applyPluginModifyCollection(resolvedCollections: AdminCollection
  *    adapters mount their own admin routes and may not implement
  *    `POST /admin/users/:userId/reset-password`; injecting the action anyway
  *    would show a button that can only ever 404.
- * 2. **afterSave callback** — shows the `CreationResultDialog` when a new user
- *    is created with `invitationSent` or `temporaryPassword` in the response
+ * 2. **browserCallbacks.afterSave** — shows the `CreationResultDialog` when a
+ *    new user is created with `invitationSent` or `temporaryPassword` in the
+ *    response
  *
  * Skips injection if the collection already has the action/callback present.
  */
@@ -109,12 +110,17 @@ function injectAuthCollectionConfig(
         }
 
         // ─── afterSave callback (creation result dialog) ─────────────────
-        const existingAfterSave = result.callbacks?.afterSave;
-        result = {
-            ...result,
-            callbacks: {
-                ...result.callbacks,
-                afterSave: async (props) => {
+        //
+        // `browserCallbacks`, not `callbacks`. This injection has always been a
+        // panel behaviour — it opens a dialog — but it was installed on the
+        // server's block, which nothing in the browser runs and which the Vite
+        // plugin strips on the way into the bundle. So it never fired, and
+        // creating a user through the panel never showed the temporary password
+        // the server had just minted and will not repeat.
+        const existingAfterSave = result.browserCallbacks?.afterSave;
+        const injectedAfterSave = {
+            ...result.browserCallbacks,
+            afterSave: (async (props) => {
                     await existingAfterSave?.(props);
 
                     const { values, status, context } = props;
@@ -153,7 +159,21 @@ function injectAuthCollectionConfig(
                             })
                         )
                     });
-                }
+            }) as NonNullable<CollectionCallbacks["afterSave"]>
+        };
+
+        // Written to both the flat key and the block. This injection runs after
+        // `resolveAdminCollection` has flattened `admin` onto the top level, and
+        // that flattening spreads the block *over* the top level — so anything
+        // put only up here is undone the next time a collection is re-resolved,
+        // which the registry controller does on every lookup. Writing both keeps
+        // re-flattening the no-op its callers already believe it is.
+        result = {
+            ...result,
+            browserCallbacks: injectedAfterSave,
+            admin: {
+                ...result.admin,
+                browserCallbacks: injectedAfterSave
             }
         };
 

@@ -287,7 +287,7 @@ export class AstSchemaEditor {
                                     kind === SyntaxKind.CallExpression ||
                                     kind === SyntaxKind.JsxElement;
 
-                                if (isCode || name === "target" || name === "callbacks" || name === "permissions" || name === "securityRules") {
+                                if (isCode || name === "target" || name === "callbacks" || name === "browserCallbacks" || name === "permissions" || name === "securityRules") {
                                     // Preserve this property exactly as it was
                                     preservedProps.push(`${AstSchemaEditor.quoteKey(name)}: ${init.getText()}`);
                                 }

@@ -21,6 +21,9 @@
     "directory": "packages/cli"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "author": "rebase.pro",
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
@@ -73,7 +76,8 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.es.js"
+      "import": "./dist/index.es.js",
+      "default": "./dist/index.es.js"
     }
   },
   "pnpm": {

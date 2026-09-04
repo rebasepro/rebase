@@ -6,7 +6,7 @@ description: What breaks when you move an existing app to the current release, a
 
 # Upgrading an existing app
 
-This guide covers two hops, in the order you have to make them.
+This guide covers three hops, in the order you have to make them.
 
 **Part 1 (sections 0–10) is 0.12 → 0.13.** It removes the `auth` schema, renames
 packages, changes what `id` means, drops CJS, moves the admin panel to
@@ -19,6 +19,12 @@ sections 1 and 2 alter who can read your data, and none of them announces itself
 **Part 2 (sections 11–13) is 0.13 → 0.14.** Every wire key is camelCase, and
 anonymous sign-in is opt-in. If you are already on 0.13, skip straight to
 [section 11](#11-the-api-is-camelcase-throughout--author_id-is-now-authorid).
+
+**Part 3 (sections 14–19) is 0.14 → 0.17.** The admin packages are renamed,
+resources are declared rather than configured, and a bundle built before it will
+not boot on a current runtime. 0.15 and 0.16 break nothing, so this is one hop
+from 0.14. If you are already on 0.16, skip to
+[section 14](#14-rebaseproadmin-is-rebaseprocms).
 
 Work through the sections in order. Each one names the symptom you would
 otherwise debug from the wrong end.
@@ -671,6 +677,102 @@ through the ordinary client — there is no separate package to install.
 
 ---
 
+# Part 3 — 0.14 to 0.17
+
+0.15 and 0.16 add and fix things; neither breaks anything. Everything in this
+part landed in **0.17.0**.
+
+Under 0.x the minor is the breaking position — `^0.16.0` resolves
+`>=0.16.0 <0.17.0` — so none of it reaches a project until you deliberately move
+to 0.17.
+
+## 14. `@rebasepro/admin` is `@rebasepro/cms`
+
+And `@rebasepro/admin-types` is `@rebasepro/cms-types`. "Admin" named two things
+at once: the whole panel, and the content-management half of it.
+
+```diff lang="ts"
+- import { RebaseAdmin } from "@rebasepro/admin";
+- import { defineCollection } from "@rebasepro/admin-types";
++ import { RebaseCMS } from "@rebasepro/cms";
++ import { defineCollection } from "@rebasepro/cms-types";
+```
+
+Change the specifier and `RebaseAdmin` to `RebaseCMS`. There is no alias: a shim
+would keep both meanings of "admin" alive, which is the thing being fixed. The
+old packages stop at 0.16.0 on npm and receive nothing after it, so `^0.16.0`
+keeps resolving rather than breaking — it just stops moving.
+
+**Your collection files do not change.** The `admin:` key is deliberately
+untouched, along with `AdminCollection*`, `ADMIN_COLLECTION_KEYS`, the `admin`
+auth role and `/api/admin` — those name something other than the CMS product.
+
+The panel's mode value moved with the package (`"content"` → `"cms"`). It is
+persisted per browser and migrates on read, so an existing browser keeps working.
+
+## 15. Resources are declared, not configured
+
+`dataSources` and `storageSources` are gone from `RebaseBackendConfig`. Declare
+them in `rebase.json` and the config package instead.
+
+**A bundle built before this will not boot on a current runtime.** Rebuild it:
+
+```bash
+rebase build
+```
+
+`rebase eject infra` is gone too, along with `rebase.infra.json` and the
+`{"$env": "..."}` indirection. Resources bind from the environment on the
+`<BASE>__<KEY>` convention, which is what every deployment already used.
+
+## 16. `admin.titleProperty` is rejected at boot
+
+Use `admin.display.title` — the same string works there.
+
+```diff lang="ts"
+  admin: {
+-     titleProperty: "name"
++     display: { title: "name" }
+  }
+```
+
+This can stop a project that starts today, which is the point: silence would
+mean the title quietly reverting to the derived one with nothing to explain why.
+
+## 17. `ctx.client` in a cron is `ctx.rebase`
+
+And `userId` is no longer accepted as an identity spelling anywhere — it is
+`uid` throughout.
+
+```diff lang="ts"
+- export default defineCron({ schedule: "0 3 * * *", async handler({ client }) {
+-     await client.dataAsAdmin.collection("orders").find();
++ export default defineCron({ schedule: "0 3 * * *", async handler({ rebase }) {
++     await rebase.dataAsAdmin.collection("orders").find();
+  } });
+```
+
+## 18. CLI flag rename
+
+The `--legacy` flag on `build` and `start` is now `--workspace`. The mode is
+supported, not retired, and the old name said otherwise.
+
+```diff
+- rebase build --legacy
++ rebase build --workspace
+```
+
+Worth grepping your scripts and CI for: `arg` runs permissively on these two
+commands, so the old spelling is **ignored rather than rejected** — the build
+succeeds and silently uses the other mode.
+
+## 19. `EmailService.send` returns a result
+
+Breaking only for code that *implements* `EmailService`: a `send` returning
+`Promise<void>` no longer satisfies it. Callers are unaffected — they may ignore
+the result — and the `auth.email.sendEmail` hook stays permissive, so an
+existing `async () => {}` provider still works and simply reports nothing.
+
 ## Upgrade checklist
 
 ```
@@ -702,6 +804,16 @@ through the ordinary client — there is no separate package to install.
 [ ] decide anonymous sign-in: set auth.allowAnonymous: true, or confirm you
     never used it (grep for signInAnonymously)
 [ ] drop @rebasepro/client-postgres from package.json
+
+--- 0.14 → 0.17 (part 3) ---
+[ ] rename @rebasepro/admin → @rebasepro/cms and admin-types → cms-types,
+    and RebaseAdmin → RebaseCMS
+[ ] move dataSources / storageSources out of the backend config into
+    rebase.json and config/, then `rebase build` — an old bundle will not boot
+[ ] grep collections for admin.titleProperty; it is refused at boot now
+[ ] grep crons for ctx.client and for `userId` as an identity key
+[ ] rename --legacy to --workspace wherever build/start is scripted
+[ ] if you implement EmailService yourself, `send` must return a result
 ```
 
 `rebase doctor --policies` is the one to wire into CI: it exits non-zero on a

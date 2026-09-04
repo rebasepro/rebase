@@ -127,12 +127,12 @@ This scaffolds a project with three packages:
 | Folder | Description |
 |--------|-------------|
 | `frontend/` | React SPA — Vite + TypeScript with the Rebase admin UI |
-| `backend/` | Node.js server — Hono, PostgreSQL via Drizzle ORM, WebSocket |
+| `backend/` | Your custom functions and crons, plus the generated Drizzle schema. There is no server file — the published runtime boots the project |
 | `config/` | Config files and collection definitions shared by both sides |
 
 ### Prerequisites
 
-- **Node.js** 18+
+- **Node.js** 22.22+ (a headless `--headless` project needs only 20)
 - **Docker** — to run the included PostgreSQL container. (Or bring your own PostgreSQL: local install, Neon, Supabase, etc.)
 - **pnpm** (recommended) or npm
 
@@ -232,15 +232,13 @@ When you open the frontend URL `rebase dev` printed, you'll see the login screen
 
 ### Define Your First Collection
 
-Open `config/collections/` and create a new file. Export the collection as the **default export** — that's how the registry picks it up:
+Open `config/collections/` and create a new file. Export the collection as the **default export** — that's how the registry picks it up. The table name is optional: it defaults to the slug, so set it only when they differ:
 
 ```typescript title="config/collections/products.ts"
 
 const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
-    singularName: "Product",
-    table: "products",
     properties: {
         name: {
             type: "string",
@@ -321,30 +319,44 @@ A Rebase starter project has three interconnected packages:
 
 ```
 my-app/
-├── .env                    # Environment variables (DATABASE_URL, JWT_SECRET, etc.)
+├── .env                    # Generated for you: JWT_SECRET, a database password, a free port
+├── rebase.json             # Which apps this repository contains, and how each is built
 ├── package.json            # Root workspace config
+├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
 │
-├── frontend/               # React admin panel (Vite)
-│   ├── src/
-│   │   ├── App.tsx         # Main application component
-│   │   ├── main.tsx        # React entry point
-│   │   └── index.css       # Global styles
-│   ├── package.json
-│   └── vite.config.ts
+├── config/                 # Shared by the backend and the admin panel
+│   ├── index.ts            # Re-exports what the runtime reads (collections, storageAuthorize)
+│   ├── collections/        # Your data model
+│   │   ├── index.ts        # Exports `collections` and the default security rules
+│   │   ├── posts.ts        # Example collections
+│   │   └── users.ts        # The auth collection
+│   ├── resources.ts        # What this project needs from wherever it runs
+│   ├── storage.ts          # Who may read, write and list files
+│   └── cms.d.ts            # One line that makes the `admin` block legal here
 │
-├── backend/                # Node.js API server (Hono)
-│   ├── src/
-│   │   ├── index.ts        # Server entry — initializes Rebase backend
-│   │   └── schema.generated.ts  # Auto-generated Drizzle schema
-│   ├── drizzle.config.ts   # Drizzle ORM configuration
-│   ├── Dockerfile
-│   └── package.json
+├── backend/
+│   ├── functions/          # Custom API routes, auto-mounted at /api/functions/<name>
+│   │   └── hello.ts
+│   └── src/
+│       └── schema.generated.ts   # Drizzle schema, regenerated from your collections
 │
-└── config/                 # Collection definitions and configurations
-    └── collections/
-        ├── index.ts        # Exports all collections
-        └── products.ts     # Example: products collection
+└── frontend/               # The admin panel (React + Vite)
+    ├── src/App.tsx
+    ├── src/main.tsx
+    └── vite.config.ts
 ```
+
+:::note[There is no `backend/src/index.ts`]
+And no `Dockerfile`. A scaffolded project declares `runtime: "managed"` in
+`rebase.json`, which means the **published `rebasepro/server` image boots your
+project as a bundle** — the same artifact whether you self-host it or deploy it
+to Rebase Cloud. You configure the server through `rebase.json`, `config/` and
+environment variables rather than by writing an entry point.
+
+If you want to own the process — your own middleware, your own routes, your own
+auth wiring — `rebase eject` writes the entry point, a Dockerfile and a compose
+file that builds them. See [Custom Server Integration](/docs/backend/custom-server).
+:::
 
 ### Frontend (`frontend/`)
 
@@ -352,14 +364,13 @@ The frontend is a standard **Vite + React + TypeScript** application. The key fi
 
 ```typescript title="frontend/src/App.tsx"
 
-// The client connects to your backend API and WebSocket
+// `rebase dev` injects VITE_API_URL with the port it actually bound, so this
+// needs no hardcoded localhost — and a deployed build serves the admin from the
+// same origin as the API, where an empty value is what you want.
 const rebaseClient = createRebaseClient({
-    baseUrl: "http://localhost:3001",
-    websocketUrl: "ws://localhost:3001"
+    baseUrl: import.meta.env.VITE_API_URL,
+    auth: { authFlowMode: "cookie" }
 });
-
-// Collections are imported via a Vite virtual module
-// that reads from the config/ directory
 ```
 
 #### Key Concepts
@@ -370,40 +381,33 @@ const rebaseClient = createRebaseClient({
 
 ### Backend (`backend/`)
 
-The backend is a **Node.js server** built on [Hono](https://hono.dev/) (a fast, lightweight HTTP framework). The entry point `index.ts` initializes everything:
+There is no server file to read, and that is the design: a scaffolded project
+declares `runtime: "managed"`, so the published `rebasepro/server` image boots
+your project. What `backend/` holds is the code the runtime picks up:
 
-```typescript title="backend/src/index.ts"
+| Path | What it is |
+|---|---|
+| `backend/functions/` | Custom routes, auto-mounted at `/api/functions/<filename>` |
+| `backend/crons/` | Scheduled jobs, discovered the same way (create it when you want one) |
+| `backend/src/schema.generated.ts` | The Drizzle schema, regenerated from your collections on every `rebase dev` and `rebase build` |
 
-const app = new Hono<HonoEnv>();
+The runtime sets up:
 
-await initializeRebaseBackend({
-    app,
-    server,
-    collectionsDir: "./config/collections",
-    database: createPostgresAdapter({
-        connection: db,
-        schema: { tables, enums, relations }
-    }),
-    auth: {
-        jwtSecret: process.env.JWT_SECRET,
-        google: process.env.GOOGLE_CLIENT_ID
-            ? { clientId: process.env.GOOGLE_CLIENT_ID }
-            : undefined,
-    },
-    storage: {
-        type: "local",
-        basePath: "./uploads"
-    },
-    history: true
-});
-```
+- **REST API** at `/api/data/*` — generated CRUD for every collection
+- **Auth** at `/api/auth/*` — signup, login, refresh, OAuth
+- **Storage** at `/api/storage/*` — upload and download
+- **WebSocket** — realtime sync over Postgres LISTEN/NOTIFY
+- **Your functions and crons**, from the directories above
 
-`initializeRebaseBackend` sets up:
-- **REST API** routes at `/api/data/*` — auto-generated CRUD for each collection
-- **Auth** routes at `/api/auth/*` — signup, login, refresh, Google OAuth
-- **Storage** routes at `/api/storage/*` — file upload/download
-- **WebSocket** server — real-time entity sync via Postgres LISTEN/NOTIFY
-- **History** — audit trail recording on every entity change
+Configuration comes from `rebase.json`, the `config/` directory and environment
+variables. See [Environment & Configuration](/docs/getting-started/configuration).
+
+To take ownership of the process instead — your own middleware, routes and auth
+wiring — run `rebase eject`. It writes an entry point that calls
+`initializeRebaseBackend` directly, plus a Dockerfile and a compose file that
+builds it; from then on you maintain the server and platform runtime upgrades no
+longer reach the project. That surface is documented in
+[Custom Server Integration](/docs/backend/custom-server).
 
 ### Collections (`config/collections/`)
 
@@ -414,7 +418,6 @@ Collections are the **single source of truth** for your data model. They are def
 export const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
-    table: "products",
     properties: {
         name: { type: "string", name: "Name" },
         price: { type: "number", name: "Price" }
@@ -422,7 +425,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api/data/products`). The `table` maps to the PostgreSQL table name.
+The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api/data/products`), and the PostgreSQL table name defaults to it. Add `table` only when they differ.
 
 ### How They Connect
 
@@ -534,8 +537,21 @@ All configuration is done via environment variables in your `.env` file at the p
 | `MICROSOFT_CLIENT_SECRET` | Microsoft OAuth client secret | — |
 | `REBASE_SERVICE_KEY` | Static admin API key. Bypasses normal JWT auth for server-to-server calls when passed as `Authorization: Bearer <key>`. (Auto-generated in development). | — |
 | `REBASE_RATE_LIMIT_STORE` | Where auth rate-limit counters live: `memory` (per-process) or `sql` (shared across replicas). A process cannot see its own replica count, so a deployment with peers has to say so — three replicas on the default enforce three times the limit. Any other value **refuses to boot** rather than falling back, `postgres` included. | `memory` |
+| `AUTH_MAGIC_LINK` | Mount the passwordless sign-in-link flow. Needs an email service configured, or the link has nowhere to go. | `false` |
+| `AUTH_EMAIL_OTP` | Mount passwordless sign-in with a six-digit code sent by email. Same email requirement as above. | `false` |
+| `CAPTCHA_PROVIDER` | Turn on captcha verification on the auth routes: `turnstile` or `hcaptcha`. Unset means no captcha. | — |
+| `CAPTCHA_SECRET` | The provider's secret, used server-side to verify the token the browser sends. Required once `CAPTCHA_PROVIDER` is set. | — |
+| `CAPTCHA_ROUTES` | Comma-separated auth routes to protect (for example `register,login`). Unset protects the provider's default set. | — |
 
 #### Storage
+
+:::caution[Storage has no row-level security, so it needs an access model]
+Collections are protected by Postgres RLS. Object storage has no equivalent —
+keys share one flat namespace — so with a bucket configured and no access model
+the server **refuses to boot in production**. Satisfy it with exactly one of:
+a `storageAuthorize` hook exported from `config/index.ts` (what the scaffold
+ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
+:::
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -548,6 +564,12 @@ All configuration is done via environment variables in your `.env` file at the p
 | `S3_SECRET_ACCESS_KEY` | AWS secret key | — |
 | `S3_ENDPOINT` | Custom S3 endpoint (for MinIO, Cloudflare R2, etc.) | — |
 | `S3_FORCE_PATH_STYLE` | Force path-style URLs for S3 bucket (`true`/`false`) | `false` |
+| `GCS_BUCKET` | GCS bucket name (when `STORAGE_TYPE=gcs`) | — |
+| `GCS_PROJECT_ID` | GCP project. Usually inferred from the credentials. | — |
+| `GCS_KEY_FILENAME` | Path to a service-account key file. Omit on GCP, where Workload Identity supplies credentials. | — |
+| `STORAGE_PUBLIC_READ` | Serve every object to anyone, no token. Only for a bucket that genuinely is a public CDN. One of the three ways to satisfy the boot guard below. | `false` |
+| `STORAGE_ALLOW_ANY_AUTHENTICATED` | Let any signed-in caller read, write, list and delete every object. Named `INSECURE` in the config object for a reason: it is only defensible in a single-tenant app where every account is trusted with every file. | `false` |
+| `STORAGE_RENDITION_CACHE` | Cache generated image renditions (resizes, format conversions) instead of producing them per request. | `false` |
 
 #### Email (Optional)
 
@@ -580,6 +602,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `REBASE_RLS_AUDIT` | Run the row-level-security audit at boot and mount its endpoint, which reports tables that are served without policies. | — |
 | `REBASE_BASE_PATH` | Base path for every API route. The client must be told the same thing — see [Changing `basePath`](#changing-basepath). | `/api` |
 | `REBASE_SERVE_STATIC` | Serve the bundle's static/admin assets from this process. Turn it off when a CDN sits in front. | `true` |
 | `REBASE_HISTORY` | Record [entity change history](/docs/backend/history). | `true` |
@@ -777,7 +800,7 @@ function Widget() {
 
 ## Upgrading an existing app
 
-This guide covers two hops, in the order you have to make them.
+This guide covers three hops, in the order you have to make them.
 
 **Part 1 (sections 0–10) is 0.12 → 0.13.** It removes the `auth` schema, renames
 packages, changes what `id` means, drops CJS, moves the admin panel to
@@ -790,6 +813,12 @@ sections 1 and 2 alter who can read your data, and none of them announces itself
 **Part 2 (sections 11–13) is 0.13 → 0.14.** Every wire key is camelCase, and
 anonymous sign-in is opt-in. If you are already on 0.13, skip straight to
 [section 11](#11-the-api-is-camelcase-throughout--author_id-is-now-authorid).
+
+**Part 3 (sections 14–19) is 0.14 → 0.17.** The admin packages are renamed,
+resources are declared rather than configured, and a bundle built before it will
+not boot on a current runtime. 0.15 and 0.16 break nothing, so this is one hop
+from 0.14. If you are already on 0.16, skip to
+[section 14](#14-rebaseproadmin-is-rebaseprocms).
 
 Work through the sections in order. Each one names the symptom you would
 otherwise debug from the wrong end.
@@ -1442,6 +1471,102 @@ through the ordinary client — there is no separate package to install.
 
 ---
 
+## Part 3 — 0.14 to 0.17
+
+0.15 and 0.16 add and fix things; neither breaks anything. Everything in this
+part landed in **0.17.0**.
+
+Under 0.x the minor is the breaking position — `^0.16.0` resolves
+`>=0.16.0 <0.17.0` — so none of it reaches a project until you deliberately move
+to 0.17.
+
+### 14. `@rebasepro/admin` is `@rebasepro/cms`
+
+And `@rebasepro/admin-types` is `@rebasepro/cms-types`. "Admin" named two things
+at once: the whole panel, and the content-management half of it.
+
+```diff lang="ts"
+- import { RebaseAdmin } from "@rebasepro/admin";
+- import { defineCollection } from "@rebasepro/admin-types";
++ import { RebaseCMS } from "@rebasepro/cms";
++ import { defineCollection } from "@rebasepro/cms-types";
+```
+
+Change the specifier and `RebaseAdmin` to `RebaseCMS`. There is no alias: a shim
+would keep both meanings of "admin" alive, which is the thing being fixed. The
+old packages stop at 0.16.0 on npm and receive nothing after it, so `^0.16.0`
+keeps resolving rather than breaking — it just stops moving.
+
+**Your collection files do not change.** The `admin:` key is deliberately
+untouched, along with `AdminCollection*`, `ADMIN_COLLECTION_KEYS`, the `admin`
+auth role and `/api/admin` — those name something other than the CMS product.
+
+The panel's mode value moved with the package (`"content"` → `"cms"`). It is
+persisted per browser and migrates on read, so an existing browser keeps working.
+
+### 15. Resources are declared, not configured
+
+`dataSources` and `storageSources` are gone from `RebaseBackendConfig`. Declare
+them in `rebase.json` and the config package instead.
+
+**A bundle built before this will not boot on a current runtime.** Rebuild it:
+
+```bash
+rebase build
+```
+
+`rebase eject infra` is gone too, along with `rebase.infra.json` and the
+`{"$env": "..."}` indirection. Resources bind from the environment on the
+`<BASE>__<KEY>` convention, which is what every deployment already used.
+
+### 16. `admin.titleProperty` is rejected at boot
+
+Use `admin.display.title` — the same string works there.
+
+```diff lang="ts"
+  admin: {
+-     titleProperty: "name"
++     display: { title: "name" }
+  }
+```
+
+This can stop a project that starts today, which is the point: silence would
+mean the title quietly reverting to the derived one with nothing to explain why.
+
+### 17. `ctx.client` in a cron is `ctx.rebase`
+
+And `userId` is no longer accepted as an identity spelling anywhere — it is
+`uid` throughout.
+
+```diff lang="ts"
+- export default defineCron({ schedule: "0 3 * * *", async handler({ client }) {
+-     await client.dataAsAdmin.collection("orders").find();
++ export default defineCron({ schedule: "0 3 * * *", async handler({ rebase }) {
++     await rebase.dataAsAdmin.collection("orders").find();
+  } });
+```
+
+### 18. CLI flag rename
+
+The `--legacy` flag on `build` and `start` is now `--workspace`. The mode is
+supported, not retired, and the old name said otherwise.
+
+```diff
+- rebase build --legacy
++ rebase build --workspace
+```
+
+Worth grepping your scripts and CI for: `arg` runs permissively on these two
+commands, so the old spelling is **ignored rather than rejected** — the build
+succeeds and silently uses the other mode.
+
+### 19. `EmailService.send` returns a result
+
+Breaking only for code that *implements* `EmailService`: a `send` returning
+`Promise<void>` no longer satisfies it. Callers are unaffected — they may ignore
+the result — and the `auth.email.sendEmail` hook stays permissive, so an
+existing `async () => {}` provider still works and simply reports nothing.
+
 ### Upgrade checklist
 
 ```
@@ -1473,6 +1598,16 @@ through the ordinary client — there is no separate package to install.
 [ ] decide anonymous sign-in: set auth.allowAnonymous: true, or confirm you
     never used it (grep for signInAnonymously)
 [ ] drop @rebasepro/client-postgres from package.json
+
+--- 0.14 → 0.17 (part 3) ---
+[ ] rename @rebasepro/admin → @rebasepro/cms and admin-types → cms-types,
+    and RebaseAdmin → RebaseCMS
+[ ] move dataSources / storageSources out of the backend config into
+    rebase.json and config/, then `rebase build` — an old bundle will not boot
+[ ] grep collections for admin.titleProperty; it is refused at boot now
+[ ] grep crons for ctx.client and for `userId` as an identity key
+[ ] rename --legacy to --workspace wherever build/start is scripted
+[ ] if you implement EmailService yourself, `send` must return a result
 ```
 
 `rebase doctor --policies` is the one to wire into CI: it exits non-zero on a
@@ -2089,8 +2224,9 @@ Inside `admin`, except `history`, which is a backend feature and stays at the to
 | `ownerId` | `string` | Owner user ID (used by plugins/custom code) |
 | `overrides` | `EntityOverrides` | Overrides for the entity view |
 | `components` | `CollectionComponentOverrideMap` | Collection-scoped UI component overrides |
-| `driver` | `string` | Database driver to use (default: `"(default)"`) |
-| `databaseId` | `string` | Database/schema ID within the driver |
+| `dataSource` | `string` | Which registered data source backs this collection (default: the unnamed one) |
+| `engine` | `string` | The engine behind it — `"postgres"`, `"firestore"`, `"mongodb"`. Resolved from `dataSource`; set it only to override |
+| `databaseId` | `string` | Database or schema within the engine |
 
 ### Entity display
 
@@ -2305,25 +2441,27 @@ name: {
 
 #### Multiline text
 
-Set `multiline: true` to render as a textarea.
+Set `admin.multiline` to render as a textarea. It changes how the field is drawn,
+not what the column holds, so it lives in the `admin` block with the rest of the
+presentation options.
 
 ```typescript
 description: {
     type: "string",
     name: "Description",
-    multiline: true
+    admin: { multiline: true }
 }
 ```
 
 #### Markdown editor
 
-Set `markdown: true` to render a full markdown editor with toolbar.
+Set `admin.markdown` to render a full markdown editor with toolbar.
 
 ```typescript
 body: {
     type: "string",
     name: "Blog text",
-    markdown: true
+    admin: { markdown: true }
 }
 ```
 
@@ -2385,18 +2523,24 @@ category: {
 
 #### Multi-select
 
-Set `enum` + `multiSelect: true` to allow picking multiple values.
+Several values out of a fixed set is an **array of an enum string**, not a flag on
+one: the column holds many values, so the property that describes it is the array.
+`columnType: "text[]"` is what makes it one Postgres column rather than a join.
 
 ```typescript no-verify
 locales: {
-    type: "string",
+    type: "array",
     name: "Available locales",
-    multiSelect: true,
-    enum: [
-        { id: "es", label: "Spanish", color: "pink" },
-        { id: "en", label: "English", color: "blueLight" },
-        { id: "fr", label: "French", color: "purpleLight" },
-    ]
+    columnType: "text[]",
+    of: {
+        type: "string",
+        name: "Locale",
+        enum: [
+            { id: "es", label: "Spanish", color: "pink" },
+            { id: "en", label: "English", color: "blueLight" },
+            { id: "fr", label: "French", color: "purpleLight" },
+        ]
+    }
 }
 ```
 
@@ -2410,7 +2554,6 @@ locales: {
 | `url` | `boolean` | URL format validation |
 | `storage` | `StorageConfig` | Enable file upload |
 | `enum` | `EnumValues` | Render as select dropdown |
-| `multiSelect` | `boolean` | Allow multiple enum selections |
 | `columnType` | `string` | Database column: `"varchar"`, `"text"` |
 | `isId` | `string` | ID generation: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
 | `userSelect` | `boolean` | Render as a user picker |
@@ -2553,7 +2696,7 @@ content: {
             text: {
                 type: "map",
                 properties: {
-                    body: { type: "string", name: "Text", markdown: true }
+                    body: { type: "string", name: "Text", admin: { markdown: true } }
                 }
             },
             image: {
@@ -3316,6 +3459,62 @@ Callbacks let you hook into the entity lifecycle to:
 - **Filter/transform** data after reading
 - **Cascade operations** — clean up related records on delete
 
+### Where callbacks run
+
+A collection has two callback blocks, and the only difference is which runtime
+executes them.
+
+| | `callbacks` | `admin.browserCallbacks` |
+|---|---|---|
+| Runs on | the server | the admin panel, in the browser |
+| Fires for | REST, the SDK, realtime, `dataAsAdmin` | reads and writes the panel makes |
+| Reaches the browser | no — bodies are stripped from the bundle | yes, in full |
+| Use for | everything below | collections the panel talks to directly |
+
+**`callbacks` is the one you want.** It runs on every path that reaches the
+server, so nothing routes around it, and its body never leaves the machine —
+an API key or a `process.env` read there is safe. The rest of this page is
+about `callbacks`.
+
+`admin.browserCallbacks` exists for one case: a collection on a `direct` or
+`custom` transport, which the panel reads and writes *itself* with no Rebase
+server in the request path. Nothing server-side sees those operations, so
+`callbacks` can never fire for them, and this block is the only place their
+lifecycle logic can live.
+
+```typescript
+
+const eventsCollection: CollectionConfig = {
+    slug: "events",
+    name: "Events",
+    dataSource: "analytics",      // declared with transport: "direct"
+    properties: {
+        city: { name: "City", type: "string" },
+        code: { name: "Code", type: "string" }
+    },
+    admin: {
+        browserCallbacks: {
+            afterRead: ({ row }) => ({ ...row, label: [row.city, row.code].join(" · ") })
+        }
+    }
+};
+```
+
+Two rules follow from "ships to every visitor", and neither is stylistic:
+
+1. **No secrets.** No API keys, no `process.env`, nothing you would mind a
+   reader of the bundle seeing. That belongs in `callbacks`.
+2. **It is not a security boundary.** A `browserCallbacks.afterRead` that
+   redacts a field redacts it *after* the browser already holds the row — on a
+   direct transport the raw document came straight from the store. It is
+   presentation. Redaction that has to hold goes in `callbacks`, or in the
+   store's own rules.
+
+On a server-transport collection — the default, and almost certainly yours —
+the server has already run `callbacks` before the row reaches the panel, so a
+`browserCallbacks.afterRead` runs *in addition* to it. Write it to be
+idempotent, or don't write it.
+
 ### Defining Callbacks
 
 ```typescript
@@ -3395,7 +3594,8 @@ beforeSave: async ({
 }
 ```
 
-Throw an error to **block the save**:
+Throw an error to **block the save**. The write never reaches the database, and
+the caller gets **400** with your message and the code `CALLBACK_REJECTED`:
 
 ```typescript
 beforeSave: async ({ values }) => {
@@ -3405,6 +3605,31 @@ beforeSave: async ({ values }) => {
     return values;
 }
 ```
+
+```json
+{ "error": { "message": "Price cannot be negative", "code": "CALLBACK_REJECTED",
+             "details": { "stage": "beforeSave", "path": "products" } } }
+```
+
+To choose the status and code yourself — a 409 for a clash, a 422 for something
+well-formed but unacceptable — throw a `RebaseApiError`:
+
+```typescript
+
+beforeSave: async ({ values }) => {
+    if (await isTaken(values.slug)) {
+        throw new RebaseApiError("That slug is taken", { status: 409, code: "SLUG_TAKEN" });
+    }
+    return values;
+}
+```
+
+:::note
+Import it from `@rebasepro/types`, not from `@rebasepro/server`. A collection file
+is shared with the frontend — the admin panel's Vite build reads this same
+directory — so it may only import packages that run in a browser. `RebaseApiError`
+is the browser-safe one, and it is the same class the client SDK throws.
+:::
 
 #### `afterSave`
 
@@ -3802,13 +4027,20 @@ This generates: `USING (true)`
 
 #### Authenticated Access
 
-Allow any authenticated user:
+Allow any signed-in user. This one is a `condition` rather than an `access`
+shortcut — `access` has exactly one value, `"public"` — because "signed in" is a
+test against the caller, and the builder is where tests against the caller live:
 
 ```typescript
+
 securityRules: [
-    { operation: "select", access: "authenticated" }
+    { operation: "select", condition: policy.authenticated() }
 ]
 ```
+
+`policy.authenticated()` is true for anonymous *sign-in* too, which mints a real
+user row and a real session. Use `policy.registered()` where a guest should not
+qualify — writing a review, joining an organization, spending money.
 
 #### Role-based Access
 
@@ -4012,7 +4244,7 @@ interface SecurityRuleBase {
 
 // …plus exactly one of:
 { ownerField: string }                        // <column> = rebase.uid()
-{ access: "public" | "authenticated" }        // the shortcut forms
+{ access: "public" }                          // the one shortcut — "no row filter"
 { condition: PolicyExpression;                // the structured builder — `policy.*`
   check?: PolicyExpression }                  // defaults to `condition`, as Postgres does
 { using?: string; withCheck?: string }        // raw SQL
@@ -4117,7 +4349,7 @@ This means:
 - `rebase.uid()` returns `'anonymous'`
 - `rebase.roles()` returns an empty string
 - `access: "public"` policies pass because they generate `USING (true)` / `WITH CHECK (true)`
-- `access: "authenticated"` policies fail because they check for a real user ID
+- `policy.authenticated()` conditions fail because they check for a real user ID
 - `ownerField` policies fail because no row will have `user_id = 'anonymous'` (unless explicitly set)
 
 #### Advanced: Raw SQL for Anonymous
@@ -4545,11 +4777,11 @@ Use `limit` and `offset`, or `page`:
 # Limit and offset
 GET /api/data/products?limit=20&offset=40
 
-# Page-based (uses default limit of 20)
+# Page-based (uses the default limit of 50)
 GET /api/data/products?page=3
 ```
 
-The default limit is **20**, the maximum is **100**.
+The default limit is **50**, the maximum is **1000**. Both come from `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, which the generated OpenAPI spec reports too — a `limit` above the maximum is rejected rather than clamped.
 
 #### Response Format
 
@@ -9333,7 +9565,7 @@ Each callback receives a single props object. Common fields:
 
 ### Blocking vs. Async Semantics
 
-- **`beforeSave`, `beforeDelete`** — blocking. If the callback throws, the operation is rejected with an HTTP 400 error response. The database write never happens.
+- **`beforeSave`, `beforeDelete`** — blocking. If the callback throws, the operation is rejected with an HTTP 400 carrying your message and the code `CALLBACK_REJECTED`, and the database write never happens. Throw a `RebaseApiError` from `@rebasepro/types` to pick the status yourself — see [Entity Callbacks](/docs/collections/callbacks#beforesave).
 - **`afterRead`** — blocking. The returned row (or transformed row) is what the caller receives.
 - **`afterSave`, `afterDelete`, `afterSaveError`** — run after the transaction commits. They do not block the HTTP response.
 
@@ -12815,16 +13047,47 @@ const { data, meta } = await client.data.products.find({
     offset: 0
 });
 
-// data is Entity<M>[]  — each item has { id, values, path }
+// data is Row[] — flat rows, with the id at the top level
 // meta has { total, limit, offset, hasMore }
 ```
 
-#### Find by ID
+#### Read one by ID
+
+Two methods, because there are two situations and they want different code.
+
+`get` is for a row you expect to exist — the id came from a link, a route
+parameter or another row. It returns the row, so nothing downstream has to
+narrow, and a missing row is an exception you can branch on:
 
 ```typescript
-const product = await client.data.products.findById(42);
-// Returns Entity<M> | undefined
+const product = await client.data.products.get(42);
+product.name;    // Row, not Row | undefined
 ```
+
+```typescript
+
+async function loadProduct(id: string) {
+    try {
+        return await client.data.products.get(id);
+    } catch (e) {
+        if (e instanceof RebaseApiError && e.code === "NOT_FOUND") return null;
+        throw e;
+    }
+}
+```
+
+`findById` is for a row that may legitimately not be there — a lookup by an id
+a user typed, a cache probe:
+
+```typescript
+const maybe = await client.data.products.findById(42);
+// Row | undefined
+```
+
+:::note
+Row-level security makes "no such row" and "not yours to read" the same answer,
+deliberately: a 404 that distinguished them would confirm the row exists.
+:::
 
 #### Create
 
@@ -18757,7 +19020,24 @@ export const articlesCollection = defineCollection({
         author: {
             type: "relation",
             name: "Author",
-            relationName: "author"
+            relation: {
+                kind: "belongsTo",
+                target: () => authorsCollection,
+                localKey: "author_id"
+            }
+        },
+        categories: {
+            type: "relation",
+            name: "Categories",
+            relation: {
+                kind: "manyToMany",
+                target: () => categoriesCollection,
+                through: {
+                    table: "article_categories",
+                    sourceColumn: "article_id",
+                    targetColumn: "category_id"
+                }
+            }
         },
         status: {
             type: "string",
@@ -18799,24 +19079,6 @@ export const articlesCollection = defineCollection({
             admin: { readOnly: true }
         }
     },
-    relations: [
-        {
-            kind: "belongsTo",
-            relationName: "author",
-            target: () => authorsCollection,
-            localKey: "author_id"
-        },
-        {
-            kind: "manyToMany",
-            relationName: "categories",
-            target: () => categoriesCollection,
-            through: {
-                table: "article_categories",
-                sourceColumn: "article_id",
-                targetColumn: "category_id"
-            }
-        }
-    ],
     callbacks: {
         beforeSave: async ({ values, status }) => {
             // Auto-generate slug

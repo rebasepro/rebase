@@ -47,7 +47,12 @@ describe("ADMIN_COLLECTION_KEYS", () => {
         // renderings of a collection's rows.
         // 41 again since `titleProperty` was removed — `display.title` is the
         // only way to state it, so the schema editor has one place to write.
-        expect(ADMIN_COLLECTION_KEYS).toHaveLength(41);
+        // 42 since `browserCallbacks` — lifecycle callbacks that run in the
+        // panel, for collections whose data source the browser talks to
+        // directly. Deliberately not named `callbacks`: that key is the
+        // contract's, it means "runs on the server", and the assertion below
+        // keeps it off this list.
+        expect(ADMIN_COLLECTION_KEYS).toHaveLength(42);
     });
 
     it("names nothing that belongs to the BaaS contract", () => {
@@ -209,6 +214,45 @@ describe("toAdminCollectionConfig", () => {
         expect((authoring.admin as Record<string, unknown>).defaultViewMode).toBe("cards");
         // The fields the user did not touch are still there.
         expect((authoring.admin as Record<string, unknown>).icon).toBe("FileText");
+    });
+
+    /**
+     * The two callback blocks are one flatten away from each other, and getting
+     * this wrong swaps which runtime a callback belongs to: `browserCallbacks`
+     * left at the top level is a field the backend ignores and the panel never
+     * reads back, while `callbacks` pulled into `admin` would take a server
+     * callback — the one that may hold an API key — and file it under the block
+     * that ships to every visitor.
+     */
+    it("nests browserCallbacks and leaves the server's callbacks at the top", () => {
+        const afterRead = () => ({});
+        const beforeSave = () => ({});
+        const flat = {
+            slug: "posts",
+            table: "posts",
+            properties: {},
+            callbacks: { beforeSave },
+            browserCallbacks: { afterRead }
+        } as unknown as AdminCollection;
+
+        const authoring = toAdminCollectionConfig(flat) as unknown as Record<string, unknown>;
+        expect(authoring.callbacks).toEqual({ beforeSave });
+        expect(authoring.admin).toEqual({ browserCallbacks: { afterRead } });
+        expect("browserCallbacks" in authoring).toBe(false);
+    });
+
+    it("flattens browserCallbacks back out, so the panel reads one name", () => {
+        const afterRead = () => ({});
+        const nestedCollection = {
+            slug: "posts",
+            table: "posts",
+            properties: {},
+            admin: { browserCallbacks: { afterRead } }
+        } as unknown as AdminCollection;
+
+        const flat = resolveAdminCollection(nestedCollection) as unknown as Record<string, unknown>;
+        expect(flat.browserCallbacks).toEqual({ afterRead });
+        expect(toAdminCollectionConfig(flat as never)).toEqual(nestedCollection);
     });
 
     it("keeps a contract field that happens to sit next to admin fields", () => {
@@ -373,5 +417,104 @@ describe("admin key fields are checked against the collection's properties", () 
             admin: { kanban: { columnProperty: "not_a_property" } }
         });
         expect(loose.admin?.kanban?.columnProperty).toBe("not_a_property");
+    });
+});
+
+/**
+ * A property may not carry a key its own type does not declare.
+ *
+ * Another *type* test: the assertions are the `@ts-expect-error` comments.
+ *
+ * This guarantee was absent for the life of the builder, and the reason is worth
+ * keeping. `defineCollection` takes `properties: P` where `const P extends
+ * PostgresProperties`, and `PostgresProperties` is an index signature — every
+ * object literal is assignable to one, extra keys included, so TypeScript's
+ * excess-property check never ran inside a property. Annotating
+ * `const c: PostgresCollectionConfig = { … }` caught all of these, which is the
+ * tell: the checking was never missing, only bypassed by the very inference the
+ * builder exists to provide.
+ *
+ * What that cost, before `StrictProperties` closed it:
+ *
+ *  - a misspelled `validation` compiled, and the field was quietly not required;
+ *  - `multiline: true` / `markdown: true` written flat — the shape the docs
+ *    themselves showed — compiled, then the backend refused to boot;
+ *  - `multiSelect: true`, a key that exists nowhere in the codebase, compiled.
+ *
+ * **One bad key per call.** Two in one literal collapse into a single TS2769
+ * from overload resolution, which leaves the other `@ts-expect-error` unused —
+ * and an unused one is itself an error, so the test would fail for a reason that
+ * has nothing to do with the guarantee.
+ */
+describe("property keys are checked against the property's own type", () => {
+    const base = { name: "Posts", slug: "posts", table: "posts" } as const;
+
+    it("accepts every real shape a property can take", () => {
+        const ok = defineCollection({
+            ...base,
+            properties: {
+                title: { name: "Title", type: "string", validation: { required: true } },
+                body: { name: "Body", type: "string", admin: { multiline: true, markdown: true } },
+                hero: { name: "Hero", type: "string", storage: { storagePath: "p/" } },
+                status: { name: "Status", type: "string", enum: [{ id: "draft", label: "Draft" }] },
+                count: { name: "Count", type: "number", columnType: "integer" },
+                made: { name: "Made", type: "date", autoValue: "on_create" },
+                tags: { name: "Tags", type: "array", of: { name: "Tag", type: "string" } }
+            }
+        });
+        expect(Object.keys(ok.properties)).toHaveLength(7);
+    });
+
+    it("rejects a misspelled `validation`", () => {
+        defineCollection({
+            ...base,
+            // @ts-expect-error — `validaton` is not a key of StringProperty
+            properties: { title: { name: "T", type: "string", validaton: { required: true } } }
+        });
+    });
+
+    it("rejects `multiline` written flat instead of under `admin`", () => {
+        defineCollection({
+            ...base,
+            // @ts-expect-error — `multiline` belongs in the property's `admin` block
+            properties: { title: { name: "T", type: "string", multiline: true } }
+        });
+    });
+
+    it("rejects `markdown` written flat instead of under `admin`", () => {
+        defineCollection({
+            ...base,
+            // @ts-expect-error — `markdown` belongs in the property's `admin` block
+            properties: { title: { name: "T", type: "string", markdown: true } }
+        });
+    });
+
+    it("rejects a key that exists nowhere", () => {
+        defineCollection({
+            ...base,
+            // @ts-expect-error — there is no `multiSelect`; a multi-value enum is
+            // an `array` whose `of` is the enum string
+            properties: { tags: { name: "T", type: "string", multiSelect: true } }
+        });
+    });
+
+    it("checks against the member the property's own `type` tag selects", () => {
+        defineCollection({
+            ...base,
+            // @ts-expect-error — `storage` is a StringProperty key; this one is a number
+            properties: { count: { name: "C", type: "number", storage: { storagePath: "p/" } } }
+        });
+    });
+
+    it("still infers property keys for the admin block", () => {
+        // The mapped type is homomorphic, so it stays invertible and `const P`
+        // inference survives. If it did not, this `@ts-expect-error` would go
+        // unused and fail the build — which is the point of asserting it here.
+        defineCollection({
+            ...base,
+            properties: { title: { name: "T", type: "string" } },
+            // @ts-expect-error — "titel" is not a property of this collection
+            admin: { display: { title: "titel" } }
+        });
     });
 });

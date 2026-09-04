@@ -15,6 +15,63 @@ Les rappels vous permettent d'intervenir dans le cycle de vie de l'entité pour 
 - **Filtrer/transformer** les données après lecture
 - **Opérations en cascade** — nettoyer les enregistrements liés lors de la suppression
 
+## Où les rappels s'exécutent
+
+Une collection a deux blocs de rappels, et la seule différence est quel runtime les exécute.
+
+| | `callbacks` | `admin.browserCallbacks` |
+|---|---|---|
+| S'exécute sur | le serveur | le panneau d'administration, dans le navigateur |
+| Se déclenche pour | REST, le SDK, le temps réel, `dataAsAdmin` | les lectures et écritures faites par le panneau |
+| Atteint le navigateur | non — les corps sont retirés du bundle | oui, en entier |
+| À utiliser pour | tout ce qui suit | les collections auxquelles le panneau parle directement |
+
+**`callbacks` est celui que vous voulez.** Il s'exécute sur chaque chemin qui
+atteint le serveur, donc rien ne le contourne, et son corps ne quitte jamais la
+machine : une clé d'API ou une lecture de `process.env` y est en sécurité. Le
+reste de cette page porte sur `callbacks`.
+
+`admin.browserCallbacks` existe pour un seul cas : une collection sur un
+transport `direct` ou `custom`, que le panneau lit et écrit *lui-même*, sans
+aucun serveur Rebase dans le chemin de la requête. Rien côté serveur ne voit ces
+opérations, donc `callbacks` ne peut jamais s'y déclencher, et ce bloc est le
+seul endroit où leur logique de cycle de vie peut vivre.
+
+```typescript
+import type { CollectionConfig } from "@rebasepro/types";
+
+const eventsCollection: CollectionConfig = {
+    slug: "events",
+    name: "Events",
+    dataSource: "analytics",      // déclaré avec transport: "direct"
+    properties: {
+        city: { name: "City", type: "string" },
+        code: { name: "Code", type: "string" }
+    },
+    admin: {
+        browserCallbacks: {
+            afterRead: ({ row }) => ({ ...row, label: [row.city, row.code].join(" · ") })
+        }
+    }
+};
+```
+
+Deux règles découlent de « livré à chaque visiteur », et aucune n'est
+stylistique :
+
+1. **Aucun secret.** Pas de clé d'API, pas de `process.env`, rien que vous
+   n'aimeriez pas voir lu dans le bundle. Cela appartient à `callbacks`.
+2. **Ce n'est pas une frontière de sécurité.** Un `browserCallbacks.afterRead`
+   qui masque un champ le masque *après* que le navigateur détient déjà la
+   ligne — sur un transport direct, le document brut vient directement du
+   magasin. C'est de la présentation. Le masquage qui doit tenir va dans
+   `callbacks`, ou dans les règles du magasin lui-même.
+
+Sur une collection à transport serveur — le cas par défaut, et presque
+certainement le vôtre — le serveur a déjà exécuté `callbacks` avant que la ligne
+n'atteigne le panneau, donc un `browserCallbacks.afterRead` s'exécute *en plus*.
+Écrivez-le idempotent, ou ne l'écrivez pas.
+
 ## Définir les Rappels
 
 ```typescript

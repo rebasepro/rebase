@@ -1,24 +1,4 @@
-import {
-    CollectionAccessor,
-    DataDriver,
-    Entity,
-    EntityValues,
-    FindAllParams,
-    FindParams,
-    FindResponse,
-    FindResult,
-    IterateParams,
-    LogicalCondition,
-    OrderByTuple,
-    RebaseData,
-    RebaseSdkData,
-    SDKCollectionClient,
-    SDKQueryBuilderInterface,
-    WhereFilterOp,
-    WhereValueFor,
-    type ComputedSortField,
-    type SearchMatch
-} from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, RebaseApiError, RebaseData, RebaseSdkData, SDKCollectionClient, SDKQueryBuilderInterface, type ComputedSortField, type SearchMatch, WhereFilterOp, WhereValueFor } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
 import { collectAllPages, paginateFind, resolveFindWindow } from "./paginate";
@@ -570,6 +550,19 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
         async findById(id: string | number): Promise<M | undefined> {
             const s = await snap.findById(id);
             return s ? entityToRow(s) : undefined;
+        },
+        async get(id: string | number): Promise<M> {
+            // The same contract server-side as in the browser SDK, deliberately:
+            // a callback, a cron and an app all read a row by id, and the shape
+            // of "it is not there" should not depend on which one is asking.
+            const s = await snap.findById(id);
+            if (!s) {
+                throw new RebaseApiError(
+                    `No record with id ${JSON.stringify(String(id))} in "${slug}".`,
+                    { status: 404, code: "NOT_FOUND" }
+                );
+            }
+            return entityToRow(s);
         },
         async create(data: Partial<M>, id?: string | number): Promise<M> {
             return entityToRow(await snap.create(data as Partial<EntityValues<M>>, id));

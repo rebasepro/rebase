@@ -148,6 +148,14 @@ export interface ExistingSchema {
      * constraint rather than attempting one that aborts the boot.
      */
     populatedTables?: Set<string>;
+    /**
+     * `schema.table.column` for every column the database gives a DEFAULT.
+     *
+     * Paired with {@link notNullColumns} to decide whether a column no property
+     * declares can still accept a write: NOT NULL with a default can, NOT NULL
+     * without one cannot. Absent is read as "unknown", which reports nothing.
+     */
+    columnDefaults?: Set<string>;
 }
 
 /**
@@ -255,6 +263,43 @@ export interface EnsurePlan {
      * hours later by whichever end validates first.
      */
     columnTypeDrift: ColumnTypeDrift[];
+    /**
+     * Columns that are NOT NULL, have no default, and that no property declares
+     * any more — so every insert through the API is rejected for a field the
+     * author cannot name, because they already deleted it.
+     *
+     * This is what a **rename** looks like to an additive provisioner. Rename
+     * `title` to `headline` and boot does exactly what it promises: it adds
+     * `headline` (nullable, correctly, and says why) and leaves `title` alone,
+     * because dropping a column is destructive and this runs unattended. The
+     * table is then unwritable:
+     *
+     *     POST /api/data/posts -> 400 PG_23502
+     *     Missing required field: "title" in "posts" cannot be empty.
+     *
+     * naming a field that is no longer in the collection at all. On the default
+     * first-run path there is no way out inside the product either: the managed
+     * database is PGlite, and `db push` — the documented repair — refuses there
+     * because Atlas needs a second database to diff against.
+     *
+     * Reported, never acted on. Dropping the column is the right fix roughly
+     * always and destructive exactly once, which is not a decision to take
+     * unattended.
+     */
+    orphanedRequiredColumns: OrphanedRequiredColumn[];
+}
+
+/**
+ * A NOT NULL column with no default that no property declares.
+ * @see EnsurePlan.orphanedRequiredColumns
+ */
+export interface OrphanedRequiredColumn {
+    /** `schema.table`. */
+    table: string;
+    /** The column left behind. */
+    column: string;
+    /** The collection that no longer declares it. */
+    slug: string;
 }
 
 /** A constraint the configuration asks for that the planner is not applying. */
@@ -853,8 +898,16 @@ export function planCollectionSchemaEnsure(
     }
 
     // 3c. The columns relation and reference properties own.
+    //
+    // Recorded per table as well as planned: these columns are derived here
+    // rather than declared in `properties`, so the orphan check below would
+    // otherwise read every foreign key as a column nobody declared.
+    const plannedRelationColumns = new Map<string, Set<string>>();
     for (const relational of planRelationalColumns(collections)) {
         const relKey = `${relational.schema}.${relational.table}`;
+        if (!plannedRelationColumns.has(relKey)) plannedRelationColumns.set(relKey, new Set());
+        plannedRelationColumns.get(relKey)!.add(relational.column);
+        if (relational.legacyColumn) plannedRelationColumns.get(relKey)!.add(relational.legacyColumn);
         if (renameLegacyColumn(relKey, relational.schema, relational.table, relational.column, relational.legacyColumn)) continue;
         addColumn(
             relKey,
@@ -959,6 +1012,44 @@ export function planCollectionSchemaEnsure(
         });
     }
 
+    // A column the database still requires that no property declares any more.
+    //
+    // Computed last, over the same live snapshot the rest of the plan read, and
+    // only for tables this run did not create — a table created here has exactly
+    // the columns the collection asked for, so there is nothing to orphan.
+    //
+    // Every element of the test matters. NOT NULL, because a nullable leftover
+    // accepts a write and is merely untidy. No DEFAULT, because a leftover with
+    // one is filled in for you. Not declared, because that is what makes it
+    // unreachable — the author has no field to send. The id column is excluded
+    // for the same reason it is skipped everywhere else here: it is generated.
+    const orphanedRequiredColumns: OrphanedRequiredColumn[] = [];
+    if (existing.notNullColumns && existing.columnDefaults) {
+        for (const collection of collections) {
+            const key = qualified(collection);
+            const live = existing.tables.get(key);
+            if (!live || created.has(key)) continue;
+
+            const declared = new Set<string>();
+            for (const [propName, prop] of Object.entries(collection.properties ?? {})) {
+                declared.add(resolveColumnName(propName, prop as Property));
+            }
+            // Relation and reference columns are planned by the relational
+            // planner, not from `properties`, so a foreign key would otherwise
+            // read as undeclared. Anything that planner named for this table is
+            // declared by definition.
+            for (const column of plannedRelationColumns.get(key) ?? []) declared.add(column);
+
+            for (const column of live) {
+                const columnKey = `${key}.${column}`;
+                if (declared.has(column)) continue;
+                if (!existing.notNullColumns.has(columnKey)) continue;
+                if (existing.columnDefaults.has(columnKey)) continue;
+                orphanedRequiredColumns.push({ table: key, column, slug: collection.slug });
+            }
+        }
+    }
+
     return {
         actions,
         statements: actions.map(a => a.sql),
@@ -967,7 +1058,8 @@ export function planCollectionSchemaEnsure(
         searchAdopted,
         vectorIndexSkipped,
         withheldConstraints,
-        columnTypeDrift
+        columnTypeDrift,
+        orphanedRequiredColumns
     };
 }
 
@@ -991,14 +1083,20 @@ export async function readExistingSchema(
     // — `int4`, `jsonb`, `_numeric`, `vector` — which is what the drift check
     // needs.
     const columnTypes = new Map<string, string>();
+    // A NOT NULL column that has a DEFAULT is not a problem for a write that
+    // omits it, so orphan detection needs the default as well as the nullability
+    // — otherwise every `created_at DEFAULT now()` on a table whose collection
+    // does not declare it would be reported as a blocker.
+    const columnDefaults = new Set<string>();
     const { rows: columns } = await client.query<{
         table_schema: string;
         table_name: string;
         column_name: string;
         is_nullable: string;
         udt_name: string | null;
+        column_default: string | null;
     }>(
-        `SELECT table_schema, table_name, column_name, is_nullable, udt_name
+        `SELECT table_schema, table_name, column_name, is_nullable, udt_name, column_default
          FROM information_schema.columns
          WHERE table_schema IN (${inList})`
     );
@@ -1008,6 +1106,7 @@ export async function readExistingSchema(
         tables.get(key)!.add(row.column_name);
         if (row.is_nullable === "NO") notNullColumns.add(`${key}.${row.column_name}`);
         if (row.udt_name) columnTypes.set(`${key}.${row.column_name}`, row.udt_name);
+        if (row.column_default !== null) columnDefaults.add(`${key}.${row.column_name}`);
     }
 
     // Which tables hold rows. This is the only fact that decides whether a
@@ -1114,7 +1213,8 @@ export async function readExistingSchema(
     }
 
     return {
-        tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables, columnTypes
+        tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables, columnTypes,
+        columnDefaults
     };
 }
 
@@ -1274,6 +1374,24 @@ export async function ensureCollectionTables(
     // whose first symptom is a write rejected long afterwards.
     for (const drift of plan.columnTypeDrift) {
         const message = columnTypeDriftMessage(drift);
+        logger.warn(`[schema] ${message}`);
+        log?.(message);
+    }
+
+    // Said once per column, every boot, and it matters more than the rest here
+    // because the table is not merely imperfect — it is unwritable, and the
+    // error the API returns names a field the author has already deleted.
+    // This is what a renamed property looks like to an additive provisioner.
+    for (const orphan of plan.orphanedRequiredColumns) {
+        const [schema, table] = orphan.table.split(".");
+        const message =
+            `"${orphan.table}"."${orphan.column}" is NOT NULL with no default, and the "${orphan.slug}" ` +
+            "collection no longer declares it. Every insert will be rejected for a field you cannot set " +
+            `(PG_23502, naming "${orphan.column}"). This is what a renamed property looks like: the new ` +
+            "column was added, and the old one cannot be dropped unattended. Fix it with ONE of:\n" +
+            `      ALTER TABLE "${schema}"."${table}" DROP COLUMN "${orphan.column}";               -- the rename is complete\n` +
+            `      ALTER TABLE "${schema}"."${table}" ALTER COLUMN "${orphan.column}" DROP NOT NULL; -- keep the data, stop requiring it\n` +
+            "      ...or declare the property again, if the column is still wanted.";
         logger.warn(`[schema] ${message}`);
         log?.(message);
     }
