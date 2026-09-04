@@ -8,49 +8,63 @@ A Rebase starter project has three interconnected packages:
 
 ```
 my-app/
-├── .env                    # Environment variables (DATABASE_URL, JWT_SECRET, etc.)
+├── .env                    # Generated for you: JWT_SECRET, a database password, a free port
+├── rebase.json             # Which apps this repository contains, and how each is built
 ├── package.json            # Root workspace config
+├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
 │
-├── frontend/               # React admin panel (Vite)
-│   ├── src/
-│   │   ├── App.tsx         # Main application component
-│   │   ├── main.tsx        # React entry point
-│   │   └── index.css       # Global styles
-│   ├── package.json
-│   └── vite.config.ts
+├── config/                 # Shared by the backend and the admin panel
+│   ├── index.ts            # Re-exports what the runtime reads (collections, storageAuthorize)
+│   ├── collections/        # Your data model
+│   │   ├── index.ts        # Exports `collections` and the default security rules
+│   │   ├── posts.ts        # Example collections
+│   │   └── users.ts        # The auth collection
+│   ├── resources.ts        # What this project needs from wherever it runs
+│   ├── storage.ts          # Who may read, write and list files
+│   └── cms.d.ts            # One line that makes the `admin` block legal here
 │
-├── backend/                # Node.js API server (Hono)
-│   ├── src/
-│   │   ├── index.ts        # Server entry — initializes Rebase backend
-│   │   └── schema.generated.ts  # Auto-generated Drizzle schema
-│   ├── drizzle.config.ts   # Drizzle ORM configuration
-│   ├── Dockerfile
-│   └── package.json
+├── backend/
+│   ├── functions/          # Custom API routes, auto-mounted at /api/functions/<name>
+│   │   └── hello.ts
+│   └── src/
+│       └── schema.generated.ts   # Drizzle schema, regenerated from your collections
 │
-└── config/                 # Collection definitions and configurations
-    └── collections/
-        ├── index.ts        # Exports all collections
-        └── products.ts     # Example: products collection
+└── frontend/               # The admin panel (React + Vite)
+    ├── src/App.tsx
+    ├── src/main.tsx
+    └── vite.config.ts
 ```
+
+:::note[There is no `backend/src/index.ts`]
+And no `Dockerfile`. A scaffolded project declares `runtime: "managed"` in
+`rebase.json`, which means the **published `rebasepro/server` image boots your
+project as a bundle** — the same artifact whether you self-host it or deploy it
+to Rebase Cloud. You configure the server through `rebase.json`, `config/` and
+environment variables rather than by writing an entry point.
+
+If you want to own the process — your own middleware, your own routes, your own
+auth wiring — `rebase eject` writes the entry point, a Dockerfile and a compose
+file that builds them. See [Custom Server Integration](/docs/backend/custom-server).
+:::
 
 ## Frontend (`frontend/`)
 
 The frontend is a standard **Vite + React + TypeScript** application. The key file is `App.tsx`, which wires together all Rebase controllers:
 
 ```typescript title="frontend/src/App.tsx"
-import { Rebase } from "@rebasepro/app";
-import { Scaffold, AppBar, Drawer } from "@rebasepro/cms";
+import { Rebase, RebaseAuth, useRebaseAuthController } from "@rebasepro/app";
+import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
 
-// The client connects to your backend API and WebSocket
+// `rebase dev` injects VITE_API_URL with the port it actually bound, so this
+// needs no hardcoded localhost — and a deployed build serves the admin from the
+// same origin as the API, where an empty value is what you want.
 const rebaseClient = createRebaseClient({
-    baseUrl: "http://localhost:3001",
-    websocketUrl: "ws://localhost:3001"
+    baseUrl: import.meta.env.VITE_API_URL,
+    auth: { authFlowMode: "cookie" }
 });
-
-// Collections are imported via a Vite virtual module
-// that reads from the config/ directory
 ```
 
 ### Key Concepts
@@ -61,44 +75,33 @@ const rebaseClient = createRebaseClient({
 
 ## Backend (`backend/`)
 
-The backend is a **Node.js server** built on [Hono](https://hono.dev/) (a fast, lightweight HTTP framework). The entry point `index.ts` initializes everything:
+There is no server file to read, and that is the design: a scaffolded project
+declares `runtime: "managed"`, so the published `rebasepro/server` image boots
+your project. What `backend/` holds is the code the runtime picks up:
 
-```typescript title="backend/src/index.ts"
-import { initializeRebaseBackend } from "@rebasepro/server";
-import { createPostgresAdapter } from "@rebasepro/server-postgres";
-import { Hono } from "hono";
-import type { HonoEnv } from "@rebasepro/server";
+| Path | What it is |
+|---|---|
+| `backend/functions/` | Custom routes, auto-mounted at `/api/functions/<filename>` |
+| `backend/crons/` | Scheduled jobs, discovered the same way (create it when you want one) |
+| `backend/src/schema.generated.ts` | The Drizzle schema, regenerated from your collections on every `rebase dev` and `rebase build` |
 
-const app = new Hono<HonoEnv>();
+The runtime sets up:
 
-await initializeRebaseBackend({
-    app,
-    server,
-    collectionsDir: "./config/collections",
-    database: createPostgresAdapter({
-        connection: db,
-        schema: { tables, enums, relations }
-    }),
-    auth: {
-        jwtSecret: process.env.JWT_SECRET,
-        google: process.env.GOOGLE_CLIENT_ID
-            ? { clientId: process.env.GOOGLE_CLIENT_ID }
-            : undefined,
-    },
-    storage: {
-        type: "local",
-        basePath: "./uploads"
-    },
-    history: true
-});
-```
+- **REST API** at `/api/data/*` — generated CRUD for every collection
+- **Auth** at `/api/auth/*` — signup, login, refresh, OAuth
+- **Storage** at `/api/storage/*` — upload and download
+- **WebSocket** — realtime sync over Postgres LISTEN/NOTIFY
+- **Your functions and crons**, from the directories above
 
-`initializeRebaseBackend` sets up:
-- **REST API** routes at `/api/data/*` — auto-generated CRUD for each collection
-- **Auth** routes at `/api/auth/*` — signup, login, refresh, Google OAuth
-- **Storage** routes at `/api/storage/*` — file upload/download
-- **WebSocket** server — real-time entity sync via Postgres LISTEN/NOTIFY
-- **History** — audit trail recording on every entity change
+Configuration comes from `rebase.json`, the `config/` directory and environment
+variables. See [Environment & Configuration](/docs/getting-started/configuration).
+
+To take ownership of the process instead — your own middleware, routes and auth
+wiring — run `rebase eject`. It writes an entry point that calls
+`initializeRebaseBackend` directly, plus a Dockerfile and a compose file that
+builds it; from then on you maintain the server and platform runtime upgrades no
+longer reach the project. That surface is documented in
+[Custom Server Integration](/docs/backend/custom-server).
 
 ## Collections (`config/collections/`)
 
@@ -110,7 +113,6 @@ import { defineCollection } from "@rebasepro/cms-types";
 export const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
-    table: "products",
     properties: {
         name: { type: "string", name: "Name" },
         price: { type: "number", name: "Price" }
@@ -118,7 +120,7 @@ export const productsCollection = defineCollection({
 });
 ```
 
-The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api/data/products`). The `table` maps to the PostgreSQL table name.
+The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api/data/products`), and the PostgreSQL table name defaults to it. Add `table` only when they differ.
 
 ## How They Connect
 

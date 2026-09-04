@@ -15,7 +15,7 @@ This scaffolds a project with three packages:
 | Folder | Description |
 |--------|-------------|
 | `frontend/` | React SPA — Vite + TypeScript with the Rebase admin UI |
-| `backend/` | Node.js server — Hono, PostgreSQL via Drizzle ORM, WebSocket |
+| `backend/` | Your custom functions and crons, plus the generated Drizzle schema. There is no server file — the published runtime boots the project |
 | `config/` | Config files and collection definitions shared by both sides |
 
 ## Prerequisites
