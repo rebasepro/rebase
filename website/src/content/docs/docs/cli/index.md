@@ -184,6 +184,12 @@ rebase db pull --from postgres://…  [--anonymize]
 `--anonymize` replaces personal fields on the way in, so a production copy can be
 worked on locally without carrying real customer data onto a laptop.
 
+`pg_dump` strips privileges, so the copy would arrive with the source's RLS
+policies and none of the grants behind them — every read as `rebase_user` failing
+with `permission denied`. The pull re-provisions the app role afterwards, using
+the same routine boot and `rebase db push` use, so Rebase's internal tables stay
+revoked as they should be.
+
 ### `rebase db stop` / `rebase db reset`
 
 For the managed development database only:

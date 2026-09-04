@@ -83,6 +83,19 @@
   domain is now refused there, before the database is started, naming
   `rebase dev --docker` and `DATABASE_URL` as the two things that work.
 
+- **`rebase db pull` handed back a database the application could not read.**
+  `pg_dump --no-privileges` strips every GRANT, so the copy arrived with the
+  source's RLS policies and its `FORCE ROW LEVEL SECURITY` intact and nothing
+  behind them. Measured on a 30-table project: 68 policies and 60 grants in, 68
+  policies and **0** grants out, and the first read as the role Rebase serves
+  every request through failing with `permission denied for table leads` — after
+  a green `✓ Local database now holds a copy of …`. Anyone who pulled and then
+  opened `psql`, ran `rls-check`, or pointed a test suite at the copy hit a wall
+  with no hint of the cause. The pull now re-provisions the app role through the
+  same `ensureAppRole` boot and `db push` call, so internal tables stay revoked
+  as well. The backup path already guarded this hazard; the newer command people
+  are told to use did not.
+
 ### Security
 
 An external audit of the framework and Rebase Cloud on 2 September 2026. Every

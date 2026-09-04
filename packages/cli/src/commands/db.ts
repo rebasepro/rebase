@@ -513,7 +513,7 @@ async function manageLocalDatabase(
  * and the wrong one here means overwriting production with a laptop.
  */
 async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
-    const { anonymizeStatements, describeTarget, dumpArgs, findPgDump, restoreArgs } =
+    const { anonymizeStatements, describeTarget, dumpArgs, findPgDump, provisionableSchemas, restoreArgs } =
         await import("../dev-db/pull");
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
 
@@ -608,9 +608,69 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
             }
         }
 
+        await restoreAppRole(target);
+
         console.log(chalk.green("✓ Local database now holds a copy of " + describeTarget(source)));
     } finally {
         fs.rmSync(dumpFile, { force: true });
+    }
+}
+
+/**
+ * Give the restored copy back the privileges `pg_dump` stripped.
+ *
+ * A pull without this ends on a green tick and hands over a database the
+ * application cannot read: `--no-privileges` removes every GRANT, so the copy
+ * has the source's RLS policies and none of the grants behind them, and the
+ * first query as `rebase_user` fails with `permission denied`. Measured — 68
+ * policies and 60 grants in, 68 policies and 0 grants out.
+ *
+ * `ensureAppRole` is the routine boot runs and `rebase db push` runs, so the
+ * pulled database ends up in the state a booted one is in, and there is no
+ * second description of these grants to drift. `detectConnectionPosture` gates
+ * it the same way `db push` does: a connection that cannot create roles reports
+ * that rather than failing the pull, which has already succeeded by this point.
+ *
+ * Failure here is a warning, not an error. The data is restored and correct; a
+ * missing grant is repaired by the next `rebase dev` or `rebase db push`, and
+ * saying so beats unwinding a copy that is fine.
+ */
+async function restoreAppRole(target: string): Promise<void> {
+    const { Client } = await import("pg");
+    const { detectConnectionPosture, ensureAppRole, REBASE_USER_ROLE } =
+        await import("@rebasepro/server-postgres");
+    const { provisionableSchemas } = await import("../dev-db/pull");
+
+    const client = new Client({ connectionString: target });
+    await client.connect();
+    try {
+        const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
+        const posture = await detectConnectionPosture(runSql);
+        if (!posture.privileged) {
+            console.log(chalk.yellow(
+                `  ⚠ Could not re-grant the "${REBASE_USER_ROLE}" role — this connection may not create roles.`
+            ));
+            console.log(chalk.gray("    The copy has its RLS policies but no privileges behind them;"));
+            console.log(chalk.gray("    `rebase dev` or `rebase db push` will provision them."));
+
+            return;
+        }
+
+        const { rows } = await client.query<{ schema: string }>(
+            "SELECT nspname AS \"schema\" FROM pg_namespace"
+        );
+        const schemas = provisionableSchemas(rows);
+        await ensureAppRole(runSql, schemas);
+        console.log(chalk.gray(
+            `  ✓ Re-granted "${REBASE_USER_ROLE}" on ${schemas.length} schema(s) — pg_dump strips privileges.`
+        ));
+    } catch (error) {
+        console.log(chalk.yellow(
+            `  ⚠ Restored, but could not re-grant "rebase_user": ${error instanceof Error ? error.message : String(error)}`
+        ));
+        console.log(chalk.gray("    Run `rebase db push` (or start `rebase dev`) to provision it."));
+    } finally {
+        await client.end();
     }
 }
 
