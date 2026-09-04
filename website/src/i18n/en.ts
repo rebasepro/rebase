@@ -880,7 +880,7 @@ export const en = {
   "studiopage.12": "Row-level security",
   "studiopage.13": "Define granular permissions per role, per table — enforced natively in PostgreSQL.",
   "studiopage.14": "Interactive ERD showing tables, columns, and relationships in a visual diagram.",
-  "studiopage.15": "Create an isolated copy of the database, work against it, and delete it when you are done. Create, list, inspect, delete — there is no merge, and the page does not pretend there is.",
+  "studiopage.15": "Copy the whole database — schema, rows, policies — switch your project onto it, and delete it when you are done. Create, list, inspect, switch, delete — there is no merge, and the page does not pretend there is.",
   "studiopage.16": "Run JavaScript with the Rebase SDK in a live sandbox. Test queries and automate tasks.",
   "studiopage.17": "Monitor and manage scheduled background tasks. View logs, status, and run history.",
   "studiopage.18": "/api/users/:id",
