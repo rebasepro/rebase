@@ -469,7 +469,39 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
         process.exit(1);
     }
 
+    // `--database-url` is refused rather than honoured, and refused rather than
+    // ignored — which is what it was.
+    //
+    // Ignored is the dangerous one. The flag was accepted, dropped on the floor,
+    // and the pull went ahead against the `.env` database: someone writing
+    // `rebase db pull --from prod --database-url scratch --yes` destroyed their
+    // working database while naming a different one. A flag that changes nothing
+    // is a bug; a destructive flag that changes nothing is a data-loss bug.
+    //
+    // Honoured is the other tempting answer, and it breaks the one guarantee
+    // this command makes. The target is always the local development database
+    // *by construction* — there is no `--to`, and no flag that reverses the
+    // direction — because a tool that can copy both ways eventually copies the
+    // wrong way, and the wrong way here is a laptop over production.
+    // `--database-url prod` is exactly that instruction written as a target.
+    //
+    // `--docker` is a different question and is passed through: it says how to
+    // get a local database, not which database to overwrite.
+    const targetFlag = readFlagValue(rawArgs, "--database-url");
+    if (targetFlag !== null) {
+        console.error(chalk.red("✗ `rebase db pull` does not take --database-url."));
+        console.error("");
+        console.error(chalk.gray("  The target is always this project's local development database. There is"));
+        console.error(chalk.gray("  no flag that makes this write somewhere else, deliberately: a command that"));
+        console.error(chalk.gray("  can copy in both directions eventually copies in the wrong one."));
+        console.error("");
+        console.error(chalk.gray(`  To read from another database, that is ${chalk.cyan("--from")}:`));
+        console.error(chalk.gray(`  rebase db pull --from ${targetFlag}`));
+        process.exit(1);
+    }
+
     const prepared = await prepareDatabaseEnv(projectRoot, {
+        flagDocker: rawArgs.includes("--docker"),
         onProgress: (message) => console.log(chalk.gray(`  ${message}`))
     });
     const target = prepared.env.DATABASE_URL ?? process.env.DATABASE_URL ?? "";
@@ -586,7 +618,8 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
     },
     pull: {
         usage: "rebase db pull --from <url> [--schema <name>] [--anonymize] [--yes]",
-        summary: "Copy another database into local development. One-directional by design — it can never push."
+        summary: "Copy another database into local development. One-directional by design — it can never push.",
+        notes: ["The target is not selectable: --database-url is refused, so this can never write to a remote database."]
     },
     stop: { usage: "rebase db stop", summary: "Stop the managed development database. Data is kept." },
     reset: {
