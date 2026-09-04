@@ -312,11 +312,7 @@ rebase build && rebase start
 | `rebase db push` | Apply schema directly to database (development only) |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending SQL migrations |
-<<<<<<< HEAD
-| `rebase db branch` | Database branching (create, list, delete, info, prune) |
-=======
-| `rebase db branch` | Database branching (create, list, delete, info) — needs a real PostgreSQL |
->>>>>>> fix/db-branch-refuse-managed
+| `rebase db branch` | Database branching (create, list, delete, info, prune) — needs a real PostgreSQL |
 | `rebase db backup` | Write a backup of the current database |
 | `rebase db backups` | List the backups taken so far |
 | `rebase db restore` | Restore the database from a backup |
