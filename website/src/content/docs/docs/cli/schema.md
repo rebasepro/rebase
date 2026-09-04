@@ -151,7 +151,9 @@ Database branching for parallel development:
 
 ```bash
 rebase db branch create feature_auth
+rebase db branch switch feature_auth
 rebase db branch list
+rebase db branch switch --off
 rebase db branch delete feature_auth
 ```
 

@@ -610,6 +610,13 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
         await import("../dev-db/branch-pointer");
     const { readEnvFile } = await import("../utils/project");
 
+    // Read as a flag rather than as the name in the third position, so
+    // `switch --off` and `switch feature --off` mean the same thing. The doc
+    // verifier reads a command's flags out of exactly this shape, which is the
+    // other reason: a flag it cannot see is one it reports as unrunnable in
+    // every page that documents it.
+    const goingOff = rawArgs.includes("--off") || rawArgs.includes("--main");
+
     // `rawArgs` is the whole of `process.argv`, so the command's own words start
     // at index 2: ["db", "branch", "switch", <name>].
     const name = rawArgs.slice(2)[3];
@@ -618,7 +625,7 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     // `switch` with no argument reports rather than changes. "Which branch am I
     // on" is asked far more often than "move me", and answering it should not
     // require guessing a flag.
-    if (!name) {
+    if (!name && !goingOff) {
         const active = readActiveBranch(projectRoot);
         console.log("");
         if (active) {
@@ -634,7 +641,7 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
         return;
     }
 
-    if (name === "--off" || name === "--main") {
+    if (goingOff) {
         const active = readActiveBranch(projectRoot);
         clearActiveBranch(projectRoot);
         console.log("");

@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`rebase db branch switch` — branching stopped one step short of being a
+  feature.** `create` copied a 12 MB database in 1.2s and then printed
+  `Database: rb_feature_auth` and nothing else: there was no `switch`, no
+  `--branch` on `rebase dev`, no `REBASE_BRANCH`, and not even a connection
+  string to paste. The only way to work on a branch was to hand-edit
+  `DATABASE_URL`, while the documentation said the CLI updated your local
+  development configuration — it did not, and the `.env` was byte-identical
+  afterwards.
+
+  ```bash
+  rebase db branch switch feature_auth   # every later command follows
+  rebase db branch switch                # which branch am I on?
+  rebase db branch switch --off          # back to the main database
+  ```
+
+  The branch is recorded in `.rebase/branch.json` as a name, never a connection
+  string, so credentials stay in `.env` alone. It outranks `DATABASE_URL` in
+  `.env` — any lower and switching would do nothing on a project that sets one —
+  and loses to `--database-url` and a `DATABASE_URL` in the shell, so a flag on
+  the command line still beats a switch made yesterday. Deleting the branch you
+  are on returns the checkout to the main database instead of leaving it aimed
+  at a database that no longer exists.
+
 ### Security
 
 An external audit of the framework and Rebase Cloud on 2 September 2026. Every

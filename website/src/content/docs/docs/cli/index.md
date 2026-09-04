@@ -199,8 +199,17 @@ rebase db reset    # delete it and start over
 rebase db branch create <name>
 rebase db branch list
 rebase db branch info <name>
+rebase db branch switch <name>     # work on it; every later command follows
+rebase db branch switch            # say which branch you are on
+rebase db branch switch --off      # back to the main database
 rebase db branch delete <name>
 ```
+
+`switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
+takes precedence over `DATABASE_URL` in `.env` and loses to `--database-url` or a
+`DATABASE_URL` in the shell, so a flag on the command line always outranks a
+switch made earlier. Deleting the branch you are on returns you to the main
+database rather than leaving the checkout pointed at a database that is gone.
 
 :::note[Not on the managed development database]
 `push`, `generate` and `migrate` plan their work with Atlas, which needs a second
