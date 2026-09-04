@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`rebase db pull --database-url` was accepted and ignored.** The flag never
+  reached the resolver, so the pull went ahead against the `.env` database
+  anyway: `rebase db pull --from prod --database-url scratch --yes` destroyed the
+  working database while naming a different one. It is now refused rather than
+  honoured — the target is the local development database by construction, since
+  a command that can copy in both directions eventually copies the wrong way, and
+  the wrong way here is a laptop over production. The refusal points at `--from`.
+
 ### Security
 
 An external audit of the framework and Rebase Cloud on 2 September 2026. Every

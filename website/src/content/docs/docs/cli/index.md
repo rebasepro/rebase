@@ -184,6 +184,10 @@ rebase db pull --from postgres://…  [--anonymize]
 `--anonymize` replaces personal fields on the way in, so a production copy can be
 worked on locally without carrying real customer data onto a laptop.
 
+The target is always this project's local development database and cannot be
+chosen: `--database-url` is refused rather than accepted, so there is no way to
+spell "pull into production". `--from` is the only direction.
+
 ### `rebase db stop` / `rebase db reset`
 
 For the managed development database only:
