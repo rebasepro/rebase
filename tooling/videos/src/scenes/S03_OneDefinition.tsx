@@ -44,7 +44,9 @@ const SURFACES: [string, string][] = [
     ["OpenAPI spec", "Generated, always current"],
     ["Typed SDK", "Accessors, not string paths"],
     ["RLS policies", "Applied by migration"],
-    ["Admin panel", "Optional"],
+    /* NOT "Optional". The film stopped selling the panel as a thing you might
+       skip two commits ago, and this label was still saying it. */
+    ["Admin panel", "Rendered from the same file"],
 ];
 
 export const S03_OneDefinition: React.FC = () => {

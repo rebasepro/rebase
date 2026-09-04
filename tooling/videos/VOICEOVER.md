@@ -35,13 +35,13 @@ sound like a way to generate REST routes.
 | 05 | Headline | 1000 | 3.2 | One package, your Postgres, and everything that follows. |
 | 06 | Headless | 1166 | 4.0 | Auth, storage, realtime, functions, cron, backups — running, not scaffolded. |
 | 07 | Stream | 1385 | 6.0 | Every write arrives on a socket, filtered by the same policies, without a subscription server. |
-| 08 | Panel | 1599 | 6.4 | Your team gets a real application. The same data, the same API, nothing duplicated for them. |
+| 08 | Panel | 1599 | 6.4 | Your team gets a real admin panel. The same data, the same API, nothing duplicated for them. |
 | 09 | Everything | 1860 | 5.2 | Boards, tables, cards, forms, a record open beside them. All generated, all live. |
 | 10 | Studio | 2081 | 4.4 | And you run the database from inside it. No second tool. |
 | 11 | SchemaMap | 2294 | 5.6 | Studio reads the catalogue, so the schema you see is the one that exists. |
 | 12 | Matrix | 2546 | 6.0 | Forty answers here, per collection, per role — and one file decides all of them. |
 | 13 | TwoUsers | 2794 | 5.2 | One call, two people, different rows. Neither can ask for the other's, ever. |
-| 14 | Proof | 3034 | 4.8 | Run it against the database you have now, before you believe us. |
+| 14 | Proof | 3034 | 4.8 | Run it on whatever you are running today. Ours, or anyone's. |
 | 15 | Agent | 3230 | 4.4 | Agents get what you get. There is nothing to negotiate with. |
 | 16 | OneCommand | 3425 | 5.2 | Three commands. No account, no container to pull, nothing to sign up for. |
 | 17 | Ownership | 3630 | 4.8 | MIT, end to end, on your own machine. Nobody holds your keys. |
