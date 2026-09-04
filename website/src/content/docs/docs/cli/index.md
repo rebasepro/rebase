@@ -200,7 +200,13 @@ rebase db branch create <name>
 rebase db branch list
 rebase db branch info <name>
 rebase db branch delete <name>
+rebase db branch prune [--older-than 14d] [--include-dev-diff]
 ```
+
+Every branch is a full copy on disk, so they need clearing out. `prune` removes
+three things: an entry whose database was dropped outside Rebase, a branch
+database whose entry was never written, and — only with `--older-than` — branches
+past an age you name. It asks before removing anything unless you pass `--yes`.
 
 :::note[Not on the managed development database]
 `push`, `generate` and `migrate` plan their work with Atlas, which needs a second

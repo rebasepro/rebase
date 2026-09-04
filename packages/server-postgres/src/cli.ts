@@ -668,16 +668,23 @@ async function reconcilePolicies(databaseUrl: string, collectionsPath: string): 
     }
 }
 
-/** `--flag value` or `--flag=value`, for the branch commands' own flags. */
-function readBranchFlag(rawArgs: readonly string[], flag: string): string | null {
-    for (let index = 0; index < rawArgs.length; index += 1) {
-        const arg = rawArgs[index];
-        if (arg === flag) return rawArgs[index + 1] ?? null;
-        if (arg.startsWith(`${flag}=`)) return arg.slice(flag.length + 1);
-    }
-
-    return null;
-}
+/**
+ * Flags the `branch` subcommands take.
+ *
+ * Declared as an `arg` spec rather than picked out of argv by hand, which is
+ * both how the rest of this file parses flags and how the documentation
+ * verifier discovers them: it reads `arg({ … })` specs out of this source, so a
+ * flag parsed any other way is one it reports as unrunnable in every page that
+ * documents it. Hand-rolled parsing here cost exactly that — `--older-than`
+ * worked and the docs check called it a command a reader cannot run.
+ */
+const BRANCH_FLAGS = {
+    "--older-than": String,
+    "--include-dev-diff": Boolean,
+    "--from": String,
+    "--yes": Boolean,
+    "-y": "--yes"
+} as const;
 
 async function branchCommand(rawArgs: string[]): Promise<void> {
     const branchAction = rawArgs[2]; // create, list, delete, info
@@ -809,7 +816,8 @@ max: 3 });
             }
 
             case "prune": {
-                const olderThanRaw = readBranchFlag(rawArgs, "--older-than");
+                const parsed = arg(BRANCH_FLAGS, { argv: rawArgs.slice(3), permissive: true });
+                const olderThanRaw = parsed["--older-than"] ?? null;
                 const olderThanDays = olderThanRaw == null ? null : parseOlderThan(olderThanRaw);
                 if (olderThanRaw != null && olderThanDays == null) {
                     outError(chalk.red(`  ✗ --older-than "${olderThanRaw}" is not a duration.`));
@@ -817,7 +825,7 @@ max: 3 });
                     process.exit(1);
                 }
 
-                const includeDevDiff = rawArgs.includes("--include-dev-diff");
+                const includeDevDiff = parsed["--include-dev-diff"] === true;
                 const { rows, databases } = await branchService.pruneCandidates();
                 const plan = planPrune({ rows, databases, branchPrefix: "rb_" }, { olderThanDays });
 
@@ -855,7 +863,7 @@ max: 3 });
                 }
                 out("");
 
-                if (!rawArgs.includes("--yes") && !rawArgs.includes("-y")) {
+                if (parsed["--yes"] !== true) {
                     // Dropping a database is not undoable and a branch may be
                     // the only copy of an afternoon's work.
                     const confirmed = await promptConfirm("  Remove these? (y/N) ");

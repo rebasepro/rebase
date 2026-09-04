@@ -312,7 +312,7 @@ rebase build && rebase start
 | `rebase db push` | Apply schema directly to database (development only) |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending SQL migrations |
-| `rebase db branch` | Database branching (create, list, delete, info) |
+| `rebase db branch` | Database branching (create, list, delete, info, prune) |
 | `rebase db backup` | Write a backup of the current database |
 | `rebase db backups` | List the backups taken so far |
 | `rebase db restore` | Restore the database from a backup |

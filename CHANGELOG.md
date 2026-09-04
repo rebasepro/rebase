@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`rebase db branch prune` — branching shipped with no cleanup story at all.**
+  No TTL, no prune, no `delete --all`, and every branch is a full-size copy:
+  `CREATE DATABASE ... TEMPLATE` duplicates the files on disk, so five branches
+  of a 100 GB database cost 500 GB. The only way to reclaim any of it was to
+  remember every name you had ever typed.
+
+  ```bash
+  rebase db branch prune                   # orphans only — always safe
+  rebase db branch prune --older-than 2w   # and anything past two weeks
+  ```
+
+  It also finds the two ways branches drift from their metadata, which drift in
+  opposite directions: an entry whose database was dropped outside Rebase, which
+  `list` would keep reporting forever while `switch` and `info` fail against a
+  database nothing can find; and a branch database whose entry was never
+  written, because `create` makes the database first and records it second.
+  Nothing expires unless asked, ages are floored so a cutoff never catches
+  something younger than it says, and `--older-than 7h` is refused rather than
+  read as seven days. Atlas's `<db>_dev_diff` scratch databases are reported
+  alongside but removed only with `--include-dev-diff`.
+
 ### Security
 
 An external audit of the framework and Rebase Cloud on 2 September 2026. Every

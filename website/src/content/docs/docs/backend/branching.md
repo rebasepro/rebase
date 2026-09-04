@@ -155,6 +155,24 @@ When you create or switch to a branch, the CLI updates your local development co
 Because PostgreSQL duplicates the files on disk, each branch consumes space equal to the source database. If you have a 100GB production database, creating 5 branches will consume an additional 500GB of storage. 
 * *Recommendation*: Use subsetted databases or thin dev-templates as your clone sources instead of full production clones.
 
+`rebase db branch prune` is how you get the space back:
+
+```bash
+rebase db branch prune                      # orphans only — always safe
+rebase db branch prune --older-than 2w      # and anything older than two weeks
+```
+
+Nothing expires unless you ask: a branch can be the only copy of an afternoon's
+work, so `--older-than` is opt-in and ages are floored, and the command shows its
+plan and asks before removing anything unless you pass `--yes`.
+
+Prune also finds the two ways branches drift from their metadata — an entry whose
+database was dropped with plain SQL (which `list` would keep reporting forever),
+and a branch database whose entry was never written (a crash between the two
+statements `create` runs). Atlas's `<db>_dev_diff` scratch databases are reported
+alongside but removed only with `--include-dev-diff`: they are not branches, and
+one may belong to a `db push` running right now.
+
 ### pgBouncer Compatibility
 When deploying behind pgBouncer or connection poolers, ensure the pooler supports administrative database operations. Creating and dropping databases bypasses standard transaction-level pools and requires direct connections to the Postgres server (using elevated user privileges) via the `adminConnectionString` configuration.
 
