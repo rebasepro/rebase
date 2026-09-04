@@ -29,6 +29,14 @@
   `rebase db branch info "$b" && deploy_against "$b"` ran the deploy against a
   branch that is not there, with the reason already on the terminal.
 
+- **`rebase db branch create alpha beta` created a branch called `alpha`.** The
+  extra word was discarded silently, so an unquoted name (`create my feature`), a
+  flag written without its dashes (`create feat from main`), or a shell splitting
+  a token you thought was one all succeeded and made a branch you did not ask
+  for — under a name you then type to switch, delete, or point a deploy at. Words
+  the command cannot account for are now refused before anything connects, with a
+  suggestion of the hyphenated name you probably meant.
+
 ### Security
 
 An external audit of the framework and Rebase Cloud on 2 September 2026. Every
