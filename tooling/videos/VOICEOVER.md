@@ -31,20 +31,19 @@ sound like a way to generate REST routes.
 | 01 | Plausible | 126 | 6.4 | An agent built this backend in an afternoon. Ten seconds of audit found two ways in. |
 | 02 | Claim | 386 | 4.8 | Rebase puts authorization in the database, where nothing can route around it. |
 | 03 | OneDefinition | 570 | 6.8 | You describe a collection once. The API, the SDK and the policies all come from that file. |
-| 04 | Routes | 788 | 4.4 | Every endpoint, an OpenAPI spec, and types that know your columns. |
-| 05 | Headline | 1000 | 3.2 | One package, your Postgres, and everything that follows. |
-| 06 | Headless | 1166 | 4.0 | Auth, storage, realtime, functions, cron, backups — running, not scaffolded. |
-| 07 | Stream | 1385 | 6.0 | Every write arrives on a socket, filtered by the same policies, without a subscription server. |
-| 08 | Panel | 1599 | 6.8 | Your team gets a real admin panel. The same data, the same API, nothing duplicated for them. |
-| 09 | Everything | 1860 | 5.2 | Boards, tables, cards, forms, a record open beside them. All generated, all live. |
-| 10 | Studio | 2081 | 4.4 | And you run the database from inside it. No second tool. |
-| 11 | SchemaMap | 2294 | 5.6 | Studio reads the catalogue, so the schema you see is the one that exists. |
-| 12 | TwoUsers | 2554 | 5.2 | One call, two people, different rows. Neither can ask for the other's, ever. |
-| 13 | Proof | 2794 | 4.4 | Run it on whatever you are running today. Ours, or anyone's. |
-| 14 | Agent | 2990 | 4.4 | Agents get what you get. There is nothing to negotiate with. |
-| 15 | OneCommand | 3185 | 5.2 | Three commands. No account, no container to pull, nothing to sign up for. |
-| 16 | Ownership | 3390 | 4.8 | MIT, end to end, on your own machine. Nobody holds your keys. |
-| 17 | Close | 3565 | 2.8 | Start with the database you already have. |
+| 04 | Headline | 824 | 3.2 | One package, your Postgres, and everything that follows. |
+| 05 | Headless | 934 | 4.0 | Auth, storage, realtime, functions, cron, backups — running, not scaffolded. |
+| 06 | Stream | 1115 | 6.0 | Every write arrives on a socket, filtered by the same policies, without a subscription server. |
+| 07 | Panel | 1329 | 6.8 | Your team gets a real admin panel. The same data, the same API, nothing duplicated for them. |
+| 08 | Everything | 1590 | 5.2 | Boards, tables, cards, forms, a record open beside them. All generated, all live. |
+| 09 | Studio | 1811 | 4.4 | And you run the database from inside it. No second tool. |
+| 10 | SchemaMap | 2024 | 5.6 | Studio reads the catalogue, so the schema you see is the one that exists. |
+| 11 | TwoUsers | 2284 | 5.2 | One call, two people, different rows. Neither can ask for the other's, ever. |
+| 12 | Proof | 2524 | 4.4 | Run it on whatever you are running today. Ours, or anyone's. |
+| 13 | Agent | 2720 | 4.4 | Agents get what you get. There is nothing to negotiate with. |
+| 14 | OneCommand | 2915 | 5.2 | Three commands. No account, no container to pull, nothing to sign up for. |
+| 15 | Ownership | 3120 | 4.8 | MIT, end to end, on your own machine. Nobody holds your keys. |
+| 16 | Close | 3295 | 2.8 | Start with the database you already have. |
 
 ## Notes for the read
 
