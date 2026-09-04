@@ -41,7 +41,7 @@ PostgreSQL processes this operation by copying the underlying filesystem directo
 
 ### The Connection Limitation Guard
 
-PostgreSQL requires that **no other active connections** exist on the template (source) database when running a `CREATE DATABASE ... TEMPLATE` command. 
+PostgreSQL requires that **no other active connections** exist on the template (source) database when running a `CREATE DATABASE ... TEMPLATE` command.
 
 To prevent failures, the Rebase `DatabasePoolManager` executes an active eviction process before cloning or dropping a branch:
 1. **Eviction Loop**: It automatically closes and disconnects all idle pools pointing to the targeted database within the Rebase application context.
@@ -59,6 +59,13 @@ Cannot create branch: the source database "leadgen" has active connections.
 
 `--force` terminates those sessions before templating, on `create` and `delete`
 alike. It never terminates the session running the command itself.
+
+`DatabasePoolManager` disconnects its own idle pools before cloning or dropping — but only the pools **inside the process doing the work**. `rebase db branch` runs as its own process, so this reaches nothing else on your machine:
+
+- **A running `rebase dev` blocks branching.** This is the common case, not an edge case: wanting a branch and running the app are usually the same moment. Stop the dev server, branch, and start it again.
+- **So does any other client.** DBeaver, pgAdmin, a `psql` session, a second app instance — PostgreSQL rejects the operation with `is being accessed by other users` and those connections have to be closed by hand.
+
+There is no way around this in PostgreSQL itself; `CREATE DATABASE ... TEMPLATE` is a filesystem-level copy and the template must be quiescent for the duration.
 
 ---
 
@@ -151,6 +158,9 @@ Database branches can be managed directly using the Rebase CLI.
 # Create a new branch named 'dev_sandbox'
 rebase db branch create dev_sandbox
 
+# Clone from a database other than the default
+rebase db branch create pr_review_42 --from rb_staging
+
 # List all branches and disk utilization
 rebase db branch list
 
@@ -162,6 +172,9 @@ rebase db branch switch
 
 # Back to the main database
 rebase db branch switch --off
+
+# Show one branch's parent, age and size
+rebase db branch info dev_sandbox
 
 # Delete a branch
 rebase db branch delete dev_sandbox
@@ -185,6 +198,25 @@ command line is a more immediate instruction than a switch made yesterday.
 
 `.rebase/` is gitignored, so the branch you are on is a fact about your machine
 and never about the project.
+
+Branches are ordinary PostgreSQL databases named after the branch with an `rb_` prefix, so `dev_sandbox` above is the database `rb_dev_sandbox` on the same server.
+
+Creating a branch does **not** change which database your project talks to. `rebase db branch create` makes the copy and stops there; nothing writes to `.env`, and the next `rebase dev` still uses the database it used before. To work against a branch, point `DATABASE_URL` at it yourself — the connection string is the one you already have, with the database name swapped:
+
+```bash
+# .env
+DATABASE_URL=postgresql://user:pass@localhost:5432/rb_dev_sandbox
+```
+
+---
+
+## Branching requires a real PostgreSQL server
+
+Branching does **not** work against the managed development database — the zero-setup PGlite database `rebase dev` starts when a project has no `DATABASE_URL`.
+
+PGlite serves exactly one database. `CREATE DATABASE ... TEMPLATE` against it writes a catalog entry and copies nothing, so the "branch" resolves to the database it was cloned from: writes you believe are isolated land in your development database, and there is no second copy to go back to.
+
+Use branching against a real server — your own PostgreSQL via `DATABASE_URL`, or `rebase dev --docker`.
 
 ---
 

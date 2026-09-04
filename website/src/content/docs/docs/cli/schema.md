@@ -154,8 +154,13 @@ rebase db branch create feature_auth
 rebase db branch switch feature_auth
 rebase db branch list
 rebase db branch switch --off
+
+rebase db branch info feature_auth
 rebase db branch delete feature_auth
 ```
+
+Each branch is a full copy of the database made with `CREATE DATABASE ... TEMPLATE`,
+so it needs a real PostgreSQL server and it costs the same disk as its source.
 
 ### `rebase doctor`
 

@@ -129,6 +129,20 @@
   are on returns the checkout to the main database instead of leaving it aimed
   at a database that no longer exists.
 
+### Documentation
+
+- **The branching page promised three things the feature does not do.** It said
+  the CLI updates your local development configuration when you create or switch
+  to a branch — there is no `switch`, and `create` leaves `.env` byte-identical.
+  It presented `DatabasePoolManager`'s pool eviction as the guard against
+  `is being accessed by other users`, when that only reaches pools inside the
+  process doing the work and `rebase db branch` is its own process — so a running
+  `rebase dev` blocks branching and always did. And nothing said branching needs
+  a real PostgreSQL server: on the managed PGlite database
+  `CREATE DATABASE ... TEMPLATE` writes a catalog entry and copies nothing, so
+  the "branch" resolves to the database it was cloned from. `rebase db branch
+  info` and `--from` were missing from the CLI reference as well.
+
 ### Security
 
 An external audit of the framework and Rebase Cloud on 2 September 2026. Every
