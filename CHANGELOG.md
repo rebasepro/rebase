@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`rebase db branch info` exited 0 for a branch that does not exist.** It
+  printed `✗ Branch "x" not found.` in red and reported success, while `delete`
+  — answering the same question — exited 1. So
+  `rebase db branch info "$b" && deploy_against "$b"` ran the deploy against a
+  branch that is not there, with the reason already on the terminal.
+
 ### Security
 
 An external audit of the framework and Rebase Cloud on 2 September 2026. Every
