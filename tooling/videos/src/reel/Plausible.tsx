@@ -67,7 +67,7 @@ export const Plausible: React.FC = () => {
                     Anyone can have a backend by lunch.
                 </DisplayLine>
                 <DisplayLine size={DISPLAY.statement} delay={13}>
-                    Nobody can tell you if it is safe.
+                    Nobody can tell you if it's safe.
                 </DisplayLine>
             </Stage>
 

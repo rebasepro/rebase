@@ -103,19 +103,19 @@ export const SCENES: SceneEntry[] = [
     },
     {
         id: "Claim", title: "02 · Row-level security", component: S04_Claim,
-        durationInFrames: 170, ground: "claim",
+        durationInFrames: 210, ground: "claim",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.22, reveal: 0.3 },
         enter: "descend",
     },
     {
         id: "OneDefinition", title: "03 · One definition", component: S03_OneDefinition,
-        durationInFrames: 210, ground: "base",
+        durationInFrames: 255, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.7, reveal: 0.3 },
         enter: "rise",
     },
     {
         id: "Headline", title: "04 · Headline", component: S01_Headline,
-        durationInFrames: 150, ground: "base",
+        durationInFrames: 180, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.3 },
         enter: "descend",
     },
@@ -181,7 +181,7 @@ export const SCENES: SceneEntry[] = [
     },
     {
         id: "Ownership", title: "15 · Yours", component: S11_Ownership,
-        durationInFrames: 175, ground: "base",
+        durationInFrames: 210, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.3 },
         enter: "rise",
     },

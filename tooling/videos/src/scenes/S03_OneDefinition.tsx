@@ -61,7 +61,7 @@ export const S03_OneDefinition: React.FC = () => {
             <Stage>
                 <Chapter n="02" label="One definition, every surface" delay={4} />
                 <div style={{ marginTop: 22, marginBottom: 52 }}>
-                    <DisplayLine size={DISPLAY.statement} delay={10}>There is no second data model.</DisplayLine>
+                    <DisplayLine size={DISPLAY.statement} delay={10}>There's no second data model.</DisplayLine>
                 </div>
 
                 {/* `stretch`, not `flex-start`: the two columns have to be the
