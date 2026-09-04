@@ -43,7 +43,7 @@ sound like a way to generate REST routes.
 | 13 | Agent | 2835 | 4.4 | An agent gets your permissions, and it can't argue past them. |
 | 14 | OneCommand | 3030 | 4.0 | Three commands, no account, and nothing to sign up for. |
 | 15 | Ownership | 3235 | 5.6 | It's open source, it runs on your machine, and nobody else has your password. |
-| 16 | Close | 3445 | 2.8 | Start with the database you've already got. |
+| 16 | Close | 3445 | 6.0 | So build it by lunch if you like. The difference is you'll know it's safe. |
 
 ## Notes for the read
 

@@ -36,5 +36,5 @@ export const NARRATION: { at: number; words: string[] }[] = [
     { at: 2835, words: ["An", "agent", "gets", "your", "permissions,", "and", "it", "can't", "argue", "past", "them."] },
     { at: 3030, words: ["Three", "commands,", "no", "account,", "and", "nothing", "to", "sign", "up", "for."] },
     { at: 3235, words: ["It's", "open", "source,", "it", "runs", "on", "your", "machine,", "and", "nobody", "else", "has", "your", "password."] },
-    { at: 3445, words: ["Start", "with", "the", "database", "you've", "already", "got."] },
+    { at: 3445, words: ["So", "build", "it", "by", "lunch", "if", "you", "like.", "The", "difference", "is", "you'll", "know", "it's", "safe."] },
 ];

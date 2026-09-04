@@ -187,7 +187,7 @@ export const SCENES: SceneEntry[] = [
     },
     {
         id: "Close", title: "16 · The ask", component: S08_Close,
-        durationInFrames: 160, ground: "base",
+        durationInFrames: 220, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.82, reveal: 0.3 },
         enter: "scale",
     },
