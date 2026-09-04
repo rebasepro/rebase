@@ -26,12 +26,12 @@ No line refers to Rebase Cloud. "Any cloud" means the viewer's own.
 | # | Scene | Starts | Words | Line | Join |
 |---|-------|--------|-------|------|------|
 | 00 | ColdOpen | 0.0s | — | *(silent — the mark assembles)* | — |
-| 01 | Plausible | 4.2s | 19 | An agent built this one in an afternoon, and it works. Then a ten-second scan found three ways in. | 1.9s **pause** |
+| 01 | Plausible | 4.2s | 19 | This backend was built by an agent in an afternoon. It works. A ten-second scan found three ways in. | 1.9s **pause** |
 | 02 | Claim | 12.4s | 19 | That's what Rebase is for. Every rule about who sees what is enforced by Postgres, not by your code. | 0.7s beat |
 | 03 | OneDefinition | 19.4s | 23 | You describe your data once, and the API, the code and the security rules all come from it. Change it, all three change. | 0.8s beat |
 | 04 | Headline | 27.9s | 17 | It's one install, and it brings you everything you're about to see. Nothing else to set up. | 0.3s flow |
 | 05 | Headless | 33.9s | 15 | Logins, file storage, real-time updates, scheduled jobs and backups — all of it already running. | 0.8s beat |
-| 06 | Stream | 39.7s | 23 | Real-time updates, so when data changes your app sees it immediately — and only the records that this person is allowed to see. | 0.3s flow |
+| 06 | Stream | 39.7s | 23 | Real-time updates, so when data changes your app sees it immediately — and only the records that the user is allowed to see. | 0.3s flow |
 | 07 | Panel | 47.7s | 29 | And your team gets a real admin panel. It runs on the same data and the same rules as your app, so you never build the same thing twice. | 0.3s flow |
 | 08 | Everything | 57.7s | 22 | Boards, tables, cards, forms, filters and search — nobody built these by hand. They come from your data, and they all work. | 0.7s beat |
 | 09 | Studio | 65.7s | 15 | Run a query, change a field, or fix a permission, without opening a database tool. | 0.8s beat |
@@ -49,3 +49,5 @@ No line refers to Rebase Cloud. "Any cloud" means the viewer's own.
   shows the line **36 frames early**, so you can read ahead rather than sight-read.
 - A line that starts before its cut is deliberate. Do not wait for the picture.
 - Numbers in the script are checked against the repo, not rounded for the read.
+- Every "this" and "it" must point at something visible. Check the picture,
+  not the sentence.

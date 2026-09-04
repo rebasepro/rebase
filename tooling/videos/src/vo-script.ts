@@ -35,6 +35,13 @@
  * There are NO references to Rebase Cloud. "Any cloud" in the ownership line
  * means the viewer's own infrastructure, which is the deploy-anywhere claim.
  *
+ * EVERY "this" AND "it" MUST POINT AT SOMETHING ON SCREEN. The first line
+ * once opened "An agent built this one in an afternoon" — "this one" named
+ * nothing, in the first sentence of the film, before the viewer knew what
+ * was being discussed. It says "This backend" now, and the terminal beside
+ * it shows that backend being built. Same defect as an earlier cut's
+ * "generated from that same file", pointing at a file never named.
+ *
  * PLAIN ENGLISH IS A HARD RULE HERE, not a preference. "Live" was the word
  * that proved it: it meant real-time in one scene, running in another, and
  * not-a-mockup in a third, all within thirty seconds. A word that means three
@@ -48,12 +55,12 @@ export const WORDS_PER_SECOND = 3.0;
 export const FRAMES_PER_WORD = 10;
 
 export const NARRATION: { at: number; words: string[] }[] = [
-    { at: 126, words: ["An", "agent", "built", "this", "one", "in", "an", "afternoon,", "and", "it", "works.", "Then", "a", "ten-second", "scan", "found", "three", "ways", "in."] },   // Plausible
+    { at: 126, words: ["This", "backend", "was", "built", "by", "an", "agent", "in", "an", "afternoon.", "It", "works.", "A", "ten-second", "scan", "found", "three", "ways", "in."] },   // Plausible
     { at: 372, words: ["That's", "what", "Rebase", "is", "for.", "Every", "rule", "about", "who", "sees", "what", "is", "enforced", "by", "Postgres,", "not", "by", "your", "code."] },   // Claim
     { at: 582, words: ["You", "describe", "your", "data", "once,", "and", "the", "API,", "the", "code", "and", "the", "security", "rules", "all", "come", "from", "it.", "Change", "it,", "all", "three", "change."] },   // OneDefinition
     { at: 837, words: ["It's", "one", "install,", "and", "it", "brings", "you", "everything", "you're", "about", "to", "see.", "Nothing", "else", "to", "set", "up."] },   // Headline
     { at: 1017, words: ["Logins,", "file", "storage,", "real-time", "updates,", "scheduled", "jobs", "and", "backups", "—", "all", "of", "it", "already", "running."] },   // Headless
-    { at: 1192, words: ["Real-time", "updates,", "so", "when", "data", "changes", "your", "app", "sees", "it", "immediately", "—", "and", "only", "the", "records", "that", "this", "person", "is", "allowed", "to", "see."] },   // Stream
+    { at: 1192, words: ["Real-time", "updates,", "so", "when", "data", "changes", "your", "app", "sees", "it", "immediately", "—", "and", "only", "the", "records", "that", "the", "user", "is", "allowed", "to", "see."] },   // Stream
     { at: 1432, words: ["And", "your", "team", "gets", "a", "real", "admin", "panel.", "It", "runs", "on", "the", "same", "data", "and", "the", "same", "rules", "as", "your", "app,", "so", "you", "never", "build", "the", "same", "thing", "twice."] },   // Panel
     { at: 1732, words: ["Boards,", "tables,", "cards,", "forms,", "filters", "and", "search", "—", "nobody", "built", "these", "by", "hand.", "They", "come", "from", "your", "data,", "and", "they", "all", "work."] },   // Everything
     { at: 1972, words: ["Run", "a", "query,", "change", "a", "field,", "or", "fix", "a", "permission,", "without", "opening", "a", "database", "tool."] },   // Studio
