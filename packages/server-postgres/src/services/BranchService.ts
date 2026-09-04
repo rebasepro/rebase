@@ -140,7 +140,10 @@ export class BranchService {
      * @param name   User-facing branch name (e.g., "feature_auth")
      * @param options.source  Source database to clone; defaults to the main database.
      */
-    async createBranch(name: string, options?: { source?: string }): Promise<BranchInfo> {
+    async createBranch(
+        name: string,
+        options?: { source?: string; force?: boolean }
+    ): Promise<BranchInfo> {
         if (options?.source) {
             validateIdentifier(options.source, "source database name");
         }
@@ -158,7 +161,22 @@ export class BranchService {
 
         // Disconnect any idle pools to the source DB so TEMPLATE works.
         // CREATE DATABASE ... TEMPLATE requires no other connections to the template.
+        //
+        // This only reaches pools inside *this* process. The CLI runs as its own
+        // process, so a `rebase dev` holding the database open is untouched by
+        // it — which is why the failure below has to name what is connected, and
+        // why `--force` exists.
         await this.poolManager.disconnectDatabase(sourceDb);
+
+        if (options?.force) {
+            const closed = await this.terminateConnections(sourceDb);
+            if (closed > 0) {
+                // Postgres reports the backend as gone before its slot is
+                // actually free, and CREATE DATABASE then fails on a connection
+                // that no longer exists. One short settle beats a confusing retry.
+                await new Promise((resolve) => setTimeout(resolve, 250));
+            }
+        }
 
         // Create the database using the source as a template.
         // Note: Identifiers must be double-quoted, not parameterized.
@@ -173,8 +191,8 @@ export class BranchService {
             if (pgError?.code === PG_OBJECT_IN_USE) {
                 // The template — not the new database — is the one still in use.
                 throw new Error(
-                    `Cannot create branch: the source database "${sourceDb}" has active connections. ` +
-                    "Close other clients or connections and try again."
+                    `Cannot create branch: the source database "${sourceDb}" has active connections.\n`
+                    + await this.describeBlockingConnections(sourceDb)
                 );
             }
             throw describeBranchDdlError(err, dbName);
@@ -198,7 +216,7 @@ export class BranchService {
      * Delete a branch database and remove its metadata.
      * Cannot delete the main/default database.
      */
-    async deleteBranch(name: string): Promise<void> {
+    async deleteBranch(name: string, options?: { force?: boolean }): Promise<void> {
         assertValidBranchName(name);
 
         // Safety, first pass: a request that would target the default database
@@ -230,8 +248,14 @@ export class BranchService {
             throw new Error("Cannot delete the main database.");
         }
 
-        // Disconnect any pools to this branch before dropping
+        // Disconnect any pools to this branch before dropping. Same limit as
+        // `createBranch`: in-process pools only.
         await this.poolManager.disconnectDatabase(dbName);
+
+        if (options?.force) {
+            const closed = await this.terminateConnections(dbName);
+            if (closed > 0) await new Promise((resolve) => setTimeout(resolve, 250));
+        }
 
         // Drop the database
         const safeDbName = dbName.replace(/"/g, '""');
@@ -241,8 +265,8 @@ export class BranchService {
             const pgError = extractPgError(err);
             if (pgError?.code === PG_OBJECT_IN_USE) {
                 throw new Error(
-                    `Cannot delete branch "${name}": the database has active connections. ` +
-                    "Close other clients and try again."
+                    `Cannot delete branch "${name}": the database has active connections.\n`
+                    + await this.describeBlockingConnections(dbName)
                 );
             }
             throw describeBranchDdlError(err, dbName);
@@ -252,6 +276,76 @@ export class BranchService {
         await this.db.execute(
             sql`DELETE FROM rebase.branches WHERE name = ${name}`
         );
+    }
+
+    /**
+     * Who is holding the database open, in words a developer can act on.
+     *
+     * `CREATE DATABASE ... TEMPLATE` and `DROP DATABASE` both require that no
+     * other session is connected, and the one thing the old message could not
+     * say is the only thing worth knowing: *which* session. "Close other
+     * clients or connections and try again" is advice you cannot follow when
+     * you do not know there is a `rebase dev` in another terminal — and that is
+     * the common case, because wanting a branch and running the app are the
+     * same moment.
+     *
+     * `application_name` is the useful column: node-postgres sends none by
+     * default, so a Rebase process shows as `(unnamed)` while DBeaver, pgAdmin
+     * and psql all name themselves. Counting by it separates "my own dev
+     * server" from "the GUI I forgot about" without any guessing.
+     *
+     * Best-effort by construction: this runs while reporting a failure, and a
+     * diagnostic that throws would replace a real error with its own.
+     */
+    private async describeBlockingConnections(dbName: string): Promise<string> {
+        try {
+            const result = await this.db.execute(sql`
+                SELECT coalesce(nullif(application_name, ''), '(unnamed)') AS app,
+                       count(*)::int AS n
+                  FROM pg_stat_activity
+                 WHERE datname = ${dbName}
+                   AND pid <> pg_backend_pid()
+                 GROUP BY 1
+                 ORDER BY 2 DESC, 1
+            `);
+            const rows = result.rows as Record<string, unknown>[];
+            if (rows.length === 0) {
+                // The blocker went away between the failure and this query, or
+                // it is a session Postgres does not attribute to this database.
+                return "  Retry — whatever was connected has since disconnected.";
+            }
+
+            const listed = rows
+                .map((row) => `    ${row.n} × ${String(row.app)}`)
+                .join("\n");
+
+            return `  Connected right now:\n${listed}\n`
+                + "  A running `rebase dev` is the usual one — stop it, or re-run with --force to\n"
+                + "  disconnect them for you.";
+        } catch {
+            return "  Close other clients and connections, or re-run with --force.";
+        }
+    }
+
+    /**
+     * Disconnect every other session on a database, and say how many.
+     *
+     * `pg_terminate_backend` rather than `pg_cancel_backend`: cancelling a
+     * query leaves the session connected, and a connected session is exactly
+     * what blocks the operation.
+     *
+     * The current backend is excluded — terminating the connection running this
+     * statement would abort the command that asked for it.
+     */
+    private async terminateConnections(dbName: string): Promise<number> {
+        const result = await this.db.execute(sql`
+            SELECT pg_terminate_backend(pid)
+              FROM pg_stat_activity
+             WHERE datname = ${dbName}
+               AND pid <> pg_backend_pid()
+        `);
+
+        return (result.rows as unknown[]).length;
     }
 
     /**

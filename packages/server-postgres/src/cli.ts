@@ -740,12 +740,14 @@ max: 3 });
                 if (fromIdx !== -1 && rawArgs[fromIdx + 1]) {
                     source = rawArgs[fromIdx + 1];
                 }
+                const force = rawArgs.includes("--force");
                 out("");
                 out(chalk.bold("  🌿 Creating database branch..."));
                 out(chalk.gray(`  Name:   ${name}`));
                 if (source) out(chalk.gray(`  Source: ${source}`));
+                if (force) out(chalk.gray("  Force:  other connections to the source will be disconnected"));
                 out("");
-                const branch = await branchService.createBranch(name, source ? { source } : undefined);
+                const branch = await branchService.createBranch(name, { source, force });
                 out(chalk.green(`  ✓ Branch "${branch.name}" created successfully.`));
                 out(chalk.gray(`    Database: rb_${branch.name}`));
                 out(chalk.gray(`    Parent:   ${branch.parentDatabase}`));
@@ -783,7 +785,7 @@ max: 3 });
                 }
                 out("");
                 out(chalk.bold(`  🗑️  Deleting branch "${name}"...`));
-                await branchService.deleteBranch(name);
+                await branchService.deleteBranch(name, { force: rawArgs.includes("--force") });
                 out(chalk.green(`  ✓ Branch "${name}" deleted.`));
                 out("");
                 break;
@@ -845,6 +847,12 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("list")}                              List all branches
   ${chalk.blue.bold("delete")} <name>                     Delete a branch
   ${chalk.blue.bold("info")} <name>                       Show branch details
+
+${chalk.green.bold("Options")}
+  ${chalk.blue.bold("--force")}                           Disconnect other sessions first.
+                                    Postgres refuses to copy or drop a database
+                                    anything else is connected to — usually your
+                                    own \`rebase dev\`.
 
 ${chalk.green.bold("Examples")}
   ${chalk.gray("# Create a branch from the current database")}

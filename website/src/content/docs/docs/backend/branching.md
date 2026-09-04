@@ -45,7 +45,20 @@ PostgreSQL requires that **no other active connections** exist on the template (
 
 To prevent failures, the Rebase `DatabasePoolManager` executes an active eviction process before cloning or dropping a branch:
 1. **Eviction Loop**: It automatically closes and disconnects all idle pools pointing to the targeted database within the Rebase application context.
-2. **External Connections Block**: If external clients (such as DBeaver, pgAdmin, or external backend processes) maintain active transactions on the source database, PostgreSQL will reject the template operation with a `"being accessed by other users"` error. In this scenario, those connections must be closed manually.
+2. **External Connections Block**: If external clients (such as DBeaver, pgAdmin, or external backend processes) maintain active transactions on the source database, PostgreSQL will reject the template operation with a `"being accessed by other users"` error.
+
+The failure names what is connected rather than leaving you to guess:
+
+```
+Cannot create branch: the source database "leadgen" has active connections.
+  Connected right now:
+    2 × psql
+  A running `rebase dev` is the usual one — stop it, or re-run with --force to
+  disconnect them for you.
+```
+
+`--force` terminates those sessions before templating, on `create` and `delete`
+alike. It never terminates the session running the command itself.
 
 ---
 

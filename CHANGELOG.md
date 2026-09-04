@@ -37,6 +37,16 @@
   the command cannot account for are now refused before anything connects, with a
   suggestion of the hyphenated name you probably meant.
 
+- **A branch could not be created while the dev server was running, and would
+  not say why.** `CREATE DATABASE ... TEMPLATE` needs the source quiescent, and
+  `DatabasePoolManager` only disconnects pools inside the process doing the work
+  — `rebase db branch` is its own process, so a `rebase dev` in another terminal
+  was never touched by it. Wanting a branch and running the app are the same
+  moment, so this was the common path, and the advice on failure was "close
+  other clients and try again" for the one case where you do not know what is
+  connected. The failure now lists the sessions by `application_name`, and
+  `--force` disconnects them for you, on create and delete alike.
+
 ### Security
 
 An external audit of the framework and Rebase Cloud on 2 September 2026. Every

@@ -202,6 +202,10 @@ rebase db branch info <name>
 rebase db branch delete <name>
 ```
 
+PostgreSQL will not copy or drop a database anything else is connected to, and
+the usual "anything else" is your own `rebase dev`. `create` and `delete` name
+what is holding the database open; `--force` disconnects those sessions first.
+
 :::note[Not on the managed development database]
 `push`, `generate` and `migrate` plan their work with Atlas, which needs a second
 empty database to compare against — and the managed PGlite serves exactly one.

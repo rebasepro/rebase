@@ -521,4 +521,121 @@ created_at: now }]
             );
         });
     });
+    // -----------------------------------------------------------------------
+    // Active connections — the most common reason branching fails
+    // -----------------------------------------------------------------------
+    describe("when something else is connected", () => {
+        /**
+         * `CREATE DATABASE ... TEMPLATE` and `DROP DATABASE` both require that
+         * no other session is attached. `poolManager.disconnectDatabase` only
+         * reaches pools in *this* process, and the CLI is its own process — so
+         * a `rebase dev` in another terminal is untouched by it. Wanting a
+         * branch and running the app are the same moment, which makes this the
+         * common path rather than the edge case.
+         */
+        const inUse = (query: string) => createDrizzleQueryError(
+            query, "55006", 'source database "my_app_db" is being accessed by other users'
+        );
+
+        it("names what is connected instead of saying \"close other clients\"", async () => {
+            (db.execute as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] })                       // existing-branch check
+                .mockRejectedValueOnce(inUse("CREATE DATABASE"))           // the CREATE
+                .mockResolvedValueOnce({ rows: [                           // pg_stat_activity
+                    { app: "(unnamed)", n: 2 },
+                    { app: "DBeaver", n: 1 }
+                ] });
+
+            await expect(service.createBranch("feature")).rejects.toThrow(/2 × \(unnamed\)/);
+        });
+
+        it("suggests the two things that actually work", async () => {
+            (db.execute as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] })
+                .mockRejectedValueOnce(inUse("CREATE DATABASE"))
+                .mockResolvedValueOnce({ rows: [{ app: "(unnamed)", n: 1 }] });
+
+            const error = await service.createBranch("feature").catch((e: Error) => e);
+
+            expect(error.message).toContain("rebase dev");
+            expect(error.message).toContain("--force");
+        });
+
+        it("says so plainly when the blocker disconnected in the meantime", async () => {
+            (db.execute as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] })
+                .mockRejectedValueOnce(inUse("CREATE DATABASE"))
+                .mockResolvedValueOnce({ rows: [] });
+
+            await expect(service.createBranch("feature")).rejects.toThrow(/since disconnected/);
+        });
+
+        it("still reports the failure when the diagnostic query itself fails", async () => {
+            // A diagnostic that throws would replace a real error with its own.
+            (db.execute as jest.Mock)
+                .mockResolvedValueOnce({ rows: [] })
+                .mockRejectedValueOnce(inUse("CREATE DATABASE"))
+                .mockRejectedValueOnce(new Error("pg_stat_activity is not readable"));
+
+            await expect(service.createBranch("feature")).rejects.toThrow(/active connections/);
+        });
+
+        it("reports the same way when a delete is blocked", async () => {
+            (db.execute as jest.Mock)
+                .mockResolvedValueOnce({ rows: [{ db_name: "rb_feature" }] })  // the branch row
+                .mockRejectedValueOnce(inUse("DROP DATABASE"))
+                .mockResolvedValueOnce({ rows: [{ app: "psql", n: 1 }] });
+
+            await expect(service.deleteBranch("feature")).rejects.toThrow(/1 × psql/);
+        });
+    });
+
+    describe("--force", () => {
+        it("terminates other sessions on the source before templating it", async () => {
+            (db.execute as jest.Mock).mockResolvedValue({ rows: [] });
+
+            await service.createBranch("feature", { force: true });
+
+            const statements = (db.execute as jest.Mock).mock.calls
+                .map((_call, index) => statementAt(db, index).sql);
+
+            expect(statements.some(text => text.includes("pg_terminate_backend"))).toBe(true);
+        });
+
+        it("never terminates the session running the statement", async () => {
+            // Terminating our own backend would abort the command that asked.
+            (db.execute as jest.Mock).mockResolvedValue({ rows: [] });
+
+            await service.createBranch("feature", { force: true });
+
+            const terminate = (db.execute as jest.Mock).mock.calls
+                .map((_call, index) => statementAt(db, index).sql)
+                .find(text => text.includes("pg_terminate_backend"));
+
+            expect(terminate).toContain("pid <> pg_backend_pid()");
+        });
+
+        it("terminates on the BRANCH when deleting, not on the main database", async () => {
+            (db.execute as jest.Mock).mockResolvedValue({ rows: [{ db_name: "rb_feature" }] });
+
+            await service.deleteBranch("feature", { force: true });
+
+            const call = (db.execute as jest.Mock).mock.calls
+                .map((_c, index) => statementAt(db, index))
+                .find(statement => statement.sql.includes("pg_terminate_backend"));
+
+            expect(call?.params).toContain("rb_feature");
+        });
+
+        it("does nothing of the sort without the flag", async () => {
+            (db.execute as jest.Mock).mockResolvedValue({ rows: [] });
+
+            await service.createBranch("feature");
+
+            const statements = (db.execute as jest.Mock).mock.calls
+                .map((_call, index) => statementAt(db, index).sql);
+
+            expect(statements.some(text => text.includes("pg_terminate_backend"))).toBe(false);
+        });
+    });
 });
