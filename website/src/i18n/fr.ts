@@ -780,7 +780,7 @@ export const fr = {
   "studiopage.12": "Sécurité au niveau des lignes",
   "studiopage.13": "Définissez des permissions granulaires par rôle et par table — appliquées nativement dans PostgreSQL.",
   "studiopage.14": "Un diagramme entité-association interactif montrant tables, colonnes et relations.",
-  "studiopage.15": "Créez une copie isolée de la base, travaillez dessus, et supprimez-la quand vous avez fini. Créer, lister, inspecter, supprimer — il n'y a pas de merge, et cette page ne prétend pas le contraire.",
+  "studiopage.15": "Copiez toute la base — schéma, lignes, policies —, basculez votre projet dessus, et supprimez-la quand vous avez fini. Créer, lister, inspecter, basculer, supprimer — il n'y a pas de merge, et cette page ne prétend pas le contraire.",
   "studiopage.16": "Exécutez du JavaScript avec le SDK Rebase dans un bac à sable en direct. Testez des requêtes et automatisez des tâches.",
   "studiopage.17": "Surveillez et gérez les tâches planifiées en arrière-plan. Consultez logs, statut et historique d'exécution.",
   "studiopage.18": "/api/users/:id",

@@ -126,3 +126,58 @@ describe("describeDevDatabase", () => {
         expect(described).not.toContain("staging.example.com");
     });
 });
+
+describe("the branch a checkout is switched to", () => {
+    const branch = { name: "feature_auth", url: "postgresql://h/rb_feature_auth" };
+
+    it("outranks DATABASE_URL in .env", () => {
+        // Without this the switch silently does nothing on every project that
+        // sets DATABASE_URL — which is every project not on the managed database.
+        const chosen = resolveDevDatabase({ envFile: { DATABASE_URL: "postgresql://h/main" }, branch });
+
+        expect(chosen).toMatchObject({ kind: "external", url: branch.url, source: "branch" });
+    });
+
+    it("loses to DATABASE_URL in the shell", () => {
+        // A variable in this shell is more immediate than a switch made yesterday.
+        const chosen = resolveDevDatabase({ env: { DATABASE_URL: "postgresql://h/ci" }, branch });
+
+        expect(chosen).toMatchObject({ source: "environment", url: "postgresql://h/ci" });
+    });
+
+    it("loses to --database-url", () => {
+        const chosen = resolveDevDatabase({ flagUrl: "postgresql://h/flag", branch });
+
+        expect(chosen).toMatchObject({ source: "flag" });
+    });
+
+    it("outranks --docker", () => {
+        const chosen = resolveDevDatabase({ flagDocker: true, branch });
+
+        expect(chosen).toMatchObject({ source: "branch" });
+    });
+
+    it("carries the branch name so diagnostics can say which one", () => {
+        const chosen = resolveDevDatabase({ branch });
+
+        expect(chosen).toMatchObject({ branch: "feature_auth" });
+        expect(describeDevDatabase(chosen)).toContain("feature_auth");
+    });
+
+    it("changes nothing when no branch is active", () => {
+        const chosen = resolveDevDatabase({ envFile: { DATABASE_URL: "postgresql://h/main" }, branch: null });
+
+        expect(chosen).toMatchObject({ source: "env-file" });
+    });
+
+    it("is ignored when its URL could not be derived", () => {
+        // `resolveActiveBranch` hands null through for an unparseable base
+        // rather than a half-built string.
+        const chosen = resolveDevDatabase({
+            envFile: { DATABASE_URL: "postgresql://h/main" },
+            branch: { name: "x", url: "" }
+        });
+
+        expect(chosen).toMatchObject({ source: "env-file" });
+    });
+});

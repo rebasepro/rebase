@@ -781,7 +781,7 @@ export const es = {
   "studiopage.12": "Seguridad a nivel de fila",
   "studiopage.13": "Define permisos granulares por rol y por tabla — aplicados de forma nativa en PostgreSQL.",
   "studiopage.14": "Un diagrama entidad-relación interactivo que muestra tablas, columnas y relaciones.",
-  "studiopage.15": "Crea una copia aislada de la base de datos, trabaja contra ella y bórrala cuando termines. Crear, listar, inspeccionar, borrar — no hay merge, y esta página no finge que lo haya.",
+  "studiopage.15": "Copia la base de datos entera — esquema, filas, políticas —, cambia tu proyecto a ella y bórrala cuando termines. Crear, listar, inspeccionar, cambiar, borrar — no hay merge, y esta página no finge que lo haya.",
   "studiopage.16": "Ejecuta JavaScript con el SDK de Rebase en un sandbox en vivo. Prueba consultas y automatiza tareas.",
   "studiopage.17": "Supervisa y gestiona las tareas programadas en segundo plano. Consulta logs, estado e historial de ejecuciones.",
   "studiopage.18": "/api/users/:id",

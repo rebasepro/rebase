@@ -11,9 +11,10 @@
  *
  *   1. `--database-url <url>`   — said on this command line, wins over everything
  *   2. `DATABASE_URL` in the shell environment
- *   3. `DATABASE_URL` in the project's `.env`
- *   4. `--docker` / a manifest preference of `docker`
- *   5. the managed PGlite database
+ *   3. the database branch this checkout is switched to
+ *   4. `DATABASE_URL` in the project's `.env`
+ *   5. `--docker` / a manifest preference of `docker`
+ *   6. the managed PGlite database
  *
  * An explicit connection string always wins. That is the whole point of the
  * override: someone pointing Rebase at their own Postgres — a colleague's
@@ -21,9 +22,17 @@
  * with no cleverness in between. The managed database is what fills the vacuum
  * when nobody has said anything, and it is the only case where the CLI picks.
  *
+ * The branch at (3) is the one addition that is not an explicit connection
+ * string, and it sits where it does deliberately. It has to outrank `.env` or
+ * `rebase db branch switch` would silently do nothing on every project that
+ * sets `DATABASE_URL` — which is every project not on the managed database.
+ * It must not outrank (1) or (2), because a flag on this command line and a
+ * variable in this shell are more immediate than a switch made yesterday.
+ *
  * {@link resolveDevDatabase} is pure: inputs in, decision out, no filesystem
- * and no process. Reading `.env` and starting a daemon happen elsewhere, so
- * the ordering above can be tested without either.
+ * and no process. Reading `.env`, reading the branch pointer and starting a
+ * daemon happen elsewhere, so the ordering above can be tested without any of
+ * them.
  */
 
 /** Where the answer came from. Carried so diagnostics can name it. */
@@ -34,6 +43,8 @@ export type DevDatabaseSource =
     | "environment"
     /** `DATABASE_URL` in the project's `.env`. */
     | "env-file"
+    /** The branch this checkout is switched to, over the base connection. */
+    | "branch"
     /** `--docker`, or `devDatabase: "docker"` in the manifest. */
     | "docker"
     /** Nobody said anything, so the managed database fills in. */
@@ -44,7 +55,9 @@ export type DevDatabase =
         kind: "external";
         /** The connection string, exactly as given. Never rewritten. */
         url: string;
-        source: Extract<DevDatabaseSource, "flag" | "environment" | "env-file">;
+        source: Extract<DevDatabaseSource, "flag" | "environment" | "env-file" | "branch">;
+        /** The branch name, when this checkout is switched to one. */
+        branch?: string;
     }
     | {
         kind: "docker";
@@ -66,6 +79,14 @@ export interface ResolveDevDatabaseInput {
     envFile?: Record<string, string> | null;
     /** `devDatabase` from `rebase.json`, if the project recorded a preference. */
     manifestPreference?: "managed" | "docker" | null;
+    /**
+     * The branch this checkout is switched to, already resolved to a URL.
+     *
+     * Resolved by the caller rather than here so this stays pure: deriving it
+     * needs the base connection string, which needs the `.env` this function is
+     * handed rather than reads.
+     */
+    branch?: { name: string; url: string } | null;
 }
 
 /**
@@ -88,6 +109,13 @@ export function resolveDevDatabase(input: ResolveDevDatabaseInput = {}): DevData
 
     const fromEnvironment = present(input.env?.DATABASE_URL);
     if (fromEnvironment) return { kind: "external", url: fromEnvironment, source: "environment" };
+
+    // Above `.env`, below anything said explicitly — see the ordering note at
+    // the top of this file.
+    const fromBranch = present(input.branch?.url);
+    if (fromBranch && input.branch) {
+        return { kind: "external", url: fromBranch, source: "branch", branch: input.branch.name };
+    }
 
     const fromEnvFile = present(input.envFile?.DATABASE_URL);
     if (fromEnvFile) return { kind: "external", url: fromEnvFile, source: "env-file" };
@@ -113,6 +141,8 @@ export function describeDevDatabase(database: DevDatabase): string {
                     return "your database (DATABASE_URL in the environment)";
                 case "env-file":
                     return "your database (DATABASE_URL in .env)";
+                case "branch":
+                    return `branch "${database.branch}" (rebase db branch switch)`;
             }
             break;
         case "docker":

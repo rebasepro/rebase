@@ -779,7 +779,7 @@ export const de = {
   "studiopage.12": "Row-Level Security",
   "studiopage.13": "Definiere granulare Berechtigungen pro Rolle und pro Tabelle — nativ von PostgreSQL durchgesetzt.",
   "studiopage.14": "Ein interaktives ER-Diagramm mit Tabellen, Spalten und Beziehungen.",
-  "studiopage.15": "Erzeuge eine isolierte Kopie der Datenbank, arbeite darauf und lösch sie, wenn du fertig bist. Anlegen, auflisten, ansehen, löschen — ein Merge gibt es nicht, und diese Seite tut nicht so.",
+  "studiopage.15": "Kopiere die ganze Datenbank — Schema, Zeilen, Policies —, schalte dein Projekt darauf um und lösch sie, wenn du fertig bist. Anlegen, auflisten, ansehen, umschalten, löschen — ein Merge gibt es nicht, und diese Seite tut nicht so.",
   "studiopage.16": "Führe JavaScript mit dem Rebase-SDK in einer Live-Sandbox aus. Teste Queries und automatisiere Aufgaben.",
   "studiopage.17": "Überwache und verwalte geplante Hintergrund-Jobs. Logs, Status und Lauf-Historie einsehen.",
   "studiopage.18": "/api/users/:id",

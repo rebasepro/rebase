@@ -20,6 +20,7 @@
  */
 
 import { readEnvFile } from "../utils/project";
+import { branchUrl, readActiveBranch } from "./branch-pointer";
 import { MANAGED_LIMITATIONS, MANAGED_POOL_MAX } from "./constraints";
 import { ensureManagedDatabase } from "./daemon";
 import { type DevDatabase, describeDevDatabase, resolveDevDatabase } from "./resolve";
@@ -54,6 +55,38 @@ export interface PreparedDatabase {
 }
 
 /**
+ * The branch this checkout is switched to, as a connection string.
+ *
+ * Derived rather than stored: the pointer holds a name, and the credentials
+ * stay in the one place the developer wrote them. The base is the project's
+ * `.env` — a switch is a statement about *this project's* database, so a
+ * `DATABASE_URL` that happens to be in the shell is not the thing being
+ * branched, and it outranks the branch anyway.
+ *
+ * Returns null when there is no branch, and also when there is no base to swap
+ * the database name on: a project with no `DATABASE_URL` is on the managed
+ * database, where branching does not work at all.
+ *
+ * Exported for its tests. Asserting this through {@link prepareDatabaseEnv}
+ * would start a real PGlite daemon to check a decision made before any daemon
+ * is involved.
+ */
+export function resolveActiveBranch(
+    projectRoot: string,
+    envFile: Record<string, string>
+): { name: string; url: string } | null {
+    const active = readActiveBranch(projectRoot);
+    if (!active) return null;
+
+    const base = envFile.DATABASE_URL?.trim();
+    if (!base) return null;
+
+    const url = branchUrl(base, active.database);
+
+    return url ? { name: active.name, url } : null;
+}
+
+/**
  * Resolve, start if needed, and describe the database for this command.
  *
  * `projectRoot` is where the managed database's data lives, so two projects on
@@ -63,14 +96,29 @@ export async function prepareDatabaseEnv(
     projectRoot: string,
     options: PrepareOptions = {}
 ): Promise<PreparedDatabase> {
+    const envFile = readEnvFile(projectRoot);
     const database = resolveDevDatabase({
         flagUrl: options.flagUrl,
         flagDocker: options.flagDocker,
         env: process.env,
-        envFile: readEnvFile(projectRoot)
+        envFile,
+        branch: resolveActiveBranch(projectRoot, envFile)
     });
 
     const description = describeDevDatabase(database);
+
+    if (database.kind === "external" && database.source === "branch") {
+        // The one external case that MUST be exported. Every other connection
+        // string is already somewhere the child will look — `.env` via
+        // DOTENV_CONFIG_PATH, or the shell it inherits — but a branch URL is
+        // derived here and exists nowhere else. Without this the pointer
+        // resolves correctly and then changes nothing: `rebase db backup` on a
+        // switched checkout still reported `Database: leadgen`.
+        //
+        // Safe to set: `dotenv` does not overwrite a variable that is already
+        // in the environment, so the child's own `.env` load cannot undo it.
+        return { database, env: { DATABASE_URL: database.url }, description };
+    }
 
     if (database.kind !== "managed") {
         // An explicit connection string, or Docker. Either way the child's

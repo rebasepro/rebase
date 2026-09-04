@@ -154,11 +154,37 @@ rebase db branch create dev_sandbox
 # List all branches and disk utilization
 rebase db branch list
 
+# Work on it — every later command in this checkout uses it
+rebase db branch switch dev_sandbox
+
+# Which branch am I on?
+rebase db branch switch
+
+# Back to the main database
+rebase db branch switch --off
+
 # Delete a branch
 rebase db branch delete dev_sandbox
 ```
 
-When you create or switch to a branch, the CLI updates your local development configuration. The `DatabasePoolManager` dynamically instantiates a new connection pool for the chosen branch database name (e.g. `rb_dev_sandbox`), letting you test migrations or seed data without manual connection string edits.
+`switch` is what makes a branch usable. It records the branch in
+`.rebase/branch.json` — a name, never a connection string, so your credentials
+stay in `.env` alone — and every `rebase` command in that checkout then resolves
+the branch's database instead: `dev`, `db push`, `db migrate`, `db backup`.
+
+It sits between the shell and the project file in the resolution order:
+
+1. `--database-url` on the command line
+2. `DATABASE_URL` in the shell environment
+3. **the branch this checkout is switched to**
+4. `DATABASE_URL` in the project's `.env`
+
+A branch has to outrank `.env` or switching would do nothing on any project that
+sets `DATABASE_URL`; it must not outrank the two above it, because a flag on this
+command line is a more immediate instruction than a switch made yesterday.
+
+`.rebase/` is gitignored, so the branch you are on is a fact about your machine
+and never about the project.
 
 ---
 
