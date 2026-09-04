@@ -1,5 +1,5 @@
 
-import { Entity, CollectionCallbacks } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
 import React, { useCallback, useMemo, useState } from "react";
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import {
@@ -20,7 +20,6 @@ export interface DeleteEntityDialogProps<M extends Record<string, unknown>> {
     collection: AdminCollection<M>
     open: boolean;
     onClose: () => void;
-    callbacks?: CollectionCallbacks<M>,
 
     onEntityDelete?(path: string, entity: Entity<M>): void;
 
@@ -41,7 +40,6 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
     collection,
     onClose,
     open,
-    callbacks,
     onEntityDelete,
     onMultipleEntitiesDelete,
     path,
@@ -85,11 +83,10 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
             data: dataClient,
             entity,
             collection: collection,
-            callbacks,
             onDeleteSuccess,
             onDeleteFailure,
             context
-        }), [dataClient, collection, callbacks, onDeleteSuccess, onDeleteFailure, context]);
+        }), [dataClient, collection, onDeleteSuccess, onDeleteFailure, context]);
 
     const handleOk = useCallback(async () => {
         if (entityOrEntities) {

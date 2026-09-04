@@ -15,6 +15,63 @@ Callbacks let you hook into the entity lifecycle to:
 - **Filter/transform** data after reading
 - **Cascade operations** — clean up related records on delete
 
+## Where callbacks run
+
+A collection has two callback blocks, and the only difference is which runtime
+executes them.
+
+| | `callbacks` | `admin.browserCallbacks` |
+|---|---|---|
+| Runs on | the server | the admin panel, in the browser |
+| Fires for | REST, the SDK, realtime, `dataAsAdmin` | reads and writes the panel makes |
+| Reaches the browser | no — bodies are stripped from the bundle | yes, in full |
+| Use for | everything below | collections the panel talks to directly |
+
+**`callbacks` is the one you want.** It runs on every path that reaches the
+server, so nothing routes around it, and its body never leaves the machine —
+an API key or a `process.env` read there is safe. The rest of this page is
+about `callbacks`.
+
+`admin.browserCallbacks` exists for one case: a collection on a `direct` or
+`custom` transport, which the panel reads and writes *itself* with no Rebase
+server in the request path. Nothing server-side sees those operations, so
+`callbacks` can never fire for them, and this block is the only place their
+lifecycle logic can live.
+
+```typescript
+import type { CollectionConfig } from "@rebasepro/types";
+
+const eventsCollection: CollectionConfig = {
+    slug: "events",
+    name: "Events",
+    dataSource: "analytics",      // declared with transport: "direct"
+    properties: {
+        city: { name: "City", type: "string" },
+        code: { name: "Code", type: "string" }
+    },
+    admin: {
+        browserCallbacks: {
+            afterRead: ({ row }) => ({ ...row, label: [row.city, row.code].join(" · ") })
+        }
+    }
+};
+```
+
+Two rules follow from "ships to every visitor", and neither is stylistic:
+
+1. **No secrets.** No API keys, no `process.env`, nothing you would mind a
+   reader of the bundle seeing. That belongs in `callbacks`.
+2. **It is not a security boundary.** A `browserCallbacks.afterRead` that
+   redacts a field redacts it *after* the browser already holds the row — on a
+   direct transport the raw document came straight from the store. It is
+   presentation. Redaction that has to hold goes in `callbacks`, or in the
+   store's own rules.
+
+On a server-transport collection — the default, and almost certainly yours —
+the server has already run `callbacks` before the row reaches the panel, so a
+`browserCallbacks.afterRead` runs *in addition* to it. Write it to be
+idempotent, or don't write it.
+
 ## Defining Callbacks
 
 ```typescript

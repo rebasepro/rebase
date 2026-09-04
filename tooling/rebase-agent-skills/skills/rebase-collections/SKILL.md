@@ -1413,6 +1413,28 @@ const jobSubmissionsCollection: PostgresCollectionConfig<{
 | `beforeDelete` | Before deletion | `void \| boolean` | Yes (throw to block) |
 | `afterDelete` | After successful deletion | `void` | No |
 
+### `callbacks` runs on the server. `admin.browserCallbacks` runs in the panel.
+
+Same six hooks, same props, different runtime — and `callbacks` is almost always
+the one you want. It runs on every path that reaches the server (REST, the SDK,
+realtime, `dataAsAdmin`), and its bodies are stripped out of the admin bundle,
+so a secret read inside one never leaves the machine.
+
+`admin.browserCallbacks` is for a collection on a `direct`/`custom` transport,
+which the panel reads and writes itself with no server in the path — nothing
+server-side sees those operations, so `callbacks` can never fire for them. It
+ships to every visitor in full: no secrets in it, and redaction written there is
+presentation, not security. On a normal server-backed collection it runs *in
+addition* to the server's, so anything written there must be idempotent.
+
+```typescript
+admin: {
+    browserCallbacks: {
+        afterRead: ({ row }) => ({ ...row, label: [row.city, row.code].join(" · ") })
+    }
+}
+```
+
 ### Callback Props Reference
 
 **`beforeSave` / `afterSave` / `afterSaveError` Props:**

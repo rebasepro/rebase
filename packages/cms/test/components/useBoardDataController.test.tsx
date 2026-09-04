@@ -337,3 +337,59 @@ count };
         jest.restoreAllMocks();
     });
 });
+
+/**
+ * The board runs the same afterRead the table does, and used to run it from the
+ * same wrong block — `collection.callbacks`, the server's, which the server had
+ * already applied to these rows and whose bodies the Vite plugin strips out of
+ * the admin bundle. The panel's own callbacks are `admin.browserCallbacks`,
+ * flattened onto the collection before the hook sees it.
+ */
+describe("useBoardDataController — afterRead", () => {
+
+    beforeEach(() => {
+        listen.mockReset();
+        find.mockReset();
+        count.mockReset();
+        listen.mockReturnValue(() => undefined);
+        find.mockResolvedValue({ data: [] });
+        count.mockResolvedValue(0);
+    });
+
+    function renderWith(collectionOverrides: Record<string, unknown>) {
+        return renderHook(() => useBoardDataController<Task, "todo">({
+            fullPath: "tasks",
+            collection: { ...collection, ...collectionOverrides },
+            columnProperty: "status",
+            columns: ["todo"],
+            pageSize: 30
+        } as never));
+    }
+
+    it("runs admin.browserCallbacks.afterRead on each column's rows", async () => {
+        const { result } = renderWith({
+            browserCallbacks: {
+                afterRead: ({ row }: { row: Record<string, unknown> }) =>
+                    ({ ...row, title: "REDACTED" })
+            }
+        });
+
+        await waitFor(() => expect(listen).toHaveBeenCalled());
+        act(() => updateFor("todo")([entity("t1", { title: "Secret", status: "todo" })]));
+
+        await waitFor(() => expect(result.current.columnData.todo.entities).toHaveLength(1));
+        expect(result.current.columnData.todo.entities[0].values).toMatchObject({ title: "REDACTED" });
+    });
+
+    it("does NOT run the server's callbacks.afterRead", async () => {
+        const serverAfterRead = jest.fn(({ row }) => ({ ...row, title: "MASKED-TWICE" }));
+        const { result } = renderWith({ callbacks: { afterRead: serverAfterRead } });
+
+        await waitFor(() => expect(listen).toHaveBeenCalled());
+        act(() => updateFor("todo")([entity("t1", { title: "Secret", status: "todo" })]));
+
+        await waitFor(() => expect(result.current.columnData.todo.entities).toHaveLength(1));
+        expect(serverAfterRead).not.toHaveBeenCalled();
+        expect(result.current.columnData.todo.entities[0].values).toMatchObject({ title: "Secret" });
+    });
+});

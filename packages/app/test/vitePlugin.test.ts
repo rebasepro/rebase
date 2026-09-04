@@ -436,14 +436,17 @@ describe("rebaseCollectionsPlugin — virtual collections module", () => {
  * own built bundle you could read the compiled `beforeSave:({values:e` and the
  * raw policy string beside it.
  *
- * These assert the strip, and — just as important — that the two callbacks the
- * panel actually runs are left alone.
+ * The strip is total: `callbacks` is the server's block, every key of it, and a
+ * callback added to the type later is stripped without anyone remembering to
+ * come back here. `afterRead` and `afterSave` used to be exempt on the grounds
+ * that the panel ran them; the panel's own callbacks now live under
+ * `admin.browserCallbacks`, which is a different key and stays.
  */
-describe("server-only callbacks are stripped from the browser bundle", () => {
+describe("server callbacks are stripped from the browser bundle", () => {
     const wrap = (callbacks: string) =>
         `const c = { slug: "posts", callbacks: { ${callbacks} } };`;
 
-    it.each(["beforeSave", "beforeDelete", "afterDelete", "afterSaveError"])(
+    it.each(["beforeSave", "beforeDelete", "afterDelete", "afterSaveError", "afterRead", "afterSave"])(
         "drops the body of %s", (hook) => {
             const transform = createTransform();
             const result = transform(wrap(`${hook}: async ({ values }) => { await chargeCard(values, process.env.STRIPE_KEY); return values; }`));
@@ -453,22 +456,43 @@ describe("server-only callbacks are stripped from the browser bundle", () => {
             expect(result!.code).not.toContain("STRIPE_KEY");
         });
 
-    it.each(["afterRead", "afterSave"])(
-        "keeps %s, which the panel calls client-side", (hook) => {
-            const transform = createTransform();
-            // `useDataTableController` / `useBoardDataController` call afterRead to
-            // transform rows before rendering; `useNavigationResolution` wraps
-            // afterSave for the user-creation dialog. Stripping either breaks the UI.
-            const result = transform(wrap(`${hook}: async ({ row }) => decorate(row)`));
-            expect(result).toBeNull();
-        });
+    it("keeps `admin.browserCallbacks`, which is the panel's own block", () => {
+        const transform = createTransform();
+        // The whole point of the second key: what runs where is decided by which
+        // block it was written in, and the plugin can see that in one file. It
+        // cannot see a `dataSources` declaration in another one.
+        const result = transform(
+            'const c = { slug: "posts", admin: { browserCallbacks: { afterRead: async ({ row }) => decorate(row) } } };');
+        expect(result).toBeNull();
+    });
+
+    it("strips the server block and keeps the browser one in the same collection", () => {
+        const transform = createTransform();
+        const result = transform(
+            'const c = { callbacks: { afterRead: ({ row }) => mask(row, process.env.SALT) },' +
+            ' admin: { browserCallbacks: { afterRead: ({ row }) => decorate(row) } } };');
+        expect(result!.code).toContain("afterRead: undefined");
+        expect(result!.code).toContain("afterRead: ({ row }) => decorate(row)");
+        expect(result!.code).not.toContain("SALT");
+    });
 
     it("keeps the key so the comma structure and every other callback survive", () => {
         const transform = createTransform();
         const result = transform(wrap(
-            "beforeSave: (p) => p, afterRead: async ({ row }) => decorate(row)"));
+            "beforeSave: (p) => p, afterDelete: async ({ row }) => audit(row)"));
         expect(result!.code).toContain("beforeSave: undefined");
-        expect(result!.code).toContain("afterRead: async ({ row }) => decorate(row)");
+        expect(result!.code).toContain("afterDelete: undefined");
+        expect(result!.code).not.toContain("audit(row)");
+    });
+
+    it("strips a callback key that did not exist when this was written", () => {
+        // No allowlist to fall out of date. The previous version named four
+        // keys, and the two it left out were both wrong in different ways —
+        // a seventh callback would have shipped for the same reason.
+        const transform = createTransform();
+        const result = transform(wrap("beforeArchive: async () => callVendor(process.env.VENDOR_KEY)"));
+        expect(result!.code).toContain("beforeArchive: undefined");
+        expect(result!.code).not.toContain("VENDOR_KEY");
     });
 
     it("strips property-level callbacks too, which are also server-only", () => {

@@ -199,6 +199,17 @@ deployment you already run.
 
 ### Fixed
 
+- **Creating a user in the panel never showed the temporary password.** The
+  server mints one, returns it beside the columns on the create response, and
+  will not repeat it; the dialog that shows it to the administrator was
+  installed as an `afterSave` on the collection's `callbacks` — the server's
+  block, which nothing in the browser runs and whose bodies the bundler strips
+  on the way in. So the callback was never called, by anything, and the
+  credential was returned to a panel that dropped it. It is injected onto
+  `admin.browserCallbacks` now, written to both the block and its flattened
+  form so re-resolving a collection cannot undo it. Resetting a password was
+  never affected: that dialog fetches and renders the result itself.
+
 - **Four of the seven showcase cards on the homepage rendered blank.** A
   key sweep on 2026-09-02 deleted the strings for the presupuestos, Prospector,
   Unfeigned and Edith cards because the carousel builds its keys dynamically
@@ -298,6 +309,35 @@ deployment you already run.
   CLI asked for 0.0.7. The family is pinned exactly.
 
 ### Changed
+
+- **A collection's `callbacks` runs on the server, and only there. The panel's
+  own callbacks are `admin.browserCallbacks`.** The Vite plugin has always
+  stripped that block's bodies out of the admin bundle, so a `beforeSave`
+  calling a vendor with a key from `process.env` does not ship to every visitor
+  — but two keys were exempt, on the grounds that the panel ran them. Both
+  exemptions were wrong, in different directions. `afterSave` had no
+  client-side call site at all: the body shipped and never ran. `afterRead` did
+  run, unconditionally, on top of the server having already applied it — so
+  every server-backed collection transformed its rows twice, and anything not
+  idempotent compounded. Meanwhile a collection on a `direct` transport, where
+  the panel talks to the store itself and no server sees the operation, got
+  read callbacks while its write callbacks were stripped out from under it,
+  silently. The strip is total now, with no allowlist to fall out of date, and
+  callbacks the panel runs live under `admin.browserCallbacks`: a separate key,
+  so which runtime a callback belongs to is a fact about the collection file
+  rather than about a `dataSources` declaration in another one — which is the
+  thing a build-time transform cannot see. Move a browser-side `afterRead` into
+  the new block; a server-side one already worked and needs no change.
+
+- **`saveEntityWithCallbacks` and `deleteEntityWithCallbacks` run callbacks.**
+  Both have been named for callbacks they never ran, since they were written,
+  and `deleteEntityWithCallbacks` went as far as accepting a `callbacks` prop
+  and dropping it on the floor. They run the collection's
+  `admin.browserCallbacks` around the write: `beforeSave` can block a save the
+  way the server's does, `beforeDelete` can block a delete, and `afterSave`
+  receives the row *as saved* rather than the values submitted. That prop is
+  gone, as is the `callbacks` prop on `DeleteEntityDialog` that fed it — both
+  were being passed the server's block, in the browser, where it does nothing.
 
 - **The ERD has one layout, and it reads top to bottom.** The LR/TB toggle
   offered a choice the canvas cannot honour: the visualizer's pane is tall and

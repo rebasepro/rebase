@@ -47,7 +47,12 @@ describe("ADMIN_COLLECTION_KEYS", () => {
         // renderings of a collection's rows.
         // 41 again since `titleProperty` was removed — `display.title` is the
         // only way to state it, so the schema editor has one place to write.
-        expect(ADMIN_COLLECTION_KEYS).toHaveLength(41);
+        // 42 since `browserCallbacks` — lifecycle callbacks that run in the
+        // panel, for collections whose data source the browser talks to
+        // directly. Deliberately not named `callbacks`: that key is the
+        // contract's, it means "runs on the server", and the assertion below
+        // keeps it off this list.
+        expect(ADMIN_COLLECTION_KEYS).toHaveLength(42);
     });
 
     it("names nothing that belongs to the BaaS contract", () => {
@@ -209,6 +214,45 @@ describe("toAdminCollectionConfig", () => {
         expect((authoring.admin as Record<string, unknown>).defaultViewMode).toBe("cards");
         // The fields the user did not touch are still there.
         expect((authoring.admin as Record<string, unknown>).icon).toBe("FileText");
+    });
+
+    /**
+     * The two callback blocks are one flatten away from each other, and getting
+     * this wrong swaps which runtime a callback belongs to: `browserCallbacks`
+     * left at the top level is a field the backend ignores and the panel never
+     * reads back, while `callbacks` pulled into `admin` would take a server
+     * callback — the one that may hold an API key — and file it under the block
+     * that ships to every visitor.
+     */
+    it("nests browserCallbacks and leaves the server's callbacks at the top", () => {
+        const afterRead = () => ({});
+        const beforeSave = () => ({});
+        const flat = {
+            slug: "posts",
+            table: "posts",
+            properties: {},
+            callbacks: { beforeSave },
+            browserCallbacks: { afterRead }
+        } as unknown as AdminCollection;
+
+        const authoring = toAdminCollectionConfig(flat) as unknown as Record<string, unknown>;
+        expect(authoring.callbacks).toEqual({ beforeSave });
+        expect(authoring.admin).toEqual({ browserCallbacks: { afterRead } });
+        expect("browserCallbacks" in authoring).toBe(false);
+    });
+
+    it("flattens browserCallbacks back out, so the panel reads one name", () => {
+        const afterRead = () => ({});
+        const nestedCollection = {
+            slug: "posts",
+            table: "posts",
+            properties: {},
+            admin: { browserCallbacks: { afterRead } }
+        } as unknown as AdminCollection;
+
+        const flat = resolveAdminCollection(nestedCollection) as unknown as Record<string, unknown>;
+        expect(flat.browserCallbacks).toEqual({ afterRead });
+        expect(toAdminCollectionConfig(flat as never)).toEqual(nestedCollection);
     });
 
     it("keeps a contract field that happens to sit next to admin fields", () => {
