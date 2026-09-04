@@ -540,24 +540,43 @@ now has one home: change it there, then grep.
 | Proof | real products (`CaseStudiesCarousel`), real terminal output | invented multipliers, anonymous cases, testimonials |
 | Competitor facts | the competitor's own docs, verified with a date, below | any adjective |
 
-**Competitor facts as verified 2026-09-02.** Re-verify before a comparison page
+**Competitor facts as verified 2026-09-04.** Re-verify before a comparison page
 changes, and replace the date here.
 
-- Firebase: Firestore is the document store; Data Connect is Cloud SQL for
-  PostgreSQL. "Firebase is NoSQL" is wrong as written.
-- Retool: exports JSON or a Toolscript archive; never XML.
+- Firebase: Firestore is the document store. The relational product is **SQL
+  Connect**, renamed from Data Connect in 2026-04, and it now carries raw SQL,
+  query subscriptions and custom resolvers over Cloud SQL for PostgreSQL — not
+  only GraphQL. "Firebase is NoSQL" is wrong as written.
+- Retool: exports JSON or a Toolscript archive; never XML. Still per-seat
+  (builders and internal users), with usage meters beside the seats.
 - Supabase: Apache-2.0. Studio has a policy editor with a generator and
-  templates. Self-hosting is a supported path with a published Compose file.
+  templates. Self-hosting is a supported path with a published Compose file:
+  PostgREST (Haskell), Auth/GoTrue (Go), Realtime (Elixir), Edge Functions
+  (Deno), Storage, Supavisor, Kong.
 - Directus: `schema snapshot` / `schema apply` are built in; it introspects an
   existing database, so the hub must not file it under "the CMS owns the
   schema". Licence: MIT → BSL (2023) → the Monospace Sustainable Core License
   with v12 (2026-04; GPL-3.0 after four years; free under $5M revenue / 50 staff).
 - Strapi: Community Edition is MIT Expat; only `ee/` is separately licensed.
+  The Content-Type Builder is development-only and restarts the server.
 - Hasura: `graphql-engine` is Apache-2.0 (DDN is a different product).
 - Payload: MIT; part of Figma since 2025-06-17; Payload Cloud exists and is
   closed to new sign-ups.
+- **Convex is not open source**: FSL-1.1-Apache-2.0, source-available, becoming
+  Apache-2.0 two years after each release. It sits two rows from Directus on
+  `/alternatives/*`, so the two labels have to be equally careful.
+- Neon: Apache-2.0 core, hosted only, part of Databricks since 2025-05.
+- Appwrite: the TablesDB API (2025-08) renamed collections/documents to
+  tables/rows, but the storage engine is unchanged — it is still a document
+  store, so "document-oriented rather than relational" stands.
 - None of the eight keeps a second copy of your data. "Often two databases" was
   false for all of them.
+
+**And one fact about us that the comparison pages kept getting wrong.** Auth is
+not "JWT and Google OAuth" — that sentence survived on `/rebase-vs-firebase`
+long after the backend grew email/password, magic links, OTP, TOTP MFA, scoped
+API keys, twelve OAuth/OIDC providers and custom adapters. The same
+understatement is still in the **docs**, and from there in `llms-full.txt`.
 
 **Still English, on purpose** — the reasons are in `PRODUCT.md`:
 `src/data/rls-checks.ts` (verbatim from the tool), `/pitch` (`lang="en"`), and

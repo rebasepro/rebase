@@ -11,10 +11,10 @@ const translatePath = useTranslatedPath(lang);
 // answers depending on which tool the visitor is already holding.
 const families = [
     {
-        kind: "A backend-as-a-service",
-        blurb: "You want APIs, auth and realtime over a database without writing a server.",
-        theirModel: "Postgres or a proprietary store, plus a dashboard built for you — the developer — not for the people who run the business.",
-        ourModel: "The same APIs, plus an admin panel your non-technical team lives in, generated from the collections you already wrote.",
+        kind: t("comparepage.fam.baas.kind"),
+        blurb: t("comparepage.fam.baas.blurb"),
+        theirModel: t("comparepage.fam.baas.theirs"),
+        ourModel: t("comparepage.fam.baas.ours"),
         tools: [
             { name: "Supabase", href: "/rebase-vs-supabase", logo: "/img/competitors/supabase-logo-wordmark-dark.svg", cls: "h-4" },
             { name: "Firebase", href: "/rebase-vs-firebase", logo: "/img/competitors/firebase-lockup-dark.svg", cls: "h-5" },
@@ -22,10 +22,10 @@ const families = [
         ],
     },
     {
-        kind: "A headless CMS",
-        blurb: "You want editors to manage content without touching the database.",
-        theirModel: "Usually the CMS owns the schema: your tables are its tables, in its shape, behind its API and its permission engine. Directus is the exception — it reads a database you already have, which is why it is the closest of the three in intent.",
-        ourModel: "Your Postgres schema stays yours — including the tables that existed before Rebase. Access control is RLS on those tables, readable by any Postgres client.",
+        kind: t("comparepage.fam.cms.kind"),
+        blurb: t("comparepage.fam.cms.blurb"),
+        theirModel: t("comparepage.fam.cms.theirs"),
+        ourModel: t("comparepage.fam.cms.ours"),
         tools: [
             { name: "Strapi", href: "/rebase-vs-strapi", logo: "/img/competitors/strapi-full-logo-light.svg", cls: "h-5" },
             { name: "Payload", href: "/rebase-vs-payload", logo: "/img/competitors/payload-logo-light.svg", cls: "h-5" },
@@ -33,19 +33,19 @@ const families = [
         ],
     },
     {
-        kind: "An internal-tool builder",
-        blurb: "You want a back office fast and you don't care how it's built.",
-        theirModel: "A hosted canvas that connects to your database over a credential you hand it. Screens are drawn by hand, per screen, forever.",
-        ourModel: "Screens are generated from the schema, so a new column shows up everywhere at once — and the tool runs on your infrastructure with no outbound connection.",
+        kind: t("comparepage.fam.internal.kind"),
+        blurb: t("comparepage.fam.internal.blurb"),
+        theirModel: t("comparepage.fam.internal.theirs"),
+        ourModel: t("comparepage.fam.internal.ours"),
         tools: [
             { name: "Retool", href: "/rebase-vs-retool", logo: "/img/competitors/Retool_Logo_0.svg", cls: "h-5" },
         ],
     },
     {
-        kind: "A framework admin",
-        blurb: "You already have a backend and want the batteries-included admin that comes with it.",
-        theirModel: "Excellent admin, tied to one language and one ORM. Your React frontend still needs an API you write and maintain by hand.",
-        ourModel: "The admin and the typed API come from the same definition, and the API is a first-class product rather than an afterthought.",
+        kind: t("comparepage.fam.framework.kind"),
+        blurb: t("comparepage.fam.framework.blurb"),
+        theirModel: t("comparepage.fam.framework.theirs"),
+        ourModel: t("comparepage.fam.framework.ours"),
         tools: [
             { name: "Django", href: "/rebase-vs-django", logo: "/img/competitors/django-logo-negative.svg", cls: "h-5" },
         ],
@@ -56,29 +56,29 @@ const families = [
 // product in this market has tables, forms and an API.
 const axes = [
     {
-        axis: "Where authorization is enforced",
-        rebase: "In Postgres. Every request runs as a restricted role under row-level security, generated from your collection definition.",
-        others: "In the application layer, by a permission engine in front of the database. Reach the data another way and the rules are gone.",
+        axis: t("comparepage.axis.authz.q"),
+        rebase: t("comparepage.axis.authz.rebase"),
+        others: t("comparepage.axis.authz.others"),
     },
     {
-        axis: "Who owns the schema",
-        rebase: "You do. Point Rebase at a database that already exists; it reads your tables and never demands its own shape.",
-        others: "Usually the tool. Content types are created through its UI, in its migration format, in tables it manages.",
+        axis: t("comparepage.axis.schema.q"),
+        rebase: t("comparepage.axis.schema.rebase"),
+        others: t("comparepage.axis.schema.others"),
     },
     {
-        axis: "Who the back office is for",
-        rebase: "Your team. Roles, media, workflows — and your own React components wherever the generated defaults don't fit.",
-        others: "Either the developer (a database dashboard) or the editor (a CMS) — rarely both, and rarely extensible in the framework you already use.",
+        axis: t("comparepage.axis.who.q"),
+        rebase: t("comparepage.axis.who.rebase"),
+        others: t("comparepage.axis.who.others"),
     },
     {
-        axis: "How many copies of your data exist",
-        rebase: "One. The panel talks to the same public API as your app, under the same policies. No sync, no mirror, no cache to reconcile.",
-        others: "One, in every tool on this page — but several of them add tables of their own for the model and the interface config, so the schema you back up is no longer only yours.",
+        axis: t("comparepage.axis.copies.q"),
+        rebase: t("comparepage.axis.copies.rebase"),
+        others: t("comparepage.axis.copies.others"),
     },
     {
-        axis: "What happens if you stop using it",
-        rebase: "The database keeps working — policies, constraints and data exactly where they were. The panel was a dependency you can delete.",
-        others: "Depends how deep the tool went into your schema. If it created the tables, leaving means a migration.",
+        axis: t("comparepage.axis.leaving.q"),
+        rebase: t("comparepage.axis.leaving.rebase"),
+        others: t("comparepage.axis.leaving.others"),
     },
 ];
 
@@ -104,7 +104,7 @@ import ClosingCta from "../ClosingCta.astro";
         <NeatBackground client:idle transition:persist="neat-hero" />
 
         <div class="px-4 mx-auto max-w-6xl lg:px-12 relative z-10">
-            <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">Compare</p>
+            <p class="mb-label text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("comparepage.eyebrow")}</p>
             <h1 class="mb-6 text-display-2 text-white" set:html={t("comparepage.00")}></h1>
             <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">{t("comparepage.01")}</p>
         </div>
