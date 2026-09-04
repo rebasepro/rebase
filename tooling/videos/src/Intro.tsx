@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Series } from "remotion";
 import { Plane, StationContext } from "./Plane";
+import { Narration } from "./Narration";
 import { SCENES, STARTS } from "./film";
 
 /**
@@ -44,3 +45,14 @@ export const STANDALONE = SCENES.map((scene, i) => {
     Component.displayName = `Standalone(${scene.id})`;
     return Component;
 });
+
+/**
+ * The film with the voiceover printed on it, for testing the rhythm of a read
+ * that has not been recorded yet. Not a deliverable.
+ */
+export const RebaseIntroVO: React.FC = () => (
+    <>
+        <RebaseIntro />
+        <Narration />
+    </>
+);

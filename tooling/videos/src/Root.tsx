@@ -2,7 +2,7 @@ import "./index.css";
 import React from "react";
 import { Composition, Series } from "remotion";
 import { loadFonts } from "./fonts";
-import { RebaseIntro, STANDALONE } from "./Intro";
+import { RebaseIntro, RebaseIntroVO, STANDALONE } from "./Intro";
 import { INTRO_DURATION, SCENES } from "./film";
 import { HeroIntro } from "./components/HeroIntro";
 import { HowItWorks } from "./components/HowItWorks";
@@ -65,6 +65,17 @@ export const RemotionRoot: React.FC = () => (
             id="Bento"
             component={Bento}
             durationInFrames={BENTO_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
+        {/* TEMPORARY. The film with the voiceover printed on it, so the read can
+            be timed before it is recorded. RebaseIntro itself is untouched. */}
+        <Composition
+            id="RebaseIntro-VO"
+            component={RebaseIntroVO}
+            durationInFrames={INTRO_DURATION}
             fps={FPS}
             width={WIDTH}
             height={HEIGHT}

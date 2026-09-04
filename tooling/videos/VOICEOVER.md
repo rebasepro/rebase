@@ -28,24 +28,24 @@ sound like a way to generate REST routes.
 | # | Scene | Frames | Sec | Line |
 |---|-------|--------|-----|------|
 | 00 | Cold open | 96 | 3.2 | *(silent — the mark assembles)* |
-| 01 | The problem | 300 | 10.0 | Getting a backend has never been easier. Knowing whether it is safe never got easier at all. Same database, ninety seconds apart. |
-| 02 | Row-level security | 170 | 5.7 | Authorization belongs in the database, where your code cannot forget to ask. |
-| 03 | One definition | 210 | 7.0 | And it is generated from your collection file — the same file that defines everything else. |
-| 04 | Forty endpoints | 270 | 9.0 | REST over every table, an OpenAPI spec, a typed SDK. None of them written, all of them following that file. |
-| 05 | Headline | 150 | 5.0 | A backend for Postgres — one you run, or a new one. |
-| 06 | Headless | 175 | 5.8 | Take only that: the SDK, auth, storage, functions, cron, backups. |
-| 07 | The wire | 240 | 8.0 | Realtime too. Every write reaches the clients your policies allow to see it. |
-| 08 | The panel | 280 | 9.3 | Or add the panel, and the same definition becomes an application for everyone who is not a developer. |
-| 09 | Every view | 240 | 8.0 | Lists, boards, tables, forms — every one generated, every one reading through the same policies. |
-| 10 | Studio | 175 | 5.8 | Add Studio and you run the database from the same app. |
-| 11 | The schema | 260 | 8.7 | It draws the schema out of the catalogue, so what you are looking at is what is actually there. |
-| 12 | Access is not a switch | 240 | 8.0 | Per collection, per operation, per role — and Postgres, not your code, is what enforces it. |
-| 13 | The same query, twice | 240 | 8.0 | The same call, from two people, returning different rows. No branch anywhere in your code. |
-| 14 | The proof | 200 | 6.7 | And rls-check will tell you the same about any Postgres, including one we have never seen. |
-| 15 | Agent-native | 165 | 5.5 | An agent gets the same authorization you do. Not a way around it. |
-| 16 | One command | 205 | 6.8 | All of it starts with one command, against a database you have or one it creates. |
-| 17 | Yours | 175 | 5.8 | MIT, end to end. Your laptop, your server, your cloud. Nobody holds your keys. |
-| 18 | The ask | 160 | 5.3 | Rebase. Open source, Postgres-native, self-hosted. |
+| 01 | The problem | 300 | 10.0 | Getting a backend has never been easier. Knowing whether it is safe never got easier. |
+| 02 | Row-level security | 170 | 5.7 | Authorization belongs in the database, where code cannot forget to ask. |
+| 03 | One definition | 210 | 7.0 | One definition, and everything else is compiled from it. |
+| 04 | Forty endpoints | 270 | 9.0 | REST, an OpenAPI spec, a typed SDK. None of it written. |
+| 05 | Headline | 150 | 5.0 | A backend for Postgres. The one you choose. |
+| 06 | Headless | 175 | 5.8 | Take only that: SDK, auth, storage, functions, cron, backups. |
+| 07 | The wire | 240 | 8.0 | Realtime too — and the rows you cannot see never arrive. |
+| 08 | The panel | 280 | 9.3 | Or add the panel, and the same definition becomes an application for everyone else. |
+| 09 | Every view | 240 | 8.0 | Lists, boards, tables, forms. Every one of them generated. |
+| 10 | Studio | 175 | 5.8 | Add Studio and run the database from the same app. |
+| 11 | The schema | 260 | 8.7 | Drawn from the catalogue, so it is what is actually there. |
+| 12 | Access is not a switch | 240 | 8.0 | Per collection, per operation, per role. Postgres enforces every cell. |
+| 13 | The same query, twice | 240 | 8.0 | The same call, two people, different rows. No branch anywhere. |
+| 14 | The proof | 200 | 6.7 | And rls-check will tell you the same about any Postgres. |
+| 15 | Agent-native | 165 | 5.5 | An agent gets the same authorization you do. |
+| 16 | One command | 205 | 6.8 | Three commands, and all of it runs against your database. |
+| 17 | Yours | 175 | 5.8 | MIT, end to end. Nobody else holds your keys. |
+| 18 | The ask | 160 | 5.3 | Rebase. Open source. Postgres-native. |
 
 ## Notes for the read
 
