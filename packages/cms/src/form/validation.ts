@@ -3,9 +3,24 @@ import type { ArrayProperty, MapProperty, NumberProperty, Property, BooleanPrope
 ;
 import { z, ZodTypeAny } from "zod";
 import { enumToObjectEntries, isPropertyBuilder } from "@rebasepro/common";
-import { getValueInPath, hydrateRegExp } from "@rebasepro/utils";
+import { getValueInPath, hydrateRegExp, prettifyIdentifier } from "@rebasepro/utils";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */
+/**
+ * What to call this field in a validation message.
+ *
+ * `property.name` is the author's label and is optional — a headless project has
+ * no panel and no reason to invent display names. Every message here
+ * interpolated it directly, so an unnamed property produced
+ * "undefined must be min 3 characters long" in front of a user.
+ *
+ * The fallback is the field's own key, prettified the same way the panel derives
+ * a column header, so the message names the field the author would recognise.
+ */
+function fieldLabel(property: Property, name?: string): string {
+    return property.name ?? (name ? prettifyIdentifier(name) : "This field");
+}
+
 function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
     if (!relation) return undefined;
     if (relation.kind === "via") return relation.cardinality as "one" | "many" | undefined;
@@ -179,11 +194,11 @@ function getZodStringSchema({
 
         if (validation.min || validation.min === 0) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "string" && value.length >= validation.min!),
-            { message: `${property.name} must be min ${validation.min} characters long` }
+            { message: `${fieldLabel(property, name)} must be min ${validation.min} characters long` }
         );
         if (validation.max || validation.max === 0) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "string" && value.length <= validation.max!),
-            { message: `${property.name} must be max ${validation.max} characters long` }
+            { message: `${fieldLabel(property, name)} must be max ${validation.max} characters long` }
         );
         if (validation.matches) {
             const regExp = typeof validation.matches === "string" ? hydrateRegExp(validation.matches) : validation.matches;
@@ -199,7 +214,7 @@ function getZodStringSchema({
         if (validation.uppercase) schema = z.preprocess((v: unknown) => typeof v === "string" ? v.toUpperCase() : v, schema);
         if (property.email) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)),
-            { message: `${property.name} must be an email` }
+            { message: `${fieldLabel(property, name)} must be an email` }
         );
         if (property.url) {
             if (!property.storage || property.storage?.storeUrl) {
@@ -213,10 +228,10 @@ function getZodStringSchema({
                             return false;
                         }
                     },
-                    { message: `${property.name} must be a url` }
+                    { message: `${fieldLabel(property, name)} must be a url` }
                 );
             } else {
-                console.warn(`Property ${property.name} has a url validation but its storage configuration is not set to store urls`);
+                console.warn(`Property ${fieldLabel(property, name)} has a url validation but its storage configuration is not set to store urls`);
             }
         }
     }
@@ -255,31 +270,31 @@ function getZodNumberSchema({
 
         if (validation.min || validation.min === 0) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "number" && value >= validation.min!),
-            { message: `${property.name} must be higher or equal to ${validation.min}` }
+            { message: `${fieldLabel(property, name)} must be higher or equal to ${validation.min}` }
         );
         if (validation.max || validation.max === 0) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "number" && value <= validation.max!),
-            { message: `${property.name} must be lower or equal to ${validation.max}` }
+            { message: `${fieldLabel(property, name)} must be lower or equal to ${validation.max}` }
         );
         if (validation.lessThan || validation.lessThan === 0) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "number" && value < validation.lessThan!),
-            { message: `${property.name} must be higher than ${validation.lessThan}` }
+            { message: `${fieldLabel(property, name)} must be higher than ${validation.lessThan}` }
         );
         if (validation.moreThan || validation.moreThan === 0) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "number" && value > validation.moreThan!),
-            { message: `${property.name} must be lower than ${validation.moreThan}` }
+            { message: `${fieldLabel(property, name)} must be lower than ${validation.moreThan}` }
         );
         if (validation.positive) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "number" && value > 0),
-            { message: `${property.name} must be positive` }
+            { message: `${fieldLabel(property, name)} must be positive` }
         );
         if (validation.negative) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "number" && value < 0),
-            { message: `${property.name} must be negative` }
+            { message: `${fieldLabel(property, name)} must be negative` }
         );
         if (validation.integer) schema = schema.refine(
             (value: unknown) => value == null || (typeof value === "number" && Number.isInteger(value)),
-            { message: `${property.name} must be an integer` }
+            { message: `${fieldLabel(property, name)} must be an integer` }
         );
     }
     return schema;
@@ -332,11 +347,11 @@ function getZodDateSchema({
 
         if (validation.min) schema = schema.refine(
             (value: unknown) => value == null || (value instanceof Date && value >= validation.min!),
-            { message: `${property.name} must be after ${validation.min}` }
+            { message: `${fieldLabel(property, name)} must be after ${validation.min}` }
         );
         if (validation.max) schema = schema.refine(
             (value: unknown) => value == null || (value instanceof Date && value <= validation.max!),
-            { message: `${property.name} must be before ${validation.min}` }
+            { message: `${fieldLabel(property, name)} must be before ${validation.min}` }
         );
     }
     return schema;
@@ -493,13 +508,13 @@ function getZodArraySchema({
                 if (typeof arrayUniqueFields === "boolean") {
                     arraySchema = arraySchema.refine(
                         (values: unknown) => !values || !Array.isArray(values) || values.length === new Set(values).size,
-                        { message: `${property.name} should have unique values within the array` }
+                        { message: `${fieldLabel(property, name)} should have unique values within the array` }
                     );
                 } else if (Array.isArray(arrayUniqueFields)) {
                     arrayUniqueFields.forEach(([fieldName, childProperty]) => {
                         arraySchema = arraySchema.refine(
                             (values: unknown) => !values || !Array.isArray(values) || values.length === new Set(values.map((v: unknown) => v && typeof v === "object" ? (v as Record<string, unknown>)[fieldName] : v)).size,
-                            { message: `${property.name} → ${childProperty.name ?? fieldName}: should have unique values within the array` }
+                            { message: `${fieldLabel(property, name)} → ${childProperty.name ?? fieldName}: should have unique values within the array` }
                         );
                     });
                 }
@@ -517,17 +532,17 @@ function getZodArraySchema({
         }
         if (validation.min || validation.min === 0) arraySchema = arraySchema.refine(
             (value: unknown) => !value || !Array.isArray(value) || value.length >= validation.min!,
-            { message: `${property.name} should be min ${validation.min} entries long` }
+            { message: `${fieldLabel(property, name)} should be min ${validation.min} entries long` }
         );
         if (validation.max) arraySchema = arraySchema.refine(
             (value: unknown) => !value || !Array.isArray(value) || value.length <= validation.max!,
-            { message: `${property.name} should be max ${validation.max} entries long` }
+            { message: `${fieldLabel(property, name)} should be max ${validation.max} entries long` }
         );
         // Handle uniqueInArray at the array level
         if (validation.uniqueInArray) {
             arraySchema = arraySchema.refine(
                 (values: unknown) => !values || !Array.isArray(values) || values.length === new Set(values).size,
-                { message: `${property.name} should have unique values within the array` }
+                { message: `${fieldLabel(property, name)} should have unique values within the array` }
             );
         }
     }

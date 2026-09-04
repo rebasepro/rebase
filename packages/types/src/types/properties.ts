@@ -239,9 +239,20 @@ export type InferEntityType<P extends Properties> = {
 
 export interface BaseProperty<CustomProps = unknown> {
     /**
-     * Property name (e.g. Product)
+     * The label the admin panel shows for this field — a column header, a form
+     * label, a card caption.
+     *
+     * Optional, and derived from the property key when absent
+     * (`publishDate` -> "Publish Date", via `prettifyIdentifier`, which is the
+     * same derivation the collection editor already uses when it suggests one).
+     *
+     * It was required, and that was a UI concern levied on everyone: a headless
+     * project has no panel and no reason to invent display names, yet could not
+     * declare a property without one. Set it when the derived label is wrong —
+     * `"URL"` rather than "Url", `"Postcode"` rather than "Zip" — which is the
+     * only time it earns the line.
      */
-    name: string;
+    name?: string;
 
     /**
      * Property description, always displayed under the field
