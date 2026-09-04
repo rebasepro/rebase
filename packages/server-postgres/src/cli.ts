@@ -24,7 +24,7 @@ import {
     ExcludeIntrospectionError,
     promptConfirm
 } from "./cli-helpers";
-import { checkDatabaseConnectivity, diagnoseDbError } from "./cli-errors";
+import { checkDatabaseConnectivity, diagnoseDbError, reportCommandFailure } from "./cli-errors";
 import { forLibpq } from "./utils/connection-string";
 import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
 import { detectDestructiveStatements, decidePushSafety } from "./schema/destructive-sql";
@@ -1335,5 +1335,8 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
 const argv1Real = process.argv[1] ? fs.realpathSync(process.argv[1]) : "";
 if (import.meta.url === `file://${argv1Real}`) {
     // Drop node and script path
-    runPluginCommand(process.argv.slice(2)).catch(() => process.exit(1));
+    runPluginCommand(process.argv.slice(2)).catch((error: unknown) => {
+        reportCommandFailure(error);
+        process.exit(1);
+    });
 }
