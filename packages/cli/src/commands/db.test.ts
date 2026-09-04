@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import path from "path";
-import { absolutizeLocalPathArgs, refuseAtlasOnManagedDatabase } from "./db.js";
+import { absolutizeLocalPathArgs, refuseAtlasOnManagedDatabase, refuseBranchOnManagedDatabase } from "./db.js";
 
 const ROOT = path.resolve("/projects/my-app");
 
@@ -141,6 +141,73 @@ describe("refuseAtlasOnManagedDatabase", () => {
         // Backups and branches reach the database directly; nothing here is
         // planned by a diff, so the managed database serves them fine.
         for (const sub of ["backup", "restore", "backups", "branch", "pull"]) {
+            expect(call(["node", "rebase", "db", sub], "managed").refused).toBe(false);
+        }
+    });
+});
+
+describe("refuseBranchOnManagedDatabase", () => {
+    /**
+     * Measured on a fresh `rebase init` scaffold: `branch create` answered
+     * `✓ Branch "feature_x" created successfully.`, `branch list` showed it at
+     * 7.1 MB, and connecting to `rb_feature_x` reported `current_database()` =
+     * `postgres`. A table created "in the branch" appeared in the parent.
+     *
+     * PGlite serves one database, so `CREATE DATABASE ... TEMPLATE` writes a
+     * catalog row and nothing else — and the catalog row is what makes the
+     * listing's `JOIN pg_database` corroborate it.
+     */
+    const call = (args: string[], kind: string) => {
+        const exit = vi.spyOn(process, "exit").mockImplementation((() => {
+            throw new Error("exited");
+        }) as never);
+        const err = vi.spyOn(console, "error").mockImplementation(() => {});
+        let threw = false;
+        try {
+            refuseBranchOnManagedDatabase(args, kind);
+        } catch {
+            threw = true;
+        }
+        const output = err.mock.calls.map(c => String(c[0] ?? "")).join("\n");
+        exit.mockRestore();
+        err.mockRestore();
+        return { refused: threw, output };
+    };
+
+    it("refuses db branch on the managed database", () => {
+        const { refused, output } = call(["node", "rebase", "db", "branch", "create", "x"], "managed");
+        expect(refused).toBe(true);
+        expect(output).toContain("does not work on the managed development database");
+    });
+
+    it.each(["create", "list", "info", "delete"])("refuses branch %s, not create alone", (action) => {
+        // `list` used to end with "Create one with: rebase db branch create",
+        // which is an invitation to do the broken thing.
+        const { refused } = call(["node", "rebase", "db", "branch", action], "managed");
+        expect(refused).toBe(true);
+    });
+
+    it("says why, in terms of what would actually happen to the data", () => {
+        const { output } = call(["node", "rebase", "db", "branch", "create", "x"], "managed");
+        expect(output).toContain("the copy would be the");
+        expect(output).toContain("PGlite");
+    });
+
+    it("names something that works rather than merely declining", () => {
+        const { output } = call(["node", "rebase", "db", "branch", "create", "x"], "managed");
+        expect(output).toContain("rebase dev --docker");
+        expect(output).toContain("DATABASE_URL");
+    });
+
+    it.each(["external", "docker"])("allows branching on a real Postgres (%s)", (kind) => {
+        const { refused } = call(["node", "rebase", "db", "branch", "create", "x"], kind);
+        expect(refused).toBe(false);
+    });
+
+    it("leaves the other db subcommands alone", () => {
+        // push/generate/migrate are refused by refuseAtlasOnManagedDatabase,
+        // with a different message; backup and restore are not refused at all.
+        for (const sub of ["push", "backup", "restore", "pull"]) {
             expect(call(["node", "rebase", "db", sub], "managed").refused).toBe(false);
         }
     });

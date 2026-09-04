@@ -136,8 +136,10 @@ function readFlagValue(rawArgs: readonly string[], flag: string): string | null 
  * The `db` subcommands that plan their work with Atlas.
  *
  * Atlas computes a diff by replaying the desired schema into a **second, empty
- * database** and comparing. That is why these three are listed and `backup`,
- * `restore` and `branch` are not.
+ * database** and comparing. That is why these three are listed and `backup` and
+ * `restore` are not — those shell out to `pg_dump`, which fails loudly on its
+ * own. `branch` is refused too, but for its own reason and with its own
+ * message: see {@link refuseBranchOnManagedDatabase}.
  */
 const ATLAS_BACKED_SUBCOMMANDS = new Set(["push", "generate", "migrate"]);
 
@@ -181,6 +183,57 @@ export function refuseAtlasOnManagedDatabase(rawArgs: string[], kind: string): v
     console.error("");
     console.error(chalk.gray("  For migrations, or to drop and rename columns, point the project at a real"));
     console.error(chalk.gray("  Postgres — uncomment DATABASE_URL in .env — and run this command again."));
+    console.error("");
+    process.exit(1);
+}
+
+/**
+ * Stop `rebase db branch` before it reports a branch that is not one.
+ *
+ * **PGlite serves exactly one database**, and this is the second thing that
+ * follows from it. `CREATE DATABASE "rb_feature_x" TEMPLATE "postgres"` there
+ * writes a `pg_database` catalog row and nothing else. Nothing errors, so the
+ * whole feature reports success end to end:
+ *
+ *     $ rebase db branch create feature_x
+ *       ✓ Branch "feature_x" created successfully.
+ *     $ rebase db branch list
+ *       ● feature_x (7.1 MB) — created just now
+ *
+ * `listBranches` joins `pg_database`, the catalog row is there, and
+ * `pg_database_size` answers with the one database's size — so the listing
+ * corroborates the lie. Then connecting to `rb_feature_x` reports
+ * `current_database()` = `postgres`, and a table created "in the branch" is
+ * visible in the parent immediately. Measured on a fresh `rebase init` scaffold.
+ *
+ * **The branch is the parent.** Every write made in the belief that it is
+ * sandboxed lands in the developer's real development database — which is the
+ * exact failure branching exists to prevent, announced as a success.
+ *
+ * So this refuses the whole `branch` domain rather than `create` alone: `list`
+ * on the managed database ends with "Create one with: rebase db branch create",
+ * an invitation to do the broken thing, and `info` would confirm a size for a
+ * database that was never made.
+ *
+ * `refuseAtlasOnManagedDatabase` above is the same shape for a different
+ * reason, and its comment named `branch` as one of the subcommands it does not
+ * cover. It does now.
+ */
+export function refuseBranchOnManagedDatabase(rawArgs: string[], kind: string): void {
+    if (kind !== "managed") return;
+    const [domain, subcommand] = rawArgs.slice(2);
+    if (domain !== "db" || subcommand !== "branch") return;
+
+    console.error("");
+    console.error(chalk.red("  ✗ rebase db branch does not work on the managed development database."));
+    console.error("");
+    console.error(chalk.gray("  Branching copies a database with CREATE DATABASE ... TEMPLATE. The managed"));
+    console.error(chalk.gray("  database is PGlite, which serves exactly one — the copy would be the"));
+    console.error(chalk.gray("  original, and every write you meant to sandbox would land in it."));
+    console.error("");
+    console.error(chalk.gray("  Branching needs a real Postgres. Either:"));
+    console.error(chalk.gray(`  ${chalk.cyan("rebase dev --docker")}    starts one, and branches work against it`));
+    console.error(chalk.gray("  or uncomment DATABASE_URL in .env to point at your own."));
     console.error("");
     process.exit(1);
 }
@@ -287,6 +340,21 @@ export async function runDriverDbCommand(
     // here covers push, generate, migrate, backup and restore alike, and any
     // subcommand a driver adds later. When the developer has named their own
     // database this adds nothing at all.
+    // Refused before anything is started. `prepareDatabaseEnv` below *boots*
+    // the managed database, and booting PGlite in order to say that PGlite
+    // cannot branch is latency spent on an answer already known — the resolver
+    // is a pure function and settles it. It also keeps the refusal working when
+    // the managed database would have failed to start, where the developer
+    // would otherwise be told about a daemon rather than about branching.
+    const { resolveDevDatabase } = await import("../dev-db/resolve");
+    const { readEnvFile } = await import("../utils/project");
+    refuseBranchOnManagedDatabase(rawArgs, resolveDevDatabase({
+        flagUrl: readFlagValue(rawArgs, "--database-url"),
+        flagDocker: rawArgs.includes("--docker"),
+        env: process.env,
+        envFile: readEnvFile(projectRoot)
+    }).kind);
+
     const { prepareDatabaseEnv, managedNotices } = await import("../dev-db/prepare");
     const prepared = await prepareDatabaseEnv(projectRoot, {
         flagUrl: readFlagValue(rawArgs, "--database-url"),
