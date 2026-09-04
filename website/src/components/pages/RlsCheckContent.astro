@@ -18,7 +18,7 @@ const { lang, t } = Astro.props;
  * good at. If the audit is good, the claim is evidenced rather than asserted.
  *
  * ── The check catalogue is the body of the page, deliberately ────────────────
- * Fourteen named failures, each with the id the tool prints. Those ids are the
+ * Fifteen named failures, each with the id the tool prints. Those ids are the
  * queries — "view bypasses RLS", "security definer search_path", "RLS enabled
  * no policies" — and each one is a question somebody types at the exact moment
  * they are worried. They come from `src/data/rls-checks.ts`, which is copied
@@ -84,7 +84,7 @@ const appSchema = {
     applicationCategory: "DeveloperApplication",
     operatingSystem: "Linux, macOS, Windows",
     description:
-        "A read-only Row-Level Security audit for any PostgreSQL database. Fourteen checks for the "
+        "A read-only Row-Level Security audit for any PostgreSQL database. Fifteen checks for the "
         + "failures that make Postgres leak in practice. One command, no account, no install.",
     url: PAGE_URL,
     downloadUrl: "https://www.npmjs.com/package/@rebasepro/rls-check",

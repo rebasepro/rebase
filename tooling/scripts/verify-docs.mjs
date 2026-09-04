@@ -44,6 +44,7 @@ import { checkProseTypes } from "./docs-verify/check-prose-types.mjs";
 import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
 import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
+import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -161,6 +162,19 @@ if (only === "both" || only === "names") {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} breaking release(s) missing from the upgrade guide:${NC}`);
         for (const b of bad) console.log(`  ${RED}${b.version}${NC} ${DIM}(${b.entries} breaking section)${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ rls-check count ━━━${NC}`);
+    const { findings: bad, packageCount, scanned } = checkRlsCheckCount(ROOT);
+    console.log(`${DIM}rls-check ships ${packageCount} checks; scanned ${scanned} file(s) that talk about it.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every stated check count matches the tool.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} stated count(s) disagree with the tool:${NC}`);
+        for (const b of bad) console.log(`  ${RED}${b.file}:${b.line}${NC}\n      ${DIM}${b.message}${NC}`);
     }
 }
 

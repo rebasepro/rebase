@@ -7,7 +7,7 @@ export const fr = {
   "hero.cta.demo": "Tester la démo",
 
   "rlscheck.title": "Ne nous croyez pas sur parole.",
-  "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> lit le catalogue de votre base de données et rapporte ce qui est réellement exposé — des tables servies avec la sécurité au niveau des lignes désactivée, des politiques vraies pour tout le monde, des vues qui contournent la RLS de leurs tables de base. Quatorze contrôles. N'importe quel Postgres : Supabase, Neon, RDS, votre propre serveur. Il est en lecture seule, ne demande aucun compte, et se moque de savoir si vous utilisez Rebase.",
+  "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> lit le catalogue de votre base de données et rapporte ce qui est réellement exposé — des tables servies avec la sécurité au niveau des lignes désactivée, des politiques vraies pour tout le monde, des vues qui contournent la RLS de leurs tables de base. Quinze contrôles. N'importe quel Postgres : Supabase, Neon, RDS, votre propre serveur. Il est en lecture seule, ne demande aucun compte, et se moque de savoir si vous utilisez Rebase.",
   "rlscheck.note": "Des SELECT sur les catalogues système et rien d'autre. Aucune télémétrie, aucun envoi, et il ne lit jamais vos données.",
   "rlscheck.cta": "Voir les 14 vérifications",
   "copy.command": "Copier",
@@ -15,7 +15,7 @@ export const fr = {
   "demo.init": "✔ Rebase initialisé dans le répertoire courant.",
   "demo.pull": "✔ Schéma appliqué à la base de données. Tables créées.",
   "demo.dev": "✔ API, temps réel et panneau démarrés.",
-  "demo.ports": "API sur <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> panneau sur <span class=\"text-surface-200\">:5173</span>",
+  "demo.ports": "Les URL de l'API et du panneau s'affichent au démarrage <span class=\"text-surface-700\">·</span> <span class=\"text-surface-200\">rebase dev</span> choisit des ports libres par projet",
   "social.title": "Des équipes qui livrent avec nos outils — Rebase, et FireCMS, le CMS open source de plus de 10 000 projets Firebase.",
   // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
   // lives today, and the rule as Postgres holds it. Code stays English.
@@ -650,8 +650,8 @@ export const fr = {
   // ── rlscheckpage ────────────────────────────────────────────────
   "rlscheckpage.00": "Outil gratuit · sans compte",
   "rlscheckpage.01": "Auditez la sécurité au niveau des lignes sur n'importe quel Postgres",
-  "rlscheckpage.02": "Quatorze contrôles pour les défaillances qui font fuiter une base Postgres dans la vraie vie — pas pour celles qui sont faciles à vérifier. Fonctionne sur Supabase, Neon, RDS, Cloud SQL, ou un conteneur sur votre portable. Une commande, rien à installer, aucune inscription.",
-  "rlscheckpage.03": "Les quatorze contrôles",
+  "rlscheckpage.02": "Quinze contrôles pour les défaillances qui font fuiter une base Postgres dans la vraie vie — pas pour celles qui sont faciles à vérifier. Fonctionne sur Supabase, Neon, RDS, Cloud SQL, ou un conteneur sur votre portable. Une commande, rien à installer, aucune inscription.",
+  "rlscheckpage.03": "Les quinze contrôles",
   "rlscheckpage.04": "Chaque constat imprimé par l'outil porte l'identifiant ci-dessous, la raison pour laquelle il compte, et le SQL qui le corrige. La sévérité est le pire niveau qu'un contrôle peut rapporter — plusieurs se rétrogradent selon ce qu'ils trouvent.",
   "rlscheckpage.05": "À quoi ressemble une exécution",
   "rlscheckpage.06": "Chaque constat nomme la relation, dit qui peut l'atteindre et ce qu'il obtiendrait, et affiche le SQL qui la referme. Il sort avec un code non nul au-delà d'une sévérité que vous choisissez : sa place est dans la CI.",
@@ -661,7 +661,7 @@ export const fr = {
   "rlscheckpage.10": "Rebase n'est pas requis",
   "rlscheckpage.11": "Il lit la base de données, pas votre code. Il n'a besoin d'aucun Rebase et n'en demande aucun.",
   "rlscheckpage.meta.title": "Audit RLS Postgres gratuit — vérifiez votre sécurité au niveau des lignes en une commande",
-  "rlscheckpage.meta.description": "rls-check est un audit gratuit et en lecture seule de la sécurité au niveau des lignes pour toute base PostgreSQL. Quatorze contrôles pour les défaillances qui font fuiter Postgres : RLS désactivée sur des tables exposées, politiques toujours vraies, vues qui contournent leur table de base. Fonctionne sur Supabase, Neon, RDS. Sans compte, sans installation.",
+  "rlscheckpage.meta.description": "rls-check est un audit gratuit et en lecture seule de la sécurité au niveau des lignes pour toute base PostgreSQL. Quinze contrôles pour les défaillances qui font fuiter Postgres : RLS désactivée sur des tables exposées, politiques toujours vraies, vues qui contournent leur table de base. Fonctionne sur Supabase, Neon, RDS. Sans compte, sans installation.",
 
   // ── contact ─────────────────────────────────────────────────────
   "contact.00": "Parlez aux gens qui le construisent.",
@@ -993,7 +993,7 @@ export const fr = {
   "securitypage.58": "Sous-traitant et sous-traitant ultérieur",
   "securitypage.59": "Vous êtes le responsable de traitement des données que vos utilisateurs mettent dans votre projet. <b class=\"text-white\">Rebase est le sous-traitant</b>, et <b class=\"text-white\">Google Cloud est sous-traitant ultérieur</b> car il fournit le calcul, le stockage et le réseau sur lesquels Rebase Cloud tourne.",
   "securitypage.60": "Une base de données par client",
-  "securitypage.61": "Ce <b class=\"text-white\">n'est pas du multi-tenant à schéma partagé</b>. Chaque projet a son propre cluster PostgreSQL CloudNativePG, dans son propre namespace Kubernetes. Il n'y a pas de colonne <span class=\"font-mono text-surface-300\">tenant_id</span> qui vous sépare d'un autre client — il y a une base de données différente.",
+  "securitypage.61": "Ce <b class=\"text-white\">n'est pas du multi-tenant à schéma partagé</b>. Chaque projet a sa propre base PostgreSQL — il n'y a pas de colonne <span class=\"font-mono text-surface-300\">tenant_id</span> qui vous sépare d'un autre client, et une connexion est liée à une seule base, donc une lecture inter-tenants est inatteignable plutôt que simplement filtrée par policy. Où vit cette base est votre choix : sur un cluster CloudNativePG partagé, ou sur un <b class=\"text-white\">cluster dédié bien à vous</b> dans son propre namespace Kubernetes.",
   "securitypage.62": "Isolation réseau entre clients",
   "securitypage.63": "Chaque namespace client est créé avec une <span class=\"font-mono text-surface-300\">NetworkPolicy</span> Kubernetes couvrant l'entrée et la sortie : les pods d'un projet ne peuvent pas ouvrir de connexions vers les pods ou la base d'un autre. Les applications clientes sont servies depuis <span class=\"font-mono text-surface-300\">*.rebase.website</span> — un domaine enregistrable distinct, délibérément jamais partagé avec la console, pour que les frontières de cookies et de same-site du navigateur tombent entre elles.",
   "securitypage.64": "Chiffrement en transit et des secrets",

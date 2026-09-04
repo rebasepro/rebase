@@ -7,15 +7,15 @@ export const es = {
   "hero.cta.demo": "Probar la demo",
 
   "rlscheck.title": "No te fíes de nuestra palabra.",
-  "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> lee el propio catálogo de tu base de datos y reporta lo que está realmente expuesto — tablas servidas con la seguridad a nivel de fila desactivada, políticas que evalúan a verdadero para todo el mundo, vistas que leen esquivando la RLS de sus tablas base. Catorce comprobaciones. Cualquier Postgres: Supabase, Neon, RDS, tu propio servidor. Es de solo lectura, no necesita cuenta y le da igual si usas Rebase.",
+  "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> lee el propio catálogo de tu base de datos y reporta lo que está realmente expuesto — tablas servidas con la seguridad a nivel de fila desactivada, políticas que evalúan a verdadero para todo el mundo, vistas que leen esquivando la RLS de sus tablas base. Quince comprobaciones. Cualquier Postgres: Supabase, Neon, RDS, tu propio servidor. Es de solo lectura, no necesita cuenta y le da igual si usas Rebase.",
   "rlscheck.note": "SELECTs contra los catálogos del sistema y nada más. Sin telemetría, sin subidas, y nunca lee tus datos.",
-  "rlscheck.cta": "Ver las 14 comprobaciones",
+  "rlscheck.cta": "Ver las 15 comprobaciones",
   "copy.command": "Copiar",
   "copy.command.done": "Copiado",
   "demo.init": "✔ Rebase inicializado en el directorio actual.",
   "demo.pull": "✔ Esquema aplicado a la base de datos. Tablas creadas.",
   "demo.dev": "✔ API, realtime y panel en marcha.",
-  "demo.ports": "API en <span class=\"text-surface-200\">:3001</span> <span class=\"text-surface-700\">·</span> panel en <span class=\"text-surface-200\">:5173</span>",
+  "demo.ports": "Las URLs de la API y del panel se imprimen al arrancar <span class=\"text-surface-700\">·</span> <span class=\"text-surface-200\">rebase dev</span> elige puertos libres por proyecto",
   "social.title": "Equipos que lanzan con nuestras herramientas — Rebase, y FireCMS, el CMS open source de más de 10.000 proyectos Firebase.",
   // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
   // lives today, and the rule as Postgres holds it. Code stays English.
@@ -651,8 +651,8 @@ export const es = {
   // ── rlscheckpage ────────────────────────────────────────────────
   "rlscheckpage.00": "Herramienta gratuita · sin cuenta",
   "rlscheckpage.01": "Audita la seguridad a nivel de fila en cualquier Postgres",
-  "rlscheckpage.02": "Catorce comprobaciones para los fallos que hacen que una base de datos Postgres filtre en la práctica — no para los que son fáciles de comprobar. Funciona en Supabase, Neon, RDS, Cloud SQL o un contenedor en tu portátil. Un comando, nada que instalar, nada a lo que registrarse.",
-  "rlscheckpage.03": "Las catorce comprobaciones",
+  "rlscheckpage.02": "Quince comprobaciones para los fallos que hacen que una base de datos Postgres filtre en la práctica — no para los que son fáciles de comprobar. Funciona en Supabase, Neon, RDS, Cloud SQL o un contenedor en tu portátil. Un comando, nada que instalar, nada a lo que registrarse.",
+  "rlscheckpage.03": "Las quince comprobaciones",
   "rlscheckpage.04": "Cada hallazgo que imprime la herramienta lleva el id de abajo, la razón por la que importa y el SQL que lo arregla. La severidad es el nivel más grave que puede reportar una comprobación — varias se rebajan según lo que encuentren.",
   "rlscheckpage.05": "Qué aspecto tiene una ejecución",
   "rlscheckpage.06": "Cada hallazgo nombra la relación, dice quién puede alcanzarla y qué obtendría, e imprime el SQL que la cierra. Sale con código distinto de cero por encima de la severidad que elijas, así que encaja en CI.",
@@ -662,7 +662,7 @@ export const es = {
   "rlscheckpage.10": "No hace falta Rebase",
   "rlscheckpage.11": "Lee la base de datos, no tu código. No necesita Rebase ni pregunta por él.",
   "rlscheckpage.meta.title": "Auditoría RLS gratuita para Postgres — revisa tu seguridad a nivel de fila con un comando",
-  "rlscheckpage.meta.description": "rls-check es una auditoría gratuita y de solo lectura de la seguridad a nivel de fila para cualquier base de datos PostgreSQL. Catorce comprobaciones para los fallos que hacen que Postgres filtre: RLS desactivada en tablas expuestas, políticas siempre verdaderas, vistas que leen esquivando su tabla base. Funciona en Supabase, Neon, RDS. Sin cuenta, sin instalación.",
+  "rlscheckpage.meta.description": "rls-check es una auditoría gratuita y de solo lectura de la seguridad a nivel de fila para cualquier base de datos PostgreSQL. Quince comprobaciones para los fallos que hacen que Postgres filtre: RLS desactivada en tablas expuestas, políticas siempre verdaderas, vistas que leen esquivando su tabla base. Funciona en Supabase, Neon, RDS. Sin cuenta, sin instalación.",
 
   // ── contact ─────────────────────────────────────────────────────
   "contact.00": "Habla con quienes lo construyen.",
@@ -994,7 +994,7 @@ export const es = {
   "securitypage.58": "Encargado y subencargado",
   "securitypage.59": "Tú eres el responsable del tratamiento de los datos que tus usuarios ponen en tu proyecto. <b class=\"text-white\">Rebase es el encargado</b>, y <b class=\"text-white\">Google Cloud es subencargado</b> porque aporta el cómputo, el almacenamiento y la red sobre los que corre Rebase Cloud.",
   "securitypage.60": "Una base de datos por cliente",
-  "securitypage.61": "Esto <b class=\"text-white\">no es multi-tenancy de esquema compartido</b>. Cada proyecto tiene su propio clúster PostgreSQL de CloudNativePG, en su propio namespace de Kubernetes. No hay ninguna columna <span class=\"font-mono text-surface-300\">tenant_id</span> que te separe de otro cliente — hay una base de datos distinta.",
+  "securitypage.61": "Esto <b class=\"text-white\">no es multi-tenancy de esquema compartido</b>. Cada proyecto tiene su propia base de datos PostgreSQL — no hay una columna <span class=\"font-mono text-surface-300\">tenant_id</span> que te separe de otro cliente, y una conexión está ligada a una sola base de datos, así que una lectura entre inquilinos es inalcanzable en vez de estar solo limitada por políticas. Dónde vive esa base de datos lo eliges tú: en un clúster CloudNativePG compartido, o en un <b class=\"text-white\">clúster dedicado propio</b> en su propio namespace de Kubernetes.",
   "securitypage.62": "Aislamiento de red entre clientes",
   "securitypage.63": "Cada namespace de cliente se crea con una <span class=\"font-mono text-surface-300\">NetworkPolicy</span> de Kubernetes que cubre entrada y salida, así que los pods de un proyecto no pueden abrir conexiones a los pods o la base de datos de otro. Las aplicaciones de cliente se sirven desde <span class=\"font-mono text-surface-300\">*.rebase.website</span> — un dominio registrable aparte, que a propósito nunca comparte con la consola, para que las fronteras de cookies y same-site del navegador caigan entre ellos.",
   "securitypage.64": "Cifrado en tránsito y de los secretos",
