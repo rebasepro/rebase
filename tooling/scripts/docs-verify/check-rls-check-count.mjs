@@ -69,8 +69,15 @@ function proseFiles(root) {
         ...globSync("website/src/i18n/*.ts", { cwd: root }),
         ...globSync("website/src/components/**/*.astro", { cwd: root }),
         ...globSync("website/src/data/rls-checks.ts", { cwd: root }),
-        ...globSync("website/src/content/docs/**/*.md", { cwd: root })
-    ].filter(rel => !/CHANGELOG/i.test(rel) && !rel.includes("/blog/"));
+        ...globSync("website/src/content/docs/**/*.md", { cwd: root }),
+        // The root `docs/` is the SOURCE `copy_repo_docs.js` mirrors into the
+        // website, so a stale count here is one that comes back on the next
+        // mirror run. Scanning only the mirror would catch it once and then
+        // watch it return.
+        ...globSync("docs/**/*.md", { cwd: root }),
+        ...globSync("README.md", { cwd: root }),
+        ...globSync("packages/rls-check/README.md", { cwd: root })
+    ].filter(rel => !/CHANGELOG/i.test(rel) && !rel.includes("/blog/") && !rel.startsWith("docs/audits/"));
 }
 
 export function checkRlsCheckCount(root) {
