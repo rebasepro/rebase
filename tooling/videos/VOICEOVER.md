@@ -28,24 +28,24 @@ sound like a way to generate REST routes.
 | # | Scene | Frames | Sec | Line |
 |---|-------|--------|-----|------|
 | 00 | Cold open | 96 | 3.2 | *(silent — the mark assembles)* |
-| 01 | The problem | 300 | 10.0 | An afternoon to build. Ten seconds to find what it missed. |
-| 02 | Row-level security | 170 | 5.7 | Every client hits it, including the ones you did not write. |
-| 03 | One definition | 210 | 7.0 | One definition, and everything else is compiled from it. |
-| 04 | Forty endpoints | 270 | 9.0 | The same file also wrote an OpenAPI spec and a typed SDK. |
-| 05 | Headline | 150 | 5.0 | Everything after this point is optional. |
-| 06 | Headless | 175 | 5.8 | And the panel's packages are never installed on this path. |
-| 07 | The wire | 240 | 8.0 | You did not write a subscription server, or decide who may listen. |
-| 08 | The panel | 280 | 9.3 | Delete it tomorrow and not one API response changes for anyone. |
-| 09 | Every view | 240 | 8.0 | Lists, boards, tables, forms. Every one of them generated. |
-| 10 | Studio | 175 | 5.8 | No psql tab, and no second set of credentials. |
-| 11 | The schema | 260 | 8.7 | Nobody maintains this drawing, because nobody drew it. |
-| 12 | Access is not a switch | 240 | 8.0 | Forty of these, and one file decides them all. |
-| 13 | The same query, twice | 240 | 8.0 | Neither of them can ask for the other's rows. |
-| 14 | The proof | 200 | 6.7 | Run it on what you have now, before believing any of this. |
-| 15 | Agent-native | 165 | 5.5 | There is nothing to talk into giving it more. |
-| 16 | One command | 205 | 6.8 | No account, no container to pull, nothing to sign up for. |
-| 17 | Yours | 175 | 5.8 | MIT, end to end. Nobody else holds your keys. |
-| 18 | The ask | 160 | 5.3 | Start with the one you already have. |
+| 01 | The problem | 300 | 10.0 | An agent built this backend in an afternoon. Ten seconds of audit found two ways in. |
+| 02 | Row-level security | 170 | 5.7 | So put the rules where nothing can route around them. |
+| 03 | One definition | 210 | 7.0 | You write the collection once, and the policies come from it. |
+| 04 | Forty endpoints | 270 | 9.0 | So does every endpoint, the OpenAPI spec, and a typed SDK that knows your columns. |
+| 05 | Headline | 150 | 5.0 | One package, your Postgres, and everything that follows. |
+| 06 | Headless | 175 | 5.8 | Auth, storage, realtime, functions, cron, backups — running, not scaffolded. |
+| 07 | The wire | 240 | 8.0 | Every write arrives on a socket, filtered by the same policies, without a subscription server. |
+| 08 | The panel | 280 | 9.3 | Your team gets a real application — the same data, the same API, nothing duplicated for them. |
+| 09 | Every view | 240 | 8.0 | Boards, tables, cards, forms, a record open beside them. All generated, all live. |
+| 10 | Studio | 175 | 5.8 | And you run the database from inside it. No second tool. |
+| 11 | The schema | 260 | 8.7 | Studio reads the catalogue, so the schema you are looking at is the one that exists. |
+| 12 | Access is not a switch | 240 | 8.0 | Forty answers here, per collection, per role — and one file decides all of them. |
+| 13 | The same query, twice | 240 | 8.0 | One call, two people, different rows. Neither can ask for the other's, ever. |
+| 14 | The proof | 200 | 6.7 | Run it against the database you have now, before you believe us. |
+| 15 | Agent-native | 165 | 5.5 | Agents get what you get. There is nothing to negotiate with. |
+| 16 | One command | 205 | 6.8 | Three commands. No account, no container to pull, nothing to sign up for. |
+| 17 | Yours | 175 | 5.8 | MIT, end to end, on your own machine. Nobody holds your keys. |
+| 18 | The ask | 160 | 5.3 | Start with the database you already have. |
 
 ## Notes for the read
 

@@ -86,19 +86,6 @@ export const S05_Proof: React.FC = () => {
                         </div>
                         <div
                             style={{
-                                marginTop: 30,
-                                fontFamily: FONT.body,
-                                fontSize: 24,
-                                lineHeight: 1.55,
-                                color: INK.copy,
-                                opacity: ramp(frame, 36, 20),
-                            }}
-                        >
-                            Supabase, Neon, RDS, your own server. It opens a read-only
-                            transaction and reports what is actually exposed.
-                        </div>
-                        <div
-                            style={{
                                 marginTop: 26,
                                 fontFamily: FONT.mono,
                                 fontSize: 16,

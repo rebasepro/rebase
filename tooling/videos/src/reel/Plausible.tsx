@@ -138,23 +138,6 @@ export const Plausible: React.FC = () => {
                     </Frame>
                 </div>
 
-                <div
-                    style={{
-                        position: "absolute",
-                        left: 200,
-                        top: 852,
-                        width: 1500,
-                        fontFamily: FONT.body,
-                        fontSize: 26,
-                        lineHeight: 1.5,
-                        color: INK.copy,
-                        opacity: ramp(frame, 208, 26),
-                    }}
-                >
-                    Agents made day-one code cheap. Nothing made the day-thirty
-                    problems cheaper —
-                    <span style={{ color: INK.high }}> and the database is the only place they can be answered once.</span>
-                </div>
             </AbsoluteFill>
         </AbsoluteFill>
     );

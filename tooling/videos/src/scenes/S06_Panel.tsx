@@ -93,22 +93,8 @@ export const S06_Panel: React.FC = () => {
                     <div style={{ width: 520, flexShrink: 0 }}>
                         <Chapter n="04" label="The panel" delay={4} />
                         <div style={{ marginTop: 26 }}>
-                            <DisplayLine size={DISPLAY.split} delay={10}>Add the panel.</DisplayLine>
-                            <DisplayLine size={DISPLAY.split} delay={16}>It becomes an app.</DisplayLine>
-                        </div>
-                        <div
-                            style={{
-                                marginTop: 28,
-                                fontFamily: FONT.body,
-                                fontSize: 23,
-                                lineHeight: 1.55,
-                                color: INK.copy,
-                                opacity: ramp(frame, 34, 22),
-                            }}
-                        >
-                            The same definition, rendered for everyone who is not a
-                            developer — reading the same API your code reads, under the
-                            same policies. Nothing is duplicated for them.
+                            <DisplayLine size={DISPLAY.split} delay={10}>And an app for</DisplayLine>
+                            <DisplayLine size={DISPLAY.split} delay={16}>everyone else.</DisplayLine>
                         </div>
 
                         {/* The shot label. One line that swaps rather than four

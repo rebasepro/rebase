@@ -201,21 +201,6 @@ export const Stream: React.FC = () => {
                 Every write, on the socket, as it happens.
             </div>
 
-            <div
-                style={{
-                    position: "absolute",
-                    left: 200,
-                    top: 946,
-                    width: 1520,
-                    fontFamily: FONT.body,
-                    fontSize: 24,
-                    color: INK.copy,
-                    opacity: ramp(frame, 168, 26),
-                }}
-            >
-                You subscribed to a collection, not a channel — and the rows you
-                are not allowed to see never arrive.
-            </div>
         </AbsoluteFill>
     );
 };

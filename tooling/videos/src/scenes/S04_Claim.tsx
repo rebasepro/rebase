@@ -56,11 +56,6 @@ export const S04_Claim: React.FC = () => (
 
             <div style={{ display: "flex", gap: 76, alignItems: "flex-start", marginTop: 52 }}>
                 <div style={{ width: 480, flexShrink: 0 }}>
-                    <Lead delay={34} size={24} width={480}>
-                        Written in TypeScript beside your schema, compiled into real
-                        Postgres policies, and applied by migration. You cannot forget
-                        to call middleware that was never in your code.
-                    </Lead>
                 </div>
 
                 <div style={{ flex: 1 }}>

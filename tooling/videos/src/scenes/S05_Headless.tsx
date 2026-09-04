@@ -67,8 +67,12 @@ export const S05_Headless: React.FC = () => {
                     <div style={{ width: 520, flexShrink: 0 }}>
                         <Chapter n="03" label="Headless" delay={2} />
                         <div style={{ marginTop: 24 }}>
-                            <DisplayLine size={DISPLAY.split} delay={8}>Take only</DisplayLine>
-                            <DisplayLine size={DISPLAY.split} delay={13}>the backend.</DisplayLine>
+                            {/* NOT "take only the backend". That framed the panel as a thing you might
+                                skip, which made the product sound like two things sold
+                                separately and the backend sound like it ships with an
+                                afterthought attached. The panel is part of it. */}
+                            <DisplayLine size={DISPLAY.split} delay={8}>The whole backend.</DisplayLine>
+                            <DisplayLine size={DISPLAY.split} delay={13}>Already running.</DisplayLine>
                         </div>
 
                         {/* Two columns of eight, so the breadth is legible as a
@@ -101,22 +105,6 @@ export const S05_Headless: React.FC = () => {
                             })}
                         </div>
 
-                        <div
-                            style={{
-                                marginTop: 34,
-                                fontFamily: FONT.body,
-                                fontSize: 21,
-                                lineHeight: 1.5,
-                                color: tone.muted,
-                                opacity: ramp(frame, 66, 22),
-                            }}
-                        >
-                            {/* A real mono span, not markdown backticks — those
-                                render as literal backticks in a sans paragraph. */}
-                            The SDK is generated from your collections.{" "}
-                            <span style={{ fontFamily: FONT.mono, color: tone.copy }}>orders</span>{" "}
-                            is a type, not a string.
-                        </div>
                     </div>
 
                     <div style={{ flex: 1 }}>

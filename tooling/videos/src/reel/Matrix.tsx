@@ -178,21 +178,6 @@ export const Matrix: React.FC = () => {
             >
                 Access is not a switch.
             </div>
-            <div
-                style={{
-                    position: "absolute",
-                    left: X,
-                    top: 964,
-                    width: 1440,
-                    fontFamily: FONT.body,
-                    fontSize: 23,
-                    color: INK.copy,
-                    opacity: ramp(frame, 186, 26),
-                }}
-            >
-                Each cell is a policy Postgres evaluates per row, for the role that
-                asked. Change the collection file and the whole grid changes with it.
-            </div>
         </AbsoluteFill>
     );
 };

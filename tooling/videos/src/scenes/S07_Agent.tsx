@@ -85,18 +85,6 @@ export const S07_Agent: React.FC = () => {
                     ))}
                 </div>
 
-                <div
-                    style={{
-                        marginTop: 48,
-                        fontFamily: FONT.body,
-                        fontSize: 24,
-                        color: tone.muted,
-                        opacity: ramp(frame, 66, 24),
-                    }}
-                >
-                    One definition, three audiences — your code, your team, and
-                    whatever you point at it next.
-                </div>
             </Stage>
         </Scene>
     );

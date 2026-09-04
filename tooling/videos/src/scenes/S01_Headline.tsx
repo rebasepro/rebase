@@ -48,12 +48,6 @@ export const S01_Headline: React.FC = () => {
 
                 <DisplayLine size={DISPLAY.bookend} delay={16}>The backend you always wanted.</DisplayLine>
                 <DisplayLine size={DISPLAY.bookend} delay={26}>On the Postgres you choose.</DisplayLine>
-
-                <Lead delay={52} size={28} width={860} style={{ marginTop: 34 }}>
-                    All of it comes from one package and one Postgres — the database
-                    you already run, or one it starts for you. What you take from
-                    there is up to you.
-                </Lead>
             </Stage>
         </Scene>
     );

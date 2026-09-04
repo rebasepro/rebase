@@ -151,21 +151,6 @@ export const Routes: React.FC = () => {
             >
                 Forty endpoints. None of them typed.
             </div>
-            <div
-                style={{
-                    position: "absolute",
-                    left: X,
-                    top: 940,
-                    width: 1440,
-                    fontFamily: FONT.body,
-                    fontSize: 24,
-                    color: INK.copy,
-                    opacity: ramp(frame, 152, 26),
-                }}
-            >
-                Add a collection and there are five more. Rename a column and every
-                one of them follows.
-            </div>
         </AbsoluteFill>
     );
 };

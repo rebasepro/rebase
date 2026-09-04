@@ -215,22 +215,6 @@ export const Map: React.FC = () => {
             >
                 Your schema, as it actually is.
             </div>
-            <div
-                style={{
-                    position: "absolute",
-                    left: 214,
-                    top: 916,
-                    width: 1420,
-                    fontFamily: FONT.body,
-                    fontSize: 24,
-                    lineHeight: 1.5,
-                    color: INK.copy,
-                    opacity: ramp(frame, 196, 26),
-                }}
-            >
-                Read out of the catalogue every time you open it — not a diagram
-                somebody drew once and stopped updating.
-            </div>
         </AbsoluteFill>
     );
 };

@@ -191,21 +191,6 @@ export const TwoUsers: React.FC = () => {
                     delay={62}
                 />
 
-                <div
-                    style={{
-                        position: "absolute",
-                        left: LEFT,
-                        top: 920,
-                        width: 1520,
-                        fontFamily: FONT.body,
-                        fontSize: 23,
-                        color: INK.copy,
-                        opacity: ramp(frame, 160, 24),
-                    }}
-                >
-                    Same call. Same endpoint. No branch in your code —
-                    <span style={{ color: INK.high }}> the database decided who could see what.</span>
-                </div>
             </AbsoluteFill>
         </AbsoluteFill>
     );
