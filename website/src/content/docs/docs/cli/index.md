@@ -218,6 +218,12 @@ empty database to compare against — and the managed PGlite serves exactly one.
 Running them there stops with a message saying so. Point `DATABASE_URL` at a real
 PostgreSQL for the migration workflow; `rebase dev` already creates missing tables
 additively on the managed one.
+
+`branch` is refused there for a related reason. `CREATE DATABASE ... TEMPLATE`
+against PGlite writes a catalog entry and copies nothing, so the branch would
+resolve to the database it was cloned from — every write you meant to sandbox
+would land in your development database. `rebase dev --docker` gives you a real
+server that branches work against.
 :::
 
 ### `rebase apps init` / `rebase apps config`

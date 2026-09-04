@@ -61,7 +61,11 @@ rebase db migrate
 | `rebase db push` | Apply schema directly to DB | Development |
 | `rebase db generate` | Generate schema + create SQL migration files | Production prep |
 | `rebase db migrate` | Run pending migrations | Production deploy |
+<<<<<<< HEAD
 | `rebase db branch` | Create / list / delete / prune a database branch | Feature work |
+=======
+| `rebase db branch` | Create / list / delete a database branch | Feature work (needs a real PostgreSQL) |
+>>>>>>> fix/db-branch-refuse-managed
 | `rebase db backup` | Write a backup of the current database | Before a risky change |
 | `rebase db backups` | List the backups taken so far | Picking one to restore |
 | `rebase db restore` | Restore the database from a backup | Recovery |

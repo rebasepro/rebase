@@ -70,6 +70,19 @@
   read as seven days. Atlas's `<db>_dev_diff` scratch databases are reported
   alongside but removed only with `--include-dev-diff`.
 
+- **`rebase db branch` reported branches the managed database had not made.**
+  PGlite serves exactly one database, so `CREATE DATABASE ... TEMPLATE` wrote a
+  `pg_database` catalog entry and copied nothing. Every step then agreed:
+  `create` answered `✓ Branch "feature_x" created successfully.`, and `list`
+  showed it at 7.1 MB because the catalog entry makes its `JOIN pg_database`
+  succeed and `pg_database_size` answer for the one real database. Connecting to
+  `rb_feature_x` reported `current_database()` = `postgres`, and a table created
+  "in the branch" appeared in the parent — so every write made in the belief
+  that it was sandboxed landed in the developer's own database. Measured on a
+  fresh `rebase init` scaffold, which is the default path. The whole `branch`
+  domain is now refused there, before the database is started, naming
+  `rebase dev --docker` and `DATABASE_URL` as the two things that work.
+
 ### Security
 
 An external audit of the framework and Rebase Cloud on 2 September 2026. Every
