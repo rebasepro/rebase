@@ -39,7 +39,7 @@ export const S07_Agent: React.FC = () => {
                 <Chapter n="08" label="Agent-native" delay={4} />
                 <div style={{ marginTop: 24 }}>
                     <DisplayLine size={DISPLAY.statement} delay={10}>
-                        An agent gets the same authorization
+                        An agent gets the same permissions
                     </DisplayLine>
                     <DisplayLine size={DISPLAY.statement} delay={17}>you do. Not a way around it.</DisplayLine>
                 </div>

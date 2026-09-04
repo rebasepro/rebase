@@ -198,7 +198,7 @@ export const Stream: React.FC = () => {
                     opacity: ramp(frame, 150, 26),
                 }}
             >
-                Every write, on the socket, as it happens.
+                Every change, the moment it happens.
             </div>
 
         </AbsoluteFill>
