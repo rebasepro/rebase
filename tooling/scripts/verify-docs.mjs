@@ -43,6 +43,7 @@ import { checkAgentBundle } from "./docs-verify/check-agent-bundle.mjs";
 import { checkProseTypes } from "./docs-verify/check-prose-types.mjs";
 import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
+import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -73,6 +74,7 @@ if (asJson) {
         out.proseTypes = checkProseTypes(ROOT).findings;
         out.versionPins = checkVersionPins(ROOT).findings;
         out.envReference = checkEnvReference(ROOT).findings;
+        out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -146,6 +148,19 @@ if (only === "both" || only === "names") {
             console.log(`  ${RED}${b.file}:${b.line}${NC} ${DIM}[${b.rule}]${NC} ${b.what} is ${RED}${b.found}${NC}`);
             console.log(`      ${DIM}${b.text}${NC}`);
         }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Upgrade-guide coverage ━━━${NC}`);
+    const { findings: bad, scanned } = checkUpgradeCoverage(ROOT);
+    console.log(`${DIM}Checked ${scanned} release(s) that declare a breaking change.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every breaking release is covered by the upgrade guide.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} breaking release(s) missing from the upgrade guide:${NC}`);
+        for (const b of bad) console.log(`  ${RED}${b.version}${NC} ${DIM}(${b.entries} breaking section)${NC}`);
     }
 }
 
