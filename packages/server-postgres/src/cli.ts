@@ -817,12 +817,14 @@ ${chalk.green.bold("Usage")}
 ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("create")} <name> [--from <source>]   Create a new branch
   ${chalk.blue.bold("list")}                              List all branches
+  ${chalk.blue.bold("switch")} [<name>|--off]             Point this checkout at a branch
   ${chalk.blue.bold("delete")} <name>                     Delete a branch
   ${chalk.blue.bold("info")} <name>                       Show branch details
 
 ${chalk.green.bold("Examples")}
-  ${chalk.gray("# Create a branch from the current database")}
+  ${chalk.gray("# Create a branch and work on it")}
   rebase db branch create feature_auth
+  rebase db branch switch feature_auth
 
   ${chalk.gray("# Create a branch from a specific source")}
   rebase db branch create staging --from production

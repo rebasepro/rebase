@@ -362,8 +362,20 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         return;
     }
 
+    // Handled here rather than by the driver, for the same reason `stop` and
+    // `reset` are: it writes per-checkout CLI state. The driver creates and
+    // drops the databases; which one this checkout talks to is not its
+    // business, and it runs as a child process that could not persist the
+    // answer anyway.
+    if (subcommand === "branch" && rawArgs.slice(2)[2] === "switch") {
+        await switchBranch(projectRoot, rawArgs);
+
+        return;
+    }
+
     try {
         await runDriverDbCommand(rawArgs);
+        await forgetDeletedBranch(projectRoot, rawArgs);
     } catch (error) {
         // A child that exited non-zero already printed its diagnostics through
         // inherited stdio; only the errors raised above have a message worth
@@ -547,6 +559,143 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
 }
 
 /**
+ * Stop pointing at a branch that was just deleted.
+ *
+ * Without this, `branch delete` succeeds and leaves the checkout aimed at a
+ * database that no longer exists — so the next `rebase dev` fails to connect,
+ * naming a database the developer has already forgotten about. The delete is
+ * the driver's, and the pointer is the CLI's, so this is the seam where the two
+ * have to agree.
+ *
+ * Only when the deleted branch is the active one; deleting a different branch
+ * is none of this function's business.
+ */
+async function forgetDeletedBranch(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
+    const [domain, subcommand, action, name] = rawArgs.slice(2);
+    if (domain !== "db" || subcommand !== "branch" || action !== "delete" || !name) return;
+
+    const { clearActiveBranch, readActiveBranch } = await import("../dev-db/branch-pointer");
+    if (readActiveBranch(projectRoot)?.name !== name) return;
+
+    clearActiveBranch(projectRoot);
+    console.log(chalk.gray("  ↩ That was the branch this checkout was on — back on the main database."));
+}
+
+/**
+ * `rebase db branch switch <name>` — point this checkout at a branch.
+ *
+ * The step branching was missing. `create` copied the database in about a
+ * second and then printed `Database: rb_feature_auth` and stopped: there was no
+ * `switch`, no `--branch` on `rebase dev`, and no `REBASE_BRANCH`. The only way
+ * to use a branch was to hand-edit `DATABASE_URL`, while the documentation said
+ * "the CLI updates your local development configuration" — it did not, and the
+ * `.env` was byte-identical afterwards.
+ *
+ * Three things it insists on:
+ *
+ * - **The branch has to exist.** Writing a pointer to a database that was never
+ *   created turns a typo into a connection error on the *next* command, which
+ *   is the one place it cannot be explained. Checked against
+ *   `rebase.branches` and `pg_database` both, because a branch dropped outside
+ *   Rebase leaves the metadata row behind.
+ *
+ * - **It says what changed, and how to undo it.** A command that silently
+ *   redirects every subsequent database operation owes the reader the database
+ *   name it moved to and the words that move it back.
+ *
+ * - **It never edits `.env`.** See `branch-pointer.ts`.
+ */
+async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
+    const { branchDatabaseName, clearActiveBranch, databaseNameOf, readActiveBranch, writeActiveBranch } =
+        await import("../dev-db/branch-pointer");
+    const { readEnvFile } = await import("../utils/project");
+
+    // `rawArgs` is the whole of `process.argv`, so the command's own words start
+    // at index 2: ["db", "branch", "switch", <name>].
+    const name = rawArgs.slice(2)[3];
+    const base = readEnvFile(projectRoot).DATABASE_URL?.trim();
+
+    // `switch` with no argument reports rather than changes. "Which branch am I
+    // on" is asked far more often than "move me", and answering it should not
+    // require guessing a flag.
+    if (!name) {
+        const active = readActiveBranch(projectRoot);
+        console.log("");
+        if (active) {
+            console.log(`  ${chalk.green("●")} On branch ${chalk.bold(active.name)} ${chalk.gray(`(${active.database})`)}`);
+            console.log(chalk.gray(`    Back to the main database: ${chalk.cyan("rebase db branch switch --off")}`));
+        } else {
+            const main = base ? databaseNameOf(base) : null;
+            console.log(`  ${chalk.gray("●")} On the main database${main ? chalk.gray(` (${main})`) : ""}`);
+            console.log(chalk.gray(`    Switch to a branch: ${chalk.cyan("rebase db branch switch <name>")}`));
+        }
+        console.log("");
+
+        return;
+    }
+
+    if (name === "--off" || name === "--main") {
+        const active = readActiveBranch(projectRoot);
+        clearActiveBranch(projectRoot);
+        console.log("");
+        console.log(active
+            ? chalk.green(`  ✓ Back on the main database${base ? ` (${databaseNameOf(base)})` : ""}.`)
+            : chalk.gray("  Already on the main database."));
+        console.log("");
+
+        return;
+    }
+
+    if (!base) {
+        console.error(chalk.red("✗ This project has no DATABASE_URL, so there is no database to branch from."));
+        console.error(chalk.gray("  Branching needs a real Postgres — the managed development database serves"));
+        console.error(chalk.gray("  exactly one. Set DATABASE_URL in .env, or run `rebase dev --docker`."));
+        process.exit(1);
+    }
+
+    const database = branchDatabaseName(name);
+
+    // Verified before the pointer is written, not after.
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: base });
+    try {
+        await client.connect();
+    } catch (error) {
+        console.error(chalk.red(`✗ Could not reach the database to check that branch "${name}" exists.`));
+        console.error(chalk.gray(`  ${error instanceof Error ? error.message : String(error)}`));
+        process.exit(1);
+    }
+    try {
+        const { rows } = await client.query<{ registered: boolean; present: boolean }>(
+            `SELECT EXISTS (SELECT 1 FROM rebase.branches WHERE name = $1)      AS registered,
+                    EXISTS (SELECT 1 FROM pg_database    WHERE datname = $2)    AS present`,
+            [name, database]
+        ).catch(() => ({ rows: [{ registered: false, present: false }] }));
+
+        const { registered, present } = rows[0] ?? { registered: false, present: false };
+        if (!present) {
+            console.error(chalk.red(`✗ Branch "${name}" does not exist.`));
+            console.error(registered
+                // The metadata row outlives a database dropped with plain SQL.
+                ? chalk.gray(`  It is registered but its database (${database}) is gone — someone dropped it outside Rebase.`)
+                : chalk.gray(`  ${chalk.cyan("rebase db branch list")} shows the ones that do.`));
+            process.exit(1);
+        }
+    } finally {
+        await client.end();
+    }
+
+    writeActiveBranch(projectRoot, { name, database });
+
+    console.log("");
+    console.log(chalk.green(`  ✓ Switched to branch "${name}".`));
+    console.log(chalk.gray(`    Database: ${database}`));
+    console.log(chalk.gray("    Every rebase command in this checkout now uses it — dev, db push, migrate."));
+    console.log(chalk.gray(`    Back to the main database: ${chalk.cyan("rebase db branch switch --off")}`));
+    console.log("");
+}
+
+/**
  * What each `rebase db <action>` does and takes.
  *
  * Kept here rather than delegated to the driver because the driver is reached
@@ -571,8 +720,12 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         summary: "Run the pending migration files against the database."
     },
     branch: {
-        usage: "rebase db branch <create|list|delete|info> [name]",
-        summary: "Database branching."
+        usage: "rebase db branch <create|list|switch|delete|info> [name]",
+        summary: "Database branching.",
+        notes: [
+            "switch <name> points this checkout at a branch; every later command uses it.",
+            "switch with no name reports where you are; switch --off returns to the main database."
+        ]
     },
     backup: {
         usage: "rebase db backup [--out <path|s3://…>]",
@@ -626,7 +779,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("push")}       Apply schema directly to database (development)
   ${chalk.blue.bold("generate")}   Generate migration files
   ${chalk.blue.bold("migrate")}    Run pending migrations
-  ${chalk.blue.bold("branch")}     Database branching (create, list, delete, info)
+  ${chalk.blue.bold("branch")}     Database branching (create, list, switch, delete, info)
   ${chalk.blue.bold("backup")}     Create a backup with pg_dump (--out <path|s3://…>)
   ${chalk.blue.bold("restore")}    Restore a backup with pg_restore (destructive; needs --yes)
   ${chalk.blue.bold("backups")}    List stored backups (backups list)
@@ -639,8 +792,10 @@ ${chalk.green.bold("Examples")}
   rebase db generate
   rebase db migrate
 
-  ${chalk.gray("# Create a database branch")}
+  ${chalk.gray("# Create a database branch and work on it")}
   rebase db branch create feature_auth
+  rebase db branch switch feature_auth
+  rebase db branch switch --off
 
   ${chalk.gray("# Back up to a local directory, then to object storage")}
   rebase db backup --out ./backups
