@@ -705,6 +705,39 @@ export interface SDKCollectionClient<
     findById(id: string | number): Promise<M | undefined>;
 
     /**
+     * Read one record by its ID, or throw if it is not there.
+     *
+     * The counterpart to {@link findById}, and the one most reads want. A row
+     * fetched by an id that came from a link, a route parameter or another row
+     * is expected to exist; when it does not, that is the error case, not a
+     * value to thread through the rest of the function.
+     *
+     * `findById` returns `M | undefined`, so every caller had to prove the row
+     * existed before touching a field:
+     *
+     * ```ts
+     * const post = await rebase.data.posts.findById(id);
+     * post.title;                        // TS18048: 'post' is possibly 'undefined'
+     * const ok = (await rebase.data.posts.findById(id))!.title;   // the `!` everyone reaches for
+     * ```
+     *
+     * With `get`, the absent case is an exception with a code you can branch on,
+     * and the happy path is typed as present:
+     *
+     * ```ts
+     * const post = await rebase.data.posts.get(id);   // M, not M | undefined
+     * ```
+     *
+     * Same split as Prisma's `findUnique` / `findUniqueOrThrow`: two contracts,
+     * both wanted, named so the choice is visible at the call site.
+     *
+     * @throws {RebaseApiError} `NOT_FOUND` (status 404) when no such row exists,
+     *   or is visible to the caller — row-level security makes a row the caller
+     *   may not read indistinguishable from one that is not there, deliberately.
+     */
+    get(id: string | number): Promise<M>;
+
+    /**
      * Create a new record.
      * @param data The record data to create (the collection's `Insert` shape).
      * @param id Optional specific id, sent as an `id` column. This is for tables

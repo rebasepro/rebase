@@ -147,6 +147,20 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             }
         },
 
+        async get(id: string | number) {
+            const row = await client.findById(id);
+            if (row === undefined) {
+                // 404 rather than a bespoke code: it is the same outcome the
+                // transport would have surfaced, and row-level security makes
+                // "no such row" and "not yours" the same answer on purpose.
+                throw new RebaseApiError(
+                    `No record with id ${JSON.stringify(String(id))} in "${slug}".`,
+                    { status: 404, code: "NOT_FOUND" }
+                );
+            }
+            return row;
+        },
+
         async create(data: Partial<M>, id?: string | number, options?: WriteOptions) {
             const body: Record<string, unknown> = { ...data };
             if (id !== undefined) {

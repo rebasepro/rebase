@@ -12854,16 +12854,47 @@ const { data, meta } = await client.data.products.find({
     offset: 0
 });
 
-// data is Entity<M>[]  — each item has { id, values, path }
+// data is Row[] — flat rows, with the id at the top level
 // meta has { total, limit, offset, hasMore }
 ```
 
-#### Find by ID
+#### Read one by ID
+
+Two methods, because there are two situations and they want different code.
+
+`get` is for a row you expect to exist — the id came from a link, a route
+parameter or another row. It returns the row, so nothing downstream has to
+narrow, and a missing row is an exception you can branch on:
 
 ```typescript
-const product = await client.data.products.findById(42);
-// Returns Entity<M> | undefined
+const product = await client.data.products.get(42);
+product.name;    // Row, not Row | undefined
 ```
+
+```typescript
+
+async function loadProduct(id: string) {
+    try {
+        return await client.data.products.get(id);
+    } catch (e) {
+        if (e instanceof RebaseApiError && e.code === "NOT_FOUND") return null;
+        throw e;
+    }
+}
+```
+
+`findById` is for a row that may legitimately not be there — a lookup by an id
+a user typed, a cache probe:
+
+```typescript
+const maybe = await client.data.products.findById(42);
+// Row | undefined
+```
+
+:::note
+Row-level security makes "no such row" and "not yours to read" the same answer,
+deliberately: a 404 that distinguished them would confirm the row exists.
+:::
 
 #### Create
 

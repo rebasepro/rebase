@@ -648,7 +648,7 @@ interface RestFetchService { aggregate, fetchCollectionForRest, fetchOneForRest 
 interface RolesContainPolicyExpression { kind, roles }
 interface RolesOnlySecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface RolesOverlapPolicyExpression { kind, roles }
-interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
+interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
 interface SDKQueryBuilderInterface { count, find, include, limit, listen, offset, orderBy, search, vectorSearch, where, where }
 interface SQLAdmin { executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase }
 interface SaveManyProps { collection, path, rows, upsert }
@@ -848,7 +848,7 @@ interface ChannelHistoryEntry { at, event, payload, senderId, seq }
 interface ChannelHistoryResult { latestSeq, messages, retained }
 interface ChannelOptions { history }
 interface ChannelTransport { onChannelMessage, onReconnect, sendMessage }
-interface CollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, include, iterate, limit, listen, listenById, observe, observeById, offset, orderBy, search, update, updateMany, vectorSearch, where }
+interface CollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, observe, observeById, offset, orderBy, search, update, updateMany, vectorSearch, where }
 interface CookieStorageOptions { domain, maxAge, path, sameSite, secure }
 interface CreateAdminOptions { adminPath }
 interface CreateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
@@ -877,7 +877,7 @@ interface PresenceDiff { joins, leaves }
 interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, onUnauthorized, realtime, storageUrlOrigin, token, websocketUrl }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
 interface RowSnapshotMeta { fromCache, hasPendingWrites }
-interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
+interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
 interface SDKQueryBuilderInterface { count, find, include, limit, listen, offset, orderBy, search, vectorSearch, where, where }
 interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
 type AuthChangeEvent
