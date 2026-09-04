@@ -1,38 +1,42 @@
 /**
- * The voiceover, as data — so the film can render it and the rhythm can be
- * judged before anyone records it.
+ * The voiceover, on an ABSOLUTE timeline.
  *
- * Kept in step with VOICEOVER.md by hand, which is fine while it is a testing
- * aid and would not be if it ever shipped. Nothing in RebaseIntro reads this;
- * only the RebaseIntro-VO composition does.
+ * It used to be one line per scene, each starting a beat after its own cut. The
+ * effect was a metronome: the narrator stopped at every single cut, nineteen
+ * times, whether the sentence had finished a thought or not. Silence has to
+ * mean something, and it cannot mean anything if it happens everywhere.
  *
- * WORDS_PER_SECOND is 2.5 — 150 words a minute, an ordinary pace for technical
- * narration. The lines are written to occupy about 55% of their scene rather
- * than all of it: a line that fits its scene exactly is a line delivered with
- * no pause before or after it, and eight of these used to be over 88%.
+ * So a line now starts where the RHYTHM wants it, not where the scene does.
+ * Several begin before their own cut and carry across it — the line about the
+ * API and the policies starts while the security slide is still up, because it
+ * is finishing that slide's sentence. Where a pause is wanted it is a real one:
+ * after the opening, and at the act joins.
+ *
+ * Frames are absolute from the first frame of the film. If a scene duration
+ * changes these do NOT follow it — regenerate them.
  */
 export const WORDS_PER_SECOND = 2.5;
 
-/** Frames before the first word of a scene's line. */
-export const LEAD_IN = 10;
+/** Frames per word at that pace, at 30fps. */
+export const FRAMES_PER_WORD = 12;
 
-export const NARRATION: { id: string; words: string[] }[] = [
-    { id: "01", words: ["An", "agent", "built", "this", "backend", "in", "an", "afternoon.", "Ten", "seconds", "of", "audit", "found", "two", "ways", "in."] },
-    { id: "02", words: ["So", "put", "the", "rules", "where", "nothing", "can", "route", "around", "them."] },
-    { id: "03", words: ["You", "write", "the", "collection", "once,", "and", "the", "policies", "come", "from", "it."] },
-    { id: "04", words: ["So", "does", "every", "endpoint,", "the", "OpenAPI", "spec,", "and", "a", "typed", "SDK", "that", "knows", "your", "columns."] },
-    { id: "05", words: ["One", "package,", "your", "Postgres,", "and", "everything", "that", "follows."] },
-    { id: "06", words: ["Auth,", "storage,", "realtime,", "functions,", "cron,", "backups", "\u2014", "running,", "not", "scaffolded."] },
-    { id: "07", words: ["Every", "write", "arrives", "on", "a", "socket,", "filtered", "by", "the", "same", "policies,", "without", "a", "subscription", "server."] },
-    { id: "08", words: ["Your", "team", "gets", "a", "real", "application", "\u2014", "the", "same", "data,", "the", "same", "API,", "nothing", "duplicated", "for", "them."] },
-    { id: "09", words: ["Boards,", "tables,", "cards,", "forms,", "a", "record", "open", "beside", "them.", "All", "generated,", "all", "live."] },
-    { id: "10", words: ["And", "you", "run", "the", "database", "from", "inside", "it.", "No", "second", "tool."] },
-    { id: "11", words: ["Studio", "reads", "the", "catalogue,", "so", "the", "schema", "you", "are", "looking", "at", "is", "the", "one", "that", "exists."] },
-    { id: "12", words: ["Forty", "answers", "here,", "per", "collection,", "per", "role", "\u2014", "and", "one", "file", "decides", "all", "of", "them."] },
-    { id: "13", words: ["One", "call,", "two", "people,", "different", "rows.", "Neither", "can", "ask", "for", "the", "other's,", "ever."] },
-    { id: "14", words: ["Run", "it", "against", "the", "database", "you", "have", "now,", "before", "you", "believe", "us."] },
-    { id: "15", words: ["Agents", "get", "what", "you", "get.", "There", "is", "nothing", "to", "negotiate", "with."] },
-    { id: "16", words: ["Three", "commands.", "No", "account,", "no", "container", "to", "pull,", "nothing", "to", "sign", "up", "for."] },
-    { id: "17", words: ["MIT,", "end", "to", "end,", "on", "your", "own", "machine.", "Nobody", "holds", "your", "keys."] },
-    { id: "18", words: ["Start", "with", "the", "database", "you", "already", "have."] },
+export const NARRATION: { at: number; words: string[] }[] = [
+    { at: 126, words: ["An", "agent", "built", "this", "backend", "in", "an", "afternoon.", "Ten", "seconds", "of", "audit", "found", "two", "ways", "in."] },
+    { at: 386, words: ["Rebase", "puts", "authorization", "in", "the", "database,", "where", "nothing", "can", "route", "around", "it."] },
+    { at: 570, words: ["You", "describe", "a", "collection", "once.", "The", "API,", "the", "SDK", "and", "the", "policies", "all", "come", "from", "that", "file."] },
+    { at: 788, words: ["Every", "endpoint,", "an", "OpenAPI", "spec,", "and", "types", "that", "know", "your", "columns."] },
+    { at: 1000, words: ["One", "package,", "your", "Postgres,", "and", "everything", "that", "follows."] },
+    { at: 1166, words: ["Auth,", "storage,", "realtime,", "functions,", "cron,", "backups", "\u2014", "running,", "not", "scaffolded."] },
+    { at: 1385, words: ["Every", "write", "arrives", "on", "a", "socket,", "filtered", "by", "the", "same", "policies,", "without", "a", "subscription", "server."] },
+    { at: 1599, words: ["Your", "team", "gets", "a", "real", "application.", "The", "same", "data,", "the", "same", "API,", "nothing", "duplicated", "for", "them."] },
+    { at: 1860, words: ["Boards,", "tables,", "cards,", "forms,", "a", "record", "open", "beside", "them.", "All", "generated,", "all", "live."] },
+    { at: 2081, words: ["And", "you", "run", "the", "database", "from", "inside", "it.", "No", "second", "tool."] },
+    { at: 2294, words: ["Studio", "reads", "the", "catalogue,", "so", "the", "schema", "you", "see", "is", "the", "one", "that", "exists."] },
+    { at: 2546, words: ["Forty", "answers", "here,", "per", "collection,", "per", "role", "\u2014", "and", "one", "file", "decides", "all", "of", "them."] },
+    { at: 2794, words: ["One", "call,", "two", "people,", "different", "rows.", "Neither", "can", "ask", "for", "the", "other's,", "ever."] },
+    { at: 3034, words: ["Run", "it", "against", "the", "database", "you", "have", "now,", "before", "you", "believe", "us."] },
+    { at: 3230, words: ["Agents", "get", "what", "you", "get.", "There", "is", "nothing", "to", "negotiate", "with."] },
+    { at: 3425, words: ["Three", "commands.", "No", "account,", "no", "container", "to", "pull,", "nothing", "to", "sign", "up", "for."] },
+    { at: 3630, words: ["MIT,", "end", "to", "end,", "on", "your", "own", "machine.", "Nobody", "holds", "your", "keys."] },
+    { at: 3805, words: ["Start", "with", "the", "database", "you", "already", "have."] },
 ];

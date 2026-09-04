@@ -1,7 +1,6 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
-import { SCENES, STARTS } from "./film";
-import { LEAD_IN, NARRATION, WORDS_PER_SECOND } from "./vo-script";
+import { FRAMES_PER_WORD, NARRATION } from "./vo-script";
 import { ramp } from "./components/motion";
 import { FONT } from "./theme";
 
@@ -9,39 +8,31 @@ import { FONT } from "./theme";
  * The voiceover, spoken on screen, for judging RHYTHM before it is recorded.
  *
  * Words appear one at a time at the narration pace, so what you are watching is
- * the delivery: where the line starts, how long it runs, and — the part that
- * actually matters — how much of the scene is left over in silence afterwards.
- * A static subtitle would show the words and hide exactly the thing being
+ * the delivery: where a line starts, how long it runs, and how much silence
+ * follows it. A static subtitle would show the words and hide the thing being
  * tested.
  *
- * This is a SEPARATE composition. RebaseIntro renders without it and always
- * has; nothing here is meant to ship.
+ * Timing is ABSOLUTE, not per scene — several lines begin before their own cut
+ * and carry across it, which is the whole point and something a scene-indexed
+ * caption could not express.
+ *
+ * This is a separate composition. RebaseIntro renders without it.
  */
 
-const PER_WORD = 30 / WORDS_PER_SECOND;
+const HOLD = 18;   // frames the finished line stays up
+const FADE = 12;
 
 export const Narration: React.FC = () => {
     const frame = useCurrentFrame();
 
-    const i = SCENES.findIndex(
-        (s, k) => frame >= STARTS[k] && frame < STARTS[k] + s.durationInFrames,
+    const line = NARRATION.find(
+        (l) => frame >= l.at - 8 && frame < l.at + l.words.length * FRAMES_PER_WORD + HOLD + FADE,
     );
-    if (i < 0) return null;
-
-    /* Scene ids in film.ts are names; the script is numbered by position, and
-       the cold open is silent and holds slot 00. */
-    const line = NARRATION[i - 1];
     if (!line) return null;
 
-    const local = frame - STARTS[i];
-    const spoken = line.words.filter((_, w) => local >= LEAD_IN + w * PER_WORD).length;
-    const endsAt = LEAD_IN + line.words.length * PER_WORD;
-
-    const up = ramp(local, LEAD_IN - 6, 8);
-    /* Held briefly, then gone — so the silence at the end of a scene is visible
-       as silence rather than as a caption nobody is reading any more. */
-    const down = 1 - ramp(local, endsAt + 18, 12);
-    const alpha = Math.max(0, Math.min(up, down));
+    const spoken = line.words.filter((_, i) => frame >= line.at + i * FRAMES_PER_WORD).length;
+    const endsAt = line.at + line.words.length * FRAMES_PER_WORD;
+    const alpha = Math.max(0, Math.min(ramp(frame, line.at - 8, 8), 1 - ramp(frame, endsAt + HOLD, FADE)));
     if (alpha <= 0.01) return null;
 
     return (
@@ -62,8 +53,6 @@ export const Narration: React.FC = () => {
                         maxWidth: 1460,
                         padding: "18px 34px",
                         borderRadius: 14,
-                        /* Opaque enough to survive the two chroma grounds; this
-                           is a test overlay, not part of the design. */
                         background: "rgba(0,0,0,0.72)",
                         border: "1px solid rgba(255,255,255,0.12)",
                         fontFamily: FONT.body,
@@ -73,10 +62,10 @@ export const Narration: React.FC = () => {
                         color: "#FFFFFF",
                     }}
                 >
-                    {line.words.map((w, k) => (
-                        <span key={k} style={{ opacity: k < spoken ? 1 : 0.16 }}>
+                    {line.words.map((w, i) => (
+                        <span key={i} style={{ opacity: i < spoken ? 1 : 0.16 }}>
                             {w}
-                            {k < line.words.length - 1 ? " " : ""}
+                            {i < line.words.length - 1 ? " " : ""}
                         </span>
                     ))}
                 </div>
