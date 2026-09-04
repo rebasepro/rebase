@@ -133,7 +133,7 @@ export const SCENES: SceneEntry[] = [
     },
     {
         id: "Panel", title: "07 · The panel", component: S06_Panel,
-        durationInFrames: 280, ground: "base",
+        durationInFrames: 300, ground: "base",
         station: { x: 0, y: -12, zoom: 2.05, roll: 0.64, reveal: 0.3 },
         enter: "descend",
     },
