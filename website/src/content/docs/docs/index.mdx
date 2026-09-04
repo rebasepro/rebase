@@ -14,7 +14,7 @@ Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** bui
 
 - **Schema as Code** — Define your data models as TypeScript collections. Rebase generates PostgreSQL tables, a full CRUD UI, REST API endpoints, and type-safe client SDKs from a single source of truth.
 - **Instant Admin Panel** — A beautiful, fast React-based admin UI with spreadsheet tables, lists, forms, Kanban boards, inline editing, and real-time sync.
-- **Integrated Backend** — Authentication (JWT + Google OAuth), file storage (local or S3), Row Level Security, entity history, and WebSocket real-time — all built in.
+- **Integrated Backend** — Authentication (passwords, magic links, one-time codes, MFA, API keys and twelve OAuth/OIDC providers), file storage (local or S3), Row Level Security, entity history, and WebSocket real-time — all built in.
 - **Radically Extensible** — If you can build it in React, you can add it to Rebase. Custom fields, custom views, plugins, and full access to internal hooks.
 
 :::tip
@@ -85,7 +85,7 @@ To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 | **Kanban Board** | Drag-and-drop board view grouped by any enum property |
 | **Relations** | One-to-one, one-to-many, many-to-many with junction tables and multi-hop joins |
 | **Row Level Security** | Supabase-style RLS policies defined in your collection config |
-| **Authentication** | JWT + refresh tokens, Google OAuth, role-based access control |
+| **Authentication** | JWT + refresh tokens, twelve OAuth/OIDC providers, magic links, one-time codes, TOTP MFA, scoped API keys, role-based access control |
 | **File Storage** | Local filesystem or S3-compatible with upload fields and browser |
 | **Real-time Sync** | WebSocket-powered live updates across all connected clients |
 | **Entity History** | Full audit trail for every create, update, and delete |

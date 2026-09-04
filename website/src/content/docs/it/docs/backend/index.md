@@ -9,7 +9,7 @@ description: Il backend di Rebase fornisce un server completo con API REST, aute
 Il backend di Rebase è un **server Node.js** basato su [Hono](https://hono.dev/) che fornisce:
 
 - **API REST** — Endpoint CRUD auto-generati per ogni collezione
-- **Autenticazione** — Token JWT, Google OAuth, gestione utenti/ruoli
+- **Autenticazione** — Token JWT, accesso OAuth e OIDC, magic link, codici monouso, MFA, chiavi API, gestione utenti/ruoli
 - **Archiviazione** — Caricamento/download di file con filesystem locale o S3
 - **WebSocket** — Sincronizzazione dati in tempo reale tramite PostgreSQL LISTEN/NOTIFY
 - **Cronologia delle Entità** — Traccia di audit per ogni modifica dei dati
@@ -46,7 +46,7 @@ Dopo l'inizializzazione, queste rotte vengono montate:
 
 | Path | Purpose |
 |------|---------|
-| `/api/auth/*` | Autenticazione (registrazione, login, refresh, Google OAuth) |
+| `/api/auth/*` | Autenticazione (registrazione, login, refresh, OAuth, magic link, codici monouso, MFA) |
 | `/api/admin/*` | Gestione utenti e ruoli (solo per admin) |
 | `/api/storage/*` | Caricamento, download ed eliminazione di file |
 | `/api/data/collections` | Endpoint per i metadati delle collezioni |
@@ -169,7 +169,7 @@ Se l'inizializzazione fallisce (ad esempio, errore di connessione al database), 
 
 ## Prossimi Passi
 
-- **[Autenticazione](/docs/backend/authentication)** — JWT, Google OAuth, gestione utenti
+- **[Autenticazione](/docs/backend/authentication)** — JWT, provider OAuth e OIDC, MFA, chiavi API, gestione utenti
 - **[Archiviazione](/docs/backend/storage)** — Archiviazione di file locali e S3
 - **[Callback delle Entità](/docs/collections/callbacks)** — Hook del ciclo di vita e API `context.data`
 - **[Cronologia delle Entità](/docs/backend/history)** — Traccia di audit

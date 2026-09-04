@@ -55,7 +55,7 @@ if (!authController.user) {
 
 A visão de login cuida de:
 - Login e cadastro com e-mail/senha
-- Login com Google OAuth (quando configurado)
+- Login com Google, GitHub e LinkedIn (quando configurado)
 - Fluxo de redefinição de senha
 - Validação de formulário e estados de erro
 

@@ -14,7 +14,7 @@ Rebase è un **Backend-as-a-Service (BaaS) open-source** e un **pannello di ammi
 
 - **Schema as Code** — Definisci i tuoi modelli di dati come collezioni TypeScript. Rebase genera tabelle PostgreSQL, un'interfaccia utente CRUD completa, endpoint API REST e SDK client type-safe da un'unica fonte di verità.
 - **Pannello di Amministrazione Istantaneo** — Un'interfaccia utente di amministrazione basata su React, bella e veloce, con tabelle a foglio di calcolo, liste, moduli, schede Kanban, editing in linea e sincronizzazione in tempo reale.
-- **Backend Integrato** — Autenticazione (JWT + Google OAuth), archiviazione di file (locale o S3), sicurezza a livello di riga (Row Level Security), cronologia delle entità e real-time WebSocket — tutto integrato.
+- **Backend Integrato** — Autenticazione (password, magic link, codici monouso, MFA, chiavi API e dodici provider OAuth/OIDC), archiviazione di file (locale o S3), sicurezza a livello di riga (Row Level Security), cronologia delle entità e real-time WebSocket — tutto integrato.
 - **Radicalmente Estensibile** — Se puoi costruirlo in React, puoi aggiungerlo a Rebase. Campi personalizzati, viste personalizzate, plugin e accesso completo agli hook interni.
 
 :::tip
@@ -77,7 +77,7 @@ Per usare il tuo PostgreSQL, togli il commento a `DATABASE_URL` in `.env` ed ese
 | **Kanban Board** | Vista a scheda drag-and-drop raggruppata per qualsiasi proprietà enum |
 | **Relations** | Uno-a-uno, uno-a-molti, molti-a-molti con tabelle di giunzione e join multi-hop |
 | **Row Level Security** | Policy RLS in stile Supabase definite nella configurazione della tua collezione |
-| **Authentication** | JWT + token di refresh, Google OAuth, controllo degli accessi basato sui ruoli |
+| **Authentication** | JWT + token di refresh, dodici provider OAuth/OIDC, magic link, codici monouso, MFA TOTP, chiavi API con ambito, controllo degli accessi basato sui ruoli |
 | **File Storage** | Filesystem locale o compatibile con S3 con campi di upload e browser |
 | **Real-time Sync** | Aggiornamenti live basati su WebSocket su tutti i client connessi |
 | **Entity History** | Traccia di audit completa per ogni creazione, aggiornamento ed eliminazione |

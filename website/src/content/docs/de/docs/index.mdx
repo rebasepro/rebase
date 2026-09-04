@@ -14,7 +14,7 @@ Rebase ist ein **quelloffenes Backend-as-a-Service (BaaS)** und **Admin-Panel**,
 
 - **Schema als Code** — Definieren Sie Ihre Datenmodelle als TypeScript-Sammlungen. Rebase generiert PostgreSQL-Tabellen, eine vollständige CRUD-Benutzeroberfläche, REST-API-Endpunkte und typsichere Client-SDKs aus einer einzigen Quelle der Wahrheit.
 - **Sofortiges Admin-Panel** — Eine schöne, schnelle React-basierte Admin-Benutzeroberfläche mit Tabellen, Listen, Formularen, Kanban-Boards, Inline-Bearbeitung und Echtzeit-Synchronisierung.
-- **Integriertes Backend** — Authentifizierung (JWT + Google OAuth), Dateispeicherung (lokal oder S3), Row Level Security, Entitätshistorie und WebSocket-Echtzeit – alles integriert.
+- **Integriertes Backend** — Authentifizierung (Passwörter, Magic Links, Einmalcodes, MFA, API-Schlüssel und zwölf OAuth-/OIDC-Provider), Dateispeicherung (lokal oder S3), Row Level Security, Entitätshistorie und WebSocket-Echtzeit – alles integriert.
 - **Radikal erweiterbar** — Wenn Sie es in React erstellen können, können Sie es zu Rebase hinzufügen. Benutzerdefinierte Felder, benutzerdefinierte Ansichten, Plugins und voller Zugriff auf interne Hooks.
 
 :::tip
@@ -77,7 +77,7 @@ Um stattdessen Ihre eigene PostgreSQL zu verwenden, kommentieren Sie `DATABASE_U
 | **Kanban-Board** | Drag-and-Drop-Board-Ansicht, gruppiert nach einer beliebigen Enum-Eigenschaft |
 | **Beziehungen** | Eins-zu-eins, Eins-zu-viele, Viele-zu-viele mit Verknüpfungstabellen und Multi-Hop-Joins |
 | **Zeilenbasierte Sicherheit (RLS)** | RLS-Richtlinien im Supabase-Stil, definiert in Ihrer Sammlungs-Konfiguration |
-| **Authentifizierung** | JWT + Refresh-Token, Google OAuth, rollenbasierte Zugriffssteuerung |
+| **Authentifizierung** | JWT + Refresh-Token, zwölf OAuth-/OIDC-Provider, Magic Links, Einmalcodes, TOTP-MFA, API-Schlüssel mit Geltungsbereich, rollenbasierte Zugriffssteuerung |
 | **Dateispeicherung** | Lokales Dateisystem oder S3-kompatibel mit Upload-Feldern und Browser |
 | **Echtzeit-Synchronisierung** | WebSocket-gesteuerte Live-Updates für alle verbundenen Clients |
 | **Entitätshistorie** | Vollständige Überwachungshistorie für jede Erstellung, Aktualisierung und Löschung |

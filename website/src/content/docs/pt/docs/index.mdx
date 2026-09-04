@@ -14,7 +14,7 @@ Rebase é um **Backend-as-a-Service (BaaS) de código aberto** e **painel de adm
 
 - **Schema as Code** — Defina seus modelos de dados como coleções TypeScript. O Rebase gera tabelas PostgreSQL, uma UI CRUD completa, endpoints de API REST e SDKs cliente com tipos seguros a partir de uma única fonte de verdade.
 - **Instant Admin Panel** — Uma UI de administração bonita e rápida baseada em React, com tabelas de planilha, listas, formulários, quadros Kanban, edição inline e sincronização em tempo real.
-- **Integrated Backend** — Autenticação (JWT + Google OAuth), armazenamento de arquivos (local ou S3), Segurança em Nível de Linha (RLS), histórico de entidades e WebSocket em tempo real — tudo integrado.
+- **Integrated Backend** — Autenticação (palavras-passe, magic links, códigos de uso único, MFA, chaves de API e doze fornecedores OAuth/OIDC), armazenamento de arquivos (local ou S3), Segurança em Nível de Linha (RLS), histórico de entidades e WebSocket em tempo real — tudo integrado.
 - **Radically Extensible** — Se você pode construir em React, pode adicionar ao Rebase. Campos personalizados, visualizações personalizadas, plugins e acesso total a hooks internos.
 
 :::tip
@@ -77,7 +77,7 @@ Para usar seu próprio PostgreSQL, descomente `DATABASE_URL` no `.env` e rode `p
 | **Kanban Board** | Visualização em quadro de arrastar e soltar agrupada por qualquer propriedade enum |
 | **Relations** | Um-para-um, um-para-muitos, muitos-para-muitos com tabelas de junção e junções de múltiplos saltos |
 | **Row Level Security** | Políticas RLS estilo Supabase definidas na configuração da sua coleção |
-| **Authentication** | JWT + tokens de atualização, Google OAuth, controle de acesso baseado em função |
+| **Authentication** | JWT + tokens de atualização, doze fornecedores OAuth/OIDC, magic links, códigos de uso único, MFA TOTP, chaves de API com âmbito, controle de acesso baseado em função |
 | **File Storage** | Sistema de arquivos local ou compatível com S3, com campos de upload e navegador |
 | **Real-time Sync** | Atualizações ao vivo via WebSocket em todos os clientes conectados |
 | **Entity History** | Trilha de auditoria completa para cada criação, atualização e exclusão |

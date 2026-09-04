@@ -93,7 +93,7 @@ await initializeRebaseBackend({
 
 `initializeRebaseBackend` richtet Folgendes ein:
 - **REST-API**-Routen unter `/api/data/*` – automatisch generiertes CRUD für jede Collection
-- **Auth**-Routen unter `/api/auth/*` – Registrierung, Login, Refresh, Google OAuth
+- **Auth**-Routen unter `/api/auth/*` – Registrierung, Login, Refresh, OAuth
 - **Storage**-Routen unter `/api/storage/*` – Datei-Upload/-Download
 - **WebSocket**-Server – Echtzeit-Entitätssynchronisation über Postgres LISTEN/NOTIFY
 - **Verlauf** – Aufzeichnung von Audit-Trails bei jeder Entitätsänderung

@@ -14,7 +14,7 @@ Rebase es un **Backend-as-a-Service (BaaS) de código abierto** y un **panel de 
 
 - **Esquema como Código** — Define tus modelos de datos como colecciones de TypeScript. Rebase genera tablas de PostgreSQL, una interfaz de usuario CRUD completa, endpoints de API REST y SDKs de cliente con tipos seguros a partir de una única fuente de verdad.
 - **Panel de Administración Instantáneo** — Una interfaz de usuario de administración hermosa y rápida basada en React con tablas de hoja de cálculo, listas, formularios, tableros Kanban, edición en línea y sincronización en tiempo real.
-- **Backend Integrado** — Autenticación (JWT + Google OAuth), almacenamiento de archivos (local o S3), seguridad a nivel de fila (Row Level Security), historial de entidades y WebSocket en tiempo real, todo integrado.
+- **Backend Integrado** — Autenticación (contraseñas, magic links, códigos de un solo uso, MFA, claves de API y doce proveedores OAuth/OIDC), almacenamiento de archivos (local o S3), seguridad a nivel de fila (Row Level Security), historial de entidades y WebSocket en tiempo real, todo integrado.
 - **Radicalmente Extensible** — Si puedes construirlo en React, puedes agregarlo a Rebase. Campos personalizados, vistas personalizadas, plugins y acceso total a los hooks internos.
 
 :::tip
@@ -77,7 +77,7 @@ Para usar tu propia PostgreSQL, descomenta `DATABASE_URL` en `.env` y ejecuta `p
 | **Tablero Kanban** | Vista de tablero de arrastrar y soltar agrupada por cualquier propiedad enum |
 | **Relaciones** | Uno a uno, uno a muchos, muchos a muchos con tablas de unión y uniones de múltiples saltos |
 | **Seguridad a Nivel de Fila** | Políticas RLS al estilo Supabase definidas en la configuración de tu colección |
-| **Autenticación** | JWT + tokens de actualización, Google OAuth, control de acceso basado en roles |
+| **Autenticación** | JWT + tokens de actualización, doce proveedores OAuth/OIDC, magic links, códigos de un solo uso, MFA TOTP, claves de API con alcance, control de acceso basado en roles |
 | **Almacenamiento de Archivos** | Sistema de archivos local o compatible con S3 con campos de carga y navegador |
 | **Sincronización en Tiempo Real** | Actualizaciones en vivo basadas en WebSocket para todos los clientes conectados |
 | **Historial de Entidades** | Rastro de auditoría completo para cada creación, actualización y eliminación |

@@ -17,7 +17,7 @@ Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** bui
 
 - **Schema as Code** — Define your data models as TypeScript collections. Rebase generates PostgreSQL tables, a full CRUD UI, REST API endpoints, and type-safe client SDKs from a single source of truth.
 - **Instant Admin Panel** — A beautiful, fast React-based admin UI with spreadsheet tables, lists, forms, Kanban boards, inline editing, and real-time sync.
-- **Integrated Backend** — Authentication (JWT + Google OAuth), file storage (local or S3), Row Level Security, entity history, and WebSocket real-time — all built in.
+- **Integrated Backend** — Authentication (passwords, magic links, one-time codes, MFA, API keys and twelve OAuth/OIDC providers), file storage (local or S3), Row Level Security, entity history, and WebSocket real-time — all built in.
 - **Radically Extensible** — If you can build it in React, you can add it to Rebase. Custom fields, custom views, plugins, and full access to internal hooks.
 
 :::tip
@@ -88,7 +88,7 @@ To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 | **Kanban Board** | Drag-and-drop board view grouped by any enum property |
 | **Relations** | One-to-one, one-to-many, many-to-many with junction tables and multi-hop joins |
 | **Row Level Security** | Supabase-style RLS policies defined in your collection config |
-| **Authentication** | JWT + refresh tokens, Google OAuth, role-based access control |
+| **Authentication** | JWT + refresh tokens, twelve OAuth/OIDC providers, magic links, one-time codes, TOTP MFA, scoped API keys, role-based access control |
 | **File Storage** | Local filesystem or S3-compatible with upload fields and browser |
 | **Real-time Sync** | WebSocket-powered live updates across all connected clients |
 | **Entity History** | Full audit trail for every create, update, and delete |
@@ -1675,7 +1675,7 @@ The three ratings mean:
 | REST API + generated SDK | Stable | The wire contract is versioned and gated; `client-sdk-e2e` drives register → sign-in → RLS-scoped reads → refresh → storage → realtime end to end |
 | Auth — email/password, OAuth, OIDC, magic link, one-time code | Stable | Twelve OAuth providers ship. The auth schema is a versioned contract, stamped and checked at boot |
 | Auth — MFA (TOTP) | Beta | Enrolment, verification and recovery work and are tested. Key rotation is implemented for the encryption key; there is no admin surface for resetting a locked-out user's factor |
-| Row-level security | Stable | The wedge of the product. `pnpm rls:check` audits a live database against fourteen checks, and the RLS e2e suite runs on every push |
+| Row-level security | Stable | The wedge of the product. `pnpm rls:check` audits a live database against fifteen checks, and the RLS e2e suite runs on every push |
 | Storage | Stable | Local, S3 and GCS. Default-deny in production since 0.17.0, and the scaffold ships an authorize hook |
 | Realtime | **Beta** | Subscriptions are matched by collection path only, so N subscribers on one collection cost N RLS-scoped refetches per write. That caps a deployment at low hundreds of concurrent subscribers. Correct at any scale; expensive past that one |
 | Vector search (pgvector) | Beta | Exact search is stable. ANN indexes are not yet declarable, so large collections scan |
@@ -4382,7 +4382,7 @@ Avoid the legacy pattern of checking `string_to_array(rebase.roles(), ',')` for 
 The Rebase backend is a **Node.js server** built on [Hono](https://hono.dev/) that provides:
 
 - **REST API** — Auto-generated CRUD endpoints for each collection
-- **Authentication** — JWT tokens, Google OAuth, user/role management
+- **Authentication** — JWT tokens, OAuth and OIDC sign-in, magic links, one-time codes, MFA, API keys, user/role management
 - **Storage** — File upload/download with local filesystem or S3
 - **WebSocket** — Real-time data sync via PostgreSQL LISTEN/NOTIFY
 - **Entity History** — Audit trail for every data change
@@ -4416,7 +4416,7 @@ After initialization, these routes are mounted:
 
 | Path | Purpose |
 |------|---------|
-| `/api/auth/*` | Authentication (signup, login, refresh, Google OAuth) |
+| `/api/auth/*` | Authentication (signup, login, refresh, OAuth, magic links, one-time codes, MFA) |
 | `/api/admin/*` | User and role management (admin-only) |
 | `/api/storage/*` | File upload, download, and deletion |
 | `/api/data/collections` | Collection metadata endpoint |
@@ -4590,7 +4590,7 @@ If initialization fails (e.g., database connection error), the server still star
 
 ### Next Steps
 
-- **[Authentication](/docs/backend/authentication)** — JWT, Google OAuth, user management
+- **[Authentication](/docs/backend/authentication)** — JWT, OAuth and OIDC providers, MFA, API keys, user management
 - **[Storage](/docs/backend/storage)** — Local and S3 file storage
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks and `context.data` API
 - **[Entity History](/docs/backend/history)** — Audit trail
@@ -9777,11 +9777,31 @@ PostgreSQL processes this operation by copying the underlying filesystem directo
 
 #### The Connection Limitation Guard
 
-PostgreSQL requires that **no other active connections** exist on the template (source) database when running a `CREATE DATABASE ... TEMPLATE` command. 
+PostgreSQL requires that **no other active connections** exist on the template (source) database when running a `CREATE DATABASE ... TEMPLATE` command.
 
 To prevent failures, the Rebase `DatabasePoolManager` executes an active eviction process before cloning or dropping a branch:
 1. **Eviction Loop**: It automatically closes and disconnects all idle pools pointing to the targeted database within the Rebase application context.
-2. **External Connections Block**: If external clients (such as DBeaver, pgAdmin, or external backend processes) maintain active transactions on the source database, PostgreSQL will reject the template operation with a `"being accessed by other users"` error. In this scenario, those connections must be closed manually.
+2. **External Connections Block**: If external clients (such as DBeaver, pgAdmin, or external backend processes) maintain active transactions on the source database, PostgreSQL will reject the template operation with a `"being accessed by other users"` error.
+
+The failure names what is connected rather than leaving you to guess:
+
+```
+Cannot create branch: the source database "leadgen" has active connections.
+  Connected right now:
+    2 × psql
+  A running `rebase dev` is the usual one — stop it, or re-run with --force to
+  disconnect them for you.
+```
+
+`--force` terminates those sessions before templating, on `create` and `delete`
+alike. It never terminates the session running the command itself.
+
+`DatabasePoolManager` disconnects its own idle pools before cloning or dropping — but only the pools **inside the process doing the work**. `rebase db branch` runs as its own process, so this reaches nothing else on your machine:
+
+- **A running `rebase dev` blocks branching.** This is the common case, not an edge case: wanting a branch and running the app are usually the same moment. Stop the dev server, branch, and start it again.
+- **So does any other client.** DBeaver, pgAdmin, a `psql` session, a second app instance — PostgreSQL rejects the operation with `is being accessed by other users` and those connections have to be closed by hand.
+
+There is no way around this in PostgreSQL itself; `CREATE DATABASE ... TEMPLATE` is a filesystem-level copy and the template must be quiescent for the duration.
 
 ---
 
@@ -9873,14 +9893,65 @@ Database branches can be managed directly using the Rebase CLI.
 # Create a new branch named 'dev_sandbox'
 rebase db branch create dev_sandbox
 
+# Clone from a database other than the default
+rebase db branch create pr_review_42 --from rb_staging
+
 # List all branches and disk utilization
 rebase db branch list
+
+# Work on it — every later command in this checkout uses it
+rebase db branch switch dev_sandbox
+
+# Which branch am I on?
+rebase db branch switch
+
+# Back to the main database
+rebase db branch switch --off
+
+# Show one branch's parent, age and size
+rebase db branch info dev_sandbox
 
 # Delete a branch
 rebase db branch delete dev_sandbox
 ```
 
-When you create or switch to a branch, the CLI updates your local development configuration. The `DatabasePoolManager` dynamically instantiates a new connection pool for the chosen branch database name (e.g. `rb_dev_sandbox`), letting you test migrations or seed data without manual connection string edits.
+`switch` is what makes a branch usable. It records the branch in
+`.rebase/branch.json` — a name, never a connection string, so your credentials
+stay in `.env` alone — and every `rebase` command in that checkout then resolves
+the branch's database instead: `dev`, `db push`, `db migrate`, `db backup`.
+
+It sits between the shell and the project file in the resolution order:
+
+1. `--database-url` on the command line
+2. `DATABASE_URL` in the shell environment
+3. **the branch this checkout is switched to**
+4. `DATABASE_URL` in the project's `.env`
+
+A branch has to outrank `.env` or switching would do nothing on any project that
+sets `DATABASE_URL`; it must not outrank the two above it, because a flag on this
+command line is a more immediate instruction than a switch made yesterday.
+
+`.rebase/` is gitignored, so the branch you are on is a fact about your machine
+and never about the project.
+
+Branches are ordinary PostgreSQL databases named after the branch with an `rb_` prefix, so `dev_sandbox` above is the database `rb_dev_sandbox` on the same server.
+
+Creating a branch does **not** change which database your project talks to. `rebase db branch create` makes the copy and stops there; nothing writes to `.env`, and the next `rebase dev` still uses the database it used before. To work against a branch, point `DATABASE_URL` at it yourself — the connection string is the one you already have, with the database name swapped:
+
+```bash
+# .env
+DATABASE_URL=postgresql://user:pass@localhost:5432/rb_dev_sandbox
+```
+
+---
+
+### Branching requires a real PostgreSQL server
+
+Branching does **not** work against the managed development database — the zero-setup PGlite database `rebase dev` starts when a project has no `DATABASE_URL`.
+
+PGlite serves exactly one database. `CREATE DATABASE ... TEMPLATE` against it writes a catalog entry and copies nothing, so the "branch" resolves to the database it was cloned from: writes you believe are isolated land in your development database, and there is no second copy to go back to.
+
+Use branching against a real server — your own PostgreSQL via `DATABASE_URL`, or `rebase dev --docker`.
 
 ---
 
@@ -9889,6 +9960,24 @@ When you create or switch to a branch, the CLI updates your local development co
 #### Disk Usage
 Because PostgreSQL duplicates the files on disk, each branch consumes space equal to the source database. If you have a 100GB production database, creating 5 branches will consume an additional 500GB of storage. 
 * *Recommendation*: Use subsetted databases or thin dev-templates as your clone sources instead of full production clones.
+
+`rebase db branch prune` is how you get the space back:
+
+```bash
+rebase db branch prune                      # orphans only — always safe
+rebase db branch prune --older-than 2w      # and anything older than two weeks
+```
+
+Nothing expires unless you ask: a branch can be the only copy of an afternoon's
+work, so `--older-than` is opt-in and ages are floored, and the command shows its
+plan and asks before removing anything unless you pass `--yes`.
+
+Prune also finds the two ways branches drift from their metadata — an entry whose
+database was dropped with plain SQL (which `list` would keep reporting forever),
+and a branch database whose entry was never written (a crash between the two
+statements `create` runs). Atlas's `<db>_dev_diff` scratch databases are reported
+alongside but removed only with `--include-dev-diff`: they are not branches, and
+one may belong to a `db push` running right now.
 
 #### pgBouncer Compatibility
 When deploying behind pgBouncer or connection poolers, ensure the pooler supports administrative database operations. Creating and dropping databases bypasses standard transaction-level pools and requires direct connections to the Postgres server (using elevated user privileges) via the `adminConnectionString` configuration.
@@ -10813,7 +10902,7 @@ function App() {
 
 The login view handles:
 - Email/password login and registration
-- Google OAuth sign-in (when configured)
+- Google, GitHub and LinkedIn OAuth sign-in (when configured)
 - Password reset flow
 - Form validation and error states
 
@@ -15720,6 +15809,16 @@ rebase db pull --from postgres://…  [--anonymize]
 `--anonymize` replaces personal fields on the way in, so a production copy can be
 worked on locally without carrying real customer data onto a laptop.
 
+`pg_dump` strips privileges, so the copy would arrive with the source's RLS
+policies and none of the grants behind them — every read as `rebase_user` failing
+with `permission denied`. The pull re-provisions the app role afterwards, using
+the same routine boot and `rebase db push` use, so Rebase's internal tables stay
+revoked as they should be.
+
+The target is always this project's local development database and cannot be
+chosen: `--database-url` is refused rather than accepted, so there is no way to
+spell "pull into production". `--from` is the only direction.
+
 #### `rebase db stop` / `rebase db reset`
 
 For the managed development database only:
@@ -15735,8 +15834,27 @@ rebase db reset    # delete it and start over
 rebase db branch create <name>
 rebase db branch list
 rebase db branch info <name>
+rebase db branch switch <name>     # work on it; every later command follows
+rebase db branch switch            # say which branch you are on
+rebase db branch switch --off      # back to the main database
 rebase db branch delete <name>
+rebase db branch prune [--older-than 14d] [--include-dev-diff]
 ```
+
+PostgreSQL will not copy or drop a database anything else is connected to, and
+the usual "anything else" is your own `rebase dev`. `create` and `delete` name
+what is holding the database open; `--force` disconnects those sessions first.
+
+Every branch is a full copy on disk, so they need clearing out. `prune` removes
+three things: an entry whose database was dropped outside Rebase, a branch
+database whose entry was never written, and — only with `--older-than` — branches
+past an age you name. It asks before removing anything unless you pass `--yes`.
+
+`switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
+takes precedence over `DATABASE_URL` in `.env` and loses to `--database-url` or a
+`DATABASE_URL` in the shell, so a flag on the command line always outranks a
+switch made earlier. Deleting the branch you are on returns you to the main
+database rather than leaving the checkout pointed at a database that is gone.
 
 :::note[Not on the managed development database]
 `push`, `generate` and `migrate` plan their work with Atlas, which needs a second
@@ -15744,6 +15862,12 @@ empty database to compare against — and the managed PGlite serves exactly one.
 Running them there stops with a message saying so. Point `DATABASE_URL` at a real
 PostgreSQL for the migration workflow; `rebase dev` already creates missing tables
 additively on the managed one.
+
+`branch` is refused there for a related reason. `CREATE DATABASE ... TEMPLATE`
+against PGlite writes a catalog entry and copies nothing, so the branch would
+resolve to the database it was cloned from — every write you meant to sandbox
+would land in your development database. `rebase dev --docker` gives you a real
+server that branches work against.
 :::
 
 #### `rebase apps init` / `rebase apps config`
@@ -16041,9 +16165,16 @@ Database branching for parallel development:
 
 ```bash
 rebase db branch create feature_auth
+rebase db branch switch feature_auth
 rebase db branch list
+rebase db branch switch --off
+
+rebase db branch info feature_auth
 rebase db branch delete feature_auth
 ```
+
+Each branch is a full copy of the database made with `CREATE DATABASE ... TEMPLATE`,
+so it needs a real PostgreSQL server and it costs the same disk as its source.
 
 #### `rebase doctor`
 

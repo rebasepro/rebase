@@ -55,7 +55,7 @@ if (!authController.user) {
 
 La vista de inicio de sesión gestiona:
 - Inicio de sesión y registro con email/contraseña
-- Inicio de sesión con Google OAuth (cuando está configurado)
+- Inicio de sesión con Google, GitHub y LinkedIn (cuando está configurado)
 - Flujo de restablecimiento de contraseña
 - Validación de formularios y estados de error
 

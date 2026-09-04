@@ -55,7 +55,7 @@ if (!authController.user) {
 
 Die Login-Ansicht übernimmt:
 - Login und Registrierung per E-Mail/Passwort
-- Google-OAuth-Anmeldung (wenn konfiguriert)
+- Anmeldung über Google, GitHub und LinkedIn (wenn konfiguriert)
 - Passwort-Zurücksetzungs-Flow
 - Formularvalidierung und Fehlerzustände
 

@@ -55,7 +55,7 @@ if (!authController.user) {
 
 La vue de connexion gère :
 - Connexion et inscription par e-mail/mot de passe
-- Connexion Google OAuth (lorsqu'elle est configurée)
+- Connexion Google, GitHub et LinkedIn (lorsqu'elle est configurée)
 - Flux de réinitialisation de mot de passe
 - Validation de formulaire et états d'erreur
 

@@ -55,7 +55,7 @@ if (!authController.user) {
 
 La vista di login gestisce:
 - Login e registrazione con email/password
-- Accesso con Google OAuth (quando configurato)
+- Accesso con Google, GitHub e LinkedIn (quando configurato)
 - Flusso di reimpostazione password
 - Validazione del modulo e stati di errore
 

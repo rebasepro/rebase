@@ -9,7 +9,7 @@ description: Le backend Rebase fournit un serveur complet avec API REST, authent
 Le backend Rebase est un **serveur Node.js** basé sur [Hono](https://hono.dev/) qui offre :
 
 - **API REST** — Points d'extrémité CRUD auto-générés pour chaque collection
-- **Authentification** — Jetons JWT, Google OAuth, gestion des utilisateurs/rôles
+- **Authentification** — Jetons JWT, connexion OAuth et OIDC, liens magiques, codes à usage unique, MFA, clés d'API, gestion des utilisateurs/rôles
 - **Stockage** — Téléchargement/téléversement de fichiers avec système de fichiers local ou S3
 - **WebSocket** — Synchronisation des données en temps réel via PostgreSQL LISTEN/NOTIFY
 - **Historique des Entités** — Piste d'audit pour chaque modification de données
@@ -46,7 +46,7 @@ Après l'initialisation, ces routes sont montées :
 
 | Path | Objectif |
 |------|----------|
-| `/api/auth/*` | Authentification (inscription, connexion, rafraîchissement, Google OAuth) |
+| `/api/auth/*` | Authentification (inscription, connexion, rafraîchissement, OAuth, liens magiques, codes à usage unique, MFA) |
 | `/api/admin/*` | Gestion des utilisateurs et des rôles (réservé aux administrateurs) |
 | `/api/storage/*` | Téléchargement, téléversement et suppression de fichiers |
 | `/api/data/collections` | Point d'extrémité des métadonnées de collection |
@@ -169,7 +169,7 @@ Si l'initialisation échoue (par exemple, erreur de connexion à la base de donn
 
 ## Prochaines étapes
 
-- **[Authentification](/docs/backend/authentication)** — JWT, Google OAuth, gestion des utilisateurs
+- **[Authentification](/docs/backend/authentication)** — JWT, fournisseurs OAuth et OIDC, MFA, clés d'API, gestion des utilisateurs
 - **[Stockage](/docs/backend/storage)** — Stockage de fichiers local et S3
 - **[Callbacks d'entité](/docs/collections/callbacks)** — Hooks de cycle de vie et API `context.data`
 - **[Historique des entités](/docs/backend/history)** — Piste d'audit

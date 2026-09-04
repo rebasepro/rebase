@@ -9,7 +9,7 @@ description: The Rebase backend provides a complete server with REST API, authen
 The Rebase backend is a **Node.js server** built on [Hono](https://hono.dev/) that provides:
 
 - **REST API** — Auto-generated CRUD endpoints for each collection
-- **Authentication** — JWT tokens, Google OAuth, user/role management
+- **Authentication** — JWT tokens, OAuth and OIDC sign-in, magic links, one-time codes, MFA, API keys, user/role management
 - **Storage** — File upload/download with local filesystem or S3
 - **WebSocket** — Real-time data sync via PostgreSQL LISTEN/NOTIFY
 - **Entity History** — Audit trail for every data change
@@ -46,7 +46,7 @@ After initialization, these routes are mounted:
 
 | Path | Purpose |
 |------|---------|
-| `/api/auth/*` | Authentication (signup, login, refresh, Google OAuth) |
+| `/api/auth/*` | Authentication (signup, login, refresh, OAuth, magic links, one-time codes, MFA) |
 | `/api/admin/*` | User and role management (admin-only) |
 | `/api/storage/*` | File upload, download, and deletion |
 | `/api/data/collections` | Collection metadata endpoint |
@@ -220,7 +220,7 @@ If initialization fails (e.g., database connection error), the server still star
 
 ## Next Steps
 
-- **[Authentication](/docs/backend/authentication)** — JWT, Google OAuth, user management
+- **[Authentication](/docs/backend/authentication)** — JWT, OAuth and OIDC providers, MFA, API keys, user management
 - **[Storage](/docs/backend/storage)** — Local and S3 file storage
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks and `context.data` API
 - **[Entity History](/docs/backend/history)** — Audit trail

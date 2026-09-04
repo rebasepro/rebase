@@ -14,7 +14,7 @@ Rebase est un **Backend-as-a-Service (BaaS) open-source** et un **panneau d'admi
 
 - **Schéma comme code** — Définissez vos modèles de données comme des collections TypeScript. Rebase génère des tables PostgreSQL, une interface utilisateur CRUD complète, des points de terminaison d'API REST et des SDK clients typés à partir d'une source unique de vérité.
 - **Panneau d'administration instantané** — Une interface utilisateur d'administration React élégante et rapide avec des tableaux de type feuille de calcul, des listes, des formulaires, des tableaux Kanban, l'édition en ligne et la synchronisation en temps réel.
-- **Backend intégré** — Authentification (JWT + Google OAuth), stockage de fichiers (local ou S3), sécurité au niveau des lignes (Row Level Security), historique des entités et temps réel WebSocket — tout est intégré.
+- **Backend intégré** — Authentification (mots de passe, liens magiques, codes à usage unique, MFA, clés d'API et douze fournisseurs OAuth/OIDC), stockage de fichiers (local ou S3), sécurité au niveau des lignes (Row Level Security), historique des entités et temps réel WebSocket — tout est intégré.
 - **Radicalement extensible** — Si vous pouvez le construire en React, vous pouvez l'ajouter à Rebase. Champs personnalisés, vues personnalisées, plugins et accès complet aux hooks internes.
 
 :::tip
@@ -77,7 +77,7 @@ Pour utiliser votre propre PostgreSQL, décommentez `DATABASE_URL` dans `.env` e
 | **Tableau Kanban** | Vue tableau par glisser-déposer groupée par n'importe quelle propriété d'énumération |
 | **Relations** | Un-à-un, un-à-plusieurs, plusieurs-à-plusieurs avec tables de jonction et jointures multi-sauts |
 | **Sécurité au Niveau des Lignes (RLS)** | Politiques RLS de style Supabase définies dans la configuration de votre collection |
-| **Authentification** | JWT + jetons de rafraîchissement, Google OAuth, contrôle d'accès basé sur les rôles |
+| **Authentification** | JWT + jetons de rafraîchissement, douze fournisseurs OAuth/OIDC, liens magiques, codes à usage unique, MFA TOTP, clés d'API à portée limitée, contrôle d'accès basé sur les rôles |
 | **Stockage de Fichiers** | Système de fichiers local ou compatible S3 avec champs de téléchargement et navigateur |
 | **Synchronisation en Temps Réel** | Mises à jour en direct basées sur WebSocket pour tous les clients connectés |
 | **Historique des Entités** | Journal d'audit complet pour chaque création, mise à jour et suppression |

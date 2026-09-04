@@ -58,7 +58,7 @@ function App() {
 
 The login view handles:
 - Email/password login and registration
-- Google OAuth sign-in (when configured)
+- Google, GitHub and LinkedIn OAuth sign-in (when configured)
 - Password reset flow
 - Form validation and error states
 

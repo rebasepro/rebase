@@ -11,6 +11,147 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Every `rebase db` failure exited 1 without saying anything.** The driver's
+  entry point ended in `.catch(() => process.exit(1))`, which discarded the
+  error. So a branch that could not be created, a name Postgres would silently
+  truncate, a duplicate, a branch that was not there — each printed its header
+  and then nothing, with an empty stderr:
+
+  ```
+  $ rebase db branch create feature_auth
+    🌿 Creating database branch...
+    Name:   feature_auth
+                                  ← nothing. exit 1.
+  ```
+
+  This was the whole `db` namespace, not only `branch`. The messages existed and
+  were carefully worded; none of them had ever reached a terminal. A child
+  process that already wrote its own diagnosis through inherited stdio still
+  stays quiet, and a bare Drizzle `Failed query:` wrapper now carries the
+  PostgreSQL error it hides in `cause`.
+
+- **`rebase db branch info` exited 0 for a branch that does not exist.** It
+  printed `✗ Branch "x" not found.` in red and reported success, while `delete`
+  — answering the same question — exited 1. So
+  `rebase db branch info "$b" && deploy_against "$b"` ran the deploy against a
+  branch that is not there, with the reason already on the terminal.
+
+- **`rebase db branch create alpha beta` created a branch called `alpha`.** The
+  extra word was discarded silently, so an unquoted name (`create my feature`), a
+  flag written without its dashes (`create feat from main`), or a shell splitting
+  a token you thought was one all succeeded and made a branch you did not ask
+  for — under a name you then type to switch, delete, or point a deploy at. Words
+  the command cannot account for are now refused before anything connects, with a
+  suggestion of the hyphenated name you probably meant.
+
+- **A branch could not be created while the dev server was running, and would
+  not say why.** `CREATE DATABASE ... TEMPLATE` needs the source quiescent, and
+  `DatabasePoolManager` only disconnects pools inside the process doing the work
+  — `rebase db branch` is its own process, so a `rebase dev` in another terminal
+  was never touched by it. Wanting a branch and running the app are the same
+  moment, so this was the common path, and the advice on failure was "close
+  other clients and try again" for the one case where you do not know what is
+  connected. The failure now lists the sessions by `application_name`, and
+  `--force` disconnects them for you, on create and delete alike.
+
+### Added
+
+- **`rebase db branch prune` — branching shipped with no cleanup story at all.**
+  No TTL, no prune, no `delete --all`, and every branch is a full-size copy:
+  `CREATE DATABASE ... TEMPLATE` duplicates the files on disk, so five branches
+  of a 100 GB database cost 500 GB. The only way to reclaim any of it was to
+  remember every name you had ever typed.
+
+  ```bash
+  rebase db branch prune                   # orphans only — always safe
+  rebase db branch prune --older-than 2w   # and anything past two weeks
+  ```
+
+  It also finds the two ways branches drift from their metadata, which drift in
+  opposite directions: an entry whose database was dropped outside Rebase, which
+  `list` would keep reporting forever while `switch` and `info` fail against a
+  database nothing can find; and a branch database whose entry was never
+  written, because `create` makes the database first and records it second.
+  Nothing expires unless asked, ages are floored so a cutoff never catches
+  something younger than it says, and `--older-than 7h` is refused rather than
+  read as seven days. Atlas's `<db>_dev_diff` scratch databases are reported
+  alongside but removed only with `--include-dev-diff`.
+
+- **`rebase db branch` reported branches the managed database had not made.**
+  PGlite serves exactly one database, so `CREATE DATABASE ... TEMPLATE` wrote a
+  `pg_database` catalog entry and copied nothing. Every step then agreed:
+  `create` answered `✓ Branch "feature_x" created successfully.`, and `list`
+  showed it at 7.1 MB because the catalog entry makes its `JOIN pg_database`
+  succeed and `pg_database_size` answer for the one real database. Connecting to
+  `rb_feature_x` reported `current_database()` = `postgres`, and a table created
+  "in the branch" appeared in the parent — so every write made in the belief
+  that it was sandboxed landed in the developer's own database. Measured on a
+  fresh `rebase init` scaffold, which is the default path. The whole `branch`
+  domain is now refused there, before the database is started, naming
+  `rebase dev --docker` and `DATABASE_URL` as the two things that work.
+
+- **`rebase db pull` handed back a database the application could not read.**
+  `pg_dump --no-privileges` strips every GRANT, so the copy arrived with the
+  source's RLS policies and its `FORCE ROW LEVEL SECURITY` intact and nothing
+  behind them. Measured on a 30-table project: 68 policies and 60 grants in, 68
+  policies and **0** grants out, and the first read as the role Rebase serves
+  every request through failing with `permission denied for table leads` — after
+  a green `✓ Local database now holds a copy of …`. Anyone who pulled and then
+  opened `psql`, ran `rls-check`, or pointed a test suite at the copy hit a wall
+  with no hint of the cause. The pull now re-provisions the app role through the
+  same `ensureAppRole` boot and `db push` call, so internal tables stay revoked
+  as well. The backup path already guarded this hazard; the newer command people
+  are told to use did not.
+
+- **`rebase db pull --database-url` was accepted and ignored.** The flag never
+  reached the resolver, so the pull went ahead against the `.env` database
+  anyway: `rebase db pull --from prod --database-url scratch --yes` destroyed the
+  working database while naming a different one. It is now refused rather than
+  honoured — the target is the local development database by construction, since
+  a command that can copy in both directions eventually copies the wrong way, and
+  the wrong way here is a laptop over production. The refusal points at `--from`.
+
+### Added
+
+- **`rebase db branch switch` — branching stopped one step short of being a
+  feature.** `create` copied a 12 MB database in 1.2s and then printed
+  `Database: rb_feature_auth` and nothing else: there was no `switch`, no
+  `--branch` on `rebase dev`, no `REBASE_BRANCH`, and not even a connection
+  string to paste. The only way to work on a branch was to hand-edit
+  `DATABASE_URL`, while the documentation said the CLI updated your local
+  development configuration — it did not, and the `.env` was byte-identical
+  afterwards.
+
+  ```bash
+  rebase db branch switch feature_auth   # every later command follows
+  rebase db branch switch                # which branch am I on?
+  rebase db branch switch --off          # back to the main database
+  ```
+
+  The branch is recorded in `.rebase/branch.json` as a name, never a connection
+  string, so credentials stay in `.env` alone. It outranks `DATABASE_URL` in
+  `.env` — any lower and switching would do nothing on a project that sets one —
+  and loses to `--database-url` and a `DATABASE_URL` in the shell, so a flag on
+  the command line still beats a switch made yesterday. Deleting the branch you
+  are on returns the checkout to the main database instead of leaving it aimed
+  at a database that no longer exists.
+
+### Documentation
+
+- **The branching page promised three things the feature does not do.** It said
+  the CLI updates your local development configuration when you create or switch
+  to a branch — there is no `switch`, and `create` leaves `.env` byte-identical.
+  It presented `DatabasePoolManager`'s pool eviction as the guard against
+  `is being accessed by other users`, when that only reaches pools inside the
+  process doing the work and `rebase db branch` is its own process — so a running
+  `rebase dev` blocks branching and always did. And nothing said branching needs
+  a real PostgreSQL server: on the managed PGlite database
+  `CREATE DATABASE ... TEMPLATE` writes a catalog entry and copies nothing, so
+  the "branch" resolves to the database it was cloned from. `rebase db branch
+  info` and `--from` were missing from the CLI reference as well.
+
 ### Security
 
 An external audit of the framework and Rebase Cloud on 2 September 2026. Every
