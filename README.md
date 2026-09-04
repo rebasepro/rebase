@@ -23,7 +23,7 @@
 <p align="center">
   <a href="https://demo.rebase.pro">Live Demo</a> •
   <a href="https://rebase.pro/docs">Documentation</a> •
-  <a href="https://rebase.pro/features">Features</a> •
+  <a href="https://rebase.pro/product">Features</a> •
   <a href="https://discord.gg/fxy7xsQm3m">Discord</a>
 </p>
 

@@ -4,6 +4,7 @@
   "private": false,
   "description": "Bundled AI agent skills for Rebase",
   "type": "module",
+  "homepage": "https://rebase.pro",
   "repository": {
     "type": "git",
     "url": "https://github.com/rebasepro/rebase.git",
