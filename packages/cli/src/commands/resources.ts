@@ -121,6 +121,19 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
             console.log(chalk.green(`✓ ${RESOURCE_GRAPH_FILENAME} matches the declarations.`));
             return;
         }
+        // Declaring nothing and having no file is a consistent state, not a
+        // stale one. The file records declarations; a project with none has
+        // nothing to record, and its default database and bucket are implicit
+        // by design — that is the overwhelmingly common project and it must not
+        // be required to commit an empty file saying so.
+        //
+        // This mattered the moment the check was put in a gate: it would have
+        // failed this repository's own reference app, which declares nothing,
+        // and every scaffolded project until someone declared a second bucket.
+        if (committed === null && graph.resources.length === 0) {
+            console.log(chalk.gray("✓ Nothing declared, so there is nothing to record."));
+            return;
+        }
         console.error(chalk.red(`\n✗ ${RESOURCE_GRAPH_FILENAME} is ${committed === null ? "missing" : "stale"}.\n`));
         console.error(
             "  A host reads this file to decide what to provision, so a stale one means the\n" +

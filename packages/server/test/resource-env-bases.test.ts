@@ -2,6 +2,7 @@ import { describe, it, expect } from "@jest/globals";
 import fs from "fs";
 import path from "path";
 import { resourceKind } from "@rebasepro/types";
+import { ACCOUNT_SCOPED_STORAGE_BASES } from "../src/boot/sources";
 
 /**
  * A kind's `envBases` list against the resolver that actually reads them.
@@ -65,6 +66,28 @@ describe("envBases matches the resolver", () => {
 
         expect(read.size).toBeGreaterThan(3);
         expect([...read].sort()).toEqual([...declared].sort());
+    });
+
+    it("account-scoped bases are exactly the ones read through the account reader", () => {
+        // `ACCOUNT_SCOPED_STORAGE_BASES` is what `rebase status` uses to tell a
+        // developer that an unset `S3_ACCESS_KEY_ID__MEDIA` is not the whole
+        // story, because the bucket names an account. It is a second statement
+        // of a fact the resolver already encodes in WHICH reader it passes each
+        // base to, so it is checked against exactly that.
+        const scoped = new Set<string>();
+        const plain = new Set<string>();
+        const body = SOURCES.slice(SOURCES.indexOf("// Storage sources"));
+        for (const m of body.matchAll(/(read(?:Account)?(?:Var|Bool))\(\s*env,\s*"([A-Z0-9_]+)"/g)) {
+            (m[1].startsWith("readAccount") ? scoped : plain).add(m[2]);
+        }
+
+        expect([...scoped].sort()).toEqual([...ACCOUNT_SCOPED_STORAGE_BASES].sort());
+        // And the bucket name must never be in it: two buckets sharing an
+        // account share credentials, never a bucket.
+        for (const name of ["S3_BUCKET", "GCS_BUCKET", "STORAGE_TYPE", "STORAGE_PATH"]) {
+            expect({ name, scoped: scoped.has(name), plain: plain.has(name) })
+                .toEqual({ name, scoped: false, plain: true });
+        }
     });
 
     it("narrows per engine without inventing a base the kind does not have", () => {

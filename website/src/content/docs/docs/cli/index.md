@@ -253,6 +253,40 @@ rebase apps init <name>      # register a new app in rebase.json
 rebase apps config <app>     # what one app resolves to
 ```
 
+### `rebase status`
+
+Everything this project declares, and whether the environment actually binds it:
+
+```bash
+rebase status               # every resource, and the variables it reads
+rebase status --json        # machine-readable
+```
+
+```
+  backend  ·  managed  Rebase's runtime boots your bundle
+  declared in  config/resources.ts
+  configured by  .env
+
+  buckets
+  ✓ media  s3 · account:minio
+      ✓ S3_BUCKET__MEDIA
+      ✓ S3_ACCESS_KEY_ID__MINIO (shared, for S3_ACCESS_KEY_ID__MEDIA)
+  ○ exports  s3
+      · S3_BUCKET__EXPORTS not set
+      └ declared, not configured — uploads here answer 501 STORAGE_SOURCE_NOT_CONFIGURED
+```
+
+Three files decide what a backend can reach, and this prints all three together:
+`rebase.json` says where your code is and who runs the server,
+`config/resources.ts` says what the project needs, and the environment says how
+to reach each thing. Everything else — `rebase.resources.json`, the bundle
+manifest — is generated from the middle one for readers that cannot run your
+code, and you never write it.
+
+A `○` is the state worth knowing about before a deploy rather than after:
+declared, not configured. A `✗` means the environment sets something *wrongly*,
+which refuses the boot rather than degrading.
+
 ### `rebase resources`
 
 What this project declares it needs — the databases, buckets and topics its

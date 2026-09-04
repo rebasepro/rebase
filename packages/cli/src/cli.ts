@@ -11,6 +11,7 @@ import { startCommand } from "./commands/start";
 import { authCommand } from "./commands/auth";
 import { doctorCommand } from "./commands/doctor";
 import { resourcesCommand } from "./commands/resources";
+import { statusCommand } from "./commands/status";
 import { skillsCommand } from "./commands/skills";
 import { apiKeysCommand } from "./commands/api-keys";
 import { telemetryCommand } from "./commands/telemetry";
@@ -96,7 +97,7 @@ export async function entry(args: string[]) {
     const subcommand = words[1];
 
     // Show global help only when no command given, or --help with no recognized command
-    const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources"];
+    const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status"];
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {
         printHelp();
         return;
@@ -201,6 +202,9 @@ export async function entry(args: string[]) {
             await authCommand(effectiveSubcommand, args);
             break;
 
+        case "status":
+            await statusCommand(args);
+            break;
         case "resources":
             await resourcesCommand(args);
             break;
@@ -268,6 +272,7 @@ ${chalk.green.bold("Auth")}
 
 ${chalk.green.bold("Diagnostics")}
   ${chalk.blue.bold("doctor")}                  Detect schema drift between collections, schema, and DB
+  ${chalk.blue.bold("status")}                  Show every resource and whether its variables are set
   ${chalk.blue.bold("resources")}               List the databases, buckets and topics this project declares
 
 ${chalk.green.bold("AI Agent Skills")}

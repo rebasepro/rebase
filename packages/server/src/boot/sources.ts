@@ -265,6 +265,30 @@ function resolvePoolConfig(env: EnvBag, suffix: string): Record<string, number> 
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * The storage bindings that describe the PROVIDER rather than the bucket.
+ *
+ * These are the ones a source's `account` lets it share: naming an account
+ * makes them fall back to `<BASE>__<ACCOUNT>` when no per-key value is set.
+ * `S3_BUCKET` and `GCS_BUCKET` are deliberately absent — the bucket name is
+ * what distinguishes one source from another and must never fall back — and so
+ * are `STORAGE_TYPE` and `STORAGE_PATH`, which describe this source alone.
+ *
+ * Exported because `rebase status` has to tell a developer *which* variable a
+ * bucket is actually waiting on, and deriving that list a second time is how it
+ * would come to disagree with the resolver below. `resource-env-bases.test.ts`
+ * holds it to the reader each base is passed to.
+ */
+export const ACCOUNT_SCOPED_STORAGE_BASES = [
+    "S3_ACCESS_KEY_ID",
+    "S3_SECRET_ACCESS_KEY",
+    "S3_REGION",
+    "S3_ENDPOINT",
+    "S3_FORCE_PATH_STYLE",
+    "GCS_PROJECT_ID",
+    "GCS_KEY_FILENAME"
+] as const;
+
+/**
  * Build one storage configuration from the variables for a single source.
  *
  * Returns `undefined` when the source has no configuration at all, so an

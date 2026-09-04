@@ -377,6 +377,7 @@ export { loadBootEnv, resolveCorsOrigin, isLocalhostOrigin } from "./boot/env";
 export type { RebaseBootEnv, CorsOriginResolver } from "./boot/env";
 export { resolveAuthOptions, resolveEmailOptions } from "./boot/options";
 export {
+    ACCOUNT_SCOPED_STORAGE_BASES,
     envSuffixForKey,
     assertDistinctSuffixes,
     resolveDataSources,

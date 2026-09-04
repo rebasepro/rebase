@@ -22,6 +22,7 @@ class TransformCache { buildKey, get, set }
 class TusHandler { create, delete, head, options, patch, startCleanup }
 class UnknownStorageSourceError { knownKeys, storageId }
 class WebhookDispatcher { deliverQueuedJob, enqueueEntityChange, flush, onEntityChange, setWebhooks }
+const ACCOUNT_SCOPED_STORAGE_BASES
 const CONCURRENT_DDL_SQLSTATES
 const DEFAULT_DRIVER_ID
 const DEFAULT_MAX_FILE_SIZE

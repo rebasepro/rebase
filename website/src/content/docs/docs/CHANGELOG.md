@@ -7,7 +7,61 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Added
+
+- **`rebase status` — what this project declares, and whether it is configured.**
+  The model a developer has to hold is three files: `rebase.json` says where the
+  code is and who runs the server, `config/resources.ts` says what the project
+  needs, and the environment says how to reach each thing. Everything else —
+  `rebase.resources.json`, the bundle manifest — is generated from the middle one
+  for readers that cannot run your code.
+
+  None of that was visible in one place. `rebase resources` listed declarations,
+  the variables lived in a `.env`, and the rule joining them was a suffix
+  convention you had to know. So the question people actually arrive with — *why
+  does uploading to `media` answer 501* — could only be answered by deriving the
+  variable name by hand. It is now printed, per resource, with the consequence
+  spelled out:
+
+  ```
+    buckets
+    ✓ media  s3 · account:minio
+        ✓ S3_BUCKET__MEDIA
+        ✓ S3_ACCESS_KEY_ID__MINIO (shared, for S3_ACCESS_KEY_ID__MEDIA)
+    ○ exports  s3
+        · S3_BUCKET__EXPORTS not set
+        └ declared, not configured — uploads here answer 501
+  ```
+
+  It shows three things nothing showed before: which shared-account variable a
+  bucket is *actually* reading, a source that is declared but not configured
+  (before a 501 in production rather than after), and a `local` bucket, which
+  resolves happily and is dropped in production because a container's filesystem
+  is erased on restart.
+
+  The verdicts come from `resolveDataSources` and `resolveStorageBackend` — the
+  functions that run at boot — rather than from a second implementation of what
+  "configured" means, which would eventually reassure someone about a deployment
+  that is about to refuse to start.
+
 ### Fixed
+
+- **`rebase resources --check` failed every project that declares nothing.** A
+  backend has a default database and a default bucket whether or not anyone says
+  so, and a project with no declarations has nothing to record — but the check
+  demanded a `rebase.resources.json` saying exactly that, and reported its
+  absence as stale. This surfaced the moment the check was put in a gate: it
+  failed this repository's own reference app, which declares nothing, and would
+  have failed every scaffolded project until someone declared a second bucket.
+
+- **Nothing ran `rebase resources --check`.** Not CI, not a package script, not
+  another gate — while the comment introducing it said it "is what keeps it
+  honest". `rebase build` rewrites the file, so a project that builds is honest
+  by construction; a `runtime: "custom"` project never runs `rebase build`,
+  because it builds its own image. So for exactly the projects where the
+  committed graph is the only record of what they need, it could drift in
+  silence. `pnpm check:resource-graphs` now runs it over every installed project
+  in the repository, in CI.
 
 - **A bucket's shared credentials worked on the managed runtime and silently
   did nothing in an ejected one.** Turning a declaration into a source

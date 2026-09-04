@@ -380,6 +380,16 @@ jobs:
       # against the project on disk. It does NOT build the image or boot it —
       # that needs an install against a lockfile no scaffold has yet, and belongs
       # in the e2e lane. Seconds, no network, no database.
+      # `rebase.resources.json` is generated from `config/resources.ts` and
+      # committed, because a host reads it to decide what to provision before it
+      # runs anything. `rebase build` rewrites it — but a `runtime: "custom"`
+      # project never runs `rebase build`, it builds its own image. So for
+      # exactly the projects where that file is the ONLY record of what they
+      # need, nothing kept it fresh: `rebase resources --check` existed and
+      # nothing ran it, here or anywhere.
+      - name: Resource graphs match their declarations
+        run: pnpm run check:resource-graphs
+
       - name: Ejected project typecheck
         run: pnpm run check:eject
         env:
