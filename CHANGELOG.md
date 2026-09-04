@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Every `rebase db` failure exited 1 without saying anything.** The driver's
+  entry point ended in `.catch(() => process.exit(1))`, which discarded the
+  error. So a branch that could not be created, a name Postgres would silently
+  truncate, a duplicate, a branch that was not there — each printed its header
+  and then nothing, with an empty stderr:
+
+  ```
+  $ rebase db branch create feature_auth
+    🌿 Creating database branch...
+    Name:   feature_auth
+                                  ← nothing. exit 1.
+  ```
+
+  This was the whole `db` namespace, not only `branch`. The messages existed and
+  were carefully worded; none of them had ever reached a terminal. A child
+  process that already wrote its own diagnosis through inherited stdio still
+  stays quiet, and a bare Drizzle `Failed query:` wrapper now carries the
+  PostgreSQL error it hides in `cause`.
+
 ### Security
 
 An external audit of the framework and Rebase Cloud on 2 September 2026. Every

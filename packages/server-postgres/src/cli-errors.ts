@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import { outWarn, outError } from "./cli-output";
+import { extractCauseMessage } from "./utils/pg-error-utils";
 
 /**
  * Detect whether an error (or AggregateError wrapping multiple attempts)
@@ -262,4 +263,43 @@ export function diagnoseDbError(err: unknown, databaseUrl?: string): string | nu
         return formatDependencyDropBanner();
     }
     return null;
+}
+
+/**
+ * Say why the command failed, on the way out.
+ *
+ * The entry point below used to be `.catch(() => process.exit(1))`, which threw
+ * the error away. Every message this file and its services raise — "Branch
+ * \"x\" already exists.", "the source database has active connections", "Branch
+ * name is too long" — was written, wrapped in the right PG error code, and then
+ * discarded one frame before it reached a terminal. What a developer saw was a
+ * header line, no error, and exit 1.
+ *
+ * Two shapes are deliberately kept quiet:
+ *
+ * - **A child process that already spoke.** Atlas, `pg_dump` and `psql` run
+ *   with inherited stdio, so their diagnosis is on the terminal already and
+ *   execa's wrapper adds only `Command failed with exit code 1: atlas …`.
+ *   `packages/cli` filters exactly these two phrasings one level up
+ *   (`runDbCommand`), and this is that filter, for the process that is actually
+ *   throwing.
+ *
+ * - **A message that is only a query.** Drizzle reports failures as
+ *   `Failed query: <sql> params:` and hides the real PostgreSQL error in
+ *   `cause`, so the wrapper alone tells a reader nothing they can act on. The
+ *   cause is appended when it says something the message does not.
+ */
+export function reportCommandFailure(error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+
+    if (!message || /Command failed|exited with code/i.test(message)) return;
+
+    outError("");
+    outError(chalk.red(`  ✗ ${message}`));
+
+    const cause = extractCauseMessage(error);
+    if (cause && !message.includes(cause)) {
+        outError(chalk.gray(`    ${cause}`));
+    }
+    outError("");
 }
