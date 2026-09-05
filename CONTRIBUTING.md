@@ -79,6 +79,30 @@ between checkouts, and `PORT` / `VITE_API_URL` apply to `rebase start`, not here
 One-off scripts, codemods and utilities go in `tooling/scripts/`, never at the repo root
 or inside a package directory.
 
+## Commits and the Changelog
+
+Commit messages are [Conventional Commits](https://www.conventionalcommits.org/),
+because the release script reads them: `tooling/scripts/release.sh` groups the
+commits since the last tag by prefix to build the release notes. A message that
+matches no prefix lands under "Other".
+
+```
+feat(scope): lowercase sentence describing the change
+```
+
+- One of `feat` / `fix` / `refactor` / `docs` / `chore`, plus `feat!` for a
+  breaking change. `.github/internal/PUBLISHING.md` has the full table.
+- The scope is the package or area (`cli`, `server`, `website`, `gates`).
+- The subject is a lowercase sentence, no trailing period. It is read as a
+  changelog line, so write what changed, not what you did.
+
+**Only ever edit `## [Unreleased]` in `CHANGELOG.md`.** The version headings
+below it are history. `release.sh` promotes `[Unreleased]` to the new version,
+dates it, and opens a fresh empty one — so a note written under a version
+heading is either overwritten or silently left out of the release it belonged
+to. `pnpm check:release-bump` reads that section to decide whether the bump you
+asked for matches what the notes say changed.
+
 ## Code Quality
 
 Before submitting a PR, make sure all checks pass:
