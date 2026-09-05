@@ -54,6 +54,7 @@
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Backend Overview](https://rebase.pro/docs/backend): The Rebase backend provides a complete server with REST API, authentication, storage, WebSocket real-time, and entity history — all initialized with a single function call.
 - [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
+- [Endpoint index](https://rebase.pro/docs/backend/endpoints): Every HTTP route a Rebase backend mounts — data, auth, storage, admin, meta — with the gate on each one and the page that explains it.
 - [Live schema editing](https://rebase.pro/docs/backend/live-schema-editing): Create and alter collections against a running backend — committed to your repository first, then applied.
 - [Authentication](https://rebase.pro/docs/backend/authentication): Configure JWT authentication, OAuth providers, SMTP email, bot protection and the users collection on the Rebase backend.
 - [Auth endpoints and tokens](https://rebase.pro/docs/backend/auth-endpoints): The authentication routes the Rebase backend mounts, their response shapes, multi-factor authentication, the database context a policy sees, JWKS and service keys.

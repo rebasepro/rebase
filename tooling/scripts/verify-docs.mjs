@@ -44,6 +44,7 @@ import { checkProseTypes } from "./docs-verify/check-prose-types.mjs";
 import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
 import { checkEnvReads } from "./docs-verify/check-env-reads.mjs";
+import { checkEndpointIndex } from "./docs-verify/check-endpoint-index.mjs";
 import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
 import { checkUnreleasedBadges } from "./docs-verify/check-unreleased-badges.mjs";
@@ -80,6 +81,7 @@ if (asJson) {
         out.versionPins = checkVersionPins(ROOT).findings;
         out.envReference = checkEnvReference(ROOT).findings;
         out.envReads = checkEnvReads(ROOT).findings;
+        out.endpointIndex = checkEndpointIndex(ROOT).findings;
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
         out.unreleasedBadges = checkUnreleasedBadges(ROOT).findings;
         out.docsLinks = checkDocsLinks(ROOT).findings;
@@ -260,6 +262,19 @@ if (only === "both" || only === "names") {
         console.log(`${RED}✗ ${bad.length} validated variable(s) missing from the reference:${NC}`);
         for (const key of bad) console.log(`  ${RED}${key}${NC}`);
         console.log(`      ${DIM}That page promises it lists every variable the schema validates.${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Endpoint index ━━━${NC}`);
+    const { findings: bad, routes, modules } = checkEndpointIndex(ROOT);
+    console.log(`${DIM}Extracted ${routes} route(s) from ${modules} router module(s).${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every mounted route is in the endpoint index.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} route(s) the index does not account for:${NC}`);
+        for (const b of bad) console.log(`  ${RED}${b.kind}${NC} ${DIM}${b.message}${NC}`);
     }
 }
 

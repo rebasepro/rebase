@@ -131,6 +131,7 @@ export default defineConfig({
                     items: [
                         { label: "Backend Setup", slug: "docs/backend" },
                         { label: "REST API", slug: "docs/backend/api" },
+                        { label: "Endpoint index", slug: "docs/backend/endpoints" },
                         { label: "Live schema editing", slug: "docs/backend/live-schema-editing" },
                         { label: "Authentication", slug: "docs/backend/authentication" },
                         { label: "Auth endpoints", slug: "docs/backend/auth-endpoints" },

@@ -16,12 +16,13 @@ No code is required — define your collections and the API appears automaticall
 
 ## REST Endpoints
 
-For each collection, the following endpoints are generated:
+For each collection, the following endpoints are generated. Every other route the backend mounts — auth, storage, admin, meta — is in the [endpoint index](/docs/backend/endpoints/).
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/data/:slug` | List entities |
 | `GET` | `/api/data/:slug/count` | Count entities |
+| `GET` | `/api/data/:slug/aggregate` | `count()`, `sum()`, `avg()`, `min()`, `max()`, optionally grouped. Takes the same filters as the list endpoint, and RLS applies to the rows being aggregated — see [Querying](/docs/sdk/querying/) |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
 | `POST` | `/api/data/:slug` | Create a record |
 | `PATCH` | `/api/data/:slug/:id` | Update a record (partial — only the properties you send are written) |
