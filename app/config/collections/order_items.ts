@@ -1,10 +1,11 @@
-import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
+import { EntityCallbackContext } from "@rebasepro/common";
 // Mutually recursive by design; the reference is only dereferenced inside the
 // `target: () =>` thunk below, so module init order never matters.
 // fallow-ignore-next-line circular-dependency
 import ordersCollection from "./orders";
 // fallow-ignore-next-line circular-dependency
 import productsCollection from "./products";
+import { defineCollection } from "@rebasepro/cms-types";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { joinParts, money, relatedRecord } from "../display";
 
@@ -22,7 +23,7 @@ const getRelationId = (val: unknown): string | number | undefined => {
     return undefined;
 };
 
-const orderItemsCollection: PostgresCollectionConfig = {
+const orderItemsCollection = defineCollection({
     name: "Order Items",
     singularName: "Order Item",
     slug: "order_items",
@@ -38,7 +39,7 @@ const orderItemsCollection: PostgresCollectionConfig = {
             type: "relation",
             relation: {
                 kind: "belongsTo",
-                target: () => ordersCollection,
+                target: (): PostgresCollectionConfig => ordersCollection,
                 onDelete: "cascade",
             }
         },
@@ -47,7 +48,7 @@ const orderItemsCollection: PostgresCollectionConfig = {
             type: "relation",
             relation: {
                 kind: "belongsTo",
-                target: () => productsCollection,
+                target: (): PostgresCollectionConfig => productsCollection,
                 onDelete: "restrict",
             }
         },
@@ -162,7 +163,7 @@ const orderItemsCollection: PostgresCollectionConfig = {
             "line_total"
         ]
     }
-};
+});
 
 // Helper function to recalculate the parent order subtotal & total
 async function updateOrderTotals(orderId: string | number, context: EntityCallbackContext) {

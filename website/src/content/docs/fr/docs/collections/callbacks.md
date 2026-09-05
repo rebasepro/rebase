@@ -75,17 +75,9 @@ n'atteigne le panneau, donc un `browserCallbacks.afterRead` s'exécute *en plus*
 ## Définir les Rappels
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-// The row shape. Without it every `values.x` below is `unknown`.
-type Article = {
-    title: string;
-    slug: string;
-    createdAt: string;
-    updatedAt: string;
-};
-
-const articlesCollection: PostgresCollectionConfig<Article> = {
+const articlesCollection = defineCollection({
     slug: "articles",
     name: "Articles",
     table: "articles",
@@ -128,8 +120,7 @@ const articlesCollection: PostgresCollectionConfig<Article> = {
             // Transform data after loading
             return entity;
         }
-    },
-    properties: { /* ... */ }
+    }
 });
 ```
 
@@ -428,17 +419,9 @@ afterSave: async ({ values, entityId, context }) => {
 L'une des utilisations les plus puissantes des rappels est la **synchronisation des données entre les collections** à l'aide de `context.data` :
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-type Submission = {
-    title: string;
-    description: string;
-    company_id: string;
-    status: string;
-    promoted_job_id: string;
-};
-
-const submissionsCollection: PostgresCollectionConfig<Submission> = {
+const submissionsCollection = defineCollection({
     slug: "job_submissions",
     name: "Job Submissions",
     table: "job_submissions",
@@ -467,8 +450,7 @@ const submissionsCollection: PostgresCollectionConfig<Submission> = {
                 });
             }
         }
-    },
-    properties: { /* ... */ }
+    }
 });
 ```
 

@@ -332,9 +332,9 @@ A common need is allowing **unauthenticated users** to submit data — contact f
 ### Recommended: a raw `withCheck` rule
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const contactMessagesCollection: PostgresCollectionConfig = {
+const contactMessagesCollection = defineCollection({
     slug: "contact_messages",
     name: "Contact Messages",
     table: "contact_messages",
@@ -353,7 +353,7 @@ const contactMessagesCollection: PostgresCollectionConfig = {
     properties: {
         email: { name: "Email", type: "string" }
     }
-};
+});
 ```
 
 The `access: "public"` shortcut generates a policy that allows the operation without requiring authentication.
@@ -361,9 +361,9 @@ The `access: "public"` shortcut generates a policy that allows the operation wit
 ### For Lead Capture / Signups
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const leadSignupsCollection: PostgresCollectionConfig = {
+const leadSignupsCollection = defineCollection({
     slug: "lead_magnet_signups",
     name: "Lead Magnet Signups",
     table: "lead_magnet_signups",
@@ -376,7 +376,7 @@ const leadSignupsCollection: PostgresCollectionConfig = {
     properties: {
         email: { name: "Email", type: "string" }
     }
-};
+});
 ```
 
 ### How Anonymous Requests Work

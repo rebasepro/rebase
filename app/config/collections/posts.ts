@@ -3,10 +3,11 @@ import authorsCollection from "./authors";
 // `target: () =>` thunk below, so module init order never matters.
 // fallow-ignore-next-line circular-dependency
 import tagsCollection from "./tags";
+import { defineCollection } from "@rebasepro/cms-types";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { relatedRecords } from "../display";
 
-const postsCollection: PostgresCollectionConfig = {
+const postsCollection = defineCollection({
     name: "Blog posts",
     singularName: "Blog post",
     slug: "posts",
@@ -163,7 +164,7 @@ const postsCollection: PostgresCollectionConfig = {
             type: "relation",
             relation: {
                 kind: "belongsTo",
-                target: () => authorsCollection,
+                target: (): PostgresCollectionConfig => authorsCollection,
             }
         },
         tags: {
@@ -171,7 +172,7 @@ const postsCollection: PostgresCollectionConfig = {
             type: "relation",
             relation: {
                 kind: "manyToMany",
-                target: () => tagsCollection,
+                target: (): PostgresCollectionConfig => tagsCollection,
             }
         },
         __order: {
@@ -276,6 +277,6 @@ const postsCollection: PostgresCollectionConfig = {
             }
         ]
     }
-};
+});
 
 export default postsCollection;

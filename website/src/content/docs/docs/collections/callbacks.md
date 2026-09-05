@@ -75,17 +75,11 @@ idempotent, or don't write it.
 ## Defining Callbacks
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-// The row shape. Without it every `values.x` below is `unknown`.
-type Article = {
-    title: string;
-    slug: string;
-    createdAt: string;
-    updatedAt: string;
-};
-
-const articlesCollection: PostgresCollectionConfig<Article> = {
+// The row shape is inferred from `properties`, so `values.title` below is a
+// `string` without anything being written twice.
+const articlesCollection = defineCollection({
     slug: "articles",
     name: "Articles",
     table: "articles",
@@ -128,8 +122,7 @@ const articlesCollection: PostgresCollectionConfig<Article> = {
             // Transform data after loading
             return row;
         }
-    },
-    properties: { /* ... */ }
+    }
 });
 ```
 
@@ -450,17 +443,9 @@ afterSave: async ({ values, entityId, context }) => {
 One of the most powerful uses of callbacks is **syncing data across collections** using `context.data`:
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-type Submission = {
-    title: string;
-    description: string;
-    company_id: string;
-    status: string;
-    promoted_job_id: string;
-};
-
-const submissionsCollection: PostgresCollectionConfig<Submission> = {
+const submissionsCollection = defineCollection({
     slug: "job_submissions",
     name: "Job Submissions",
     table: "job_submissions",
@@ -489,8 +474,7 @@ const submissionsCollection: PostgresCollectionConfig<Submission> = {
                 });
             }
         }
-    },
-    properties: { /* ... */ }
+    }
 });
 ```
 

@@ -2,10 +2,11 @@
 // `target: () =>` thunk below, so module init order never matters.
 // fallow-ignore-next-line circular-dependency
 import ordersCollection from "./orders";
+import { defineCollection } from "@rebasepro/cms-types";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { fullName, joinParts, money } from "../display";
 
-const customersCollection: PostgresCollectionConfig = {
+const customersCollection = defineCollection({
     name: "Customers",
     singularName: "Customer",
     slug: "customers",
@@ -112,7 +113,7 @@ const customersCollection: PostgresCollectionConfig = {
         {
             kind: "hasMany",
             relationName: "orders",
-            target: () => ordersCollection,
+            target: (): PostgresCollectionConfig => ordersCollection,
             }
     ],
     admin: {
@@ -182,7 +183,7 @@ const customersCollection: PostgresCollectionConfig = {
             "updated_at"
         ]
     }
-};
+});
 
 
 export default customersCollection;
