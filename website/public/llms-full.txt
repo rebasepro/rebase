@@ -5638,6 +5638,53 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
+### Where each option lives
+
+That call is the **ejected** shape — the one you write yourself after `rebase
+eject`, or in a custom server. A scaffolded project does not have it: the
+published runtime boots the project, and each option arrives as an environment
+variable in `.env`, an export from `config/index.ts`, or a directory the bundle
+declares in `rebase.json`.
+
+Both paths reach the same `RebaseBackendConfig`. This is the whole map.
+
+| Option | Managed runtime |
+|---|---|
+| `basePath` | `REBASE_BASE_PATH` (default `/api`) |
+| `collections`, `collectionsDir` | the `config/collections/` directory, declared by `rebase.json` |
+| `functionsDir` | `backend/functions/` |
+| `cronsDir` | `backend/crons/` |
+| `bootstrappers`, `database` | `DATABASE_URL`, plus `export const dataSources` from `config/index.ts` |
+| `auth` | `JWT_SECRET`, the `OAUTH_*` variables, and `config/collections/users` |
+| `storage` | the `STORAGE_*` variables, plus `export const storageSources` from `config/index.ts` |
+| `storageAuthorize` | `export const storageAuthorize` from `config/index.ts` |
+| `storagePublicRead` | `STORAGE_PUBLIC_READ` |
+| `storageRenditionCache` | `STORAGE_RENDITION_CACHE` |
+| `storageInsecureAllowAnyAuthenticated` | `STORAGE_ALLOW_ANY_AUTHENTICATED` |
+| `callbacks` | `export const callbacks` from `config/index.ts` |
+| `history` | `REBASE_HISTORY` (on by default) — the boolean form only |
+| `enableSwagger` | `REBASE_ENABLE_SWAGGER`; unset means on outside production |
+| `compression` | `REBASE_COMPRESSION` |
+| `maxBodySize` | `REBASE_MAX_BODY_SIZE` |
+| `logging` | `LOG_LEVEL` |
+| `provisionSchema`, `surfaces`, `ownership`, `functionsSelection`, `functionsUpstream` | `REBASE_ROLE` — see [Split Processes](/docs/deployment/split-processes/) |
+| `corsHandled` | CORS is installed by the runtime from `CORS_ORIGINS` |
+| `schemaVersion`, `runtimeVersion` | the build stamps both into the bundle |
+| `app`, `server`, `provisioningDriverResult` | the runtime creates them |
+
+#### Options with no managed route
+
+These have no environment variable and no config export. They are reachable
+only from a hand-written `initializeRebaseBackend` call — `rebase eject`, or a
+[custom server](/docs/backend/custom-server/):
+
+`rateLimit` · `jobs` · `csrf` · `cronPersistence` · `functionsTimeoutMs` ·
+`storagePolicies` · `storageTriggers` · `baas` · `liveSchema` · `rlsAudit` ·
+`history` in its object form (`{ maxEntries, ttlDays }`)
+
+`schemaEditor` is forced off in a built bundle: the editor rewrites collection
+*source* files, and a bundle holds compiled output.
+
 ### What Gets Created
 
 After initialization, these routes are mounted:
@@ -7675,6 +7722,14 @@ Rebase supports three storage backends:
 
 ### Configuration
 
+:::note[Where this goes]
+**Managed runtime** — the `STORAGE_*` variables in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET`, `STORAGE_PUBLIC_READ`, …), plus `export const storageSources` and `export const storageAuthorize` from `config/index.ts`. `storageAuthorize` has no environment form on purpose: no variable can express "this user may read this key".
+
+**Ejected** — the `storage` block on `initializeRebaseBackend({ … })`. `storagePolicies` and `storageTriggers` are ejected-only.
+
+The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
+:::
+
 Storage is configured in the `storage` block of `initializeRebaseBackend`:
 
 #### Local Storage
@@ -9673,6 +9728,14 @@ The **filename** (without extension) becomes the job's unique ID — e.g., `heal
 
 ### Configuration
 
+:::note[Where this goes]
+**Managed runtime** — put the files in `backend/crons/`. `rebase.json` declares the directory and the runtime mounts it — there is nothing to enable. `REBASE_CRON_SCHEDULER` in `.env` decides whether *this* process runs the timers.
+
+**Ejected** — `cronsDir` on `initializeRebaseBackend({ … })`, as below.
+
+The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
+:::
+
 Enable cron jobs by adding `cronsDir` to your backend config:
 
 ```typescript no-verify
@@ -10086,6 +10149,19 @@ external system.
 | A `setTimeout` in a callback | Once, in this process | No |
 
 ### Enabling
+
+:::note[Where this goes]
+**Managed runtime** — nowhere. `jobs` takes handler *functions*, which no
+environment variable and no `config/index.ts` export can carry, so a scaffolded
+project cannot enable the queue. Run `rebase eject` (or write a
+[custom server](/docs/backend/custom-server/)) to reach it. `REBASE_JOB_WORKERS`
+in `.env` only decides whether an already-enabled queue's workers run in *this*
+process.
+
+**Ejected** — the `jobs` block on `initializeRebaseBackend({ … })`, as below.
+
+The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
+:::
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -10732,6 +10808,14 @@ Use global callbacks for:
 
 ### Configuration
 
+:::note[Where this goes]
+**Managed runtime** — `export const callbacks = { … }` from `config/index.ts`. The runtime reads that export at boot; nothing else needs changing.
+
+**Ejected** — the `callbacks` key on `initializeRebaseBackend({ … })`.
+
+The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
+:::
+
 Pass the `callbacks` key to `initializeRebaseBackend`:
 
 ```typescript no-verify
@@ -10895,6 +10979,14 @@ For callbacks that only apply to a single collection, prefer [per-collection cal
 Entity history records a entity of entity values on every create, update, and delete. This gives you a full audit trail with diffs.
 
 ### Enabling History
+
+:::note[Where this goes]
+**Managed runtime** — on by default. `REBASE_HISTORY=false` in `.env` turns it off.
+
+**Ejected** — `history: true` in `initializeRebaseBackend({ … })`. The object form below — `{ maxEntries, ttlDays }` — is ejected-only; the environment variable is a boolean.
+
+The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
+:::
 
 #### Backend
 

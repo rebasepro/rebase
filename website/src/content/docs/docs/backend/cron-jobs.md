@@ -55,6 +55,14 @@ The **filename** (without extension) becomes the job's unique ID — e.g., `heal
 
 ## Configuration
 
+:::note[Where this goes]
+**Managed runtime** — put the files in `backend/crons/`. `rebase.json` declares the directory and the runtime mounts it — there is nothing to enable. `REBASE_CRON_SCHEDULER` in `.env` decides whether *this* process runs the timers.
+
+**Ejected** — `cronsDir` on `initializeRebaseBackend({ … })`, as below.
+
+The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
+:::
+
 Enable cron jobs by adding `cronsDir` to your backend config:
 
 ```typescript no-verify

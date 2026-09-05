@@ -10,6 +10,14 @@ Entity history records a entity of entity values on every create, update, and de
 
 ## Enabling History
 
+:::note[Where this goes]
+**Managed runtime** — on by default. `REBASE_HISTORY=false` in `.env` turns it off.
+
+**Ejected** — `history: true` in `initializeRebaseBackend({ … })`. The object form below — `{ maxEntries, ttlDays }` — is ejected-only; the environment variable is a boolean.
+
+The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
+:::
+
 ### Backend
 
 Enable history in `initializeRebaseBackend`:
