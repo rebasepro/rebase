@@ -4,7 +4,9 @@
  *
  * Wraps content that should only be shown for a specific experiment variant.
  * The "control" variant is visible by default (SEO-safe, noscript-safe).
- * Other variants are hidden via inline style and revealed by the AB head script.
+ * Losing variants are hidden by static CSS generated in Layout.astro from the
+ * EXPERIMENTS list; the winner carries no display rule at all, so `class` decides
+ * how it lays out — pass `class="inline"` for variants that sit inside a sentence.
  *
  * Usage:
  *   <ABVariant experiment="hero-cta" variant="control">
@@ -24,13 +26,8 @@ interface Props {
 }
 
 const { experiment, variant, class: className } = Astro.props;
-const isControl = variant === "control";
 ---
 
-<div
-    data-ab-show={`${experiment}:${variant}`}
-    class={className}
-    style={isControl ? undefined : "display:none"}
->
+<div data-ab-show={`${experiment}:${variant}`} class={className}>
     <slot />
 </div>

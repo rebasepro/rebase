@@ -9,6 +9,7 @@ import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
 import CookieBanner from "../components/CookieBanner.astro";
 import ABDevPanel from "../components/ABDevPanel.astro";
+import { EXPERIMENTS } from "../scripts/ab-testing";
 import TypeDevPanel from "../components/TypeDevPanel.astro";
 
 import ManifestoBanner from "../components/ManifestoBanner.astro";
@@ -103,6 +104,23 @@ const siteSchema = {
     ],
 };
 
+// Variant visibility, generated at build time from the one experiment list.
+//
+// Hide-only, deliberately. The rule this replaces was injected at runtime and
+// revealed the winner with `display:block!important`, which silently overrode
+// whatever the caller had asked for — ManifestoBanner passes `class="inline"`
+// because its variants are a sentence inside a <p>, and block broke the line.
+// Hiding the losers instead leaves the winner's own classes to lay it out.
+const abVariantCss = EXPERIMENTS.flatMap((exp) =>
+    exp.variants.map((v) =>
+        v === "control"
+            // Control is the SEO- and noscript-safe default, so it is hidden only
+            // once an assignment actually exists on <html>.
+            ? `html[data-ab-${exp.id}]:not([data-ab-${exp.id}="control"]) [data-ab-show="${exp.id}:control"]{display:none!important}`
+            : `html:not([data-ab-${exp.id}="${v}"]) [data-ab-show="${exp.id}:${v}"]{display:none!important}`
+    )
+).join("");
+
 const canonicalBase = "https://rebase.pro";
 const path = Astro.url.pathname;
 const canonical = path === "/" ? canonicalBase : `${canonicalBase}${path}`;
@@ -131,82 +149,112 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
 <head>
     <meta charset="UTF-8">
 
-    <!-- Immediate check for dismissed manifesto banner & active A/B tests to avoid CLS -->
-    <script is:inline>
+    <!-- Variant visibility. Static, so it survives a view-transition swap and needs
+         no runtime <style> to be kept in sync by two different call sites. -->
+    <style is:inline set:html={abVariantCss}></style>
+
+    <!-- Dismissed-banner class + active A/B assignment, applied before paint to avoid CLS.
+
+         Everything below writes to the *document*: a class and the data-ab-* attributes
+         on <html>. A view transition destroys both — Astro's swap strips every attribute
+         off documentElement and re-applies only the ones the incoming server-rendered
+         document carried. The script cannot repair that on its own either: Astro dedupes
+         inline scripts by content, so this one is marked data-astro-exec after the first
+         load and never runs again. Hence a named, idempotent apply() called on first
+         paint and again on every swap — the same shape as the data-scrolled listener in
+         Header.astro. -->
+    <script is:inline define:vars={{ abExperiments: EXPERIMENTS }}>
     (function(){
-        try {
-            if (localStorage.getItem('rb_manifesto_banner_dismissed') === 'true') {
-                document.documentElement.classList.add('banner-dismissed-instant');
-            }
-            
-            // 1. Get existing ab object from cookie
-            var match = document.cookie.match(/(^|;)\s*rb_ab\s*=\s*([^;]+)/);
-            var ab = {};
-            if (match) {
-                try { ab = JSON.parse(decodeURIComponent(match[2])); } catch(e) {}
-            }
+        if (window.__rebaseAbBound) return;
+        window.__rebaseAbBound = true;
 
-            // 2. Experiments definition
-            var experiments = [
-                // The nav is where the two-layer story is taught (backend column /
-                // admin-panel column), so the flat variant is parked at 0% rather
-                // than deleted — flip the weights back to split-test it again.
-                { id: "navigation-structure", variants: ["control", "flat-nav"], weights: [100, 0] },
-                // Parked at 0% — see src/scripts/ab-testing.ts for why.
-                { id: "manifesto-banner-text", variants: ["control", "mission", "founders"], weights: [100, 0, 0] }
-            ];
+        function applyAbState() {
+            try {
+                if (localStorage.getItem('rb_manifesto_banner_dismissed') === 'true') {
+                    document.documentElement.classList.add('banner-dismissed-instant');
+                }
 
-            var updated = false;
-            var H = document.documentElement;
+                // 1. Get existing ab object from cookie
+                var match = document.cookie.match(/(^|;)\s*rb_ab\s*=\s*([^;]+)/);
+                var ab = {};
+                if (match) {
+                    try { ab = JSON.parse(decodeURIComponent(match[2])); } catch(e) {}
+                }
 
-            for (var i = 0; i < experiments.length; i++) {
-                var exp = experiments[i];
-                var variant = ab[exp.id];
+                var updated = false;
+                var H = document.documentElement;
 
-                // If not assigned or not a valid variant, assign one
-                if (!variant || exp.variants.indexOf(variant) === -1) {
-                    var r = Math.random() * 100;
-                    var sum = 0;
-                    var assigned = exp.variants[0];
-                    for (var j = 0; j < exp.variants.length; j++) {
-                        sum += exp.weights[j];
-                        if (r <= sum) {
-                            assigned = exp.variants[j];
-                            break;
-                        }
+                // A variant forced from the dev panel outranks assignment and expiry,
+                // and is session-scoped so it never reaches a real visitor. Without it
+                // the panel could not preview a parked or expired experiment past the
+                // first navigation, since this function would retire it again.
+                var forced = {};
+                try { forced = JSON.parse(sessionStorage.getItem("rb_ab_force") || "{}"); } catch(e) {}
+
+                for (var i = 0; i < abExperiments.length; i++) {
+                    var exp = abExperiments[i];
+
+                    if (forced[exp.id] && exp.variants.indexOf(forced[exp.id]) !== -1) {
+                        H.setAttribute("data-ab-" + exp.id, forced[exp.id]);
+                        continue;
                     }
-                    ab[exp.id] = assigned;
-                    variant = assigned;
-                    updated = true;
+
+                    // `expires` now means what the type says it means. It used to gate
+                    // only the GA4 reporting, so an expired experiment kept serving
+                    // variants with nothing recording the result — and because a stored
+                    // assignment is only re-rolled when it is *invalid*, parking an
+                    // experiment at 0% never moved anyone already bucketed. Skipping it
+                    // here is what actually retires it, cookie and all.
+                    if (exp.expires && new Date(exp.expires).getTime() < Date.now()) {
+                        H.removeAttribute("data-ab-" + exp.id);
+                        continue;
+                    }
+
+                    var variant = ab[exp.id];
+
+                    // If not assigned or not a valid variant, assign one
+                    if (!variant || exp.variants.indexOf(variant) === -1) {
+                        // The type documents weights as optional with an equal split
+                        // default. Nothing implemented it, so an experiment written to
+                        // that contract threw on exp.weights[j] — inside the catch, which
+                        // would have silently dropped every later experiment too.
+                        var weights = exp.weights;
+                        if (!weights || weights.length !== exp.variants.length) {
+                            weights = exp.variants.map(function(){ return 100 / exp.variants.length; });
+                        }
+                        var r = Math.random() * 100;
+                        var sum = 0;
+                        var assigned = exp.variants[0];
+                        for (var j = 0; j < exp.variants.length; j++) {
+                            sum += weights[j];
+                            if (r <= sum) {
+                                assigned = exp.variants[j];
+                                break;
+                            }
+                        }
+                        ab[exp.id] = assigned;
+                        variant = assigned;
+                        updated = true;
+                    }
+
+                    // Apply attribute to html element
+                    H.setAttribute("data-ab-" + exp.id, variant);
                 }
 
-                // Apply attribute to html element
-                H.setAttribute("data-ab-" + exp.id, variant);
-            }
-
-            // Write back cookie if updated
-            if (updated) {
-                var dm = location.hostname.indexOf("rebase.pro") > -1 ? ";domain=.rebase.pro" : "";
-                document.cookie = "rb_ab=" + encodeURIComponent(JSON.stringify(ab)) +
-                    ";path=/;max-age=7776000;samesite=lax" + dm;
-            }
-
-            // Inject CSS for active non-control content variants
-            var css = "";
-            for (var id in ab) {
-                var v = ab[id];
-                if (v && v !== "control") {
-                    css += '[data-ab-show="' + id + ':control"]{display:none!important}';
-                    css += '[data-ab-show="' + id + ':' + v + '"]{display:block!important}';
+                // Write back cookie if updated. A re-apply after a swap finds every
+                // assignment already valid, so this is a first-visit-only write.
+                if (updated) {
+                    var dm = location.hostname.indexOf("rebase.pro") > -1 ? ";domain=.rebase.pro" : "";
+                    document.cookie = "rb_ab=" + encodeURIComponent(JSON.stringify(ab)) +
+                        ";path=/;max-age=7776000;samesite=lax" + dm;
                 }
-            }
-            if (css) {
-                var s = document.createElement("style");
-                s.id = "ab-styles-head";
-                s.textContent = css;
-                document.head.appendChild(s);
-            }
-        } catch(e) {}
+            } catch(e) {}
+        }
+
+        applyAbState();
+        // Fires after the swap has cleared <html>'s attributes, and before the new body
+        // is painted — so the variant is restored with no flash of the control.
+        document.addEventListener('astro:after-swap', applyAbState);
     })();
     </script>
 
