@@ -529,6 +529,31 @@ describe("template package.json contracts", () => {
         expect(workspace).toContain("frontend");
         expect(workspace).toContain("config");
     });
+
+    it("ships everything scripts/example.ts needs to run", () => {
+        // The script is in the template. Its runner and its three imports were
+        // in the baas overlay only, so `pnpm example` in the default scaffold
+        // was a missing script, and running it by hand was three missing
+        // modules. A file that ships has to be a file that runs.
+        const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
+        const example = fs.readFileSync(path.join(TEMPLATE_DIR, "scripts", "example.ts"), "utf-8");
+
+        expect(pkg.scripts.example).toBe("tsx scripts/example.ts");
+        expect(pkg.devDependencies).toHaveProperty("tsx");
+
+        const declared = { ...pkg.dependencies, ...pkg.devDependencies };
+        const imported = [...example.matchAll(/^import [^"']*["']([^"'.][^"']*)["']/gm)]
+            .map(match => match[1])
+            .filter(specifier => !specifier.startsWith("node:"));
+
+        expect(imported.length).toBeGreaterThan(0);
+        for (const specifier of imported) {
+            const name = specifier.startsWith("@")
+                ? specifier.split("/").slice(0, 2).join("/")
+                : specifier.split("/")[0];
+            expect(declared, `scripts/example.ts imports ${name}`).toHaveProperty(name);
+        }
+    });
 });
 
 // =============================================================================
