@@ -123,7 +123,8 @@ To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 
 - **[Quickstart](/docs/getting-started/quickstart)** — Get running in 2 minutes
 - **[Backend only](/docs/getting-started/headless/)** — The headless API over a database you already have
-- **[Project Structure](/docs/getting-started/project-structure)** — Understand the generated code
+- **[Project Structure](/docs/getting-started/project-structure)** — Understand the generated code,
+  and the five words the rest of these pages assume
 - **[Collections](/docs/collections)** — Define your data schema
 - **[Backend](/docs/backend)** — Configure auth, storage, and the API
 - **[Architecture](/docs/architecture)** — Understand how it all fits together
@@ -136,7 +137,9 @@ To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 pnpm dlx @rebasepro/cli init my-app
 ```
 
-This scaffolds a project with three packages:
+This scaffolds a project with three packages. If any of *collection*, *Studio*,
+*managed runtime*, *bundle* or *resource* is new, the five-word box on
+[Project Structure](/docs/getting-started/project-structure/) defines them.
 
 | Folder | Description |
 |--------|-------------|
@@ -207,7 +210,8 @@ touched, and one pointing anywhere other than this machine is left alone
 entirely.
 
 With your own database you also get the migration commands, which the managed one
-cannot offer — they plan changes with Atlas, which needs a second empty database
+cannot offer — they plan changes with [Atlas](https://atlasgo.io/), the schema-migration engine
+Rebase plans with, which needs a second empty database
 to compare against, and PGlite serves exactly one:
 
 ```bash
@@ -215,7 +219,9 @@ pnpm run db:push
 ```
 
 Boot already creates missing tables additively, so `db push` is for the two
-things it deliberately leaves alone: junction-table RLS on many-to-many
+things it deliberately leaves alone: junction-table
+[RLS](/docs/collections/security-rules/) — PostgreSQL's row-level security, which is
+how Rebase enforces who may read a row — on many-to-many
 relations, and any change that is not purely additive — a renamed column, a
 narrowed type, a removed field.
 
@@ -329,6 +335,25 @@ narrowed type, a removed field.
 
 ## Project Structure
 
+:::note[Five words this page uses]
+Every one of them means something specific here, and four of them mean something
+else elsewhere in the industry.
+
+- **Collection** — one table, described in TypeScript. The schema, the API and
+  the admin screen all come from the same file.
+- **Studio** — the developer half of the admin panel: schema editor, SQL
+  console, policy browser. The same app your content team uses, behind a toggle.
+- **Managed runtime** — the published `rebasepro/server` image boots your
+  project. You write no server file, and you get runtime upgrades without a
+  rebuild. The alternative is `rebase eject`, below.
+- **Bundle** — what `rebase build` produces: your collections, functions and
+  crons, compiled, with a manifest saying where each one is. It is what the
+  managed runtime boots.
+- **Resource** — something the project needs from wherever it runs: a database,
+  a bucket, a topic. Declared in `config/resources.ts`, bound by environment
+  variables.
+:::
+
 A Rebase starter project has three interconnected packages:
 
 ```
@@ -416,8 +441,19 @@ The runtime sets up:
 Configuration comes from `rebase.json`, the `config/` directory and environment
 variables. See [Environment & Configuration](/docs/getting-started/configuration).
 
+`rebase build` turns all of it into a **bundle** — the compiled collections,
+functions and crons plus a manifest — which the managed runtime boots. Nothing
+about the bundle is written by hand; if you want to see one,
+[Runtime & Bundles](/docs/architecture/runtime-and-bundles/) is what is in it.
+
+The panel the frontend serves has two halves. **Studio** is the developer one —
+the schema editor, the SQL console, the RLS policy browser — and it is behind
+the toggle in the drawer, not a separate deployment. See [Studio](/docs/studio/).
+
 To take ownership of the process instead — your own middleware, routes and auth
-wiring — run `rebase eject`. It writes an entry point that calls
+wiring — run `rebase eject`. **Everything below this paragraph is ejected-only**:
+a scaffolded project has none of those files, and nothing in it calls
+`initializeRebaseBackend`. It writes an entry point that calls
 `initializeRebaseBackend` directly, plus a Dockerfile and a compose file that
 builds it; from then on you maintain the server and platform runtime upgrades no
 longer reach the project. That surface is documented in
