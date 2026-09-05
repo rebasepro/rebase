@@ -10223,23 +10223,46 @@ The Rebase frontend is a **React framework** that renders your admin panel. It r
 
 In the default scaffold, the admin panel **is** the frontend: it's served at the root of your deployed URL. If you build your own product app instead, you can mount the admin under a prefix like `/admin` in the same deployment — see [Changing the Base URL](/docs/getting-started/deployment#changing-the-base-url).
 
-The key components that make up a Rebase frontend:
+This is `frontend/src/App.tsx` as `rebase init` writes it — the whole admin
+panel, four declarations inside one provider:
 
 ```tsx
-<Rebase
-    client={rebaseClient}
-    authController={authController}
->
-    {({ loading }) => (
-        <Scaffold>
-            <AppBar />
-            <Drawer title="My App" />
-            <Outlet />
-            <SideDialogs />
-        </Scaffold>
-    )}
-</Rebase>
+
+const client = createRebaseClient({
+    baseUrl: import.meta.env.VITE_API_URL,
+    auth: { authFlowMode: "cookie" }
+});
+
+export function App() {
+    const authController = useRebaseAuthController({ client });
+
+    return (
+        <Rebase client={client} authController={authController}>
+            {/* Sign-in screen. Pass `loginView` to replace it. */}
+            <RebaseAuth/>
+            <RebaseCMS collections={collections}/>
+            <RebaseStudio/>
+            <RebaseShell title="My App"/>
+        </Rebase>
+    );
+}
 ```
+
+The first three render nothing: they *register* configuration into the
+provider. `<RebaseShell>` is what draws — it reads that registry and builds the
+navigation, routes and layout from it. So the order they appear in does not
+matter, and adding a feature means adding a component, not rewiring a tree.
+
+| Component | Package | Registers |
+|---|---|---|
+| `<RebaseAuth>` | `@rebasepro/app` | the sign-in screen (`loginView`) |
+| `<RebaseCMS>` | `@rebasepro/cms` | collections, custom views, the home page, the collection editor |
+| `<RebaseStudio>` | `@rebasepro/studio` | the developer tools (SQL, RLS, logs, backups…) |
+| `<RebaseShell>` | `@rebasepro/cms` | nothing — it renders the admin from everything above |
+
+Drop `<RebaseStudio>` and you have a content-only CMS; drop `<RebaseCMS>` and
+you have the developer tools alone. To lay the shell out by hand instead, see
+[Advanced: manual layout](#advanced-manual-layout).
 
 ### The Rebase Provider
 
@@ -10297,11 +10320,70 @@ const { data: entities } = await data.collection("posts").find();
 entities[0].values.title;
 ```
 
-### Controllers
+### Advanced: manual layout
 
-Controllers are React hooks that configure specific aspects of the framework:
+Everything below replaces `<RebaseShell>`. You need it only when the stock
+layout is in the way — a different chrome around the admin, a route tree of
+your own, an app where the admin is one page among many. If you are not
+replacing the layout, stop at [Custom Views](#custom-views).
 
-#### `useBuildNavigationStateController`
+`<RebaseShell>` is sugar for four layers, and you can take them one at a time:
+
+```tsx
+<Rebase client={client} authController={authController}>
+    <RebaseCMS collections={collections}/>
+    <RebaseStudio/>
+
+    {/* login screen until there is a user */}
+    <RebaseAuthGate>
+        {/* builds the navigation, URL and collection-registry controllers */}
+        <RebaseNavigation>
+            {/* the admin's routes, drawn inside the layout you pass */}
+            <RebaseRouteDefs layout={<RebaseLayout title="My App"/>}/>
+        </RebaseNavigation>
+    </RebaseAuthGate>
+</Rebase>
+```
+
+The order is fixed: `RebaseAuthGate → RebaseNavigation → RebaseRouteDefs →
+RebaseLayout`. `RebaseAuthGate` shows the login view until there is a user, so
+nothing below it renders for a signed-out visitor; `RebaseNavigation` builds
+the navigation, URL and collection-registry controllers that `RebaseRouteDefs`
+and every collection view read, so `RebaseRouteDefs` outside it throws.
+
+Each layer is usable on its own. `<RebaseAuthGate>` alone gates your own app
+behind Rebase's login. Swap `<RebaseLayout>` for your own component to keep the
+routing and lose the chrome; drop `<RebaseRouteDefs>` too and you are building
+the routes yourself out of the components in
+[Scaffold Components](#scaffold-components).
+
+Below that floor `<Rebase>` also accepts a **render prop** instead of children,
+which hands you the context and the loading flag and leaves the entire tree to
+you:
+
+```tsx
+<Rebase client={rebaseClient} authController={authController}>
+    {({ context, loading }) => (
+        <Scaffold>
+            <AppBar/>
+            <Drawer title="My App"/>
+            <Outlet/>
+            <SideDialogs/>
+        </Scaffold>
+    )}
+</Rebase>
+```
+
+At that point nothing is wired for you: you build the controllers below by
+hand and render the routes yourself.
+
+#### Controllers
+
+Controllers are React hooks that configure specific aspects of the framework.
+`<RebaseNavigation>` calls all of them for you — reach for these only inside a
+render prop.
+
+##### `useBuildNavigationStateController`
 
 The main controller that wires everything together:
 
@@ -10325,7 +10407,7 @@ const navigationStateController = useBuildNavigationStateController({
 });
 ```
 
-#### `useBuildCollectionRegistryController`
+##### `useBuildCollectionRegistryController`
 
 Manages how collections are resolved from URL paths:
 
@@ -10335,7 +10417,7 @@ const collectionRegistryController = useBuildCollectionRegistryController({
 });
 ```
 
-#### `useBuildUrlController`
+##### `useBuildUrlController`
 
 Configures URL generation:
 
@@ -10347,7 +10429,7 @@ const urlController = useBuildUrlController({
 });
 ```
 
-#### `useBuildModeController`
+##### `useBuildModeController`
 
 Manages light/dark theme:
 
@@ -10356,7 +10438,7 @@ const modeController = useBuildModeController();
 // Provides: modeController.mode ("light" | "dark"), modeController.toggleMode()
 ```
 
-#### `useBuildAdminModeController`
+##### `useBuildAdminModeController`
 
 Toggles between Studio and Content modes:
 
@@ -10365,7 +10447,7 @@ const adminModeController = useBuildAdminModeController();
 // Provides: adminModeController.mode ("studio" | "content")
 ```
 
-### Scaffold Components
+#### Scaffold Components
 
 | Component | Description |
 |-----------|-------------|

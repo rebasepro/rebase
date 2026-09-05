@@ -246,3 +246,36 @@ describe("Scaffold drawer open state", () => {
         });
     });
 });
+
+describe("Scaffold children that are not elements", () => {
+
+    beforeEach(() => {
+        window.localStorage.clear();
+        mockLargeLayout = true;
+    });
+
+    // `React.Children.toArray` keeps strings and numbers, and those have no
+    // `.type`. Reading `child.type.componentType` off one threw a TypeError from
+    // inside the layout — a bewildering way to be told that a conditional had
+    // rendered a stray `""`.
+    test("a text child renders instead of throwing", () => {
+        expect(() => render(
+            <Scaffold>
+                <DrawerStub/>
+                {"a stray string"}
+                <Probe/>
+            </Scaffold>
+        )).not.toThrow();
+        expect(screen.getByText("a stray string")).toBeTruthy();
+        expect(screen.getByTestId("drawer")).toBeTruthy();
+    });
+
+    test("a number child renders instead of throwing", () => {
+        expect(() => render(
+            <Scaffold>
+                {0}
+                <Probe/>
+            </Scaffold>
+        )).not.toThrow();
+    });
+});

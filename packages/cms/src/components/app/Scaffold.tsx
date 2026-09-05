@@ -101,16 +101,27 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
             padding = true
         } = props;
 
-        const drawerChildren = React.Children.toArray(children).filter((child: any) => child.type.componentType === "Drawer");
+        // `toArray` keeps strings and numbers, and those have no `.type` at all.
+        // Reading `child.type.componentType` off one threw a TypeError from
+        // inside the layout, which is a bewildering way to be told that a stray
+        // text node — a conditional that rendered `""`, a template string —
+        // reached the Scaffold. Anything that is not an element is just "other".
+        const slotOf = (child: React.ReactNode): string | undefined =>
+            React.isValidElement(child)
+                ? (child.type as { componentType?: string })?.componentType
+                : undefined;
+
+        const childArray = React.Children.toArray(children);
+        const drawerChildren = childArray.filter((child) => slotOf(child) === "Drawer");
         if (drawerChildren.length > 1) {
             throw Error("Only one Drawer component is allowed in Scaffold");
         }
-        const appBarChildren = React.Children.toArray(children).filter((child: any) => child.type.componentType === "AppBar");
+        const appBarChildren = childArray.filter((child) => slotOf(child) === "AppBar");
         if (appBarChildren.length > 1) {
             throw Error("Only one AppBar component is allowed in Scaffold");
         }
-        const otherChildren = React.Children.toArray(children)
-            .filter((child: any) => child.type.componentType !== "Drawer" && child.type.componentType !== "AppBar");
+        const otherChildren = childArray
+            .filter((child) => slotOf(child) !== "Drawer" && slotOf(child) !== "AppBar");
         const includeDrawer = drawerChildren.length > 0;
         const largeLayout = useLargeLayout();
 
