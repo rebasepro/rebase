@@ -49,38 +49,43 @@ const unsubscribe = client.data.orders.listen(
 
 ```typescript no-verify
 listen(
-    params: FindParams | undefined,
-    onUpdate: (response: FindResponse<M>) => void,
+    params: FindParams<M> | undefined,
+    onUpdate: (result: FindResult<M>) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-### Metadati in due fasi
+`FindResult<M>` è la stessa forma restituita da `find()`: righe piatte in `data` e
+`{ total, limit, offset, hasMore }` in `meta`.
 
-Quando `listen()` si attiva, emette gli aggiornamenti in un massimo di due fasi:
+### Una emissione per ogni cambiamento
 
-1. **Immediata (stimata):** Il primo callback si attiva istantaneamente con le entità e metadati di paginazione euristici (`total` = numero di entità restituite, `hasMore` = se il conteggio è uguale al limite richiesto). Questa emissione porta `meta.total: true`.
+Ogni push del server richiama la tua callback **una volta**, con metadati che descrivono
+le righe che li accompagnano. Non c'è una prima emissione separata né alcun flag da
+controllare:
 
-2. **Autorevole (facoltativa):** Una query di conteggio asincrona viene eseguita in background. Se il `total` o `hasMore` autorevole differisce dalla stima, si attiva un secondo callback con metadati corretti e **senza** il flag `estimated`. Se i valori corrispondono, la seconda emissione viene completamente saltata — il tuo callback si attiva una sola volta.
-
-Se la query di conteggio **fallisce**, non si verifica una seconda emissione. Il flag `estimated: true` della prima emissione rimane come segnale che i metadati sono euristici. Questo non viene trattato come un errore di sottoscrizione.
+- Prima dell'emissione viene eseguito un `count()` per la query, quindi `meta.total` e
+  `meta.hasMore` sono autorevoli.
+- Se un push arriva mentre quel conteggio è ancora in corso, l'emissione più vecchia
+  viene scartata: non ricevi mai una callback con un totale appartenente a una pagina
+  precedente.
+- Se il conteggio **fallisce**, viene riusato l'ultimo totale realmente restituito da un
+  conteggio. Un conteggio fallito non dice nulla sulla dimensione della collezione, e
+  quindi non può sovrascrivere una risposta vera. Non è un errore di sottoscrizione, e
+  `onError` non viene chiamata.
+- Se nessun conteggio è mai riuscito per questa sottoscrizione, `meta.total` è un
+  **limite inferiore** — le righe di questa pagina più quelle saltate per arrivarci — e
+  `meta.hasMore` è `true` quando la pagina è tornata piena.
 
 ```typescript
 client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
-    (response) => {
-        if (response.meta.total) {
-            // First-paint: render immediately, total/hasMore may change
-            renderProducts(response.data, { loading: true });
-        } else {
-            // Authoritative: safe to render final pagination controls
-            renderProducts(response.data, { loading: false });
-        }
+    (result) => {
+        renderProducts(result.data);
+        renderPager({ total: result.meta.total, hasMore: result.meta.hasMore });
     }
 );
 ```
-
-> **Suggerimento:** Se non hai bisogno di distinguere tra metadati stimati e autorevoli, puoi ignorare il flag `estimated` — entrambe le emissioni portano lo stesso array `data`.
 
 ## Sottoscrivere una singola entità
 
@@ -107,12 +112,13 @@ const unsubscribe = client.data.products.listenById(
 ```typescript
 listenById(
     id: string | number,
-    onUpdate: (entity: Entity<M> | undefined) => void,
+    onUpdate: (row: M | undefined) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-Il callback riceve `undefined` quando l'entità viene eliminata.
+La callback riceve una riga piatta — non una `Entity`, quindi senza `.values` — e
+`undefined` quando il record viene eliminato.
 
 ## Query Builder fluido
 

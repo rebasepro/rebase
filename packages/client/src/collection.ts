@@ -504,34 +504,35 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                         });
                     };
 
-                    // With no count to go on, the only defensible total is a
-                    // lower bound: the rows on this page plus the ones paged
-                    // past to reach them. Reporting `rows.length` claimed a
-                    // collection read at offset 10 held two rows.
-                    const emitWithoutCount = () => emit(
-                        offset + rows.length,
-                        rows.length >= requestedLimit
-                    );
-
-                    if (client.count) {
-                        client.count(params)
-                            .then((total) => {
-                                lastKnownTotal = total;
-                                emit(total, offset + rows.length < total);
-                            })
-                            .catch(() => {
-                                // A count that failed is not evidence about the
-                                // size of the collection. Keep the last real
-                                // answer; only guess if there has never been one.
-                                if (lastKnownTotal !== undefined) {
-                                    emit(lastKnownTotal, offset + rows.length < lastKnownTotal);
-                                } else {
-                                    emitWithoutCount();
-                                }
-                            });
-                    } else {
-                        emitWithoutCount();
-                    }
+                    // One emission per push, and it waits for the count: a
+                    // subscriber is called back once, with metadata that
+                    // describes the rows beside it. (The docs used to promise
+                    // two emissions and an `estimated` flag; neither has ever
+                    // existed here.)
+                    //
+                    // A push that lands while a count is in flight bumps
+                    // `lastUpdateId`, and `emit` drops the stale one — so the
+                    // wait cannot deliver a total belonging to an older page.
+                    client.count(params)
+                        .then((total) => {
+                            lastKnownTotal = total;
+                            emit(total, offset + rows.length < total);
+                        })
+                        .catch(() => {
+                            // A count that failed is not evidence about the
+                            // size of the collection. Keep the last real
+                            // answer; only guess if there has never been one.
+                            if (lastKnownTotal !== undefined) {
+                                emit(lastKnownTotal, offset + rows.length < lastKnownTotal);
+                                return;
+                            }
+                            // With no count to go on, the only defensible total
+                            // is a lower bound: the rows on this page plus the
+                            // ones paged past to reach them. Reporting
+                            // `rows.length` claimed a collection read at offset
+                            // 10 held two rows.
+                            emit(offset + rows.length, rows.length >= requestedLimit);
+                        });
                 },
                 onError
             );

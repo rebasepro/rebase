@@ -49,38 +49,41 @@ const unsubscribe = client.data.orders.listen(
 
 ```typescript no-verify
 listen(
-    params: FindParams | undefined,
-    onUpdate: (response: FindResponse<M>) => void,
+    params: FindParams<M> | undefined,
+    onUpdate: (result: FindResult<M>) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-### Two-Phase Meta
+`FindResult<M>` is the same shape `find()` returns: flat rows in `data`, and
+`{ total, limit, offset, hasMore }` in `meta`.
 
-When `listen()` fires, it emits updates in up to two phases:
+### One emission per change
 
-1. **Immediate (estimated):** The first callback fires instantly with the entities and heuristic pagination metadata (`total` = number of returned entities, `hasMore` = whether the count equals the requested limit). This emission carries `meta.total: true`.
+Each server push calls your callback **once**, with metadata that describes the
+rows beside it. There is no separate first-paint emission and no flag to check:
 
-2. **Authoritative (optional):** An async count query runs in the background. If the authoritative `total` or `hasMore` differs from the estimate, a second callback fires with corrected metadata and **no** `estimated` flag. If the values match, the second emission is skipped entirely — your callback fires only once.
-
-If the count query **fails**, no second emission occurs. The first emission's `estimated: true` flag remains as the signal that the metadata is heuristic. This is not treated as a subscription error.
+- A `count()` runs for the query before the emission, so `meta.total` and
+  `meta.hasMore` are authoritative.
+- If a push arrives while that count is still in flight, the older emission is
+  dropped — you are never called back with a total belonging to a previous page.
+- If the count **fails**, the last total a count actually returned is reused. A
+  failed count says nothing about how big the collection is, so it must not be
+  allowed to overwrite a real answer. This is not a subscription error, and
+  `onError` is not called.
+- If no count has ever succeeded for this subscription, `meta.total` is a
+  **lower bound** — the rows on this page plus the ones paged past to reach
+  them — and `meta.hasMore` is `true` when the page came back full.
 
 ```typescript
 client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
-    (response) => {
-        if (response.meta.total) {
-            // First-paint: render immediately, total/hasMore may change
-            renderProducts(response.data, { loading: true });
-        } else {
-            // Authoritative: safe to render final pagination controls
-            renderProducts(response.data, { loading: false });
-        }
+    (result) => {
+        renderProducts(result.data);
+        renderPager({ total: result.meta.total, hasMore: result.meta.hasMore });
     }
 );
 ```
-
-> **Tip:** If you don't need to distinguish between estimated and authoritative metadata, you can ignore the `estimated` flag — both emissions carry the same `data` array.
 
 ## Subscribing to a Single Entity
 
@@ -110,12 +113,13 @@ const unsubscribe = client.data
 ```typescript no-verify
 listenById(
     id: string | number,
-    onUpdate: (entity: Entity<M> | undefined) => void,
+    onUpdate: (row: M | undefined) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-The callback receives `undefined` when the entity is deleted.
+The callback receives a flat row — not an `Entity`, so there is no `.values` —
+and `undefined` when the record is deleted.
 
 ## Fluent Query Builder
 

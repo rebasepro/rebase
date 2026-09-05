@@ -49,38 +49,42 @@ const unsubscribe = client.data.orders.listen(
 
 ```typescript no-verify
 listen(
-    params: FindParams | undefined,
-    onUpdate: (response: FindResponse<M>) => void,
+    params: FindParams<M> | undefined,
+    onUpdate: (result: FindResult<M>) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-### Metadatos en Dos Fases
+`FindResult<M>` es la misma forma que devuelve `find()`: filas planas en `data` y
+`{ total, limit, offset, hasMore }` en `meta`.
 
-Cuando `listen()` se dispara, emite actualizaciones en hasta dos fases:
+### Una emisión por cambio
 
-1. **Inmediata (estimada):** El primer callback se dispara al instante con las entidades y metadatos de paginación heurísticos (`total` = número de entidades devueltas, `hasMore` = si el conteo es igual al límite solicitado). Esta emisión lleva `meta.total: true`.
+Cada envío del servidor llama a tu callback **una vez**, con metadatos que describen
+las filas que lo acompañan. No hay una primera emisión aparte ni ningún indicador que
+comprobar:
 
-2. **Autoritativa (opcional):** Una consulta de conteo asíncrona se ejecuta en segundo plano. Si el `total` o `hasMore` autoritativo difiere de la estimación, se dispara un segundo callback con metadatos corregidos y **sin** la marca `estimated`. Si los valores coinciden, la segunda emisión se omite por completo — su callback se dispara solo una vez.
-
-Si la consulta de conteo **falla**, no se produce una segunda emisión. La marca `estimated: true` de la primera emisión permanece como señal de que los metadatos son heurísticos. Esto no se trata como un error de suscripción.
+- Antes de la emisión se ejecuta un `count()` para la consulta, así que `meta.total` y
+  `meta.hasMore` son autoritativos.
+- Si llega un envío mientras ese recuento sigue en curso, la emisión anterior se
+  descarta: nunca recibirás un total que pertenece a una página anterior.
+- Si el recuento **falla**, se reutiliza el último total que un recuento devolvió de
+  verdad. Un recuento fallido no dice nada sobre el tamaño de la colección, así que no
+  puede sobrescribir una respuesta real. Esto no es un error de suscripción y no se
+  llama a `onError`.
+- Si ningún recuento ha tenido éxito para esta suscripción, `meta.total` es una **cota
+  inferior** — las filas de esta página más las que se saltaron para llegar a ellas — y
+  `meta.hasMore` es `true` cuando la página vino llena.
 
 ```typescript
 client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
-    (response) => {
-        if (response.meta.total) {
-            // First-paint: render immediately, total/hasMore may change
-            renderProducts(response.data, { loading: true });
-        } else {
-            // Authoritative: safe to render final pagination controls
-            renderProducts(response.data, { loading: false });
-        }
+    (result) => {
+        renderProducts(result.data);
+        renderPager({ total: result.meta.total, hasMore: result.meta.hasMore });
     }
 );
 ```
-
-> **Consejo:** Si no necesita distinguir entre metadatos estimados y autoritativos, puede ignorar la marca `estimated` — ambas emisiones llevan el mismo array `data`.
 
 ## Suscribirse a una Sola Entidad
 
@@ -107,12 +111,13 @@ const unsubscribe = client.data.products.listenById(
 ```typescript
 listenById(
     id: string | number,
-    onUpdate: (entity: Entity<M> | undefined) => void,
+    onUpdate: (row: M | undefined) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-El callback recibe `undefined` cuando la entidad se elimina.
+El callback recibe una fila plana — no una `Entity`, así que no hay `.values` — y
+`undefined` cuando el registro se elimina.
 
 ## Constructor de Consultas Fluido
 

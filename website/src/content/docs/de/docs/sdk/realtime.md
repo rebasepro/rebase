@@ -49,38 +49,42 @@ const unsubscribe = client.data.orders.listen(
 
 ```typescript no-verify
 listen(
-    params: FindParams | undefined,
-    onUpdate: (response: FindResponse<M>) => void,
+    params: FindParams<M> | undefined,
+    onUpdate: (result: FindResult<M>) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-### Zweiphasige Metadaten
+`FindResult<M>` ist dieselbe Form, die `find()` zurückgibt: flache Zeilen in `data` und
+`{ total, limit, offset, hasMore }` in `meta`.
 
-Wenn `listen()` ausgelöst wird, gibt es Updates in bis zu zwei Phasen aus:
+### Eine Emission pro Änderung
 
-1. **Sofort (geschätzt):** Der erste Callback wird sofort mit den Entitäten und heuristischen Paginierungs-Metadaten ausgelöst (`total` = Anzahl der zurückgegebenen Entitäten, `hasMore` = ob die Anzahl dem angeforderten Limit entspricht). Diese Emission trägt `meta.total: true`.
+Jeder Server-Push ruft Ihren Callback **einmal** auf, mit Metadaten, die die
+nebenstehenden Zeilen beschreiben. Es gibt keine separate erste Emission und kein Flag,
+das geprüft werden müsste:
 
-2. **Autoritativ (optional):** Eine asynchrone Zählabfrage läuft im Hintergrund. Wenn der autoritative `total`- oder `hasMore`-Wert von der Schätzung abweicht, wird ein zweiter Callback mit korrigierten Metadaten und **ohne** `estimated`-Flag ausgelöst. Stimmen die Werte überein, wird die zweite Emission vollständig übersprungen — Ihr Callback wird nur einmal ausgelöst.
-
-Wenn die Zählabfrage **fehlschlägt**, erfolgt keine zweite Emission. Das `estimated: true`-Flag der ersten Emission bleibt als Signal dafür bestehen, dass die Metadaten heuristisch sind. Dies wird nicht als Abonnementfehler behandelt.
+- Vor der Emission läuft ein `count()` für die Abfrage, daher sind `meta.total` und
+  `meta.hasMore` autoritativ.
+- Trifft ein Push ein, während diese Zählung noch läuft, wird die ältere Emission
+  verworfen — Sie erhalten nie einen Callback mit einem Gesamtwert einer früheren Seite.
+- **Schlägt** die Zählung fehl, wird der letzte tatsächlich zurückgegebene Gesamtwert
+  weiterverwendet. Eine fehlgeschlagene Zählung sagt nichts über die Größe der Sammlung
+  aus und darf eine echte Antwort daher nicht überschreiben. Das ist kein
+  Abonnementfehler, und `onError` wird nicht aufgerufen.
+- Ist für dieses Abonnement noch nie eine Zählung gelungen, ist `meta.total` eine
+  **untere Schranke** — die Zeilen dieser Seite plus die übersprungenen — und
+  `meta.hasMore` ist `true`, wenn die Seite voll zurückkam.
 
 ```typescript
 client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
-    (response) => {
-        if (response.meta.total) {
-            // First-paint: render immediately, total/hasMore may change
-            renderProducts(response.data, { loading: true });
-        } else {
-            // Authoritative: safe to render final pagination controls
-            renderProducts(response.data, { loading: false });
-        }
+    (result) => {
+        renderProducts(result.data);
+        renderPager({ total: result.meta.total, hasMore: result.meta.hasMore });
     }
 );
 ```
-
-> **Tipp:** Wenn Sie nicht zwischen geschätzten und autoritativen Metadaten unterscheiden müssen, können Sie das `estimated`-Flag ignorieren — beide Emissionen tragen dasselbe `data`-Array.
 
 ## Eine einzelne Entität abonnieren
 
@@ -107,12 +111,13 @@ const unsubscribe = client.data.products.listenById(
 ```typescript
 listenById(
     id: string | number,
-    onUpdate: (entity: Entity<M> | undefined) => void,
+    onUpdate: (row: M | undefined) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-Der Callback erhält `undefined`, wenn die Entität gelöscht wird.
+Der Callback erhält eine flache Zeile — keine `Entity`, also ohne `.values` — und
+`undefined`, wenn der Datensatz gelöscht wurde.
 
 ## Fluent-Query-Builder
 
