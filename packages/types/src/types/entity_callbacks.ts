@@ -112,13 +112,27 @@ export type BeforeSaveProps<M extends Record<string, unknown> = Record<string, u
         id?: string | number;
     }
 /**
- * Parameters passed to hooks before a entity is saved
+ * Parameters passed to hooks when a save fails.
+ *
+ * `id` is optional because a failed create may never have been assigned one.
+ * `error` is what the save threw — the reason the hook exists. Documented since
+ * the callbacks guide first shipped, and until now not on the type or on the
+ * object: a handler that read `props.error` compiled and logged `undefined`.
+ *
  * @group Models
  */
 export type AfterSaveErrorProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
     Omit<AfterSaveProps<M, USER>, "id">
     & {
         id?: string | number;
+
+        /**
+         * Whatever the save threw: a `RebaseApiError` when a `before*` callback
+         * or a validator refused it, otherwise the driver's error with the
+         * SQLSTATE in its cause chain. Not narrowed, because a callback may
+         * throw anything.
+         */
+        error: unknown;
     }
 
 /**

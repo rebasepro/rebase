@@ -901,40 +901,41 @@ export class PostgresBackendDriver implements DataDriver {
             return savedRow;
         } catch (error) {
             if (globalCallbacks?.afterSaveError || callbacks?.afterSaveError || propertyCallbacks?.afterSaveError) {
+                // What the hook exists to see. It was documented from the start
+                // and never passed, so `props.error` was `undefined` in every
+                // handler ever written against the guide. `id` is the caller's
+                // when there is one — `"unknown"` was a string standing where a
+                // real key belonged — and `previousValues` is whatever the
+                // pre-write read managed to fetch, rather than a hardcoded
+                // `undefined` that hid an update's before-state.
+                const errorProps = {
+                    path,
+                    id,
+                    values: updatedValues,
+                    previousValues: previousValuesForHistory,
+                    status,
+                    error,
+                    context: contextForCallback
+                };
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterSaveError) {
                     await globalCallbacks.afterSaveError({
                         collection: resolvedCollection as unknown as CollectionConfig,
-                        path,
-                        id: id || "unknown",
-                        values: updatedValues,
-                        previousValues: undefined,
-                        status,
-                        context: contextForCallback
+                        ...errorProps
                     });
                 }
                 // 2. Collection callbacks second
                 if (callbacks?.afterSaveError) {
                     await callbacks.afterSaveError({
                         collection: resolvedCollection as CollectionConfig<M>,
-                        path,
-                        id: id || "unknown",
-                        values: updatedValues,
-                        previousValues: undefined,
-                        status,
-                        context: contextForCallback
+                        ...errorProps
                     });
                 }
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterSaveError) {
                     await propertyCallbacks.afterSaveError({
                         collection: resolvedCollection as unknown as CollectionConfig,
-                        path,
-                        id: id || "unknown",
-                        values: updatedValues,
-                        previousValues: undefined,
-                        status,
-                        context: contextForCallback
+                        ...errorProps
                     });
                 }
             }

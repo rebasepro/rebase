@@ -493,27 +493,23 @@ propertyCallbacks: undefined };
             return savedRow;
         } catch (error) {
             if (callbacks?.afterSaveError || propertyCallbacks?.afterSaveError) {
+                // `error` is the reason the hook exists; it was documented and
+                // never passed. Same fix as the Postgres driver.
+                const errorProps = {
+                    collection: resolvedCollection as CollectionConfig<M>,
+                    path,
+                    id,
+                    values: updatedValues,
+                    previousValues: undefined,
+                    status,
+                    error,
+                    context: contextForCallback
+                };
                 if (callbacks?.afterSaveError) {
-                    await callbacks.afterSaveError({
-                        collection: resolvedCollection as CollectionConfig<M>,
-                        path,
-                        id: id || "unknown",
-                        values: updatedValues,
-                        previousValues: undefined,
-                        status,
-                        context: contextForCallback
-                    });
+                    await callbacks.afterSaveError(errorProps);
                 }
                 if (propertyCallbacks?.afterSaveError) {
-                    await propertyCallbacks.afterSaveError({
-                        collection: resolvedCollection as CollectionConfig<M>,
-                        path,
-                        id: id || "unknown",
-                        values: updatedValues,
-                        previousValues: undefined,
-                        status,
-                        context: contextForCallback
-                    });
+                    await propertyCallbacks.afterSaveError(errorProps);
                 }
             }
             throw error;

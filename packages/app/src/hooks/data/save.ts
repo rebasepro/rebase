@@ -98,6 +98,7 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
                 values,
                 previousValues,
                 status,
+                error,
                 context
             });
             if (afterSaveError) afterSaveError(error);
@@ -143,6 +144,7 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
             values: valuesToSave,
             previousValues,
             status,
+            error: e,
             context
         });
         if (afterSaveError) afterSaveError(e);

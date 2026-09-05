@@ -103,6 +103,94 @@ const IGNORED_CODES = new Set([
 ]);
 
 /**
+ * Syntax diagnostics that are prose economy in a *fragment* and a real defect in
+ * a fence that stands on its own.
+ *
+ * A snippet showing one object property (`beforeSave: async ({ values }) => …`)
+ * cannot parse as a program, and 1005 / 1109 / 1128 are how the compiler says
+ * so — nothing a reader would hit. But a fence that opens `const x: T = {` and
+ * closes `});` is a complete declaration with a brace that does not match, and
+ * a reader who copies it gets a syntax error before any API is exercised. Two
+ * such fences sat in the callbacks guide, both closing an object literal as if
+ * it were a call, and both invisible because these codes were blanket-ignored.
+ */
+const DECLARATION_SYNTAX_CODES = new Set([1005, 1109, 1128]);
+
+/**
+ * The two notations docs use where code would be, and which cannot parse.
+ *
+ * `{ ... }` / `(...)` / `[ ... ]` / a trailing `...` — "your content here". A
+ * real spread is `...values`, with a name after it, so it does not match.
+ *
+ * `signUp(email, password, displayName?)` — the argument list written as a
+ * signature, with `?` marking what may be omitted.
+ */
+const ELISION_PLACEHOLDER = /(^|[\s([{,:=])\.\.\.\s*([)\]}]|,|;|$)/;
+const OPTIONAL_ARG_NOTATION = /[A-Za-z_$][\w$]*\?\s*[,)]/;
+
+/** Opens a top-level declaration or statement — the shape a whole program has. */
+const TOP_LEVEL_START = /^(import|export|declare|const|let|var|function|class|interface|type|enum|async\s+function|await\s|if\s*\(|for\s*\(|while\s*\(|try\s*\{|switch\s*\()/;
+
+/** A closing token, or the continuation of a chain — still inside the declaration. */
+const CONTINUATION = /^([)\]}]|\.|,|\?|:|&&|\|\||\+)/;
+
+/** `app.get(...)`, `foo.bar = 1` — a statement, not an object-literal property. */
+const STATEMENT_START = /^[A-Za-z_$][\w$.[\]"']*\s*(\(|=[^=>]|=>|\+\+|--)/;
+
+/**
+ * True when the fence is a whole top-level program rather than a fragment
+ * lifted out of one.
+ *
+ * Deliberately narrow, because the cost of a false positive is a docs gate that
+ * fails on well-formed prose. Two conditions, both about column zero — a line
+ * that starts there is at the fence's top level:
+ *
+ * 1. The first line of substance opens a declaration or a statement.
+ * 2. No later column-zero line is an object-literal property (`auth: {`). Those
+ *    are the giveaway that the fence continues *inside* a structure it never
+ *    opened: half a program, where an unclosed brace is the author eliding, not
+ *    a defect.
+ */
+/** Whether the line a diagnostic points at uses one of the notations above. */
+function isElisionDiagnostic(sourceFile, diagnostic) {
+    const text = sourceFile.getFullText();
+    const { line } = sourceFile.getLineAndCharacterOfPosition(diagnostic.start ?? 0);
+    // Trailing comments carry commas and ellipses of their own; strip them.
+    const lineText = (text.split("\n")[line] ?? "").replace(/\/\/.*$/, "").trim();
+    return ELISION_PLACEHOLDER.test(lineText) || OPTIONAL_ARG_NOTATION.test(lineText);
+}
+
+function isWholeDeclaration(code) {
+    let inBlockComment = false;
+    let first = true;
+    for (const raw of code.split("\n")) {
+        const line = raw.trimEnd();
+        const trimmed = line.trim();
+        if (inBlockComment) {
+            if (trimmed.includes("*/")) inBlockComment = false;
+            continue;
+        }
+        if (!trimmed || trimmed.startsWith("//")) continue;
+        if (trimmed.startsWith("/*")) {
+            if (!trimmed.includes("*/")) inBlockComment = true;
+            continue;
+        }
+        if (first) {
+            first = false;
+            if (!TOP_LEVEL_START.test(line) && !STATEMENT_START.test(line)) return false;
+            continue;
+        }
+        // Indented lines are inside whatever the first line opened.
+        if (/^\s/.test(raw)) continue;
+        if (CONTINUATION.test(line) || TOP_LEVEL_START.test(line) || STATEMENT_START.test(line)) continue;
+        // A bare `key: value` at column zero — the fence resumes inside a
+        // literal the reader is expected to supply.
+        return false;
+    }
+    return !first;
+}
+
+/**
  * Where a bare specifier resolved from, keyed by the package name a snippet
  * imports. Node and tsc must agree: `isStubbable` says "resolvable, import it
  * for real", but tsc resolves from the scratch directory under the workspace
@@ -340,7 +428,9 @@ export async function typecheckSnippets(root, opts = {}) {
     const prepared = snippets.map((s) => ({
         snippet: s,
         name: scratchName(s),
-        code: rewriteImports(s.code, root, `${s.file}:${s.line}`)
+        code: rewriteImports(s.code, root, `${s.file}:${s.line}`),
+        // Whether a brace that does not close is prose economy or a defect.
+        wholeDeclaration: isWholeDeclaration(s.code)
     }));
 
     // Stub modules for specifiers we cannot resolve. A shorthand ambient
@@ -503,7 +593,14 @@ export async function typecheckSnippets(root, opts = {}) {
             const diags = [
                 ...program.getSemanticDiagnostics(sf),
                 ...program.getSyntacticDiagnostics(sf)
-            ].filter((d) => !IGNORED_CODES.has(d.code));
+            ].filter((d) => {
+                if (!IGNORED_CODES.has(d.code)) return true;
+                if (!p.wholeDeclaration || !DECLARATION_SYNTAX_CODES.has(d.code)) return false;
+                // `properties: { ... }` is the docs' elision idiom, not a
+                // defect: the reader is meant to fill it in. It parses as a
+                // spread of nothing, which is exactly these codes.
+                return !isElisionDiagnostic(sf, d);
+            });
             byFile.set(p.name, diags);
         }
         return byFile;

@@ -128,9 +128,8 @@ const articlesCollection: PostgresCollectionConfig<Article> = {
             // Transform data after loading
             return row;
         }
-    },
-    properties: { /* ... */ }
-});
+    }
+};
 ```
 
 ## Callback Reference
@@ -226,13 +225,18 @@ Called when a save operation fails.
 ```typescript
 afterSaveError: async ({
     values,
-    id,
-    error,
+    id,             // the caller's id, or undefined for a create that never got one
+    previousValues, // the row as it was, when the save was an update
+    error,          // what the save threw
     context
 }) => {
     console.error("Save failed:", error);
 }
 ```
+
+`error` is a `RebaseApiError` when a `before*` callback or a validator refused
+the write, and the driver's error — SQLSTATE in its cause chain — when the
+database did. It is typed `unknown`, because a callback may throw anything.
 
 ### `afterRead`
 
@@ -325,7 +329,7 @@ Every callback receives a `context` object that includes `context.data` — a un
 `context.data` uses a JavaScript Proxy, so you can access any collection by its slug as a property:
 
 ```typescript
-afterSave: async ({ values, entityId, context }) => {
+afterSave: async ({ values, id, context }) => {
     // Dynamic property access — works for any collection slug
     const jobs = context.data.jobs;
     const users = context.data.users;
@@ -385,7 +389,7 @@ afterSave: async ({ values, context }) => {
 ### Creating Entities
 
 ```typescript
-afterSave: async ({ values, entityId, previousValues, context }) => {
+afterSave: async ({ values, id, previousValues, context }) => {
     // Promote an approved submission to a published job
     if (values.status === "approved" && previousValues?.status !== "approved") {
         const newJob = await context.data.jobs.create({
@@ -393,11 +397,11 @@ afterSave: async ({ values, entityId, previousValues, context }) => {
             description: values.description,
             company_id: values.company_id,
             status: "published",
-            source_submission_id: entityId,
+            source_submission_id: id,
         });
 
         // Link back to the original submission
-        await context.data["job-submissions"].update(entityId, {
+        await context.data["job-submissions"].update(id, {
             promoted_job_id: newJob.id,
         });
     }
@@ -546,9 +550,8 @@ const submissionsCollection: PostgresCollectionConfig<Submission> = {
                 });
             }
         }
-    },
-    properties: { /* ... */ }
-});
+    }
+};
 ```
 
 Other cross-collection patterns:
