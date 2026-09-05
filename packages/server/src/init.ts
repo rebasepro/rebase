@@ -41,6 +41,7 @@ import { createAdapterAuthMiddleware } from "./auth/adapter-middleware";
 import { scopeDataDriver, SERVICE_IDENTITY } from "./auth/rls-scope";
 import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
 import { errorHandler } from "./api/errors";
+import { installRootErrorHandler } from "./api/root-error-handler";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HonoEnv } from "./api/types";
@@ -1020,6 +1021,15 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             notServing: offSurfaces
         });
     }
+
+    // The JSON envelope, on the root app, before any middleware is added — so
+    // that a throw *in* a middleware is caught too. It used to live on the data
+    // and functions routers alone, so everything else (auth, storage, admin, a
+    // project's own routes) answered Hono's default `500 Internal Server Error`
+    // as `text/plain`: no `code`, and a JSON parse failure for any client that
+    // reads one. An app that already has its own handler keeps it — see
+    // `installRootErrorHandler`.
+    installRootErrorHandler(config.app);
 
     // Configure Hono middlewares (Request ID, body limit, CSRF, CORS warning, logging)
     configureMiddlewares(config.app, basePath, isProduction, config);

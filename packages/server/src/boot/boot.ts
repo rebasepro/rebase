@@ -22,6 +22,7 @@ import {
 import { initializeRebaseBackend, type RebaseBackendInstance } from "../init";
 import { loadCollectionsFromDirectory } from "../collections/loader";
 import type { HonoEnv } from "../api/types";
+import { installRootErrorHandler } from "../api/root-error-handler";
 import { describeCauseChain, logger } from "../utils/logger";
 import { serveSPA } from "../serve-spa";
 import { installShutdownHandlers } from "../init/shutdown";
@@ -267,6 +268,13 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
 
     // ── HTTP ─────────────────────────────────────────────────────────────────
     const app = new Hono<HonoEnv>();
+
+    // Before any middleware, so that a throw *in* a middleware is caught too.
+    // Without this the envelope existed only on the data and functions routers,
+    // and everything else — an auth route, a storage route, a middleware —
+    // answered Hono's default: `500 Internal Server Error` as `text/plain`,
+    // which a client parsing `error.code` cannot read at all.
+    installRootErrorHandler(app);
 
     app.use("/*", cors({
         origin: resolveCorsOrigin(env),
@@ -623,6 +631,10 @@ async function bootStaticApp(
     const metricsToken = process.env.REBASE_METRICS_TOKEN;
 
     const app = new Hono<HonoEnv>();
+
+    // The static path has fewer ways to throw and the same reason to answer in
+    // one shape when it does.
+    installRootErrorHandler(app);
 
     // Assets must be loadable from other origins (a custom domain, the console),
     // so the same cross-origin relaxation the API path makes applies here.
