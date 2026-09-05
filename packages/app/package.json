@@ -77,7 +77,8 @@
   "peerDependencies": {
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-router": "^8.3.0"
+    "react-router": "^8.3.0",
+    "typescript": "^6.0.0"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",
