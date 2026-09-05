@@ -217,6 +217,52 @@ Single entity responses return a flat object:
 }
 ```
 
+## Errors
+
+Every failure, from every route, comes back in one envelope:
+
+```json
+{
+    "error": {
+        "message": "Unknown filter operator 'contains' on field 'title'.",
+        "code": "UNKNOWN_FILTER_OPERATOR",
+        "details": { "field": "title", "operator": "contains" },
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
+    }
+}
+```
+
+`message` and `code` are always present. `details` appears when the refusal is
+*about* something — the field that was wrong, the paths that failed. `requestId`
+appears when the request carried an `X-Request-ID` header or was assigned one;
+it is echoed on the response header too, and it is the thing to quote in a bug
+report.
+
+**Branch on `code`, never on `message` or on the status alone.** Codes are
+`SCREAMING_SNAKE_CASE` and stable; messages are written for a person reading a
+console and are free to change. The HTTP status is on the response, not in the
+body.
+
+| Status | Typical code | Means |
+|--------|--------------|-------|
+| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT` | The request is malformed or asks for something impossible |
+| 401 | `UNAUTHORIZED` | No credential, or one that identifies nobody |
+| 403 | `FORBIDDEN`, `DB_PERMISSION_DENIED` | A credential that identifies somebody without the right |
+| 404 | `NOT_FOUND` | The thing addressed does not exist |
+| 409 | `CONFLICT` | The state conflicts — a duplicate key, a dirty tree |
+| 501 | varies | The surface exists but is **not configured** on this deployment |
+| 503 | `SERVICE_UNAVAILABLE` | A dependency is down; the request never reached it |
+
+A surface that is absent because this deployment did not enable it answers 501
+with a code and a reason, not 404 — an unexplained 404 on a route the UI just
+called reads as a broken deploy.
+
+Routes add their own more specific codes on top of these (`EMAIL_EXISTS`,
+`TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), so treat the list of codes as
+open. The client SDK turns all of them into a single `RebaseApiError` carrying
+`status`, `code` and `details` — see
+[Error handling](/docs/backend#error-handling).
+
 ## Text Search
 
 Use `searchString` for full-text search across string fields:

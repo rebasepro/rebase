@@ -37,8 +37,12 @@ surface, and the only way to know was to read `init.ts`.
 One envelope, everywhere:
 
 ```json
-{ "error": { "code": "SCHEMA_CHANGE_UNAPPLICABLE", "message": "…", "details": {} } }
+{ "error": { "code": "SCHEMA_CHANGE_UNAPPLICABLE", "message": "…", "details": {}, "requestId": "…" } }
 ```
+
+Four fields, and no others. In particular there is **no `status`** in the body:
+the status is on the response. A sample that shows one teaches callers to read
+it from the wrong place, and the two can then disagree.
 
 - `code` is `SCREAMING_SNAKE_CASE` and stable. It is what client code branches
   on, so treat it as part of the contract — see `docs/bug-classes.md` on
@@ -49,6 +53,9 @@ One envelope, everywhere:
 - `details` is optional and structured. Where a refusal is *about* something —
   a list of changes, a set of failing paths — it goes here rather than being
   formatted into `message`.
+- `requestId` is optional and added by `errorHandler`, not by routes. It echoes
+  the request's `X-Request-ID` when there is one, and is what a bug report
+  quotes to find the server-side line.
 
 Throw `ApiError` and let `errorHandler` format it. Do not build error bodies by
 hand; a route that writes its own `c.json({ error: … }, 4xx)` is one that will

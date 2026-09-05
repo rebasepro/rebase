@@ -261,4 +261,42 @@ describe("Error Handler (Hono)", () => {
             expect(body.error).toHaveProperty("code");
         }
     });
+
+    /**
+     * The envelope is a published contract, and the docs had been publishing a
+     * different one — `{ message, code, status }` with kebab-case codes like
+     * `"not-found"`. A reader who branched on either got code that never fired.
+     *
+     * `status` in particular must stay out of the body: it is on the response,
+     * and a second copy is a field that can disagree with it. These two assert
+     * the shape itself rather than the prose that describes it.
+     */
+    describe("the envelope is exactly four fields", () => {
+        const paths = [
+            "/bad-request", "/unauthorized", "/forbidden", "/not-found",
+            "/conflict", "/internal", "/service-unavailable", "/generic-error",
+            "/error-with-code"
+        ];
+
+        it("carries no key outside message / code / details / requestId", async () => {
+            const app = createApp();
+            for (const path of paths) {
+                const body = await (await app.request(path)).json() as { error: Record<string, unknown> };
+                expect(Object.keys(body)).toEqual(["error"]);
+                for (const key of Object.keys(body.error)) {
+                    expect(["message", "code", "details", "requestId"]).toContain(key);
+                }
+                expect(body.error).not.toHaveProperty("status");
+                expect(body.error).not.toHaveProperty("statusCode");
+            }
+        });
+
+        it("spells every code SCREAMING_SNAKE_CASE", async () => {
+            const app = createApp();
+            for (const path of paths) {
+                const body = await (await app.request(path)).json() as { error: { code: string } };
+                expect(body.error.code).toMatch(/^[A-Z][A-Z0-9_]*$/);
+            }
+        });
+    });
 });

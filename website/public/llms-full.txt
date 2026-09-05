@@ -4470,8 +4470,7 @@ If the database is unreachable during boot (e.g., PostgreSQL is starting or netw
   {
     "error": {
       "message": "Database connection is not ready.",
-      "code": "service-unavailable",
-      "status": 503
+      "code": "SERVICE_UNAVAILABLE"
     }
   }
   ```
@@ -4574,14 +4573,38 @@ The backend uses PostgreSQL `LISTEN/NOTIFY` internally. For multi-instance deplo
 
 ### Error Handling
 
-The backend includes an error handler that catches all exceptions and returns structured error responses:
+Every failure — from any route, in any subsystem — comes back in one envelope:
 
 ```json
 {
     "error": {
         "message": "Entity not found",
-        "code": "not-found",
-        "status": 404
+        "code": "NOT_FOUND",
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
+    }
+}
+```
+
+| Field | Always present | What it is |
+|-------|:--------------:|------------|
+| `message` | yes | Written for a person reading a console. Names the obstacle, not the rule. |
+| `code` | yes | `SCREAMING_SNAKE_CASE` and stable. This is the field to branch on. |
+| `details` | no | Structured payload when the refusal is *about* something — a list of failing paths, a set of unknown fields. |
+| `requestId` | no | Present when the request carried or was assigned one; echoes `X-Request-ID`. Quote it in a bug report. |
+
+The HTTP status is on the response, not in the body. Branch on `code`, not on
+`message` — messages are written for humans and are free to change.
+
+The client SDK turns every one of these into a `RebaseApiError` carrying
+`status`, `code` and `details`, so application code catches one class:
+
+```typescript
+async function setPrice(id: string, price: number) {
+    try {
+        return await client.data.products.update(id, { price });
+    } catch (e) {
+        if (e instanceof RebaseApiError && e.code === "NOT_FOUND") return null;
+        throw e;
     }
 }
 ```
@@ -4812,6 +4835,52 @@ Single entity responses return a flat object:
     "createdAt": "2026-01-15T10:30:00Z"
 }
 ```
+
+### Errors
+
+Every failure, from every route, comes back in one envelope:
+
+```json
+{
+    "error": {
+        "message": "Unknown filter operator 'contains' on field 'title'.",
+        "code": "UNKNOWN_FILTER_OPERATOR",
+        "details": { "field": "title", "operator": "contains" },
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
+    }
+}
+```
+
+`message` and `code` are always present. `details` appears when the refusal is
+*about* something — the field that was wrong, the paths that failed. `requestId`
+appears when the request carried an `X-Request-ID` header or was assigned one;
+it is echoed on the response header too, and it is the thing to quote in a bug
+report.
+
+**Branch on `code`, never on `message` or on the status alone.** Codes are
+`SCREAMING_SNAKE_CASE` and stable; messages are written for a person reading a
+console and are free to change. The HTTP status is on the response, not in the
+body.
+
+| Status | Typical code | Means |
+|--------|--------------|-------|
+| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT` | The request is malformed or asks for something impossible |
+| 401 | `UNAUTHORIZED` | No credential, or one that identifies nobody |
+| 403 | `FORBIDDEN`, `DB_PERMISSION_DENIED` | A credential that identifies somebody without the right |
+| 404 | `NOT_FOUND` | The thing addressed does not exist |
+| 409 | `CONFLICT` | The state conflicts — a duplicate key, a dirty tree |
+| 501 | varies | The surface exists but is **not configured** on this deployment |
+| 503 | `SERVICE_UNAVAILABLE` | A dependency is down; the request never reached it |
+
+A surface that is absent because this deployment did not enable it answers 501
+with a code and a reason, not 404 — an unexplained 404 on a route the UI just
+called reads as a broken deploy.
+
+Routes add their own more specific codes on top of these (`EMAIL_EXISTS`,
+`TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), so treat the list of codes as
+open. The client SDK turns all of them into a single `RebaseApiError` carrying
+`status`, `code` and `details` — see
+[Error handling](/docs/backend#error-handling).
 
 ### Text Search
 

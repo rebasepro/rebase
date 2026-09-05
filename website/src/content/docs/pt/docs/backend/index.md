@@ -159,11 +159,21 @@ O backend inclui um manipulador de erros que captura todas as exceções e retor
 {
     "error": {
         "message": "Entity not found",
-        "code": "not-found",
-        "status": 404
+        "code": "NOT_FOUND",
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
     }
 }
 ```
+
+| Campo | Sempre presente | O que é |
+|-------|:---------------:|---------|
+| `message` | sim | Escrito para a pessoa que o lê numa consola. Nomeia o obstáculo, não a regra. |
+| `code` | sim | `SCREAMING_SNAKE_CASE` e estável. É o campo sobre o qual ramificar. |
+| `details` | não | Carga estruturada quando a recusa é *sobre* alguma coisa — uma lista de caminhos falhados, um conjunto de campos desconhecidos. |
+| `requestId` | não | Presente quando o pedido trazia um ou lhe foi atribuído; reflete `X-Request-ID`. Cite-o num relatório de erro. |
+
+O estado HTTP está na resposta, não no corpo. Ramifique sobre `code`, não sobre
+`message` — as mensagens são escritas para pessoas e podem mudar.
 
 Se a inicialização falhar (por exemplo, erro de conexão à base de dados), o servidor ainda inicia, mas retorna 503 para todos os pedidos da API, com uma mensagem de erro descritiva nos logs.
 

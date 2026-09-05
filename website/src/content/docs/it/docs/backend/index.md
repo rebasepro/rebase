@@ -159,11 +159,21 @@ Il backend include un gestore degli errori che cattura tutte le eccezioni e rest
 {
     "error": {
         "message": "Entity not found",
-        "code": "not-found",
-        "status": 404
+        "code": "NOT_FOUND",
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
     }
 }
 ```
+
+| Campo | Sempre presente | Che cos'è |
+|-------|:---------------:|-----------|
+| `message` | sì | Scritto per la persona che lo leggerà in una console. Nomina l'ostacolo, non la regola. |
+| `code` | sì | `SCREAMING_SNAKE_CASE` e stabile. È il campo su cui ramificare. |
+| `details` | no | Payload strutturato quando il rifiuto riguarda *qualcosa* — un elenco di percorsi falliti, un insieme di campi sconosciuti. |
+| `requestId` | no | Presente quando la richiesta ne portava uno o gliene è stato assegnato uno; riflette `X-Request-ID`. Citalo in una segnalazione. |
+
+Lo stato HTTP sta nella risposta, non nel corpo. Ramifica su `code`, non su
+`message` — i messaggi sono scritti per le persone e possono cambiare.
 
 Se l'inizializzazione fallisce (ad esempio, errore di connessione al database), il server si avvia comunque ma restituisce 503 per tutte le richieste API, con un messaggio di errore descrittivo nei log.
 
