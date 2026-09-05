@@ -505,6 +505,8 @@ export const de = {
   "pricing.cloud.feat2": "Deployen über die CLI, zurückrollen in der Konsole",
   "pricing.cloud.feat3": "Du legst die Ressourcen fest, die Rechnung folgt ihnen",
   "pricing.cloud.feat4": "Derselbe Code läuft self-hosted — ein Wechsel ist ein Redeploy",
+  "pricing.cloud.billingNote":
+    "Für das erste Deployment braucht die Organisation eine hinterlegte Zahlungsmethode. Einmal hinterlegen — rebase cloud billing setup — und zwar vor dem Deployment.",
   "pricing.ent.name": "Enterprise",
   "pricing.ent.price": "Individuell",
   "pricing.ent.priceNote": "Sprich mit uns über deine Anforderungen",

@@ -732,6 +732,113 @@ async function readDeployContext(
     }
 }
 
+/* ─── billing, asked before the build rather than after the upload ─────────── */
+
+/**
+ * What the billing pre-check managed to learn about the organization paying for
+ * this project. `null` means "could not tell", and is never a refusal.
+ */
+export interface BillingState {
+    /** The billing account's plan, or null when the row could not be read. */
+    plan: string | null;
+    /** Whether the control plane reports a card on file, or null when it could not be asked. */
+    hasPaymentMethod: boolean | null;
+    /** The control plane has no Stripe configured — a local or staging control plane. */
+    simulated: boolean;
+}
+
+/**
+ * Whether a deploy should be refused here, before anything is built or uploaded.
+ *
+ * The server's gate (`ensureProjectComputeBilling`) is the authority and stays
+ * the authority; this only moves the same refusal earlier in the sequence. A
+ * managed deploy type-checks, builds a bundle, packs it and uploads it before it
+ * triggers anything, so a 402 arrived after several minutes of work whose only
+ * outcome was a discarded tarball.
+ *
+ * One direction only. A positive "no card" refuses; every other answer proceeds,
+ * including every answer we could not obtain. That asymmetry is the whole design:
+ * a pre-check that guesses wrong in the refusing direction blocks a deploy the
+ * platform would have accepted, and there are two states this client cannot see —
+ * an internal billing account (skipped server-side) and `REBASE_BYO_FREE` — so
+ * "unknown" has to mean "carry on and let the server decide".
+ */
+export function billingBlocksDeploy(state: BillingState): boolean {
+    // No Stripe behind the control plane: `hasPaymentMethod` is inferred from a
+    // simulated setup, and a false there is not a card that is missing.
+    if (state.simulated) return false;
+    // Platform-internal projects skip billing entirely, server-side.
+    if (state.plan === "internal") return false;
+    return state.hasPaymentMethod === false;
+}
+
+/**
+ * Ask the control plane whether the organization behind this project has a card.
+ *
+ * Best-effort throughout, for the reason above: every failure resolves to a
+ * state that {@link billingBlocksDeploy} lets through.
+ */
+export async function readBillingState(client: CloudClient, projectId: string): Promise<BillingState> {
+    const unknown: BillingState = { plan: null,
+hasPaymentMethod: null,
+simulated: false };
+    try {
+        const project = (await client.data.collection("projects").findById(projectId)) as
+            | Record<string, unknown>
+            | undefined;
+        const orgRaw = project?.organization ?? project?.organizationId ?? project?.organization_id;
+        const org = orgRaw == null ? "" : String(orgRaw);
+        if (!org) return unknown;
+
+        const card = await client.functions
+            .invoke<{ hasPaymentMethod?: boolean; simulated?: boolean }>(
+                "stripe-billing",
+                undefined,
+                { method: "GET",
+path: `payment-method/${encodeURIComponent(org)}` }
+            )
+            .catch(() => undefined);
+        if (!card) return unknown;
+
+        // The plan lives on the billing account, and an org that has none has no
+        // plan to read — which is not "internal", so it does not exempt anything.
+        let plan: string | null = null;
+        try {
+            const orgRow = (await client.data.collection("organizations").findById(org)) as
+                | { billing_account_id?: string | number; billingAccount?: string | number }
+                | undefined;
+            const billingId = orgRow?.billing_account_id ?? orgRow?.billingAccount;
+            if (billingId != null) {
+                const acct = (await client.data.collection("billing-accounts").findById(billingId)) as
+                    | { plan?: string }
+                    | undefined;
+                plan = typeof acct?.plan === "string" ? acct.plan : null;
+            }
+        } catch {
+            // Unreadable: `plan: null`, which exempts nothing and refuses nothing
+            // on its own.
+        }
+
+        return {
+            plan,
+            hasPaymentMethod: typeof card.hasPaymentMethod === "boolean" ? card.hasPaymentMethod : null,
+            simulated: card.simulated === true
+        };
+    } catch {
+        return unknown;
+    }
+}
+
+/** Refuse a deploy the control plane would 402, before the build starts. */
+async function requirePaymentMethod(client: CloudClient, projectId: string): Promise<void> {
+    if (!billingBlocksDeploy(await readBillingState(client, projectId))) return;
+    fail(
+        "This project's organization has no payment method on file, so the deploy would be refused.",
+        "Attach a card once with `rebase cloud billing setup`, then deploy again.",
+        "payment_required"
+    );
+}
+
 /**
  * Whether this repository's backend declares the managed runtime.
  *
@@ -854,6 +961,12 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
 
     const { client, url } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
+
+    // Before the build, not after the upload. The managed path type-checks,
+    // builds, packs and uploads a bundle before it triggers anything, so a
+    // billing 402 used to arrive at the end of all of it — with nothing to show
+    // for the wait but a discarded tarball.
+    await requirePaymentMethod(client, projectId);
 
     // Managed bundle deploy. Builds the project into a bundle, uploads it, and
     // lets the control plane run the platform runtime with it.

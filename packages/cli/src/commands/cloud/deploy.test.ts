@@ -19,6 +19,7 @@ import {
     warningPayload,
     ejectWarning,
     resolveDeployTimeout,
+    billingBlocksDeploy,
     EJECTS_MANAGED_RUNTIME
 } from "./deploy";
 import { warn, setJsonModeForTest } from "./context";
@@ -307,5 +308,50 @@ describe("resolveDeployTimeout", () => {
         }) as never);
         expect(() => resolveDeployTimeout(value)).toThrow("__exit__");
         exit.mockRestore();
+    });
+});
+
+/**
+ * The billing pre-check, which only ever refuses in one direction.
+ *
+ * The 402 used to land after a completed upload: the managed path builds, packs
+ * and uploads before it triggers anything, so "no card on file" arrived at the
+ * end of several minutes whose only product was a discarded tarball. Moving the
+ * question earlier is only safe if the client refuses exactly when it is sure —
+ * an internal billing account and `REBASE_BYO_FREE` are both server-side skips
+ * this client cannot see, so every unknown has to proceed and let the server
+ * decide.
+ */
+describe("billingBlocksDeploy", () => {
+    it("refuses when the control plane says there is no card", () => {
+        expect(billingBlocksDeploy({ plan: "standard",
+hasPaymentMethod: false,
+simulated: false })).toBe(true);
+    });
+
+    it("lets a card on file through", () => {
+        expect(billingBlocksDeploy({ plan: "standard",
+hasPaymentMethod: true,
+simulated: false })).toBe(false);
+    });
+
+    it("never refuses on an answer it could not get", () => {
+        expect(billingBlocksDeploy({ plan: null,
+hasPaymentMethod: null,
+simulated: false })).toBe(false);
+    });
+
+    it("exempts a control plane with no Stripe behind it", () => {
+        // `hasPaymentMethod: false` there is inferred from a simulated setup,
+        // not from a customer that has no card.
+        expect(billingBlocksDeploy({ plan: null,
+hasPaymentMethod: false,
+simulated: true })).toBe(false);
+    });
+
+    it("exempts an internal billing account, which the server skips entirely", () => {
+        expect(billingBlocksDeploy({ plan: "internal",
+hasPaymentMethod: false,
+simulated: false })).toBe(false);
     });
 });
