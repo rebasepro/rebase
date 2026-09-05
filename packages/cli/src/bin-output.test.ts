@@ -32,6 +32,9 @@ const binPath = path.resolve(
 );
 
 /** ANSI CSI sequences — what a pipe must never receive. */
+// The ESC byte is the subject here: this regex exists to prove none of it
+// reaches a pipe, so no-control-regex has nothing to say about it.
+// eslint-disable-next-line no-control-regex
 const ESCAPES = /\[[0-9;]*m/;
 
 async function runCli(args: string[], env: NodeJS.ProcessEnv = {}, cwd = path.dirname(binPath)) {

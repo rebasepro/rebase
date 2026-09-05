@@ -22,8 +22,11 @@ describe("the Logs Explorer ring", () => {
 
     beforeEach(() => {
         detach = teeLoggerIntoLogBuffer();
-        // Drain, so a previous suite's lines cannot be mistaken for this one's.
-        logBuffer.query({ limit: 10_000 }).entries.length;
+        // Nothing drains the ring — `LogRingBuffer` has no clear() — and this
+        // used to pretend otherwise with a `query(...).entries.length` whose
+        // value went nowhere. It is not needed: every assertion below reads
+        // `latest(n)`, the newest entries first, so a previous suite's lines are
+        // behind the ones under test rather than mixed in with them.
     });
 
     afterEach(() => {

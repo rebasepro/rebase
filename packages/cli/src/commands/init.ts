@@ -601,7 +601,7 @@ async function createProject(options: InitOptions) {
     // The template has to spell one of them, and `npm run build --workspace
     // frontend` in a pnpm project is a second package manager reading a
     // lockfile it did not write.
-    await useProjectPackageManagerInManifest(options.targetDirectory, options.pmCommands);
+    await writeProjectPackageManagerIntoManifest(options.targetDirectory, options.pmCommands);
 
     // Create the repository now, but commit at the very end — see
     // commitScaffold below for why the two halves are separated.
@@ -873,7 +873,7 @@ force: true });
  * write — `rebase build` then either installs a second tree or fails on a
  * workspace flag npm and pnpm spell differently.
  */
-async function useProjectPackageManagerInManifest(
+async function writeProjectPackageManagerIntoManifest(
     targetDirectory: string,
     pmCommands: PMCommands
 ): Promise<void> {
