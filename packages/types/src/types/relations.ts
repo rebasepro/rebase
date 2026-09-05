@@ -39,7 +39,32 @@ export interface RelationBase {
     /** The collection on the other end. */
     target: () => AnyCollectionConfig;
 
+    /**
+     * What the database does to this side's foreign key when the target row's
+     * key changes. Emitted as the constraint's `ON UPDATE`.
+     *
+     * Unset means no clause, which Postgres reads as `NO ACTION`. Set
+     * `"cascade"` when the target's key is a natural key that can be edited —
+     * a slug, a SKU — so the pointers follow it.
+     *
+     * Only a `belongsTo` puts the key on this table, so this is the only kind
+     * where the clause is written here; on the other kinds it describes the
+     * constraint the target's own column carries.
+     */
     onUpdate?: OnAction;
+    /**
+     * What the database does to this side's rows when the target row is
+     * deleted. Emitted as the constraint's `ON DELETE`.
+     *
+     * Defaults, when unset, to `"set null"` for an optional relation and
+     * **`"restrict"`** for a required one. `NOT NULL` says a child cannot exist
+     * without a parent; it does not say deleting the parent should delete the
+     * child. Ask for `"cascade"` when that is what you mean — it is the one
+     * value that destroys rows you did not name.
+     *
+     * A `manyToMany` is the exception: its junction rows default to
+     * `"cascade"`, because the row deleted there is the link and not the target.
+     */
     onDelete?: OnAction;
 
     /** Presentation overrides applied when this relation is rendered as a tab. */

@@ -11,6 +11,31 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Breaking
+
+- **A required `belongsTo` no longer defaults to `ON DELETE CASCADE`. It is
+  `RESTRICT`.** `validation: { required: true }` on a relation says the child
+  cannot exist without a parent. It does not say that deleting the parent should
+  delete the child — but that is what the generator inferred, so `onDelete`, a
+  field nobody has to write, quietly turned every `DELETE FROM authors` into a
+  cascade through posts, their comments, and anything hanging off those. The
+  default is now `RESTRICT`: the delete fails and names the constraint, and
+  `onDelete: "cascade"` is something an author asks for on purpose. Optional
+  relations are unchanged (`SET NULL`), and a `manyToMany` junction is unchanged
+  (`CASCADE` — the row it deletes is the link, not the target).
+
+  **This is a DDL change for existing projects.** The next `db push` will plan a
+  constraint rewrite (`DROP CONSTRAINT` / `ADD CONSTRAINT`) for every required
+  relation that never named an `onDelete`, and after it those parent deletes
+  start failing where they used to cascade. To keep the old behaviour, write it
+  down: `onDelete: "cascade"` on the relation. Review the plan before applying
+  it — `db push` prints the statements.
+
+  All three generators moved together (the `CREATE TABLE` DDL, the desired state
+  boot-ensure diffs the live database against, and the generated Drizzle schema),
+  so the default cannot differ between them and make every boot plan the same
+  rewrite forever.
+
 ### Added
 
 - **`rebase status` — what this project declares, and whether it is configured.**

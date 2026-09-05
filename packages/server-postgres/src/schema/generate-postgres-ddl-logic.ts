@@ -86,6 +86,30 @@ type ResolveCollection = (slug: string) => CollectionConfig | undefined;
  */
 const statementsToDdl = (statements: string[]): string => statements.map(s => `${s}\n`).join("");
 
+/**
+ * The `ON DELETE` a `belongsTo` foreign key gets when the author did not say.
+ *
+ * An optional link is `SET NULL`: the column can hold NULL, so dropping the
+ * parent leaves the child row with an empty pointer, which is what "optional"
+ * already means.
+ *
+ * A required link is **`RESTRICT`**, not `CASCADE`. `NOT NULL` says the child
+ * cannot exist without a parent; it does not say deleting the parent should
+ * take the child with it. That second claim is a data-retention decision, and
+ * defaulting to it meant `onDelete` — a field nobody has to write — silently
+ * turned every `DELETE FROM authors` into a cascade through posts, comments and
+ * anything else that hung off them. `RESTRICT` fails the delete instead and
+ * names the constraint, so the author chooses `cascade` on purpose or clears
+ * the children first.
+ *
+ * Both DDL paths — the `CREATE TABLE` generator and {@link planRelationalColumns},
+ * which boot-ensure compares the live database against — call this, so a
+ * default that appears in one and not the other cannot make `db push` plan a
+ * constraint rewrite on every run.
+ */
+export const defaultBelongsToOnDelete = (required: boolean | undefined): "RESTRICT" | "SET NULL" =>
+    required ? "RESTRICT" : "SET NULL";
+
 const generatePolicyDdl = (collection: CollectionConfig, rule: SecurityRule, resolveCollection: ResolveCollection): string =>
     statementsToDdl(generatePolicyStatements(collection, rule, resolveCollection));
 
@@ -726,7 +750,7 @@ export const generatePostgresDdl = async (
                     
                     const onUpdate = relInfo.onUpdate ? ` ON UPDATE ${relInfo.onUpdate.toUpperCase()}` : "";
                     const required = prop.validation?.required;
-                    const onDeleteVal = relInfo.onDelete ?? (required ? "CASCADE" : "SET NULL");
+                    const onDeleteVal = relInfo.onDelete ?? defaultBelongsToOnDelete(required);
                     
                     let colDef = `  "${relInfo.localKey}" ${fkColType}`;
                     if (required) colDef += " NOT NULL";
@@ -1081,7 +1105,7 @@ export const planRelationalColumns = (allCollections: CollectionConfig[]): Relat
                         targetSchema: schemaOfCollection(targetCollection),
                         targetTable: bareTableName(getTableName(targetCollection)),
                         targetColumn: getPrimaryKeyName(targetCollection),
-                        onDelete: relInfo.onDelete ?? (required ? "CASCADE" : "SET NULL"),
+                        onDelete: relInfo.onDelete ?? defaultBelongsToOnDelete(required),
                         onUpdate: relInfo.onUpdate
                     })
                 });

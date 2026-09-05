@@ -1,6 +1,7 @@
 import { CollectionConfig, NumberProperty, Property, ResolvedRelation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty, isManyToMany, type ResolvedManyToMany, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, hasForeignKeyOnTarget } from "@rebasepro/types";
 import { getPrimaryKeys } from "../services/collection-helpers";
 import { buildSearchColumnSpec } from "./search-column";
+import { defaultBelongsToOnDelete } from "./generate-postgres-ddl-logic";
 import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, fieldKeyForColumn, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig, resolveStringColumnLength, relationalCollections, sortCollectionsBySlug } from "@rebasepro/common";
 import { toSnakeCase, getPolicyNamesForRule } from "@rebasepro/utils";
 import { logger } from "@rebasepro/server";
@@ -317,7 +318,11 @@ export const getDrizzleColumn = (propName: string, prop: Property, collection: C
 
             const onUpdate = relation.onUpdate ? `onUpdate: "${relation.onUpdate}"` : "";
             const required = prop.validation?.required;
-            const onDeleteVal = relation.onDelete ?? (required ? "cascade" : "set null");
+            // Same default as the DDL generator, lowercased for Drizzle's
+            // option literal. The two files describe the same constraint; a
+            // default that differs between them makes `db push` plan a rewrite
+            // of every required foreign key on every run.
+            const onDeleteVal = relation.onDelete ?? defaultBelongsToOnDelete(required).toLowerCase();
             const onDelete = `onDelete: \"${onDeleteVal}\"`;
 
             const refOptionsParts = [onUpdate, onDelete].filter(Boolean);

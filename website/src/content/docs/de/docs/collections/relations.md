@@ -225,6 +225,38 @@ relations: [
 | `"set null"` | Die FK-Spalte auf NULL setzen |
 | `"set default"` | Die FK-Spalte auf ihren Standardwert setzen |
 
+### Was gilt, wenn Sie nichts angeben
+
+`onDelete` ist optional, daher benennen die meisten Beziehungen nie eines. Der
+Standardwert hängt davon ab, ob die Beziehung erforderlich ist:
+
+| Beziehung | Standard-`onDelete` |
+|--------|----------|
+| `belongsTo`, optional | `"set null"` — der Zeiger wird geleert |
+| `belongsTo`, `validation: { required: true }` | `"restrict"` — das Löschen des Elternteils schlägt fehl |
+| `manyToMany` (Verknüpfungszeilen) | `"cascade"` — die Verknüpfung geht, die Zielzeile bleibt |
+
+Eine erforderliche Beziehung ist **keine** Kaskade. `required` sagt, dass ein
+Kind ohne Elternteil nicht existieren kann; es sagt nicht, dass das Löschen des
+Elternteils das Kind zerstören soll. Das sind verschiedene Aussagen, und nur eine
+davon entfernt Zeilen, die Sie nicht benannt haben. Deshalb lässt der
+Standardwert das Löschen fehlschlagen und nennt die Beschränkung, und `"cascade"`
+ist etwas, worum Sie ausdrücklich bitten:
+
+```typescript
+{
+    kind: "belongsTo",
+    relationName: "order",
+    target: () => ordersCollection,
+    // Eine Bestellposition ist ohne ihre Bestellung sinnlos — sagen Sie es.
+    onDelete: "cascade"
+}
+```
+
+`onUpdate` hat keinen Standardwert: ohne Angabe wendet Postgres `NO ACTION` an.
+Setzen Sie `"cascade"`, wenn der Schlüssel des Ziels etwas ist, das eine Person
+bearbeiten kann — ein Slug, eine SKU — damit die Zeiger ihm folgen.
+
 ## Beziehungen im SDK abrufen
 
 Beim Abfragen von Daten über das Rebase Client SDK sind Beziehungen standardmäßig **nicht** enthalten. Verwenden Sie die Methode `include()`, um verwandte Entitäten zusammen mit den primären Daten anzufordern.

@@ -225,6 +225,39 @@ relations: [
 | `"set null"` | Imposta la colonna FK a NULL |
 | `"set default"` | Imposta la colonna FK al suo valore predefinito |
 
+### Cosa ottieni se non dici nulla
+
+`onDelete` è opzionale, quindi la maggior parte delle relazioni non lo nomina
+mai. Il valore predefinito dipende dal fatto che la relazione sia obbligatoria:
+
+| Relazione | `onDelete` predefinito |
+|--------|----------|
+| `belongsTo`, opzionale | `"set null"` — il puntatore viene svuotato |
+| `belongsTo`, `validation: { required: true }` | `"restrict"` — l'eliminazione del padre fallisce |
+| `manyToMany` (righe di giunzione) | `"cascade"` — sparisce il collegamento, la riga di destinazione resta |
+
+Una relazione obbligatoria **non** è una cascata. `required` dice che un figlio
+non può esistere senza un padre; non dice che eliminare il padre debba
+distruggere il figlio. Sono affermazioni diverse, e solo una delle due rimuove
+righe che non hai nominato. Per questo il valore predefinito fa fallire
+l'eliminazione e nomina il vincolo, e `"cascade"` è qualcosa che chiedi
+esplicitamente:
+
+```typescript
+{
+    kind: "belongsTo",
+    relationName: "order",
+    target: () => ordersCollection,
+    // Una riga d'ordine non ha senso senza il suo ordine: dillo.
+    onDelete: "cascade"
+}
+```
+
+`onUpdate` non ha un valore predefinito: senza nulla di impostato, Postgres
+applica `NO ACTION`. Usa `"cascade"` quando la chiave della destinazione è
+qualcosa che una persona può modificare — uno slug, uno SKU — così che i
+puntatori la seguano.
+
 ## Recupero delle Relazioni nell'SDK
 
 Quando si interrogano i dati tramite l'SDK Rebase Client, le relazioni **non** sono incluse di default. Usa il metodo `include()` per richiedere le entità correlate insieme ai dati primari.

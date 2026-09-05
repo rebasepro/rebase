@@ -225,6 +225,37 @@ relations: [
 | `"set null"` | Define a coluna FK como NULL |
 | `"set default"` | Define a coluna FK para seu valor padrão |
 
+### O que você obtém se não disser nada
+
+`onDelete` é opcional, então a maioria das relações nunca nomeia um. O padrão
+depende de a relação ser obrigatória:
+
+| Relação | `onDelete` padrão |
+|--------|----------|
+| `belongsTo`, opcional | `"set null"` — o ponteiro é esvaziado |
+| `belongsTo`, `validation: { required: true }` | `"restrict"` — a exclusão do pai falha |
+| `manyToMany` (linhas de junção) | `"cascade"` — o vínculo vai, a linha de destino fica |
+
+Uma relação obrigatória **não** é uma cascata. `required` diz que um filho não
+pode existir sem um pai; não diz que excluir o pai deva destruir o filho. São
+afirmações diferentes, e apenas uma delas remove linhas que você não nomeou. Por
+isso o padrão faz a exclusão falhar e nomeia a restrição, e `"cascade"` é algo
+que você pede de propósito:
+
+```typescript
+{
+    kind: "belongsTo",
+    relationName: "order",
+    target: () => ordersCollection,
+    // Um item de pedido não faz sentido sem o seu pedido — diga isso.
+    onDelete: "cascade"
+}
+```
+
+`onUpdate` não tem padrão: sem nada definido, o Postgres aplica `NO ACTION`.
+Defina `"cascade"` quando a chave do destino for algo que uma pessoa pode editar
+— um slug, um SKU — para que os ponteiros a acompanhem.
+
 ## Buscando Relações no SDK
 
 Ao consultar dados através do Rebase Client SDK, as relações **não** são incluídas por padrão. Use o método `include()` para solicitar entidades relacionadas juntamente com os dados primários.
