@@ -29,6 +29,8 @@ import {
     warn,
     reportError,
     resolveTimeoutMs,
+    fetchTenantBaseDomain,
+    projectHost,
     type CloudClient
 } from "./context";
 import { latestDeployment, fmtDate } from "./projects";
@@ -448,8 +450,12 @@ following: false }
         console.log("");
     }
 
-    const status = await streamBuildLogs(client, deploymentId, { quiet: isJsonMode(),
-timeoutMs: opts.timeoutMs });
+    const status = await streamBuildLogs(client, deploymentId, {
+        quiet: isJsonMode(),
+        timeoutMs: opts.timeoutMs,
+        projectId,
+        url
+    });
     emit(() => {}, { success: true,
 deploymentId,
 managed,
@@ -1117,7 +1123,9 @@ following: false,
     // one object printed at the end carries the outcome.
     const status = await streamBuildLogs(client, deploymentId, {
         quiet: isJsonMode(),
-        timeoutMs: resolveDeployTimeout(args["--timeout"])
+        timeoutMs: resolveDeployTimeout(args["--timeout"]),
+        projectId,
+        url
     });
     emit(
         () => {},
@@ -1214,10 +1222,35 @@ deduplicated: true };
  * `quiet` follows without printing — JSON mode, where the log stream would
  * corrupt the one object the caller is parsing.
  */
+/**
+ * The host a project answers on — the same one `cloud status` prints, resolved
+ * the same way, so the two commands cannot disagree about where the app is.
+ *
+ * `undefined` on any failure: the control plane may not report a base domain,
+ * and a deploy that just succeeded must not be reported as anything else
+ * because a cosmetic lookup did not.
+ */
+export async function deployedUrl(
+    client: CloudClient,
+    opts: { projectId?: string; url?: string }
+): Promise<string | undefined> {
+    if (!opts.projectId || !opts.url) return undefined;
+    try {
+        const [project, baseDomain] = await Promise.all([
+            client.data.collection("projects").findById(opts.projectId),
+            fetchTenantBaseDomain(client, opts.url)
+        ]);
+        if (!project) return undefined;
+        return projectHost(project as { subdomain?: string; host?: string }, baseDomain);
+    } catch {
+        return undefined;
+    }
+}
+
 async function streamBuildLogs(
     client: CloudClient,
     deploymentId: string,
-    opts: { quiet?: boolean; timeoutMs?: number } = {}
+    opts: { quiet?: boolean; timeoutMs?: number; projectId?: string; url?: string } = {}
 ): Promise<string> {
     const quiet = opts.quiet === true;
     const timeoutMs = opts.timeoutMs ?? POLL_TIMEOUT_MS;
@@ -1263,6 +1296,16 @@ async function streamBuildLogs(
             if (!quiet) {
                 console.log("");
                 console.log(chalk.bold.green("  ✓ Deployment succeeded"));
+                // The URL. A deploy that says only "succeeded" leaves the one
+                // thing the whole command was for — the address the app now
+                // answers on — to a second command (`cloud status`), and the
+                // person who just watched a build finish has to go and ask.
+                //
+                // Best-effort and silent when it cannot be resolved: a URL is
+                // not worth failing a successful deploy over, and a fabricated
+                // host is worse than none.
+                const url = await deployedUrl(client, opts);
+                if (url) console.log(`  ${chalk.cyan(`https://${url}`)}`);
                 console.log("");
             }
             return dep.status;
@@ -1289,7 +1332,7 @@ export async function logsCommand(rawArgs: string[], projectRef: string): Promis
         { argv: rawArgs.slice(2),
 permissive: true }
     );
-    const { client } = await requireClient(rawArgs);
+    const { client, url } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
 
     if (args["--runtime"]) {
@@ -1327,7 +1370,8 @@ path: projectId }
 
         if (args["--follow"] && dep.status === "deploying") {
             // Hand off to the streamer, which prints from the top and tails live.
-            await streamBuildLogs(client, String(dep.id));
+            await streamBuildLogs(client, String(dep.id), { projectId,
+url });
         } else {
             console.log(dep.logs ?? chalk.gray("  (no logs)"));
             console.log("");

@@ -20,6 +20,7 @@ import {
     ejectWarning,
     resolveDeployTimeout,
     billingBlocksDeploy,
+    deployedUrl,
     EJECTS_MANAGED_RUNTIME
 } from "./deploy";
 import { warn, setJsonModeForTest } from "./context";
@@ -353,5 +354,46 @@ simulated: true })).toBe(false);
         expect(billingBlocksDeploy({ plan: "internal",
 hasPaymentMethod: false,
 simulated: false })).toBe(false);
+    });
+});
+
+/**
+ * "✓ Deployment succeeded" and then the address.
+ *
+ * A deploy that says only that it worked leaves the one thing the command was
+ * for — where the app now answers — to a second command, and the person who
+ * just watched the build finish has to go and ask `cloud status`. Resolved the
+ * same way `status` resolves it, so the two cannot disagree about the host.
+ */
+describe("deployedUrl", () => {
+    function client(project: unknown, baseDomain: unknown) {
+        return {
+            data: { collection: () => ({ findById: async () => project }) },
+            functions: { invoke: async () => ({ tenantBaseDomain: baseDomain }) }
+        } as never;
+    }
+
+    it("joins the subdomain to the base domain the control plane reports", async () => {
+        await expect(
+            deployedUrl(client({ subdomain: "shop" }, "rebase.website"), {
+                projectId: "p1",
+                url: "https://cp-deployedurl-1.example"
+            })
+        ).resolves.toBe("shop.rebase.website");
+    });
+
+    it("says nothing rather than guessing when the project cannot be read", async () => {
+        await expect(
+            deployedUrl(client(undefined, "rebase.website"), {
+                projectId: "p1",
+                url: "https://cp-deployedurl-2.example"
+            })
+        ).resolves.toBeUndefined();
+    });
+
+    it("says nothing when there is no project to resolve", async () => {
+        // `logs` without a follow, and any caller that did not pass one: a
+        // missing URL must never be a failed deploy.
+        await expect(deployedUrl(client({ subdomain: "shop" }, "rebase.website"), {})).resolves.toBeUndefined();
     });
 });
