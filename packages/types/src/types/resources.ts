@@ -56,6 +56,21 @@ export type ResourceTransport =
 export interface ResourceKindSpec {
     /** The kind's name, as it appears in a declaration and in the graph. */
     kind: string;
+    /**
+     * Which definition of this kind this is. Bump it whenever anything else in
+     * the spec changes.
+     *
+     * Two copies of this package can meet in one process — a published driver
+     * inlines it into its dist, and the runtime image ships its own — and the
+     * registry is shared between them on purpose. Without a revision the only
+     * thing the registry can do with two specs that differ is refuse, and a
+     * refusal at driver load is a pod that never boots: every bundle built with
+     * a driver older than the change dies on the first image that carries it.
+     * With one, the higher revision wins whichever copy loads first, and the
+     * older copy is told so. Missing means 0, which is what every copy shipped
+     * before revisions existed reports.
+     */
+    revision?: number;
     /** Engines this kind ships with. `custom:<id>` is always additionally valid. */
     engines: readonly string[];
     /** Used when a declaration names none. */
@@ -164,16 +179,42 @@ function declarationId(kind: string, key: string): string {
     return `${kind}:${key}`;
 }
 
-/** Register a resource kind. Idempotent for an identical spec; throws on a conflicting one. */
+/**
+ * Register a resource kind.
+ *
+ * Idempotent for an identical spec. When a spec for the same kind is already
+ * registered and differs, the `revision` decides: the higher one is kept and
+ * the other copy is warned about, in either load order — the case where an
+ * older inlined copy of this package (a driver built before the kind changed)
+ * meets the runtime's current one. Two different specs at the SAME revision
+ * are a genuine conflict — two packages defining one kind, or a change that
+ * forgot to bump — and still throw.
+ */
 export function registerResourceKind(spec: ResourceKindSpec): void {
-    const existing = registry().kinds.get(spec.kind);
-    if (existing && JSON.stringify(existing) !== JSON.stringify(spec)) {
+    const kinds = registry().kinds;
+    const existing = kinds.get(spec.kind);
+    if (!existing) {
+        kinds.set(spec.kind, spec);
+        return;
+    }
+    if (JSON.stringify(existing) === JSON.stringify(spec)) return;
+
+    const have = existing.revision ?? 0;
+    const incoming = spec.revision ?? 0;
+    if (have === incoming) {
         throw new Error(
-            `Resource kind "${spec.kind}" is already registered with a different definition. ` +
-            "Two packages cannot define the same kind."
+            `Resource kind "${spec.kind}" is already registered with a different definition at revision ${have}. ` +
+            "Two packages cannot define the same kind; a newer definition of the same kind must carry a higher `revision`."
         );
     }
-    registry().kinds.set(spec.kind, spec);
+    const [kept, dropped] = incoming > have ? [spec, existing] : [existing, spec];
+    if (kept === spec) kinds.set(spec.kind, spec);
+    // No logger below @rebasepro/server, and this runs in browsers too.
+    console.warn(
+        `[resources] Resource kind "${spec.kind}" is registered twice, at revisions ${dropped.revision ?? 0} and ` +
+        `${kept.revision ?? 0}; keeping revision ${kept.revision ?? 0}. The older copy is usually @rebasepro/types ` +
+        "inlined in a driver built before the kind changed — rebuild the project with a current driver to remove it."
+    );
 }
 
 /** Every registered kind, for validators and for `rebase doctor`. */

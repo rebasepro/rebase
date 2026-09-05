@@ -648,7 +648,7 @@ interface ResolvedVia { cardinality, joinPath, kind, onDelete, onUpdate, overrid
 interface ResourceDeclaration { engine, key, kind, label, options, transport }
 interface ResourceGraph { resources, version }
 interface ResourceHandle { engine, key, kind, label, options, toString, transport }
-interface ResourceKindSpec { defaultEngine, engines, envBases, envBasesByEngine, implicitDefault, kind, optionKeys }
+interface ResourceKindSpec { defaultEngine, engines, envBases, envBasesByEngine, implicitDefault, kind, optionKeys, revision }
 interface RestFetchService { aggregate, fetchCollectionForRest, fetchOneForRest }
 interface RolesContainPolicyExpression { kind, roles }
 interface RolesOnlySecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }

@@ -160,10 +160,59 @@ describe("kinds are registered, not hardcoded", () => {
         expect(declareResource("cache", "sessions").engine).toBe("redis");
     });
 
-    it("refuses two different definitions of one kind", () => {
+    it("refuses two different definitions of one kind at the same revision", () => {
         registerResourceKind({ kind: "cache", engines: ["redis"], defaultEngine: "redis", envBases: ["REDIS_URL"] });
         expect(() => registerResourceKind({ kind: "cache", engines: ["memcached"], defaultEngine: "memcached", envBases: [] }))
-            .toThrow(/already registered with a different definition/);
+            .toThrow(/already registered with a different definition at revision 0/);
+    });
+
+    describe("two copies of this package at different revisions", () => {
+        // A published driver inlines this package into its dist, so a bundle
+        // built before a kind changed brings the old spec to a runtime that
+        // registered the new one. The registry is shared between the copies on
+        // purpose; the revision is what lets them coexist.
+        // The kinds map is process-global and never reset, so each case uses a
+        // kind name no other test has registered.
+        const specs = (kind: string) => {
+            const older = { kind, engines: ["redis"], defaultEngine: "redis", envBases: ["REDIS_URL"] };
+            return { older, newer: { ...older, revision: 1, envBases: ["REDIS_URL", "CACHE_URL"] } };
+        };
+        let warn: jest.SpyInstance;
+        beforeEach(() => { warn = jest.spyOn(console, "warn").mockImplementation(() => undefined); });
+        afterEach(() => warn.mockRestore());
+
+        it("keeps the newer definition when the older copy loads second", () => {
+            const { older, newer } = specs("skew-newer-first");
+            registerResourceKind(newer);
+            registerResourceKind(older);
+            expect(resourceKinds().find(k => k.kind === "skew-newer-first")?.envBases).toEqual(["REDIS_URL", "CACHE_URL"]);
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(warn.mock.calls[0][0]).toMatch(/revisions 0 and 1; keeping revision 1/);
+        });
+
+        it("keeps the newer definition when the older copy loads first", () => {
+            const { older, newer } = specs("skew-older-first");
+            registerResourceKind(older);
+            registerResourceKind(newer);
+            expect(resourceKinds().find(k => k.kind === "skew-older-first")?.envBases).toEqual(["REDIS_URL", "CACHE_URL"]);
+            expect(warn).toHaveBeenCalledTimes(1);
+        });
+
+        it("says nothing when the same revision is registered twice, identically", () => {
+            const { newer } = specs("skew-identical");
+            registerResourceKind(newer);
+            registerResourceKind({ ...newer });
+            expect(warn).not.toHaveBeenCalled();
+        });
+    });
+
+    it("the kinds that changed since 0.17.3 carry a revision, so an inlined 0.17.3 copy defers", () => {
+        // 25f1a97e3 corrected the env bindings of `database` and `bucket`. A
+        // driver published at 0.17.3 registers those kinds at revision 0 from
+        // its own inlined copy; without a bump here it would throw at load.
+        for (const kind of ["database", "bucket"]) {
+            expect(resourceKinds().find(k => k.kind === kind)?.revision ?? 0).toBeGreaterThanOrEqual(1);
+        }
     });
 });
 
