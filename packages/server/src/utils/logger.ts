@@ -305,6 +305,56 @@ function formatData(data?: Record<string, unknown>): Record<string, unknown> | u
     return out;
 }
 
+/**
+ * Something that wants a copy of every line this logger writes.
+ *
+ * Receives the message and fields *after* redaction, never before: a sink is
+ * another destination for the same line, and the one thing that must not vary
+ * by destination is whether the query and its bound values are in it.
+ */
+export type LogSink = (
+    level: LogLevel,
+    message: string,
+    data: Record<string, unknown>
+) => void;
+
+const sinks = new Set<LogSink>();
+
+/**
+ * Tee this logger somewhere else. Returns the unsubscribe.
+ *
+ * The Studio's Logs Explorer is the caller: its ring buffer used to be fed only
+ * by a request middleware, so the panel showed a wall of `GET … 200` and not one
+ * of the errors, warnings or diagnoses the server was writing to stdout at the
+ * same moment. A log viewer that cannot show you an error is a log viewer
+ * nobody opens twice.
+ *
+ * A sink MUST NOT log. It is called from inside `emit`, so anything that comes
+ * back through `logger` recurses; the guard below stops the stack blowing, but
+ * the line is dropped rather than delivered, which is its own bug.
+ */
+export function addLogSink(sink: LogSink): () => void {
+    sinks.add(sink);
+    return () => { sinks.delete(sink); };
+}
+
+/** Re-entrancy guard: see `addLogSink`. */
+let inSink = false;
+
+function fanOut(level: LogLevel, message: string, data: Record<string, unknown>): void {
+    if (sinks.size === 0 || inSink) return;
+    inSink = true;
+    try {
+        for (const sink of sinks) {
+            // One broken sink must not take down the line, nor the request that
+            // was writing it.
+            try { sink(level, message, data); } catch { /* a broken tee is not the caller's problem */ }
+        }
+    } finally {
+        inSink = false;
+    }
+}
+
 function createLogger(rawDefaultFields: Record<string, unknown> = {}): Logger {
     // Child fields go through the same pass as per-call data — they are merged
     // into every line this logger emits, so leaving them raw would be a hole
@@ -322,6 +372,10 @@ function createLogger(rawDefaultFields: Record<string, unknown> = {}): Logger {
         const safeMessage = redactSensitiveText(message);
         const merged = { ...defaultFields,
 ...formatData(data) };
+
+        // Before the write, so a sink still sees the line if stdout is the
+        // thing that is broken.
+        fanOut(level, safeMessage, merged);
 
         if (isProduction()) {
             // Structured JSON for Cloud Logging

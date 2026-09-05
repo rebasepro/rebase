@@ -3,6 +3,7 @@ import type { MiddlewareHandler } from "hono";
 import { streamSSE } from "hono/streaming";
 import type { HonoEnv } from "./types";
 import { ApiError, errorHandler } from "./errors";
+import { addLogSink } from "../utils/logger";
 
 export interface LogEntry {
     id: string;
@@ -161,14 +162,98 @@ export function logMiddleware(options: LogMiddlewareOptions = {}): MiddlewareHan
         if (ignored.has(c.req.path)) return;
         const duration = Date.now() - start;
         const reqId = c.get("requestId");
-        addLog("info", "api", `${c.req.method} ${c.req.path} ${c.res.status} ${duration}ms`, {
-            method: c.req.method,
-            path: c.req.path,
-            status: c.res.status,
-            duration,
-            ...(reqId && { requestId: reqId })
-        });
+        // Every request used to be recorded at `info`, whatever it answered, so
+        // the Logs Explorer's level filter could not find a single failure: a
+        // 500 sat at the same level as the 200 above it, in a wall of them.
+        const status = c.res.status;
+        const level: LogEntry["level"] = status >= 500 ? "error" : status >= 400 ? "warn" : "info";
+        // What the error handler answered, so the failure is on the entry
+        // rather than in a stdout line the panel cannot see. See
+        // `HonoEnv.Variables.errorSummary`.
+        const failure = c.get("errorSummary");
+        addLog(
+            level,
+            "api",
+            `${c.req.method} ${c.req.path} ${status} ${duration}ms`
+                + (failure ? ` — ${failure.code}: ${failure.message}` : ""),
+            {
+                method: c.req.method,
+                path: c.req.path,
+                status,
+                duration,
+                ...(reqId && { requestId: reqId }),
+                ...(c.get("collection") && { collection: c.get("collection") }),
+                ...(failure && { errorCode: failure.code, errorMessage: failure.message })
+            }
+        );
     };
+}
+
+/**
+ * Prefixes the server writes at the head of a log message, and the `source`
+ * each one belongs to.
+ *
+ * The ring's `source` is a closed set the Studio filters on, and the messages
+ * carry their origin as a bracketed prefix — `[API]`, `[Auth]`, `[functions]`,
+ * `[schema]`. Matching them is what makes a teed line filterable beside the
+ * request entries rather than a heap under "system".
+ */
+const SOURCE_BY_PREFIX: Array<[RegExp, LogEntry["source"]]> = [
+    [/^\[?(api|rest)\b/i, "api"],
+    [/^\[?auth\b/i, "auth"],
+    [/^\[?(storage|s3|gcs)\b/i, "storage"],
+    [/^\[?(realtime|ws|websocket|cdc)\b/i, "realtime"]
+];
+
+/**
+ * The `source` for a teed line, from whatever prefix it carries.
+ *
+ * Exported for its test: the mapping is a string match on wording somebody else
+ * writes, which is the shape of check that stops working without failing.
+ */
+export function sourceForMessage(message: string): LogEntry["source"] {
+    // The level emoji comes first on several call sites (`⚠️ [API] …`), so the
+    // prefix is whatever is inside the first bracket, wherever that is.
+    const bracketed = message.match(/\[([^\]]{1,32})\]/);
+    const candidate = bracketed?.[1] ?? message;
+    for (const [pattern, source] of SOURCE_BY_PREFIX) {
+        if (pattern.test(candidate)) return source;
+    }
+    return "system";
+}
+
+/**
+ * Feed the Logs Explorer everything the server says at warn and above.
+ *
+ * The ring used to be filled by `logMiddleware` alone, so the panel showed a
+ * wall of `GET /api/data/posts 200 4ms` and not one of the errors, warnings or
+ * boot diagnoses being written to stdout at the same moment. A function that
+ * threw was the sharpest case: the request entry said `500` and the reason
+ * existed only in a terminal the person looking at the panel does not have.
+ *
+ * Warn and above, deliberately. `info` is where the steady-state chatter lives,
+ * and a 10,000-entry ring filled with it evicts the lines somebody opened the
+ * panel to find.
+ *
+ * Idempotent: called from `createLogsRoutes`, which a split deployment may
+ * reach more than once.
+ */
+let detachLoggerTee: (() => void) | undefined;
+export function teeLoggerIntoLogBuffer(): () => void {
+    if (detachLoggerTee) return detachLoggerTee;
+    const detach = addLogSink((level, message, data) => {
+        if (level !== "warn" && level !== "error") return;
+        // `requestLogger` writes this one to stdout for every request, and
+        // `logMiddleware` has already recorded the same request here with the
+        // fields this panel renders. Teeing it too would double every failure.
+        if (message === "request") return;
+        addLog(level, sourceForMessage(message), message, Object.keys(data).length > 0 ? data : undefined);
+    });
+    detachLoggerTee = () => {
+        detach();
+        detachLoggerTee = undefined;
+    };
+    return detachLoggerTee;
 }
 
 /**
@@ -235,6 +320,12 @@ export interface LogStreamTiming {
 }
 
 export function createLogsRoutes(timing: LogStreamTiming = {}): Hono<HonoEnv> {
+    // Here rather than at module load: the ring exists whether or not anything
+    // reads it, but there is no reason to fill it on a process that serves no
+    // logs surface. Idempotent, so the repeated calls a split deployment makes
+    // do not stack up sinks.
+    teeLoggerIntoLogBuffer();
+
     const flushMs = timing.flushMs ?? STREAM_FLUSH_MS;
     const heartbeatMs = timing.heartbeatMs ?? STREAM_HEARTBEAT_MS;
     const maxPending = timing.maxPending ?? STREAM_MAX_PENDING;
