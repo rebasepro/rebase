@@ -80,7 +80,7 @@ That's it. Rebase will:
 2. Register each default export as a cron job
 3. Auto-create the `rebase.cron_logs` table in PostgreSQL (if the driver supports SQL)
 4. Start the scheduler and seed counters from existing DB logs
-5. Mount admin REST routes at `/api/cron`
+5. Mount admin REST routes at `/api/admin/cron`
 
 ## Schedule Syntax
 
@@ -271,16 +271,16 @@ All cron routes require **admin authentication** (`requireAuth` + `requireAdmin`
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/cron` | List all registered cron jobs |
-| `GET` | `/api/cron/:id` | Get a single job's status |
-| `POST` | `/api/cron/:id/trigger` | Manually trigger a job |
-| `GET` | `/api/cron/:id/logs` | Get execution history (`?limit=N`) |
-| `PUT` | `/api/cron/:id` | Enable/disable a job (`{ "enabled": true }`) |
+| `GET` | `/api/admin/cron` | List all registered cron jobs |
+| `GET` | `/api/admin/cron/:id` | Get a single job's status |
+| `POST` | `/api/admin/cron/:id/trigger` | Manually trigger a job |
+| `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`) |
+| `PUT` | `/api/admin/cron/:id` | Enable/disable a job (`{ "enabled": true }`) |
 
 ### Example: List All Jobs
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/admin/cron
 ```
 
 ```json
@@ -336,7 +336,7 @@ field.
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3001/api/cron/health-check/trigger
+    http://localhost:3001/api/admin/cron/health-check/trigger
 ```
 
 ## Client SDK

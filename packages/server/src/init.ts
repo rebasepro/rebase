@@ -425,7 +425,8 @@ export interface RebaseBackendConfig {
      * such handle to give (it gave the connection to the adapter instead), so it
      * leaves this unset and the adapter falls back to its own connection.
      *
-     * Not part of the ordinary configuration surface: set by `bootFromBundle`.
+     * @internal Set by `bootFromBundle`; not part of the ordinary configuration
+     * surface.
      */
     provisioningDriverResult?: InitializedDriver;
 
@@ -437,6 +438,8 @@ export interface RebaseBackendConfig {
      * builds them from the declared graph. The list of *declared* sources is no
      * longer an option here: it is read from the resource graph, which is the
      * one place a project declares them.
+     *
+     * @internal Built by `initializeDataSources` from the declared resource graph. Pass `database` instead.
      */
     bootstrappers?: BackendBootstrapper[];
     /**
@@ -651,6 +654,8 @@ export interface RebaseBackendConfig {
      * EXISTS` reads the catalog and then writes to it, so N processes racing to
      * provision the same schema is a state nobody designed. `bootFromBundle`
      * derives it from `REBASE_ROLE`.
+     *
+     * @internal Derived from `REBASE_ROLE` by `bootFromBundle`.
      */
     provisionSchema?: boolean;
     surfaces?: RuntimeSurfaceOptions;
@@ -687,6 +692,8 @@ export interface RebaseBackendConfig {
      * `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE`.
      *
      * A name that is not in the bundle fails the boot — see `selectFunctions`.
+     *
+     * @internal Filled from `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE`.
      */
     functionsSelection?: import("./functions/selection").FunctionSelection;
     /**
@@ -695,6 +702,8 @@ export interface RebaseBackendConfig {
      * Only consulted when the `functions` surface is off — a process that serves
      * them has nothing to forward. `bootFromBundle` fills this from
      * `REBASE_FUNCTIONS_UPSTREAM` on the `api` role.
+     *
+     * @internal Filled from `REBASE_FUNCTIONS_UPSTREAM` on the `api` role.
      */
     functionsUpstream?: string;
     cronsDir?: string;
@@ -785,6 +794,8 @@ export interface RebaseBackendConfig {
      *
      * Suppresses the "no CORS configuration detected" warning, which exists for
      * hand-wired backends that genuinely have no origin policy.
+     *
+     * @internal Set by the boot path that installs CORS itself.
      */
     corsHandled?: boolean;
 
@@ -799,7 +810,11 @@ export interface RebaseBackendConfig {
      */
     schemaVersion?: string;
 
-    /** Runtime version reported by the contract endpoint. Informational. */
+    /**
+     * Runtime version reported by the contract endpoint. Informational.
+     *
+     * @internal Read from the bundle manifest by `bootFromBundle`.
+     */
     runtimeVersion?: string;
 
     /**
@@ -2779,11 +2794,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             cronScheduler.start();
             logger.info("Mounted cron jobs", {
                 count: loadedCronJobs.length,
-                path: `${basePath}/cron`
+                path: `${basePath}/admin/cron`
             });
         } else {
             logger.warn(
-                `Cron routes mounted at ${basePath}/cron, but no jobs loaded from ${config.cronsDir}. ` +
+                `Cron routes mounted at ${basePath}/admin/cron, but no jobs loaded from ${config.cronsDir}. ` +
                 (cronProblems.length > 0
                     ? `Nothing is scheduled — ${cronProblems.length} file(s) were skipped, see the messages above.`
                     : "The directory holds no .ts/.js cron files, so nothing is scheduled.")
