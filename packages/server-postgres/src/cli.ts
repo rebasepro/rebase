@@ -31,6 +31,7 @@ import { detectDestructiveStatements, decidePushSafety } from "./schema/destruct
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { acceptsExcludeFlag, buildAtlasArgs } from "./schema/atlas-argv";
 import { unexpectedBranchArgs } from "./branch-argv";
+import { assertKnownFlags } from "./cli-flags";
 
 import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
 
@@ -77,6 +78,13 @@ export async function runPluginCommand(args: string[]) {
     await loadEnv();
     const domain = args[0]; // "db" or "schema"
     const subcommand = args[1];
+
+    // Before anything reads the line: every parser below runs `permissive`,
+    // which turns an undeclared flag into a positional rather than an error, so
+    // `db push --alow-destructive` pushed with the destructive gate still shut
+    // and `schema generate --ouput x` wrote the default path in silence. See
+    // cli-flags.ts for why the check has to be here and not in those parsers.
+    assertKnownFlags(domain, subcommand, args);
 
     if (domain === "db") {
         await dbCommand(subcommand, args);

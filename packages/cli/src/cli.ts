@@ -19,6 +19,7 @@ import { isEnabled } from "./telemetry";
 import { cloudCommand } from "./commands/cloud";
 import { appsCommand } from "./commands/apps";
 import { requireProjectRoot } from "./utils/project";
+import { parseCommandArgs } from "./utils/args";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -134,22 +135,28 @@ export async function entry(args: string[]) {
             break;
 
         case "generate-sdk": {
-            const sdkArgs = arg(
-                {
+            // Strict, and parsed from the whole line rather than `slice(3)`.
+            // Permissive parsing turned a typo into silence: `rebase
+            // generate-sdk --ouput ./sdk` wrote the SDK to the default path and
+            // said nothing, so the next build imported a stale one. And the
+            // fixed slice meant `rebase --debug generate-sdk -o ./sdk` read
+            // `generate-sdk` as the first token of the flag line, dropping the
+            // flags entirely. `parseCommandArgs` fixes both: it consumes flags
+            // wherever they appear and rejects the ones nobody declared.
+            const { flags: sdkArgs, help: sdkHelp } = parseCommandArgs({
+                spec: {
                     "--collections-dir": String,
                     "--output": String,
                     "--from": String,
                     "--token": String,
-                    "--help": Boolean,
                     "-c": "--collections-dir",
-                    "-o": "--output",
-                    "-h": "--help"
+                    "-o": "--output"
                 },
-                {
-                    argv: args.slice(3),
-                    permissive: true
-                }
-            );
+                rawArgs: args,
+                commandWords: 1,
+                command: "generate-sdk",
+                maxPositionals: 0
+            });
             // Defaults hang off the project root, not the cwd. `./config/
             // collections` relative to wherever you happen to be standing meant
             // `rebase generate-sdk` worked from the repository root and threw
@@ -158,13 +165,13 @@ export async function entry(args: string[]) {
             // sits — while `rebase db push` and `rebase dev` worked from all of
             // them. An explicitly passed path still resolves against the cwd,
             // which is where the person typing it means it.
-            const sdkRoot = sdkArgs["--help"] ? process.cwd() : requireProjectRoot();
+            const sdkRoot = sdkHelp ? process.cwd() : requireProjectRoot();
             await generateSdkCommand({
                 collectionsDir: sdkArgs["--collections-dir"] || path.join(sdkRoot, "config/collections"),
                 output: sdkArgs["--output"] || path.join(sdkRoot, "generated/sdk"),
                 from: sdkArgs["--from"],
                 token: sdkArgs["--token"],
-                help: sdkArgs["--help"],
+                help: sdkHelp,
                 cwd: process.cwd()
             });
             break;
