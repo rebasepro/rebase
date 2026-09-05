@@ -46,258 +46,83 @@ Everything below this line is for **self-hosting** — Docker, Kubernetes, and
 running the image yourself on a cloud provider.
 
 ---
-
 ## Docker (Self-Hosted)
 
-### Production Dockerfile (Multi-Stage)
+**There is no application image to build.** A Rebase project travels as a
+*bundle*; the runtime is the published `rebasepro/server` image. Upgrading
+Rebase is a tag change, not a rebuild, and the artifact you self-host is the
+artifact Rebase Cloud runs.
 
-The production Dockerfile is a **multi-stage build**. The build context is the **monorepo root** (where `pnpm-workspace.yaml` lives), not the app directory.
+> **IMPORTANT FOR AGENTS:** never write a multi-stage build that compiles the
+> project into an image. That was how this worked before the bundle contract,
+> and a generated one will not boot: the runtime looks for `/bundle`, not for a
+> compiled `backend/dist`. If you find yourself writing `corepack enable` or
+> `pnpm build` inside a container recipe, stop — you are solving a problem that
+> no longer exists.
 
-> **IMPORTANT FOR AGENTS:** The Dockerfile uses `node:22-alpine`, `corepack enable` (NOT `npm install -g pnpm`), and requires the monorepo root as the build context. Never generate a single-stage Dockerfile or use `node:20`.
+### The whole of it
 
-```dockerfile
-# ── Stage 1: Install + Build ─────────────────────────────────────────
-FROM node:22-alpine AS builder
-
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-ENV CI=true
-RUN corepack enable
-
-RUN apk add --no-cache python3 make g++
-
-WORKDIR /app
-
-# Copy workspace root
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-
-# Copy source packages and app
-COPY packages ./packages
-COPY app ./app
-
-# Install all dependencies with flat node_modules for Docker compatibility
-# (many packages rely on hoisted devDependencies like @vitejs/plugin-react)
-RUN pnpm install --shamefully-hoist
-
-# Build all packages using pnpm recursive with --no-bail.
-# Some packages may fail tsc declarations — that's fine, we only need vite bundles + esbuild outputs.
-RUN pnpm --filter './packages/*' -r --no-bail run build; exit 0
-
-# Build the backend (TypeScript → JavaScript), then resolve ESM import extensions
-# 1. tsc compiles TS→JS  2. tsc-alias resolves path aliases  3. sed adds .js to remaining relative imports
-RUN cd app/backend && npx tsc -p tsconfig.docker.json && npx tsc-alias -p tsconfig.docker.json -f \
-    && find dist -name '*.js' -exec sed -i 's/from "\(\.[^"]*\)"/from "\1.js"/g; s/\.js\.js/.js/g' {} +
-
-# Build frontend (reads .env.production for VITE_API_URL etc.)
-RUN cd app/frontend && npx vite build
-
-# Prune devDependencies to reduce image size
-RUN pnpm install --shamefully-hoist --prod
-
-# ── Stage 2: Production Runtime ──────────────────────────────────────
-FROM node:22-alpine AS runtime
-
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-ENV NODE_ENV=production
-
-RUN corepack enable
-
-# Security: run as non-root
-RUN addgroup -g 1001 rebase && adduser -u 1001 -G rebase -s /bin/sh -D rebase
-
-WORKDIR /app
-
-# Copy only production artifacts (node_modules already pruned of devDependencies)
-COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages ./packages
-COPY --from=builder /app/app ./app
-
-# Uploads directory with correct ownership
-RUN mkdir -p /app/app/uploads && chown -R rebase:rebase /app
-
-ENV STORAGE_PATH=/app/app/uploads
-
-USER rebase
-
-WORKDIR /app/app/backend
-EXPOSE 3001
-
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
-
-# Copy the entrypoint script and drizzle config for auto-migration
-COPY --from=builder /app/app/backend/entrypoint.sh ./entrypoint.sh
-COPY --from=builder /app/app/backend/drizzle.config.ts ./drizzle.config.ts
-COPY --from=builder /app/app/backend/drizzle ./drizzle
-
-# Auto-migrate then start the compiled JavaScript backend
-CMD ["sh", "entrypoint.sh"]
-```
-
-**Build command** (run from monorepo root):
+`rebase init` writes `docker-compose.yml` at the project root, with two
+services: `pgvector/pgvector:pg18` and `rebasepro/server:${REBASE_VERSION:-latest}`
+with `./dist-bundle` mounted at `/bundle`.
 
 ```bash
-docker build -t rebase-backend -f app/backend/Dockerfile .
+rebase build              # produces ./dist-bundle
+docker compose up -d db
+docker compose up         # boot creates the tables it is missing
 ```
 
-### Docker Entrypoint (Auto-Migration)
+One container then serves the API at `/api` and the admin at `/` — same origin,
+so there is no CORS between them and no second web server.
 
-The Docker image uses an entrypoint script (`entrypoint.sh`) that **automatically runs database migrations** before starting the server. Migrations are non-fatal — if they fail (e.g. already applied), the server still starts.
+### The version pin
+
+`REBASE_VERSION` in `.env` chooses the runtime:
 
 ```bash
-#!/bin/sh
-set -e
-
-echo "🔄 Running database migrations..."
-npx drizzle-kit migrate --config=drizzle.config.ts 2>&1 || echo "⚠️ Migrations skipped or failed (non-fatal)"
-
-echo "🚀 Starting Rebase backend..."
-exec node dist/app/backend/src/index.js
+REBASE_VERSION=0.17.3     # unset means :latest, which is not a pin
 ```
 
-> **IMPORTANT FOR AGENTS:** The entrypoint runs `drizzle-kit migrate` automatically on container start. Never add manual migration steps to a Dockerfile CMD — they are handled by `entrypoint.sh`.
+To upgrade Rebase, change that line and restart. The bundle is untouched. Pin it
+for anything that is not a laptop: `latest` means "whatever was published this
+morning", and a restart is enough to move a production deployment onto it.
 
-### Docker Compose (Monorepo)
+### The four values the stack refuses to start without
 
-This is the monorepo-internal Docker Compose (`app/backend/docker-compose.yml`). Note: the build context is `../..` (monorepo root).
-
-```yaml
-services:
-  db:
-    image: postgres:18-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: rebase
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rebasepassword}
-      POSTGRES_DB: rebase
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "max_connections=100"
-      - "-c"
-      - "log_min_duration_statement=1000"
-
-  backend:
-    build:
-      context: ../..
-      dockerfile: app/backend/Dockerfile
-    restart: unless-stopped
-    ports:
-      - "${PORT:-3001}:3001"
-    environment:
-      DATABASE_URL: postgresql://rebase:${POSTGRES_PASSWORD:-rebasepassword}@db:5432/rebase
-      ADMIN_CONNECTION_STRING: postgresql://rebase:${POSTGRES_PASSWORD:-rebasepassword}@db:5432/rebase
-      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-change-in-production}
-      NODE_ENV: ${NODE_ENV:-development}
-      PORT: "3001"
-      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - uploads:/app/app/backend/uploads
-
-volumes:
-  postgres_data:
-    driver: local
-  uploads:
-    driver: local
+```bash
+DATABASE_PASSWORD=...     # the Postgres password
+JWT_SECRET=...            # signs every session; rotating it signs everybody out
+REBASE_SERVICE_KEY=...    # the server-to-server credential — treat it as root
+CORS_ORIGINS=...          # the origin you browse to, e.g. http://localhost:3001
 ```
 
-> **WARNING FOR AGENTS:** The build context is `../..` (monorepo root), NOT `.` or `app/backend`. The Dockerfile path is relative to the monorepo root: `app/backend/Dockerfile`. The `depends_on` uses `condition: service_healthy` so the backend waits for postgres to be ready. **Never use `version: '3.8'`** — modern Docker Compose doesn't use the `version` key.
+`rebase init` generates the three secrets. Each must be at least 32 characters.
+The compose file declares them with `${VAR:?…}`, so a missing one stops the
+stack with a message naming it rather than starting something half-configured.
 
-### Docker Compose (User Template)
+### Schema
 
-For user-generated projects (created via `rebase init`), the Docker Compose file is at the project root. It includes separate backend + frontend services:
+`REBASE_MIGRATE_ON_BOOT` defaults to `ensure`: the runtime creates missing
+tables, columns and enum types at boot, including your collections', and applies
+their row-level security. It never alters, narrows or drops anything that
+already exists — a container restart must not be able to reshape a schema.
 
-```yaml
-services:
-  db:
-    image: postgres:18-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: rebase
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
-      POSTGRES_DB: rebase
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    command:
-      - "postgres"
-      - "-c"
-      - "shared_buffers=256MB"
-      - "-c"
-      - "max_connections=100"
-      - "-c"
-      - "work_mem=4MB"
-      - "-c"
-      - "effective_cache_size=768MB"
-      - "-c"
-      - "log_min_duration_statement=1000"
+`rebase db push` remains the step for the rest: junction-table RLS on
+many-to-many relations, and any change that is not purely additive.
 
-  backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    restart: unless-stopped
-    ports:
-      - "${PORT:-3001}:3001"
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path%3Dpublic
-      ADMIN_CONNECTION_STRING: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path%3Dpublic
-      NODE_ENV: production
-      PORT: "3001"
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - uploads:/app/backend/uploads
+### Uploads
 
-  frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
+Local storage in production is refused unless the path is a durable mount,
+because a container filesystem is destroyed on the next deploy. The generated
+compose file mounts a named volume and sets `FORCE_LOCAL_STORAGE=true` to
+acknowledge that. Moving storage off-box means `STORAGE_TYPE=s3` (or `gcs`) and
+dropping both lines.
 
-volumes:
-  postgres_data:
-    driver: local
-  uploads:
-    driver: local
-```
+### Owning the server code instead
 
-Key differences from the monorepo compose:
-- Build context is `.` (project root), dockerfile is `backend/Dockerfile`
-- Uses `env_file: .env` to load all env vars
-- Sets `NODE_ENV: production` explicitly
-- Includes a separate `frontend` service (nginx)
-- Adds Postgres tuning for `work_mem` and `effective_cache_size`
+`rebase eject` writes the entrypoint, a Dockerfile and a compose file that
+builds them. That is the supported way to take over the boot path — and the only
+reason to have a build recipe of your own.
 
 ---
 
@@ -551,6 +376,23 @@ Set **either** a router `basename="/admin"` **or** `<RebaseCMS basePath="/admin"
 
 ---
 
+## The image every managed platform wants
+
+AWS, GCP, Azure, Scaleway and the PaaS platforms all want a registry tag rather
+than a mounted volume. There is still nothing of yours to compile — the image is
+the published runtime with the bundle copied in, two lines at the project root:
+
+```dockerfile
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+`rebase build` first, then `docker build`. Baking the bundle in also pins exactly
+what runs, which is what a rollback needs. Everything below assumes this shape;
+where a section says "build and push", that is what it is building.
+
+---
+
 ## AWS (ECS/Fargate + RDS)
 
 Deploy the Rebase Docker image to AWS using ECS (Fargate) with a managed PostgreSQL database via RDS.
@@ -565,13 +407,13 @@ Internet → ALB (HTTPS) → ECS Fargate (Rebase container) → RDS PostgreSQL
 ### Key Steps
 
 1. **PostgreSQL** — Create an RDS PostgreSQL 16+ instance (or Aurora Serverless v2). Enable automated backups. Place in a private subnet.
-2. **Docker Image** — Push the Rebase Docker image to ECR:
+2. **Image** — there is nothing of yours to compile. `rebase build` produces
+   `dist-bundle`; bake it into the published runtime the way
+   [Self-Hosting](https://rebase.pro/docs/deployment/self-hosting) shows, tag
+   that, and push it to ECR:
    ```bash
-   # Build and tag
-   docker build -t rebase-backend -f app/backend/Dockerfile .
-   docker tag rebase-backend:latest <account-id>.dkr.ecr.<region>.amazonaws.com/rebase-backend:latest
-
-   # Push
+   rebase build
+   docker build -t <account-id>.dkr.ecr.<region>.amazonaws.com/rebase-backend:latest .
    aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <account-id>.dkr.ecr.<region>.amazonaws.com
    docker push <account-id>.dkr.ecr.<region>.amazonaws.com/rebase-backend:latest
    ```
@@ -616,7 +458,7 @@ Internet → Cloud Run (HTTPS, auto-scaling) → Cloud SQL PostgreSQL
 2. **Docker Image** — Push to Artifact Registry:
    ```bash
    # Build and tag
-   docker build -t rebase-backend -f app/backend/Dockerfile .
+   rebase build && docker build -t rebase-backend .
    docker tag rebase-backend:latest <region>-docker.pkg.dev/<project-id>/rebase/backend:latest
 
    # Push
@@ -677,7 +519,7 @@ Internet → Azure Container Apps (HTTPS, auto-scaling) → Azure Database for P
    az acr login --name YourRegistryName
 
    # Build and push
-   docker build -t yourregistryname.azurecr.io/rebase-backend:latest -f app/backend/Dockerfile .
+   rebase build && docker build -t yourregistryname.azurecr.io/rebase-backend:latest .
    docker push yourregistryname.azurecr.io/rebase-backend:latest
    ```
 3. **Container App** — Create a Container Apps Environment and deploy:
@@ -721,7 +563,7 @@ Internet → Scaleway Serverless Container (HTTPS) → Managed PostgreSQL
 2. **Docker Image** — Push to Scaleway Container Registry:
    ```bash
    # Build and push
-   docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f app/backend/Dockerfile .
+   rebase build && docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest .
    docker push rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest
    ```
 3. **Serverless Container** — Deploy from the Scaleway Console or CLI:
@@ -843,7 +685,7 @@ Docker-based PaaS platforms that deploy directly from your repo or Docker image.
 ### General Pattern
 
 All PaaS platforms follow the same workflow:
-1. Connect your Git repository or point to a Dockerfile
+1. Connect your Git repository, or point the platform at an image that bakes `dist-bundle` into `rebasepro/server`
 2. Provision a managed PostgreSQL add-on
 3. Set environment variables (see env var reference above)
 4. Deploy — the platform builds and runs the Docker image
@@ -1014,7 +856,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 - Run tests (`pnpm test`)
 - Run local dev server (`pnpm dev`)
 - Check logs (read-only)
-- Create or edit Dockerfiles and docker-compose files
+- Create or edit container and docker-compose files
 - Create or edit `.env` files
 - Run deployment commands *only* if the user explicitly asks you to deploy in the current conversation. Otherwise, provide the exact commands for the user to run.
 
@@ -1024,13 +866,11 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 - **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
-- **Dockerfile:** `app/backend/Dockerfile`
-- **Docker Compose (monorepo):** `app/backend/docker-compose.yml`
-- **Docker Compose (template):** `packages/cli/templates/template/docker-compose.yml`
-- **Entrypoint:** `app/backend/entrypoint.sh`
+- **Self-hosting guide:** [rebase.pro/docs/deployment/self-hosting](https://rebase.pro/docs/deployment/self-hosting)
+- **Compose file a project gets:** `packages/cli/templates/template/docker-compose.yml`
+- **Compose file the acceptance gate boots:** `infra/docker/docker-compose.selfhost.yml`
 - **Env Schema:** `packages/server/src/env.ts`
 - **Helm chart:** `infra/charts/rebase` (see `infra/charts/rebase/README.md`)
 - **Role resolution:** `packages/server/src/boot/role.ts`
 - **serveSPA:** `packages/server/src/serve-spa.ts`
-- **Backend Entry:** `app/backend/src/index.ts`
 - **.env.example:** `app/.env.example`
