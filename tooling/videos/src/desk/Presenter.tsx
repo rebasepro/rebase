@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, OffthreadVideo, staticFile, useCurrentFrame } from "remotion";
-import { beat } from "./beats";
+import { beat, tempo, TEMPO } from "./beats";
 import { FONT, FRAME, INK } from "../theme";
 
 /**
@@ -47,14 +47,14 @@ export const OPEN: Box = { x: 520, y: 210, w: 880, h: 660 };
 /** Left column of the close; the address takes the right. */
 export const CLOSE: Box = { x: 200, y: 240, w: 680, h: 600 };
 
-const HOOK = beat("hook");
 const ALL = beat("all");
 
-/** Frames of the presenter's own timeline, absolute. The open runs until
- *  "It works." — twelve words at the film's pace — then the window flies to
- *  the corner while the hook's windows arrive on the desk behind it. */
+/** Frames of the presenter's own timeline, absolute. The open runs through
+ *  the question — "You can build a backend in an afternoon now. But can you
+ *  trust it?", fourteen words to camera — then the window flies to the
+ *  corner while the evidence arrives on the desk behind it. */
 export const PRESENTER_IN = 52;
-export const FLY_TO_CORNER = HOOK.start + 29 + 12 * 11;
+export const FLY_TO_CORNER = tempo(92) + 14 * Math.round(10 * TEMPO) + 5;
 const FLY = 36;
 /** Lifts off the corner as the camera lifts off the desk. */
 export const FLY_TO_CLOSE = ALL.start + 4;

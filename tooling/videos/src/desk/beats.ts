@@ -109,22 +109,22 @@ const TERMINAL: View = { x: 0, y: 420, zoom: 1 };
  */
 export const BEATS: Beat[] = [
     { id: "hook", start: tempo(66), view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.3 },
-    { id: "init", start: tempo(340), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "rule", start: tempo(560), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
-    { id: "push", start: tempo(800), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.3 },
-    { id: "users", start: tempo(1040), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
-    { id: "agent", start: tempo(1280), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
-    { id: "panel", start: tempo(1480), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "views", start: tempo(1740), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
-    { id: "schema", start: tempo(1850), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
-    { id: "studio", start: tempo(1970), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
-    { id: "all", start: tempo(2080), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "init", start: tempo(460), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "rule", start: tempo(680), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
+    { id: "push", start: tempo(920), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.3 },
+    { id: "users", start: tempo(1160), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
+    { id: "agent", start: tempo(1400), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
+    { id: "panel", start: tempo(1600), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "views", start: tempo(1860), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "schema", start: tempo(1970), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
+    { id: "studio", start: tempo(2090), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
+    { id: "all", start: tempo(2200), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
 ];
 
 /** The cold open holds the camera on the hook before anything is on it. */
 export const OPENING: View = cell(0, 0);
 
-export const DESK_DURATION = tempo(2400);
+export const DESK_DURATION = tempo(2580);
 
 export const beat = (id: string): Beat => {
     const b = BEATS.find((x) => x.id === id);

@@ -102,8 +102,9 @@ export const Desk: React.FC = () => {
                     thirds — and set at 180 that left a third of the frame
                     empty under two small windows. */}
                 {/* The hook's windows arrive as the presenter leaves the middle
-                    of the frame for the corner: the headline first, the agent's
-                    summary under it, and the scan last, so its findings print
+                    of the frame for the corner, under the second line: the
+                    headline first, the agent's summary during "built by an
+                    agent. It works.", and the scan last, so its findings print
                     under "found three ways in". */}
                 <On beats={["hook", "all"]}>
                     <Title
@@ -118,7 +119,7 @@ export const Desk: React.FC = () => {
                     {/* Wide enough that the tool's own clean line — 70 characters
                         of it — sits on one row at 18px. Wrapped, it read as two
                         findings; wider, it ran under the presenter. */}
-                    <ScanWindow x={1010} y={530} w={820} at={FLY_TO_CORNER + 26} rerunAt={RERUN_AT} />
+                    <ScanWindow x={1010} y={530} w={820} at={FLY_TO_CORNER + 119} rerunAt={RERUN_AT} />
                     <ScanNote x={1010} y={846} at={RERUN_AT + 70} />
                 </On>
 
