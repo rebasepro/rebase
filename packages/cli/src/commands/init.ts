@@ -249,6 +249,7 @@ ${chalk.bold("Options")}
   ${chalk.blue("--headless")}                Backend only — no admin panel, no collections
   ${chalk.blue("-y, --yes")}                 Accept defaults, never prompt ${chalk.gray("(required for CI / non-TTY)")}
   ${chalk.blue("-i, --install")}             Install dependencies after scaffolding
+  ${chalk.blue("--no-install")}              Scaffold only, install nothing ${chalk.gray("(the default)")}
   ${chalk.blue("-g, --git")}                 Initialize a git repository and make an initial commit
   ${chalk.blue("--database-url")} ${chalk.gray("<url>")}      Use an existing database instead of the generated one
   ${chalk.blue("--introspect")}              Generate collections from that database ${chalk.gray("(implies --template blank; needs --install)")}
@@ -286,6 +287,12 @@ ${chalk.bold("Rebase")} — Create a new project 🚀
 export const INIT_FLAGS = {
     "--git": Boolean,
     "--install": Boolean,
+    // The default, spelled out. `arg` has no negation, so without this entry a
+    // CI script that writes what reads naturally — `rebase init app --yes
+    // --no-install` — died on "Unknown or unexpected option", and both the
+    // README and the Quickstart documented a flag the parser rejected. When
+    // both are passed, the explicit "no" wins.
+    "--no-install": Boolean,
     "--database-url": String,
     "--introspect": Boolean,
     "--template": String,
@@ -336,6 +343,13 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
 
     const headlessArg = args["--headless"] === true ? true : undefined;
 
+    // `--no-install` is an explicit "no", not merely the absence of a "yes": it
+    // suppresses the interactive question too, so `rebase init app --no-install`
+    // asks one fewer thing rather than asking and ignoring the answer.
+    const noInstall = args["--no-install"] === true;
+    const installFlag = noInstall ? false : (args["--install"] ?? false);
+    const hasInstallFlag = noInstall || args["--install"] === true;
+
     if (isNonInteractive) {
         const projectName = nameArg || "my-rebase-app";
         const targetDirectory = path.resolve(process.cwd(), projectName);
@@ -345,7 +359,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         return {
             projectName: path.basename(targetDirectory),
             git: args["--git"] ?? false,
-            installDeps: args["--install"] ?? false,
+            installDeps: installFlag,
             targetDirectory,
             templateDirectory,
             databaseUrl: args["--database-url"] || undefined,
@@ -377,7 +391,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         templateArg,
         headlessArg,
         hasGitFlag: !!args["--git"],
-        hasInstallFlag: !!args["--install"],
+        hasInstallFlag,
         pm
     });
 
@@ -392,7 +406,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
     return {
         projectName,
         git: args["--git"] || answers.git || false,
-        installDeps: args["--install"] || answers.installDeps || false,
+        installDeps: noInstall ? false : (args["--install"] || answers.installDeps || false),
         targetDirectory,
         templateDirectory,
         databaseUrl: (answers.databaseUrl as string)?.trim() || undefined,

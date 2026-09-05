@@ -11,7 +11,7 @@ import os from "os";
 import { cp } from "fs/promises";
 import inquirer from "inquirer";
 import net from "net";
-import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES } from "./init.js";
+import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS } from "./init.js";
 
 
 let tmpDir: string;
@@ -1363,14 +1363,18 @@ describe("init --help", () => {
     }
 
     it("documents every flag the parser accepts", () => {
-        // The flags used to be discoverable only by triggering the non-TTY
-        // error. If a new one is added to promptForOptions, document it here too.
+        // Read from INIT_FLAGS rather than a hand-kept list. The list was the
+        // list, so a flag added to the parser and left out of the help passed
+        // this test — which is exactly the drift the test exists to catch.
+        // `--no-install` arrived documented in the README and the Quickstart
+        // and absent from both the parser and the help, and nothing noticed.
         const text = helpText();
-        for (const flag of [
-            "--template", "--headless", "--yes", "--install", "--git",
-            "--database-url", "--introspect", "--project", "--setup-key"
-        ]) {
-            expect(text).toContain(flag);
+        const longFlags = Object.entries(INIT_FLAGS)
+            .filter(([name, spec]) => name.startsWith("--") && typeof spec !== "string")
+            .map(([name]) => name);
+        expect(longFlags).toContain("--no-install");
+        for (const flag of longFlags) {
+            expect(text, `${flag} is accepted by the parser but missing from --help`).toContain(flag);
         }
     });
 
