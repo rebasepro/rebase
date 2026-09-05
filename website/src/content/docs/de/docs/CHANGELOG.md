@@ -13,6 +13,37 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ### Breaking
 
+- **`defineCollection` is one signature, and its errors land on the field.** It
+  was three overloads — Postgres, Firestore, MongoDB — and when a call failed
+  TypeScript emitted exactly one diagnostic, on `defineCollection(`, listing each
+  overload's first failure. So a Postgres collection's typo reported
+  `FirebaseCollectionConfig` and `MongoDBCollectionConfig` at an author who had
+  named neither engine, and a collection with two mistakes reported one of them,
+  revealing the second only on the next compile.
+
+  There is now one signature discriminated on `engine` (Postgres when absent).
+  Errors are reported where they are, all of them at once: a misspelled key on
+  the key, a bad `admin.display.title` on the path, a link field that belongs to
+  another relation kind on that field.
+
+  Two type exports move with it: `UnknownPropertyKey` is now **`NoSuchKey`**,
+  which carries a `didYouMean` member naming the shape whose keys were valid, and
+  `PropertyTypeNotOnThisEngine` is new — it is what a `relation` on a Firestore
+  collection resolves to. Both are internal machinery of the builder; nothing
+  should be importing them, and neither has a runtime representation, so no
+  contract bump.
+
+- **`defineCollection` no longer stops checking the `admin` block when a property
+  is wrong.** The builder declared `const P extends PostgresProperties`, and a
+  constraint TypeScript cannot satisfy is one it silently falls back from: a
+  single property with a bad `defaultValue` made `P` collapse to
+  `PostgresProperties`, the inferred entity shape collapse to
+  `Record<string, unknown>`, and `display.title`, `listProperties`,
+  `propertiesOrder` and `previewProperties` all widen to `string`. Every check the
+  builder exists to provide switched itself off, quietly, at the first mistake.
+  `P` is unconstrained now; exactness and the engine gate are expressed inside
+  `StrictProperties`, where a violation is one error on one property.
+
 - **`defineCollection` now checks a relation against the member its `kind`
   selects.** `Relation` has been a closed union since 0.11 — `belongsTo` owns
   `localKey`, `hasOne`/`hasMany` own `foreignKeyOnTarget`, `manyToMany` owns

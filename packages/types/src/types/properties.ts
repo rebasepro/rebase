@@ -119,15 +119,43 @@ export type MongoProperties = {
 export type EngineProperties = PostgresProperties | FirebaseProperties | MongoProperties;
 
 /**
- * What a property key that no property type declares resolves to.
+ * What a key the surrounding shape does not declare resolves to.
  *
- * Nothing is assignable to it — it has a required brand nobody can spell — so
- * the key errors. It exists as a *named* type rather than `never` purely for the
- * message: TypeScript prints the target type, so the compiler names the offending
- * key back to the author instead of saying "not assignable to type 'never'".
+ * Nothing is assignable to it — it has required members nobody can spell — so
+ * the key errors. It is a *named* type rather than `never` purely for the
+ * message: TypeScript prints the target, so the compiler reads back the key that
+ * is wrong and the keys that would have been right, instead of saying "not
+ * assignable to type 'never'".
+ *
+ * ```
+ * Type '{ required: true }' is not assignable to type
+ *   '{ readonly required: true } & NoSuchKey<"validaton", "name" | "type" | "validation" | …>'.
+ *   Property 'didYouMean' is missing …
+ * ```
+ *
+ * `Known` is the set of keys that *were* available. TypeScript elides a long
+ * union after a few members, so this is a hint and not an exhaustive listing —
+ * which is the right trade: the near-miss is usually alphabetically adjacent to
+ * the key that was meant, and a wall of 25 names would be read by nobody.
  */
-export type UnknownPropertyKey<K extends PropertyKey> = {
-    readonly __rebaseUnknownPropertyKey: K;
+export type NoSuchKey<K extends PropertyKey, Known extends PropertyKey = never> = {
+    readonly noSuchKey: K;
+    readonly didYouMean: Known;
+};
+
+/**
+ * What a property whose `type` the engine does not have resolves to.
+ *
+ * Same trick as {@link NoSuchKey}, for a different mistake: a `relation`
+ * on a Firestore collection, a `vector` on MongoDB. The gate used to live on the
+ * builder's `P extends FirebaseProperties` constraint, which reported it as a
+ * failed constraint on the whole property map — and, worse, made a *single* bad
+ * property collapse `P` back to its constraint, taking every `admin` key check
+ * with it. Expressed here it is one error, on the property, and the rest of the
+ * collection is still checked.
+ */
+export type PropertyTypeNotOnThisEngine<T> = {
+    readonly __rebasePropertyTypeNotOnThisEngine: T;
 };
 
 /**
@@ -148,7 +176,8 @@ export type UnknownPropertyKey<K extends PropertyKey> = {
  */
 type StrictRelation<R> = R extends { kind: infer K }
     ? R & {
-        [Key in Exclude<keyof R, keyof Extract<Relation, { kind: K }>>]: UnknownPropertyKey<Key>;
+        [Key in Exclude<keyof R, keyof Extract<Relation, { kind: K }>>]:
+            NoSuchKey<Key, keyof Extract<Relation, { kind: K }>>;
     }
     : R;
 
@@ -161,9 +190,11 @@ type StrictRelation<R> = R extends { kind: infer K }
  * {@link StrictRelation}. The rest (`array.of`, `map.properties`, the `admin`
  * options) are left to the weak-type check and the boot validator.
  */
-type ExactProperty<V, Shape> = V & {
-    [K in Exclude<keyof V, keyof Shape>]: UnknownPropertyKey<K>;
-} & (V extends { relation: infer R } ? { relation: StrictRelation<R> } : unknown);
+type ExactProperty<V, Shape> = [Shape] extends [never]
+    ? PropertyTypeNotOnThisEngine<V extends { type: infer T } ? T : never>
+    : V & {
+        [K in Exclude<keyof V, keyof Shape>]: NoSuchKey<K, keyof Shape>;
+    } & (V extends { relation: infer R } ? { relation: StrictRelation<R> } : unknown);
 
 /**
  * A property map in which each value is checked against the *concrete* member of

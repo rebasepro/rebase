@@ -770,6 +770,7 @@ type ListenCollectionProps
 type ListenOneProps
 type MongoProperties
 type MongoProperty
+type NoSuchKey { didYouMean, noSuchKey }
 type OnAction
 type OrderBySortTuple
 type OrderBySpec
@@ -783,6 +784,7 @@ type Properties
 type Property
 type PropertyBuilderProps { authController, entityId, index, path, previousValues, propertyValue, values }
 type PropertyCallbacks { afterRead, beforeSave }
+type PropertyTypeNotOnThisEngine
 type QueryComputedFields
 type RebaseAppConfig
 type RebaseAppType
@@ -811,7 +813,6 @@ type StorageSourceTransport
 type StrictProperties
 type TopicDelivery
 type TopicHandler
-type UnknownPropertyKey
 type UpdateOf
 type User { createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, photoURL, providerId, roles, uid }
 type VectorDistance
