@@ -52,12 +52,16 @@ Common destinations:
 | Agent | Location | Layout |
 |---|---|---|
 | Claude Code | `.claude/skills/<name>/SKILL.md` | one directory per skill |
-| Cursor | `.cursor/rules/<name>.mdc` | flat |
-| Windsurf | `.windsurf/rules/<name>.md` | flat |
 | Gemini CLI / Antigravity | `.agents/skills/<name>/SKILL.md` | one directory per skill |
 | Codex CLI | `.codex/skills/<name>/SKILL.md` | one directory per skill |
-| Kiro | `.kiro/steering/<name>.md` | flat |
-| GitHub Copilot | `.github/instructions/<name>.instructions.md` | flat |
+| Cursor | `.cursor/rules/rebase.mdc` + `<name>/SKILL.md` | index rule + bodies |
+| Windsurf | `.windsurf/rules/rebase.md` + `<name>/SKILL.md` | index rule + bodies |
+| Kiro | `.kiro/steering/rebase.md` + `<name>/SKILL.md` | index rule + bodies |
+| GitHub Copilot | `.github/instructions/rebase.instructions.md` + `<name>/SKILL.md` | index rule + bodies |
+
+The last four load their whole rules directory into every request, so they get
+one ~3 KB `alwaysApply` index naming the skills, and read a body when they need
+it — rather than 84,000 characters of reference in front of every question.
 
 ### Option 4: Agent Skills CLI, from a local clone
 

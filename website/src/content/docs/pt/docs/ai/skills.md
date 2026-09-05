@@ -32,13 +32,24 @@ Sete destinos são suportados — um para cada arquivo de ponteiro que o `rebase
 
 | `--agent` | Assistente | Gravado em |
 |---|---|---|
-| `cursor` | Cursor | `.cursor/rules/<skill>.mdc` |
+| `cursor` | Cursor | `.cursor/rules/rebase.mdc` + `.cursor/rules/<skill>/SKILL.md` |
 | `claude` | Claude Code | `.claude/skills/<skill>/SKILL.md` |
-| `windsurf` | Windsurf | `.windsurf/rules/<skill>.md` |
+| `windsurf` | Windsurf | `.windsurf/rules/rebase.md` + `.windsurf/rules/<skill>/SKILL.md` |
 | `gemini` | Gemini CLI / Antigravity | `.agents/skills/<skill>/SKILL.md` |
 | `codex` | Codex CLI | `.codex/skills/<skill>/SKILL.md` |
-| `kiro` | Kiro | `.kiro/steering/<skill>.md` |
-| `copilot` | GitHub Copilot | `.github/instructions/<skill>.instructions.md` |
+| `kiro` | Kiro | `.kiro/steering/rebase.md` + `.kiro/steering/<skill>/SKILL.md` |
+| `copilot` | GitHub Copilot | `.github/instructions/rebase.instructions.md` + `<skill>/SKILL.md` |
+
+:::note[Cursor, Windsurf, Kiro e Copilot recebem um único arquivo sempre ativo]
+Esses quatro carregam todo o diretório de regras em cada requisição. Um arquivo
+de regras por skill significava cerca de **84.000 caracteres** de referência do
+Rebase na frente de cada pergunta, fosse ela sobre Rebase ou não — e uma
+instrução que um assistente apenas folheia é uma instrução que ele não segue.
+
+Em vez disso recebem `rebase.mdc` (ou `rebase.md`): um índice de cerca de 3 KB
+com `alwaysApply: true`, listando o que cada skill cobre e o arquivo a ler. Os
+corpos ficam em subdiretórios por skill e são abertos sob demanda.
+:::
 
 O `gemini` cobre **tanto** o Gemini CLI quanto o Antigravity — eles leem o mesmo
 diretório `.agents/`, portanto não há um valor `antigravity` separado.
@@ -117,7 +128,7 @@ base de código.
 ```text
   Found 21 Rebase skills
 
-  ✓ Claude Code — 21 skills installed (+ 1 reference file) to .claude/skills
+  ✓ Claude Code — 21 skills installed (+ 8 reference files) to .claude/skills
 ```
 
 As skills são distribuídas a partir do pacote `@rebasepro/agent-skills`, do qual a CLI depende,

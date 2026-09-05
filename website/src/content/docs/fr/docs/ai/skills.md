@@ -32,13 +32,25 @@ Sept cibles sont prises en charge — une pour chaque fichier pointeur écrit pa
 
 | `--agent` | Assistant | Écrit dans |
 |---|---|---|
-| `cursor` | Cursor | `.cursor/rules/<skill>.mdc` |
+| `cursor` | Cursor | `.cursor/rules/rebase.mdc` + `.cursor/rules/<skill>/SKILL.md` |
 | `claude` | Claude Code | `.claude/skills/<skill>/SKILL.md` |
-| `windsurf` | Windsurf | `.windsurf/rules/<skill>.md` |
+| `windsurf` | Windsurf | `.windsurf/rules/rebase.md` + `.windsurf/rules/<skill>/SKILL.md` |
 | `gemini` | Gemini CLI / Antigravity | `.agents/skills/<skill>/SKILL.md` |
 | `codex` | Codex CLI | `.codex/skills/<skill>/SKILL.md` |
-| `kiro` | Kiro | `.kiro/steering/<skill>.md` |
-| `copilot` | GitHub Copilot | `.github/instructions/<skill>.instructions.md` |
+| `kiro` | Kiro | `.kiro/steering/rebase.md` + `.kiro/steering/<skill>/SKILL.md` |
+| `copilot` | GitHub Copilot | `.github/instructions/rebase.instructions.md` + `<skill>/SKILL.md` |
+
+:::note[Cursor, Windsurf, Kiro et Copilot reçoivent un seul fichier toujours actif]
+Ces quatre-là chargent tout leur répertoire de règles dans chaque requête. Un
+fichier de règles par compétence représentait environ **84 000 caractères** de
+référence Rebase devant chaque question, qu'elle porte sur Rebase ou non — et
+une instruction qu'un assistant survole est une instruction qu'il ne suit pas.
+
+Ils reçoivent à la place `rebase.mdc` (ou `rebase.md`) : un index d'environ 3 Ko
+avec `alwaysApply: true`, qui liste ce que couvre chaque compétence et le
+fichier à lire. Les contenus restent dans des sous-répertoires par compétence et
+sont ouverts à la demande.
+:::
 
 `gemini` couvre **à la fois** Gemini CLI et Antigravity — ils lisent le même
 répertoire `.agents/`, il n'y a donc pas de valeur `antigravity` distincte.
@@ -117,7 +129,7 @@ codebase.
 ```text
   Found 21 Rebase skills
 
-  ✓ Claude Code — 21 skills installed (+ 1 reference file) to .claude/skills
+  ✓ Claude Code — 21 skills installed (+ 8 reference files) to .claude/skills
 ```
 
 Les compétences sont fournies par le paquet `@rebasepro/agent-skills`, dont dépend le CLI,
