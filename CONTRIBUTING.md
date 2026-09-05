@@ -87,7 +87,22 @@ Before submitting a PR, make sure all checks pass:
 ./tooling/scripts/verify-quality.sh
 ```
 
-This runs TypeScript compilation, ESLint, unit tests, and Playwright E2E tests.
+It runs the build, `pnpm ci:static` — the same gate list CI's `static` job runs,
+type check and ESLint included — the unit suites, and the Playwright end-to-end
+tests. The browser suite needs a browser, which the npm package does not ship;
+the script installs it for you, or do it once yourself:
+
+```bash
+pnpm exec playwright install chromium
+```
+
+Two gates need a tool the repository cannot install for you — Docker (it boots
+the runtime image) and Helm (it renders the chart). Without them `ci:static`
+says so and skips them; CI has both and refuses to skip.
+
+If you only want the fast half, `pnpm ci:static` on its own reads source and
+needs no build, no database and no browser. Every gate it runs is listed with
+what it protects in **[docs/gates.md](docs/gates.md)**.
 
 ## Compatibility
 
