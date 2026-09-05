@@ -122,6 +122,15 @@ function devRuntimeEnv(projectRoot: string): Record<string, string> {
 export const DEV_PORT_FILENAME = ".rebase-dev-port";
 
 /**
+ * The `PORT` the scaffold's own `.env.example` ships.
+ *
+ * `rebase init` copies that file into `.env` verbatim, so every new project has
+ * this value whether or not anyone meant it. `init.test.ts` asserts the
+ * template still says this number, so the two cannot drift apart in silence.
+ */
+export const SCAFFOLD_DEFAULT_PORT = 3001;
+
+/**
  * Compute a deterministic port from the project root path.
  * Range: 3001–3999 (avoids privileged ports and common services).
  * Two different project directories will almost always get different ports.
@@ -321,6 +330,30 @@ async function ensureGeneratedSchema(projectRoot: string): Promise<void> {
         console.log(`  ${chalk.yellow("⚠")} ${chalk.gray(`Could not regenerate the database schema: ${message}`)}`);
         console.log(`  ${chalk.gray(`Run ${chalk.cyan("rebase schema generate")} to see why. Collection reads will fail until it succeeds.`)}`);
     }
+}
+
+/**
+ * One variable's value out of `.env` text, or undefined when it has none.
+ *
+ * The obvious `\s*(.+?)\s*$` does not do this, because `\s` matches a newline
+ * and `$` under /m matches at every line end: on `VITE_API_URL=` followed by
+ * `# VITE_GOOGLE_CLIENT_ID=`, the leading `\s*` ate the line break and the
+ * capture returned the *next* line. The scaffold ships `VITE_API_URL=` empty,
+ * so every first `rebase dev` read a comment as its value, decided it differed
+ * from the derived URL, and warned that a variable the developer had not set
+ * was being ignored.
+ *
+ * Horizontal whitespace only, so a value stops at its own line.
+ */
+export function readEnvValue(envText: string, key: string): string | undefined {
+    const match = envText.match(
+        new RegExp(`^[^\\S\\r\\n]*${key}[^\\S\\r\\n]*=[^\\S\\r\\n]*(.*?)[^\\S\\r\\n]*$`, "m")
+    );
+    if (!match) return undefined;
+
+    const value = match[1].replace(/^["']|["']$/g, "");
+
+    return value.length > 0 ? value : undefined;
 }
 
 /**
@@ -749,16 +782,20 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         if (envFile) {
             try {
                 const envText = fs.readFileSync(envFile, "utf-8");
-                const readEnvKey = (key: string): string | undefined => {
-                    const m = envText.match(new RegExp(`^\\s*${key}\\s*=\\s*(.+?)\\s*$`, "m"));
-                    return m ? m[1].replace(/^["']|["']$/g, "") : undefined;
-                };
-                const envPort = readEnvKey("PORT");
-                const envApiUrl = readEnvKey("VITE_API_URL");
+                const envPort = readEnvValue(envText, "PORT");
+                const envApiUrl = readEnvValue(envText, "VITE_API_URL");
                 // Only name the keys — never echo a raw `http://localhost:<port>`
                 // value, so log scrapers don't mistake it for the dev server URL.
                 const overridden: string[] = [];
-                if (envPort && envPort !== String(startPort)) overridden.push("PORT");
+                // A value equal to the scaffold's own default was written by
+                // the scaffold, not chosen by anyone, so there is nothing to
+                // warn about: this fired on the very first `rebase dev` of
+                // every new project, about a line the developer had not read
+                // yet, for a setting that applies to a command they had not
+                // run. A warning that is always there is a warning nobody
+                // reads when it matters.
+                const portWasChosen = Boolean(envPort) && envPort !== String(SCAFFOLD_DEFAULT_PORT);
+                if (portWasChosen && envPort !== String(startPort)) overridden.push("PORT");
                 if (envApiUrl && envApiUrl !== `http://localhost:${startPort}`) overridden.push("VITE_API_URL");
                 if (overridden.length > 0) {
                     console.log(chalk.yellow(

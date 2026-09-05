@@ -12,6 +12,7 @@ import { cp } from "fs/promises";
 import inquirer from "inquirer";
 import net from "net";
 import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS } from "./init.js";
+import { SCAFFOLD_DEFAULT_PORT } from "./dev.js";
 
 
 let tmpDir: string;
@@ -528,6 +529,15 @@ describe("template package.json contracts", () => {
         expect(workspace).toContain("backend");
         expect(workspace).toContain("frontend");
         expect(workspace).toContain("config");
+    });
+
+    it("the .env.example PORT is the one dev.ts treats as unchosen", () => {
+        // `rebase dev` derives a per-project port and warns when .env names a
+        // different one. Every scaffold ships this line unread, so without a
+        // shared constant the warning fired on every first run — and with one,
+        // this is what stops the two drifting apart.
+        const envExample = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.example"), "utf-8");
+        expect(envExample).toMatch(new RegExp(`^PORT=${SCAFFOLD_DEFAULT_PORT}$`, "m"));
     });
 
     it("ships everything scripts/example.ts needs to run", () => {

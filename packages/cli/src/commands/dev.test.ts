@@ -16,7 +16,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, getProjectPort, resolveStartPort } from "./dev";
+import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, getProjectPort, readEnvValue, resolveStartPort, SCAFFOLD_DEFAULT_PORT } from "./dev";
 
 describe("getProjectPort", () => {
     it("returns a port in the range 3001–3999", () => {
@@ -166,6 +166,45 @@ force: true });
  * destructive: `rebase dev -p 4000`, typed straight off this page, started on
  * the project's default port and said nothing about the flag it ignored.
  */
+describe("readEnvValue", () => {
+    it("returns undefined for a variable that is set to nothing", () => {
+        // The scaffold ships `VITE_API_URL=` empty and a commented line right
+        // under it. The old `\\s*(.+?)\\s*$` let the leading `\\s*` eat the
+        // newline, so this returned "# VITE_GOOGLE_CLIENT_ID=" — and every
+        // first `rebase dev` warned that a variable nobody had set was being
+        // ignored.
+        const env = [
+            "VITE_API_URL=",
+            "# VITE_GOOGLE_CLIENT_ID=",
+            ""
+        ].join("\n");
+
+        expect(readEnvValue(env, "VITE_API_URL")).toBeUndefined();
+    });
+
+    it("reads a value on its own line", () => {
+        expect(readEnvValue("PORT=3001\nNODE_ENV=development\n", "PORT")).toBe("3001");
+    });
+
+    it("strips surrounding quotes", () => {
+        expect(readEnvValue('FRONTEND_URL="http://localhost:5173"\n', "FRONTEND_URL"))
+            .toBe("http://localhost:5173");
+    });
+
+    it("is undefined for a key that is not there", () => {
+        expect(readEnvValue("PORT=3001\n", "DATABASE_URL")).toBeUndefined();
+    });
+
+    it("does not read a commented-out line as a value", () => {
+        // `# DATABASE_URL=…` is how the scaffold says "not this one".
+        expect(readEnvValue("# DATABASE_URL=postgres://x\n", "DATABASE_URL")).toBeUndefined();
+    });
+
+    it("names the port the scaffold ships", () => {
+        expect(SCAFFOLD_DEFAULT_PORT).toBe(3001);
+    });
+});
+
 describe("the dev help and the dev flag spec", () => {
     it("advertises only short aliases the spec declares", async () => {
         const printed: string[] = [];
