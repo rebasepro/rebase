@@ -966,6 +966,15 @@ path: projectId });
    Dispatch
    ═══════════════════════════════════════════════════════════════ */
 
+/**
+ * Everything the switch below dispatches, for the did-you-mean. `workload` is
+ * the older spelling of `pod` and stays out of it: suggesting the name we no
+ * longer print in the help would teach the wrong one.
+ */
+import { unknownCommand, unknownCommandMessage } from "../../utils/unknown-command";
+
+const DEBUG_SUBCOMMANDS = ["health", "logs", "errors", "boot", "requests", "pod", "db"] as const;
+
 export async function debugCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
     switch (action) {
         case undefined:
@@ -1011,12 +1020,14 @@ title: "📄 Logs" });
         case "--help":
             printDebugHelp();
             break;
-        default:
-            if (isJsonMode()) fail(`Unknown debug command: ${action}`, undefined, "unknown_command");
-            console.error(chalk.red(`Unknown debug command: ${action}`));
-            console.log("");
-            printDebugHelp();
-            process.exit(1);
+        default: {
+            // The JSON envelope is the contract for `--json` callers and stays
+            // exactly as it was; only the words are shared, so the human line
+            // and the machine one no longer drift apart.
+            const message = unknownCommandMessage(action, DEBUG_SUBCOMMANDS, "cloud debug");
+            if (isJsonMode()) fail(message, undefined, "unknown_command");
+            unknownCommand(action, DEBUG_SUBCOMMANDS, "cloud debug");
+        }
     }
 }
 

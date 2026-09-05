@@ -11,6 +11,11 @@ import { configPath, endpoint, previewEvent, readConfig, readProjectPolicy, setC
  * the same builder the sender uses, so what appears here is what would go, not
  * a documentation comment that quietly fell out of date two releases ago.
  */
+import { unknownCommand } from "../utils/unknown-command";
+
+/** Everything the switch below dispatches, for the did-you-mean. */
+const TELEMETRY_SUBCOMMANDS = ["status", "show", "enable", "disable"] as const;
+
 export async function telemetryCommand(rawArgs: string[]): Promise<void> {
     const subcommand = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[0];
 
@@ -53,8 +58,11 @@ export async function telemetryCommand(rawArgs: string[]): Promise<void> {
             console.log(chalk.gray("Anonymous usage sharing disabled. Nothing further will be sent."));
             return;
         default:
-            printHelp();
-            process.exitCode = 1;
+            // Printing the help and setting exit 1 said nothing about *why*:
+            // the page that came back looked like the page `rebase telemetry
+            // --help` prints, and the only difference was an exit code nobody
+            // reads at a prompt.
+            unknownCommand(subcommand, TELEMETRY_SUBCOMMANDS, "telemetry");
     }
 }
 

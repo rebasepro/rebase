@@ -43,6 +43,11 @@ ${chalk.bold("Options")}
 `.trim());
 }
 
+import { unknownCommand } from "../utils/unknown-command";
+
+/** Everything the switch below dispatches, for the did-you-mean. */
+const APPS_SUBCOMMANDS = ["list", "init", "config"] as const;
+
 export async function appsCommand(subcommand: string | undefined, rawArgs: string[] = []): Promise<void> {
     // Help is answered before parsing, so `rebase apps config --help` prints the
     // page rather than being rejected for naming no app.
@@ -76,10 +81,7 @@ export async function appsCommand(subcommand: string | undefined, rawArgs: strin
             await printAppConfig(positionals[1], Boolean(args["--json"]));
             break;
         default:
-            console.error(chalk.red(`Unknown subcommand: ${subcommand}`));
-            console.log("");
-            printHelp();
-            process.exit(1);
+            unknownCommand(subcommand, APPS_SUBCOMMANDS, "apps");
     }
 }
 

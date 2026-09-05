@@ -20,6 +20,7 @@ import { cloudCommand } from "./commands/cloud";
 import { appsCommand } from "./commands/apps";
 import { requireProjectRoot } from "./utils/project";
 import { parseCommandArgs } from "./utils/args";
+import { unknownCommand } from "./utils/unknown-command";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -236,11 +237,13 @@ export async function entry(args: string[]) {
             break;
 
         default:
-            console.error(chalk.red(`Unknown command: ${command}`));
-            console.log("");
-            printHelp();
+            // One line, with the correction, and no screen of help after it: the
+            // sentence that says what happened must not scroll off the top of a
+            // CI log. `namespacedCommands` is the dispatch itself, so the
+            // suggestion can never name a command that is not there.
+            //
             // A mistyped command must not look like success to a shell or CI.
-            process.exit(1);
+            unknownCommand(command, namespacedCommands);
     }
 }
 

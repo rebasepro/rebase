@@ -201,9 +201,19 @@ describe("CLI routing", () => {
         expect(errOutput).toContain("Unknown command");
         expect(processExitSpy).toHaveBeenCalledWith(1);
 
-        // Help is still printed to stdout so the user sees the valid commands.
+        // And nothing else. Dumping the whole help after the error pushed the
+        // one line that says what happened off the top of a CI log; the error
+        // now names `rebase --help` instead of reprinting it.
         const output = consoleLogSpy.mock.calls.map((c) => c[0]).join("\n");
-        expect(output).toContain("Commands");
+        expect(output).not.toContain("Commands");
+    });
+
+    it("corrects the near miss instead of listing everything", async () => {
+        await entry(["node", "rebase", "statsu"]);
+
+        const errOutput = consoleErrorSpy.mock.calls.map((c) => c[0]).join("\n");
+        expect(errOutput).toContain("did you mean");
+        expect(errOutput).toContain("status");
     });
 });
 
