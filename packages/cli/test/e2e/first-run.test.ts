@@ -33,7 +33,7 @@ import {
     linkLocalPackages,
     startBackend,
     stopBackend,
-    registerAndLogin,
+    loginSeededAdmin,
     writeRow,
     readRows,
     type RunningBackend
@@ -72,7 +72,12 @@ beforeAll(async () => {
     // `rebase dev --backend-only`, exactly as the printed next steps say — and
     // nothing between it and the install.
     backend = await startBackend(projectDir, env);
-    admin = await registerAndLogin(backend.baseUrl, "admin@example.com", "StrongPass1!");
+    // Signed in, not registered. `rebase init` names the first admin in `.env`
+    // and the runtime creates it while the user table is empty, so the account
+    // this suite used to register itself is already there — and registering it
+    // answered `409 EMAIL_EXISTS`, which is what a reader following the
+    // quickstart would hit too if they typed the default address.
+    admin = await loginSeededAdmin(projectDir, backend.baseUrl);
 }, 900_000);
 
 afterAll(async () => {
@@ -135,9 +140,12 @@ describe("the documented first run", () => {
         expect(read.rows.map((r: { title: string }) => r.title)).toContain("Hello from the first run");
     });
 
-    it("promotes the first registered user to admin", () => {
-        // The README says so on this path too, and this is the only suite that
-        // registers against the managed database.
+    it("seeds the admin named in .env, with the admin role", () => {
+        // The scaffold's own account, on the managed-database path: `init`
+        // writes the address and a generated password, and boot creates it
+        // before anyone can register. That the role comes with it is the whole
+        // reason the account exists — a seeded user without it would leave a
+        // first run with no way into the admin panel at all.
         expect(admin.roles).toContain("admin");
     });
 });
