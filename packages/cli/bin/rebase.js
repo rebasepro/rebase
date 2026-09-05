@@ -8,6 +8,28 @@ const distEntry = join(here, "..", "dist", "index.es.js");
 const srcDir = join(here, "..", "src");
 
 /**
+ * Colour, but only for a terminal.
+ *
+ * Every other line the CLI prints goes through chalk, which checks this for
+ * itself. These three did not — they are written before the bundle is even
+ * imported, so they hard-coded `\x1b[31m` — and stderr is exactly where that
+ * costs something: `rebase status extra 2>err.txt` wrote the escapes into the
+ * file, and CI logs, `2>&1 | grep`, and every agent reading a failed command's
+ * output got them too.
+ *
+ * `NO_COLOR` and `FORCE_COLOR` are the two conventions chalk honours, so
+ * honouring the same two keeps one CLI rather than two.
+ */
+const useColor = process.env.FORCE_COLOR !== undefined && process.env.FORCE_COLOR !== "0"
+    ? true
+    : Boolean(process.stderr.isTTY) && !process.env.NO_COLOR && process.env.TERM !== "dumb";
+
+const paint = (code, text) => (useColor ? `\x1b[${code}m${text}\x1b[0m` : text);
+const red = (text) => paint(31, text);
+const yellow = (text) => paint(33, text);
+const dim = (text) => paint(90, text);
+
+/**
  * Warn when the built CLI is older than the source it was built from.
  *
  * `rebase` runs `dist/`, and a global install of this package is usually a
@@ -53,7 +75,7 @@ function warnIfStale() {
         ? `${Math.round(seconds / 3600)}h`
         : seconds >= 60 ? `${Math.round(seconds / 60)}m` : `${seconds}s`;
     process.stderr.write(
-        `[33m⚠ rebase CLI: dist/ is ${ago} older than src/ — you are running a stale build.[0m\n` +
+        `${yellow(`⚠ rebase CLI: dist/ is ${ago} older than src/ — you are running a stale build.`)}\n` +
         `  Rebuild with: (cd ${join(here, "..")} && npm run build)\n`
     );
 }
@@ -77,7 +99,7 @@ try {
 if (!existsSync(distEntry)) {
     const dev = existsSync(srcDir);
     process.stderr.write(
-        `\x1b[31m✗ rebase CLI: not built yet — ${distEntry} is missing.\x1b[0m\n` +
+        `${red(`✗ rebase CLI: not built yet — ${distEntry} is missing.`)}\n` +
         (dev
             ? "  Build it with: pnpm --filter @rebasepro/cli build\n" +
               "  (or `pnpm build` from the repo root to build every package)\n"
@@ -102,16 +124,24 @@ const { entry } = await import("../dist/index.es.js");
  * friendly and exit never reach here. The stack is available behind
  * `--debug`/`REBASE_DEBUG`, because when the message is *not* enough that is
  * the only thing that helps.
+ *
+ * With one exception: a *usage* error. `rebase status extra` has no stack worth
+ * reading — it points at `arg` and `utils/args.ts` — and the hint suggests
+ * re-running with another flag, when the flags are precisely what went wrong.
+ * `utils/args.ts` marks those with `isUsageError` rather than a class, because
+ * this file imports the bundle and `instanceof` cannot reach across it.
  */
 const wantsStack = process.argv.includes("--debug") || process.env.REBASE_DEBUG === "1";
 
 entry(process.argv).catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`\x1b[31m✗ ${message}\x1b[0m\n`);
+    const isUsage = Boolean(error && typeof error === "object" && error.isUsageError);
+
+    process.stderr.write(`${red(`✗ ${message}`)}\n`);
     if (wantsStack && error instanceof Error && error.stack) {
         process.stderr.write(`\n${error.stack}\n`);
-    } else {
-        process.stderr.write("\x1b[90m  Re-run with --debug for the stack trace.\x1b[0m\n");
+    } else if (!isUsage) {
+        process.stderr.write(`${dim("  Re-run with --debug for the stack trace.")}\n`);
     }
     process.exit(1);
 });

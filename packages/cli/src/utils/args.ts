@@ -60,6 +60,29 @@ export function wantsHelp(rawArgs: string[]): boolean {
 }
 
 /**
+ * The command line was wrong — nothing ran, and there is no stack to want.
+ *
+ * `bin/rebase.js` ends every failure with "Re-run with --debug for the stack
+ * trace.", which is right when something broke inside a command and absurd for
+ * a typo: the stack points at `arg` and this file, neither of which the person
+ * who mistyped `--ouput` has any interest in. Worse, `--debug` is a flag, so
+ * the suggested next command is *another* command line — and the one thing we
+ * have just established is that the command line is what went wrong.
+ *
+ * Marked with a property rather than left to `instanceof`, because the reader
+ * is `bin/rebase.js`: it imports the bundle, so the class object it would test
+ * against is not the one this file compiled to.
+ */
+export class UsageError extends Error {
+    readonly isUsageError = true;
+
+    constructor(message: string) {
+        super(message);
+        this.name = "UsageError";
+    }
+}
+
+/**
  * Resolve a command's flags and positionals from the full `process.argv`.
  *
  * `commandWords` is how many words name the command itself — 2 for
@@ -95,7 +118,7 @@ export function parseCommandArgs<S extends arg.Spec>({
         parsed = arg(merged, { argv: rawArgs.slice(2) }) as arg.Result<S> & { "--help"?: boolean };
     } catch (err) {
         if (err instanceof Error && (err as arg.ArgError).code === "ARG_UNKNOWN_OPTION") {
-            throw new Error(
+            throw new UsageError(
                 `${err.message} — run \`rebase ${command} --help\` for the options it takes.`
             );
         }
@@ -111,7 +134,7 @@ export function parseCommandArgs<S extends arg.Spec>({
         // as likely to be a typo as an argument, and one of these positions is a
         // password.
         if (value.startsWith("-")) {
-            throw new Error(
+            throw new UsageError(
                 `\`${value}\` looks like an option, not a value — pass it with an explicit flag ` +
                 `(\`rebase ${command} --help\`).`
             );
@@ -119,7 +142,7 @@ export function parseCommandArgs<S extends arg.Spec>({
     }
 
     if (maxPositionals !== undefined && positionals.length > maxPositionals) {
-        throw new Error(
+        throw new UsageError(
             `rebase ${command} takes ${maxPositionals} argument${maxPositionals === 1 ? "" : "s"}, ` +
             `got ${positionals.length}: ${positionals.join(" ")}`
         );
