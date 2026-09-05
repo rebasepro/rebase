@@ -49,7 +49,7 @@ import { resolveDomainArg } from "./domains";
 import { resolveExtensionArgs } from "./extensions";
 import { resolveDeploymentIdArg } from "./deployments";
 import { resolveBackupArgs } from "./databases";
-import { resolveWebhookIdArg, webhooksCommand, resolveClusterVerifyArgs } from "./resources";
+import { resolveWebhookIdArg, webhooksCommand, resolveClusterVerifyArgs, resolveClusterAddArgs } from "./resources";
 import { resolveProjectArg } from "./projects";
 import { resolveDeployArgs } from "./deploy";
 
@@ -452,5 +452,66 @@ baseline: true });
     it("refuses an undeclared flag rather than verifying a cluster named after it", async () => {
         const err = await refusalOf(() => resolveClusterVerifyArgs(argv("clusters", "verify", "--baselin")));
         expect(err.code).toBe("usage");
+    });
+});
+
+/**
+ * `rebase cloud clusters add` — a Hetzner cluster is registered whole.
+ *
+ * The control plane installs the cluster baseline on INSERT and reads the row
+ * to do it: the name is what the Hetzner load balancer is adopted by, the
+ * address is what the ingress is pinned to. So everything a row needs has to
+ * be settable at insert, or the baseline installs knowing neither.
+ */
+describe("cloud clusters add", () => {
+    it("registers the four required columns and nothing it was not told", () => {
+        const args = resolveClusterAddArgs(argv(
+            "clusters", "add", "--name", "rebase-fsn1", "--provider", "hetzner", "--region", "fsn1", "--kubeconfig", "./cp.kubeconfig"
+        ));
+        expect(args).toEqual({
+            name: "rebase-fsn1", provider: "hetzner", region: "fsn1", kubeconfigPath: "./cp.kubeconfig",
+            baseDomain: undefined, ingressAddress: undefined, platformCapacity: false
+        });
+    });
+
+    it("carries the placement, address and backup store the baseline reads at insert", () => {
+        const args = resolveClusterAddArgs(argv(
+            "clusters", "add", "--name", "rebase-fsn1", "--provider", "hetzner", "--region", "fsn1", "--kubeconfig", "./cp.kubeconfig",
+            "--base-domain", "fsn1.rebase.website", "--ingress-address", "49.13.1.1", "--platform-capacity",
+            "--backup-bucket", "rebase-fsn1-db-backups", "--backup-endpoint", "https://fsn1.your-objectstorage.com",
+            "--backup-access-key-id", "AK", "--backup-secret-access-key", "SK"
+        ));
+        expect(args.platformCapacity).toBe(true);
+        expect(args.baseDomain).toBe("fsn1.rebase.website");
+        expect(args.ingressAddress).toBe("49.13.1.1");
+        expect(args.backupBucket).toBe("rebase-fsn1-db-backups");
+        expect(args.backupEndpoint).toBe("https://fsn1.your-objectstorage.com");
+        expect(args.backupAccessKeyId).toBe("AK");
+        expect(args.backupSecretAccessKey).toBe("SK");
+    });
+
+    it("refuses a backup bucket without its key — that row has NO backup store", async () => {
+        setJsonModeForTest(true);
+        const refusal = await refusalOf(() => resolveClusterAddArgs(argv(
+            "clusters", "add", "--name", "x", "--provider", "hetzner", "--region", "fsn1", "--kubeconfig", "k",
+            "--backup-bucket", "b"
+        )));
+        expect(refusal.message).toMatch(/go together/);
+    });
+
+    it("refuses platform capacity on Hetzner with no backup store of its own", async () => {
+        setJsonModeForTest(true);
+        const refusal = await refusalOf(() => resolveClusterAddArgs(argv(
+            "clusters", "add", "--name", "x", "--provider", "hetzner", "--region", "fsn1", "--kubeconfig", "k", "--platform-capacity"
+        )));
+        expect(refusal.message).toMatch(/backup store/);
+    });
+
+    it("refuses a provider it does not know", async () => {
+        setJsonModeForTest(true);
+        const refusal = await refusalOf(() => resolveClusterAddArgs(argv(
+            "clusters", "add", "--name", "x", "--provider", "azure", "--region", "r", "--kubeconfig", "k"
+        )));
+        expect(refusal.message).toMatch(/gcp, aws or hetzner/);
     });
 });

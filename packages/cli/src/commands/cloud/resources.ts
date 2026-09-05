@@ -995,41 +995,132 @@ async function clustersVerifyCommand(rawArgs: string[]): Promise<void> {
  * names an unreachable cluster is worse than no row, because a project pointed
  * at it fails at deploy instead of at registration.
  */
-async function clustersAddCommand(rawArgs: string[]): Promise<void> {
-    const { client } = await requireClient(rawArgs);
-    const flag = (name: string): string | undefined => {
-        const i = rawArgs.indexOf(name);
-        return i === -1 ? undefined : rawArgs[i + 1];
-    };
+/** The columns a `clusters` row is registered with. Exported for its test. */
+export interface ClusterAddArgs {
+    name: string;
+    provider: "gcp" | "aws" | "hetzner";
+    region: string;
+    kubeconfigPath: string;
+    baseDomain?: string;
+    ingressAddress?: string;
+    /** This is capacity we operate: projects placed in its region deploy here. */
+    platformCapacity: boolean;
+    backupBucket?: string;
+    backupEndpoint?: string;
+    backupAccessKeyId?: string;
+    backupSecretAccessKey?: string;
+}
 
-    const name = flag("--name");
-    const provider = flag("--provider");
-    const region = flag("--region");
-    const kubeconfigPath = flag("--kubeconfig");
+/**
+ * What `clusters add` was asked to register.
+ *
+ * Everything a row needs to serve tenants is settable HERE, at insert, because
+ * the control plane installs the cluster baseline on insert and reads the row
+ * to do it: the name is what the Hetzner load balancer is adopted by, the
+ * address is what the ingress is pinned to. Registering with the four
+ * required flags and patching the rest afterwards would install a baseline
+ * that knew neither.
+ *
+ * The backup fields travel together: a bucket with no key, or a key with no
+ * bucket, is a row `resolveBackupStore` deliberately treats as "no store" —
+ * so it is refused here, where the operator can still fix the command.
+ */
+export function resolveClusterAddArgs(rawArgs: string[]): ClusterAddArgs {
+    const { flags } = parseCloudArgs({
+        spec: {
+            "--name": String,
+            "--provider": String,
+            "--region": String,
+            "--kubeconfig": String,
+            "--base-domain": String,
+            "--ingress-address": String,
+            "--platform-capacity": Boolean,
+            "--backup-bucket": String,
+            "--backup-endpoint": String,
+            "--backup-access-key-id": String,
+            "--backup-secret-access-key": String
+        },
+        rawArgs,
+        commandWords: 2, // cloud clusters — `add` is the action positional
+        command: "cloud clusters add",
+        maxPositionals: 1
+    });
 
+    const name = flags["--name"];
+    const provider = flags["--provider"];
+    const region = flags["--region"];
+    const kubeconfigPath = flags["--kubeconfig"];
     if (!name || !provider || !region || !kubeconfigPath) {
         fail(
-            "Usage: rebase cloud clusters add --name <n> --provider <gcp|aws|hetzner> --region <r> --kubeconfig <path>",
+            "Usage: rebase cloud clusters add --name <n> --provider <gcp|aws|hetzner> --region <r> --kubeconfig <path> " +
+                "[--base-domain <d>] [--ingress-address <ip>] [--platform-capacity] " +
+                "[--backup-bucket <b> --backup-endpoint <url> --backup-access-key-id <k> --backup-secret-access-key <s>]",
             undefined,
             "bad_request"
         );
     }
-    if (!["gcp", "aws", "hetzner"].includes(provider!)) {
+    if (provider !== "gcp" && provider !== "aws" && provider !== "hetzner") {
         fail(`--provider must be gcp, aws or hetzner (got "${provider}")`, undefined, "bad_request");
     }
 
+    const backup = {
+        backupBucket: flags["--backup-bucket"],
+        backupEndpoint: flags["--backup-endpoint"],
+        backupAccessKeyId: flags["--backup-access-key-id"],
+        backupSecretAccessKey: flags["--backup-secret-access-key"]
+    };
+    const anyBackup = Boolean(backup.backupBucket || backup.backupAccessKeyId || backup.backupSecretAccessKey);
+    if (anyBackup && !(backup.backupBucket && backup.backupAccessKeyId && backup.backupSecretAccessKey)) {
+        fail(
+            "--backup-bucket, --backup-access-key-id and --backup-secret-access-key go together: a bucket " +
+                "without a key, or a key without a bucket, is a cluster with NO backup store.",
+            undefined,
+            "bad_request"
+        );
+    }
+    if (provider === "hetzner" && flags["--platform-capacity"] && !backup.backupBucket) {
+        fail(
+            "A Hetzner cluster we operate needs its own backup store (--backup-bucket ... on Hetzner Object " +
+                "Storage): without one its databases archive nowhere, or — worse — into the GCP default from " +
+                "another provider.",
+            undefined,
+            "bad_request"
+        );
+    }
+
+    return {
+        name: name!,
+        provider,
+        region: region!,
+        kubeconfigPath: kubeconfigPath!,
+        baseDomain: flags["--base-domain"],
+        ingressAddress: flags["--ingress-address"],
+        platformCapacity: flags["--platform-capacity"] === true,
+        ...(anyBackup ? backup : {})
+    };
+}
+
+async function clustersAddCommand(rawArgs: string[]): Promise<void> {
+    const args = resolveClusterAddArgs(rawArgs);
+    // Parsed before authenticating: a usage error is answerable without a
+    // session, and asking for one first turns "you forgot the id" into "log in".
+    const { client } = await requireClient(rawArgs);
+
     let kubeConfigData: string;
     try {
-        kubeConfigData = fs.readFileSync(kubeconfigPath!, "utf8");
+        kubeConfigData = fs.readFileSync(args.kubeconfigPath, "utf8");
     } catch {
-        fail(`Could not read ${kubeconfigPath}`, undefined, "bad_request");
+        fail(`Could not read ${args.kubeconfigPath}`, undefined, "bad_request");
         return;
     }
 
+    const { kubeconfigPath: _path, ...columns } = args;
     let created: { id: string | number };
     try {
         created = await client.data.collection("clusters").create({
-            name, provider, region, authType: "kubeconfig", kubeConfigData
+            ...columns,
+            authType: "kubeconfig",
+            kubeConfigData
         }) as never;
     } catch (error: unknown) {
         reportError(error, "Could not register the cluster");
@@ -1038,12 +1129,17 @@ async function clustersAddCommand(rawArgs: string[]): Promise<void> {
 
     emit(
         () => {
-            success(`Registered ${name} (${created.id}).`);
+            success(`Registered ${args.name} (${created.id}).`);
             noteBlank();
-            note("Verifying it can host tenants:");
+            note("The cluster baseline (ingress, certificates, the database operator) is installing in the background.");
+            note("Verify it can host tenants:");
             note(chalk.cyan(`  rebase cloud clusters verify ${created.id} --baseline`));
+            if (args.platformCapacity) {
+                noteBlank();
+                note(`Projects placed in ${args.region} now deploy here. Point *.${args.baseDomain ?? "<baseDomain>"} at ${args.ingressAddress ?? "its ingress address"} first.`);
+            }
         },
-        { id: created.id, name, provider, region }
+        { id: created.id, name: args.name, provider: args.provider, region: args.region, platformCapacity: args.platformCapacity }
     );
 }
 

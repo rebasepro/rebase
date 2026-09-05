@@ -205,6 +205,39 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
+    "clusters add": {
+        command: "cloud clusters add",
+        usage: "cloud clusters add --name <n> --provider <gcp|aws|hetzner> --region <r> --kubeconfig <path> [options]",
+        summary:
+            "Register a cluster. Everything the row needs to serve tenants is set here, at insert, "
+            + "because the control plane installs the cluster baseline on insert and reads the row to do it: "
+            + "the name is what a Hetzner load balancer is adopted by, the address is what the ingress is pinned to.",
+        flags: [
+            ["--name <n>", "The cluster's name. On Hetzner, its load balancer is `<name>-ingress`"],
+            ["--provider <gcp|aws|hetzner>", "Where it runs"],
+            ["--region <r>", "Its region id (europe-west1, fsn1, hel1). Projects placed here deploy to it"],
+            ["--kubeconfig <path>", "A kubeconfig for the control plane's identity on it"],
+            ["--base-domain <d>", "Tenants on it are served at <subdomain>.<d>. Convention: <region>.rebase.website"],
+            ["--ingress-address <ip>", "Its pinned ingress address — what the wildcard DNS record points at"],
+            ["--platform-capacity", "This is capacity Rebase operates: projects placed in its region deploy here. Leave off for a customer's own cluster"],
+            ["--backup-bucket <b>", "Its own object-storage bucket for database backups (with the three below)"],
+            ["--backup-endpoint <url>", "S3 endpoint of that bucket, e.g. https://fsn1.your-objectstorage.com"],
+            ["--backup-access-key-id <k>", "Key for the bucket"],
+            ["--backup-secret-access-key <s>", "Secret for the bucket. Encrypted at rest"]
+        ],
+        examples: [
+            "rebase cloud clusters add --name gke-eu --provider gcp --region europe-west1 --kubeconfig ./kubeconfig",
+            "rebase cloud clusters add --name rebase-fsn1 --provider hetzner --region fsn1 --kubeconfig ./control-plane.kubeconfig "
+            + "--base-domain fsn1.rebase.website --ingress-address 49.13.1.1 --platform-capacity "
+            + "--backup-bucket rebase-fsn1-db-backups --backup-endpoint https://fsn1.your-objectstorage.com "
+            + "--backup-access-key-id … --backup-secret-access-key …"
+        ],
+        notes: [
+            "The backup flags go together; a bucket without a key is a cluster with no backup store.",
+            "A Hetzner cluster registered with --platform-capacity must bring its own backup store."
+        ]
+    },
+
     "clusters verify": {
         command: "cloud clusters verify",
         usage: "cloud clusters verify <cluster-id> [--baseline]",

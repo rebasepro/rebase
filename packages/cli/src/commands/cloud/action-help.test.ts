@@ -60,7 +60,20 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     billing: {},
     logs: null,
     status: null,
-    "clusters verify": null
+    "clusters verify": null,
+    "clusters add": {
+        "--name": String,
+        "--provider": String,
+        "--region": String,
+        "--kubeconfig": String,
+        "--base-domain": String,
+        "--ingress-address": String,
+        "--platform-capacity": Boolean,
+        "--backup-bucket": String,
+        "--backup-endpoint": String,
+        "--backup-access-key-id": String,
+        "--backup-secret-access-key": String
+    }
 };
 
 /** `--name, -n <name>` → `--name`. The page spells flags for a reader. */
