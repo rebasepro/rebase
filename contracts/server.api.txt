@@ -857,7 +857,7 @@ interface CreateApiKeysOptions { apiKeysPath }
 interface CreateAuthOptions { authFlowMode, authPath, autoRefresh, persistSession, storage }
 interface CreateBackupsOptions { backupsPath }
 interface CreateCronOptions { cronPath }
-interface CreateRebaseClientOptions { admin, anonymous, apiKeys, apiPath, auth, baseUrl, collections, cron, fetch, offline, onUnauthorized, realtime, storageSources, storageUrlOrigin, token, websocketUrl }
+interface CreateRebaseClientOptions { admin, anonymous, apiKeys, apiPath, auth, baseUrl, collections, cron, fetch, headers, offline, onUnauthorized, realtime, schemaVersion, storageSources, storageUrlOrigin, token, websocketUrl }
 interface DeviceSession { createdAt, id, ipAddress, isCurrentSession, userAgent }
 interface FindResult { data, meta }
 interface FunctionInvokeOptions { headers, method, path }
@@ -875,7 +875,7 @@ interface PageWalkOptions { cursor, maxPages, pageSize }
 interface PaginationMeta { hasMore, limit, offset, total }
 interface PendingMutation { attempts, collection, data, generatedId, id, ids, lastError, mutationId, queuedAt, rollback, type, updates, upsert }
 interface PresenceDiff { joins, leaves }
-interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, onUnauthorized, realtime, storageUrlOrigin, token, websocketUrl }
+interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, headers, onUnauthorized, realtime, schemaVersion, storageUrlOrigin, token, websocketUrl }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
 interface RowSnapshotMeta { fromCache, hasPendingWrites }
 interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
