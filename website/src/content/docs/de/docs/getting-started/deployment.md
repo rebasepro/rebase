@@ -164,17 +164,35 @@ Cloud Run und andere serverlose Plattformen sind zustandslos. Verwenden Sie **S3
 
 ## Basis-URL ändern
 
-Wenn Sie möchten, dass Rebase unter einem Unterpfad läuft (z. B. `/admin`):
+Wenn die Administration unter einem Unterpfad laufen soll (z. B. `/admin`), ändern Sie eine Zeile — den `path` der App in `rebase.json`:
 
-**Frontend** — Aktualisieren Sie den `basename` des `BrowserRouter`:
-
-```tsx title="frontend/src/main.tsx"
-<BrowserRouter basename="/admin">
-    <App />
-</BrowserRouter>
+```json title="rebase.json"
+"admin": {
+    "type": "static",
+    "root": "frontend",
+    "build": "npm run build --workspace frontend",
+    "output": "frontend/dist",
+    "path": "/admin"
+}
 ```
 
-**Backend** — Aktualisieren Sie den Basispfad:
+`rebase build` übergibt ihn Vite als `base` (über `REBASE_APP_BASE`), Vite gibt ihn als `import.meta.env.BASE_URL` zurück, und die `main.tsx` des Scaffolds reicht ihn bereits an den Router weiter — so stimmen Assets, Routen und Server überein, ohne dass das Präfix an drei Stellen steht:
+
+```tsx title="frontend/src/main.tsx"
+// At "/" this is "".
+const basename = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const router = createBrowserRouter([
+    {
+        path: "/*",
+        element: <App/>
+    }
+], { basename });
+```
+
+Die Administration braucht einen **Data Router** — `createBrowserRouter`, nicht der einfache `BrowserRouter` — weil das Blockieren ungespeicherter Änderungen `useBlocker` verwendet, das nur der Data Router bereitstellt.
+
+**Backend** — wenn Sie auch die API verschieben, passen Sie deren Basispfad an:
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -209,16 +227,17 @@ sodass jede App lazy geladen wird und Produktbesucher niemals das Admin-Bundle h
 const isAdmin = window.location.pathname.startsWith("/admin");
 
 const ProductApp = lazy(() => import("./App"));
-const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseCMS basePath="/admin" />
+const AdminApp = lazy(() => import("./AdminApp"));
 
-if (isAdmin) {
-    // The admin uses useBlocker → needs a data router
-    const router = createBrowserRouter([{ path: "/admin/*", element: <AdminApp /> }]);
-    root.render(<RouterProvider router={router} />);
-} else {
-    root.render(<BrowserRouter><ProductApp /></BrowserRouter>);
-}
+const router = isAdmin
+    // The admin lives under /admin, and `basename` is how the router is told.
+    ? createBrowserRouter([{ path: "/*", element: <AdminApp/> }], { basename: "/admin" })
+    : createBrowserRouter([{ path: "/*", element: <ProductApp/> }]);
+
+root.render(<RouterProvider router={router}/>);
 ```
+
+Ein Router für beide Hälften: die Administration braucht den Data Router ohnehin, und es gibt keinen Grund, die Produkt-App auf einen anderen zu setzen.
 
 Das Backend benötigt für dieses Muster keine Änderungen — die API bleibt unter `/api` und der SPA-
 Catch-all liefert `index.html` sowohl für `/` als auch für `/admin/*`.

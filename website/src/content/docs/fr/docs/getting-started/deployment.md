@@ -173,17 +173,35 @@ Cloud Run et d'autres plateformes serverless sont sans état. Utilisez le **stoc
 
 ## Changer l'URL de base
 
-Si vous voulez que Rebase s'exécute sur un sous-chemin (par ex. `/admin`) :
+Si vous voulez que l'administration tourne sur un sous-chemin (par ex. `/admin`), changez une ligne — le `path` de l'app dans `rebase.json` :
 
-**Frontend** — Mettez à jour le `basename` de `BrowserRouter` :
-
-```tsx title="frontend/src/main.tsx"
-<BrowserRouter basename="/admin">
-    <App />
-</BrowserRouter>
+```json title="rebase.json"
+"admin": {
+    "type": "static",
+    "root": "frontend",
+    "build": "npm run build --workspace frontend",
+    "output": "frontend/dist",
+    "path": "/admin"
+}
 ```
 
-**Backend** — Mettez à jour le chemin de base :
+`rebase build` le passe à Vite comme `base` (via `REBASE_APP_BASE`), Vite le renvoie comme `import.meta.env.BASE_URL`, et le `main.tsx` du scaffold le donne déjà au routeur — les assets, les routes et le serveur s'accordent donc sans que le préfixe soit écrit à trois endroits :
+
+```tsx title="frontend/src/main.tsx"
+// At "/" this is "".
+const basename = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const router = createBrowserRouter([
+    {
+        path: "/*",
+        element: <App/>
+    }
+], { basename });
+```
+
+L'administration a besoin d'un **data router** — `createBrowserRouter`, pas le simple `BrowserRouter` — car le blocage des modifications non enregistrées utilise `useBlocker`, que seul le data router fournit.
+
+**Backend** — si vous déplacez aussi l'API, mettez à jour son chemin de base :
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -218,16 +236,17 @@ de sorte que chaque app est chargée en lazy et que les visiteurs du produit ne 
 const isAdmin = window.location.pathname.startsWith("/admin");
 
 const ProductApp = lazy(() => import("./App"));
-const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseCMS basePath="/admin" />
+const AdminApp = lazy(() => import("./AdminApp"));
 
-if (isAdmin) {
-    // The admin uses useBlocker → needs a data router
-    const router = createBrowserRouter([{ path: "/admin/*", element: <AdminApp /> }]);
-    root.render(<RouterProvider router={router} />);
-} else {
-    root.render(<BrowserRouter><ProductApp /></BrowserRouter>);
-}
+const router = isAdmin
+    // The admin lives under /admin, and `basename` is how the router is told.
+    ? createBrowserRouter([{ path: "/*", element: <AdminApp/> }], { basename: "/admin" })
+    : createBrowserRouter([{ path: "/*", element: <ProductApp/> }]);
+
+root.render(<RouterProvider router={router}/>);
 ```
+
+Un seul routeur pour les deux moitiés : l'administration a de toute façon besoin du data router, et rien ne justifie que l'app produit soit sur un autre.
 
 Le backend ne nécessite aucune modification pour ce modèle — l'API reste à `/api` et le catch-all de la SPA
 sert `index.html` à la fois pour `/` et `/admin/*`.
