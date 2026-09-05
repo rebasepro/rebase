@@ -20,6 +20,7 @@ import {
 import { scanTextForLibpqUrls, type LibpqUrlFinding } from "../utils/libpq-url";
 import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
 import { reportSpawnFailure } from "../utils/spawn-error";
+import { argsFromCommand } from "../utils/command-words";
 import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
 
 /**
@@ -204,13 +205,13 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
             if (!tsxBin) {
                 exitDependenciesNotInstalled(projectRoot);
             }
-            await execa(tsxBin, [pluginCli, ...rawArgs.slice(2)], {
+            await execa(tsxBin, [pluginCli, ...argsFromCommand(rawArgs, "doctor")], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env
             });
         } else {
-            await execa("node", [pluginCli, ...rawArgs.slice(2)], {
+            await execa("node", [pluginCli, ...argsFromCommand(rawArgs, "doctor")], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env

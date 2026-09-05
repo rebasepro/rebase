@@ -17,6 +17,7 @@ import {
     dependenciesNotInstalled
 } from "../utils/project";
 import { reportSpawnFailure } from "../utils/spawn-error";
+import { argsFromCommand, commandWords } from "../utils/command-words";
 import { recordEvent } from "../telemetry";
 
 /**
@@ -171,7 +172,7 @@ const ATLAS_BACKED_SUBCOMMANDS = new Set(["push", "generate", "migrate"]);
  */
 export function refuseAtlasOnManagedDatabase(rawArgs: string[], kind: string): void {
     if (kind !== "managed") return;
-    const [domain, subcommand] = rawArgs.slice(2);
+    const [domain, subcommand] = commandWords(rawArgs, "db");
     if (domain !== "db" || !ATLAS_BACKED_SUBCOMMANDS.has(subcommand ?? "")) return;
 
     console.error("");
@@ -223,7 +224,7 @@ export function refuseAtlasOnManagedDatabase(rawArgs: string[], kind: string): v
  */
 export function refuseBranchOnManagedDatabase(rawArgs: string[], kind: string): void {
     if (kind !== "managed") return;
-    const [domain, subcommand] = rawArgs.slice(2);
+    const [domain, subcommand] = commandWords(rawArgs, "db");
     if (domain !== "db" || subcommand !== "branch") return;
 
     console.error("");
@@ -375,7 +376,12 @@ export async function runDriverDbCommand(
 
     // Resolved against the directory the developer is standing in, before the
     // child is handed a different one. See absolutizeLocalPathArgs.
-    const childArgs = absolutizeLocalPathArgs(rawArgs.slice(2), process.cwd());
+    //
+    // From the command word, not from index 2: the driver reads its domain out
+    // of `args[0]`, so `rebase --debug db push` spawned it with ["--debug",
+    // "db", "push"] and it answered "Unknown domain command: --debug" — for a
+    // flag this CLI prints after every failure as the thing to re-run with.
+    const childArgs = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "db"), process.cwd());
 
     const isTs = pluginCli.endsWith(".ts");
     if (isTs) {
@@ -437,7 +443,7 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
     // drops the databases; which one this checkout talks to is not its
     // business, and it runs as a child process that could not persist the
     // answer anyway.
-    if (subcommand === "branch" && rawArgs.slice(2)[2] === "switch") {
+    if (subcommand === "branch" && commandWords(rawArgs, "db")[2] === "switch") {
         await switchBranch(projectRoot, rawArgs);
 
         return;
@@ -730,7 +736,7 @@ async function restoreAppRole(target: string): Promise<void> {
  * is none of this function's business.
  */
 async function forgetDeletedBranch(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
-    const [domain, subcommand, action, name] = rawArgs.slice(2);
+    const [domain, subcommand, action, name] = commandWords(rawArgs, "db");
     if (domain !== "db" || subcommand !== "branch" || action !== "delete" || !name) return;
 
     const { clearActiveBranch, readActiveBranch } = await import("../dev-db/branch-pointer");
@@ -776,9 +782,9 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     // every page that documents it.
     const goingOff = rawArgs.includes("--off") || rawArgs.includes("--main");
 
-    // `rawArgs` is the whole of `process.argv`, so the command's own words start
-    // at index 2: ["db", "branch", "switch", <name>].
-    const name = rawArgs.slice(2)[3];
+    // ["db", "branch", "switch", <name>], with any flags taken back out —
+    // `rebase --debug db branch switch feature` read the name as "switch".
+    const name = commandWords(rawArgs, "db")[3];
     const base = readEnvFile(projectRoot).DATABASE_URL?.trim();
 
     // `switch` with no argument reports rather than changes. "Which branch am I

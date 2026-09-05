@@ -15,6 +15,7 @@ import {
 import { recordEvent } from "../telemetry";
 import { wantsHelp } from "../utils/args";
 import { reportSpawnFailure } from "../utils/spawn-error";
+import { argsFromCommand } from "../utils/command-words";
 
 export async function schemaCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
     // `--help` is answered here, before `requireProjectRoot` and before the
@@ -69,13 +70,13 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
             if (!tsxBin) {
                 exitDependenciesNotInstalled(projectRoot);
             }
-            await execa(tsxBin, [pluginCli, ...rawArgs.slice(2)], {
+            await execa(tsxBin, [pluginCli, ...argsFromCommand(rawArgs, "schema")], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env
             });
         } else {
-            await execa("node", [pluginCli, ...rawArgs.slice(2)], {
+            await execa("node", [pluginCli, ...argsFromCommand(rawArgs, "schema")], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env
