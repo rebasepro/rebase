@@ -187,4 +187,52 @@ describe("the dev help and the dev flag spec", () => {
             expect(Object.keys(DEV_FLAGS)).toContain(alias);
         }
     });
+
+    it("documents every flag the spec accepts", async () => {
+        // The other direction, and the one that was broken: `--database-url`
+        // and `--docker` were both accepted and neither appeared in --help, so
+        // the only way to learn that `dev` can use your own Postgres was to
+        // read resolve.ts.
+        const printed: string[] = [];
+        const spy = vi.spyOn(console, "log").mockImplementation(message => {
+            printed.push(String(message));
+        });
+        try {
+            await devCommand(["node", "rebase", "dev", "--help"]);
+        } finally {
+            spy.mockRestore();
+        }
+
+        // eslint-disable-next-line no-control-regex
+        const help = printed.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+        const longFlags = Object.entries(DEV_FLAGS)
+            .filter(([name, spec]) => name.startsWith("--") && typeof spec !== "string")
+            .map(([name]) => name);
+
+        expect(longFlags).toEqual(expect.arrayContaining(["--docker", "--database-url"]));
+        for (const flag of longFlags) {
+            expect(help, `${flag} is accepted by the parser but missing from --help`).toContain(flag);
+        }
+    });
+
+    it("no longer claims a docker-compose db service is started first", async () => {
+        // It is started only for `--docker`, or for a DATABASE_URL that already
+        // points at this machine. A scaffolded project sets neither and runs on
+        // the managed database, so the old description described a path the
+        // documented first run never takes.
+        const printed: string[] = [];
+        const spy = vi.spyOn(console, "log").mockImplementation(message => {
+            printed.push(String(message));
+        });
+        try {
+            await devCommand(["node", "rebase", "dev", "--help"]);
+        } finally {
+            spy.mockRestore();
+        }
+
+        // eslint-disable-next-line no-control-regex
+        const help = printed.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+        expect(help).not.toContain("service is started first");
+        expect(help).toContain("the managed development database");
+    });
 });

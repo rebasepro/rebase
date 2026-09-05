@@ -941,23 +941,43 @@ ${chalk.green.bold("Usage")}
   rebase dev [options]
 
 ${chalk.green.bold("Options")}
-  ${chalk.blue("--backend-only, -b")}   Only start the backend server
-  ${chalk.blue("--frontend-only, -f")}  Only start the frontend server
-  ${chalk.blue("--port, -P")}           Backend port (default: auto-detected per project)
+  ${chalk.blue("--backend-only, -b")}    Only start the backend server
+  ${chalk.blue("--frontend-only, -f")}   Only start the frontend server
+  ${chalk.blue("--port, -P")}            Backend port (default: auto-detected per project)
   ${chalk.blue("--generate, -g")}        Enable automatic schema and SDK generation on startup and file changes
-  ${chalk.blue("--no-db")}               Never start the database or push the schema
+  ${chalk.blue("--database-url")} ${chalk.gray("<url>")}  Use this Postgres, ahead of everything else
+  ${chalk.blue("--docker")}              Use the project's docker-compose ${chalk.gray("db")} service
+  ${chalk.blue("--no-db")}               Start no database at all
+
+${chalk.green.bold("Which database")}
+  Ordered, and the order is the promise. The first of these that says
+  something wins:
+
+    1. ${chalk.blue("--database-url <url>")}    on this command line
+    2. ${chalk.gray("DATABASE_URL")}            in the shell environment
+    3. the branch this checkout is switched to ${chalk.gray("(rebase db branch switch)")}
+    4. ${chalk.gray("DATABASE_URL")}            in the project's .env
+    5. ${chalk.blue("--docker")}, or ${chalk.gray("devDatabase: \"docker\"")} in rebase.json
+    6. the managed development database ${chalk.gray("(PGlite, data in .rebase/)")}
+
+  A scaffolded project sets none of 1–5, so it lands on (6): no Docker,
+  nothing to install, and the collections' tables are created at boot.
+
+  ${chalk.blue("--docker")} reaches the ${chalk.gray("db")} service in this project's docker-compose.yml,
+  starting the container if nothing is listening on its port, and pushing
+  the schema when this command is what started it. Its connection string
+  is derived from the compose file and ${chalk.gray("DATABASE_PASSWORD")} in .env — the same
+  string .env carries, commented out, as ${chalk.gray("DATABASE_URL")}.
+
+  A database that is already running is never touched: no schema push,
+  no connection. A DATABASE_URL pointing anywhere other than this machine
+  is left alone entirely. Pass ${chalk.blue("--no-db")}, or set REBASE_DEV_NO_DB=1, to
+  start nothing — the backend then fails on the database it cannot reach,
+  which is the point.
 
 ${chalk.green.bold("Description")}
   Starts both the backend (tsx watch + Hono) and frontend (Vite)
   dev servers concurrently with color-coded output prefixes.
-
-  If DATABASE_URL points at this machine and nothing is listening on it,
-  the project's docker-compose \`db\` service is started first and the
-  schema is pushed to it — so a freshly scaffolded project needs only
-  this one command. A database that is already running is never touched:
-  no schema push, no connection. A DATABASE_URL pointing anywhere other
-  than localhost is left alone entirely. Pass --no-db, or set
-  REBASE_DEV_NO_DB=1, to skip all of it.
 
   Each project automatically receives a unique default port derived
   from its directory path, preventing collisions when running multiple
