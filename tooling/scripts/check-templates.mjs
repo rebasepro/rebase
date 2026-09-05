@@ -313,6 +313,54 @@ function checkPinnedTypesAreDeclared() {
  *
  * So assert it on the files instead. Cheap, and it cannot be fooled by resolution.
  */
+/**
+ * The compile below is not the compile the user gets.
+ *
+ * `TSCONFIG` above is synthetic — it has to be, because a scaffolded project
+ * resolves `@rebasepro/*` through an install this check has no install for. But
+ * a synthetic tsconfig can silently disagree with the shipped one, and it did:
+ * this gate compiled every preset under `moduleResolution: "bundler"` while
+ * `backend/tsconfig.json` shipped `"node"`, so the setting the user actually
+ * compiles with was the one setting nothing checked. `node` is TypeScript's
+ * node10 algorithm — no `exports` maps — and it is deprecated in TS 6.
+ *
+ * Only module resolution is compared, because it is the option that decides
+ * whether an import resolves at all. The rest of the synthetic config differs
+ * on purpose (noEmit, paths, typeRoots).
+ */
+function checkResolutionMatchesShipped() {
+    const problems = [];
+    const expected = TSCONFIG.compilerOptions.moduleResolution;
+
+    for (const [root, workspaces] of [
+        [templateRoot, ["config", "backend", "frontend"]],
+        [path.join(repoRoot, "packages/cli/templates/overlays/baas"), ["config", "backend"]]
+    ]) {
+        for (const workspace of workspaces) {
+            const tsconfigPath = path.join(root, workspace, "tsconfig.json");
+            if (!fs.existsSync(tsconfigPath)) continue;
+            const raw = fs.readFileSync(tsconfigPath, "utf8")
+                .replace(/\/\*[\s\S]*?\*\//g, "")
+                .replace(/(^|[^:])\/\/.*$/gm, "$1");
+            let declared;
+            try {
+                declared = JSON.parse(raw).compilerOptions?.moduleResolution;
+            } catch {
+                continue; // checkPinnedTypesAreDeclared already reports a bad parse
+            }
+            if (declared !== undefined && declared !== expected) {
+                problems.push(
+                    `${path.relative(repoRoot, tsconfigPath)} sets moduleResolution: "${declared}", ` +
+                    `but this gate compiles the preset with "${expected}" — so the setting shipped to ` +
+                    "users is the one nothing checks"
+                );
+            }
+        }
+    }
+
+    return problems;
+}
+
 function checkBaasHasNoAdminTypes() {
     const problems = [];
     const walk = (dir) => {
@@ -341,6 +389,15 @@ if (baasProblems.length > 0) {
     for (const p of baasProblems) console.error(`    ${p}`);
 } else {
     console.log("  ok   baas has no admin layer");
+}
+
+const resolutionProblems = checkResolutionMatchesShipped();
+if (resolutionProblems.length > 0) {
+    failed++;
+    console.log("  FAIL shipped tsconfigs resolve the way this gate compiles");
+    for (const p of resolutionProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   shipped tsconfigs resolve the way this gate compiles");
 }
 
 const pinnedTypeProblems = checkPinnedTypesAreDeclared();
