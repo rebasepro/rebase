@@ -262,12 +262,18 @@ locali e remoti. Mentre `rebase dev` è in esecuzione, il server legge la porta 
 chiave di servizio da `.rebase/state.json` nella directory del progetto, rendendo il caso
 locale completamente a configurazione zero.
 
-:::note[`REBASE_PROJECT_DIR` popola il registro solo una volta]
-La variabile d'ambiente crea il progetto `default` **solo se il registro non contiene
-ancora una voce `default`**. Una volta creato `~/.rebase/projects.json`, la modifica di
-`REBASE_PROJECT_DIR` non ha alcun effetto su un progetto `default` già registrato, e l'`activeProject`
-del registro è ciò a cui gli strumenti fanno effettivamente riferimento. Se un assistente sembra
-leggere il database sbagliato, esegui prima `rebase_project_current`: la causa è quasi sempre questa.
+:::note[Il blocco di ambiente ha la precedenza sul registro]
+`REBASE_PROJECT_DIR`, `REBASE_BASE_URL` e `REBASE_API_TOKEN` ricostruiscono il
+progetto `default` **a ogni avvio**, non solo al primo. La ricostruzione riguarda
+l'intera voce: un token registrato per il vecchio `projectDir` viene scartato
+anziché essere trasferito in una directory per cui non era mai stato emesso.
+
+Il `default` persistito viene usato solo quando la configurazione del client non
+imposta nessuna delle tre variabili. `activeProject` resta comunque persistente:
+se una sessione precedente ha chiamato `rebase_project_switch`, gli strumenti
+fanno riferimento a quel progetto e il server lo segnala su stderr. Se un
+assistente sembra leggere il database sbagliato, esegui prima
+`rebase_project_current`.
 :::
 
 I token vengono memorizzati in tale registro **in chiaro**. Si tratta di un file nella tua

@@ -15,11 +15,12 @@ import {
     READ_ONLY_TOOLS,
     LOCAL_ONLY_TOOLS,
     findBackendDir,
-    findDevDir
+    findDevDir,
+    envDeclaredProject
 } from "../src/index";
 import type { PackageManager } from "../src/index";
 import { spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -1052,5 +1053,126 @@ describe("the two project layouts", () => {
     it("runs dev in app/ when there is one", () => {
         mkdirSync(join(root, "app"), { recursive: true });
         expect(findDevDir(root)).toBe(resolve(root, "app"));
+    });
+});
+
+describe("the environment block outranks the persisted registry", () => {
+    // `homedir()` is mocked at the top of this file, so this is where the
+    // server's own REGISTRY_PATH resolves.
+    const home = join(tmpdir(), "rebase-mcp-test-home");
+    const registryPath = join(home, ".rebase", "projects.json");
+    let saved: string | null = null;
+
+    beforeEach(() => {
+        mkdirSync(join(home, ".rebase"), { recursive: true });
+        saved = existsSync(registryPath) ? readFileSync(registryPath, "utf8") : null;
+    });
+
+    afterEach(() => {
+        if (saved === null) rmSync(registryPath, { force: true });
+        else writeFileSync(registryPath, saved);
+        vi.unstubAllEnvs();
+        vi.resetModules();
+    });
+
+    /** Re-import the server with a written registry and a chosen environment. */
+    async function bootWith(
+        persisted: unknown,
+        env: Record<string, string>
+    ): Promise<typeof import("../src/index")> {
+        writeFileSync(registryPath, JSON.stringify(persisted));
+        for (const key of ["REBASE_PROJECT_DIR", "REBASE_BASE_URL", "REBASE_API_TOKEN", "REBASE_TOKEN"]) {
+            vi.stubEnv(key, env[key] ?? "");
+        }
+        vi.resetModules();
+        return await import("../src/index");
+    }
+
+    async function currentProject(mod: typeof import("../src/index")) {
+        const handler = (mod.server as any)._requestHandlers.get("tools/call");
+        const result = await handler({
+            method: "tools/call",
+            params: { name: "rebase_project_current", arguments: {} }
+        });
+        return JSON.parse(result.content[0].text);
+    }
+
+    const persistedDefault = (dir: string) => ({
+        activeProject: "default",
+        projects: {
+            default: {
+                name: "default",
+                projectDir: dir,
+                baseUrl: "https://persisted.example.com",
+                token: "persisted-token-that-is-long-enough",
+                addedAt: "2020-01-01T00:00:00.000Z"
+            }
+        }
+    });
+
+    it("rebuilds the default project from the environment on every start", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
+        const mod = await bootWith(persistedDefault(join(dir, "stale")), {
+            REBASE_PROJECT_DIR: dir,
+            REBASE_BASE_URL: "http://localhost:4321",
+            REBASE_API_TOKEN: "rk_env_00000000000000000000000000"
+        });
+
+        const current = await currentProject(mod);
+        expect(current.projectDir).toBe(dir);
+        expect(current.baseUrl).toBe("http://localhost:4321");
+        expect(current.tokenPrefix).toBe("rk_env_0...");
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("drops a token registered against the directory the environment replaced", async () => {
+        // The persisted token is a credential for the *old* projectDir. Carrying
+        // it into a directory it was never issued for is how an admin key ends
+        // up pointed at somebody else's backend.
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
+        const mod = await bootWith(persistedDefault(join(dir, "stale")), { REBASE_PROJECT_DIR: dir });
+
+        const current = await currentProject(mod);
+        expect(current.projectDir).toBe(dir);
+        expect(current.hasToken).toBe(false);
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("keeps the persisted default when the client declares none of the three", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
+        const mod = await bootWith(persistedDefault(join(dir, "kept")), {});
+
+        const current = await currentProject(mod);
+        expect(current.baseUrl).toBe("https://persisted.example.com");
+        expect(current.projectDir).toBe(join(dir, "kept"));
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("says on stderr that a sticky activeProject is what tools actually target", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
+        const warn = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        await bootWith(
+            {
+                activeProject: "prod",
+                projects: {
+                    default: { name: "default", projectDir: dir, baseUrl: "http://localhost:3001", token: "", addedAt: "2020-01-01T00:00:00.000Z" },
+                    prod: { name: "prod", projectDir: dir, baseUrl: "https://prod.example.com", token: "", addedAt: "2020-01-01T00:00:00.000Z" }
+                }
+            },
+            { REBASE_BASE_URL: "http://localhost:4321" }
+        );
+        const written = warn.mock.calls.map((c) => String(c[0])).join("");
+        expect(written).toContain("\"prod\" is the active one");
+        warn.mockRestore();
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("reports nothing when the environment is silent", () => {
+        expect(envDeclaredProject({} as NodeJS.ProcessEnv)).toBeNull();
+        expect(envDeclaredProject({ REBASE_TOKEN: "rk_x" } as NodeJS.ProcessEnv)).toEqual({
+            projectDir: undefined,
+            baseUrl: undefined,
+            token: "rk_x"
+        });
     });
 });

@@ -15293,13 +15293,17 @@ environments. While `rebase dev` is running, the server reads the active port an
 service key from `.rebase/state.json` in the project directory, which is what
 makes the local case zero-config.
 
-:::note[`REBASE_PROJECT_DIR` only seeds the registry once]
-The env var creates the `default` project **only if the registry has no
-`default` entry yet**. Once `~/.rebase/projects.json` exists, changing
-`REBASE_PROJECT_DIR` has no effect on an already-registered `default`, and the
-registry's `activeProject` is what tools actually target. If an assistant seems
-to be reading the wrong database, call `rebase_project_current` first — it is
-almost always this.
+:::note[The environment block wins over the registry]
+`REBASE_PROJECT_DIR`, `REBASE_BASE_URL` and `REBASE_API_TOKEN` rebuild the
+`default` project **on every start**, not just the first one. The rebuild is
+whole-entry: a token registered against the old `projectDir` is dropped rather
+than carried into a directory it was never issued for.
+
+The persisted `default` is used only when the client's config sets none of the
+three. `activeProject` is still sticky, so if a previous session called
+`rebase_project_switch`, tools target that project and the server says so on
+stderr. If an assistant seems to be reading the wrong database, call
+`rebase_project_current` first.
 :::
 
 Tokens are stored in that registry **in plaintext**. It is a file in your home

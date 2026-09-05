@@ -325,18 +325,54 @@ const ENV_BASE_URL = process.env.REBASE_BASE_URL || "";
 const ENV_API_TOKEN = process.env.REBASE_API_TOKEN || process.env.REBASE_TOKEN || "";
 
 /**
+ * The env vars that describe a `default` project, or `null` when the client
+ * declared none of them.
+ *
+ * `ENV_PROJECT_DIR` cannot answer this on its own: it falls back to
+ * `process.cwd()`, so it is always truthy and "was it set?" has to be asked of
+ * `process.env` directly.
+ */
+export function envDeclaredProject(
+    env: NodeJS.ProcessEnv = process.env
+): { projectDir?: string; baseUrl?: string; token?: string } | null {
+    const projectDir = env.REBASE_PROJECT_DIR || undefined;
+    const baseUrl = env.REBASE_BASE_URL || undefined;
+    const token = env.REBASE_API_TOKEN || env.REBASE_TOKEN || undefined;
+    if (!projectDir && !baseUrl && !token) return null;
+    return { projectDir, baseUrl, token };
+}
+
+/**
  * Initialize the project registry.
  *
  * Priority:
- * 1. REBASE_PROJECT_DIR env → single-project mode (backward-compatible)
- * 2. Load ~/.rebase/projects.json
- * 3. Auto-discover from .rebase/state.json in the project dir
+ * 1. `REBASE_PROJECT_DIR` / `REBASE_BASE_URL` / `REBASE_API_TOKEN` — the block
+ *    in the client's own MCP config. If any of them is set, the `default`
+ *    project is rebuilt from them on **every** start.
+ * 2. The persisted `default` in `~/.rebase/projects.json`, when the client
+ *    declared none of the three.
+ * 3. Auto-discovery from `.rebase/state.json` in the project dir, which fills
+ *    the gaps in either case.
+ *
+ * Step 1 used to be `if (!registry.projects["default"])` — the env vars seeded
+ * the registry once and were dead ever after. That is the wrong way round:
+ * the env block is what the person editing `.mcp.json` just wrote, and
+ * `~/.rebase/projects.json` is a cache in their home directory they have
+ * probably forgotten exists. Pointing `REBASE_PROJECT_DIR` at a second project
+ * silently kept talking to the first one, which is the failure this file can
+ * least afford: every tool here acts on whatever `default` resolves to.
+ *
+ * The rebuild is whole-entry, not per-field, on purpose. A token registered
+ * for one `projectDir` is a credential for *that* backend; carrying it over
+ * because the new env block only named a directory would hand the wrong
+ * project an admin key.
  */
 function initializeRegistry(): void {
     registry = loadRegistry();
 
-    // Ensure a "default" project exists from env vars or CWD
-    if (!registry.projects["default"]) {
+    const fromEnv = envDeclaredProject();
+
+    if (fromEnv || !registry.projects["default"]) {
         const devState = readDevState(ENV_PROJECT_DIR);
         const envServiceKey = readServiceKeyFromEnv(ENV_PROJECT_DIR);
         registry.projects["default"] = {
@@ -355,6 +391,48 @@ function initializeRegistry(): void {
 
     if (!registry.activeProject || !registry.projects[registry.activeProject]) {
         registry.activeProject = "default";
+    }
+
+    warnIfEnvIgnored(fromEnv);
+}
+
+/**
+ * Say so on stderr if the environment asked for something the registry is not
+ * doing.
+ *
+ * Two cases, and only the second one is reachable now:
+ *
+ * - The `default` entry does not carry the env values. That is the bug fixed
+ *   above; the check stays as a canary, because the symptom of the old
+ *   behaviour was an assistant confidently reading the wrong database with no
+ *   output anywhere saying so.
+ * - The env block is set but a *different* project is active, because a
+ *   previous session called `rebase_project_switch` and the registry remembers
+ *   it. Tools target `activeProject`, so the env block really is inert — the
+ *   registry is not overruled here, since sticky project selection is the
+ *   point of having a registry, but silence is not an option either.
+ *
+ * stderr, not stdout: stdout is the MCP framing channel.
+ */
+function warnIfEnvIgnored(fromEnv: ReturnType<typeof envDeclaredProject>): void {
+    if (!fromEnv) return;
+    const def = registry.projects["default"];
+    const mismatched: string[] = [];
+    if (fromEnv.projectDir && def?.projectDir !== fromEnv.projectDir) mismatched.push("REBASE_PROJECT_DIR");
+    if (fromEnv.baseUrl && def?.baseUrl !== fromEnv.baseUrl) mismatched.push("REBASE_BASE_URL");
+    if (fromEnv.token && def?.token !== fromEnv.token) mismatched.push("REBASE_API_TOKEN");
+    if (mismatched.length) {
+        process.stderr.write(
+            `[rebase-mcp] ${mismatched.join(", ")} set but not reflected in the "default" project — ` +
+            `this is a bug in the server; report it.\n`
+        );
+    }
+    if (registry.activeProject && registry.activeProject !== "default") {
+        process.stderr.write(
+            `[rebase-mcp] the environment describes the "default" project, but "${registry.activeProject}" ` +
+            `is the active one, so tools target it instead. Call rebase_project_switch with "default" ` +
+            `to use the environment's values.\n`
+        );
     }
 }
 

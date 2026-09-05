@@ -278,13 +278,18 @@ environnements locaux et distants. Pendant que `rebase dev` s'exécute, le serve
 le port actif et la clé de service depuis `.rebase/state.json` dans le répertoire du
 projet, ce qui permet le fonctionnement sans configuration en local.
 
-:::note[`REBASE_PROJECT_DIR` n'initialise le registre qu'une seule fois]
-La variable d'environnement crée le projet `default` **uniquement si le registre ne
-contient pas encore d'entrée `default`**. Dès que `~/.rebase/projects.json` existe,
-modifier `REBASE_PROJECT_DIR` n'a aucun effet sur un projet `default` déjà enregistré,
-et c'est l'`activeProject` du registre qui est réellement ciblé par les outils. Si un
-assistant semble lire la mauvaise base de données, appelez d'abord
-`rebase_project_current` — c'est presque toujours la cause.
+:::note[Le bloc d'environnement l'emporte sur le registre]
+`REBASE_PROJECT_DIR`, `REBASE_BASE_URL` et `REBASE_API_TOKEN` reconstruisent le
+projet `default` **à chaque démarrage**, et pas seulement au premier. La
+reconstruction porte sur l'entrée entière : un jeton enregistré pour l'ancien
+`projectDir` est abandonné plutôt que repris dans un répertoire pour lequel il
+n'a jamais été émis.
+
+Le `default` persisté n'est utilisé que lorsque la configuration du client ne
+définit aucune des trois variables. `activeProject` reste persistant : si une
+session précédente a appelé `rebase_project_switch`, les outils visent ce projet
+et le serveur le signale sur stderr. Si un assistant semble lire la mauvaise
+base de données, appelez d'abord `rebase_project_current`.
 :::
 
 Les jetons sont stockés dans ce registre **en clair**. Il s'agit d'un fichier situé

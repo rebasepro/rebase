@@ -285,14 +285,18 @@ Remote-Umgebungen hinweg arbeiten. Während `rebase dev` läuft, liest der Serve
 den aktiven Port und den Service-Schlüssel aus `.rebase/state.json` im
 Projektverzeichnis, was den lokalen Anwendungsfall zum Zero-Config-Erlebnis macht.
 
-:::note[`REBASE_PROJECT_DIR` initialisiert die Registry nur einmal]
-Die Umgebungsvariable erstellt das Projekt `default` **nur dann, wenn die
-Registry noch keinen `default`-Eintrag enthält**. Sobald `~/.rebase/projects.json`
-existiert, hat das Ändern von `REBASE_PROJECT_DIR` keine Auswirkung auf ein
-bereits registriertes `default`, und das `activeProject` der Registry ist das,
-worauf die Tools tatsächlich abzielen. Wenn ein Assistent die falsche Datenbank
-zu lesen scheint, rufen Sie zuerst `rebase_project_current` auf – fast immer
-liegt es daran.
+:::note[Der Umgebungsblock hat Vorrang vor der Registry]
+`REBASE_PROJECT_DIR`, `REBASE_BASE_URL` und `REBASE_API_TOKEN` bauen das Projekt
+`default` **bei jedem Start** neu auf, nicht nur beim ersten. Der Neuaufbau
+betrifft den gesamten Eintrag: Ein Token, das für das alte `projectDir`
+registriert wurde, wird verworfen statt in ein Verzeichnis übernommen zu werden,
+für das es nie ausgestellt wurde.
+
+Der persistierte `default` wird nur verwendet, wenn die Client-Konfiguration
+keine der drei Variablen setzt. `activeProject` bleibt weiterhin bestehen: Hat
+eine frühere Sitzung `rebase_project_switch` aufgerufen, richten sich die Tools
+auf dieses Projekt, und der Server meldet das auf stderr. Wenn ein Assistent die
+falsche Datenbank zu lesen scheint, rufe zuerst `rebase_project_current` auf.
 :::
 
 Tokens werden in dieser Registry **im Klartext** gespeichert. Es handelt sich um

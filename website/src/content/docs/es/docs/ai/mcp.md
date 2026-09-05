@@ -270,13 +270,17 @@ y remotos. Mientras `rebase dev` está en ejecución, el servidor lee el puerto 
 y la clave de servicio desde `.rebase/state.json` en el directorio del proyecto, que
 es lo que hace que el caso local funcione sin configuración previa.
 
-:::note[`REBASE_PROJECT_DIR` solo inicializa el registro una vez]
-La variable de entorno crea el proyecto `default` **solo si el registro aún no tiene
-una entrada `default`**. Una vez que `~/.rebase/projects.json` existe, cambiar
-`REBASE_PROJECT_DIR` no tiene efecto en un `default` ya registrado, y el `activeProject`
-del registro es a lo que las herramientas realmente apuntan. Si un asistente parece
-estar leyendo la base de datos equivocada, llama primero a `rebase_project_current`
-—casi siempre se debe a esto.
+:::note[El bloque de entorno tiene prioridad sobre el registro]
+`REBASE_PROJECT_DIR`, `REBASE_BASE_URL` y `REBASE_API_TOKEN` reconstruyen el
+proyecto `default` **en cada arranque**, no solo en el primero. La reconstrucción
+afecta a toda la entrada: un token registrado para el `projectDir` anterior se
+descarta en lugar de trasladarse a un directorio para el que nunca se emitió.
+
+El `default` persistido solo se usa cuando la configuración del cliente no define
+ninguna de las tres variables. `activeProject` sigue siendo persistente: si una
+sesión anterior llamó a `rebase_project_switch`, las herramientas apuntan a ese
+proyecto y el servidor lo indica por stderr. Si un asistente parece estar leyendo
+la base de datos equivocada, ejecuta primero `rebase_project_current`.
 :::
 
 Los tokens se almacenan en ese registro **en texto plano**. Es un archivo en tu directorio
