@@ -7,7 +7,9 @@
  * workflow. A list that lives in one place and is executable from both sides
  * cannot drift from itself.
  *
- * The per-step rationale that used to sit in the YAML lives in `why` below.
+ * The per-step rationale that used to sit in the YAML lives in `why` below, and
+ * `docs/gates.md` renders the same set as a table. `check:gates-doc` fails when
+ * the two disagree.
  *
  *   pnpm ci:static            run everything (skipping what this machine cannot)
  *   pnpm ci:static --list     print the gate list, one script per line
@@ -228,6 +230,13 @@ other — the steps, app/.env.example, and the compose file that starts the
 database. They disagreed on the username, the password and the SSL mode,
 and no step created the .env at all, so \`db:push\` silently pushed to a
 different database than the one the previous step had started.`
+    },
+    {
+        run: "check:gates-doc",
+        why: `docs/gates.md is the map of this list, and a map that is allowed to go
+stale is worse than none: it tells a contributor a gate does not exist.
+This fails when a gate script has no row, when a row names a script that
+is gone, and when a name breaks the \`check:\` / \`verify:\` / \`test:\` rule.`
     },
     {
         run: "verify:docs:strict",
