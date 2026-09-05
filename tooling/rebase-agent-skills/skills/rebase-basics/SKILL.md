@@ -172,7 +172,7 @@ A BaaS install is `server` + a driver + `client`, with no React in the tree.
 |---------|-------------|
 | `rebase init [name]` | Scaffold a new Rebase project interactively |
 | `rebase dev` | Start development server (backend + frontend concurrently) |
-| `rebase build` | Build all workspace packages for production |
+| `rebase build` | Build the apps declared in rebase.json into a deployable bundle |
 | `rebase start` | Start the backend server in production mode |
 
 ### `rebase init` Options

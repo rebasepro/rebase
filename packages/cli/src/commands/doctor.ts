@@ -14,10 +14,13 @@ import {
     getActiveBackendPlugin,
     resolvePluginCliScript,
     resolveTsx,
-    findEnvFile
+    findEnvFile,
+    exitDependenciesNotInstalled
 } from "../utils/project";
 import { scanTextForLibpqUrls, type LibpqUrlFinding } from "../utils/libpq-url";
 import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
+import { reportSpawnFailure } from "../utils/spawn-error";
+import { argsFromCommand } from "../utils/command-words";
 import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
 
 /**
@@ -175,8 +178,7 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
 
     const pluginCli = resolvePluginCliScript(backendDir, activePlugin);
     if (!pluginCli) {
-        console.error(chalk.red(`✗ Could not find CLI entry point for ${activePlugin}.`));
-        process.exit(1);
+        exitDependenciesNotInstalled(projectRoot);
     }
 
     // Set up environment with DOTENV_CONFIG_PATH
@@ -201,24 +203,26 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
         if (isTs) {
             const tsxBin = resolveTsx(projectRoot);
             if (!tsxBin) {
-                console.error(chalk.red("✗ Could not find tsx binary."));
-                process.exit(1);
+                exitDependenciesNotInstalled(projectRoot);
             }
-            await execa(tsxBin, [pluginCli, ...rawArgs.slice(2)], {
+            await execa(tsxBin, [pluginCli, ...argsFromCommand(rawArgs, "doctor")], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env
             });
         } else {
-            await execa("node", [pluginCli, ...rawArgs.slice(2)], {
+            await execa("node", [pluginCli, ...argsFromCommand(rawArgs, "doctor")], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env
             });
         }
-    } catch {
-        // If the process exits with an error code, execa will throw,
-        // but inherit stdio means the user already saw the output.
+    } catch (error) {
+        // A child that ran and exited non-zero already printed its diagnostics
+        // through inherited stdio. A child that never started did not — and
+        // "the tsx symlink is broken" is exactly the state `doctor` exists to
+        // report, so exiting 1 in silence was the worst possible answer.
+        reportSpawnFailure(error);
         process.exit(1);
     }
 }

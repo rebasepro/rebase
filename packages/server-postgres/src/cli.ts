@@ -31,6 +31,8 @@ import { detectDestructiveStatements, decidePushSafety } from "./schema/destruct
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { acceptsExcludeFlag, buildAtlasArgs } from "./schema/atlas-argv";
 import { unexpectedBranchArgs } from "./branch-argv";
+import { assertKnownFlags } from "./cli-flags";
+import { backupActionOf } from "./backup-argv";
 
 import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
 
@@ -77,6 +79,13 @@ export async function runPluginCommand(args: string[]) {
     await loadEnv();
     const domain = args[0]; // "db" or "schema"
     const subcommand = args[1];
+
+    // Before anything reads the line: every parser below runs `permissive`,
+    // which turns an undeclared flag into a positional rather than an error, so
+    // `db push --alow-destructive` pushed with the destructive gate still shut
+    // and `schema generate --ouput x` wrote the default path in silence. See
+    // cli-flags.ts for why the check has to be here and not in those parsers.
+    assertKnownFlags(domain, subcommand, args);
 
     if (domain === "db") {
         await dbCommand(subcommand, args);
@@ -201,7 +210,12 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
 
     if (subcommand === "backup" || subcommand === "restore" || subcommand === "backups") {
         const { backupCommand, restoreCommand, backupsCommand } = await import("./backup/backup-cli");
-        if (subcommand === "backup") await backupCommand(rawArgs);
+        // `rebase cloud db backup list` is how the cloud family spells this, and
+        // locally the same words *created a backup*: "list" was a positional
+        // `backupCommand` ignored. One CLI, two spellings, and the wrong guess
+        // wrote a dump instead of reading one. Both spellings list now.
+        if (subcommand === "backup" && backupActionOf(rawArgs) === "list") await backupsCommand(rawArgs);
+        else if (subcommand === "backup") await backupCommand(rawArgs);
         else if (subcommand === "restore") await restoreCommand(rawArgs);
         else await backupsCommand(rawArgs);
         return;
@@ -1303,6 +1317,23 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
 }
 
 async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<void> {
+    // The same second line of defence `dbCommand` above carries, for the same
+    // reason: this file is also its own CLI, spawned directly by
+    // `resolvePluginCliScript` and executable on its own. Nothing here had a
+    // `--help` case, so `schema generate --help` regenerated the schema and
+    // `schema introspect --help` rewrote the collection files — a flag whose
+    // entire job is to print text, overwriting authored source.
+    //
+    // Guarded by a real subcommand: the internal callers below re-enter this
+    // function with a synthesised argv, and none of them can carry `--help`.
+    if (subcommand && (rawArgs.includes("--help") || rawArgs.includes("-h"))) {
+        out("");
+        out(chalk.bold(`  rebase schema ${subcommand}`));
+        out(chalk.gray("  Run `rebase schema --help` for the full page — this is the driver's own entry point."));
+        out("");
+        return;
+    }
+
     if (subcommand === "stale") {
         await schemaStaleCommand(rawArgs);
         return;

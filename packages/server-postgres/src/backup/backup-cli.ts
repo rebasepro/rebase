@@ -101,6 +101,12 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
     const args = arg(
         {
             "--out": String,
+            // The same alias `build` and `cloud env pull` carry. `--output` is
+            // the canonical spelling in this CLI and this command took only
+            // `--out`, so `rebase db backup --output ./backups` wrote to
+            // ./backups *and* to the default directory — the flag was ignored
+            // and its value became a positional.
+            "--output": "--out",
             "--exclude-schema": [String],
             "--no-owner": Boolean,
             "--enable-row-security": Boolean,
@@ -371,7 +377,7 @@ export async function backupsCommand(rawArgs: string[]): Promise<void> {
         process.exit(1);
     }
 
-    const args = arg({ "--out": String, "-o": "--out" }, { argv: rawArgs.slice(3), permissive: true });
+    const args = arg({ "--out": String, "--output": "--out", "-o": "--out" }, { argv: rawArgs.slice(3), permissive: true });
     const out = args["--out"] || process.env.BACKUP_DESTINATION || path.join(process.cwd(), "backups");
     const dest = parseBackupDestination(out);
 
@@ -516,5 +522,6 @@ ${chalk.bold("rebase db backups")} — Manage stored backups
 
 ${chalk.green.bold("Usage")}
   rebase db backups list [--out <path|s3://bucket/prefix>]
+  rebase db backup list  [--out <path|s3://bucket/prefix>]   ${chalk.gray("(the same thing)")}
 `);
 }

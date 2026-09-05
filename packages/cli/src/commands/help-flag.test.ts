@@ -26,13 +26,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let scratch: string;
 
+/**
+ * How many times a command asked for the project root.
+ *
+ * The mock hands one back, so "did it exit?" cannot distinguish a help page
+ * printed *before* the lookup from one printed after. `rebase schema introspect
+ * --help` has to work in an empty directory — the state everyone reading help
+ * for the first time is in — and that is only true if the root is never
+ * required. Counted rather than mocked away, because the same mock is what lets
+ * the other tests reach the spawn.
+ */
+let projectRootLookups = 0;
+
 vi.mock("../utils/project", async importOriginal => {
     const actual = await importOriginal<typeof import("../utils/project")>();
     return {
         ...actual,
         // Both spellings: `skills` falls back to the cwd, the others exit.
         findProjectRoot: () => scratch,
-        requireProjectRoot: () => scratch,
+        requireProjectRoot: () => {
+            projectRootLookups++;
+            return scratch;
+        },
         requireBackendDir: () => path.join(scratch, "backend"),
         findEnvFile: () => path.join(scratch, ".env"),
         readEnvFile: () => ({
@@ -71,6 +86,7 @@ import { apiKeysCommand } from "./api-keys";
 import { authCommand } from "./auth";
 import { skillsCommand } from "./skills";
 import { dbCommand } from "./db";
+import { schemaCommand } from "./schema";
 import { execa } from "execa";
 import { prepareDatabaseEnv } from "../dev-db/prepare";
 
@@ -98,6 +114,7 @@ let fetchSpy: ReturnType<typeof vi.fn>;
 let exitSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
+    projectRootLookups = 0;
     scratch = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-help-"));
     // `.claude/` is what `skills install` detects — without it the install has
     // nothing to write and the test would pass for the wrong reason.
@@ -177,6 +194,38 @@ describe("--help never runs the command", () => {
             expect(exitSpy).not.toHaveBeenCalled();
         }
     );
+
+    /**
+     * `schema` had the same hole `db` had, one release later.
+     *
+     * `cli.ts` only rewrites the subcommand to `"--help"` when the user named
+     * none, so `rebase schema --help` printed a page and `rebase schema
+     * generate --help` did not: the flag went through `requireProjectRoot` and
+     * on to the driver, whose own `schemaCommand` has no `--help` case — it
+     * **ran the generator**, overwriting `src/schema.generated.ts`, and
+     * `introspect --help` rewrote the collection files. Authored source, lost
+     * to a flag that prints text.
+     *
+     * The root lookup is asserted too, and it is the half that matters for
+     * help: it is what made `rebase schema introspect --help` exit 1 with
+     * "Could not find a Rebase project root" in an empty directory, which is
+     * exactly where someone reads help before they have a project.
+     */
+    it.each([["generate"], ["introspect"], ["stale"]])(
+        "rebase schema %s --help generates nothing and needs no project",
+        async (action) => {
+            await schemaCommand(action, argv("schema", action, "--help"));
+
+            expect(execaSpy).not.toHaveBeenCalled();
+            expect(projectRootLookups).toBe(0);
+            expect(exitSpy).not.toHaveBeenCalled();
+        }
+    );
+
+    it("still runs rebase schema generate without the flag", async () => {
+        await schemaCommand("generate", argv("schema", "generate"));
+        expect(execaSpy).toHaveBeenCalled();
+    });
 
     it("still runs the command without the flag", async () => {
         // The guard must not swallow real invocations: a `--help` check that

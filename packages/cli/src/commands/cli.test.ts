@@ -201,9 +201,19 @@ describe("CLI routing", () => {
         expect(errOutput).toContain("Unknown command");
         expect(processExitSpy).toHaveBeenCalledWith(1);
 
-        // Help is still printed to stdout so the user sees the valid commands.
+        // And nothing else. Dumping the whole help after the error pushed the
+        // one line that says what happened off the top of a CI log; the error
+        // now names `rebase --help` instead of reprinting it.
         const output = consoleLogSpy.mock.calls.map((c) => c[0]).join("\n");
-        expect(output).toContain("Commands");
+        expect(output).not.toContain("Commands");
+    });
+
+    it("corrects the near miss instead of listing everything", async () => {
+        await entry(["node", "rebase", "statsu"]);
+
+        const errOutput = consoleErrorSpy.mock.calls.map((c) => c[0]).join("\n");
+        expect(errOutput).toContain("did you mean");
+        expect(errOutput).toContain("status");
     });
 });
 
@@ -242,5 +252,37 @@ output: "./out" })
             expect.objectContaining({ help: true })
         );
         expect(requireProjectRoot).not.toHaveBeenCalled();
+    });
+
+    /**
+     * `permissive: true` does not relax parsing — it moves an undeclared flag
+     * into the positionals. So `--ouput ./sdk` was accepted, ignored, and never
+     * mentioned: the SDK went to the default path and the next build imported a
+     * stale one. Nothing in this command reads a positional, so there was
+     * nowhere for the mistake to surface.
+     */
+    it("rejects a misspelled flag instead of writing to the default path", async () => {
+        await expect(entry(["node", "rebase", "generate-sdk", "--ouput", "./sdk"]))
+            .rejects.toThrow(/unknown or unexpected option: --ouput/);
+        expect(generateSdkCommand).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The line was parsed from a fixed `args.slice(3)`, so anything before the
+     * command word shifted it — and `--debug` is what the CLI prints after
+     * *every* failure as the thing to re-run with. `rebase --debug generate-sdk
+     * -o ./sdk` therefore dropped `-o` and wrote to the project default.
+     */
+    it("reads its flags wherever they appear on the line", async () => {
+        await entry(["node", "rebase", "--debug", "generate-sdk", "-o", "./sdk"]);
+
+        expect(generateSdkCommand).toHaveBeenCalledWith(
+            expect.objectContaining({ output: "./sdk" })
+        );
+    });
+
+    it("refuses a bare word it has no meaning for", async () => {
+        await expect(entry(["node", "rebase", "generate-sdk", "./sdk"]))
+            .rejects.toThrow(/takes 0 arguments/);
     });
 });

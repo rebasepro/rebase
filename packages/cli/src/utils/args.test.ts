@@ -98,3 +98,35 @@ describe("wantsHelp", () => {
         expect(wantsHelp(argv("api-keys", "list"))).toBe(false);
     });
 });
+
+describe("UsageError", () => {
+    /**
+     * `bin/rebase.js` ends every failure with "Re-run with --debug for the
+     * stack trace." For a mistyped flag that is worse than nothing: the stack
+     * names `arg` and this file, and the suggested next step is to add another
+     * flag to the command line we have just established is the problem.
+     *
+     * The marker is a property, not the class: `bin/rebase.js` imports the
+     * bundle, so the class object it would test with `instanceof` is a
+     * different one from this.
+     */
+    it("marks every shape parseCommandArgs refuses", () => {
+        const refuse = (rawArgs: string[], maxPositionals?: number) => {
+            try {
+                parseCommandArgs({ spec: { "--json": Boolean }, rawArgs, commandWords: 1, command: "status", maxPositionals });
+                throw new Error("expected a refusal");
+            } catch (err) {
+                return err as { isUsageError?: boolean; name?: string };
+            }
+        };
+
+        for (const err of [
+            refuse(["node", "rebase", "status", "--jsn"]),
+            refuse(["node", "rebase", "status", "--", "-x"]),
+            refuse(["node", "rebase", "status", "extra"], 0)
+        ]) {
+            expect(err.isUsageError).toBe(true);
+            expect(err.name).toBe("UsageError");
+        }
+    });
+});

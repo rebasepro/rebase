@@ -5,6 +5,7 @@ import inquirer from "inquirer";
 import { createRequire } from "module";
 import { findProjectRoot } from "../utils/project";
 import { wantsHelp } from "../utils/args";
+import { unknownCommand } from "../utils/unknown-command";
 
 const require = createRequire(import.meta.url);
 
@@ -213,6 +214,9 @@ export function installForAgent(
     return { skills: count, assets: assetCount };
 }
 
+/** Everything the switch below dispatches, for the did-you-mean. */
+const SKILLS_SUBCOMMANDS = ["install"] as const;
+
 export async function skillsCommand(subcommand: string | undefined, rawArgs: string[]) {
     // `--help` cannot reach `skillsInstall`. `cli.ts` only rewrites the
     // subcommand to `"--help"` when none was named, so `rebase skills install
@@ -233,10 +237,7 @@ export async function skillsCommand(subcommand: string | undefined, rawArgs: str
             printSkillsHelp();
             break;
         default:
-            console.error(chalk.red(`Unknown skills subcommand: ${subcommand}`));
-            console.log("");
-            printSkillsHelp();
-            process.exit(1);
+            unknownCommand(subcommand, SKILLS_SUBCOMMANDS, "skills");
     }
 }
 

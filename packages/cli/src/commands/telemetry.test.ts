@@ -89,10 +89,35 @@ describe("rebase telemetry", () => {
         expect(out.join("\n")).toMatch(/disabled/i);
     });
 
-    it("prints help and fails for an unknown subcommand", async () => {
-        const text = await run("frobnicate");
-        expect(text).toMatch(/rebase telemetry/);
-        expect(process.exitCode).toBe(1);
+    it("names the unknown subcommand and fails", async () => {
+        // It used to print the status/help page and set exit 1 — which made a
+        // typo indistinguishable from `rebase telemetry --help` apart from an
+        // exit code nobody reads at a prompt.
+        const exit = vi.spyOn(process, "exit").mockImplementation(code => {
+            throw new Error(`process.exit(${code})`);
+        });
+        const errors: string[] = [];
+        vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+            errors.push(args.map(String).join(" "));
+        });
+
+        await expect(run("frobnicate")).rejects.toThrow("process.exit(1)");
+        expect(errors.join("\n")).toMatch(/Unknown telemetry command "frobnicate"/);
+        expect(errors.join("\n")).toMatch(/rebase telemetry --help/);
+        expect(exit).toHaveBeenCalledWith(1);
+    });
+
+    it("suggests the subcommand that was meant", async () => {
+        vi.spyOn(process, "exit").mockImplementation(code => {
+            throw new Error(`process.exit(${code})`);
+        });
+        const errors: string[] = [];
+        vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+            errors.push(args.map(String).join(" "));
+        });
+
+        await expect(run("stat")).rejects.toThrow("process.exit(1)");
+        expect(errors.join("\n")).toMatch(/did you mean `status`/);
     });
 
     it("tells a project it cannot opt its members in", async () => {

@@ -15,7 +15,8 @@ import {
     findFrontendDir,
     findEnvFile,
     getActiveBackendPlugin,
-    readEnvFile
+    readEnvFile,
+    dependenciesNotInstalled
 } from "./project";
 
 let tmpDir: string;
@@ -328,5 +329,35 @@ describe("readEnvFile", () => {
 
     it("returns an empty object when there is no env file", () => {
         expect(readEnvFile(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-env-")))).toEqual({});
+    });
+});
+
+describe("dependenciesNotInstalled", () => {
+    /**
+     * Six commands each had their own wording for one state, and none named the
+     * remedy: "Could not find CLI entry point for @rebasepro/server-postgres",
+     * "Could not find tsx binary", "Could not find tsx binary for backend". All
+     * three mean the same thing on a fresh clone — the one thing a checkout
+     * does not carry is `node_modules/` — and all three read as Rebase being
+     * broken rather than as a step nobody has run yet.
+     */
+    it("names the install command and the directory to run it in", () => {
+        const root = createDir("shop");
+        writeFile(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+
+        expect(dependenciesNotInstalled(root)).toBe(
+            `Dependencies are not installed — run \`pnpm install\` in ${root}`
+        );
+    });
+
+    it("follows the lock file the project already has", () => {
+        // The directory matters as much as the command: the working directory
+        // is usually `backend/` or `frontend/`, where an install would create a
+        // second, wrong node_modules instead of fixing the first one.
+        const root = createDir("npm-shop");
+        writeFile(path.join(root, "package-lock.json"), "{}\n");
+
+        expect(dependenciesNotInstalled(root)).toContain("`npm install`");
+        expect(dependenciesNotInstalled(root)).toContain(root);
     });
 });
