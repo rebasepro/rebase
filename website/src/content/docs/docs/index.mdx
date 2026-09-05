@@ -21,6 +21,19 @@ Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** bui
 Rebase runs either way, and your code does not change between them. **Self-host it** — you own the data, the code, and the machine it runs on. Or deploy the same project to **Rebase Cloud** ([app.rebase.pro](https://app.rebase.pro)), which is the same Rebase run for you; it is live with real tenants today and opening in batches while it is in private beta. Think of it as an open-source alternative to Supabase or Retool where *you* decide who operates it.
 :::
 
+## Choose your path
+
+Rebase is two products that happen to share a server. Start from the one you
+came for:
+
+| I want… | Start here | What you get |
+|---|---|---|
+| **A backend and an admin panel** | [Quickstart](/docs/getting-started/quickstart/) | Collections in TypeScript, a generated CRUD UI, a REST API, auth, storage and realtime |
+| **Just the API, over my own database** | [Backend only](/docs/getting-started/headless/) | A headless REST API and SDK over your existing PostgreSQL — no admin panel, no collection files, no React |
+
+Neither is a one-way door: a headless project grows an admin panel by adding
+collection files, and a full project can serve tables it has no collection for.
+
 ## How It Works
 
 ```
@@ -106,6 +119,7 @@ To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 ## Next Steps
 
 - **[Quickstart](/docs/getting-started/quickstart)** — Get running in 2 minutes
+- **[Backend only](/docs/getting-started/headless/)** — The headless API over a database you already have
 - **[Project Structure](/docs/getting-started/project-structure)** — Understand the generated code
 - **[Collections](/docs/collections)** — Define your data schema
 - **[Backend](/docs/backend)** — Configure auth, storage, and the API

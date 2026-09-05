@@ -24,6 +24,19 @@ Rebase is an **open-source Backend-as-a-Service (BaaS)** and **admin panel** bui
 Rebase runs either way, and your code does not change between them. **Self-host it** — you own the data, the code, and the machine it runs on. Or deploy the same project to **Rebase Cloud** ([app.rebase.pro](https://app.rebase.pro)), which is the same Rebase run for you; it is live with real tenants today and opening in batches while it is in private beta. Think of it as an open-source alternative to Supabase or Retool where *you* decide who operates it.
 :::
 
+### Choose your path
+
+Rebase is two products that happen to share a server. Start from the one you
+came for:
+
+| I want… | Start here | What you get |
+|---|---|---|
+| **A backend and an admin panel** | [Quickstart](/docs/getting-started/quickstart/) | Collections in TypeScript, a generated CRUD UI, a REST API, auth, storage and realtime |
+| **Just the API, over my own database** | [Backend only](/docs/getting-started/headless/) | A headless REST API and SDK over your existing PostgreSQL — no admin panel, no collection files, no React |
+
+Neither is a one-way door: a headless project grows an admin panel by adding
+collection files, and a full project can serve tables it has no collection for.
+
 ### How It Works
 
 ```
@@ -109,6 +122,7 @@ To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 ### Next Steps
 
 - **[Quickstart](/docs/getting-started/quickstart)** — Get running in 2 minutes
+- **[Backend only](/docs/getting-started/headless/)** — The headless API over a database you already have
 - **[Project Structure](/docs/getting-started/project-structure)** — Understand the generated code
 - **[Collections](/docs/collections)** — Define your data schema
 - **[Backend](/docs/backend)** — Configure auth, storage, and the API
@@ -173,7 +187,7 @@ Pin a port with `rebase dev --port 3001`.
 | Flag | On | What it does |
 |---|---|---|
 | `--yes` | `init` | Accept every default. **Required when there is no terminal to prompt**, such as CI |
-| `--headless` | `init` | A backend with no collection files and no UI — see [below](#just-the-api-headless) |
+| `--headless` | `init` | A backend with no collection files and no UI — see [Backend only](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Start from a template other than the default |
 | `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
 | `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one |
@@ -1915,6 +1929,1216 @@ backfilled after the fact.
    no version to refuse on, because a column carries no version stamp. The step
    that replaces them is deciding not to make the change — see the section above
    for what the alternative looks like.
+
+## Backend only (headless)
+
+Rebase has two shapes, and this page is the one that never opens a browser: a
+REST API, auth, storage, realtime and backups over a PostgreSQL database you
+already have. No admin panel, no React, no collection files. If you were
+reaching for Supabase or PostgREST, this is the comparable thing.
+
+Everything on this page also works in the full project — it is the same server.
+What `--headless` removes is the frontend package and the collection files, not
+a capability.
+
+### Scaffold it
+
+```bash
+pnpm dlx @rebasepro/cli init my-api --headless --yes
+cd my-api
+```
+
+Two workspaces, no `frontend/`:
+
+| Folder | What is in it |
+|--------|---------------|
+| `backend/` | Your custom functions and crons. There is no server file — the published runtime boots the project |
+| `config/` | `storageAuthorize`, and any collections `--introspect` generates |
+
+`--template` has no effect here: a preset seeds collection files, and this
+flavour has none. Node 20 is enough, where the full project wants 22.22+.
+
+### Point it at your database
+
+`init` generates a ready-to-run `.env`. To use a database you already run, pass
+its URL at scaffold time:
+
+```bash
+pnpm dlx @rebasepro/cli init my-api --headless --database-url "postgres://user:pass@host:5432/db" --yes
+```
+
+Or set `DATABASE_URL` in `.env` afterwards — it is the same thing. With no
+`DATABASE_URL`, `rebase dev` starts a managed PostgreSQL (PGlite) in the project
+directory, which is useful for trying the API out but is not what this flavour
+is for.
+
+Then:
+
+```bash
+pnpm install
+pnpm run dev
+```
+
+**Read the URL from the output.** `rebase dev` derives a free port from the
+project's path rather than using a fixed one, so it differs between projects and
+between machines.
+
+### Where the collections come from
+
+There are none in code. The server reads your database schema at boot and serves
+the tables it finds, so the API follows your migrations: change the schema, and
+the endpoints change with it.
+
+A table is served once it has an authorization model — row-level security
+enabled, plus at least one policy:
+
+```sql
+ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
+CREATE POLICY your_table_owner ON your_table
+    FOR ALL USING (user_id = rebase.uid());
+```
+
+`rebase.uid()`, `rebase.roles()` and `rebase.jwt()` are installed by Rebase and
+read the identity of the authenticated request. See
+[Security Rules](/docs/collections/security-rules/) for the policy vocabulary,
+and [rls-check](/docs/rls-check/) for an audit of what your policies actually
+allow.
+
+A table without RLS is **skipped**, deliberately: every authenticated request
+runs as `rebase_user`, so serving a table with no policy would hand every row to
+every signed-in caller. Each skipped table is named at boot along with the SQL
+that would protect it.
+
+:::note
+`baas: { unprotectedTables: "serve" }` serves them anyway. It is an
+`initializeRebaseBackend` option, so it is reachable only after `rebase eject` —
+the managed runtime does not read it from `config/index.ts` or from the
+environment. Only sensible when every caller is already trusted.
+:::
+
+#### Generating collection files instead
+
+If you would rather have the tables written down as TypeScript — for types, for
+callbacks, for review — introspect them:
+
+```bash
+pnpm dlx @rebasepro/cli init my-api --headless --database-url "postgres://…" --introspect --install
+```
+
+`--introspect` implies `--template blank` and needs `--install`, because it runs
+against the installed CLI. In an existing project the same thing is:
+
+```bash
+pnpm rebase schema introspect
+```
+
+Files land in `config/collections/`. From that point the project has collections
+in code and the boot-time introspection stops being what defines the API.
+
+### Use it
+
+Over HTTP:
+
+```bash
+curl "$API_URL/api/data/posts?limit=10"
+```
+
+Or with the type-safe client, which is a dependency of the headless scaffold
+already:
+
+```typescript title="scripts/example.ts"
+
+// The URL `rebase dev` printed, or your deployment's.
+const rebase = createRebaseClient({ baseUrl: process.env.API_URL! });
+
+const { data: posts } = await rebase.data.collection("posts").find({
+    where: { published: ["==", true] },
+    limit: 10
+});
+```
+
+- [REST API](/docs/backend/api/) — the endpoint shapes, filters and errors
+- [Client SDK](/docs/sdk/) — querying, auth, realtime, storage
+- `/api/docs` and `/api/swagger` — the OpenAPI document and its viewer, served
+  by the running backend
+
+### `404 NO_COLLECTIONS`
+
+If every data request answers with this:
+
+```json
+{
+  "error": {
+    "message": "This project serves no collections yet. …",
+    "code": "NO_COLLECTIONS"
+  }
+}
+```
+
+then the project declares no collections in code *and* the database gave it
+nothing to derive them from. It is the expected first response from a headless
+project pointed at an empty database, and it is a 404 rather than a 500 because
+nothing is broken — there is simply nothing to serve yet.
+
+Three things resolve it, in the order worth checking:
+
+1. **The database has no tables.** Create them — a migration, plain SQL, or a
+   collection file plus `rebase db push` — and restart.
+2. **The tables have no RLS policy**, so boot skipped them. The boot log names
+   each one. Add a policy, as above.
+3. **`DATABASE_URL` points somewhere else** than you think. `rebase status`
+   prints the three files that decide what the backend reaches.
+
+### Adding an admin panel later
+
+Nothing here locks you out of it. Add a `config/collections/` directory — by
+hand or with `rebase schema introspect` — and a frontend that renders them; the
+backend does not change. [Frontend Setup](/docs/frontend/) is where that starts.
+
+### Next steps
+
+- [Authentication](/docs/backend/authentication/) — providers, tokens, API keys
+- [Security Rules (RLS)](/docs/collections/security-rules/) — the access model
+- [Custom Functions](/docs/backend/custom-functions/) — your own routes
+- [Deployment](/docs/getting-started/deployment/) — taking it to production
+
+## REST API
+
+### Overview
+
+Rebase automatically generates a complete API from your collection definitions:
+
+- **REST API** — CRUD endpoints for every collection at `/api/data/:slug`
+- **OpenAPI spec** — Machine-readable spec at `/api/docs`
+- **Swagger UI** — Interactive API explorer at `/api/swagger` (dev mode only)
+
+No code is required — define your collections and the API appears automatically.
+
+### REST Endpoints
+
+For each collection, the following endpoints are generated:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/data/:slug` | List entities |
+| `GET` | `/api/data/:slug/count` | Count entities |
+| `GET` | `/api/data/:slug/:id` | Get a single entity |
+| `POST` | `/api/data/:slug` | Create a entity |
+| `PATCH` | `/api/data/:slug/:id` | Update a entity (partial — only the properties you send are written) |
+| `DELETE` | `/api/data/:slug/:id` | Delete a entity |
+| `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
+| `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
+| `POST` | `/api/data/:slug/bulk/delete` | Delete many entities in one transaction |
+
+#### Subcollection Routes
+
+Nested relations are accessible via URL paths:
+
+```
+GET    /api/data/authors/42/posts         → list author's posts
+GET    /api/data/authors/42/posts/7       → get a specific post by author
+POST   /api/data/authors/42/posts         → create a post for author
+PATCH  /api/data/authors/42/posts/7       → update the post
+DELETE /api/data/authors/42/posts/7       → delete the post
+```
+
+##### Routing Mechanics & Segment Parsing
+
+To handle arbitrary nested subcollection depths, Rebase routes incoming requests using Hono's `:rest{.+}` parameter regex. The internal segment parsing engine analyzes paths by counting slash-separated segments:
+- **Odd segment count** (e.g., `authors/42/posts` -> 3 segments) represents a collection list request.
+- **Even segment count** (e.g., `authors/42/posts/7` -> 4 segments) represents an operation on a specific entity ID. The last segment is popped as the target `entityId`.
+
+The engine filters out reserved system namespaces (e.g., `history`) from the path segment analysis to prevent collisions with built-in endpoints.
+
+### Authentication
+
+All data endpoints require authentication by default. Include a Bearer token in the `Authorization` header:
+
+```bash
+curl -H "Authorization: Bearer <access-token>" \
+     https://api.example.com/api/data/products
+```
+
+For server-to-server calls, use the service key:
+
+```bash
+curl -H "Authorization: Bearer <service-key>" \
+     https://api.example.com/api/data/products
+```
+
+### Filtering
+
+Use PostgREST-style query parameters to filter results. The format is `?field=operator.value`:
+
+```bash
+# Exact match
+GET /api/data/products?active=eq.true
+
+# Comparison operators
+GET /api/data/products?price=gt.100
+GET /api/data/products?price=lte.50
+
+# Multiple filters (AND)
+GET /api/data/products?active=eq.true&price=gt.10
+
+# IN operator — match any value in a set
+GET /api/data/products?status=in.(draft,published)
+
+# NOT IN
+GET /api/data/products?status=nin.(archived,deleted)
+
+# Array contains
+GET /api/data/products?tags=cs.electronics
+
+# Array contains any
+GET /api/data/products?tags=csa.(electronics,books)
+```
+
+#### Filter Operators
+
+| Operator | Meaning | Example |
+|----------|---------|---------|
+| `eq` | Equals (`==`) | `?active=eq.true` |
+| `neq` | Not equals (`!=`) | `?status=neq.draft` |
+| `gt` | Greater than (`>`) | `?price=gt.100` |
+| `gte` | Greater or equal (`>=`) | `?price=gte.100` |
+| `lt` | Less than (`<`) | `?price=lt.50` |
+| `lte` | Less or equal (`<=`) | `?price=lte.50` |
+| `in` | In array | `?status=in.(a,b,c)` |
+| `nin` | Not in array | `?status=nin.(a,b)` |
+| `cs` | Array contains | `?tags=cs.value` |
+| `csa` | Array contains any | `?tags=csa.(a,b)` |
+| `like` | Pattern match, case-sensitive (`like`) | `?sku=like.AB-%` |
+| `ilike` | Pattern match, case-insensitive (`ilike`) | `?name=ilike.%widget%` |
+| `nlike` | Does not match the pattern (`not-like`) | `?sku=nlike.TMP-%` |
+| `nilike` | Does not match, case-insensitively (`not-ilike`) | `?name=nilike.%test%` |
+| `isnull` | Column is `NULL` (`is-null`) | `?deleted_at=isnull.null` |
+| `notnull` | Column is not `NULL` (`is-not-null`) | `?deleted_at=notnull.null` |
+
+`isnull` and `notnull` ignore their value — the operator is the whole condition,
+and anything after the dot is discarded. The SDK writes `.null`, so that is the
+spelling you will see on the wire.
+
+:::caution[`eq.null` is the four-character string, not `IS NULL`]
+`?deleted_at=eq.null` searches for the literal text `null`. SQL `= NULL` is
+never true, so there is no reading of `eq.null` that could mean the null test —
+use `isnull` for that. The SDK serializes `.where("deleted_at", "==", null)` as
+`isnull.null` for exactly this reason.
+:::
+
+#### Logical Operators
+
+Use `or` and `and` for complex conditions:
+
+```bash
+# OR: match products that are either cheap or on sale
+GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
+
+# AND: explicit conjunction
+GET /api/data/products?and=(active.eq.true,price.gt.0)
+```
+
+### Sorting
+
+Use `orderBy` with the format `field:direction`:
+
+```bash
+# Sort by price descending
+GET /api/data/products?orderBy=price:desc
+
+# Sort by name ascending (default)
+GET /api/data/products?orderBy=name:asc
+```
+
+A missing direction is `asc`. A direction that is neither `asc` nor `desc`, or a
+field the collection does not have, is a **400** — not a 200 with the rows in
+whatever order the database pleased, which is indistinguishable from a sort that
+worked.
+
+#### Several keys
+
+The shorthand carries one key. For more, pass a JSON array — the second key
+decides between rows the first calls equal:
+
+```bash
+# By category, and newest first within each category
+GET /api/data/products?orderBy=[{"field":"category"},{"field":"createdAt","direction":"desc"}]
+```
+
+Both spellings reach every route that lists rows, including nested ones
+(`/api/data/authors/:id/posts`). Every sort ends on the row id descending
+whether you asked for it or not: that is what makes the ordering total, and
+paging over an order that is not total repeats and skips rows.
+
+A repeated `?orderBy=` parameter is not a multi-key sort — the last one wins, as
+it does for every other query parameter. Use the array.
+
+### Pagination
+
+Use `limit` and `offset`, or `page`:
+
+```bash
+# Limit and offset
+GET /api/data/products?limit=20&offset=40
+
+# Page-based (uses the default limit of 50)
+GET /api/data/products?page=3
+```
+
+The default limit is **50**, the maximum is **1000**. Both come from `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, which the generated OpenAPI spec reports too — a `limit` above the maximum is rejected rather than clamped.
+
+#### Response Format
+
+List responses include pagination metadata:
+
+```json
+{
+    "data": [
+        { "id": 1, "name": "Widget", "price": 29.99 },
+        { "id": 2, "name": "Gadget", "price": 49.99 }
+    ],
+    "meta": {
+        "total": 150,
+        "limit": 20,
+        "offset": 0,
+        "hasMore": true
+    }
+}
+```
+
+Single entity responses return a flat object:
+
+```json
+{
+    "id": 1,
+    "name": "Widget",
+    "price": 29.99,
+    "createdAt": "2026-01-15T10:30:00Z"
+}
+```
+
+### Text Search
+
+Use `searchString` for full-text search across string fields:
+
+```bash
+GET /api/data/products?searchString=wireless%20keyboard
+```
+
+### Vector Search
+
+If a collection defines a property with a type of `vector`, you can perform high-speed similarity searches using pgvector distance operations compiled directly in the database query.
+
+```bash
+GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_distance=cosine&vector_threshold=0.8
+```
+
+#### Vector Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `vector_search` | `string` | The name of the vector property to query against. |
+| `vector` | `string` | A JSON-serialized array of floats representing the query vector. |
+| `vector_distance` | `string` | The distance metric to evaluate. Supported values: `cosine` (default, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
+| `vector_threshold` | `number` | Maximum distance threshold. Only records with distance less than this threshold are returned. |
+
+### Relation Inclusion
+
+Use the `include` parameter to embed related entities:
+
+```bash
+# Include specific relations
+GET /api/data/articles?include=author,categories
+
+# Include all relations
+GET /api/data/articles?include=*
+```
+
+Included relations are embedded directly in the response:
+
+```json
+{
+    "id": 1,
+    "title": "Getting Started",
+    "authorId": 42,
+    "author": {
+        "id": 42,
+        "name": "Jane Doe",
+        "email": "jane@example.com"
+    }
+}
+```
+
+### Field Selection
+
+Use `fields` to select specific columns:
+
+```bash
+GET /api/data/products?fields=id,name,price
+```
+
+### Lifecycle Hook Pipeline
+
+Every REST mutation operation (`POST`, `PATCH`, `DELETE`) runs through a strict, sequential hook execution pipeline:
+
+```
+Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ──► afterSave/afterDelete (deferred) ──► Response
+```
+
+#### Blocking vs. Deferred Hooks
+
+1. **Blocking Hooks (`beforeSave`, `beforeDelete`)**
+   These hooks are executed synchronously in the main request cycle *before* committing the database transaction. They can modify incoming payloads, run custom validations, or abort the request entirely by throwing an error.
+
+2. **Deferred Hooks (`afterSave`, `afterDelete`)**
+   These hooks execute asynchronously after the database transaction has successfully committed. They use deferred promises (fire-and-forget), meaning they run in the background and do not block the client's HTTP response. Ideal for sending webhooks, triggering push notifications, or queuing external tasks.
+
+### System endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/health` and `/api/health` | none | Liveness/readiness check |
+| `GET` | `/api/docs` | none | The OpenAPI 3.0 JSON specification |
+| `GET` | `/api/swagger` | none | Swagger UI. On in development, off in production; `REBASE_ENABLE_SWAGGER` overrides either way |
+| `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from — deliberately unauthenticated, and it returns only that hash |
+| `GET` | `/api/meta/contract` | admin, service key or admin API key | The full collection contract, for `rebase generate-sdk --from`. Fail-closed: `404` when no auth is configured |
+| `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
+
+### OpenAPI / Swagger
+
+The OpenAPI spec is auto-generated from your collection definitions: it describes the list, read, create, update, delete and bulk endpoints of every collection the backend serves, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
+
+### API Keys
+
+API keys provide machine-to-machine authentication for agents, MCP servers, CI pipelines, and external integrations. They support per-collection permission scoping and optional full admin access.
+
+#### Creating an API Key
+
+```bash
+# Via CLI
+rebase api-keys create --name "My Integration" \
+  --permissions '[{"collection":"orders","operations":["read","write"]}]'
+
+# Via REST (requires admin auth)
+curl -X POST http://localhost:3000/api/admin/api-keys \
+  -H "Authorization: Bearer <service-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Integration",
+    "permissions": [{ "collection": "orders", "operations": ["read", "write"] }]
+  }'
+```
+
+The response includes the full plaintext key (`rk_live_...`) **exactly once** — store it immediately.
+
+#### Using an API Key
+
+```bash
+curl http://localhost:3000/api/data/orders \
+  -H "Authorization: Bearer rk_live_abc123..."
+```
+
+#### Permissions and RLS: two independent gates
+
+An API key's request passes through **two** authorization checks, and both must allow it:
+
+1. **The key's permission list** — collection × operation, checked at the route layer.
+2. **Row-Level Security** — API keys do *not* bypass RLS. A key runs as
+   `uid: "api-key:<id>"` with the `service` role (plus `admin` when
+   `admin: true`). Admin keys pass via the built-in admin policies; a
+   non-admin key only sees rows that a security rule explicitly grants to
+   the `service` role or to the public. Owner-style rules
+   (`owner_id = rebase.uid()`) never match an API key.
+
+So a non-admin key with `"*"` permissions can still get empty results — that's
+RLS working, not a bug. Either grant the `service` role in the relevant
+collections' security rules, or use an admin key.
+
+#### Custom Functions
+
+Function invocations are scoped like collections, under the `functions`
+namespace: `{"collection": "functions", "operations": ["write"]}` grants every
+function, `"functions/<name>"` grants one, and the global `"*"` wildcard grants
+all. A key without such an entry cannot invoke functions at all.
+
+#### Storage
+
+Storage works the same way, under the `storage` namespace:
+`{"collection": "storage", "operations": ["read", "write"]}` lets the key
+download/list (`read`), upload and create folders (`write`), and delete files
+(`delete`). The global `"*"` wildcard also grants storage. A key without such
+an entry cannot touch storage. TUS resumable-upload routes count as `write`
+for every step (including the offset check and cancel), so a write-scoped key
+can complete an upload on its own.
+
+#### Agents and MCP Servers
+
+An agent wants the *narrowest* key that does its job, not an admin one. Start
+scoped, and give it an expiry:
+
+```bash
+rebase api-keys create -n "My Agent" \
+  --permissions '[{"collection":"articles","operations":["read"]}]' \
+  --expires 30d
+```
+
+Operations are `read`, `write` and `delete`, derived from the HTTP method:
+`GET`/`HEAD`/`OPTIONS` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` →
+`delete`.
+
+##### A scoped key reads zero rows until a rule grants `service`
+
+This is the step that makes a correctly scoped key look broken. A non-admin key
+runs as `uid: "api-key:<id>"` with the roles `["service"]`, and the RLS policy
+injected into every collection by default compiles to:
+
+```sql
+rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
+```
+
+— the server context, or an admin. A non-admin key matches neither arm, so on a
+collection with no `securityRules` the request succeeds with an empty result set
+and no error explaining why. Grant the role explicitly:
+
+```ts
+securityRules: [
+    { operation: "select", roles: ["service"], using: "true" }
+]
+```
+
+Because `rebase.uid()` carries the key's id, a rule can also scope rows to one
+specific key:
+
+```ts
+securityRules: [
+    {
+        operation: "select",
+        condition: policy.compare(policy.authUid(), "eq", policy.literal("api-key:<id>"))
+    }
+]
+```
+
+##### Don't use `"*"` for a read-only key
+
+The `"*"` wildcard is not "every collection" — it also matches the `functions`
+namespace and `storage`. A `GET` counts as `read`, and a custom function's
+handler is arbitrary code that can write, so a wildcard "read-only" key can
+mutate through a function. Naming collections explicitly gives the key no
+function access at all.
+
+##### `--admin --full-access`: CI, migrations, first-party tooling
+
+`"admin": true` grants the key the admin role — `/api/admin/*` routes for schema
+management, user management, and more, plus cron, backups, and logs. Combined
+with `--full-access` (`{"collection": "*", "operations": ["read", "write",
+"delete"]}`) the key holds every collection plus all storage and every custom
+function. That is the right shape for CI, migrations, and trusted first-party
+tooling — not for agents.
+
+```bash
+# CLI
+rebase api-keys create -n "CI" --admin --full-access
+
+# REST
+curl -X POST http://localhost:3000/api/admin/api-keys \
+  -H "Authorization: Bearer <service-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "CI",
+    "admin": true,
+    "permissions": [{ "collection": "*", "operations": ["read", "write", "delete"] }]
+  }'
+```
+
+##### No realtime over API keys
+
+The realtime WebSocket does not parse `rk_` tokens — it accepts user JWTs and
+the service key only. An agent authenticated with an API key polls the REST
+endpoints instead of subscribing.
+
+#### Key Options
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Human-readable label |
+| `permissions` | `ApiKeyPermission[]` | Per-collection access (`"*"` = everything; `"functions/<name>"` = one function; `"storage"` = file storage) |
+| `admin` | `boolean` | Grant admin role — admin routes + RLS admin policies |
+| `rate_limit` | `number \| null` | Requests per 15-min window (`null` = the server default, 1000) |
+| `expires_at` | `string \| null` | ISO-8601 expiration timestamp |
+
+The CLI requires an explicit scope: pass `--permissions '<json>'` or opt into
+`--full-access` — there is no silent full-access default.
+
+Keys can be listed, updated, and revoked via `/api/admin/api-keys` or the
+`rebase api-keys` CLI commands — but not by an API key. Any request to
+`/api/admin/api-keys` authenticated with an `rk_` key is refused with `403
+API_KEY_SELF_MANAGEMENT_FORBIDDEN`, whatever its `admin` flag. Key management
+requires an admin user's session or the service key.
+
+### Metadata Endpoint
+
+Get a list of all available collections and their structure:
+
+```bash
+GET /api/collections
+```
+
+### Next Steps
+
+- **[Client SDK](/docs/sdk)** — Type-safe client for the REST API
+- **[Collections](/docs/collections)** — Define your data schema
+- **[Security Rules (RLS)](/docs/collections/security-rules)** — Control access per row
+
+## Client SDK — Getting Started
+
+### Overview
+
+The `@rebasepro/client` package provides a type-safe JavaScript SDK for interacting with your Rebase backend. It handles:
+
+- **Data operations** — CRUD with filtering, sorting, and pagination
+- **Relation fetching** — Include related entities with `.include()`
+- **Real-time subscriptions** — WebSocket-based live updates
+- **Offline & local-first sync** — Opt-in local row database, instant offline writes, live queries
+- **Authentication** — Token management, login, signup, OAuth
+- **Storage** — File upload, download, and management
+- **Custom functions** — Call custom server endpoints
+
+### Installation
+
+```bash
+pnpm add @rebasepro/client
+```
+
+### Creating a Client
+
+```typescript
+
+const client = createRebaseClient({
+    baseUrl: "http://localhost:3001",
+});
+```
+
+The `websocketUrl` is derived automatically from `baseUrl` (`http → ws`, `https → wss`). You can override it explicitly if needed:
+
+```typescript
+const client = createRebaseClient({
+    baseUrl: "http://localhost:3001",
+    websocketUrl: "ws://localhost:3001",
+});
+```
+
+#### Configuration Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `baseUrl` | `string` | Backend URL (e.g. `http://localhost:3001`) |
+| `websocketUrl` | `string` | WebSocket URL — auto-derived from `baseUrl` if omitted |
+| `token` | `string` | Static JWT token for server-to-server calls |
+| `apiPath` | `string` | API prefix (default: `"/api"`) |
+| `fetch` | `typeof fetch` | Custom fetch implementation (e.g. for SSR) |
+| `onUnauthorized` | `() => Promise<boolean>` | Custom 401 handler — return `true` to retry |
+| `realtime` | `boolean` | Open the WebSocket (default `true`) — set `false` in one-shot scripts |
+| `collections` | `Record<string, string>` | Maps accessor names to collection slugs |
+| `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
+
+### Typed SDK Generation
+
+Generate a fully typed client from your collection definitions:
+
+```bash
+rebase generate-sdk
+```
+
+Then pass the `Database` type parameter to `createRebaseClient` for full autocomplete:
+
+```typescript
+
+const client = createRebaseClient<Database>({
+    baseUrl: "http://localhost:3001",
+    collections: collectionsDictionary,
+});
+
+// Full autocomplete on collection names and field types
+const { data } = await client.data.products.find();
+```
+
+When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientResult<DB>` instance. This maps camelCase collection accessors directly on `client.data` to their corresponding types, giving you full autocomplete on collection operations and types (e.g. `client.data.products.find()`).
+
+`collectionsDictionary` maps each accessor back to the slug the wire uses. Pass it whenever a slug is not already a valid property name — `my-notes` is reachable as `client.data.myNotes` only because the dictionary says so.
+
+#### Field names
+
+**A field's name on the wire is its property key**, and the API is camelCase throughout. A `createdAt` property stored in a `created_at` column is `row.createdAt`, and a relation's foreign key is `authorId` even though the column stays `author_id`. `where` and `orderBy` are keyed off the same `Row` type, so what compiles is what the backend answers to.
+
+A property key *you* wrote is your key, whatever its shape — nothing renames a name you chose. The two keys that are derived rather than declared, a relation's foreign key and a column read back by introspection, are camelCase.
+
+`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. Nullable columns are `T | null` on `Row`, the primary key is always present on a read and never settable on an update, and a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`).
+
+### Quick Example
+
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
+// Create
+const product = await client.data.products.create({
+    name: "Camera",
+    price: 299,
+});
+
+// Query with filters
+const { data } = await client.data.products
+    .where("price", ">=", 100)
+    .orderBy("createdAt", "desc")
+    .limit(10)
+    .find();
+
+// Real-time subscription
+const unsubscribe = client.data.products.listen(
+    { where: { active: ["==", true] } },
+    (response) => console.log("Updated:", response.data)
+);
+```
+
+### Using with React
+
+In a Rebase frontend, the client is created once and shared via context:
+
+```tsx no-verify
+
+const client = createRebaseClient({ baseUrl: API_URL });
+
+<Rebase client={client} ...>
+```
+
+Access it from any component:
+
+```tsx
+
+function MyComponent() {
+    const client = useRebaseClient();
+    // client.data, client.auth, client.storage, client.functions
+}
+```
+
+### Next Steps
+
+- **[Querying Data](/docs/sdk/querying)** — CRUD, filters, pagination, and relations
+- **[Authentication](/docs/sdk/authentication)** — Sign in, sign up, OAuth, sessions
+- **[Realtime Subscriptions](/docs/sdk/realtime)** — Live data with WebSockets
+- **[Offline & Local-First Sync](/docs/sdk/offline)** — Work without a connection, and sync when it returns
+- **[Storage & Files](/docs/sdk/storage)** — Upload, download, and manage files
+
+## Security Rules (RLS)
+
+### Overview
+
+Security rules let you define **Row Level Security (RLS)** policies for your PostgreSQL tables directly in your collection definitions. When the Drizzle schema is generated, Rebase creates the corresponding `CREATE POLICY` statements.
+
+```typescript
+
+const postsCollection = defineCollection({
+    slug: "posts",
+    name: "Posts",
+    table: "posts",
+    properties: { /* ... */ },
+    securityRules: [
+        { operation: "select", access: "public" },
+        { operations: ["insert", "update", "delete"], ownerField: "authorId" }
+    ]
+});
+```
+
+### How It Works
+
+1. You define `securityRules` on a collection
+2. `rebase schema generate` creates Drizzle schema with RLS enabled
+3. `rebase db push` or `rebase db migrate` applies the policies to PostgreSQL
+4. Every query is filtered by the current user's context automatically
+
+The authenticated user's identity is available in SQL via:
+
+| Function | Returns |
+|----------|---------|
+| `rebase.uid()` | The current user's ID |
+| `rebase.roles()` | Comma-separated app role IDs |
+| `rebase.jwt()` | Full JWT claims as JSONB |
+
+These are set automatically per-transaction by the Rebase backend.
+
+### Convenience Shortcuts
+
+#### Owner-based Access
+
+The simplest pattern — users can only access rows they own:
+
+```typescript
+securityRules: [
+    { operation: "all", ownerField: "user_id" }
+]
+```
+
+This generates: `USING (user_id = rebase.uid())`
+
+#### Public Access
+
+Allow anyone (including unauthenticated users) to read:
+
+```typescript
+securityRules: [
+    { operation: "select", access: "public" }
+]
+```
+
+This generates: `USING (true)`
+
+#### Authenticated Access
+
+Allow any signed-in user. This one is a `condition` rather than an `access`
+shortcut — `access` has exactly one value, `"public"` — because "signed in" is a
+test against the caller, and the builder is where tests against the caller live:
+
+```typescript
+
+securityRules: [
+    { operation: "select", condition: policy.authenticated() }
+]
+```
+
+`policy.authenticated()` is true for anonymous *sign-in* too, which mints a real
+user row and a real session. Use `policy.registered()` where a guest should not
+qualify — writing a review, joining an organization, spending money.
+
+#### Role-based Access
+
+Restrict operations to specific roles:
+
+```typescript
+securityRules: [
+    { operation: "all", roles: ["admin"] },
+    { operation: "select", roles: ["editor", "viewer"] }
+]
+```
+
+#### Membership / Relational Access
+
+To scope access by membership in a *related* collection — e.g. "only rows whose
+team the caller belongs to" — use the structured `condition` with
+`policy.existsIn`. It compiles to a single correlated `EXISTS` subquery (no
+per-row lookups), and is the safe, first-class alternative to hand-writing the
+raw SQL shown below.
+
+```typescript
+
+// documents visible only to members of the document's team:
+securityRules: [
+    {
+        operation: "select",
+        condition: policy.existsIn({
+            collection: "team_members",         // the join / membership collection
+            where: policy.and(
+                // correlate to the row being checked:
+                policy.compare(policy.field("team_id"), "eq", policy.outerField("team_id")),
+                // …and to the caller:
+                policy.compare(policy.field("user_id"), "eq", policy.authUid()),
+            ),
+        }),
+    },
+]
+```
+
+Inside `where`, `policy.field(...)` refers to a column of the joined collection
+(`team_members`), while `policy.outerField(...)` refers to a column of the row
+being checked (`documents`). Combine with `policy.authUid()` to scope to the
+current user. Because it is enforced by the database, the admin UI treats it as
+server-authoritative.
+
+##### The `policy` builder, in full
+
+Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
+
+| Expression | Compiles to |
+|---|---|
+| `policy.true()` / `policy.false()` | `true` / `false` |
+| `policy.and(…)` / `policy.or(…)` | conjunction / disjunction |
+| `policy.not(e)` | negation |
+| `policy.compare(left, op, right)` | a comparison between two operands |
+| `policy.rolesOverlap(roles)` | the caller has **any** of these app roles |
+| `policy.rolesContain(roles)` | the caller has **all** of these app roles |
+| `policy.authenticated()` | signed in — `rebase.uid()` is set **and is not an anonymous sentinel**. `IS NOT NULL` alone would be a tautology, since an anonymous request sets a sentinel rather than leaving it unset |
+| `policy.registered()` | signed in **with an account** — `authenticated()` and not a guest. See below |
+| `policy.serverContext()` | `rebase.uid() IS NULL` — see the caution below |
+| `policy.existsIn({ collection, where })` | a correlated `EXISTS` subquery |
+| `policy.raw(sql)` | an escape hatch, inserted verbatim |
+
+| Operand | Means |
+|---|---|
+| `policy.field(name)` | a column of the collection being checked — or, inside `existsIn`, of the joined one |
+| `policy.outerField(name)` | inside `existsIn`, a column of the outer row |
+| `policy.literal(value)` | a string, number, boolean or `null` |
+| `policy.authUid()` | `rebase.uid()` |
+| `policy.authRoles()` | `rebase.roles()` |
+
+#### `authenticated()` and `registered()`
+
+Two different things are called anonymous, and it is worth being precise about
+which one a rule means.
+
+An **unauthenticated** request carries no session at all. It is given a sentinel
+id so that `rebase.uid()` is never `NULL` on the user path, and
+`policy.authenticated()` excludes it — that is what makes it mean "signed in"
+rather than "anyone".
+
+A **guest** is the other thing: a session with nobody behind it.
+`POST /auth/anonymous` mints a real user row with a real uid, so a guest passes
+every test that looks at the id. That is the point of the feature — a cart
+before checkout, a draft before signup — and it means `authenticated()` is true
+for anybody who pressed *Continue as guest*, which asks for no email, no
+password and no agreement to anything.
+
+`policy.registered()` is `authenticated()` plus "not a guest". Reach for it
+wherever a rule is about a person who could be held responsible for something:
+writing a review, joining an organization, spending money. Reach for
+`authenticated()` where a guest is genuinely welcome.
+
+```ts
+// Anyone with a session, guests included — a draft cart.
+{ operation: "insert", check: policy.authenticated() }
+
+// Someone with an account.
+{ operation: "insert", check: policy.registered() }
+```
+
+Under the hood the guest flag travels with the session — it is in the access
+token and reaches the database as `rebase.is_anonymous()` — so a policy can ask
+the question without a lookup. A database served by a server too old to set it
+reads every session as an account, which is the behaviour that deployment
+already had.
+
+:::caution[`serverContext()` is not satisfied by the server singleton]
+It compiles to `rebase.uid() IS NULL`, and `rebase.dataAsAdmin` runs as
+`uid: "service"` — so it is **false** for the accessor most people mean by "the
+server". A collection with `disableDefaultPolicies: true` whose only rule is
+`serverContext()` denies those writes (`42501`) and returns zero rows — HTTP 200,
+empty — for those reads. `rebase.sql()` is the accessor that genuinely bypasses
+policies.
+:::
+
+### Raw SQL Expressions
+
+For complex logic, use `using` and `withCheck`:
+
+```typescript
+securityRules: [
+    {
+        operation: "select",
+        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
+    }
+]
+```
+
+- **`using`** — Filters which existing rows are visible (applies to SELECT, UPDATE, DELETE)
+- **`withCheck`** — Validates new row values (applies to INSERT, UPDATE)
+
+Column references use `{column_name}` syntax which gets resolved to the full table-qualified column.
+
+### Combining Shortcuts and SQL
+
+Mix convenience shortcuts with raw SQL:
+
+```typescript
+securityRules: [
+    // Admins can do anything
+    { operation: "all", roles: ["admin"], using: "true" },
+    // Regular users can only see their own rows
+    { operation: "select", ownerField: "user_id" },
+    // Users can insert, but only for themselves
+    { operation: "insert", withCheck: "{user_id} = rebase.uid()" },
+    // Locked rows cannot be updated
+    { operation: "update", mode: "restrictive", using: "{is_locked} = false" }
+]
+```
+
+### Permissive vs Restrictive
+
+PostgreSQL has two policy modes:
+
+- **Permissive** (default) — Multiple permissive policies are **OR'd** together. If any one passes, access is granted.
+- **Restrictive** — Restrictive policies are **AND'd** together. All must pass.
+
+```typescript
+securityRules: [
+    // Permissive: owners can access their rows
+    { operation: "all", ownerField: "user_id" },
+    // Restrictive: but locked rows cannot be updated
+    { operation: "update", mode: "restrictive", using: "{is_locked} = false", withCheck: "{is_locked} = false" }
+]
+```
+
+### Operations
+
+| Operation | SQL Equivalent | Description |
+|-----------|---------------|-------------|
+| `"select"` | `SELECT` | Read rows |
+| `"insert"` | `INSERT` | Create new rows |
+| `"update"` | `UPDATE` | Modify existing rows |
+| `"delete"` | `DELETE` | Remove rows |
+| `"all"` | All of the above | Shorthand for all operations |
+
+You can also use `operations` (plural) to apply one rule to multiple operations:
+
+```typescript
+{ operations: ["insert", "update", "delete"], ownerField: "authorId" }
+```
+
+### Full SecurityRule Interface
+
+`SecurityRule` is a **union**, not one open object: a rule picks exactly one way
+of expressing its predicate, and the others are typed `never` so mixing them is a
+compile error rather than a policy that silently ignores half of what you wrote.
+
+```typescript no-verify
+// Shared by every variant
+interface SecurityRuleBase {
+    name?: string;                        // Policy name. Omit it and one is derived
+    operation?: SecurityOperation;        // "select" | "insert" | "update" | "delete" | "all"
+    operations?: SecurityOperation[];     // …or several at once
+    mode?: "permissive" | "restrictive";  // Default: "permissive"
+    roles?: string[];                     // App roles, via rebase.roles()
+    pgRoles?: string[];                   // Native Postgres roles — the CREATE POLICY `TO` clause.
+                                          // NOT the same as `roles`. Default: ["public"]
+}
+
+// …plus exactly one of:
+{ ownerField: string }                        // <column> = rebase.uid()
+{ access: "public" }                          // the one shortcut — "no row filter"
+{ condition: PolicyExpression;                // the structured builder — `policy.*`
+  check?: PolicyExpression }                  // defaults to `condition`, as Postgres does
+{ using?: string; withCheck?: string }        // raw SQL
+```
+
+`roles` and `pgRoles` are the two that get confused. `roles` is an application
+role, enforced *inside* the `USING` / `WITH CHECK` clause through
+`rebase.roles()`. `pgRoles` is a database role, and controls which connections
+the policy is attached to at all. Almost every project wants `roles`.
+
+### Examples
+
+#### Blog Platform
+
+```typescript
+securityRules: [
+    // Anyone can read published posts
+    { operation: "select", using: "{status} = 'published'" },
+    // Authors can see their own drafts
+    { operation: "select", ownerField: "authorId" },
+    // Authors can create and edit their own posts
+    { operations: ["insert", "update"], ownerField: "authorId" },
+    // Only admins can delete
+    { operation: "delete", roles: ["admin"] }
+]
+```
+
+#### Multi-Tenant SaaS
+
+```typescript
+securityRules: [
+    {
+        operation: "all",
+        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
+    }
+]
+```
+
+### Anonymous Access (Public Inserts)
+
+A common need is allowing **unauthenticated users** to submit data — contact forms, newsletter signups, public applications. Rebase provides a clean pattern for this.
+
+#### Recommended: a raw `withCheck` rule
+
+```typescript
+
+const contactMessagesCollection: PostgresCollectionConfig = {
+    slug: "contact_messages",
+    name: "Contact Messages",
+    table: "contact_messages",
+    securityRules: [
+        // Anyone can submit a contact message
+        {
+            operation: "insert",
+            // A raw rule carries `using` (which rows are visible) and `withCheck`
+            // (what a write must satisfy); an insert only exercises the latter.
+            using: "true",
+            withCheck: "true"
+        },
+        // Only admins can read, update, or delete messages
+        { operations: ["select", "update", "delete"], roles: ["admin"] }
+    ],
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+};
+```
+
+The `access: "public"` shortcut generates a policy that allows the operation without requiring authentication.
+
+#### For Lead Capture / Signups
+
+```typescript
+
+const leadSignupsCollection: PostgresCollectionConfig = {
+    slug: "lead_magnet_signups",
+    name: "Lead Magnet Signups",
+    table: "lead_magnet_signups",
+    securityRules: [
+        // Allow anonymous inserts
+        { operation: "insert", using: "true", withCheck: "true" },
+        // Admins can view all signups
+        { operation: "select", roles: ["admin"] }
+    ],
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+};
+```
+
+#### How Anonymous Requests Work
+
+When a request arrives without a JWT token, the Rebase backend sets the PostgreSQL session variables to:
+
+| Variable | Value |
+|----------|-------|
+| `app.user_id` | `'anonymous'` |
+| `app.user_roles` | `''` (empty) |
+
+This means:
+
+- `rebase.uid()` returns `'anonymous'`
+- `rebase.roles()` returns an empty string
+- `access: "public"` policies pass because they generate `USING (true)` / `WITH CHECK (true)`
+- `policy.authenticated()` conditions fail because they check for a real user ID
+- `ownerField` policies fail because no row will have `user_id = 'anonymous'` (unless explicitly set)
+
+#### Advanced: Raw SQL for Anonymous
+
+If you need more granular control, use raw SQL:
+
+```typescript
+securityRules: [
+    {
+        operation: "insert",
+        withCheck: "rebase.uid() = 'anonymous' OR rebase.uid() IS NOT NULL"
+    }
+]
+```
+
+:::tip
+Avoid the legacy pattern of checking `string_to_array(rebase.roles(), ',')` for anonymous access. The `access: "public"` shortcut is simpler and generates the correct policy automatically.
+:::
+
+### Next Steps
+
+- **[Relations](/docs/collections/relations)** — Foreign keys and joins
+- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
+- **[Custom Functions](/docs/backend/custom-functions)** — Custom API endpoints
 
 ## Collections
 

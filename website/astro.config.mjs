@@ -87,6 +87,21 @@ export default defineConfig({
                     ]
                 },
                 {
+                    // The BaaS path. Half of what Rebase is has no admin panel
+                    // in it, and until this group existed the only route from
+                    // the landing page to the SDK ran through Frontend pages —
+                    // so a reader who wanted an API over their database was
+                    // reading about React components to get there.
+                    label: "Backend only",
+                    collapsed: false,
+                    items: [
+                        { label: "Headless setup", slug: "docs/getting-started/headless" },
+                        { label: "REST API", slug: "docs/backend/api" },
+                        { label: "Client SDK", slug: "docs/sdk" },
+                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" }
+                    ]
+                },
+                {
                     label: "Collections",
                     collapsed: false,
                     items: [
