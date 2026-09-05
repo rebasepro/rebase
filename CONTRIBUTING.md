@@ -103,6 +103,20 @@ heading is either overwritten or silently left out of the release it belonged
 to. `pnpm check:release-bump` reads that section to decide whether the bump you
 asked for matches what the notes say changed.
 
+After editing `CHANGELOG.md` or anything under `docs/`, regenerate the website's
+mirrors and commit them with the change:
+
+```bash
+pnpm -C website generate-all
+```
+
+The docs site keeps a copy of the changelog per locale, and `llms.txt`,
+`llms-full.txt` and `sitemap.md` are generated from the docs and committed. They
+used to refresh only when somebody happened to build the site, so `llms.txt` sat
+a commit behind the docs it summarises. `pnpm check:generated` runs the same
+command in CI and fails on a diff — if it changes a tracked file, the commit that
+changed the docs forgot to.
+
 ## Code Quality
 
 Before submitting a PR, make sure all checks pass:
