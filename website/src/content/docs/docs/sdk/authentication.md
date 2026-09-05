@@ -241,7 +241,7 @@ import { createRebaseClient, createCookieStorage } from "@rebasepro/client";
 
 // Use cookies instead of localStorage
 const client = createRebaseClient({
-    baseUrl: "http://localhost:3001",
+    baseUrl: import.meta.env.VITE_API_URL,
     auth: {
         storage: createCookieStorage({
             path: "/",

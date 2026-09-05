@@ -24,11 +24,16 @@ pnpm add @rebasepro/client
 
 ## Creating a Client
 
+`rebase dev` derives a free port from the project's path rather than using a
+fixed one, so **read `baseUrl` from the URL it printed** — there is no port
+every project shares. In a Vite frontend that is the `VITE_API_URL` the scaffold
+writes into `.env`; in a script, an environment variable of your own.
+
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
 
 const client = createRebaseClient({
-    baseUrl: "http://localhost:3001",
+    baseUrl: import.meta.env.VITE_API_URL,
 });
 ```
 
@@ -36,8 +41,8 @@ The `websocketUrl` is derived automatically from `baseUrl` (`http → ws`, `http
 
 ```typescript
 const client = createRebaseClient({
-    baseUrl: "http://localhost:3001",
-    websocketUrl: "ws://localhost:3001",
+    baseUrl: import.meta.env.VITE_API_URL,
+    websocketUrl: import.meta.env.VITE_WS_URL,
 });
 ```
 
@@ -45,7 +50,7 @@ const client = createRebaseClient({
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `baseUrl` | `string` | Backend URL (e.g. `http://localhost:3001`) |
+| `baseUrl` | `string` | Backend URL. Read it from what `rebase dev` printed, or from your deployment |
 | `websocketUrl` | `string` | WebSocket URL — auto-derived from `baseUrl` if omitted |
 | `token` | `string` | Static JWT token for server-to-server calls |
 | `apiPath` | `string` | API prefix (default: `"/api"`) |
@@ -70,7 +75,7 @@ import { createRebaseClient } from "@rebasepro/client";
 import { collectionsDictionary, type Database } from "./generated/sdk/database.types";
 
 const client = createRebaseClient<Database>({
-    baseUrl: "http://localhost:3001",
+    baseUrl: import.meta.env.VITE_API_URL,
     collections: collectionsDictionary,
 });
 

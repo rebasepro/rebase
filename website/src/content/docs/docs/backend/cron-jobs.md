@@ -254,8 +254,11 @@ All cron routes require **admin authentication** (`requireAuth` + `requireAdmin`
 
 ### Example: List All Jobs
 
+`$API_URL` is whatever `rebase dev` printed — the port is derived from the
+project's path, so there is no fixed one.
+
 ```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
+curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"
 ```
 
 ```json
@@ -281,7 +284,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3001/api/cron/health-check/trigger
+    "$API_URL/api/cron/health-check/trigger"
 ```
 
 ## Client SDK
@@ -291,7 +294,7 @@ The Rebase client SDK exposes a `cron` namespace for all operations:
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
 
-const client = createRebaseClient({ baseUrl: "http://localhost:3001" });
+const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
 
 // List all jobs
 const { jobs } = await client.cron.listJobs();
