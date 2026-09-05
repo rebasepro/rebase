@@ -11,4 +11,8 @@ import { CustomizationControllerContext } from "../contexts/CustomizationControl
  *
  * @group Hooks and utilities
  */
-export const useCustomizationController = (): CustomizationController => useContext(CustomizationControllerContext);
+export const useCustomizationController = (): CustomizationController => {
+    const controller = useContext(CustomizationControllerContext);
+    if (!controller) throw new Error("useCustomizationController must be used inside <Rebase>");
+    return controller;
+};

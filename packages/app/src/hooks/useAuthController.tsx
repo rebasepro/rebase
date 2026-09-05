@@ -12,4 +12,8 @@ import { AuthControllerContext } from "../contexts/AuthControllerContext";
  * @see AuthController
  * @group Hooks and utilities
  */
-export const useAuthController = <USER extends User = User, AuthControllerType extends AuthController<USER> = AuthController<USER>>(): AuthControllerType => useContext(AuthControllerContext) as AuthControllerType;
+export const useAuthController = <USER extends User = User, AuthControllerType extends AuthController<USER> = AuthController<USER>>(): AuthControllerType => {
+    const authController = useContext(AuthControllerContext);
+    if (!authController) throw new Error("useAuthController must be used inside <Rebase>");
+    return authController as AuthControllerType;
+};

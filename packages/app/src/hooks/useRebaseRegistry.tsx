@@ -71,7 +71,7 @@ export function useRebaseRegistry(): RebaseRegistryController {
     const dispatch = useContext(RegistryDispatchContext);
     const state = useContext(RegistryStateContext);
     if (!dispatch) {
-        throw new Error("useRebaseRegistry must be used within RebaseRegistryProvider");
+        throw new Error("useRebaseRegistry must be used inside <Rebase>");
     }
     return useMemo(() => ({ ...state,
 ...dispatch }), [state, dispatch]);
@@ -85,7 +85,7 @@ export function useRebaseRegistry(): RebaseRegistryController {
 export function useRebaseRegistryDispatch(): RegistryDispatch {
     const dispatch = useContext(RegistryDispatchContext);
     if (!dispatch) {
-        throw new Error("useRebaseRegistryDispatch must be used within RebaseRegistryProvider");
+        throw new Error("useRebaseRegistryDispatch must be used inside <Rebase>");
     }
     return dispatch;
 }

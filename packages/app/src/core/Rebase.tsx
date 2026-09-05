@@ -390,7 +390,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
                     <StorageSourcesContext.Provider
                         value={storageSourcesValue}>
                     <StorageSourceContext.Provider
-                        value={resolvedStorage!}>
+                        value={resolvedStorage}>
                         <CollectionResolverRegistrationContext.Provider
                             value={registerCollectionResolver}>
                         <DataSourcesContext.Provider
