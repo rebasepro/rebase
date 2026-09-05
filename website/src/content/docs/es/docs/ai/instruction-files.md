@@ -37,6 +37,21 @@ Please refer to and follow the instructions defined in [ai-instructions.md](./ai
 Esto ocurre en cada `rebase init`, para cada preset, incluido `--headless`.
 No hay ningún flag ni confirmación interactiva.
 
+`rebase init` también escribe `.mcp.json`, que apunta Claude Code, Cursor y
+cualquier otro cliente MCP al [servidor MCP de Rebase](/es/docs/ai/mcp):
+
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "rebase": { "command": "npx", "args": ["-y", "@rebasepro/mcp"] }
+  }
+}
+```
+
+Dentro no hay `REBASE_PROJECT_DIR`, y es intencionado: el cliente arranca el
+servidor en la raíz del proyecto, y una ruta absoluta es la única línea de ese
+archivo que no se puede confirmar en el repositorio.
+
 ## Por qué un puntero en lugar de una copia
 
 Los archivos de puntero están deliberadamente vacíos de contenido. Los asistentes

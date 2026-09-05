@@ -36,6 +36,21 @@ Please refer to and follow the instructions defined in [ai-instructions.md](./ai
 Questo avviene a ogni `rebase init`, per ogni preset incluso `--headless`.
 Non ci sono flag né richieste di conferma.
 
+`rebase init` scrive anche `.mcp.json`, che indirizza Claude Code, Cursor e
+qualsiasi altro client MCP al [server MCP di Rebase](/it/docs/ai/mcp):
+
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "rebase": { "command": "npx", "args": ["-y", "@rebasepro/mcp"] }
+  }
+}
+```
+
+Al suo interno non c'è `REBASE_PROJECT_DIR`, ed è voluto: il client avvia il
+server nella radice del progetto, e un percorso assoluto è l'unica riga di quel
+file che non può essere committata.
+
 ## Perché un puntatore invece di una copia
 
 I file puntatore sono deliberatamente privi di contenuti. Gli assistenti seguono i

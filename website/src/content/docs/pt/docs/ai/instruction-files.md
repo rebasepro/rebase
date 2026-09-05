@@ -37,6 +37,21 @@ O `.github/copilot-instructions.md` é idêntico, exceto pelo caminho relativo
 Isso acontece em todo `rebase init`, para todos os presets, incluindo `--headless`.
 Não há nenhuma flag nem prompt.
 
+O `rebase init` também escreve `.mcp.json`, que aponta o Claude Code, o Cursor
+e qualquer outro cliente MCP para o [servidor MCP do Rebase](/pt/docs/ai/mcp):
+
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "rebase": { "command": "npx", "args": ["-y", "@rebasepro/mcp"] }
+  }
+}
+```
+
+Não há `REBASE_PROJECT_DIR` nele, de propósito: o cliente inicia o servidor na
+raiz do projeto, e um caminho absoluto é a única linha desse arquivo que não
+pode ser commitada.
+
 ## Por que um ponteiro em vez de uma cópia
 
 Os arquivos de ponteiro são deliberadamente sem conteúdo próprio. Os assistentes seguem links

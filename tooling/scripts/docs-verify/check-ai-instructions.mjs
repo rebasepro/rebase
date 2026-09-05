@@ -17,6 +17,11 @@
  *      publishes, read from its own `exports` map — which catches the other
  *      half of the same drift, a guard import pointed at a subpath that is not
  *      there.
+ *   3. Every script in the scaffold's own `package.json` is named in the
+ *      instruction file, and the scaffold ships an `.mcp.json` pointing at
+ *      `@rebasepro/mcp`. An assistant that has to guess at the run scripts
+ *      invents `npm run migrate`; one with no MCP block never finds the tools
+ *      at all.
  */
 import { readFileSync, globSync } from "node:fs";
 import path from "node:path";
@@ -150,5 +155,66 @@ export function checkAiInstructions(root) {
         }
     }
 
+    checkScaffold(root, findings);
     return { findings, scanned };
+}
+
+/** The default `rebase init` layout — the one every quickstart produces. */
+const SCAFFOLD = "packages/cli/templates/template";
+
+/**
+ * What a fresh scaffold hands its assistant: the run scripts, and the MCP block.
+ *
+ * The headless overlay is deliberately not checked here. It deletes
+ * `config/collections` and ships a smaller script list, so it is a different
+ * file's job, and asserting the base template's scripts against it would only
+ * teach the check to accept less.
+ */
+function checkScaffold(root, findings) {
+    const instructions = path.join(root, SCAFFOLD, "ai-instructions.md");
+    let text;
+    try {
+        text = readFileSync(instructions, "utf8");
+    } catch {
+        findings.push({ file: `${SCAFFOLD}/ai-instructions.md`, line: 0, message: "missing" });
+        return;
+    }
+
+    let scripts = {};
+    try {
+        scripts = JSON.parse(readFileSync(path.join(root, SCAFFOLD, "package.json"), "utf8")).scripts ?? {};
+    } catch {
+        /* the template package.json is checked elsewhere */
+    }
+    for (const name of Object.keys(scripts)) {
+        if (text.includes(`\`pnpm ${name}\``) || text.includes(`\`${name}\``)) continue;
+        findings.push({
+            file: `${SCAFFOLD}/ai-instructions.md`,
+            line: 0,
+            message:
+                `the scaffold declares a \`${name}\` script that this file never names. ` +
+                "An assistant that cannot see a command invents one."
+        });
+    }
+
+    const mcpPath = path.join(root, SCAFFOLD, ".mcp.json");
+    let mcp;
+    try {
+        mcp = JSON.parse(readFileSync(mcpPath, "utf8"));
+    } catch {
+        findings.push({
+            file: `${SCAFFOLD}/.mcp.json`,
+            line: 0,
+            message: "missing or unparseable — a fresh scaffold must ship the MCP server block"
+        });
+        return;
+    }
+    const args = mcp?.mcpServers?.rebase?.args ?? [];
+    if (!args.includes("@rebasepro/mcp")) {
+        findings.push({
+            file: `${SCAFFOLD}/.mcp.json`,
+            line: 0,
+            message: `\`mcpServers.rebase\` does not run \`@rebasepro/mcp\` (args: ${JSON.stringify(args)})`
+        });
+    }
 }

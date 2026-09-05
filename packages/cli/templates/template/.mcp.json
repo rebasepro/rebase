@@ -1,0 +1,8 @@
+{
+    "mcpServers": {
+        "rebase": {
+            "command": "npx",
+            "args": ["-y", "@rebasepro/mcp"]
+        }
+    }
+}
