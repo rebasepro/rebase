@@ -90,6 +90,8 @@
     "check:test-scripts": "node tooling/scripts/check-test-scripts.mjs",
     "check:control-chars": "node tooling/scripts/check-control-chars.mjs",
     "check:untranslated": "node tooling/scripts/check-untranslated.mjs",
+    "check:lint": "eslint . --quiet",
+    "ci:static": "node tooling/scripts/ci-static.mjs",
     "harness": "node tooling/scripts/harness/harness.mjs",
     "harness:preflight": "node tooling/scripts/harness/harness.mjs preflight",
     "harness:eval": "node tooling/scripts/harness/harness.mjs eval",
