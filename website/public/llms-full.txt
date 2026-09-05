@@ -10279,12 +10279,16 @@ you have the developer tools alone. To lay the shell out by hand instead, see
 | `entityActions` | Global entity actions |
 | `plugins` | Plugin instances |
 | `slots` | Slot contributions declared directly, without a plugin |
-| `basePath` / `baseCollectionPath` | URL prefixes when the admin is not at the site root |
 | `components` | Component overrides |
 
 The navigation, URL and collection-registry controllers are **not** `<Rebase>`
 props — they are built by the hooks below and consumed inside the admin tree
 (`<RebaseShell>` wires them for you in the default scaffold).
+
+Neither is the URL prefix. When the admin is mounted under a path, that belongs
+on `<RebaseCMS basePath="/admin">`, which is what resolves URLs to collections —
+and only when the router has no `basename` of its own. See
+[Changing the Base URL](/docs/getting-started/deployment#changing-the-base-url).
 
 ### Two data shapes
 

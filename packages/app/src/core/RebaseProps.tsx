@@ -114,18 +114,6 @@ export type RebaseProps<USER extends User, DB = unknown> = {
     children: React.ReactNode | ((props: { context: RebaseContext; loading: boolean }) => React.ReactNode);
 
     /**
-     * Optional base path for the entire Rebase app.
-     * Defaults to "/"
-     */
-    basePath?: string;
-
-    /**
-     * Optional base path for the admin collections.
-     * Defaults to "/c"
-     */
-    baseCollectionPath?: string;
-
-    /**
      * Base URL for the backend API (e.g. "http://localhost:3001").
      * When provided, this is available via `useApiConfig()` to any hook
      * in the tree, reducing repetitive `apiUrl` threading.
