@@ -13,7 +13,8 @@ import {
     getActiveBackendPlugin,
     resolvePluginCliScript,
     resolveTsx,
-    findEnvFile
+    findEnvFile,
+    dependenciesNotInstalled
 } from "../utils/project";
 import { recordEvent } from "../telemetry";
 
@@ -263,7 +264,7 @@ async function resolveDriverCli(): Promise<{
     }
     const pluginCli = resolvePluginCliScript(backendDir, activePlugin);
     if (!pluginCli) {
-        throw new Error(`Could not find CLI entry point for ${activePlugin}.`);
+        throw new Error(dependenciesNotInstalled(projectRoot));
     }
 
     const envFile = findEnvFile(projectRoot);
@@ -285,7 +286,7 @@ async function execDriverCli(
     const isTs = pluginCli.endsWith(".ts");
     if (isTs) {
         const tsxBin = resolveTsx(projectRoot);
-        if (!tsxBin) throw new Error("Could not find tsx binary.");
+        if (!tsxBin) throw new Error(dependenciesNotInstalled(projectRoot));
         await execa(tsxBin, [pluginCli, ...childArgs], { cwd: backendDir, stdio, env });
         return;
     }
@@ -325,7 +326,7 @@ export async function runDriverDbCommand(
 
     const pluginCli = resolvePluginCliScript(backendDir, activePlugin);
     if (!pluginCli) {
-        throw new Error(`Could not find CLI entry point for ${activePlugin}.`);
+        throw new Error(dependenciesNotInstalled(projectRoot));
     }
 
     // Set up environment with DOTENV_CONFIG_PATH
@@ -378,7 +379,7 @@ export async function runDriverDbCommand(
     const isTs = pluginCli.endsWith(".ts");
     if (isTs) {
         const tsxBin = resolveTsx(projectRoot);
-        if (!tsxBin) throw new Error("Could not find tsx binary.");
+        if (!tsxBin) throw new Error(dependenciesNotInstalled(projectRoot));
         await execa(tsxBin, [pluginCli, ...childArgs], { cwd: backendDir, stdio: "inherit", env });
         return;
     }

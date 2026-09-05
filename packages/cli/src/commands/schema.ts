@@ -9,7 +9,8 @@ import {
     getActiveBackendPlugin,
     resolvePluginCliScript,
     resolveTsx,
-    findEnvFile
+    findEnvFile,
+    exitDependenciesNotInstalled
 } from "../utils/project";
 import { recordEvent } from "../telemetry";
 import { wantsHelp } from "../utils/args";
@@ -50,8 +51,7 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
 
     const pluginCli = resolvePluginCliScript(backendDir, activePlugin);
     if (!pluginCli) {
-        console.error(chalk.red(`✗ Could not find CLI entry point for ${activePlugin}.`));
-        process.exit(1);
+        exitDependenciesNotInstalled(projectRoot);
     }
 
     // Set up environment with DOTENV_CONFIG_PATH
@@ -66,8 +66,7 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
         if (isTs) {
             const tsxBin = resolveTsx(projectRoot);
             if (!tsxBin) {
-                console.error(chalk.red("✗ Could not find tsx binary."));
-                process.exit(1);
+                exitDependenciesNotInstalled(projectRoot);
             }
             await execa(tsxBin, [pluginCli, ...rawArgs.slice(2)], {
                 cwd: backendDir,

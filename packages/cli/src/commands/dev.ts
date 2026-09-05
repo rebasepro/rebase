@@ -30,7 +30,8 @@ import {
     resolveTsx,
     validateTsxInstallation,
     getActiveBackendPlugin,
-    resolvePluginCliScript
+    resolvePluginCliScript,
+    dependenciesNotInstalled
 } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
@@ -559,10 +560,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     if (!frontendOnly && backendDir) {
         const tsxBin = resolveTsx(projectRoot);
         if (!tsxBin) {
-            const pmCmdsLocal = getPMCommands(detectPackageManager(projectRoot));
-            const addCmd = [...pmCmdsLocal.install, "-D", "tsx"].join(" ");
-            console.error(chalk.red("  ✗ Could not find tsx binary for backend."));
-            console.error(chalk.gray(`    Install it with: ${addCmd}`));
+            console.error(chalk.red(`  ✗ ${dependenciesNotInstalled(projectRoot)}`));
             process.exit(1);
         }
 

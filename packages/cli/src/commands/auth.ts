@@ -14,7 +14,8 @@ import {
     requireBackendDir,
     findEnvFile,
     readEnvFile,
-    resolveTsx
+    resolveTsx,
+    exitDependenciesNotInstalled
 } from "../utils/project";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 
@@ -283,8 +284,7 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
     const tsxBin = resolveTsx(projectRoot);
 
     if (!tsxBin) {
-        console.error(chalk.red("✗ Could not find tsx binary."));
-        process.exit(1);
+        exitDependenciesNotInstalled(projectRoot);
     }
 
     try {

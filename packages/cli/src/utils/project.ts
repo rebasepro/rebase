@@ -9,6 +9,7 @@ import path from "path";
 import { execSync } from "child_process";
 import dotenv from "dotenv";
 import chalk from "chalk";
+import { detectPackageManager, getPMCommands } from "./package-manager";
 
 /** The authored project manifest. Its presence alone marks a project root. */
 export const MANIFEST_FILENAME = "rebase.json";
@@ -285,6 +286,44 @@ export function validateTsxInstallation(tsxBinPath: string): string | null {
         // realpathSync throws if the symlink target is completely gone
         return `tsx binary symlink is broken: ${err instanceof Error ? err.message : String(err)}`;
     }
+}
+
+/**
+ * The one sentence a command says when the project's dependencies are missing.
+ *
+ * Six commands each had their own wording for the same state, and none of them
+ * named the remedy:
+ *
+ *   ✗ Could not find CLI entry point for @rebasepro/server-postgres.
+ *   ✗ Could not find tsx binary.
+ *   ✗ Could not find tsx binary for backend.
+ *
+ * All three mean "you have not installed yet" — `getActiveBackendPlugin` has
+ * already read the driver out of `backend/package.json` by the time the first
+ * one fires, so the package is declared and simply not on disk, and `tsx` is a
+ * devDependency of every scaffold. But they read as *Rebase* being broken, and
+ * they name an internal path or a binary the developer never asked for rather
+ * than the command that fixes it. That is the whole of the failure someone sees
+ * on a fresh clone, where `node_modules/` is the one thing a checkout does not
+ * carry.
+ *
+ * So: one sentence, naming the package manager this project uses and the
+ * directory to run it in — the working directory is usually neither.
+ */
+export function dependenciesNotInstalled(projectRoot: string): string {
+    const install = getPMCommands(detectPackageManager(projectRoot)).install.join(" ");
+    return `Dependencies are not installed — run \`${install}\` in ${projectRoot}`;
+}
+
+/**
+ * Print {@link dependenciesNotInstalled} and exit 1.
+ *
+ * For the five commands that report and stop. `db.ts` throws instead, because
+ * its caller adds the `✗` and the exit itself.
+ */
+export function exitDependenciesNotInstalled(projectRoot: string): never {
+    console.error(chalk.red(`✗ ${dependenciesNotInstalled(projectRoot)}`));
+    process.exit(1);
 }
 
 /**
