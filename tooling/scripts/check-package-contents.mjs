@@ -27,21 +27,33 @@
  * used to scan one directory, so the one publishable package outside it was
  * invisible here for the same reason it was invisible to four releases.
  *
- * ## No tarball ships its tests
+ * ## No tarball ships `src/`
  *
- * Most packages here declare `files: ["dist", "src"]` and ship their sources
- * alongside the build, which is deliberate — it makes stack traces and
- * go-to-definition work for anyone who installs them. What was not deliberate
- * is what rides along: seven packages co-locate their tests beside the code as
- * `src/**\/*.test.ts`, so `src` swept them into the tarball. `@rebasepro/client`
- * shipped twenty-seven test files to npm, more than half of what it published.
+ * Sixteen packages declared `files: ["dist", "src"]` on the reasoning that
+ * shipping sources makes stack traces and go-to-definition work. They already
+ * did: every `.map` in `dist` carries full `sourcesContent`, so the sources
+ * were in the tarball twice. For `@rebasepro/cms` that second copy was 2.85 MB
+ * of a 2.86 MB package — the build was a rounding error next to it.
  *
- * The reason this is a check and not a note is that it is invisible from the
- * repository. Nothing in the working tree looks wrong; the difference between a
- * package that ships its tests and one that does not is where the author
- * happened to put them — `packages/app` was clean only because its tests live
- * in `test/` rather than `src/`. Two packages with identical intent, different
- * output, and no signal either way until someone unpacks a tarball.
+ * It also brought the tests with it. Seven packages co-locate tests beside the
+ * code as `src/**\/*.test.ts`, so `src` swept them in; `@rebasepro/client`
+ * published twenty-seven test files, more than half of what it shipped. Six
+ * `!src/**` negations per manifest existed to police that, and they are gone
+ * with the thing they were policing.
+ *
+ * The test rule stays, because `files` can grow a `src` again and because a
+ * package can name a test path some other way. It is worth keeping for its own
+ * sake: tests here are written to explain the defect they pin, at length and by
+ * name — which policy shipped anonymous access and for how long, which guard
+ * was silently doing nothing. That is the right way to write a regression test
+ * and the wrong thing to publish to a registry.
+ *
+ * Both rules are invisible from the repository, which is why they are checks
+ * rather than notes. Nothing in the working tree looks wrong; whether a package
+ * publishes its tests depended only on where its author put them —
+ * `packages/app` was clean because its tests live in `test/` rather than
+ * `src/`. Two packages with identical intent, different output, and no signal
+ * either way until someone unpacks a tarball.
  *
  * It matters beyond bloat. Tests in this repository are written to explain the
  * defect they pin, at length and by name: which policy shipped anonymous access
@@ -63,6 +75,9 @@ const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "
 /** A path in a tarball that should not be in a tarball. */
 const TEST_PATH = /(^|\/)(__tests__|tests)\/|\.(test|spec)\.[cm]?[jt]sx?$/;
 
+/** Sources, which every `dist/*.map` already carries as `sourcesContent`. */
+const SRC_PATH = /^src\//;
+
 /**
  * Every directory that can hold a publishable package.
  *
@@ -75,6 +90,7 @@ const CANDIDATE_DIRS = ["packages", "tooling"];
 const licenceText = fs.readFileSync(path.join(root, "LICENSE"));
 
 const shippingTests = [];
+const shippingSources = [];
 const licenceProblems = [];
 let checked = 0;
 
@@ -110,6 +126,9 @@ for (const parent of CANDIDATE_DIRS) {
         const bad = packed.filter((f) => TEST_PATH.test(f));
         if (bad.length > 0) shippingTests.push({ name: manifest.name, rel, bad });
 
+        const sources = packed.filter((f) => SRC_PATH.test(f));
+        if (sources.length > 0) shippingSources.push({ name: manifest.name, rel, count: sources.length });
+
         // npm includes a LICENSE regardless of `files`, so a package missing it
         // from the tarball is a package missing it from disk.
         if (!packed.some((f) => /^LICEN[CS]E(\.\w+)?$/i.test(f))) {
@@ -136,6 +155,19 @@ if (shippingTests.length > 0) {
     console.error("");
 }
 
+if (shippingSources.length > 0) {
+    console.error("");
+    console.error(`✗ ${shippingSources.length} package(s) would publish src/ a second time:`);
+    for (const { name, rel, count } of shippingSources) {
+        console.error(`    ${name} (${rel}): ${count} file(s) under src/`);
+    }
+    console.error("");
+    console.error("  Every dist/*.map already embeds the full sources as `sourcesContent`, so");
+    console.error("  this is a duplicate copy — for @rebasepro/cms it was 2.85 MB of a 2.86 MB");
+    console.error("  package. Fix: drop \"src\" from \"files\".");
+    console.error("");
+}
+
 if (licenceProblems.length > 0) {
     console.error("");
     console.error(`✗ ${licenceProblems.length} package(s) would publish without the project's licence:`);
@@ -146,6 +178,8 @@ if (licenceProblems.length > 0) {
     console.error("");
 }
 
-if (shippingTests.length > 0 || licenceProblems.length > 0) process.exit(1);
+if (shippingTests.length > 0 || shippingSources.length > 0 || licenceProblems.length > 0) process.exit(1);
 
-console.log(`✓ ${checked} publishable package(s): none shipping tests, all carrying the project licence.`);
+console.log(
+    `✓ ${checked} publishable package(s): no tests, no duplicated src/, all carrying the project licence.`
+);
