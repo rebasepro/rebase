@@ -48,6 +48,22 @@ region: "europe-west1" }
 region: undefined });
     });
 
+    it("an explicit provider takes the region the control plane offers on it", () => {
+        // `--provider hetzner` means the Hetzner region we have capacity in —
+        // which the control plane lists and a per-provider guess cannot know.
+        expect(chooseRequestedTarget("hetzner", [
+            { clusterId: null,
+provider: "gcp",
+region: "europe-west1",
+label: "Rebase Cloud" },
+            { clusterId: null,
+provider: "hetzner",
+region: "fsn1",
+label: "Falkenstein (Hetzner)" }
+        ])).toEqual({ provider: "hetzner",
+region: "fsn1" });
+    });
+
     it("leaves the region unset when the target cannot name one", () => {
         // The ambient in-cluster rung has no cluster record to read a region
         // from. `providerDefaults` then supplies one that at least matches the

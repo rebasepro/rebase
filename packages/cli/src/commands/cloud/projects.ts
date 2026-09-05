@@ -123,7 +123,10 @@ function providerDefaults(provider: string): { region: string } {
         case "aws":
             return { region: "us-east-1" };
         default:
-            return { region: "nbg1" };
+            // fsn1, not nbg1: Falkenstein is the Hetzner region the control
+            // plane prices and stands capacity in; Nuremberg is in neither list,
+            // so a project defaulted there was refused as an unknown region.
+            return { region: "fsn1" };
     }
 }
 
@@ -159,8 +162,16 @@ export function chooseRequestedTarget(
     requested: string | undefined,
     targets: DeployTarget[] | undefined
 ): { provider: string; region?: string } | null {
-    if (requested) return { provider: requested,
-region: undefined };
+    if (requested) {
+        // An explicit provider takes the region of the first target the control
+        // plane offers on it: `--provider hetzner` means "the Hetzner region
+        // we have capacity in", which the control plane knows and a
+        // per-provider guess does not. No such target, no region — the caller
+        // may still name one, or the per-provider default applies.
+        const offered = targets?.find((t) => t.provider === requested);
+        return { provider: requested,
+region: offered?.region?.trim() || undefined };
+    }
 
     // Keep the historical default against a control plane that cannot answer,
     // rather than refusing to create a project against it.
