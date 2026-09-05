@@ -538,20 +538,31 @@ export class PersistService {
             if (isRowLevelSecurityDenial(error)) {
                 return ApiError.forbidden(message, "WRITE_DENIED");
             }
-            return new Error(message);
+            // `{ cause }` is load-bearing, not tidiness. The API error handler
+            // walks the cause chain for a SQLSTATE and classifies from it: a
+            // `42P01` becomes `SCHEMA_DRIFT` with "table X does not exist. Run
+            // `rebase db push`", and a `42501` becomes `DB_PERMISSION_DENIED`
+            // naming row-level security. A bare `new Error(message)` severs the
+            // chain, so every write against a table the code expects and the
+            // database lacks answered `INTERNAL_ERROR` / "An unexpected error
+            // occurred" — the one failure with the most actionable fix in the
+            // product, reported as the least actionable message in it. Reads
+            // were classified correctly the whole time, which is why the
+            // asymmetry went unnoticed.
+            return new Error(message, { cause: error });
         }
 
         // No PG error found — try to extract a useful message from the
         // Drizzle wrapper instead of leaking the raw SQL query + params.
         const causeMessage = extractCauseMessage(error);
         if (causeMessage) {
-            return new Error(`Database error in "${collectionSlug}": ${causeMessage}`);
+            return new Error(`Database error in "${collectionSlug}": ${causeMessage}`, { cause: error });
         }
 
         // Last resort: generic message, never leak raw SQL
         if (error instanceof Error && error.message.startsWith("Failed query:")) {
-            return new Error(`Failed to save row in "${collectionSlug}". Check server logs for details.`);
+            return new Error(`Failed to save row in "${collectionSlug}". Check server logs for details.`, { cause: error });
         }
-        return new Error(`Database error in "${collectionSlug}": ${String(error)}`);
+        return new Error(`Database error in "${collectionSlug}": ${String(error)}`, { cause: error });
     }
 }
