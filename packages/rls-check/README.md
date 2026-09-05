@@ -222,7 +222,9 @@ The connection string is taken from, in order:
 
 The connection string never appears in the output — not in the report, not in an error, not in a log line. Host, port and database name are shown; the user and password are replaced with `***`.
 
-If your password contains `@`, `:`, `/`, `?` or `#`, percent-encode it. An unencoded one makes the URL ambiguous, and `rls-check` refuses to guess rather than risk connecting somewhere unintended.
+If your password contains `/`, `?` or `#`, percent-encode it. Those three end the URL's authority section, so the split lands inside the credential — and rather than print fragments of a password, `rls-check` refuses the string and says so.
+
+`@` and `:` need no encoding here: the userinfo is split at the **last** `@` and the user at the **first** `:`, which is what `pg` does too, so `postgresql://user:pa@ss@host:5432/db` connects to `host` with the password `pa@ss`. Encoding them anyway is never wrong.
 
 ## Exit codes
 

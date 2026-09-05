@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 
 import { clientConfigFromKeywords, unsupportedConnectionKeywords } from "./introspect";
-import { parseKeywordConnectionString } from "./redact";
+import { parseConnectionString, parseKeywordConnectionString } from "./redact";
 
 const keywords = (raw: string): Map<string, string> => {
     const parsed = parseKeywordConnectionString(raw);
@@ -90,5 +90,39 @@ describe("unsupportedConnectionKeywords", () => {
             "hostaddr",
             "sslrootcert"
         ]);
+    });
+});
+
+/**
+ * Which unencoded characters in a password are handled, and which are refused.
+ *
+ * The README used to say all five of `@ : / ? #` made the URL ambiguous and
+ * were refused. Two of them are not: the userinfo splits at the LAST `@` and
+ * the user at the FIRST `:`, which is what `pg` does too, so those passwords
+ * connect. A documented refusal that does not happen sends people
+ * percent-encoding a string that already worked — and teaches them not to trust
+ * the refusal that is real.
+ */
+describe("unencoded characters in a password", () => {
+    it("splits at the last @ and the first :, so both work unencoded", () => {
+        expect(parseConnectionString("postgresql://u:pa@ss@127.0.0.1:5432/db")).toMatchObject({
+            host: "127.0.0.1",
+            port: 5432,
+            database: "db",
+            user: "u",
+            password: "pa@ss"
+        });
+
+        expect(parseConnectionString("postgresql://u:pa:ss@127.0.0.1:5432/db")).toMatchObject({
+            host: "127.0.0.1",
+            password: "pa:ss"
+        });
+    });
+
+    it.each(["/", "?", "#"])("refuses the string when the password contains %s", (char) => {
+        // These end the authority, so the split lands inside the credential.
+        // Refusing is the only safe answer: printing the pieces would print
+        // part of the password.
+        expect(parseConnectionString(`postgresql://u:pa${char}ss@127.0.0.1:5432/db`)).toBeNull();
     });
 });

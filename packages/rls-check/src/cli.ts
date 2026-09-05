@@ -857,7 +857,7 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
                 formatFriendlyError(
                     {
                         headline: "That does not look like a PostgreSQL connection string.",
-                        hint: "Expected postgresql://user:password@host:5432/database, or a libpq keyword string carrying at least one of host= dbname= user= (port, password, sslmode, application_name, connect_timeout and options are honoured too). If the password contains @ : / ? or #, percent-encode it — otherwise the URL is ambiguous and neither this tool nor libpq can tell where the credential ends."
+                        hint: "Expected postgresql://user:password@host:5432/database, or a libpq keyword string carrying at least one of host= dbname= user= (port, password, sslmode, application_name, connect_timeout and options are honoured too). A password containing / ? or # is the usual cause: those end the authority, so the split lands inside the credential and neither this tool nor libpq can tell where it ends — percent-encode them. An @ or a : inside a password is fine, and needs no encoding."
                     },
                     color
                 )
