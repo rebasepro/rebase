@@ -1,3 +1,4 @@
+import { en } from "../../app/src/locales/en";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { StudioHomePage } from "../src/components/StudioHomePage";
@@ -23,6 +24,11 @@ const mockRegistry = {
 };
 
 jest.mock("@rebasepro/app", () => ({
+    useTranslation: () => ({
+        t: (key: string) => (en as Record<string, string>)[key] ?? key,
+        i18n: { language: "en" }
+    }),
+    useNavigationGroupLabel: () => (group: string) => group,
     useRebaseContext: () => ({
         baseUrl: "http://localhost:3001",
         collections: []

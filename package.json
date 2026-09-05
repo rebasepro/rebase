@@ -89,6 +89,7 @@
     "check:test-scripts": "node tooling/scripts/check-test-scripts.mjs",
     "check:control-chars": "node tooling/scripts/check-control-chars.mjs",
     "check:untranslated": "node tooling/scripts/check-untranslated.mjs",
+    "check:rebase-props": "node tooling/scripts/check-rebase-props-table.mjs",
     "harness": "node tooling/scripts/harness/harness.mjs",
     "harness:preflight": "node tooling/scripts/harness/harness.mjs preflight",
     "harness:eval": "node tooling/scripts/harness/harness.mjs eval",

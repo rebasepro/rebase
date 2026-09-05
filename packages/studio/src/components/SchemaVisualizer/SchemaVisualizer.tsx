@@ -27,7 +27,8 @@ import {
 } from "@rebasepro/ui";
 import {
     useStudioCollectionRegistry,
-    IconForView
+    IconForView,
+    useTranslation
 } from "@rebasepro/app";
 
 import { isPostgresCollectionConfig } from "@rebasepro/types";
@@ -625,6 +626,7 @@ duration: 400 }
 // ─── Outer wrapper (provides ReactFlowProvider) ────────────────────────
 
 export const SchemaVisualizer = () => {
+    const { t } = useTranslation();
     const { collections: registryCollections } =
         useStudioCollectionRegistry() as {
             collections?: AdminCollection[];
@@ -662,17 +664,13 @@ export const SchemaVisualizer = () => {
             <div className="flex items-center justify-center h-full w-full p-6">
                 <div className="max-w-md text-center space-y-2">
                     <Typography variant="subtitle2" className="block">
-                        No collections declared
+                        {t("studio_schema_no_collections")}
                     </Typography>
                     <Typography variant="body2" color="secondary" className="block">
-                        There is nothing to draw yet. Add a collection under{" "}
-                        <code className="font-mono text-[12px]">config/collections/</code>, or
-                        open <strong>Edit collections</strong> to add one here.
+                        {t("studio_schema_no_collections_body")}
                     </Typography>
                     <Typography variant="body2" color="secondary" className="block">
-                        Against a database that already has tables,{" "}
-                        <code className="font-mono text-[12px]">rebase schema introspect</code>{" "}
-                        writes the collection files for you.
+                        {t("studio_schema_introspect_hint")}
                     </Typography>
                 </div>
             </div>

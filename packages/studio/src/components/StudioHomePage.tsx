@@ -1,7 +1,7 @@
 import type { AppView, HomePageSection, PluginGenericProps } from "@rebasepro/cms-types";
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, cls, Container, ExpandablePanel, Typography } from "@rebasepro/ui";
-import { IconForView, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot } from "@rebasepro/app";
+import { IconForView, useNavigationGroupLabel, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot } from "@rebasepro/app";
 import { useNavigate } from "react-router";
 import { useStudioBreadcrumbs, SchemaDriftBanner } from "@rebasepro/app";
 
@@ -148,6 +148,9 @@ export function StudioHomePage({
     );
 
     const { isGroupCollapsed, toggleGroupCollapsed } = useStudioCollapsedGroups(groupNames);
+    // The group name is the identifier this page orders and collapses by;
+    // only what the reader sees is translated.
+    const groupLabel = useNavigationGroupLabel();
 
     return (
         <div ref={containerRef} className="py-2 overflow-auto h-full w-full bg-surface-50 dark:bg-surface-800">
@@ -198,7 +201,7 @@ export function StudioHomePage({
                                             "font-medium text-[10px] uppercase tracking-[0.08em] text-primary/50 dark:text-primary/70"
                                         )}
                                     >
-                                        {section.label}
+                                        {groupLabel(section.label)}
                                     </Typography>
                                 }
                             >

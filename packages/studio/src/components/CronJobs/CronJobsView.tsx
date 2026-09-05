@@ -19,7 +19,7 @@ import {
     RefreshCwIcon,
     Typography
 } from "@rebasepro/ui";
-import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
+import { useRebaseClient, useSnackbarController, useTranslation } from "@rebasepro/app";
 import type { CronJobStatus, CronJobLogEntry } from "@rebasepro/types";
 import type { RebaseClient } from "@rebasepro/types";
 
@@ -55,6 +55,7 @@ disabled: "bg-surface-400"
 export function CronJobsView() {
     const client = useRebaseClient<RebaseClient>();
     const snackbar = useSnackbarController();
+    const { t } = useTranslation();
     const [jobs, setJobs] = useState<CronJobStatus[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -226,10 +227,9 @@ message: e instanceof Error ? e.message : String(e) });
     if (failure) return (
         <LoadFailureView
             failure={failure}
-            title="Could not read this project's cron jobs"
-            deniedTitle="You cannot list this project's cron jobs"
-            deniedHint={<>Nothing is wrong with the project. The cron API is admin-only, and the
-                signed-in account was refused.</>}
+            title={t("studio_cron_read_failed")}
+            deniedTitle={t("studio_cron_denied_title")}
+            deniedHint={t("studio_cron_denied_hint")}
             onRetry={refreshJobs}
         />
     );
@@ -251,7 +251,7 @@ message: e instanceof Error ? e.message : String(e) });
                 <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
                     <div className="flex items-center gap-2">
                         <CalendarIcon size={iconSize.smallest} className="text-primary"/>
-                        <Typography variant="subtitle2" className="font-semibold">Cron Jobs</Typography>
+                        <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_cron")}</Typography>
                         <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{jobs.length}</Chip>
                     </div>
                     <IconButton size="small" onClick={refreshJobs} title="Refresh"><RefreshCwIcon size={iconSize.smallest}/></IconButton>

@@ -24,7 +24,7 @@ import {
     Trash2Icon,
     Typography
 } from "@rebasepro/ui";
-import { useRebaseContext, useSnackbarController, ConfirmationDialog } from "@rebasepro/app";
+import { useRebaseContext, useSnackbarController, ConfirmationDialog, useTranslation } from "@rebasepro/app";
 import { isBranchAdmin } from "@rebasepro/types";
 import type { BranchInfo } from "@rebasepro/types";
 import { formatRelativeTime } from "@rebasepro/utils";
@@ -50,6 +50,7 @@ function formatRelative(date: Date | string | undefined): string {
 export function BranchesView() {
     const { databaseAdmin } = useRebaseContext();
     const snackbar = useSnackbarController();
+    const { t } = useTranslation();
 
     const [branches, setBranches] = useState<BranchInfo[]>([]);
     const [loading, setLoading] = useState(true);
@@ -173,7 +174,7 @@ export function BranchesView() {
                 <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
                     <div className="flex items-center gap-2">
                         <GitBranchIcon size={iconSize.small} className="text-primary"/>
-                        <Typography variant="subtitle2" className="font-semibold">Branches</Typography>
+                        <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_branches")}</Typography>
                         <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{branches.length}</Chip>
                     </div>
                     <div className="flex items-center gap-1">
@@ -189,10 +190,9 @@ export function BranchesView() {
                     {failure ? (
                         <LoadFailureView
                             failure={failure}
-                            title="Could not read this project's branches"
-                            deniedTitle="You cannot list this project's branches"
-                            deniedHint={<>Nothing is wrong with the project. Branching runs on the admin
-                                connection, and the signed-in account was refused.</>}
+                            title={t("studio_branches_read_failed")}
+                            deniedTitle={t("studio_branches_denied_title")}
+                            deniedHint={t("studio_branches_denied_hint")}
                             onRetry={loadBranches}
                         />
                     ) : branches.length === 0 ? (

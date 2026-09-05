@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import { en } from "../../app/src/locales/en";
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -36,6 +37,11 @@ const databaseAdmin = {
 };
 
 jest.mock("@rebasepro/app", () => ({
+    useTranslation: () => ({
+        t: (key: string) => (en as Record<string, string>)[key] ?? key,
+        i18n: { language: "en" }
+    }),
+    useNavigationGroupLabel: () => (group: string) => group,
     useRebaseClient: () => client,
     useRebaseContext: () => ({ databaseAdmin }),
     useSnackbarController: () => ({ open: jest.fn() }),

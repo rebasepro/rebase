@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import { en } from "../../app/src/locales/en";
 import React from "react";
 import { render } from "@testing-library/react";
 import type { AppView, RebaseStudioConfig } from "@rebasepro/cms-types";
@@ -23,7 +24,14 @@ const dispatch = {
     unregisterStudio: () => undefined
 };
 
+const translation = {
+    t: (key: string) => (en as Record<string, string>)[key] ?? key,
+    i18n: { language: "en" }
+};
+
 jest.mock("@rebasepro/app", () => ({
+    useTranslation: () => translation,
+    useNavigationGroupLabel: () => (group: string) => group,
     useRebaseRegistryDispatch: () => dispatch
 }));
 

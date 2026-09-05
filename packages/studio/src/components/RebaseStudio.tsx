@@ -1,5 +1,5 @@
 import React, { Suspense, useLayoutEffect, useMemo } from "react";
-import { useRebaseRegistryDispatch } from "@rebasepro/app";
+import { useRebaseRegistryDispatch, useTranslation } from "@rebasepro/app";
 import type { RebaseStudioConfig, AppView } from "@rebasepro/cms-types";
 import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 
@@ -34,6 +34,7 @@ const DEFAULT_HOME_PAGE = <StudioHomePage/>;
 
 export function RebaseStudio({ tools, homePage, devViews: extraViews }: RebaseStudioConfig) {
     const dispatch = useRebaseRegistryDispatch();
+    const { t, i18n } = useTranslation();
 
     const resolvedHomePage = homePage ?? DEFAULT_HOME_PAGE;
 
@@ -59,90 +60,90 @@ export function RebaseStudio({ tools, homePage, devViews: extraViews }: RebaseSt
 
         if (activeTools.includes("sql")) {
             views.push({ slug: "sql",
-name: "SQL Console",
+name: t("studio_tool_sql"),
 group: "Database",
 icon: "terminal",
-description: "Execute SQL queries",
+description: t("studio_tool_sql_description"),
 view: suspense(<SQLEditor/>) });
         }
         if (activeTools.includes("js")) {
             views.push({ slug: "js",
-name: "JS Console",
+name: t("studio_tool_js"),
 group: "Compute",
 icon: "code",
-description: "Execute JavaScript",
+description: t("studio_tool_js_description"),
 view: suspense(<JSEditor/>) });
         }
         if (activeTools.includes("rls")) {
             views.push({ slug: "rls",
-name: "RLS Policies",
+name: t("studio_tool_rls"),
 group: "Database",
 icon: "ShieldCheck",
-description: "Row Level Security",
+description: t("studio_tool_rls_description"),
 view: suspense(<RLSEditor/>) });
         }
         if (activeTools.includes("storage")) {
             views.push({ slug: "storage",
-name: "Storage",
+name: t("studio_tool_storage"),
 group: "Storage",
 icon: "HardDrive",
-description: "Manage storage files",
+description: t("studio_tool_storage_description"),
 view: suspense(<StorageView/>) });
         }
         if (activeTools.includes("cron")) {
             views.push({ slug: "cron",
-name: "Cron Jobs",
+name: t("studio_tool_cron"),
 group: "Compute",
 icon: "Clock",
-description: "Manage scheduled tasks",
+description: t("studio_tool_cron_description"),
 view: suspense(<CronJobsView/>) });
         }
         if (activeTools.includes("schema-visualizer")) {
             views.push({ slug: "schema-visualizer",
-name: "Schema Visualizer",
+name: t("studio_tool_schema_visualizer"),
 group: "Database",
 icon: "Network",
-description: "Interactive database ERD",
+description: t("studio_tool_schema_visualizer_description"),
 view: suspense(<SchemaVisualizer/>) });
         }
         if (activeTools.includes("branches")) {
             views.push({ slug: "branches",
-name: "Branches",
+name: t("studio_tool_branches"),
 group: "Database",
 icon: "GitBranch",
-description: "Create and manage database branches",
+description: t("studio_tool_branches_description"),
 view: suspense(<BranchesView/>) });
         }
         if (activeTools.includes("backups")) {
             views.push({ slug: "backups",
-name: "Backups",
+name: t("studio_tool_backups"),
 group: "Database",
 icon: "Database",
-description: "Download database backups",
+description: t("studio_tool_backups_description"),
 view: suspense(<BackupsView/>) });
         }
         if (activeTools.includes("api")) {
             views.push({ slug: "api",
-name: "API Explorer",
+name: t("studio_tool_api"),
 group: "API",
 icon: "BookOpen",
-description: "Interactive API documentation and testing",
+description: t("studio_tool_api_description"),
 view: suspense(<ApiExplorer/>) });
         }
         if (activeTools.includes("logs")) {
             views.push({ slug: "logs",
-name: "Logs Explorer",
+name: t("studio_tool_logs"),
 group: "Database",
 icon: "Activity",
-description: "Real-time system and query logs",
+description: t("studio_tool_logs_description"),
 view: suspense(<LogsExplorer/>) });
         }
         if (activeTools.includes("api-keys")) {
             views.push({ slug: "api-keys",
-name: "API Keys",
+name: t("studio_tool_api_keys"),
 group: "Access Control",
 icon: "KeyRound",
-description: "Create and manage scoped API keys",
+description: t("studio_tool_api_keys_description"),
 view: suspense(<ApiKeysView/>) });
         }
         // Note: "schema" tool is auto-injected by RebaseShell when collectionEditor is enabled.
@@ -150,8 +151,10 @@ view: suspense(<ApiKeysView/>) });
         return views;
         // Keyed by the tool list's *contents*; see `toolsKey`. `tools` itself is
         // read inside, and is exactly determined by the key.
+        // The strings are now translated, so the active language is part of
+        // what this list is.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [toolsKey]);
+    }, [toolsKey, t, i18n.language]);
 
     /**
      * Your own tools, keyed the same way `tools` is and for the same reason:

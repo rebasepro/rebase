@@ -61,18 +61,35 @@ you have the developer tools alone. To lay the shell out by hand instead, see
 
 `<Rebase>` is the root provider that makes all Rebase functionality available to child components via context. It accepts:
 
+All twenty-two of them, in full — the table used to list ten, and two of those
+were props the component never read:
+
+<!-- rebase-props:start -->
 | Prop | Description |
 |------|-------------|
-| `client` | `RebaseClient` instance for data, auth, and storage |
-| `authController` | Authentication state and methods |
-| `dataSources` | Additional data sources (see [Multiple sources](/docs/backend/multiple-sources)) |
-| `storageSource` / `storageSources` | File storage operations, and named storage sources |
-| `userConfigPersistence` | Local UI preferences (column widths, etc.) |
-| `entityViews` | Global custom entity view tabs |
-| `entityActions` | Global entity actions |
-| `plugins` | Plugin instances |
+| `children` | The admin's root components — `<RebaseCMS>`, `<RebaseStudio>`, `<RebaseShell>`. A render function is the manual-layout escape hatch. |
+| `apiUrl` | Base URL of the backend API, made available to every hook via `useApiConfig()` |
+| `dateTimeFormat` | How dates are printed. Defaults to `MMMM dd, yyyy, HH:mm:ss` |
+| `locale` | Initial language of the admin, and the locale dates are formatted in — see [Translations](/docs/frontend/i18n) |
+| `client` | `RebaseClient` instance: the default source for data, auth and storage |
+| `dataSources` | Extra data sources, for collections that name one — see [Multiple sources](/docs/backend/multiple-sources) |
+| `authController` | Authentication state and methods. Replaces the `client.auth` subscription outright |
+| `storageSource` | The default storage source, overriding `client.storage` |
+| `storageSources` | Named storage sources beyond the default |
+| `databaseAdmin` | Administrative database operations (SQL, schema discovery). Only Studio needs it |
+| `userConfigPersistence` | Local UI preferences — column widths, collapsed groups |
+| `onAnalyticsEvent` | Called for every analytics event the admin emits |
+| `entityLinkBuilder` | Returns a URL for the "open in your app" button on an entity form |
+| `plugins` | Plugin instances — see [Plugins](/docs/plugins) |
 | `slots` | Slot contributions declared directly, without a plugin |
-| `components` | Component overrides |
+| `propertyConfigs` | Custom field widgets, keyed by the name a property names in `propertyConfig` |
+| `entityViews` | Global custom entity view tabs |
+| `collectionViews` | Custom collection view modes, available to any collection by `key` |
+| `entityActions` | Global entity actions |
+| `effectiveRoleController` | Simulate a different role while dev mode is on |
+| `translations` | Override or extend any UI string, keyed by locale — see [Translations](/docs/frontend/i18n) |
+| `components` | Replace built-in components — see [Component Overrides](/docs/frontend/component-overrides) |
+<!-- rebase-props:end -->
 
 The navigation, URL and collection-registry controllers are **not** `<Rebase>`
 props — they are built by the hooks below and consumed inside the admin tree
@@ -332,4 +349,5 @@ Rebase uses **Tailwind CSS v4** and supports light/dark modes. Customize via:
 - **[Custom Fields](/docs/frontend/custom-fields)** — Build custom form fields
 - **[Entity Views](/docs/frontend/entity-views)** — Add tabs to entity editors
 - **[View Modes](/docs/frontend/view-modes)** — List, Table, Cards, Kanban
+- **[Translations](/docs/frontend/i18n)** — Change any string, or add a language
 - **[Plugins](/docs/plugins)** — Extend the framework

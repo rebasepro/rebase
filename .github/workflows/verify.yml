@@ -269,6 +269,12 @@ jobs:
       - name: Untranslated-string ratchet
         run: pnpm run check:untranslated
 
+      # The `<Rebase>` props table documented ten of twenty-four props, and two
+      # of the ten were declared on RebaseProps and never read by Rebase.tsx.
+      # A hand-written table drifts the moment a prop is added.
+      - name: "<Rebase> props table"
+        run: pnpm run check:rebase-props
+
       # Astro and JSX drop the newline between a word and an adjacent tag rather
       # than collapsing it to a space, so a paragraph broken across two source
       # lines at that boundary renders "or runrebase dev". Invisible in the

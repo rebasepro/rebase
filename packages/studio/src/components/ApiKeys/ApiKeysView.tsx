@@ -24,7 +24,7 @@ import {
     AlertCircleIcon,
     CheckCircleIcon
 } from "@rebasepro/ui";
-import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
+import { useRebaseClient, useSnackbarController, useTranslation } from "@rebasepro/app";
 import type { ApiKeyMasked, ApiKeyWithSecret, RebaseClient } from "@rebasepro/types";
 
 import { CreateApiKeyDialog } from "./CreateApiKeyDialog";
@@ -69,6 +69,7 @@ function keyStatus(key: ApiKeyMasked): { label: string; color: string } {
 export function ApiKeysView() {
     const client = useRebaseClient<RebaseClient>();
     const snackbar = useSnackbarController();
+    const { t } = useTranslation();
     const [keys, setKeys] = useState<ApiKeyMasked[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -137,7 +138,7 @@ export function ApiKeysView() {
                     <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
                         <div className="flex items-center gap-2">
                             <KeyRoundIcon size={iconSize.smallest} className="text-primary"/>
-                            <Typography variant="subtitle2" className="font-semibold">API Keys</Typography>
+                            <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_api_keys")}</Typography>
                             <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{activeKeys.length}</Chip>
                         </div>
                         <div className="flex items-center gap-1">
@@ -151,10 +152,9 @@ export function ApiKeysView() {
                         {failure && (
                             <LoadFailureView
                                 failure={failure}
-                                title="Could not read this project's API keys"
-                                deniedTitle="You cannot list this project's API keys"
-                                deniedHint={<>Nothing is wrong with the project. Managing API keys is an admin
-                                    operation, and the signed-in account was refused.</>}
+                                title={t("studio_api_keys_read_failed")}
+                                deniedTitle={t("studio_api_keys_denied_title")}
+                                deniedHint={t("studio_api_keys_denied_hint")}
                                 onRetry={loadKeys}
                             />
                         )}

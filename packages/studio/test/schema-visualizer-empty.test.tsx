@@ -1,6 +1,7 @@
 /**
  * @jest-environment jsdom
  */
+import { en } from "../../app/src/locales/en";
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
@@ -15,6 +16,11 @@ import { render, screen } from "@testing-library/react";
 let registryCollections: unknown[] | undefined;
 
 jest.mock("@rebasepro/app", () => ({
+    useTranslation: () => ({
+        t: (key: string) => (en as Record<string, string>)[key] ?? key,
+        i18n: { language: "en" }
+    }),
+    useNavigationGroupLabel: () => (group: string) => group,
     useStudioCollectionRegistry: () => ({ collections: registryCollections }),
     useStudioSidePanelController: () => ({ open: jest.fn(), replace: jest.fn(), close: jest.fn() }),
     useStudioCapabilities: () => ({ codebase: false }),
@@ -55,7 +61,7 @@ describe("SchemaVisualizer with nothing to draw", () => {
         registryCollections = [];
         render(<SchemaVisualizer/>);
 
-        expect(screen.getByText("rebase schema introspect")).toBeTruthy();
-        expect(screen.getByText("Edit collections")).toBeTruthy();
+        expect(screen.getByText(/rebase schema introspect/)).toBeTruthy();
+        expect(screen.getByText(/Edit collections/)).toBeTruthy();
     });
 });

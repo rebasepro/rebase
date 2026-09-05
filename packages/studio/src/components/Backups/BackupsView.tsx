@@ -13,7 +13,7 @@ import {
     RefreshCwIcon,
     Typography
 } from "@rebasepro/ui";
-import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
+import { useRebaseClient, useSnackbarController, useTranslation } from "@rebasepro/app";
 import type { BackupInfo, RebaseClient } from "@rebasepro/types";
 
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
@@ -37,6 +37,7 @@ function formatDate(iso: string | undefined): string {
 export function BackupsView() {
     const client = useRebaseClient<RebaseClient>();
     const snackbar = useSnackbarController();
+    const { t } = useTranslation();
 
     const [backups, setBackups] = useState<BackupInfo[]>([]);
     const [destinationKind, setDestinationKind] = useState<string>("local");
@@ -130,7 +131,7 @@ export function BackupsView() {
             <div className={cls("flex items-center justify-between px-5 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
                 <div className="flex items-center gap-2">
                     <DatabaseIcon size={iconSize.small} className="text-primary"/>
-                    <Typography variant="subtitle2" className="font-semibold">Backups</Typography>
+                    <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_backups")}</Typography>
                     <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{backups.length}</Chip>
                     <Chip size="smallest" className="bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400 uppercase font-mono text-[10px]">{destinationKind}</Chip>
                 </div>
@@ -143,12 +144,9 @@ export function BackupsView() {
                 {failure ? (
                     <LoadFailureView
                         failure={failure}
-                        title="Could not read this project's backups"
-                        deniedTitle="You cannot list this project's backups"
-                        deniedHint={<>Nothing is wrong with the project. Listing backups needs an admin
-                            connection, and the signed-in account was refused — check
-                            <code className="mx-1 font-mono text-[12px]">ADMIN_CONNECTION_STRING</code>
-                            and the account&apos;s role.</>}
+                        title={t("studio_backups_read_failed")}
+                        deniedTitle={t("studio_backups_denied_title")}
+                        deniedHint={t("studio_backups_denied_hint")}
                         onRetry={load}
                     />
                 ) : !configured ? (
@@ -191,7 +189,7 @@ export function BackupsView() {
                                         ? <CircularProgress size="smallest"/>
                                         : <DownloadIcon size={iconSize.smallest}/>}
                                 >
-                                    {downloading === backup.key ? "Downloading…" : "Download"}
+                                    {downloading === backup.key ? t("studio_backups_downloading") : t("download")}
                                 </Button>
                             </div>
                         ))}
