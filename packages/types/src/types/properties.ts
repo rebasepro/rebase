@@ -148,13 +148,14 @@ export type NoSuchKey<K extends PropertyKey, Known extends PropertyKey = never> 
 /**
  * What a property whose `type` the engine does not have resolves to.
  *
- * Same trick as {@link NoSuchKey}, for a different mistake: a `relation`
- * on a Firestore collection, a `vector` on MongoDB. The gate used to live on the
- * builder's `P extends FirebaseProperties` constraint, which reported it as a
- * failed constraint on the whole property map — and, worse, made a *single* bad
- * property collapse `P` back to its constraint, taking every `admin` key check
- * with it. Expressed here it is one error, on the property, and the rest of the
- * collection is still checked.
+ * Same trick as {@link NoSuchKey}, for a different mistake: a `relation` on a
+ * Firestore collection, a `vector` on MongoDB.
+ *
+ * Without it, `ExactProperty<V, never>` is `V & {}` — which is `V`, and
+ * therefore no check at all. The gate is normally caught one level up, by the
+ * builder's `P extends FirebaseProperties` constraint; this is what catches it
+ * when `StrictProperties` is applied to a property map that carries no such
+ * constraint, and it reports on the property rather than on the whole map.
  */
 export type PropertyTypeNotOnThisEngine<T> = {
     /** The `type` tag that has no home on this engine. Required, so nothing fits. */

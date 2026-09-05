@@ -742,24 +742,38 @@ type PropertiesForEngine<E> =
  */
 export function defineCollection<
     const E extends CollectionEngine = "postgres",
-    // Unconstrained on purpose — see {@link EntityShapeOf}. Every rule a
-    // constraint here used to express (exactness, the engine gate) is in
-    // `StrictProperties` instead, where a violation is one error on one
-    // property rather than a fallback that silently unchecks the admin block.
-    const P = Properties,
+    /**
+     * The properties, **constrained**. This is what checks them, and — just as
+     * importantly — what supplies the contextual type inside them: without a
+     * constraint the parameter of an inline
+     * `callbacks: { beforeSave: ({ value }) => … }` has nothing to be typed
+     * from, and TypeScript reports an implicit `any` on a callback the author
+     * wrote correctly.
+     */
+    const P extends PropertiesForEngine<E> & Properties = PropertiesForEngine<E> & Properties,
+    /**
+     * The properties again, **unconstrained**, and this is why there are two.
+     *
+     * A constraint TypeScript cannot satisfy is one it silently falls back
+     * from: one property with a bad `defaultValue` made `P` become
+     * `PostgresProperties`, the entity shape become `Record<string, unknown>`,
+     * and every `admin` key — `display.title`, `listProperties`,
+     * `propertiesOrder` — widen to `string` and stop being checked. A
+     * collection with two mistakes reported one, and revealed the second only
+     * after the first was fixed.
+     *
+     * `KEYS` has no constraint to fall back from, so `keyof KEYS` survives a bad
+     * property and the `admin` block is still checked against the real key set.
+     */
+    const KEYS = Properties,
     USER extends User = User
 >(
-    collection: Omit<CollectionConfigForEngine<E, P, USER>, "properties" | "engine">
+    collection: Omit<CollectionConfigForEngine<E, KEYS, USER>, "properties" | "engine">
         & {
             engine?: E;
-            // Two targets, on purpose. `StrictProperties` is where `P` is
-            // inferred from, so it cannot also be what validates the values —
-            // a target that contains the source is satisfied by it. The second
-            // member does the validating, names no type parameter TypeScript
-            // could infer, and reports on the property that is wrong.
-            properties: StrictProperties<P, PropertyForEngine<E>> & PropertiesForEngine<E>;
+            properties: StrictProperties<P, PropertyForEngine<E>> & KEYS;
         }
-): CollectionConfigForEngine<E, P, USER> & { properties: P };
+): CollectionConfigForEngine<E, KEYS, USER> & { properties: KEYS };
 
 /** Identity at runtime; the signature above is the whole point. @group Builder */
 export function defineCollection(collection: CollectionConfig): CollectionConfig {
