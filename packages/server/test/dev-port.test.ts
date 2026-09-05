@@ -19,6 +19,7 @@ import path from "path";
 import net from "net";
 import { createServer, type Server } from "http";
 import { listenWithPortRetry, DEV_PORT_FILENAME } from "../src/utils/dev-port";
+import { logger } from "../src/utils/logger";
 
 /** A port nothing is listening on. */
 async function freePort(): Promise<number> {
@@ -107,6 +108,26 @@ describe("listenWithPortRetry", () => {
         // the return value, or the banner printed from it, reached the squatter.
         expect(reported).toBe(actual.port);
         expect(parseInt(fs.readFileSync(portFile(), "utf-8").trim(), 10)).toBe(actual.port);
+    });
+
+    it("says which port was in use and which one it moved to", async () => {
+        // Silence here is how a developer ends up staring at a server on 3002
+        // while the frontend, the bookmark and the curl all point at 3001, with
+        // nothing anywhere saying a port was skipped.
+        const occupied = await freePort();
+        await new Promise<void>(r => track(createServer()).listen(occupied, "0.0.0.0", r));
+
+        const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
+        try {
+            const server = track(createServer());
+            const bound = await listenWithPortRetry(server, occupied, { portFileDir: dir });
+
+            const said = warn.mock.calls.map(call => String(call[0])).join("\n");
+            expect(said).toContain(`Port ${occupied} is in use`);
+            expect(said).toContain(String(bound));
+        } finally {
+            warn.mockRestore();
+        }
     });
 
     it("reports the ephemeral port the OS chose when asked for 0", async () => {
