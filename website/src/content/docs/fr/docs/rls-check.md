@@ -51,7 +51,9 @@ l'indiquera plutôt que de vous laisser deviner.
 | Option | Signification |
 | --- | --- |
 | `--json` | Sortie lisible par une machine sur stdout, et rien d'autre sur stdout |
+| `--html <chemin>` | Écrit également un rapport HTML autonome à cet endroit. Un seul fichier, aucune requête réseau |
 | `--schema <name>` | Restreindre le scan à un schéma. Répétable ou séparé par des virgules |
+| `--role <name>` | Traiter ce rôle comme un rôle sous lequel un appelant non fiable arrive, en plus de `anon`, `authenticated`, `web_anon` et `rebase_user`. Répétable ou séparé par des virgules |
 | `--fail-on <severity>` | Quitter avec le code 1 à partir de cette sévérité. Par défaut `high` ; `none` n'échoue jamais |
 | `--only <id>` | Exécuter uniquement ces vérifications. Répétable ou séparé par des virgules |
 | `--skip <id>` | Ignorer ces vérifications. Répétable ou séparé par des virgules |
@@ -61,7 +63,22 @@ l'indiquera plutôt que de vous laisser deviner.
 | `--no-color` | Désactiver les couleurs ANSI (respecte également `NO_COLOR` et un stdout non-TTY) |
 
 Un identifiant inconnu transmis à `--only` ou `--skip` génère une erreur plutôt qu'une
-ignorance silencieuse, car une faute de frappe affaiblirait discrètement le scan.
+ignorance silencieuse, car une faute de frappe affaiblirait discrètement le scan. Un `--role`
+absent de `pg_roles` est une erreur pour la même raison : chaque vérification s'appuie sur un
+privilège accordé à un rôle exposé, donc un nom qui ne correspond à rien retire de la couverture
+sans le dire.
+
+L'en-tête du rapport nomme les rôles que l'exécution a traités comme exposés, pour que vous voyiez
+d'un coup d'œil si `No findings` couvrait le rôle avec lequel votre application se connecte :
+
+```
+Exposed   PUBLIC, anon, authenticated (add yours with --role)
+```
+
+Lorsque le scan se connecte avec un rôle que la sécurité au niveau des lignes *peut* réellement
+contraindre — ni superutilisateur, ni propriétaire, sans `BYPASSRLS` — ce rôle est ajouté à
+l'ensemble et le rapport le signale. Scanner avec le rôle de votre propre application est ce qui
+se rapproche le plus de demander à la base de données ce que votre API voit.
 
 ### Codes de sortie
 
@@ -85,9 +102,13 @@ ignorance silencieuse, car une faute de frappe affaiblirait discrètement le sca
 ### Sortie JSON
 
 `--json` émet un objet stable : `scannedAt`, `database` (hôte et nom uniquement — jamais
-les identifiants), `serverVersion`, `platform`, `scannerIsPrivileged`, `stats`, et `findings`.
-Chaque résultat contient `id`, `severity`, `title`, `target`, `detail`, `impact`, `fix`,
-`docs` et `confidence`.
+les identifiants), `serverVersion`, `platform`, `scannerIsPrivileged`, `exposedRoles`, `stats`,
+`findings` et `diagnostics`. Chaque résultat contient `id`, `severity`, `title`, `target`,
+`detail`, `impact`, `fix`, `docs` et `confidence`.
+
+`exposedRoles` et `diagnostics` font partie du contrat, ce ne sont pas des extras : chaque
+vérification s'appuie sur l'ensemble des rôles exposés, et `diagnostics.degraded` est ce qui
+permet de distinguer « rien n'allait mal » de « le scan n'a pas pu regarder ».
 
 ## Comment lire le rapport
 

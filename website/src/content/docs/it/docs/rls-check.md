@@ -50,7 +50,9 @@ indicherà chiaramente invece di farti tirare a indovinare.
 | Opzione | Significato |
 | --- | --- |
 | `--json` | Output leggibile da macchina su stdout, e nient'altro su stdout |
+| `--html <percorso>` | Scrive anche un report HTML autonomo lì. Un solo file, nessuna richiesta di rete |
 | `--schema <name>` | Limita la scansione a uno schema. Ripetibile o separato da virgole |
+| `--role <name>` | Tratta questo ruolo come uno con cui arriva un chiamante non fidato, oltre a `anon`, `authenticated`, `web_anon` e `rebase_user`. Ripetibile o separato da virgole |
 | `--fail-on <severity>` | Termina con codice di uscita 1 a questa gravità o superiore. Predefinito `high`; `none` non fallisce mai |
 | `--only <id>` | Esegue solo questi controlli. Ripetibile o separato da virgole |
 | `--skip <id>` | Salta questi controlli. Ripetibile o separato da virgole |
@@ -60,7 +62,20 @@ indicherà chiaramente invece di farti tirare a indovinare.
 | `--no-color` | Disabilita i colori ANSI (rispetta anche `NO_COLOR` e stdout non-TTY) |
 
 Un ID sconosciuto passato a `--only` o `--skip` genera un errore anziché essere ignorato silenziosamente,
-poiché un refuso indebolirebbe silenziosamente la scansione.
+poiché un refuso indebolirebbe silenziosamente la scansione. Un `--role` che non è in `pg_roles` è un errore
+per lo stesso motivo: ogni controllo si basa su un privilegio concesso a un ruolo esposto, quindi un nome che
+non corrisponde a nulla toglie copertura senza dirlo.
+
+L'intestazione del report nomina i ruoli che l'esecuzione ha trattato come esposti, così vedi a colpo d'occhio
+se `No findings` copriva il ruolo con cui si connette la tua applicazione:
+
+```
+Exposed   PUBLIC, anon, authenticated (add yours with --role)
+```
+
+Quando la scansione si connette con un ruolo che la row-level security *può* davvero vincolare — né superuser,
+né proprietario, senza `BYPASSRLS` — quel ruolo viene aggiunto all'insieme e il report lo dichiara. Scansionare
+con il ruolo della tua applicazione è la cosa più vicina a chiedere al database cosa vede la tua API.
 
 ### Codici di uscita
 
@@ -84,9 +99,13 @@ poiché un refuso indebolirebbe silenziosamente la scansione.
 ### Output JSON
 
 `--json` emette un oggetto stabile: `scannedAt`, `database` (solo host e nome — mai credenziali),
-`serverVersion`, `platform`, `scannerIsPrivileged`, `stats` e `findings`.
-Ogni risultato (finding) contiene `id`, `severity`, `title`, `target`, `detail`, `impact`, `fix`,
-`docs` e `confidence`.
+`serverVersion`, `platform`, `scannerIsPrivileged`, `exposedRoles`, `stats`, `findings` e
+`diagnostics`. Ogni risultato (finding) contiene `id`, `severity`, `title`, `target`, `detail`,
+`impact`, `fix`, `docs` e `confidence`.
+
+`exposedRoles` e `diagnostics` fanno parte del contratto, non sono extra: ogni controllo si basa
+sull'insieme dei ruoli esposti, e `diagnostics.degraded` è ciò che permette di distinguere «non
+c'era nulla che non andasse» da «la scansione non è riuscita a guardare».
 
 ## Come leggere il report
 

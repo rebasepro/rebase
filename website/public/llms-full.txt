@@ -16501,7 +16501,9 @@ than letting you guess.
 | Option | Meaning |
 | --- | --- |
 | `--json` | Machine-readable output on stdout, and nothing else on stdout |
+| `--html <path>` | Also write a self-contained HTML report there. One file, no network requests |
 | `--schema <name>` | Restrict the scan to a schema. Repeatable, or comma-separated |
+| `--role <name>` | Treat this role as one an untrusted caller arrives as, on top of `anon`, `authenticated`, `web_anon` and `rebase_user`. Repeatable, or comma-separated |
 | `--fail-on <severity>` | Exit 1 at or above this severity. Default `high`; `none` never fails |
 | `--only <id>` | Run only these checks. Repeatable, or comma-separated |
 | `--skip <id>` | Skip these checks. Repeatable, or comma-separated |
@@ -16511,7 +16513,20 @@ than letting you guess.
 | `--no-color` | Disable ANSI colour (also honours `NO_COLOR` and a non-TTY stdout) |
 
 An unknown id passed to `--only` or `--skip` is an error rather than a silent no-op, because
-a typo there quietly weakens the scan.
+a typo there quietly weakens the scan. A `--role` that is not in `pg_roles` is an error for
+the same reason: every check gates on a grant to an exposed role, so a name that matches
+nothing removes coverage without saying so.
+
+The report's header names the roles the run treated as exposed, so you can see at a glance
+whether `No findings` covered the role your application connects as:
+
+```
+Exposed   PUBLIC, anon, authenticated (add yours with --role)
+```
+
+When the scan connects as a role row-level security *can* constrain — not a superuser, not
+an owner, no `BYPASSRLS` — that role is added to the set and the report says so. Scanning as
+your application's own role is the closest thing to asking the database what your API sees.
 
 #### Exit codes
 
@@ -16536,9 +16551,13 @@ database.
 #### JSON output
 
 `--json` emits a stable object: `scannedAt`, `database` (host and name only — never
-credentials), `serverVersion`, `platform`, `scannerIsPrivileged`, `stats`, and `findings`.
-Each finding carries `id`, `severity`, `title`, `target`, `detail`, `impact`, `fix`,
-`docs` and `confidence`.
+credentials), `serverVersion`, `platform`, `scannerIsPrivileged`, `exposedRoles`, `stats`,
+`findings` and `diagnostics`. Each finding carries `id`, `severity`, `title`, `target`,
+`detail`, `impact`, `fix`, `docs` and `confidence`.
+
+`exposedRoles` and `diagnostics` are part of the contract, not extras: every check gates on
+the exposed set, and `diagnostics.degraded` is how a consumer tells "nothing was wrong" from
+"the scan could not look". Reading `findings: []` without both is reading half the answer.
 
 ### Running it on a schedule
 

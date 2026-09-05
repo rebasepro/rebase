@@ -193,9 +193,12 @@ DATABASE_URL="postgresql://..." npx @rebasepro/rls-check [options]
 npx @rebasepro/rls-check [connection-string] [options]
 
   --json                 Machine-readable ScanResult on stdout, and nothing else.
+  --html <path>          Also write a self-contained HTML report to <path>. One file,
+                         no network requests, safe to attach to a ticket.
   --schema <name>        Restrict the scan to a schema. Repeatable or comma-separated.
   --role <name>          Treat this role as one an untrusted caller arrives as, in
                          addition to anon, authenticated, web_anon and rebase_user.
+                         A name that is not in pg_roles is an error, not a no-op.
                          Repeatable or comma-separated.
   --fail-on <severity>   Exit 1 at or above this severity: info, low, medium, high,
                          critical, or none to never fail. Default: high.
