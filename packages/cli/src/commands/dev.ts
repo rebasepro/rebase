@@ -390,6 +390,13 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     const frontendDir = findFrontendDir(projectRoot);
     const backendOnly = args["--backend-only"] || false;
     const frontendOnly = args["--frontend-only"] || false;
+    /**
+     * Start no database at all — not the compose container, and not the managed
+     * one either. Read once, here, because both halves of `dev` have to agree:
+     * gating only the preflight left the managed PGlite starting anyway, which
+     * is the one database a scaffolded project would otherwise get.
+     */
+    const noDb = Boolean(args["--no-db"]) || process.env.REBASE_DEV_NO_DB === "1";
     const shouldGenerate = args["--generate"] || process.env.REBASE_AUTO_GENERATE === "true" || process.env.REBASE_GENERATE === "true";
 
     // Resolve the ports ONCE, before starting anything. Both, because the
@@ -418,7 +425,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         await ensureGeneratedSchema(projectRoot);
         await runDatabasePreflight({
             projectRoot,
-            disabled: Boolean(args["--no-db"]) || process.env.REBASE_DEV_NO_DB === "1",
+            disabled: noDb,
             // `--docker` names a container, not a connection string, and the
             // preflight is what starts it. Derived from the compose file so the
             // two halves agree on which database "the docker one" is.
@@ -606,12 +613,20 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // DATABASE_URL is untouched; a project without one gets a managed
         // Postgres started here, which is what makes `rebase dev` the only
         // command a new project needs.
-        const prepared = await prepareDatabaseEnv(projectRoot, {
+        // `--no-db` means start nothing, and that includes the managed
+        // database. It used to gate only the preflight, so the one path that
+        // actually starts a database on a scaffolded project — the managed
+        // PGlite, started here — ran anyway: `rebase dev --no-db` wrote
+        // `.rebase/pglite/`, booted a daemon and served against it, which is
+        // the opposite of what a reader asking for no database expects. The
+        // backend is left to fail on the DATABASE_URL it cannot find, which is
+        // the failure the flag exists to produce.
+        const prepared = noDb ? null : await prepareDatabaseEnv(projectRoot, {
             flagUrl: typeof args["--database-url"] === "string" ? args["--database-url"] : null,
             flagDocker: Boolean(args["--docker"]),
             onProgress: (message) => console.log(chalk.gray(`  ${message}`))
         });
-        Object.assign(env, prepared.env);
+        if (prepared) Object.assign(env, prepared.env);
 
         // Always inject PORT so the backend uses our resolved port instead of
         // its hardcoded default (3001). This prevents cross-project collisions
@@ -630,11 +645,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
         console.log(`  ${chalk.cyan("▶")} Backend:  ${chalk.gray(backendDir)}`);
         console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(String(startPort))}`);
-        console.log(`  ${chalk.gray("↳ Database")} = ${chalk.white(prepared.description)}`);
+        console.log(`  ${chalk.gray("↳ Database")} = ${chalk.white(
+            prepared ? prepared.description : "none (--no-db) — the backend needs DATABASE_URL"
+        )}`);
         // Stated on every start rather than left to be discovered. A developer
         // who does not know requests are serialized here will read the
         // difference as a bug in their own code.
-        for (const line of managedNotices(prepared).slice(1)) console.log(`  ${chalk.gray(line)}`);
+        if (prepared) {
+            for (const line of managedNotices(prepared).slice(1)) console.log(`  ${chalk.gray(line)}`);
+        }
 
         // The .env's PORT / VITE_API_URL look authoritative but are overridden in
         // dev: we derive a per-project port to avoid cross-project collisions and

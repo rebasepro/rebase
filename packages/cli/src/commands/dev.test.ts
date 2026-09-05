@@ -215,6 +215,23 @@ describe("the dev help and the dev flag spec", () => {
         }
     });
 
+    it("reads --no-db in exactly one place", () => {
+        // The flag used to be read twice: once to disable the preflight, once
+        // not at all for the managed database, which starts on the *other*
+        // branch. So `rebase dev --no-db` wrote .rebase/pglite/, booted a
+        // daemon and served against it — the one database a scaffolded project
+        // would otherwise get, started by the flag that asks for none. Two
+        // reads of the same flag are two things that have to agree; one is not.
+        const source = fs.readFileSync(
+            path.join(import.meta.dirname, "dev.ts"),
+            "utf8"
+        );
+
+        const reads = source.match(/args\["--no-db"\]/g) ?? [];
+        expect(reads).toHaveLength(1);
+        expect(source).toContain("const noDb =");
+    });
+
     it("no longer claims a docker-compose db service is started first", async () => {
         // It is started only for `--docker`, or for a DATABASE_URL that already
         // points at this machine. A scaffolded project sets neither and runs on

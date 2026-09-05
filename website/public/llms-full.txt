@@ -178,7 +178,7 @@ Pin a port with `rebase dev --port 3001`.
 | `--template <name>` | `init` | Start from a template other than the default |
 | `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
 | `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one |
-| `--no-db` | `dev` | Touch no database at all; you bring one |
+| `--no-db` | `dev` | Start no database at all — not the container and not the managed one. Set `DATABASE_URL` yourself |
 
 ### Variant: use your own PostgreSQL
 
