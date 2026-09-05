@@ -293,9 +293,13 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `SERVICE_KEY` | The service key they authenticate with, instead of prompting. | — |
 | `REBASE_ENV_FILE_PATH` | Which `.env` the CLI reads and writes, when it is not the project's. | — |
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
+| `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
+| `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |
 | `REBASE_DEBUG` | `1` prints the underlying error and request detail instead of the short message. The first thing to set when a `rebase cloud` command fails unhelpfully. | — |
 | `REBASE_DEV_NO_DB` | `rebase dev` starts no database and provisions nothing — you bring your own. Same as `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Pins the frontend dev server's port, which `rebase dev` otherwise derives from the project's path. | — |
+| `REBASE_DEV_READY_TIMEOUT_MS` | How long `rebase dev` waits for the backend to announce itself before saying it has not started. `0` disables the report. | `30000` |
+| `DATABASE_PASSWORD` | The password `rebase dev --docker` puts into the connection string it derives from `docker-compose.yml`. | — |
 | `DO_NOT_TRACK` | The cross-tool convention. Set to anything but `0` and the CLI sends no telemetry. | — |
 | `REBASE_TELEMETRY_DISABLED` | The same, for Rebase specifically. Needs no file, which is why it is the one to use in CI and in an image. | — |
 | `REBASE_TELEMETRY_ENDPOINT` | Where telemetry is sent, for a self-hosted collector. | — |

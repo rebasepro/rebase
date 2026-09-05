@@ -6,6 +6,8 @@ description: Deploy Rebase to a Kubernetes cluster with the official Helm chart 
 
 ## Overview
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 The official chart is the Kubernetes peer of the Docker Compose self-hosting
 setup. Same idea, same image, same bundle: **the runtime is the image, your
 project is the bundle, and upgrading Rebase is a tag change.**

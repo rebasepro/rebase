@@ -50,6 +50,8 @@ Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched
 
 ## 3. Deploy via AWS App Runner
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 App Runner is the simplest way to run containers on AWS without managing orchestrators.
 
 1. Navigate to **AWS App Runner** and click **Create service**.

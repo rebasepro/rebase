@@ -60,6 +60,8 @@ healthcheck.
 
 ### The six values it needs
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 `quickstart.sh` generates these for you. To write the `.env` yourself:
 
 ```bash

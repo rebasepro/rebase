@@ -201,3 +201,9 @@ which quotes the host, port, database name and role — goes to the logs.
 Every API failure answers the same envelope and carries a `code`. The
 [error-code reference](/docs/backend/errors/) lists all of them with the status
 and the fix.
+
+## Where to go next
+
+- [Error codes](/docs/backend/errors/) — every `code` the API can answer, with the status and the fix.
+- [Environment & Configuration](/docs/getting-started/configuration/) — every variable the runtime reads, and the ones production refuses to start without.
+- [Backend Overview](/docs/backend/) — what boot does, in order, and which probe answers which question.

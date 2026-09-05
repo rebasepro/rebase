@@ -50,6 +50,8 @@ Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched
 
 ## 3. Deploy the Serverless Container
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 1. Navigate to **Serverless Containers**.
 2. Click **Create a Container**.
 3. Choose the image you just pushed.

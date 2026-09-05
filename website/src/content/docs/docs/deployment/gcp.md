@@ -56,6 +56,8 @@ Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched
 
 ## 3. Deploy to Cloud Run
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 ```bash
 gcloud run deploy rebase-backend \
   --image europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest \

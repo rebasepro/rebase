@@ -43,6 +43,8 @@ Then: **New → GitHub Repo**, select your repository, and let Railway detect th
 
 ## 4. Set environment variables
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 1. Click the service card.
 2. Go to the **Variables** tab.
 3. Add:

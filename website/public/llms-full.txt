@@ -827,9 +827,13 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `SERVICE_KEY` | The service key they authenticate with, instead of prompting. | — |
 | `REBASE_ENV_FILE_PATH` | Which `.env` the CLI reads and writes, when it is not the project's. | — |
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
+| `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
+| `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |
 | `REBASE_DEBUG` | `1` prints the underlying error and request detail instead of the short message. The first thing to set when a `rebase cloud` command fails unhelpfully. | — |
 | `REBASE_DEV_NO_DB` | `rebase dev` starts no database and provisions nothing — you bring your own. Same as `--no-db`. | — |
 | `REBASE_FRONTEND_PORT` | Pins the frontend dev server's port, which `rebase dev` otherwise derives from the project's path. | — |
+| `REBASE_DEV_READY_TIMEOUT_MS` | How long `rebase dev` waits for the backend to announce itself before saying it has not started. `0` disables the report. | `30000` |
+| `DATABASE_PASSWORD` | The password `rebase dev --docker` puts into the connection string it derives from `docker-compose.yml`. | — |
 | `DO_NOT_TRACK` | The cross-tool convention. Set to anything but `0` and the CLI sends no telemetry. | — |
 | `REBASE_TELEMETRY_DISABLED` | The same, for Rebase specifically. Needs no file, which is why it is the one to use in CI and in an image. | — |
 | `REBASE_TELEMETRY_ENDPOINT` | Where telemetry is sent, for a self-hosted collector. | — |
@@ -1178,6 +1182,12 @@ which quotes the host, port, database name and role — goes to the logs.
 Every API failure answers the same envelope and carries a `code`. The
 [error-code reference](/docs/backend/errors/) lists all of them with the status
 and the fix.
+
+### Where to go next
+
+- [Error codes](/docs/backend/errors/) — every `code` the API can answer, with the status and the fix.
+- [Environment & Configuration](/docs/getting-started/configuration/) — every variable the runtime reads, and the ones production refuses to start without.
+- [Backend Overview](/docs/backend/) — what boot does, in order, and which probe answers which question.
 
 ## Upgrading
 
@@ -24704,6 +24714,8 @@ the runtime image ships without the CLI.
 
 ### Your first admin
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 **Set `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` before the first boot.**
 Every platform guide on this site points here, because this is the one step that
 has no recovery from the outside.
@@ -24755,6 +24767,8 @@ Sign in and change the password. It is sitting in plain text wherever you put
 your environment.
 
 ### Production Checklist
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Before deploying to production, ensure:
 
@@ -25175,6 +25189,8 @@ You do not need to start the database separately — `api` waits on its
 healthcheck.
 
 #### The six values it needs
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 `quickstart.sh` generates these for you. To write the `.env` yourself:
 
@@ -25782,6 +25798,8 @@ order does not matter, because the schema step is additive and idempotent.
 
 ### Overview
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 The official chart is the Kubernetes peer of the Docker Compose self-hosting
 setup. Same idea, same image, same bundle: **the runtime is the image, your
 project is the bundle, and upgrading Rebase is a tag change.**
@@ -26006,6 +26024,8 @@ Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched
 
 ### 3. Deploy via AWS App Runner
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 App Runner is the simplest way to run containers on AWS without managing orchestrators.
 
 1. Navigate to **AWS App Runner** and click **Create service**.
@@ -26114,6 +26134,8 @@ Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched
 
 ### 3. Deploy to Cloud Run
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 ```bash
 gcloud run deploy rebase-backend \
   --image europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest \
@@ -26214,6 +26236,8 @@ COPY dist-bundle /bundle
 Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched.
 
 ### 3. Deploy the Container App
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Azure Container Apps provides a serverless container environment with built-in HTTPS ingress.
 
@@ -26482,6 +26506,8 @@ Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched
 
 ### 3. Deploy the Serverless Container
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 1. Navigate to **Serverless Containers**.
 2. Click **Create a Container**.
 3. Choose the image you just pushed.
@@ -26586,6 +26612,8 @@ Build the bundle in CI and commit or upload it as part of your release, or run `
 Then: **New → GitHub Repo**, select your repository, and let Railway detect the Dockerfile at the root.
 
 ### 4. Set environment variables
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 1. Click the service card.
 2. Go to the **Variables** tab.

@@ -124,6 +124,8 @@ the runtime image ships without the CLI.
 
 ## Your first admin
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 **Set `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` before the first boot.**
 Every platform guide on this site points here, because this is the one step that
 has no recovery from the outside.
@@ -175,6 +177,8 @@ Sign in and change the password. It is sitting in plain text wherever you put
 your environment.
 
 ## Production Checklist
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Before deploying to production, ensure:
 

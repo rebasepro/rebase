@@ -53,6 +53,8 @@ Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched
 
 ## 3. Deploy the Container App
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 Azure Container Apps provides a serverless container environment with built-in HTTPS ingress.
 
 1. Search the portal for **Container Apps** and click **Create**.
