@@ -3,7 +3,7 @@ import { useCurrentFrame } from "remotion";
 import { Scene, Stage } from "../components/Scene";
 import { Chapter, DisplayLine, DISPLAY } from "../components/Type";
 import { Frame } from "../components/Frame";
-import { Code } from "../components/Code";
+import { Code, CodeCaption } from "../components/Code";
 import { ramp, ENTER } from "../components/motion";
 import { FONT } from "../theme";
 import { useTone } from "../Plane";
@@ -70,9 +70,14 @@ export const S04_Claim: React.FC = () => {
                     <DisplayLine size={DISPLAY.statement} delay={10}>Security lives in the database.</DisplayLine>
                 </div>
 
-                <div style={{ display: "flex", gap: 0, alignItems: "center", marginTop: 56 }}>
+                {/* Files get a caption above them and no window chrome — the
+                    convention the next two scenes use for the same file. A
+                    title bar with traffic lights says "a window", and these
+                    are the contents of two files. */}
+                <div style={{ display: "flex", gap: 0, alignItems: "flex-start", marginTop: 52 }}>
                     <div style={{ width: 640, flexShrink: 0 }}>
-                        <Frame title="collections/orders.ts" delay={FILE_AT} bodyStyle={{ padding: "26px 30px" }}>
+                        <CodeCaption delay={FILE_AT - 4}>collections/orders.ts</CodeCaption>
+                        <Frame delay={FILE_AT} style={{ marginTop: 12 }} bodyStyle={{ padding: "26px 30px" }}>
                             <Code code={RULE} delay={FILE_AT + 14} step={4} size={22} />
                         </Frame>
                     </div>
@@ -80,7 +85,7 @@ export const S04_Claim: React.FC = () => {
                     {/* The connector. A line, not an arrow: it draws from the
                         file to the policy in the direction the derivation
                         runs, and the dot lands as the policy frame arrives. */}
-                    <svg width={112} height={24} style={{ flexShrink: 0, display: "block" }}>
+                    <svg width={112} height={24} style={{ flexShrink: 0, display: "block", marginTop: 112 }}>
                         <line
                             x1={12}
                             y1={12}
@@ -94,11 +99,8 @@ export const S04_Claim: React.FC = () => {
                     </svg>
 
                     <div style={{ flex: 1 }}>
-                        <Frame
-                            title="migrations/0004_orders.sql"
-                            delay={POLICY_AT}
-                            bodyStyle={{ padding: "26px 30px" }}
-                        >
+                        <CodeCaption delay={POLICY_AT - 4}>migrations/0004_orders.sql</CodeCaption>
+                        <Frame delay={POLICY_AT} style={{ marginTop: 12 }} bodyStyle={{ padding: "26px 30px" }}>
                             <Code code={POLICY} sql delay={POLICY_AT + 14} step={3.5} size={22} />
                         </Frame>
                     </div>

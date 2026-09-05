@@ -1,6 +1,7 @@
 import React from "react";
 import { useCurrentFrame } from "remotion";
-import { FONT, INK } from "../theme";
+import { FONT } from "../theme";
+import { useTone } from "../Plane";
 import { ramp } from "./motion";
 
 /**
@@ -141,12 +142,16 @@ export const CodeCaption: React.FC<{ children: React.ReactNode; delay?: number }
     delay = 0,
 }) => {
     const frame = useCurrentFrame();
+    /* The ground's own muted ink, not INK.muted: #797979 is 2.4:1 on the
+       claim's blue, and a file name nobody can read is a frame with no
+       name. See the note over TONE in theme.ts. */
+    const tone = useTone();
     return (
         <div
             style={{
                 fontFamily: FONT.mono,
                 fontSize: 15,
-                color: INK.muted,
+                color: tone.muted,
                 letterSpacing: "0.04em",
                 opacity: ramp(frame, delay, 12),
             }}
