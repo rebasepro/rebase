@@ -428,8 +428,14 @@ export interface RebaseServerClient<DB = unknown> extends Omit<RebaseClient<DB>,
     dataAsAdmin: RebaseSdkData<DB>;
 
     /**
-     * Server-side email service. Always present server-side (a no-op sender is
-     * wired when SMTP is not configured).
+     * Server-side email service. Always present — including on a backend that
+     * configured no mail at all, where `send()` throws a message naming what to
+     * set rather than the property being `undefined`.
+     *
+     * It is not a no-op sender. A no-op would swallow the reset mail a user is
+     * waiting for and report success, and nothing downstream could tell that from
+     * delivery. Ask {@link EmailService.isConfigured} before sending if the call
+     * site can carry on without mail.
      */
     email: EmailService;
 

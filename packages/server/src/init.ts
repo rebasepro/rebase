@@ -124,7 +124,7 @@ import { createRebaseClient } from "@rebasepro/client";
 
 import { createHistoryRoutes } from "./history";
 import type { EmailService } from "./email";
-import { createEmailService, EmailConfig } from "./email";
+import { createEmailService, createUnconfiguredEmailService, EmailConfig } from "./email";
 import { activeDevEmailSink } from "./email/dev-sink";
 import type { OAuthProvider } from "./auth/interfaces";
 import type { AuthHooks } from "./auth/auth-hooks";
@@ -2510,10 +2510,20 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         emailService = createEmailService((config.auth as RebaseAuthConfig).email!);
     }
 
-    if (emailService) {
-        Object.assign(serverClient, { email: emailService });
-        logger.debug("Email service attached to singleton", { configured: emailService.isConfigured() });
+    // `RebaseServerClient` declares `email` as always present, so it has to be.
+    // Left absent, a cron or a custom function calling `rebase.email.send` on a
+    // backend without SMTP died on "Cannot read properties of undefined" — a
+    // stack trace about a language feature rather than about the thing nobody
+    // configured. The stand-in throws a sentence that names the fix, and reports
+    // `isConfigured() === false`, so the auth routes that already check that keep
+    // answering 503 rather than reaching it.
+    {
+        const attached = emailService ?? createUnconfiguredEmailService();
+        Object.assign(serverClient, { email: attached });
+        logger.debug("Email service attached to singleton", { configured: attached.isConfigured() });
+    }
 
+    if (emailService) {
         if (emailService.isConfigured() && typeof emailService.verifyConnection === "function") {
             emailService.verifyConnection().then((success) => {
                 if (!success) {
