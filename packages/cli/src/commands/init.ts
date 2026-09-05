@@ -201,7 +201,7 @@ export function buildInitQuestions(params: BuildQuestionsParams): Record<string,
     questions.push({
         type: "input",
         name: "databaseUrl",
-        message: "Enter your PostgreSQL database connection string (leave blank to use a local default):",
+        message: "PostgreSQL connection string (blank = a managed database for this project, no setup):",
         default: "",
         validate: (input: string) => {
             if (input.trim() && /[\r\n]/.test(input)) {
@@ -1308,16 +1308,15 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
                 // stays here, one `#` away, because the alternative — a project
                 // that mentions Docker nowhere — makes switching to it a
                 // documentation lookup instead of an edit.
+                // Deliberately short: the header copied from `.env.example`
+                // sits directly above and already says what unset means. Saying
+                // it twice, in the first section of the first file a new
+                // developer opens, is how a generated file starts reading like
+                // boilerplate nobody wrote on purpose.
                 [
-                    "# DATABASE_URL is commented out on purpose.",
-                    "#",
-                    "# `rebase dev` starts a managed PostgreSQL for this project — no Docker,",
-                    "# no setup, and the data lives in .rebase/. Set this variable to use a",
-                    "# database of your own instead; it always wins over the managed one.",
-                    "#",
-                    "# To use the docker-compose Postgres that ships with this project:",
-                    "#   docker compose up -d db",
-                    "# then uncomment the line below.",
+                    "# Commented out on purpose — that is what selects the managed database.",
+                    "# To use the docker-compose Postgres this project ships instead:",
+                    "#   docker compose up -d db, then uncomment the line below.",
                     `# DATABASE_URL=postgresql://rebase_app:${dbPassword}@127.0.0.1:${dbPort}/rebase?options=-c%20search_path%3Dpublic&sslmode=disable`,
                     `DATABASE_PASSWORD=${dbPassword}`
                 ].join("\n")

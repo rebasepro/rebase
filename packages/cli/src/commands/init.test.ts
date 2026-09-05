@@ -746,7 +746,12 @@ describe(".env.example", () => {
         // must be filled in, that they ship empty, and how to produce a value.
         const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.example"), "utf-8");
 
-        expect(envContent).toMatch(/Database connection string \(required\)/);
+        // DATABASE_URL is deliberately NOT among them: `rebase init` writes it
+        // commented out, and that is what puts a new project on the managed
+        // database. Calling it "required" next to a line the scaffold comments
+        // out is the file contradicting itself on its own first section.
+        expect(envContent).not.toMatch(/Database connection string \(required\)/);
+        expect(envContent).toMatch(/unset means the managed database/);
         expect(envContent).toMatch(/JWT Authentication \(required\)/);
 
         // JWT_SECRET must ship empty — a default here is a shared signing key.
