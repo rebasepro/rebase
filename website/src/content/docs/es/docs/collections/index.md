@@ -121,8 +121,8 @@ Pero una anotación solo *valida* el objeto — no puede ver los nombres de tus 
 | `slug` | `string` | **Requerido.** Identificador seguro para URL. Usado en la URL de la UI de administración y la ruta de la API REST (`/api/data/{slug}`). |
 | `name` | `string` | **Requerido.** Nombre de visualización (plural). Se muestra en la navegación y los encabezados de página. |
 | `singularName` | `string` | Nombre de visualización para una sola entidad. Usado en "Nuevo Producto", "Editar Producto", etc. |
-| `table` | `string` | **Requerido.** Nombre de la tabla PostgreSQL. Si es diferente de `slug`, permite desacoplar las URLs de los nombres de las tablas. |
-| `admin.icon` | `string` | Clave del icono de Material Design. Ver [Google Fonts Icons](https://fonts.google.com/icons). |
+| `table` | `string` | Nombre de la tabla PostgreSQL. Por defecto `toSnakeCase(slug)`; defínelo solo para desacoplar la URL del nombre de la tabla. |
+| `admin.icon` | `string` | Nombre de un icono de [Lucide](https://lucide.dev/icons), p. ej. `"FileText"`, `"ShoppingCart"`. |
 
 ### Esquema
 
@@ -141,7 +141,7 @@ Todos los siguientes van dentro de `admin`.
 
 | Propiedad | Tipo | Predeterminado | Descripción |
 |----------|------|---------|-------------|
-| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Modo de vista predeterminado |
+| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"list"` | Modo de vista predeterminado |
 | `enabledViews` | `ViewMode[]` | Las cuatro | Qué modos de vista están disponibles |
 | `kanban` | `KanbanConfig` | — | Configuración de Kanban (propiedad de columna). Combínala siempre con `orderProperty` — consulta [Modos de vista](/docs/frontend/view-modes) |
 | `orderProperty` | `string` | — | Clave de la propiedad **string** que guarda la clave de orden de arrastrar y soltar. Necesaria para que un tablero Kanban funcione |

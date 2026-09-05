@@ -121,8 +121,8 @@ Mais une annotation ne fait que *valider* l'objet — elle ne voit pas les noms 
 | `slug` | `string` | **Obligatoire.** Identifiant sécurisé pour les URL. Utilisé dans l'URL de l'interface d'administration et le chemin de l'API REST (`/api/data/{slug}`). |
 | `name` | `string` | **Obligatoire.** Nom d'affichage (pluriel). Affiché dans la navigation et les en-têtes de page. |
 | `singularName` | `string` | Nom d'affichage pour une entité unique. Utilisé dans "Nouveau Produit", "Modifier Produit", etc. |
-| `table` | `string` | **Obligatoire.** Nom de la table PostgreSQL. S'il est différent du `slug`, il permet de découpler les URL des noms de table. |
-| `admin.icon` | `string` | Clé d'icône Material Design. Voir [Google Fonts Icons](https://fonts.google.com/icons). |
+| `table` | `string` | Nom de la table PostgreSQL. Par défaut `toSnakeCase(slug)` ; ne le définissez que pour découpler l'URL du nom de la table. |
+| `admin.icon` | `string` | Nom d'une icône [Lucide](https://lucide.dev/icons), p. ex. `"FileText"`, `"ShoppingCart"`. |
 
 ### Schéma
 
@@ -141,7 +141,7 @@ Tous les champs suivants vont dans `admin`.
 
 | Propriété | Type | Défaut | Description |
 |----------|------|---------|-------------|
-| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Mode d'affichage par défaut |
+| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"list"` | Mode d'affichage par défaut |
 | `enabledViews` | `ViewMode[]` | All four | Quels modes d'affichage sont disponibles |
 | `kanban` | `KanbanConfig` | — | Configuration Kanban (propriété de colonne). Toujours à associer à `orderProperty` — voir [Modes d'affichage](/docs/frontend/view-modes) |
 | `orderProperty` | `string` | — | Clé de la propriété **string** qui stocke la clé d'ordre du glisser-déposer. Indispensable pour un tableau Kanban fonctionnel |

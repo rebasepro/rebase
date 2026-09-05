@@ -2158,8 +2158,8 @@ export const productsCollection = defineCollection({
 | `slug` | `string` | **Required.** URL-safe identifier. Used in the admin UI URL and REST API path (`/api/data/{slug}`). |
 | `name` | `string` | **Required.** Display name (plural). Shown in navigation and page headers. |
 | `singularName` | `string` | Display name for a single entity. Used in "New Product", "Edit Product", etc. |
-| `table` | `string` | **Required.** PostgreSQL table name. If different from `slug`, allows you to decouple URLs from table names. |
-| `admin.icon` | `string` | Icon key. See [Google Fonts Icons](https://fonts.google.com/icons). |
+| `table` | `string` | PostgreSQL table name. Defaults to `toSnakeCase(slug)` — set it only to decouple the URL from the table, e.g. an existing `blog_posts` table served at `/posts`. |
+| `admin.icon` | `string` | A [Lucide](https://lucide.dev/icons) icon name, e.g. `"FileText"`, `"ShoppingCart"`. A rendered element also works, but the name survives serialization, so it is what the schema editor writes back. |
 
 #### Schema
 
@@ -2178,7 +2178,7 @@ All of the following go inside `admin`.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Default view mode |
+| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"list"` | Default view mode |
 | `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
 | `kanban` | `KanbanConfig` | — | Kanban configuration (column property). Always pair with `orderProperty` — see [View Modes](/docs/frontend/view-modes) |
 | `orderProperty` | `string` | — | Key of the **string** property holding the drag-and-drop order key. Required for a working Kanban board |
@@ -2387,7 +2387,7 @@ All property types share these options:
 | Property | Type | Description |
 |----------|------|-------------|
 | `type` | `string` | **Required.** Data type (see above) |
-| `name` | `string` | **Required.** Display label |
+| `name` | `string` | Display label. Defaults to the property key, prettified — `publishDate` → "Publish Date". Set it when that derivation is wrong: `"URL"` rather than "Url". |
 | `description` | `string` | Help text shown below the field |
 | `defaultValue` | `any` | Default value for new entities |
 | `validation` | `object` | Validation rules |
@@ -2583,7 +2583,7 @@ Number fields render as a standard text input with numeric validation.
 | Property | Type | Description |
 |----------|------|-------------|
 | `enum` | `EnumValues` | Render as select with numeric values |
-| `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
+| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
 | `isId` | `string` | ID generation strategy |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 

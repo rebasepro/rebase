@@ -36,7 +36,7 @@ Todos los tipos de propiedades comparten estas opciones:
 | Propiedad | Tipo | Descripción |
 |----------|------|-------------|
 | `type` | `string` | **Requerido.** Tipo de dato (ver arriba) |
-| `name` | `string` | **Requerido.** Etiqueta de visualización |
+| `name` | `string` | Etiqueta de visualización. Por defecto, la clave de la propiedad, embellecida — `publishDate` → "Publish Date". |
 | `description` | `string` | Texto de ayuda mostrado debajo del campo |
 | `defaultValue` | `any` | Valor predeterminado para nuevas entidades |
 | `validation` | `object` | Reglas de validación |
@@ -243,7 +243,7 @@ Los campos numéricos se renderizan como un campo de texto estándar con validac
 | Propiedad | Tipo | Descripción |
 |----------|------|-------------|
 | `enum` | `EnumValues` | Renderizar como select con valores numéricos |
-| `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
+| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
 | `isId` | `string` | Estrategia de generación de ID |
 | `admin.clearable` | `boolean` | Añadir un icono para borrar el valor (establecer a null) |
 

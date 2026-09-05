@@ -249,8 +249,8 @@ export const productsCollection = defineCollection({
 | `slug` | `string` | **Required.** URL-safe identifier. Used in the admin UI URL and REST API path (`/api/data/{slug}`). |
 | `name` | `string` | **Required.** Display name (plural). Shown in navigation and page headers. |
 | `singularName` | `string` | Display name for a single entity. Used in "New Product", "Edit Product", etc. |
-| `table` | `string` | **Required.** PostgreSQL table name. If different from `slug`, allows you to decouple URLs from table names. |
-| `admin.icon` | `string` | Icon key. See [Google Fonts Icons](https://fonts.google.com/icons). |
+| `table` | `string` | PostgreSQL table name. Defaults to `toSnakeCase(slug)` — set it only to decouple the URL from the table, e.g. an existing `blog_posts` table served at `/posts`. |
+| `admin.icon` | `string` | A [Lucide](https://lucide.dev/icons) icon name, e.g. `"FileText"`, `"ShoppingCart"`. A rendered element also works, but the name survives serialization, so it is what the schema editor writes back. |
 
 ### Schema
 
@@ -269,7 +269,7 @@ All of the following go inside `admin`.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Default view mode |
+| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"list"` | Default view mode |
 | `enabledViews` | `ViewMode[]` | All four | Which view modes are available |
 | `kanban` | `KanbanConfig` | — | Kanban configuration (column property). Always pair with `orderProperty` — see [View Modes](/docs/frontend/view-modes) |
 | `orderProperty` | `string` | — | Key of the **string** property holding the drag-and-drop order key. Required for a working Kanban board |
