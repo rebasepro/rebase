@@ -19,6 +19,10 @@
  *   reached, because booting a Postgres to print usage would be absurd.
  */
 
+import fs from "fs";
+import path from "path";
+
+import { composeDatabaseUrl } from "../utils/dev-preflight";
 import { readEnvFile } from "../utils/project";
 import { branchUrl, readActiveBranch } from "./branch-pointer";
 import { MANAGED_LIMITATIONS, MANAGED_POOL_MAX } from "./constraints";
@@ -87,6 +91,24 @@ export function resolveActiveBranch(
 }
 
 /**
+ * The compose `db` service's connection string for this project, or null.
+ *
+ * Read here rather than in `resolve.ts` so the ordering there stays pure, and
+ * exported so `rebase dev` can hand the same URL to the preflight that starts
+ * the container — the preflight decides "local, and not running" from a DSN,
+ * so without one `--docker` asked for a container nothing ever started.
+ */
+export function resolveComposeUrl(projectRoot: string, envFile: Record<string, string>): string | null {
+    const composePath = path.join(projectRoot, "docker-compose.yml");
+    if (!fs.existsSync(composePath)) return null;
+    try {
+        return composeDatabaseUrl(fs.readFileSync(composePath, "utf8"), envFile);
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Resolve, start if needed, and describe the database for this command.
  *
  * `projectRoot` is where the managed database's data lives, so two projects on
@@ -102,7 +124,8 @@ export async function prepareDatabaseEnv(
         flagDocker: options.flagDocker,
         env: process.env,
         envFile,
-        branch: resolveActiveBranch(projectRoot, envFile)
+        branch: resolveActiveBranch(projectRoot, envFile),
+        composeUrl: resolveComposeUrl(projectRoot, envFile)
     });
 
     const description = describeDevDatabase(database);
@@ -120,9 +143,25 @@ export async function prepareDatabaseEnv(
         return { database, env: { DATABASE_URL: database.url }, description };
     }
 
+    if (database.kind === "docker") {
+        // Docker is the one case where nothing has named a connection string:
+        // `.env` leaves DATABASE_URL commented out, so without this the child
+        // booted with no database at all and failed on the message a project
+        // that configured nothing gets — while the container it had just been
+        // asked for was never started either.
+        if (!database.url) {
+            throw new Error(
+                "--docker needs a docker-compose.yml with a db service in this project, " +
+                "and this one has none that names POSTGRES_USER, POSTGRES_DB and a published port. " +
+                "Set DATABASE_URL in .env to point at the database you mean instead."
+            );
+        }
+        return { database, env: { DATABASE_URL: database.url }, description };
+    }
+
     if (database.kind !== "managed") {
-        // An explicit connection string, or Docker. Either way the child's
-        // environment is already correct and this adds nothing to it.
+        // An explicit connection string. The child's environment is already
+        // correct and this adds nothing to it.
         return { database, env: {}, description };
     }
 

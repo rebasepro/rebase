@@ -17,7 +17,7 @@
 import chalk from "chalk";
 import { execa, execaCommandSync, type ResultPromise } from "execa";
 
-import { managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
+import { managedNotices, prepareDatabaseEnv, resolveComposeUrl } from "../dev-db/prepare";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -27,6 +27,7 @@ import {
     findBackendDir,
     findFrontendDir,
     findEnvFile,
+    readEnvFile,
     resolveTsx,
     validateTsxInstallation,
     getActiveBackendPlugin,
@@ -328,14 +329,24 @@ async function ensureGeneratedSchema(projectRoot: string): Promise<void> {
  * Separated from `ensureDevDatabase` so that everything needing a project on
  * disk lives here and the decision logic stays testable without one.
  */
-async function runDatabasePreflight(options: { projectRoot: string; disabled: boolean }): Promise<void> {
+async function runDatabasePreflight(options: {
+    projectRoot: string;
+    disabled: boolean;
+    /**
+     * The DSN the preflight decides from, when the caller resolved one that is
+     * not in `.env`. `--docker` is exactly that case: the compose URL is
+     * derived, so reading `.env` here saw nothing and the container the flag
+     * asked for was never started.
+     */
+    databaseUrl?: string;
+}): Promise<void> {
     const { projectRoot, disabled } = options;
 
     const hasCollections = projectHasCollections(projectRoot);
 
     const outcome = await ensureDevDatabase({
         projectRoot,
-        databaseUrl: readEnvVar(projectRoot, "DATABASE_URL"),
+        databaseUrl: options.databaseUrl ?? readEnvVar(projectRoot, "DATABASE_URL"),
         disabled,
         hasCollections,
         pushSchema: async () => {
@@ -407,7 +418,13 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         await ensureGeneratedSchema(projectRoot);
         await runDatabasePreflight({
             projectRoot,
-            disabled: Boolean(args["--no-db"]) || process.env.REBASE_DEV_NO_DB === "1"
+            disabled: Boolean(args["--no-db"]) || process.env.REBASE_DEV_NO_DB === "1",
+            // `--docker` names a container, not a connection string, and the
+            // preflight is what starts it. Derived from the compose file so the
+            // two halves agree on which database "the docker one" is.
+            databaseUrl: args["--docker"]
+                ? resolveComposeUrl(projectRoot, readEnvFile(projectRoot)) ?? undefined
+                : undefined
         });
     }
 

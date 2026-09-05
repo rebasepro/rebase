@@ -85,12 +85,33 @@ describe("resolveDevDatabase", () => {
     });
 
     describe("docker", () => {
+        const COMPOSE_URL = "postgresql://rebase_app:pw@127.0.0.1:5435/rebase?sslmode=disable";
+
         it("is chosen by the flag when no connection string exists", () => {
-            expect(resolveDevDatabase({ flagDocker: true })).toEqual({ kind: "docker", source: "docker" });
+            expect(resolveDevDatabase({ flagDocker: true, composeUrl: COMPOSE_URL })).toEqual({
+                kind: "docker",
+                source: "docker",
+                url: COMPOSE_URL
+            });
         });
 
         it("is chosen by a manifest preference", () => {
-            expect(resolveDevDatabase({ manifestPreference: "docker" })).toEqual({ kind: "docker", source: "docker" });
+            expect(resolveDevDatabase({ manifestPreference: "docker", composeUrl: COMPOSE_URL })).toEqual({
+                kind: "docker",
+                source: "docker",
+                url: COMPOSE_URL
+            });
+        });
+
+        it("carries a null url when the project has no compose db service", () => {
+            // Not a fallback to localhost:5432: a --docker that cannot be
+            // honoured has to say so, and a guess would point the project at
+            // whatever Postgres happens to be on the default port.
+            expect(resolveDevDatabase({ flagDocker: true })).toEqual({
+                kind: "docker",
+                source: "docker",
+                url: null
+            });
         });
 
         it("loses to an explicit connection string", () => {
