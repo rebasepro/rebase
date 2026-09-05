@@ -22,7 +22,7 @@
   },
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.22.0"
   },
   "author": "rebase.pro",
   "main": "./dist/index.es.js",

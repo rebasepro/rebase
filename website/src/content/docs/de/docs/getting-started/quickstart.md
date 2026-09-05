@@ -20,7 +20,7 @@ Dies erstellt ein Projekt mit drei Paketen:
 
 ## Voraussetzungen
 
-- **Node.js** 18+
+- **Node.js** 22.22 oder neuer (die Version in `.nvmrc`)
 - **Docker** — um den mitgelieferten PostgreSQL-Container auszuführen. (Oder bringen Sie Ihre eigene PostgreSQL mit: lokale Installation, Neon, Supabase usw.)
 - **pnpm** (empfohlen) oder npm
 

@@ -19,6 +19,9 @@
     "directory": "packages/firebase"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=22.22.0"
+  },
   "type": "module",
   "publishConfig": {
     "access": "public"

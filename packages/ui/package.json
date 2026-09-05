@@ -33,7 +33,7 @@
   "types": "./dist/index.d.ts",
   "source": "src/index.ts",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.22.0"
   },
   "exports": {
     ".": {

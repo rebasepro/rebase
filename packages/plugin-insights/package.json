@@ -19,6 +19,9 @@
     "directory": "packages/plugin-insights"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=22.22.0"
+  },
   "type": "module",
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",

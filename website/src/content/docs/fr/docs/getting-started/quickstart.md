@@ -20,7 +20,7 @@ Ceci échafaude un projet avec trois packages :
 
 ## Prérequis
 
-- **Node.js** 18+
+- **Node.js** 22.22 ou plus récent (la version dans `.nvmrc`)
 - **Docker** — pour exécuter le conteneur PostgreSQL inclus. (Ou apportez votre propre PostgreSQL : installation locale, Neon, Supabase, etc.)
 - **pnpm** (recommandé) ou npm
 

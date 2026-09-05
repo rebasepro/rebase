@@ -30,7 +30,7 @@
         "dotenv": "^16.0.0"
     },
     "engines": {
-        "node": ">=20"
+        "node": ">=22.22.0"
     },
     "pnpm": {
         "onlyBuiltDependencies": [
