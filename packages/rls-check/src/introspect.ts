@@ -19,7 +19,9 @@
  *     that one fact, not the whole scan.
  */
 import { Client } from "pg";
+import type { ClientConfig } from "pg";
 
+import { parseKeywordConnectionString } from "./redact";
 import type {
     DbColumn,
     DbForeignKey,
@@ -190,15 +192,89 @@ export async function introspectWithDiagnostics(opts: ConnectOptions): Promise<I
 type SslOption = false | { rejectUnauthorized: boolean };
 
 /**
+ * libpq keywords this tool can express as `pg` `Client` options.
+ *
+ * The list is an allowlist rather than a "map what we know and drop the rest",
+ * because every keyword left out changes where the connection goes or how it is
+ * verified: dropping `sslrootcert` would connect with weaker verification than
+ * was asked for, and dropping `hostaddr` would connect to a different machine.
+ * Silently doing either in a security scanner is worse than refusing.
+ */
+const SUPPORTED_KEYWORDS = new Set([
+    "host",
+    "port",
+    "dbname",
+    "user",
+    "password",
+    "sslmode",
+    "application_name",
+    "connect_timeout",
+    "options"
+]);
+
+/**
+ * The keywords in a libpq keyword string that this tool cannot honour, in the
+ * order they were written. Empty for a URL, and empty for a keyword string it
+ * can translate in full.
+ */
+export function unsupportedConnectionKeywords(connectionString: string): string[] {
+    const keywords = parseKeywordConnectionString(connectionString);
+    if (!keywords) return [];
+
+    return [...keywords.keys()].filter((keyword) => !SUPPORTED_KEYWORDS.has(keyword));
+}
+
+/**
+ * `Client` options for a libpq keyword string. Throws on a keyword it cannot
+ * honour. Exported for the test that pins the translation: getting `host` or
+ * `port` wrong here sends a production scan somewhere nobody asked for, and the
+ * failure would still be reported against the host the user typed.
+ */
+export function clientConfigFromKeywords(keywords: Map<string, string>): ClientConfig {
+    const unsupported = [...keywords.keys()].filter((keyword) => !SUPPORTED_KEYWORDS.has(keyword));
+    if (unsupported.length > 0) {
+        throw new Error(
+            `Unsupported connection keyword${unsupported.length === 1 ? "" : "s"}: ${unsupported.join(", ")}. Use a postgresql:// URL instead.`
+        );
+    }
+
+    const port = keywords.has("port") ? Number.parseInt(keywords.get("port")!, 10) : NaN;
+    const timeoutSeconds = keywords.has("connect_timeout")
+        ? Number.parseInt(keywords.get("connect_timeout")!, 10)
+        : NaN;
+
+    const config: ClientConfig = {
+        host: keywords.get("host") ?? "localhost",
+        database: keywords.get("dbname"),
+        user: keywords.get("user"),
+        password: keywords.get("password"),
+        application_name: keywords.get("application_name"),
+        options: keywords.get("options")
+    };
+    if (Number.isFinite(port)) config.port = port;
+    if (Number.isFinite(timeoutSeconds)) config.connectionTimeoutMillis = timeoutSeconds * 1000;
+
+    return config;
+}
+
+/**
  * Connect, negotiating TLS the way libpq would.
  *
  * `pg` lets the connection string override an explicit `ssl` option, so the
  * `sslmode` parameter is read and removed before the attempts are built —
  * otherwise the retry would silently reuse the setting that just failed.
+ *
+ * `pg` also cannot read the libpq keyword form (`host=… dbname=…`) at all — it
+ * would connect to the default host and then report the failure against the
+ * host the user *did* name, which is the worst of both. So that form is
+ * translated into explicit `Client` options here, or refused.
  */
 async function connect(connectionString: string): Promise<{ client: Client; tlsVerificationDisabled: boolean }> {
-    const sslmode = readParam(connectionString, "sslmode");
-    const cleaned = stripParam(connectionString, "sslmode");
+    const keywords = parseKeywordConnectionString(connectionString);
+    const sslmode = keywords ? keywords.get("sslmode")?.toLowerCase() : readParam(connectionString, "sslmode");
+    const base: ClientConfig = keywords
+        ? clientConfigFromKeywords(keywords)
+        : { connectionString: stripParam(connectionString, "sslmode") };
 
     // Each entry is (ssl option, did we give up verification to get here?).
     let attempts: { ssl: SslOption; downgraded: boolean }[];
@@ -227,7 +303,7 @@ async function connect(connectionString: string): Promise<{ client: Client; tlsV
 
     let lastError: unknown;
     for (const attempt of attempts) {
-        const client = new Client({ connectionString: cleaned, ssl: attempt.ssl });
+        const client = new Client({ ...base, ssl: attempt.ssl });
         try {
             await client.connect();
             return { client, tlsVerificationDisabled: attempt.downgraded };

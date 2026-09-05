@@ -23,7 +23,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { CHECKS, runChecks } from "./checks";
-import { introspectWithDiagnostics } from "./introspect";
+import { introspectWithDiagnostics, unsupportedConnectionKeywords } from "./introspect";
 import { formatEndpoint, isLoopbackEndpoint, parseConnectionString, redactSecrets } from "./redact";
 import { exceedsThreshold, renderCheckCatalog, renderJson, renderReport } from "./report";
 import { renderHtml } from "./report-html";
@@ -856,7 +856,25 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
                 formatFriendlyError(
                     {
                         headline: "That does not look like a PostgreSQL connection string.",
-                        hint: "Expected postgresql://user:password@host:5432/database, or a libpq keyword string such as host=… dbname=…. If the password contains @ : / ? or #, percent-encode it — otherwise the URL is ambiguous and neither this tool nor libpq can tell where the credential ends."
+                        hint: "Expected postgresql://user:password@host:5432/database, or a libpq keyword string carrying at least one of host= dbname= user= (port, password, sslmode, application_name, connect_timeout and options are honoured too). If the password contains @ : / ? or #, percent-encode it — otherwise the URL is ambiguous and neither this tool nor libpq can tell where the credential ends."
+                    },
+                    color
+                )
+            );
+
+            return EXIT_ERROR;
+        }
+
+        // A keyword string this tool cannot translate in full is refused rather
+        // than connected with the missing keyword dropped: every one of them
+        // changes where the connection goes or how it is verified.
+        const unsupported = unsupportedConnectionKeywords(connectionString);
+        if (unsupported.length > 0) {
+            io.stderr(
+                formatFriendlyError(
+                    {
+                        headline: `This connection string uses ${unsupported.length === 1 ? "a keyword" : "keywords"} the scan cannot honour: ${unsupported.join(", ")}.`,
+                        hint: "Rewrite it as a URL — postgresql://user:password@host:5432/database?sslmode=require. Connecting with those keywords dropped would send the scan somewhere you did not ask for, or verify TLS less strictly than you asked for."
                     },
                     color
                 )

@@ -16,7 +16,11 @@
  *   - the user ends at the FIRST `:` in the userinfo
  *
  * A libpq keyword string (`host=... password=...`) is understood too, because
- * `psql "$PGSTRING"` users paste those.
+ * `psql "$PGSTRING"` users paste those. Understood here means *parsed*: `pg`
+ * itself cannot read that form, so anything that opens a connection has to go
+ * through {@link parseKeywordConnectionString} and build the `Client` options
+ * by hand. Parsing it here and handing the raw string to the driver would
+ * report failures against a host the user never named.
  */
 
 /** What replaces every credential. */
@@ -67,9 +71,25 @@ function splitHostPort(hostport: string): { host: string; port: number | null } 
     return { host: hostport.slice(0, colon), port };
 }
 
-function parseKeywordString(raw: string): ConnectionTarget | null {
+/**
+ * The libpq keyword/value form (`host=… dbname=…`) as a map of lowercased
+ * keyword to unquoted value, or `null` when the string is not that form.
+ *
+ * Exported because `pg` cannot read this form at all: `pg-connection-string`
+ * only understands URLs, so a `Client({ connectionString: "host=127.0.0.1
+ * port=1 …" })` connects to the *default* host and reports a failure against an
+ * endpoint nobody asked for. Whoever opens the connection has to translate
+ * these keywords into `Client` options itself — see `connect()` in
+ * `introspect.ts`.
+ */
+export function parseKeywordConnectionString(raw: string): Map<string, string> | null {
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) return null;
+    // A `scheme://` string is a URL, whatever else it contains.
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) return null;
+
     // host=localhost port=5432 dbname=app user=me password='s3 cret'
-    const pairs = raw.match(/(\w+)\s*=\s*('(?:[^']|'')*'|[^\s]+)/g);
+    const pairs = trimmed.match(/(\w+)\s*=\s*('(?:[^']|'')*'|[^\s]+)/g);
     if (!pairs || pairs.length === 0) return null;
 
     const map = new Map<string, string>();
@@ -84,6 +104,13 @@ function parseKeywordString(raw: string): ConnectionTarget | null {
     }
 
     if (!map.has("host") && !map.has("dbname") && !map.has("user")) return null;
+
+    return map;
+}
+
+function parseKeywordString(raw: string): ConnectionTarget | null {
+    const map = parseKeywordConnectionString(raw);
+    if (!map) return null;
 
     const port = map.has("port") ? Number.parseInt(map.get("port")!, 10) : NaN;
 
