@@ -22,6 +22,17 @@
 #
 # For development, use `rebase dev` instead.
 #
+# This file is the recommended one for a scaffolded project: it is in your
+# repository, `rebase init` filled in its secrets, its first admin account and
+# its pinned runtime version, and it is booted by the framework's own acceptance
+# gate on every push. The copy in the Rebase repository
+# (`infra/docker/docker-compose.selfhost.yml`) is the reference for a deployment
+# with no scaffold behind it, and adds a pgbouncer profile and the split-process
+# shapes. The two agree on every environment variable except the database
+# password: this file reads DATABASE_PASSWORD, which `rebase init` also embeds
+# in the DATABASE_URL in your .env; that one reads POSTGRES_PASSWORD, generated
+# by its own quickstart script.
+#
 # To upgrade Rebase, change REBASE_VERSION and restart. Your bundle is untouched.
 # To run your OWN server code instead, `rebase eject` — it writes the entrypoint,
 # a Dockerfile and a compose file that builds them.

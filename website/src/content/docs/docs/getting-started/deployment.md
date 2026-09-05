@@ -25,10 +25,20 @@ A fresh **production** deployment does not offer a bootstrap screen, and its fir
 
 ## Docker Compose (Recommended)
 
-The generated project already includes a working `docker-compose.yml` — that
-file is the source of truth; use it as-is rather than hand-writing one. It runs
-**two** containers, Postgres and the published Rebase runtime with your built
-bundle mounted into it. There is no application image to build.
+The generated project already includes a working `docker-compose.yml` — **that
+file is the one to use for a scaffolded project**, as-is rather than
+hand-written or copied from elsewhere. `rebase init` filled in its secrets, its
+first admin account and its pinned runtime version, and it is booted by the
+framework's own acceptance gate on every push. It runs **two** containers,
+Postgres and the published Rebase runtime with your built bundle mounted into
+it. There is no application image to build.
+
+[Self-Hosting](/docs/deployment/self-hosting) covers the same deployment without
+a scaffold behind it, using
+[`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml)
+from the Rebase repository — and the two things this file deliberately leaves
+out: a connection pooler, and running functions and the job worker as their own
+processes.
 
 ```bash
 rebase build          # produces ./dist-bundle
@@ -60,9 +70,16 @@ services:
     ports:
       - "${PORT:-3001}:3001"
     environment:
+      NODE_ENV: production
       DATABASE_URL: postgresql://rebase_app:${DATABASE_PASSWORD:-changeme}@db:5432/rebase
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY:?set REBASE_SERVICE_KEY in .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS in .env}
+      # This service runs in production, where the first account to register is
+      # not promoted to admin. So the admin is named instead.
+      REBASE_ADMIN_EMAIL: ${REBASE_ADMIN_EMAIL:?set REBASE_ADMIN_EMAIL in .env}
+      REBASE_ADMIN_PASSWORD: ${REBASE_ADMIN_PASSWORD:?set REBASE_ADMIN_PASSWORD in .env}
+      DISABLE_SELF_REGISTRATION: ${DISABLE_SELF_REGISTRATION:-true}
     volumes:
       # Your built project, from `rebase build`.
       - ./dist-bundle:/bundle
@@ -71,9 +88,14 @@ volumes:
   postgres_data:
 ```
 
-`rebase init` generates `JWT_SECRET` and `REBASE_SERVICE_KEY` into `.env` for
-you. Both are declared with `${VAR:?…}`, so a missing one stops the stack with a
-message naming it rather than starting something half-configured.
+`rebase init` writes all of these into `.env` for you, including a generated
+admin password. Each is declared with `${VAR:?…}`, so a missing one stops the
+stack with a message naming it rather than starting something half-configured —
+and Compose interpolates the whole file before selecting services, so a missing
+one stops `docker compose up -d db` too.
+
+Change the admin email to yours, sign in, and change the password. See [Your
+first admin](#your-first-admin).
 
 ### The schema
 

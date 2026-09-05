@@ -16,11 +16,31 @@ why it is split that way.
 
 ## Docker Compose
 
-The compose file lives in the repository, at
+**If your project came from `rebase init`, use its own `docker-compose.yml`.**
+It is in your repository, `init` filled in its secrets, its first admin account
+and its pinned runtime version, and it is the file
+[Deployment](/docs/getting-started/deployment/#docker-compose-recommended)
+describes:
+
+```bash
+rebase build
+docker compose up -d
+```
+
+The rest of this page is the same deployment without a scaffold behind it —
+somebody else's project, a bundle built in CI, or the two things the generated
+file deliberately leaves out: a connection pooler and the split-process shapes.
+That one lives in the repository, at
 [`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml).
-Use that one rather than copying a snippet out of this page: it is the file the
-project's own acceptance gate boots on every push, so it cannot drift from what
+Use it rather than copying a snippet out of this page: both files are booted by
+the project's own acceptance gate on every push, so neither can drift from what
 actually works.
+
+The two agree on every environment variable except the database password, and
+that is because each is written for its own writer: this one reads
+`POSTGRES_PASSWORD`, which `quickstart.sh` generates; the generated one reads
+`DATABASE_PASSWORD`, which `rebase init` also embeds in the `DATABASE_URL` it
+writes into your `.env`.
 
 ```bash
 rebase build                    # produces ./dist-bundle
