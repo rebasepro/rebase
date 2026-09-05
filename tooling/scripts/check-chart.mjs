@@ -455,6 +455,91 @@ check("contract", notRefused.length === 0,
 check("contract", refusedForNothing.length === 0,
     `_validate.tpl refuses ${refusedForNothing.join(", ")}, which pod-contract.ts no longer lists`);
 
+// ── 2g. the install command the documentation prints ─────────────────────────
+//
+// Everything above renders BASE, which is this script's own idea of a valid
+// release. The command a reader actually runs is the one on the Kubernetes
+// page, and the two had drifted: the page's headline `helm install` omitted
+// `config.adminEmail` and `config.adminPassword`, so the very first command in
+// the guide was refused by the chart it installs. Nothing could see that,
+// because no gate read the page.
+//
+// So the flags are read out of the page rather than transcribed here. A
+// documented command that stops rendering fails this, and so does a new
+// refusal that the guide has not been updated for.
+const K8S_DOC = path.join(ROOT, "website/src/content/docs/docs/deployment/kubernetes.md");
+
+/** Split a shell command the way a shell would, respecting quotes. */
+function shellTokens(text) {
+    const tokens = [];
+    let current = "";
+    let quote = null;
+    let started = false;
+    for (const char of text) {
+        if (quote) {
+            if (char === quote) quote = null;
+            else current += char;
+            started = true;
+        } else if (char === "'" || char === "\"") {
+            quote = char;
+            started = true;
+        } else if (/\s/.test(char)) {
+            if (started) { tokens.push(current); current = ""; started = false; }
+        } else {
+            current += char;
+            started = true;
+        }
+    }
+    if (started) tokens.push(current);
+    return tokens;
+}
+
+/**
+ * The `--set` flags from the page's headline install command.
+ *
+ * `$(openssl rand -hex N)` is stood in for rather than run: helm only needs a
+ * value of the right length, and shelling out to reproduce a documented
+ * substitution would test openssl.
+ */
+function documentedInstallSets() {
+    const doc = fs.readFileSync(K8S_DOC, "utf8");
+    const block = [...doc.matchAll(/```bash\n([\s\S]*?)```/g)]
+        .map(m => m[1])
+        .find(body => body.includes("helm install rebase oci://"));
+    if (!block) return undefined;
+    const flattened = block
+        .replace(/\\\r?\n\s*/g, " ")
+        .replace(/\$\(openssl rand -hex (\d+)\)/g, (_m, n) => "0".repeat(Number(n) * 2));
+    const tokens = shellTokens(flattened);
+    const sets = [];
+    for (let i = 0; i < tokens.length; i++) {
+        if (tokens[i] === "--set" && tokens[i + 1]) sets.push("--set", tokens[++i]);
+    }
+    return sets;
+}
+
+const documented = documentedInstallSets();
+check("docs", Array.isArray(documented) && documented.length > 0,
+    `no \`helm install rebase oci://…\` block found in ${path.relative(ROOT, K8S_DOC)} — ` +
+    "the guide's headline command is what this renders");
+
+if (documented && documented.length > 0) {
+    // Rendered on its own, NOT on top of BASE: the question is whether the
+    // documented command is sufficient by itself, which is the question the
+    // reader is asking.
+    const fromDocs = helm(["template", "rebase", CHART, ...documented]);
+    check("docs", fromDocs.ok,
+        "the install command on the Kubernetes page does not render:\n" +
+        `      ${fromDocs.out.trim().split("\n").slice(0, 3).join("\n      ")}\n` +
+        `      Update ${path.relative(ROOT, K8S_DOC)} — a guide whose first command is refused ` +
+        "is a guide nobody gets past.");
+    if (fromDocs.ok) {
+        check("docs", /REBASE_ADMIN_EMAIL:/.test(fromDocs.out),
+            "the documented command renders no REBASE_ADMIN_EMAIL, so the release it installs " +
+            "has an empty user table, self-registration off, and no way to sign in");
+    }
+}
+
 // ── 3. every refusal is reachable ────────────────────────────────────────────
 
 /**

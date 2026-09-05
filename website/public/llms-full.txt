@@ -18416,18 +18416,39 @@ helm install rebase oci://registry-1.docker.io/rebasepro/rebase \
   --set config.databaseUrl='postgres://user:pass@host:5432/db' \
   --set config.jwtSecret="$(openssl rand -hex 32)" \
   --set config.serviceKey="$(openssl rand -hex 32)" \
+  --set config.adminEmail=you@example.com \
+  --set config.adminPassword="$(openssl rand -hex 16)" \
   --set ingress.host=api.example.com \
   --set image.repository=my-registry/my-app
 ```
+
+The chart ships with self-registration off, so a release has to name the account
+its operator signs in with — otherwise it comes up with an empty user table and
+no way to produce the first authenticated caller. `config.adminPassword` must be
+at least 12 characters, and `config.adminEmail` needs a dot in its domain: the
+login route parses its body with `z.string().email()`, so `admin@localhost`
+seeds an account and then refuses every sign-in. Both are refusals rather than
+runtime surprises — see [what the chart refuses to
+render](#what-the-chart-refuses-to-render). Sign in and change the password;
+these values land in a Secret.
+
+Manage them out of band instead by pointing `existingSecret` at a Secret
+carrying `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` alongside
+`DATABASE_URL` and the rest.
 
 The chart deploys the **runtime only**. It does not deploy Postgres — use
 CloudNativePG, a managed database, or your own StatefulSet, and point
 `config.databaseUrl` at it. A chart that also owned your database would own your
 backups and your failover, which is a much larger promise than "run the app".
 
-> **Maturity.** The chart is linted and rendered in CI against Helm v4.2.4 —
-> every documented topology, and a case reaching every refusal listed below. It
-> has **not yet been exercised against a live cluster**. Treat it as a
+> **Maturity.** Two separate things are checked in CI, and a third is not.
+> The chart is linted and rendered against Helm v4.2.4 — every documented
+> topology on this page, including the install command above, and a case
+> reaching every refusal listed below. The runtime image the chart deploys is
+> built and booted against a real Postgres, both ways a bundle can arrive. What
+> has **never run is the chart against a live cluster**: nothing has scheduled
+> these manifests, so the probes, the pre-install migration Job's ordering and
+> the ingress are correct as YAML and unproven as a deployment. Treat it as a
 > well-tested starting point rather than a production-proven default, and read
 > [Self-Hosting](/docs/deployment/self-hosting) for the path that is.
 
@@ -18534,6 +18555,13 @@ instead, naming the value to change:
 - `bundle.mode=image` while `image.repository` is still the stock runtime image
 - `ingress.enabled` with no host, or `bundle.mode=url` with no URL
 - an unrecognised `migrationJob.mode` or `sharedState.rateLimitStore`
+- no `config.adminEmail` with self-registration off — a release nobody can sign
+  in to. Set the two admin values, or `config.allowSelfRegistration=true`
+  understanding that the first person to reach the sign-up form becomes its
+  administrator
+- a `config.adminPassword` under 12 characters, or a `config.adminEmail` whose
+  domain has no dot. Both seed nothing and leave the same locked-out release,
+  one at boot and one at the sign-in form
 
 ### What the chart cannot do for you
 
