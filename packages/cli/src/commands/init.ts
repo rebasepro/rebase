@@ -899,14 +899,18 @@ async function replacePlaceholders(options: InitOptions) {
         try {
             // First try to check if the specific cliVersion exists for this package
             const { stdout } = await execa(viewBin, ["view", `${pkgName}@${cliVersion}`, "version"]);
-            if (!stdout.trim()) throw new Error("Not found");
+            // Caught immediately below, and named anyway: an empty stdout from
+            // `npm view` is indistinguishable from a network failure at the
+            // catch, and if either ever escapes this function a bare "Not
+            // found" says nothing about which package or which version.
+            if (!stdout.trim()) throw new Error(`No published ${pkgName}@${cliVersion}`);
             versionToUse = stdout.trim();
         } catch {
             try {
                 // If specific version doesn't exist, try the matching tag (canary or latest)
                 const tag = cliVersion.includes("canary") ? "canary" : "latest";
                 const { stdout } = await execa(viewBin, ["view", `${pkgName}@${tag}`, "version"]);
-                if (!stdout.trim()) throw new Error("Not found");
+                if (!stdout.trim()) throw new Error(`No ${pkgName}@${tag} on the registry`);
                 versionToUse = stdout.trim();
             } catch {
                 try {

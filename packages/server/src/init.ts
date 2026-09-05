@@ -1234,7 +1234,15 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     const defaultDriver = driverRegistry.getOrDefault(defaultDriverId);
     if (!defaultDriver || !defaultDriverResult) {
-        throw new Error("Default driver not initialized by bootstrappers");
+        // Named, because the reader's next question is "which one" and the
+        // answer is not obvious from a multi-source configuration: the default
+        // is whichever adapter is marked `isDefault`, or the first declared.
+        throw new Error(
+            `The "${defaultDriverId}" data source is the default, and its adapter's ` +
+            "`initializeDriver` returned nothing usable. Adapters that ran: " +
+            `${bootstrappers.map(b => b.id || b.type).join(", ") || "none"}. ` +
+            "Check that adapter's connection configuration."
+        );
     }
     const defaultBootstrapper = bootstrappers.find(b => b.id === defaultDriverId || b.type === defaultDriverId) || bootstrappers[0];
     const defaultRealtimeService = defaultDriverResult.realtimeProvider;
