@@ -10,11 +10,24 @@ import {
     WhereFilterOp,
     WhereValueFor,
     WriteOptions,
+    isUnsupported,
+    unsupportedMethod,
     type ComputedSortField
 } from "@rebasepro/types";
 import { collectAllPages, normalizeOrderBy, paginateFind, resolveFindWindow } from "@rebasepro/common";
 
 import { SDKQueryBuilder } from "./sdk_query_builder";
+
+/**
+ * What `listen`/`listenById` say on a client that has no socket.
+ *
+ * One sentence, in one place: it used to live in `SDKQueryBuilder.listen` only,
+ * so the same failure reached callers of `client.data.posts.listen` as
+ * `undefined is not a function`.
+ */
+const NO_SOCKET =
+    "Listen is only available when RebaseClient is configured with a websocketUrl, "
+    + "and not when it was created with realtime: false.";
 
 /**
  * Counts currently in flight, keyed by the exact request they issue. Entries
@@ -341,7 +354,10 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             client.find(params).then((result) => deliver(result, false)).catch((error) => {
                 if (!closed) onError?.(error as Error);
             });
-            const live = options?.realtime !== false && client.listen
+            // `observe()` degrades to the single fetch above rather than
+            // throwing, so it asks the capability question explicitly — the
+            // method itself is always there now.
+            const live = options?.realtime !== false && !isUnsupported(client.listen)
                 ? client.listen(params, (result) => deliver(result, true), onError)
                 : undefined;
             return () => {
@@ -374,7 +390,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             client.findById(id).then((row) => deliver(row, false)).catch((error) => {
                 if (!closed) onError?.(error as Error);
             });
-            const live = options?.realtime !== false && client.listenById
+            const live = options?.realtime !== false && !isUnsupported(client.listenById)
                 ? client.listenById(id, (row) => deliver(row, true), onError)
                 : undefined;
             return () => {
@@ -412,7 +428,16 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         },
         include(...relations: string[]) {
             return new SDKQueryBuilder<M>(client).include(...relations);
-        }
+        },
+
+        // `listen`/`listenById` are part of the contract, so they are always
+        // here to call. Without a socket they are stubs that say why, rather
+        // than absent properties every call site had to null-check — a check
+        // that was indistinguishable from "does this transport support
+        // realtime?", which is `isUnsupported()` and is what the admin panel
+        // actually asks before choosing to poll instead.
+        listen: unsupportedMethod(NO_SOCKET),
+        listenById: unsupportedMethod(NO_SOCKET)
     };
 
     if (ws) {

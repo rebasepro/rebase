@@ -117,3 +117,58 @@ export class RebaseClientError extends RebaseApiError {
         this.name = "RebaseClientError";
     }
 }
+
+/**
+ * Brand for a contract method a particular client cannot serve.
+ *
+ * `Symbol.for` rather than a fresh symbol: two copies of `@rebasepro/types` in
+ * one tree — which happens, see `docs/dependency-duplication-traps.md` — must
+ * agree about it, and a module-local symbol would not.
+ */
+const UNSUPPORTED_METHOD = Symbol.for("rebase.unsupportedMethod");
+
+/**
+ * Build the stub a client installs for a contract method it cannot serve.
+ *
+ * `listen`, `listenById` and `count` are part of `SDKCollectionClient`, not
+ * optional extras — a caller should be able to write
+ * `client.data.posts.count()` without asking first, and a transport that cannot
+ * serve it should answer with a sentence naming the configuration that would,
+ * rather than with `undefined is not a function` at the call site. Where the
+ * transport genuinely cannot (a client built with `realtime: false`, a driver
+ * with no `listenCollection`), it installs one of these instead of omitting the
+ * method.
+ *
+ * @param message What to tell the caller, naming the fix.
+ * @group Errors
+ */
+export function unsupportedMethod<F>(message: string): F {
+    const stub = (): never => {
+        throw new RebaseClientError(message);
+    };
+    (stub as unknown as Record<symbol, boolean>)[UNSUPPORTED_METHOD] = true;
+    return stub as unknown as F;
+}
+
+/**
+ * Can this method actually do anything?
+ *
+ * `true` for a stub from {@link unsupportedMethod} **and** for a method that is
+ * simply not there — a partial client, a hand-built test double, an
+ * implementation written against an older shape of the interface. Both mean the
+ * same thing to a caller, so both answer the same way, and an adapter that
+ * checks this cannot be caught out by either.
+ *
+ * Ordinary code does not need it: calling the method and letting it throw is
+ * the normal path. Adapters do — the admin panel chooses between subscribing
+ * and a one-shot `find()` by asking whether the client can listen, and a UI
+ * that subscribes into a throw is worse than one that polls. This is the
+ * question `if (accessor.listen)` used to be asking, made explicit now that the
+ * method is always there to call.
+ *
+ * @group Errors
+ */
+export function isUnsupported(method: unknown): boolean {
+    if (typeof method !== "function") return true;
+    return (method as unknown as Record<symbol, boolean>)[UNSUPPORTED_METHOD] === true;
+}

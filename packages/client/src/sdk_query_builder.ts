@@ -185,22 +185,19 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * Count the records matching this query.
      */
     async count(): Promise<number> {
-        if (!this.collection.count) {
-            throw new Error("count() is not supported by this collection client.");
-        }
         return this.collection.count(this.params as FindParams<M>);
     }
 
     /**
      * Listen to realtime updates matching this query.
+     *
+     * The guard that used to stand here — `if (!this.collection.listen) throw`
+     * — has moved onto the client itself, which is where the same failure had
+     * to be diagnosed anyway: `client.data.posts.listen(…)`, one call short of
+     * this builder, answered `undefined is not a function`. The message is now
+     * the same either way.
      */
     listen(onUpdate: (data: FindResult<M>) => void, onError?: (error: Error) => void): () => void {
-        if (!this.collection.listen) {
-            throw new Error(
-                "Listen is only available when RebaseClient is configured with a websocketUrl, " +
-                "and not when it was created with realtime: false."
-            );
-        }
         return this.collection.listen(this.params as FindParams<M>, onUpdate, onError);
     }
 }

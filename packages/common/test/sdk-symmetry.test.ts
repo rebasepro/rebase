@@ -122,12 +122,12 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
         } as any);
 
         let flatRows: any;
-        sdk(buildSdkData(driver), "products").listen!(undefined, (r) => { flatRows = r.data; });
+        sdk(buildSdkData(driver), "products").listen(undefined, (r) => { flatRows = r.data; });
         expect(flatRows[0].name).toBe("Widget");
         expect(flatRows[0].values).toBeUndefined();
 
         let flatOne: any;
-        sdk(buildSdkData(driver), "products").listenById!("p1", (row) => { flatOne = row; });
+        sdk(buildSdkData(driver), "products").listenById("p1", (row) => { flatOne = row; });
         expect(flatOne.name).toBe("Widget");
         expect(flatOne.values).toBeUndefined();
 
@@ -238,9 +238,9 @@ describe("SDK relation shape (one shape, with or without `include`)", () => {
         const fromFindById = await sdk(data, "jobs").findById("j1");
 
         let fromListen: any;
-        sdk(data, "jobs").listen!(undefined, (r) => { fromListen = r.data[0]; });
+        sdk(data, "jobs").listen(undefined, (r) => { fromListen = r.data[0]; });
         let fromListenById: any;
-        sdk(data, "jobs").listenById!("j1", (row) => { fromListenById = row; });
+        sdk(data, "jobs").listenById("j1", (row) => { fromListenById = row; });
 
         for (const row of [fromFind, fromInclude, fromFindById, fromListen, fromListenById]) {
             for (const value of Object.values(row as Record<string, unknown>)) {

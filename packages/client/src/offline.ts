@@ -1,5 +1,5 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
-import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions } from "@rebasepro/types";
+import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, isUnsupported } from "@rebasepro/types";
 import { collectAllPages, paginateFind } from "@rebasepro/common";
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
@@ -771,13 +771,19 @@ data: u.data as AnyRow })),
             offset: (count) => new SDKQueryBuilder<M>(wrapped).offset(count),
             search: (searchString, options) => new SDKQueryBuilder<M>(wrapped).search(searchString, options),
             vectorSearch: (property, vector, options) => new SDKQueryBuilder<M>(wrapped).vectorSearch(property, vector, options),
-            include: (...relations) => new SDKQueryBuilder<M>(wrapped).include(...relations)
+            include: (...relations) => new SDKQueryBuilder<M>(wrapped).include(...relations),
+
+            // Carried over as-is when the inner client cannot listen, so the
+            // wrapper does not turn "realtime is off on this client" into
+            // "this method does not exist" — the two used to be the same thing.
+            listen: inner.listen,
+            listenById: inner.listenById
         };
 
         // Realtime stays a live server stream — but everything it delivers is
         // worth keeping, so it feeds the local database on its way past.
-        if (inner.listen) {
-            wrapped.listen = (params, onUpdate, onError) => inner.listen!(
+        if (!isUnsupported(inner.listen)) {
+            wrapped.listen = (params, onUpdate, onError) => inner.listen(
                 params,
                 (response) => {
                     void this.ingest(slug, response.data ?? []).then(() => this.notifyCollection(slug, false));
@@ -786,8 +792,8 @@ data: u.data as AnyRow })),
                 onError
             );
         }
-        if (inner.listenById) {
-            wrapped.listenById = (id, onUpdate, onError) => inner.listenById!(
+        if (!isUnsupported(inner.listenById)) {
+            wrapped.listenById = (id, onUpdate, onError) => inner.listenById(
                 id,
                 (row) => {
                     if (row) void this.ingest(slug, [row]).then(() => this.notifyCollection(slug, false));
@@ -857,7 +863,7 @@ data: u.data as AnyRow })),
             if (!closed) observer.emit();
         })();
 
-        if (options?.realtime !== false && inner.listen) {
+        if (options?.realtime !== false && !isUnsupported(inner.listen)) {
             unlisten = inner.listen(params, (response) => {
                 void this.ingest(slug, response.data ?? []).then(() => {
                     this.recordSnapshot(slug, params, response);
@@ -921,7 +927,7 @@ data: u.data as AnyRow })),
             if (!closed) observer.emit();
         })();
 
-        if (options?.realtime !== false && inner.listenById) {
+        if (options?.realtime !== false && !isUnsupported(inner.listenById)) {
             unlisten = inner.listenById(id, (row) => {
                 if (!row) {
                     if (!this.hasPending(slug, id)) this.removeLocalRow(slug, id, true);

@@ -873,19 +873,30 @@ export interface SDKCollectionClient<
      * does not call back. `listen` does none of that; it forwards what the
      * socket sends.
      *
-     * Optional because it is only present when realtime is enabled. `observe()`
-     * is not — it degrades to a single fetch — which is the other reason to
-     * reach for it instead.
+     * Always present. A client that cannot subscribe — one built with
+     * `realtime: false`, or on a driver with no `listenCollection` — installs a
+     * stub that throws a `RebaseClientError` naming the configuration that
+     * would make it work. It used to be optional, which made every call site
+     * either write `listen!(…)` or a null check the type system could not tell
+     * apart from a real capability question; the answer to *that* question is
+     * {@link isUnsupported}, and the answer for ordinary code is to just call
+     * it.
+     *
+     * `observe()` degrades to a single fetch instead of throwing, which is the
+     * other reason to reach for it instead.
      */
-    listen?(params: FindParams<M> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
+    listen(params: FindParams<M> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
 
     /** {@link listen} for a single row. Prefer `observeById()`. */
-    listenById?(id: string | number, onUpdate: (row: M | undefined) => void, onError?: (error: Error) => void): () => void;
+    listenById(id: string | number, onUpdate: (row: M | undefined) => void, onError?: (error: Error) => void): () => void;
 
     /**
      * Count the number of records matching the given filter.
+     *
+     * Always present; see {@link listen} for what a transport that cannot serve
+     * it does instead.
      */
-    count?(params?: FindParams<M>): Promise<number>;
+    count(params?: FindParams<M>): Promise<number>;
 
     // Fluent Query Builder
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): SDKQueryBuilderInterface<M>;

@@ -14418,7 +14418,7 @@ Use `listenById()` to watch a specific record by its ID:
 // The SDK hands back a flat row, not an `Entity` — there is no `.values`.
 const unsubscribe = client.data
     .collection<{ id: number; name: string }>("products")
-    .listenById!(
+    .listenById(
     42,
     (product) => {
         if (product) {
@@ -14521,7 +14521,7 @@ This matters for apps with meaningful signed-out traffic — marketing pages, pu
 
 Two related behaviours:
 
-- `realtime: false` remains a hard opt-out: no socket ever, and `client.realtime.channel()` throws.
+- `realtime: false` remains a hard opt-out: no socket ever, and `client.realtime.channel()` throws. So do `listen()` and `listenById()` — they are always there to call, and on a client with no socket they throw a `RebaseClientError` naming the option that would enable them. `observe()` does not: it degrades to a single fetch.
 - `client.close()` is final. It releases the socket and its reconnect timer, and nothing queued afterwards will redial. In Node, an open socket keeps the event loop alive, so a script that never calls it will not exit on its own.
 
 ### Broadcast Channels

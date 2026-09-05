@@ -629,9 +629,13 @@ describe("listen() — include", () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         expect(() => c.include("author").listen(jest.fn())).toThrow("Listen is only available");
     });
-    it("listen is undefined without ws", () => {
+    it("throws the same sentence one call earlier, straight off the client", () => {
+        // `listen` used to be absent here, so the two spellings of the same
+        // mistake failed differently: this one said `undefined is not a
+        // function`, the builder above said "realtime: false".
         const { transport } = createMockTransport();
-        expect(createCollectionClient<PostModel>(transport, "posts").listen).toBeUndefined();
+        expect(() => createCollectionClient<PostModel>(transport, "posts").listen(undefined, jest.fn()))
+            .toThrow("Listen is only available");
     });
     /**
      * LIMITATION, not a contract: the realtime subscription payload
