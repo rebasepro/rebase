@@ -853,8 +853,8 @@ The Rebase MCP server provides these tools for AI agents. Use the MCP tool calli
 |------|-------------|------------|
 | `list_users` | List all users registered in the backend, including their roles | — |
 | `create_user` | Create a new user | `email` (required), `displayName?: string`, `password?: string`, `roles?: string[]` |
-| `update_user` | Update an existing user (email, display name, roles) | `userId` (required), `email?: string`, `displayName?: string`, `roles?: string[]` |
-| `delete_user` | Delete a user from the backend | `userId` (required) |
+| `update_user` | Update an existing user (email, display name, roles) | `uid` (required), `email?: string`, `displayName?: string`, `roles?: string[]` |
+| `delete_user` | Delete a user from the backend | `uid` (required) |
 | `list_roles` | List all roles defined in the backend | — |
 
 ### Filtering with `list_documents`
