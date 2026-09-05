@@ -10462,29 +10462,55 @@ const adminModeController = useBuildAdminModeController();
 
 ### Custom Views
 
-Add top-level navigation views for dashboards, tools, or custom pages:
+Add top-level navigation views for dashboards, tools, or custom pages. An
+`AppView` is a flat object — everything below sits at the top level, there is no
+nested `admin` block:
 
 ```tsx
+
 const views: AppView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",
-        view: <MyDashboard />
+        icon: "LayoutDashboard",
+        view: <MyDashboard/>
     },
     {
         slug: "settings",
         name: "App Settings",
-        view: <AppSettings />,
-        nestedRoutes: true  // Support sub-paths,
-        admin: {
-            icon: "dashboard",
-            group: "Analytics",
-            icon: "settings"
-        }
+        icon: "Settings",
+        group: "Admin",
+        // Register `settings/*` too, so the view can route inside itself.
+        nestedRoutes: true,
+        // Reachable by URL, but not listed in the drawer.
+        hideFromNavigation: true,
+        view: <AppSettings/>
     }
 ];
-
 ```
+
+Hand them to `<RebaseCMS>`, next to your collections — that is the component
+that registers navigation:
+
+```tsx
+<RebaseCMS collections={collections} views={views}/>
+```
+
+| Field | |
+|---|---|
+| `slug` | the path it is reached at, under the admin root |
+| `name` | the label in the drawer and on the home page |
+| `view` | the element to render, or a `ComponentType` to render it lazily |
+| `icon` | a [Lucide](https://lucide.dev/icons/) icon name, e.g. `"ShoppingCart"` — or any node |
+| `group` | groups views together in the drawer; `"Admin"` and `"Settings"` sink to the bottom |
+| `pinToBottom` | sinks the group to the bottom under any name — prefer it over the two magic strings |
+| `nestedRoutes` | also registers `slug/*`, for a view with routes of its own |
+| `hideFromNavigation` | keeps the route, drops the nav entry |
+| `roles` | only users holding one of these roles see the view, or can reach it |
+| `description` | Markdown, shown on the home-page card |
+
+To put a view under **Studio** instead of the CMS, pass it to
+[`<RebaseStudio devViews>`](/docs/studio#adding-your-own-tool).
 
 ### Styling
 
