@@ -26,6 +26,9 @@ The CLI is also bundled with every Rebase project as a local dependency.
 | `rebase generate-sdk` | Generate a typed TypeScript SDK from collections |
 | `rebase auth reset-password` | Reset a user's password |
 | `rebase doctor` | Detect schema drift between collections, Drizzle schema, and database |
+| `rebase status` | Show every resource this project declares and whether its variables are set |
+| `rebase resources` | List the databases, buckets and topics this project declares |
+| `rebase skills install` | Install Rebase agent skills for your AI coding assistant |
 | `rebase cloud <command>` | Manage your apps on Rebase Cloud (auth, deploy, databases, …) |
 
 Run `rebase --help` or `rebase <command> --help` for detailed usage.
@@ -61,11 +64,22 @@ Run `rebase cloud --help` for the full list.
 ## Quick Start
 
 ```bash
-rebase init my-app
+pnpm dlx @rebasepro/cli init my-app
 cd my-app
-docker compose up -d db
-pnpm run db:push
+pnpm install
 pnpm run dev
+```
+
+That is the whole first run. With no `DATABASE_URL` set, `rebase dev` starts a
+managed PostgreSQL (PGlite) in the project directory, generates the Drizzle
+schema from your collections, and creates the tables at boot — no database to
+install and no schema step.
+
+Two commands worth knowing straight after:
+
+```bash
+rebase status           # every resource, and whether its variables are set
+rebase skills install   # Rebase skills for your AI coding assistant
 ```
 
 ## Related Packages
