@@ -188,14 +188,14 @@ single file:
 | Runner | Packages | One file |
 |---|---|---|
 | Vitest | `cli`, `mcp`, `rls-check` | `pnpm --filter @rebasepro/cli test src/utils/args` |
-| Jest | everything else | `pnpm --filter @rebasepro/ui test -- Button.test.tsx` |
+| Jest | everything else | `pnpm --filter @rebasepro/ui test -- chip-contrast` |
 
 `packages/server-postgres` has both: `test` is Jest over `test/*`, and
 `test:e2e` is Vitest against the **built** `dist`, so build the package before
 running it.
 
 `@rebasepro/server` runs Jest under `NODE_OPTIONS="--experimental-vm-modules"`.
-Its `test` script sets that for you; a bare `npx jest` in that package fails on
+Its `test` script sets that for you; a bare `pnpm exec jest` in that package fails on
 the first ESM import with `Cannot use import statement outside a module`.
 
 `packages/firebase` has tests and no runner — five of them, never executed. That
