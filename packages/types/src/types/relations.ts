@@ -67,12 +67,18 @@ export interface RelationBase {
      */
     onDelete?: OnAction;
 
-    /** Presentation overrides applied when this relation is rendered as a tab. */
+    /**
+     * Presentation overrides applied when this relation is rendered as a tab.
+     *
+     * Whether the link is *required* is not here: it is
+     * `validation: { required: true }` on the declaring property, the same key
+     * every other field uses. A relation carried its own copy until 0.18, and
+     * the two disagreed by construction — the DDL generator read the property
+     * (so the column was `NOT NULL`) while codegen read the relation (so the
+     * generated `Insert` type made it optional), and a `create()` that
+     * typechecked failed at the database.
+     */
     overrides?: Partial<AnyCollectionConfig>;
-
-    validation?: {
-        required?: boolean;
-    };
 }
 
 /**
@@ -268,7 +274,6 @@ export interface ResolvedRelationBase {
     onUpdate?: OnAction;
     onDelete?: OnAction;
     overrides?: Partial<AnyCollectionConfig>;
-    validation?: { required?: boolean };
     /**
      * Whether one row or many come back. Derived from `kind` — kept because it
      * is what most consumers actually branch on, and because `via` is the one

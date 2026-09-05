@@ -67,6 +67,53 @@ export function resolveCollectionRelations(
 }
 
 /**
+ * The `type: "relation"` property that declares a link, or `undefined` for one
+ * that only exists in the collection's `relations` array.
+ *
+ * Both declaration sites end up in {@link resolveCollectionRelations}, and only
+ * one of them has a property to carry field-level facts — `name`, `admin`, and
+ * the one this exists for, `validation.required`.
+ */
+export function relationDeclaringProperty(
+    collection: CollectionConfig,
+    relation: ResolvedRelation
+): RelationProperty | undefined {
+    const resolved = resolveCollectionRelations(collection);
+    for (const [key, raw] of Object.entries(collection.properties ?? {})) {
+        const prop = raw as Property | undefined;
+        if (prop?.type !== "relation") continue;
+        // A relation declared inline is keyed by the property; one declared in
+        // `relations` is keyed by its name, which the property addresses.
+        if (resolved[key] === relation) return prop as RelationProperty;
+        const addressed = (prop as RelationProperty).relation?.relationName;
+        if (addressed && findRelation(resolved, addressed) === relation) return prop as RelationProperty;
+    }
+    return undefined;
+}
+
+/**
+ * Must every row of this collection point at a target through this link?
+ *
+ * Read from the declaring property's `validation.required` — the same key every
+ * other field uses, and the only place it lives.
+ *
+ * `RelationBase` carried its own `validation.required` until 0.18, which made
+ * this two questions rather than one. They were answered by different readers:
+ * the Postgres DDL generator asked the property (so the foreign-key column was
+ * `NOT NULL`) and the SDK type generator asked the relation (so the generated
+ * `Insert` type made the field optional). A `create()` that left the relation
+ * out therefore typechecked and then failed at the database with a not-null
+ * violation, and the two `required`s had to be written twice, identically, for
+ * the pair to agree.
+ *
+ * A relation with no declaring property — an entry in `relations` nothing
+ * points at — is not required. There is no field to fill in.
+ */
+export function isRelationRequired(collection: CollectionConfig, relation: ResolvedRelation): boolean {
+    return Boolean(relationDeclaringProperty(collection, relation)?.validation?.required);
+}
+
+/**
  * The path of the collection a relation property points at, derived from the
  * property alone.
  *

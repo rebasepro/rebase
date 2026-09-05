@@ -501,7 +501,7 @@ interface BackupsAPI { download, list }
 interface BaseCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, properties, securityRules, singularName, slug, strictWrites }
 interface BaseProperty { callbacks, columnName, conditions, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, validation }
 interface BeforeDeleteProps { collection, context, id, path, row }
-interface BelongsToRelation { kind, localKey, onDelete, onUpdate, overrides, relationName, target, validation }
+interface BelongsToRelation { kind, localKey, onDelete, onUpdate, overrides, relationName, target }
 interface BinaryProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
 interface BooleanProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
 interface BootstrappedAuth { authRepository, emailService, roleService, schemaHealthCheck, userService }
@@ -575,8 +575,8 @@ interface FunctionInvokeOptions { headers, method, path }
 interface FunctionsAPI { invoke }
 interface GeopointProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
 interface GinIndex { on, reason, using, where }
-interface HasManyRelation { foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, sourceKey, target, validation }
-interface HasOneRelation { foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, sourceKey, target, validation }
+interface HasManyRelation { foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, sourceKey, target }
+interface HasOneRelation { foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, sourceKey, target }
 interface HealthCheckResult { details, healthy, latencyMs }
 interface HistoryRetentionConfig { maxEntries, ttlDays }
 interface ImageResize { format, maxHeight, maxWidth, mode, quality }
@@ -588,7 +588,7 @@ interface ListLimitBounds { defaultLimit, maxLimit, vectorDefaultLimit }
 interface LiteralPolicyOperand { kind, value }
 interface LogicalCondition { conditions, type }
 interface ManagedCompatibility { eligible, reasons }
-interface ManyToManyRelation { kind, onDelete, onUpdate, overrides, relationName, target, through, validation }
+interface ManyToManyRelation { kind, onDelete, onUpdate, overrides, relationName, target, through }
 interface MapProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, excludeFromApi, keyValue, metadata, name, properties, propertiesOrder, propertyConfig, type, validation }
 interface MongoDBCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, path, properties, securityRules, singularName, slug, strictWrites }
 interface MountableRouter { fetch, routes }
@@ -631,16 +631,16 @@ interface RecordHistoryParams { action, id, previousValues, tableName, updatedBy
 interface ReferenceProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, isId, metadata, name, path, propertyConfig, type, validation }
 interface RegisteredPolicyExpression { kind }
 interface RelationAggregateSort { agg, field, relation }
-interface RelationBase { onDelete, onUpdate, overrides, relationName, target, validation }
+interface RelationBase { onDelete, onUpdate, overrides, relationName, target }
 interface RelationProperty { callbacks, columnName, conditions, defaultValue, description, dynamicProps, excludeFromApi, isId, metadata, name, propertyConfig, relation, resolvedRelation, type, validation }
-interface ResolvedBelongsTo { cardinality, kind, localKey, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, validation, writable }
+interface ResolvedBelongsTo { cardinality, kind, localKey, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, writable }
 interface ResolvedDataSource { capabilities, databaseId, engine, key, transport }
-interface ResolvedHasMany { cardinality, foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, shared, sourceKey, target, targetSlug, validation, writable }
-interface ResolvedHasOne { cardinality, foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, shared, sourceKey, target, targetSlug, validation, writable }
-interface ResolvedManyToMany { cardinality, kind, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, through, validation, writable }
-interface ResolvedRelationBase { cardinality, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, validation, writable }
+interface ResolvedHasMany { cardinality, foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, shared, sourceKey, target, targetSlug, writable }
+interface ResolvedHasOne { cardinality, foreignKeyOnTarget, kind, onDelete, onUpdate, overrides, relationName, shared, sourceKey, target, targetSlug, writable }
+interface ResolvedManyToMany { cardinality, kind, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, through, writable }
+interface ResolvedRelationBase { cardinality, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, writable }
 interface ResolvedStorageSource { engine, key, label, transport }
-interface ResolvedVia { cardinality, joinPath, kind, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, validation, writable }
+interface ResolvedVia { cardinality, joinPath, kind, onDelete, onUpdate, overrides, relationName, shared, target, targetSlug, writable }
 interface ResourceDeclaration { engine, key, kind, label, options, transport }
 interface ResourceGraph { resources, version }
 interface ResourceHandle { engine, key, kind, label, options, toString, transport }
@@ -704,7 +704,7 @@ interface UserManagementAdapter { createUser, deleteUser, getUserById, getUserRo
 interface VectorIndexConfig { distance, efConstruction, lists, m, method }
 interface VectorProperty { callbacks, columnName, conditions, defaultValue, description, dimensions, dynamicProps, excludeFromApi, index, metadata, name, propertyConfig, type, validation }
 interface VectorSearchParams { distance, property, threshold, vector }
-interface ViaRelation { cardinality, joinPath, kind, onDelete, onUpdate, overrides, relationName, target, validation }
+interface ViaRelation { cardinality, joinPath, kind, onDelete, onUpdate, overrides, relationName, target }
 interface WebSocketErrorPayload { code, error, message }
 interface WebSocketMessage { channel, error, payload, requestId, row, rows, subscriptionId, type }
 interface WithheldSchemaConstraint { kind, reason, remedy, target }
@@ -976,6 +976,7 @@ function isAddressableId
 function isJunctionBackedRelation
 function isPropertyBuilder
 function isRebaseInternalTable
+function isRelationRequired
 function isRelationalCollection
 function normalizeDriverOrderBy
 function normalizeEmail
@@ -988,6 +989,7 @@ function parseOrderBySpecStrict
 function policyToPostgres
 function primaryOrderBy
 function registerConditionOperations
+function relationDeclaringProperty
 function relationalCollections
 function resolveArrayProperties
 function resolveCollectionRelations

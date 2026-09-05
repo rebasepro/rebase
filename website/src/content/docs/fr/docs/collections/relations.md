@@ -325,7 +325,6 @@ interface RelationBase {
     onUpdate?: "cascade" | "restrict" | "no action" | "set null" | "set default";
     onDelete?: "cascade" | "restrict" | "no action" | "set null" | "set default";
     overrides?: Partial<CollectionConfig>;
-    validation?: { required?: boolean };
 }
 
 // ...and only the fields its own kind uses:

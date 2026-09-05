@@ -13,6 +13,36 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ### Breaking
 
+- **A relation no longer carries its own `validation`. `required` lives on the
+  property.** There were two places to write it and they were read by different
+  generators: the Postgres DDL asked the *property* (so the foreign-key column
+  came out `NOT NULL`) while the SDK type generator asked the *relation* (so the
+  generated `Insert` type made the field optional). A `create()` that omitted the
+  relation therefore typechecked and then failed at the database with a not-null
+  violation — and getting both right meant writing `required` twice, identically.
+
+  `RelationBase.validation` and `ResolvedRelationBase.validation` are deleted. Move
+  it up one level, beside every other field's:
+
+  ```ts
+  author: {
+      type: "relation",
+      validation: { required: true },        // ← here
+      relation: { kind: "belongsTo", target: () => authors }
+  }
+  ```
+
+  The boot validator refuses the old key by name rather than ignoring it: silence
+  would have left the surviving `required` unset, quietly turning a required
+  relation optional in the generated types and nullable in the column. New in
+  `@rebasepro/common`: `isRelationRequired(collection, relation)` and
+  `relationDeclaringProperty(collection, relation)`, which are how every reader
+  now asks.
+
+  The runtime contract major is **not** bumped. What was removed is an optional
+  member of a TypeScript interface — it has no runtime representation, so no
+  already-built bundle can fail to boot on it.
+
 - **A required `belongsTo` no longer defaults to `ON DELETE CASCADE`. It is
   `RESTRICT`.** `validation: { required: true }` on a relation says the child
   cannot exist without a parent. It does not say that deleting the parent should

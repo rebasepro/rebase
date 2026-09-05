@@ -154,6 +154,39 @@ describe("known-renamed keys", () => {
         expect(problem.path).toBe("posts.properties.author.relation.localKey");
         expect(problem.message).toContain("not valid on a \"hasMany\" relation");
     });
+
+    // Not a rename with a silent fallback: the surviving key is one level up
+    // and unset, so ignoring this would turn a required relation optional in
+    // the generated types and nullable in the column, quietly.
+    it("errors on a relation carrying its own `validation`, naming the property's", () => {
+        const collection = valid();
+        collection.properties.author.relation = {
+            kind: "belongsTo",
+            target: () => ({}),
+            relationName: "author",
+            validation: { required: true }
+        } as never;
+
+        const [problem] = errors([collection]);
+
+        expect(problem.path).toBe("posts.properties.author.relation.validation");
+        expect(problem.message).toContain("no longer read here");
+        expect(problem.message).toContain("the property's `validation.required`");
+    });
+
+    it("errors on a `relations[]` entry carrying its own `validation`", () => {
+        const collection = { ...valid(), relations: [{
+            kind: "belongsTo",
+            relationName: "editor",
+            target: () => ({}),
+            validation: { required: true }
+        }] };
+
+        const [problem] = errors([collection]);
+
+        expect(problem.path).toBe("posts.relations[editor].validation");
+        expect(problem.message).toContain("the property's `validation.required`");
+    });
 });
 
 /**

@@ -256,7 +256,6 @@ const RELATION_KEYS = new Set<string>([
     "onUpdate",
     "onDelete",
     "overrides",
-    "validation",
     "localKey",
     "foreignKeyOnTarget",
     "sourceKey",
@@ -369,7 +368,15 @@ const RELATION_UNION_CODEMOD = "node tooling/scripts/codemod/relations-tagged-un
 /** Fields the old flat `Relation` carried that the tagged union does not. */
 const RELATION_MIGRATIONS: Record<string, Migration> = {
     direction: { fix: RELATION_PROPERTY_MIGRATIONS.direction.fix, codemod: RELATION_UNION_CODEMOD },
-    inverseRelationName: { fix: RELATION_PROPERTY_MIGRATIONS.inverseRelationName.fix, codemod: RELATION_UNION_CODEMOD }
+    inverseRelationName: { fix: RELATION_PROPERTY_MIGRATIONS.inverseRelationName.fix, codemod: RELATION_UNION_CODEMOD },
+    // Not a rename: the key already existed one level up, and the two answers
+    // were read by different generators. Silence here would leave the surviving
+    // one — the property's — unset, and a required relation would quietly
+    // become optional in the generated types and nullable in the column.
+    validation: {
+        fix: "a relation no longer carries its own `validation` — `required` moved to the property's `validation.required`, " +
+            "beside every other field's. Write `{ type: \"relation\", validation: { required: true }, relation: { kind: … } }`"
+    }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

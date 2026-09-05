@@ -3423,8 +3423,9 @@ interface RelationBase {
     onUpdate?: OnAction;
     onDelete?: OnAction;
     overrides?: Partial<CollectionConfig>;   // applied when rendered as a tab
-    validation?: { required?: boolean };
 }
+// `required` is not here. It is `validation: { required: true }` on the
+// property that declares the relation, the same key every other field uses.
 
 interface BelongsToRelation extends RelationBase {
     kind: "belongsTo";

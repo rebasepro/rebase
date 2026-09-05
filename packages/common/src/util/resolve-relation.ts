@@ -44,7 +44,7 @@ export function resolveRelation(
     // property's key, then the target's slug.
     const relationName = relation.relationName ?? propertyKey ?? toSnakeCase(targetCollection.slug);
 
-    const shared: Pick<ResolvedRelation, "relationName" | "target" | "targetSlug" | "onUpdate" | "onDelete" | "overrides" | "validation"> = {
+    const shared: Pick<ResolvedRelation, "relationName" | "target" | "targetSlug" | "onUpdate" | "onDelete" | "overrides"> = {
         relationName,
         // Normalised, not the thunk as written. Resolution reads the target once
         // and every later consumer calls it again — the driver building a join,
@@ -57,8 +57,11 @@ export function resolveRelation(
         targetSlug: targetCollection.slug,
         onUpdate: relation.onUpdate,
         onDelete: relation.onDelete,
-        overrides: relation.overrides,
-        validation: relation.validation
+        overrides: relation.overrides
+        // No `validation`. Whether the link is required is a fact about the
+        // *property*, and copying it onto the resolved relation gave the
+        // question two answers that were free to disagree. Ask
+        // `isRelationRequired(collection, relation)`, which reads the one.
     };
 
     const sourceName = toSnakeCase(sourceCollection.slug ?? sourceCollection.name);
