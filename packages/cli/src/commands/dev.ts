@@ -437,6 +437,26 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
     const children: ResultPromise[] = [];
 
+    /**
+     * Whether this project has an admin panel to serve at all.
+     *
+     * A headless project declares one app, of type "backend", so there is no
+     * `frontend/` and never will be. Warning that a directory is "missing" for
+     * a shape that has no such directory reads as a broken scaffold on the
+     * very first run of the very command the headless quickstart names.
+     */
+    const declaresStaticApp = (() => {
+        try {
+            const { manifest } = loadManifest(projectRoot);
+            return Object.values(manifest.apps ?? {}).some(app => app.type === "static");
+        } catch {
+            // A manifest that will not load is a different problem, reported
+            // elsewhere. Fall back to the directory, which is what this check
+            // used to be.
+            return Boolean(frontendDir);
+        }
+    })();
+
     // --- State for printing the banner ---
     let frontendUrl = "";
     let backendUrl = "";
@@ -450,20 +470,77 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // eslint-disable-next-line no-control-regex
     const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
 
+    /**
+     * The connection string of the database this run started, when it started
+     * one. Filled in below; read by the headless banner, which is the only
+     * place a headless project could learn it — there is no admin panel to
+     * open, and `.env` deliberately does not name the managed database.
+     */
+    let managedConnectionString: string | null = null;
+
+    /**
+     * Where the backend mounted Swagger, if it mounted it at all.
+     *
+     * Read from the backend's own log rather than assumed: a headless project
+     * with no tables yet serves no data API and no Swagger, and the banner must
+     * not name a URL that answers 404.
+     */
+    let swaggerPath: string | null = null;
+
     function printSummary() {
-        if (!frontendUrl || !backendUrl) return;
+        if (!backendUrl) return;
+        // A headless project has no frontend URL to wait for, and waiting for
+        // one meant it got no banner at all: the first run of `rebase dev`
+        // ended in log lines, with the API URL, the Swagger path and the
+        // database it had just created all unstated.
+        if (declaresStaticApp && !frontendUrl) return;
         if (debounceSummary) clearTimeout(debounceSummary);
         debounceSummary = setTimeout(() => {
             if (bannerPrinted) return;
+
+            const api = `http://localhost:${resolvedBackendPort}`;
+            /** `[label, value]` per line; an empty pair is a blank line. */
+            const lines: Array<[string, string]> = declaresStaticApp
+                ? [["", ""], ["✦ Rebase Admin App is ready!", ""], ["➜ Frontend URL: ", stripAnsi(frontendUrl)], ["", ""]]
+                : [["", ""], ["✦ Rebase API is ready!", ""], ["➜ API:      ", api]];
+
+            if (!declaresStaticApp) {
+                // Only when it is actually mounted. A project with no tables
+                // yet mounts no data API and no Swagger, and printing a URL
+                // that 404s is worse than printing nothing — the reader spends
+                // the next ten minutes deciding whether their install is
+                // broken. The backend says which; this reads its own child.
+                if (swaggerPath) {
+                    lines.push(["➜ Swagger:  ", `${api}${swaggerPath}`]);
+                } else {
+                    // Say why, in the box the reader is actually looking at.
+                    // "No docs" with no reason reads as a broken install.
+                    lines.push(["  ", "(no tables served yet, so no data API and no docs)"]);
+                }
+                if (managedConnectionString) {
+                    lines.push(["", ""]);
+                    lines.push(["Database (managed, this project only):", ""]);
+                    lines.push(["  ", managedConnectionString]);
+                    lines.push(["  ", "also: rebase db url"]);
+                }
+                lines.push(["", ""]);
+            }
+
+            // Sized to its contents. A fixed width silently pushed the right
+            // border off the moment a value was longer than the cell, and a
+            // managed connection string — port and all — always is.
+            const inner = Math.max(...lines.map(([label, value]) => label.length + value.length)) + 4;
+
             console.log("");
-            console.log(chalk.cyan("┌────────────────────────────────────────────────────────────┐"));
-            console.log(chalk.cyan("│                                                            │"));
-            console.log(chalk.cyan("│   ✦ Rebase Admin App is ready!                             │"));
-            const cleanUrl = stripAnsi(frontendUrl);
-            const paddedUrl = cleanUrl.padEnd(41);
-            console.log(chalk.cyan("│   ➜ Frontend URL: ") + chalk.white(paddedUrl) + chalk.cyan("│"));
-            console.log(chalk.cyan("│                                                            │"));
-            console.log(chalk.cyan("└────────────────────────────────────────────────────────────┘"));
+            console.log(chalk.cyan("┌" + "─".repeat(inner) + "┐"));
+            for (const [label, value] of lines) {
+                console.log(
+                    chalk.cyan("│  ") + label + chalk.white(value) +
+                    " ".repeat(inner - 2 - label.length - value.length) +
+                    chalk.cyan("│")
+                );
+            }
+            console.log(chalk.cyan("└" + "─".repeat(inner) + "┘"));
             console.log("");
             bannerPrinted = true;
         }, 500);
@@ -636,6 +713,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
          * remedy that names it has to know which database is under this run.
          */
         const managed = prepared?.database.kind === "managed";
+        if (managed) managedConnectionString = prepared?.env.DATABASE_URL ?? null;
 
         // Always inject PORT so the backend uses our resolved port instead of
         // its hardcoded default (3001). This prevents cross-project collisions
@@ -898,6 +976,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             lines.forEach((line: string) => {
                 console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
                 const cleanLine = stripAnsi(line);
+                const swaggerMatch = cleanLine.match(/Swagger UI available.*"path":"([^"]+)"/);
+                if (swaggerMatch) swaggerPath = swaggerMatch[1];
+
                 const serverMatch = cleanLine.match(/Server running at http:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
                 if (serverMatch) {
                     resolvedBackendPort = parseInt(serverMatch[1], 10);
@@ -964,7 +1045,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // Start frontend immediately if backend-only mode or no backend
     if (!backendOnly && frontendDir && (frontendOnly || !backendDir)) {
         startFrontend(null);
-    } else if (!backendOnly && !frontendDir) {
+    } else if (!backendOnly && !frontendDir && declaresStaticApp) {
         console.warn(chalk.yellow("  ⚠ No frontend/ directory found, skipping frontend."));
     }
 
