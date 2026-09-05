@@ -75,7 +75,7 @@
     "release:minor": "./tooling/scripts/release.sh minor",
     "release:major": "./tooling/scripts/release.sh major",
     "release:dry": "./tooling/scripts/release.sh patch --dry-run",
-    "e2e": "npx playwright test -c tests/e2e/playwright.config.ts",
+    "e2e": "playwright test -c tests/e2e/playwright.config.ts",
     "deploy:demo": "./tooling/scripts/deploy-demo.sh",
     "deploy:demo:quick": "./tooling/scripts/deploy-demo.sh --only-deploy",
     "kill": "pkill -f 'rebase.*dev' || true; pkill -f 'tsx watch' || true; pkill -f vite || true",

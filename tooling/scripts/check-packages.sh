@@ -112,7 +112,7 @@ section "4. Vite build check (server packages)"
 for pkg in "${SERVER_PKGS[@]}"; do
     pkg_dir="$PACKAGES_DIR/$pkg"
     echo "  Building $pkg..."
-    build_output=$( (cd "$pkg_dir" && npx vite build) 2>&1 ) || true
+    build_output=$( (cd "$pkg_dir" && pnpm exec vite build) 2>&1 ) || true
     if echo "$build_output" | grep -q "built in"; then
         size=$(echo "$build_output" | grep 'index.es.js' | head -1)
         ok "$pkg vite build succeeded — $size"

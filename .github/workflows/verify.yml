@@ -356,10 +356,10 @@ jobs:
           done
 
       - name: Install Playwright Browsers
-        run: npx playwright install chromium --with-deps
+        run: pnpm exec playwright install chromium --with-deps
 
       - name: Run E2E Test Suite
-        run: npx tsx tests/e2e/tests/cli-init-e2e.ts
+        run: pnpm exec tsx tests/e2e/tests/cli-init-e2e.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
           SCREENSHOT_DIR: ${{ github.workspace }}/.artifacts/e2e-screenshots
@@ -376,7 +376,7 @@ jobs:
       # report from being suppressed by the first.
       - name: Run BaaS E2E
         if: always()
-        run: npx tsx tests/e2e/tests/cli-init-baas-e2e.ts
+        run: pnpm exec tsx tests/e2e/tests/cli-init-baas-e2e.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
@@ -407,7 +407,7 @@ jobs:
       # `always()` for the same reason as its neighbours.
       - name: Client SDK E2E (end-user auth, RLS, storage, realtime)
         if: always()
-        run: npx tsx tests/e2e/tests/client-sdk-e2e.ts
+        run: pnpm exec tsx tests/e2e/tests/client-sdk-e2e.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
@@ -467,7 +467,7 @@ jobs:
           done
 
       - name: Install Playwright Browsers
-        run: npx playwright install chromium --with-deps
+        run: pnpm exec playwright install chromium --with-deps
 
       # The admin panel itself, driven in a browser. `cli-init-e2e` proves a
       # scaffolded project installs and answers HTTP; nothing until now opened
@@ -500,8 +500,8 @@ jobs:
         run: |
           docker exec rebase-postgres createdb -U rebase rebase_admin_e2e
           (cd app && pnpm exec rebase db push --yes)
-          (cd app/backend && npx tsx src/seed.ts)
-          npx playwright test -c tests/e2e/playwright.config.ts
+          (cd app/backend && pnpm exec tsx src/seed.ts)
+          pnpm exec playwright test -c tests/e2e/playwright.config.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
           # sslmode=disable: the CI Postgres container serves no TLS, and Atlas
