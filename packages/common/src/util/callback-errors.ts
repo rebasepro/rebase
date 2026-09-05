@@ -1,9 +1,14 @@
 import { RebaseApiError } from "@rebasepro/types";
 
 /**
- * The code a write carries when a `before*` callback rejected it and did not say
- * how. Distinct from `INVALID_INPUT`, which the framework's own validation
+ * The code a write carries when a collection callback rejected it and did not
+ * say how. Distinct from `INVALID_INPUT`, which the framework's own validation
  * raises: this one means *your* rule refused, so the message is the author's.
+ *
+ * `details.stage` names which callback refused — `beforeSave`, `beforeDelete`,
+ * `afterSave` or `afterDelete`. An `after*` hook runs inside the write's
+ * transaction, so a throw there rolls the row back too; the caller is told the
+ * write did not happen and which hook decided that.
  */
 export const CALLBACK_REJECTED = "CALLBACK_REJECTED";
 
@@ -29,6 +34,15 @@ export const CALLBACK_REJECTED = "CALLBACK_REJECTED";
  * conservative reading — "an unrecognised throw might be a real bug, so 500" —
  * costs every validation rule its message and makes the documented example
  * wrong. A rule that wants a 500 can still raise one explicitly.
+ *
+ * ### Why `after*` comes through here too
+ *
+ * `afterSave` and `afterDelete` run inside the write's transaction and are
+ * awaited, so a throw in one aborts the transaction: the row is not there when
+ * the request ends. Left unconverted, the caller saw a 500 for a write that a
+ * rule deliberately undid, and had no way to tell that from a database outage.
+ * Converted, it is the same 400 `CALLBACK_REJECTED` a `before*` hook produces,
+ * with `stage` naming the hook that refused.
  *
  * ### What passes through untouched
  *

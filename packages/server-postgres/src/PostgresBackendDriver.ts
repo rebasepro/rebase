@@ -817,43 +817,56 @@ export class PostgresBackendDriver implements DataDriver {
             // synthesized address rather than the column it now is.
             const savedValues = savedRow;
 
-            if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
-                // 1. Global callbacks first
-                if (globalCallbacks?.afterSave) {
-                    await globalCallbacks.afterSave({
-                        collection: resolvedCollection as unknown as CollectionConfig,
-                        path,
-                        id: savedId,
-                        values: savedValues,
-                        previousValues: previousValuesForHistory,
-                        status,
-                        context: contextForCallback
-                    });
+            // `afterSave` runs INSIDE the write's transaction and is awaited, so a
+            // throw here rolls the row back — the write and its consequences
+            // commit together or not at all. That is the contract the docs state,
+            // and it only holds if the throw is answerable: routed through the
+            // same `toCallbackError` path a `before*` hook uses, it becomes a 400
+            // `CALLBACK_REJECTED` naming the stage instead of a masked 500 whose
+            // message only the server log ever sees. Side effects that must not
+            // hold a transaction open (HTTP calls, mail) belong in a job — one
+            // enqueued in a transaction that rolls back was never enqueued.
+            try {
+                if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
+                    // 1. Global callbacks first
+                    if (globalCallbacks?.afterSave) {
+                        await globalCallbacks.afterSave({
+                            collection: resolvedCollection as unknown as CollectionConfig,
+                            path,
+                            id: savedId,
+                            values: savedValues,
+                            previousValues: previousValuesForHistory,
+                            status,
+                            context: contextForCallback
+                        });
+                    }
+                    // 2. Collection callbacks second
+                    if (callbacks?.afterSave) {
+                        await callbacks.afterSave({
+                            collection: resolvedCollection as CollectionConfig<M>,
+                            path,
+                            id: savedId,
+                            values: savedValues as Partial<M>,
+                            previousValues: previousValuesForHistory,
+                            status,
+                            context: contextForCallback
+                        });
+                    }
+                    // 3. Property callbacks third
+                    if (propertyCallbacks?.afterSave) {
+                        await propertyCallbacks.afterSave({
+                            collection: resolvedCollection as unknown as CollectionConfig,
+                            path,
+                            id: savedId,
+                            values: savedValues,
+                            previousValues: previousValuesForHistory,
+                            status,
+                            context: contextForCallback
+                        });
+                    }
                 }
-                // 2. Collection callbacks second
-                if (callbacks?.afterSave) {
-                    await callbacks.afterSave({
-                        collection: resolvedCollection as CollectionConfig<M>,
-                        path,
-                        id: savedId,
-                        values: savedValues as Partial<M>,
-                        previousValues: previousValuesForHistory,
-                        status,
-                        context: contextForCallback
-                    });
-                }
-                // 3. Property callbacks third
-                if (propertyCallbacks?.afterSave) {
-                    await propertyCallbacks.afterSave({
-                        collection: resolvedCollection as unknown as CollectionConfig,
-                        path,
-                        id: savedId,
-                        values: savedValues,
-                        previousValues: previousValuesForHistory,
-                        status,
-                        context: contextForCallback
-                    });
-                }
+            } catch (callbackError) {
+                throw toCallbackError(callbackError, "afterSave", path);
             }
 
             // Record row history (fire-and-forget, never blocks the save)
@@ -1218,37 +1231,44 @@ export class PostgresBackendDriver implements DataDriver {
             resolvedCollection?.databaseId
         );
 
-        if (globalCallbacks?.afterDelete || callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
-            // 1. Global callbacks first
-            if (globalCallbacks?.afterDelete) {
-                await globalCallbacks.afterDelete({
-                    collection: resolvedCollection as unknown as CollectionConfig,
-                    path: targetPath,
-                    id: row.id,
-                    row: targetRow,
-                    context: contextForCallback
-                });
+        // Same contract as `afterSave`: inside the transaction, awaited, and a
+        // throw undoes the delete rather than leaving the row gone and the
+        // cleanup half-done. See the comment on the `afterSave` block.
+        try {
+            if (globalCallbacks?.afterDelete || callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
+                // 1. Global callbacks first
+                if (globalCallbacks?.afterDelete) {
+                    await globalCallbacks.afterDelete({
+                        collection: resolvedCollection as unknown as CollectionConfig,
+                        path: targetPath,
+                        id: row.id,
+                        row: targetRow,
+                        context: contextForCallback
+                    });
+                }
+                // 2. Collection callbacks second
+                if (callbacks?.afterDelete) {
+                    await callbacks.afterDelete({
+                        collection: resolvedCollection as CollectionConfig<M>,
+                        path: targetPath,
+                        id: row.id,
+                        row: targetRow,
+                        context: contextForCallback
+                    });
+                }
+                // 3. Property callbacks third
+                if (propertyCallbacks?.afterDelete) {
+                    await propertyCallbacks.afterDelete({
+                        collection: resolvedCollection as unknown as CollectionConfig,
+                        path: targetPath,
+                        id: row.id,
+                        row: targetRow,
+                        context: contextForCallback
+                    });
+                }
             }
-            // 2. Collection callbacks second
-            if (callbacks?.afterDelete) {
-                await callbacks.afterDelete({
-                    collection: resolvedCollection as CollectionConfig<M>,
-                    path: targetPath,
-                    id: row.id,
-                    row: targetRow,
-                    context: contextForCallback
-                });
-            }
-            // 3. Property callbacks third
-            if (propertyCallbacks?.afterDelete) {
-                await propertyCallbacks.afterDelete({
-                    collection: resolvedCollection as unknown as CollectionConfig,
-                    path: targetPath,
-                    id: row.id,
-                    row: targetRow,
-                    context: contextForCallback
-                });
-            }
+        } catch (callbackError) {
+            throw toCallbackError(callbackError, "afterDelete", targetPath);
         }
 
         // Record delete history (fire-and-forget)

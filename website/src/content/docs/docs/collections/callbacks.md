@@ -192,7 +192,9 @@ is the browser-safe one, and it is the same class the client SDK throws.
 
 ### `afterSave`
 
-Called after a successful save. Use for side effects.
+Called after the row is written and **before the transaction commits**, awaited.
+Use it for work that belongs to the write: denormalised counters, an audit row,
+a linked record.
 
 ```typescript
 afterSave: async ({
@@ -202,13 +204,20 @@ afterSave: async ({
     status,         // "new" | "existing" | "copy"
     context
 }) => {
-    // Send webhook
-    await fetch("https://api.slack.com/webhook", {
-        method: "POST",
-        body: JSON.stringify({ text: `New article: ${values.title}` })
+    await context.data.audit_logs.create({
+        action: status === "new" ? "create" : "update",
+        article_id: id,
+        by: context.user?.uid
     });
 }
 ```
+
+A throw here rolls the save back and answers **400 `CALLBACK_REJECTED`** with
+`details.stage: "afterSave"` — the same shape a `beforeSave` throw produces.
+That makes it a fine place to enforce an invariant that can only be checked once
+the row exists, and a bad place for an HTTP call: a webhook that times out
+becomes a save that never happened. Send those from a
+[job](/docs/backend/jobs). See [Transaction Semantics](#transaction-semantics).
 
 ### `afterSaveError`
 
@@ -260,7 +269,9 @@ beforeDelete: async ({
 
 ### `afterDelete`
 
-Called after a successful deletion.
+Called after the row is deleted and **before the transaction commits**, awaited.
+A throw here undoes the delete, so cleanup either finishes or the row is still
+there — never half-done.
 
 ```typescript
 afterDelete: async ({
@@ -268,8 +279,8 @@ afterDelete: async ({
     row,
     context
 }) => {
-    // Cleanup related data
-    console.log(`Article ${id} deleted`);
+    // Cascade: this runs in the same transaction as the delete above it.
+    await context.data.comments.delete(id);
 }
 ```
 
@@ -412,38 +423,69 @@ The behaviour above is verified end-to-end against Postgres by the `"scopes cont
 
 ### Transaction Semantics
 
-:::warning
-**`context.data` operations are NOT automatically wrapped in the same transaction as the triggering save.**
-
-The original entity save completes its database transaction first. Then `afterSave` runs and any `context.data` calls open **separate transactions**. If a `context.data` operation fails in `afterSave`, the original save is **not rolled back**.
+:::note
+**One transaction covers the write and every callback around it.** `beforeSave`,
+the SQL, `afterSave` (and the delete equivalents) all run inside the transaction
+opened for the request, and each is awaited. A `context.data` call from a
+callback runs on that same transaction handle, not a separate one.
 :::
 
-This means:
+So:
 
-- ✅ The triggering save always succeeds independently
-- ⚠️ Side-effect writes may fail without affecting the original operation
-- ⚠️ There is no atomicity guarantee between the original save and subsequent `context.data` calls
+- ✅ The write and its side effects are atomic — they commit together or not at all.
+- ✅ A `context.data` write from `afterSave` sees the row the save just made, before anyone else can.
+- ⚠️ A throw in `afterSave` **rolls the original save back**. The caller gets **400 `CALLBACK_REJECTED`** with `details.stage: "afterSave"`.
+- ⚠️ The callback holds the transaction open while it runs. Slow work there is a lock held and a connection tied up.
 
-For operations that must be atomic, wrap them in error handling:
+If a side effect should survive the write being undone — or must not delay the
+response — it does not belong in the callback body. Enqueue a
+[job](/docs/backend/jobs) instead; a job enqueued in a transaction that rolls
+back was never enqueued, which is exactly the coupling you want:
 
 ```typescript
-afterSave: async ({ values, entityId, context }) => {
+afterSave: async ({ id, context }) => {
+    // Atomic with the save: if this write fails, the article is not published
+    // either. That is usually what an audit trail should do.
+    await context.data.audit_logs.create({ action: "publish", article_id: id });
+
+    // The slow part — mail, a webhook, a third-party call — goes on the queue.
+    // `enqueue` writes a row in this same transaction, so the work becomes
+    // visible to a worker only once the save commits, and disappears with the
+    // save if it rolls back.
+    const { enqueue } = await import("../lib/queue");
+    await enqueue("notify-subscribers", { articleId: id });
+}
+```
+
+:::note
+`enqueue` above is your own thin wrapper around the `jobQueue` that
+`initializeRebaseBackend` returns — see [Background Jobs](/docs/backend/jobs).
+It is imported dynamically, inside the callback body, because a collection file
+is also read by the admin panel's build and must not pull `@rebasepro/server`
+into the browser bundle at the top level.
+:::
+
+If you want the old behaviour — a side effect whose failure must not undo the
+write — catch it yourself, and be explicit that you are swallowing it:
+
+```typescript
+afterSave: async ({ values, id, context }) => {
     try {
-        await context.data.jobs.create({
-            title: values.title,
-            status: "published",
-        });
+        await context.data.collection("jobs").create({ title: values.title, status: "published" });
     } catch (error) {
-        // Log the failure — the original save already succeeded
+        // Swallowed deliberately: a failed promotion must not undo the submission.
         console.error(`Failed to promote job from submission ${id}:`, error);
-        // Optionally: mark the submission as "promotion_failed"
-        await context.data["job-submissions"].update(id, {
-            promotion_status: "failed",
-            promotion_error: String(error),
-        });
     }
 }
 ```
+
+:::caution[This page used to say the opposite]
+Earlier versions said the save "completes its database transaction first", that
+`context.data` calls in `afterSave` open separate transactions, and that the
+triggering save "always succeeds independently". None of that was true, and the
+difference matters in the direction that loses data: an `afterSave` that throws
+has always rolled the write back.
+:::
 
 ## Syncing Data Between Collections
 
