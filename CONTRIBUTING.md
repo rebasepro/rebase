@@ -79,6 +79,12 @@ between checkouts, and `PORT` / `VITE_API_URL` apply to `rebase start`, not here
 One-off scripts, codemods and utilities go in `tooling/scripts/`, never at the repo root
 or inside a package directory.
 
+`pnpm-workspace.yaml` also lists `saas/*`, and the root `saas` and `saas:prod`
+scripts point there. That is Rebase Cloud's control plane, a private repository
+checked out at `saas/`. It is absent from a public clone; pnpm ignores a pattern
+that matches nothing, so the install is unaffected and those two scripts are the
+only things that will not run.
+
 ## Commits and the Changelog
 
 Commit messages are [Conventional Commits](https://www.conventionalcommits.org/),
