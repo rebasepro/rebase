@@ -1307,6 +1307,23 @@ const DIAL_FLAGS = {
     "--autoscale-cpu-target": "autoscaleTargetCpuPercent"
 } as const;
 
+/**
+ * The flags `resources set` accepts, in the shape a spec is written in.
+ *
+ * Derived from `DIAL_FLAGS` rather than written out beside it: `action-help.ts`
+ * documents this command and `action-help.test.ts` pairs the page against this
+ * constant, so a dial added above is a dial the help page has to describe on the
+ * same commit. A hand-copied second list is how the page and the parser drift.
+ *
+ * `buildDialPatch` still scans `rawArgs` itself — it has to, because
+ * `--no-autoscale` is value-less and a dial's value may not be consumed as one
+ * — so this is a description of that line, not a second parser for it.
+ */
+export const RESOURCES_SET_FLAGS: Record<string, unknown> = {
+    ...Object.fromEntries(Object.keys(DIAL_FLAGS).map((flag) => [flag, String])),
+    "--no-autoscale": Boolean
+};
+
 /** Dials whose column is a number, not the text a flag carries. */
 const NUMERIC_DIALS = new Set([
     "databaseInstances",

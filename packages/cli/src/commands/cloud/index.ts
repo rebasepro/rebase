@@ -79,7 +79,7 @@ permissive: true })._;
  * The dispatch below accepts both (`case "db": case "database":`), so help has
  * to as well, or half the spellings of a command have no page.
  */
-const GROUP_ALIASES: Record<string, string> = {
+export const GROUP_ALIASES: Record<string, string> = {
     database: "db",
     domain: "domains",
     extension: "extensions",
@@ -87,7 +87,7 @@ const GROUP_ALIASES: Record<string, string> = {
     project: "projects"
 };
 
-const GROUP_HELP: Record<string, () => void> = {
+export const GROUP_HELP: Record<string, () => void> = {
     env: printEnvHelp,
     domains: printDomainsHelp,
     domain: printDomainsHelp,
@@ -344,7 +344,7 @@ async function deploymentsGroup(action: string | undefined, rawArgs: string[]): 
  * added there without being added here is a test failure rather than a
  * command that exists but cannot be found.
  */
-const CLOUD_GROUPS = [
+export const CLOUD_GROUPS = [
     "login", "logout", "whoami",
     "link", "unlink", "use", "open",
     "projects",

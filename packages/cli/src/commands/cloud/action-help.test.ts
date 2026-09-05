@@ -21,6 +21,8 @@ import { CREATE_PROJECT_FLAGS } from "./projects";
 import { CREATE_DATABASE_FLAGS } from "./databases";
 import { DEPLOY_FLAGS } from "./deploy";
 import { ENV_SET_FLAGS } from "./env";
+import { RESOURCES_SET_FLAGS } from "./resources";
+import { LOGIN_FLAGS } from "./auth";
 
 /**
  * Which spec backs which page.
@@ -60,7 +62,29 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     billing: {},
     logs: null,
     status: null,
-    "clusters verify": null
+    "clusters verify": null,
+    // The dials. `resources set` scans `rawArgs` rather than parsing a spec —
+    // `--no-autoscale` is value-less — so `RESOURCES_SET_FLAGS` is the
+    // description of that line, derived from `DIAL_FLAGS`.
+    resources: null,
+    "resources set": RESOURCES_SET_FLAGS,
+    // Session, link and the operations whose only options are the global ones.
+    // `{}` rather than `null` on purpose: it says "this command declares nothing
+    // of its own", which turns the reverse check on — a page inventing a flag
+    // here fails rather than being skipped.
+    login: LOGIN_FLAGS,
+    logout: {},
+    whoami: null,
+    link: {},
+    unlink: null,
+    use: null,
+    open: null,
+    rollback: {},
+    cancel: {},
+    start: {},
+    stop: {},
+    restart: {},
+    metrics: null
 };
 
 /** `--name, -n <name>` → `--name`. The page spells flags for a reader. */

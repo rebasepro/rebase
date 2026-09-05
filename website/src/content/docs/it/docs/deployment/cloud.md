@@ -113,6 +113,37 @@ A rollback re-points the project at a previous successful deployment's image. It
 needs one that recorded an image, so it is available for a project that has
 deployed successfully at least twice.
 
+## Resources, and what they cost
+
+A project is priced from what it reserves, not from a tier. `resources` prints
+every dial and the control plane's own itemised quote for them:
+
+```bash
+rebase cloud resources
+rebase cloud resources set --cpu 500m --memory 2Gi
+```
+
+| Dial | Unit, and what it means |
+|---|---|
+| `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default — `250m` and `512Mi` |
+| `--replicas` | Instances that always exist: the autoscaler's floor, and what the project is billed for at rest |
+| `--autoscale-max` | 1–16. The ceiling it may reach, and the worst case it may be billed. `--no-autoscale` turns it off |
+| `--autoscale-cpu-target` | 10–95. The CPU utilisation the autoscaler holds, against the request rather than the limit. Empty means 70 |
+| `--spot` | `true` or `false`. Preemptible capacity: cheaper, and restarted without notice |
+| `--scale-to-zero` | `true` or `false`. Request-billed compute that stops when idle, at the cost of a cold start |
+| `--db-mode` | `shared` (the pooled cluster) or `dedicated` (one of this project's own) |
+| `--db-instances` | 1–3. `1` is a single instance with no failover; `2` adds an automatic standby |
+| `--db-cpu`, `--db-memory`, `--storage` | Per database instance. Empty means `500m`, `2Gi` and the default volume |
+
+An empty dial is not the same as one pinned to the same number: an empty dial
+follows the platform default and moves when it moves.
+
+Nothing is validated by the CLI, on purpose — the limits belong to the cluster a
+project runs on, and they differ between providers. The control plane refuses a
+value it cannot honour and names the field. Run `rebase cloud resources` to see
+the €/month before and after; a change applies immediately, prorated from today,
+except one that restarts the database, which waits for a maintenance window.
+
 ## The rest of the surface
 
 | Command group | What it covers |
@@ -128,9 +159,16 @@ deployed successfully at least twice.
 | `db` | Attach or create a database, backups, restore, and point-in-time recovery |
 | `extensions` | The Postgres extension allowlist |
 | `storage` | The project's bucket |
+| `resources` | What the project reserves, what it costs, and how to change it |
 | `settings`, `orgs`, `webhooks`, `billing` | Project settings, organizations, deploy hooks, payment |
 
-Every group answers `--help`, and `--help` never runs the command.
+Every group in that table answers `--help` with a page of its own — a usage line,
+its flags, and examples — and `--help` never runs the command. A test holds the
+index to the pages, so a group added without one fails the build rather than
+answering with the table of contents.
+
+Piped, `--help` answers in JSON instead: the same usage line, flags and examples
+as a structure to read rather than sixty lines of terminal escapes.
 
 ## What the beta does not include
 

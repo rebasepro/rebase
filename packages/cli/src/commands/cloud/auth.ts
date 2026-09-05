@@ -22,14 +22,23 @@ import {
     requireInteractive
 } from "./context";
 
+/**
+ * Every flag `rebase cloud login` accepts.
+ *
+ * Hoisted out of the `arg` call so one declaration serves the parser,
+ * `action-help.ts`'s page for this command, and the test that holds the two to
+ * each other — the same arrangement `DEPLOY_FLAGS` and `CREATE_PROJECT_FLAGS`
+ * already use.
+ */
+export const LOGIN_FLAGS = {
+    "--email": String,
+    "--password": String,
+    "-e": "--email"
+} as const;
+
 export async function loginCommand(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        { "--email": String,
-"--password": String,
-"-e": "--email" },
-        { argv: rawArgs.slice(3),
-permissive: true }
-    );
+    const args = arg(LOGIN_FLAGS, { argv: rawArgs.slice(3),
+permissive: true });
     const url = resolveCloudUrl(rawArgs);
 
     noteBlank();
