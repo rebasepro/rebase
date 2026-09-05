@@ -13,15 +13,23 @@ Please complete these setup steps before proceeding, and remember your progress 
    - Verify PostgreSQL is available: `psql --version` or confirm Docker is running with a Postgres container.
    - If any of these checks fail, use the `rebase-local-env-setup` skill to get the environment ready.
 
-2. **Authentication:**
-   Ensure you are logged in to Rebase Cloud for MCP server access. Run `rebase cloud login`. This opens a browser for Google OAuth.
-   - Tokens are stored at `~/.rebase/tokens.json` and shared between CLI and MCP server.
-   - If the browser fails to open, check the CLI output for a manual URL.
+2. **MCP server access:** The MCP server needs a running `rebase dev`, or a
+   `REBASE_SERVICE_KEY` in the project's `.env`. Nothing else — there is no
+   login step, and the server never talks to Rebase Cloud.
+   - `rebase dev` writes `.rebase/state.json`, and the MCP server reads the
+     backend URL and service key straight out of it. That is the zero-config
+     path.
+   - Without a dev server, the server reads `REBASE_SERVICE_KEY` from
+     `.env` or `app/.env` under `REBASE_PROJECT_DIR`.
+   - Call `rebase_project_current` to see which project, URL and credential the
+     tools are actually using.
 
-3. **Active Project:**
-   Most Rebase tasks require a project context.
-   - For Rebase Cloud: Run `rebase cloud login` and select your project via the MCP `list_projects` tool.
-   - For self-hosted: Ensure your `.env` file in the project root contains a valid `DATABASE_URL`.
+3. **Project context:** Most Rebase tasks need a project directory.
+   - `REBASE_PROJECT_DIR` in the MCP client's config should be the directory
+     containing `rebase.json`; without it the server uses its working directory.
+   - Ensure `.env` in that directory contains a valid `DATABASE_URL` — it is what
+     the CLI tools (`rebase_db_push`, `rebase_doctor`, the branch tools) connect
+     with, and they never see the API token.
 
 # Rebase Usage Principles
 

@@ -26,9 +26,14 @@ Before using the Rebase MCP server, ensure Node.js and the required tools are in
   - Check installation: `rebase --version` (or `npx @rebasepro/cli --version`)
   - Install globally: `npm install -g @rebasepro/cli`
 
-- **Authentication**: Sign in to Rebase Cloud
-  - Run: `rebase cloud login` (opens browser for Google OAuth)
-  - Tokens are stored at `~/.rebase/tokens.json`
+- **A credential for the backend**: the MCP server needs a running `rebase dev`
+  or a `REBASE_SERVICE_KEY` in the project's `.env`. Nothing else — there is no
+  login step, and the server never talks to Rebase Cloud.
+  - `rebase dev` writes `.rebase/state.json`; the server reads the backend URL
+    and service key out of it.
+  - For a remote backend, set `REBASE_API_TOKEN` to a scoped `rk_` API key
+    instead, and remember that write tools are refused against a non-local
+    target unless `REBASE_MCP_ALLOW_REMOTE_WRITES=true`.
 
 - **PostgreSQL**: Required for the Rebase backend
   - Check: `psql --version`
@@ -39,7 +44,7 @@ Before using the Rebase MCP server, ensure Node.js and the required tools are in
 
 Once configured, the MCP server provides Rebase capabilities to your AI assistant:
 
-- Browse and query data in your Rebase Cloud projects
+- Browse and query data in your Rebase project
 - Create, update, and delete documents
 - Manage users and roles
 - Generate collection schemas with AI
