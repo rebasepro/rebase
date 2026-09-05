@@ -38,6 +38,7 @@ const CAPABILITIES = [
     "verifyConnection",
     "ensureCollectionSchema",
     "ensureCollectionPolicies",
+    "ensureRlsRuntime",
     "finalizeSecurityPosture",
     "readCollectionsSchemaVersion",
     "stampCollectionsSchemaVersion",

@@ -972,6 +972,9 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
             ? (collections, driverResult, log) =>
                 dbAdapter.ensureCollectionPolicies!(collections, driverResult, log)
             : undefined,
+        ensureRlsRuntime: dbAdapter.ensureRlsRuntime
+            ? (driverResult) => dbAdapter.ensureRlsRuntime!(driverResult)
+            : undefined,
         finalizeSecurityPosture: dbAdapter.finalizeSecurityPosture
             ? (driverResult) => dbAdapter.finalizeSecurityPosture!(driverResult)
             : undefined,
