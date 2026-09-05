@@ -1153,4 +1153,14 @@ export interface RebaseTranslations {
     studio_rls_drop_policy_body?: string;
     studio_rls_unapplied?: string;
     studio_rls_unapplied_tooltip?: string;
+
+
+    // ─── Studio: empty states that name a remedy ────────────────
+    studio_branches_unavailable_title?: string;
+    studio_branches_unavailable_body?: string;
+    studio_backups_not_configured_title?: string;
+    studio_backups_not_configured_body?: string;
+    studio_cron_empty_title?: string;
+    studio_cron_empty_body?: string;
+    studio_read_the_docs?: string;
 }

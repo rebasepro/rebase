@@ -288,6 +288,12 @@ jobs:
       - name: Studio tools table
         run: pnpm run check:studio-tools
 
+      # The backups pane said "See docs/backups.md" — a path in this repository,
+      # not in the reader's project, so following it finds nothing and there is
+      # no way to discover where the page actually is.
+      - name: UI strings name reachable paths
+        run: pnpm run check:ui-string-paths
+
       # Astro and JSX drop the newline between a word and an adjacent tag rather
       # than collapsing it to a space, so a paragraph broken across two source
       # lines at that boundary renders "or runrebase dev". Invisible in the

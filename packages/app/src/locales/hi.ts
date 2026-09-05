@@ -989,5 +989,15 @@ no_filter: "No filter",
     studio_rls_drop_policy_title: "इस नीति को हटाएँ?",
     studio_rls_drop_policy_body: "{{policy}} को डेटाबेस में {{table}} से हटा दिया जाएगा। आपके कोड में कुछ नहीं लिखा जाता, इसलिए डिप्लॉय इसे वापस ला सकता है।",
     studio_rls_unapplied: "लागू नहीं",
-    studio_rls_unapplied_tooltip: "आपके कोड में घोषित, डेटाबेस में अभी नहीं। बदलाव की योजना बनाकर लागू करने के लिए इसे यहाँ सहेजें, या `rebase db push` चलाएँ।"
+    studio_rls_unapplied_tooltip: "आपके कोड में घोषित, डेटाबेस में अभी नहीं। बदलाव की योजना बनाकर लागू करने के लिए इसे यहाँ सहेजें, या `rebase db push` चलाएँ।",
+
+
+    // ─── Studio: empty states that name a remedy ────────────────
+    studio_branches_unavailable_title: "डेटाबेस ब्रांचिंग उपलब्ध नहीं है",
+    studio_branches_unavailable_body: "ब्रांचिंग के लिए एडमिन कनेक्शन वाला Postgres बैकएंड चाहिए। बैकएंड के एनवायरनमेंट में ADMIN_CONNECTION_STRING सेट करें।",
+    studio_backups_not_configured_title: "बैकअप कॉन्फ़िगर नहीं हैं",
+    studio_backups_not_configured_body: "BACKUP_DESTINATION को किसी लोकल पाथ या s3:// अथवा gs:// URL पर सेट करें, फिर `rebase db backup` या निर्धारित क्रॉन से बैकअप बनाएँ।",
+    studio_cron_empty_title: "कोई क्रॉन जॉब पंजीकृत नहीं",
+    studio_cron_empty_body: "backend/crons/ में एक फ़ाइल जोड़ें जो CronJobDefinition को डिफ़ॉल्ट एक्सपोर्ट करे।",
+    studio_read_the_docs: "दस्तावेज़ पढ़ें"
 };

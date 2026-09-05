@@ -152,11 +152,16 @@ export function BackupsView() {
                 ) : !configured ? (
                     <Alert color="info">
                         <Typography variant="body2" className="text-[13px]">
-                            <strong>Backups are not configured.</strong> Set
-                            <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-950 font-mono text-[12px]">BACKUP_DESTINATION</code>
-                            (a local path or an <code className="font-mono text-[12px]">s3://</code> / <code className="font-mono text-[12px]">gs://</code> URL) and create backups with
-                            <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-950 font-mono text-[12px]">rebase db backup</code>
-                            or a scheduled cron. See docs/backups.md.
+                            <strong>{t("studio_backups_not_configured_title")}</strong>{" "}
+                            {t("studio_backups_not_configured_body")}{" "}
+                            <a
+                                href="https://rebase.pro/docs/backend/jobs"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary underline"
+                            >
+                                {t("studio_read_the_docs")}
+                            </a>
                         </Typography>
                     </Alert>
                 ) : backups.length === 0 ? (

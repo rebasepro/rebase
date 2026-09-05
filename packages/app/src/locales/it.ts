@@ -989,5 +989,15 @@ no_filter: "No filter",
     studio_rls_drop_policy_title: "Eliminare questo criterio?",
     studio_rls_drop_policy_body: "{{policy}} viene rimosso da {{table}} nel database. Nel codice non viene scritto nulla, quindi un deploy può ripristinarlo.",
     studio_rls_unapplied: "Non applicato",
-    studio_rls_unapplied_tooltip: "Dichiarato nel codice, non ancora nel database. Salvalo qui per pianificare e applicare la modifica, oppure esegui `rebase db push`."
+    studio_rls_unapplied_tooltip: "Dichiarato nel codice, non ancora nel database. Salvalo qui per pianificare e applicare la modifica, oppure esegui `rebase db push`.",
+
+
+    // ─── Studio: empty states that name a remedy ────────────────
+    studio_branches_unavailable_title: "Il branching del database non è disponibile",
+    studio_branches_unavailable_body: "Il branching richiede un backend Postgres con una connessione da amministratore. Imposta ADMIN_CONNECTION_STRING nell'ambiente del backend.",
+    studio_backups_not_configured_title: "I backup non sono configurati",
+    studio_backups_not_configured_body: "Imposta BACKUP_DESTINATION su un percorso locale o su un URL s3:// o gs://, poi crea un backup con `rebase db backup` o un cron pianificato.",
+    studio_cron_empty_title: "Nessun processo cron registrato",
+    studio_cron_empty_body: "Aggiungi un file in backend/crons/ che esporti di default una CronJobDefinition.",
+    studio_read_the_docs: "Leggi la documentazione"
 };

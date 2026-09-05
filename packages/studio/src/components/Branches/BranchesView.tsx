@@ -148,11 +148,18 @@ export function BranchesView() {
         return (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
                 <GitBranchIcon size={iconSize.large} className="text-surface-300 dark:text-surface-600"/>
-                <Typography variant="h6" color="secondary">Database Branching Not Available</Typography>
+                <Typography variant="h6" color="secondary">{t("studio_branches_unavailable_title")}</Typography>
                 <Typography variant="body2" color="disabled" className="max-w-md">
-                    Branching requires a PostgreSQL backend with an admin connection configured.
-                    Set <code className="text-xs bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded font-mono">adminConnectionString</code> in your server configuration.
+                    {t("studio_branches_unavailable_body")}
                 </Typography>
+                <a
+                    href="https://rebase.pro/docs/backend/branching"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary text-sm underline"
+                >
+                    {t("studio_read_the_docs")}
+                </a>
             </div>
         );
     }

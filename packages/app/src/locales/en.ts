@@ -1069,5 +1069,15 @@ export const en: RebaseTranslations = {
     studio_rls_drop_policy_title: "Drop this policy?",
     studio_rls_drop_policy_body: "{{policy}} is removed from {{table}} in the database. Nothing is written to your code, so a deploy can restore it.",
     studio_rls_unapplied: "Unapplied",
-    studio_rls_unapplied_tooltip: "Declared in your code, not yet in the database. Save it here to plan and apply the change, or run `rebase db push`."
+    studio_rls_unapplied_tooltip: "Declared in your code, not yet in the database. Save it here to plan and apply the change, or run `rebase db push`.",
+
+
+    // ─── Studio: empty states that name a remedy ────────────────
+    studio_branches_unavailable_title: "Database branching is not available",
+    studio_branches_unavailable_body: "Branching needs a Postgres backend with an admin connection. Set ADMIN_CONNECTION_STRING in the backend's environment.",
+    studio_backups_not_configured_title: "Backups are not configured",
+    studio_backups_not_configured_body: "Set BACKUP_DESTINATION to a local path or an s3:// or gs:// URL, then create a backup with `rebase db backup` or a scheduled cron.",
+    studio_cron_empty_title: "No cron jobs registered",
+    studio_cron_empty_body: "Add a file under backend/crons/ that default-exports a CronJobDefinition.",
+    studio_read_the_docs: "Read the documentation"
 };

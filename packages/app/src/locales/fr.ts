@@ -989,5 +989,15 @@ no_filter: "No filter",
     studio_rls_drop_policy_title: "Supprimer cette politique ?",
     studio_rls_drop_policy_body: "{{policy}} est retirée de {{table}} dans la base de données. Rien n'est écrit dans votre code, un déploiement peut donc la rétablir.",
     studio_rls_unapplied: "Non appliquée",
-    studio_rls_unapplied_tooltip: "Déclarée dans votre code, pas encore dans la base de données. Enregistrez-la ici pour planifier et appliquer le changement, ou lancez `rebase db push`."
+    studio_rls_unapplied_tooltip: "Déclarée dans votre code, pas encore dans la base de données. Enregistrez-la ici pour planifier et appliquer le changement, ou lancez `rebase db push`.",
+
+
+    // ─── Studio: empty states that name a remedy ────────────────
+    studio_branches_unavailable_title: "Le branchement de base de données n'est pas disponible",
+    studio_branches_unavailable_body: "Le branchement requiert un backend Postgres avec une connexion administrateur. Définissez ADMIN_CONNECTION_STRING dans l'environnement du backend.",
+    studio_backups_not_configured_title: "Les sauvegardes ne sont pas configurées",
+    studio_backups_not_configured_body: "Définissez BACKUP_DESTINATION sur un chemin local ou une URL s3:// ou gs://, puis créez une sauvegarde avec `rebase db backup` ou un cron planifié.",
+    studio_cron_empty_title: "Aucune tâche cron enregistrée",
+    studio_cron_empty_body: "Ajoutez un fichier dans backend/crons/ qui exporte par défaut une CronJobDefinition.",
+    studio_read_the_docs: "Consulter la documentation"
 };

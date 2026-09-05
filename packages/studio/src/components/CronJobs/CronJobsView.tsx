@@ -237,10 +237,18 @@ message: e instanceof Error ? e.message : String(e) });
     if (jobs.length === 0) return (
         <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
             <CalendarIcon size={iconSize.medium} className="text-surface-300 dark:text-surface-600"/>
-            <Typography variant="h6" color="secondary">No Cron Jobs Registered</Typography>
+            <Typography variant="h6" color="secondary">{t("studio_cron_empty_title")}</Typography>
             <Typography variant="body2" color="disabled" className="max-w-md">
-                Create a file in your <code className="text-xs bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded font-mono">crons/</code> directory that default-exports a <code className="text-xs bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded font-mono">CronJobDefinition</code>.
+                {t("studio_cron_empty_body")}
             </Typography>
+            <a
+                href="https://rebase.pro/docs/backend/cron-jobs"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary text-sm underline"
+            >
+                {t("studio_read_the_docs")}
+            </a>
         </div>
     );
 

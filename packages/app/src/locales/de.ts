@@ -989,5 +989,15 @@ no_filter: "No filter",
     studio_rls_drop_policy_title: "Diese Richtlinie löschen?",
     studio_rls_drop_policy_body: "{{policy}} wird in der Datenbank aus {{table}} entfernt. In den Code wird nichts geschrieben, ein Deploy kann sie also zurückbringen.",
     studio_rls_unapplied: "Nicht angewendet",
-    studio_rls_unapplied_tooltip: "Im Code deklariert, aber noch nicht in der Datenbank. Hier speichern, um die Änderung zu planen und anzuwenden, oder `rebase db push` ausführen."
+    studio_rls_unapplied_tooltip: "Im Code deklariert, aber noch nicht in der Datenbank. Hier speichern, um die Änderung zu planen und anzuwenden, oder `rebase db push` ausführen.",
+
+
+    // ─── Studio: empty states that name a remedy ────────────────
+    studio_branches_unavailable_title: "Datenbank-Branching ist nicht verfügbar",
+    studio_branches_unavailable_body: "Branching benötigt ein Postgres-Backend mit einer Admin-Verbindung. Setze ADMIN_CONNECTION_STRING in der Umgebung des Backends.",
+    studio_backups_not_configured_title: "Sicherungen sind nicht konfiguriert",
+    studio_backups_not_configured_body: "Setze BACKUP_DESTINATION auf einen lokalen Pfad oder eine s3:// bzw. gs://-URL und erstelle dann eine Sicherung mit `rebase db backup` oder einem geplanten Cron-Job.",
+    studio_cron_empty_title: "Keine Cron-Jobs registriert",
+    studio_cron_empty_body: "Lege unter backend/crons/ eine Datei an, die eine CronJobDefinition als Default exportiert.",
+    studio_read_the_docs: "Zur Dokumentation"
 };
