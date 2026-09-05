@@ -57,7 +57,35 @@ function isProduction(): boolean {
     return hostEnv().NODE_ENV === "production";
 }
 
+/**
+ * An explicit level from `config.logging.level`, when a project set one.
+ *
+ * Outranks `LOG_LEVEL` because it is the more specific statement: an
+ * environment variable is the deployment's default, and this is the
+ * application saying what it wants regardless of where it runs.
+ *
+ * There used to be a second, separate mechanism for this — `utils/logging.ts`
+ * reassigned `console.debug`/`console.log`/`console.warn` to no-ops — and the
+ * two disagreed in a way nobody could have guessed from either: `LOG_LEVEL=warn`
+ * silenced this logger's info lines *and* every `console.log` in the process,
+ * including a dependency's, including a project's own debugging. It also could
+ * not be undone, because the originals were gone.
+ */
+let configuredLevel: LogLevel | undefined;
+
+/**
+ * Set the level from configuration. `undefined` returns to `LOG_LEVEL`.
+ *
+ * Read per line rather than captured at construction, so a logger created
+ * before configuration is read still honours it — which the singleton below
+ * always is.
+ */
+export function setLogLevel(level?: LogLevel): void {
+    configuredLevel = level;
+}
+
 function getMinLevel(): LogLevel {
+    if (configuredLevel) return configuredLevel;
     const env = (hostEnv().LOG_LEVEL || "info").toLowerCase();
     if (env in LOG_PRIORITY) return env as LogLevel;
     return "info";
@@ -278,14 +306,16 @@ function formatData(data?: Record<string, unknown>): Record<string, unknown> | u
 }
 
 function createLogger(rawDefaultFields: Record<string, unknown> = {}): Logger {
-    const minLevel = getMinLevel();
     // Child fields go through the same pass as per-call data — they are merged
     // into every line this logger emits, so leaving them raw would be a hole
     // the moment `child()` gets its first caller.
     const defaultFields = formatData(rawDefaultFields) ?? {};
 
     function emit(level: LogLevel, message: string, data?: Record<string, unknown>): void {
-        if (LOG_PRIORITY[level] < LOG_PRIORITY[minLevel]) return;
+        // Per line, not captured at construction: the singleton is created when
+        // this module is first imported, which is long before a project's
+        // `config.logging.level` has been read.
+        if (LOG_PRIORITY[level] < LOG_PRIORITY[getMinLevel()]) return;
 
         // The message is redacted too, not just the data: several call sites
         // interpolate `error.message` straight into the line they log.

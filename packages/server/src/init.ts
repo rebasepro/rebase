@@ -45,8 +45,7 @@ import { installRootErrorHandler } from "./api/root-error-handler";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HonoEnv } from "./api/types";
-import { configureLogLevel } from "./utils/logging";
-import { logger } from "./utils/logger";
+import { logger, setLogLevel } from "./utils/logger";
 import { configureMiddlewares } from "./init/middlewares";
 import { initializeStorage, assertStorageAccessControlConfigured } from "./init/storage";
 import { resolveStorageAccessControl } from "./storage/policies";
@@ -973,11 +972,12 @@ export async function initializeRebaseBackend(config: RebaseBackendConfig): Prom
 }
 
 async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<RebaseBackendInstance> {
-    if (config.logging?.level) {
-        configureLogLevel(config.logging.level);
-    } else {
-        configureLogLevel();
-    }
+    // One level system. This used to also call `configureLogLevel`, which
+    // replaced `console.debug`/`console.log`/`console.warn` with no-ops — so
+    // `LOG_LEVEL=warn` silenced not just this server's info lines but every
+    // `console.log` in the process: a dependency's, and the project's own
+    // debugging. Irreversibly, since the originals were discarded.
+    setLogLevel(config.logging?.level);
 
     // Before anything reads the config: a project still declaring resources the
     // old way is refused here rather than booted with them ignored. First
