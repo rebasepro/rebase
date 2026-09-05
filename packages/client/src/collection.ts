@@ -12,7 +12,9 @@ import {
     WriteOptions,
     isUnsupported,
     unsupportedMethod,
-    type ComputedSortField
+    type ComputedSortField,
+    type FieldPath,
+    type RelationAggregateSort
 } from "@rebasepro/types";
 import { collectAllPages, normalizeOrderBy, paginateFind, resolveFindWindow } from "@rebasepro/common";
 
@@ -407,7 +409,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             }
             return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValueFor<WhereFilterOp, M[keyof M & string]>);
         },
-        orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc") {
+        orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction?: "asc" | "desc") {
             return new SDKQueryBuilder<M>(client).orderBy(column, direction);
         },
         limit(count: number) {

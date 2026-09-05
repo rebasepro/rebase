@@ -1,13 +1,20 @@
 import {
+    FindAllParams,
     FindParams,
     FindResult,
+    IterateParams,
     LogicalCondition,
     OrderByTuple,
+    PageWalkOptions,
+    RelationAggregateSort,
     SDKCollectionClient,
     SDKQueryBuilderInterface,
     WhereFilterOp,
     WhereValueFor,
-    type ComputedSortField
+    sortKeyToString,
+    type ComputedSortField,
+    type FieldPath,
+    type NonColumnFieldPath
 } from "@rebasepro/types";
 import { normalizeOrderBy } from "@rebasepro/common";
 
@@ -40,6 +47,8 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * client.data.users.where('age', '>=', 18).find()
      */
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
+    /** A relation path (`author.name`) or a JSON path (`metadata->>tier`). */
+    where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): this;
     where(logicalCondition: LogicalCondition): this;
     where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown): this {
         if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {
@@ -80,9 +89,11 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * `.orderBy("roles").orderBy("created_at", "desc")` sorts by role and
      * shows the newest first within each one.
      */
-    orderBy(column: (keyof M & string) | ComputedSortField, direction: "asc" | "desc" = "asc"): this {
+    orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction: "asc" | "desc" = "asc"): this {
         const existing = normalizeOrderBy(this.params.orderBy) ?? [];
-        this.params.orderBy = [...existing, [column, direction] as OrderByTuple];
+        // `sortKeyToString` encodes a relation aggregate — `count(applications)`
+        // — which is the single-string form every layer below here speaks.
+        this.params.orderBy = [...existing, [sortKeyToString(column), direction] as OrderByTuple];
         return this;
     }
 
@@ -179,6 +190,29 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      */
     async find(): Promise<FindResult<M>> {
         return this.collection.find(this.params as FindParams<M>);
+    }
+
+    /**
+     * Page through everything this query matches, one row at a time.
+     *
+     * `.limit()` on the builder becomes the page size, so the ceiling on a
+     * single `find()` is not a ceiling on what the query can read.
+     */
+    iterate(options?: PageWalkOptions<M>): AsyncIterableIterator<M> {
+        return this.collection.iterate({
+            ...(this.params as FindParams<M>),
+            ...(this.params.limit !== undefined && { pageSize: this.params.limit }),
+            ...options
+        } as IterateParams<M>);
+    }
+
+    /** Collect everything this query matches into one array. */
+    findAll(options?: PageWalkOptions<M> & { maxRows?: number }): Promise<M[]> {
+        return this.collection.findAll({
+            ...(this.params as FindParams<M>),
+            ...(this.params.limit !== undefined && { pageSize: this.params.limit }),
+            ...options
+        } as FindAllParams<M>);
     }
 
     /**

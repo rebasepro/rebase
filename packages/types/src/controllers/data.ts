@@ -1,7 +1,7 @@
 import type { VectorSearchParams } from "./data_driver";
 import type { ComputedSortField, SearchMatch } from "../types/search";
 import { Entity, EntityValues } from "../types/entities";
-import { WhereFilterOp, FieldPath, FilterValues, OrderBySpec } from "../types/filter-operators";
+import { WhereFilterOp, FieldPath, NonColumnFieldPath, FilterValues, OrderBySpec, RelationAggregateSort } from "../types/filter-operators";
 
 /**
  * The element type of an array column, and the column's own type otherwise.
@@ -545,8 +545,27 @@ export type FindAllParams<M extends Record<string, unknown> = Record<string, unk
  */
 export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
+    /**
+     * Filter on a relation path (`author.name`) or a JSON path
+     * (`metadata->>tier`).
+     *
+     * A separate overload because the value cannot be typed: neither addresses
+     * a column of `M`, so there is nothing in a generated row type to check
+     * against — the driver resolves the path and refuses what it cannot. The
+     * key is still constrained to a *path*, so a mistyped column name does not
+     * fall through to here and lose its check.
+     *
+     * `find({ where })` has accepted both all along ({@link FieldPath}); the
+     * builder did not, so the documented relation-path filters were compile
+     * errors on a typed client.
+     */
+    where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): this;
     where(logicalCondition: LogicalCondition): this;
-    orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): this;
+    /**
+     * Sort by a column, a relation or JSON path, `_score`, or an aggregate over
+     * a to-many relation — the same key set {@link FindParams.orderBy} takes.
+     */
+    orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction?: "asc" | "desc"): this;
     limit(count: number): this;
     offset(count: number): this;
     search(searchString: string, options?: { explain?: boolean }): this;
@@ -567,6 +586,25 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
     ): this;
     include(...relations: string[]): this;
     find(): Promise<FindResult<M>>;
+
+    /**
+     * Page through everything this query matches, one row at a time.
+     *
+     * The same walker {@link SDKCollectionClient.iterate} uses, so the ceiling
+     * on `limit` is not a ceiling on what a query can read. `.limit()` set on
+     * the builder becomes the **page size** here, not a total.
+     */
+    iterate(options?: PageWalkOptions<M>): AsyncIterableIterator<M>;
+
+    /**
+     * Collect everything this query matches into one array.
+     *
+     * {@link SDKCollectionClient.findAll}'s `maxRows` guard applies: an
+     * unbounded collect is a memory hazard, so it stops and says so rather than
+     * growing until the process dies.
+     */
+    findAll(options?: PageWalkOptions<M> & { maxRows?: number }): Promise<M[]>;
+
     count(): Promise<number>;
     listen(onUpdate: (data: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
 }
@@ -900,8 +938,10 @@ export interface SDKCollectionClient<
 
     // Fluent Query Builder
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): SDKQueryBuilderInterface<M>;
+    /** A relation path (`author.name`) or a JSON path (`metadata->>tier`). */
+    where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): SDKQueryBuilderInterface<M>;
     where(logicalCondition: LogicalCondition): SDKQueryBuilderInterface<M>;
-    orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): SDKQueryBuilderInterface<M>;
+    orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction?: "asc" | "desc"): SDKQueryBuilderInterface<M>;
     limit(count: number): SDKQueryBuilderInterface<M>;
     offset(count: number): SDKQueryBuilderInterface<M>;
     search(searchString: string, options?: { explain?: boolean }): SDKQueryBuilderInterface<M>;

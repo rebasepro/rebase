@@ -1,4 +1,4 @@
-import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, RebaseApiError, RebaseData, RebaseSdkData, SDKCollectionClient, SDKQueryBuilderInterface, type ComputedSortField, type SearchMatch, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type ComputedSortField, type FieldPath, type NonColumnFieldPath, type SearchMatch, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
 import { collectAllPages, paginateFind, resolveFindWindow } from "./paginate";
@@ -469,6 +469,8 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
     constructor(private client: SDKCollectionClient<M>) {}
 
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
+    /** A relation path (`author.name`) or a JSON path (`metadata->>tier`). */
+    where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): this;
     where(logicalCondition: LogicalCondition): this;
     where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown): this {
         if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {
@@ -496,9 +498,9 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
     }
 
     /** Called again, this adds a tie-breaker rather than replacing the sort. */
-    orderBy(column: (keyof M & string) | ComputedSortField, direction: "asc" | "desc" = "asc"): this {
+    orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction: "asc" | "desc" = "asc"): this {
         const existing = normalizeOrderBy(this.params.orderBy) ?? [];
-        this.params.orderBy = [...existing, [column, direction] as OrderByTuple];
+        this.params.orderBy = [...existing, [sortKeyToString(column), direction] as OrderByTuple];
         return this;
     }
 
@@ -522,6 +524,29 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
 
     async find(): Promise<FindResult<M>> {
         return this.client.find(this.params as FindParams<M>);
+    }
+
+    /**
+     * Page through everything this query matches, one row at a time.
+     *
+     * `.limit()` on the builder becomes the page size, so the ceiling on a
+     * single `find()` is not a ceiling on what the query can read.
+     */
+    iterate(options?: PageWalkOptions<M>): AsyncIterableIterator<M> {
+        return this.client.iterate({
+            ...(this.params as FindParams<M>),
+            ...(this.params.limit !== undefined && { pageSize: this.params.limit }),
+            ...options
+        } as IterateParams<M>);
+    }
+
+    /** Collect everything this query matches into one array. */
+    findAll(options?: PageWalkOptions<M> & { maxRows?: number }): Promise<M[]> {
+        return this.client.findAll({
+            ...(this.params as FindParams<M>),
+            ...(this.params.limit !== undefined && { pageSize: this.params.limit }),
+            ...options
+        } as FindAllParams<M>);
     }
 
     /**
@@ -657,7 +682,7 @@ data: u.data as Partial<EntityValues<M>> }))
             }
             return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValueFor<WhereFilterOp, M[keyof M & string]>);
         },
-        orderBy: (column: keyof M & string, direction?: "asc" | "desc") => new SdkQueryBuilder<M>(client).orderBy(column, direction),
+        orderBy: (column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction?: "asc" | "desc") => new SdkQueryBuilder<M>(client).orderBy(column, direction),
         limit: (count: number) => new SdkQueryBuilder<M>(client).limit(count),
         offset: (count: number) => new SdkQueryBuilder<M>(client).offset(count),
         search: (searchString: string) => new SdkQueryBuilder<M>(client).search(searchString),

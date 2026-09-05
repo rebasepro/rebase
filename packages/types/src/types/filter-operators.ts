@@ -280,6 +280,13 @@ export type FilterValues<Key extends string> =
  * closed. A typo'd relation path is refused at runtime with the target
  * collection's real column list in the message.
  *
+ * A JSON path — `metadata->>tier` — is admitted on the same terms and for the
+ * same reason. It addresses a key *inside* a `json`/`jsonb` column, so nothing
+ * in a generated row type describes it either; the driver resolves it and
+ * refuses what it cannot. It has no dot, so the dotted branch above never
+ * covered it, and every documented `?metadata->>tier=eq.gold` filter was a
+ * compile error on a typed client while working perfectly over HTTP.
+ *
  * Undotted keys are unaffected and still checked against `keyof M`.
  *
  * When `M` is left at its default `Record<string, unknown>`, `keyof M` is
@@ -291,7 +298,26 @@ export type FilterValues<Key extends string> =
  */
 export type FieldPath<M extends Record<string, unknown> = Record<string, unknown>> =
     | Extract<keyof M, string>
-    | `${string}.${string}`;
+    | NonColumnFieldPath;
+
+/**
+ * A field key that is not a column: a relation path (`author.name`) or a JSON
+ * path (`metadata->>tier`).
+ *
+ * The fluent builder needs this on its own, where `FindParams` does not. Its
+ * `where(column, operator, value)` types the value against `M[column]`, which
+ * only means something for a real column — so paths take a second overload
+ * whose value is `unknown`. Keying that overload on the *shape* of a path,
+ * rather than on "everything that is not a column", is what keeps a real column
+ * with a wrong value type from falling through to it and being accepted: a
+ * mistyped column name has neither a dot nor a `->>`, so it matches neither
+ * overload and is still refused.
+ *
+ * @group Models
+ */
+export type NonColumnFieldPath =
+    | `${string}.${string}`
+    | `${string}->>${string}`;
 
 /**
  * Relaxed filter type that also accepts pre-serialized PostgREST strings.

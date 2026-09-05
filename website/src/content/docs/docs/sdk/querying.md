@@ -228,13 +228,19 @@ const { data } = await client.data.products
 | Method | Description | Example |
 |--------|-------------|---------|
 | `.where(field, op, value)` | Add a filter condition | `.where("age", ">=", 18)` |
+| `.where(path, op, value)` | Filter on a [relation](#querying-through-a-relation) or [JSON](#filtering-inside-json) path | `.where("author.name", "==", "bob")` |
+| `.where(group)` | Add an [OR/AND group](#logical-conditions-or--and) | `.where(or(cond(…), cond(…)))` |
 | `.orderBy(field, dir)` | Sort results | `.orderBy("name", "asc")` |
+| `.orderBy(aggregate, dir)` | Sort by an [aggregate over a relation](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
 | `.limit(n)` | Limit result count | `.limit(25)` |
 | `.offset(n)` | Skip first N results | `.offset(50)` |
 | `.search(text)` | Text search — see [Search](/docs/backend/search) | `.search("laptop")` |
 | `.vectorSearch(prop, vector, opts?)` | Nearest-neighbour search over a `vector` property | `.vectorSearch("embedding", vec)` |
 | `.include(...relations)` | Include related entities | `.include("author", "tags")` |
-| `.find()` | Execute the query | Returns `FindResponse<M>` |
+| `.find()` | Execute the query | Returns `FindResult<M>` |
+| `.iterate(options?)` | [Stream every matching row](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
+| `.findAll(options?)` | [Collect every matching row](#reading-everything-iterate-and-findall) | Returns `M[]` |
+| `.count()` | Count the matching rows | Returns `number` |
 | `.listen(onUpdate, onError?)` | Subscribe to real-time updates | Returns `unsubscribe()` |
 
 ### Filter Operators
@@ -378,6 +384,63 @@ negative, or fractional one — is refused with a 400 `INVALID_LIMIT` rather tha
 clamped, because a silently smaller page cannot be told apart from the last one.
 To read past that ceiling, walk the pages with `iterate()` or `findAll()`.
 
+### Reading everything: `iterate()` and `findAll()`
+
+`iterate()` streams every row a query matches, one at a time, fetching a page at
+a time behind the scenes. Nothing accumulates, so it is the one to use for a
+collection you cannot hold in memory:
+
+```typescript
+for await (const order of client.data.orders.iterate({
+    where: { status: ["==", "pending"] }
+})) {
+    await handleOrder(order);
+}
+```
+
+`findAll()` is the same walk collected into an array:
+
+```typescript
+const stale = await client.data.sessions.findAll({
+    where: { expiresAt: ["<", cutoff] }
+});
+```
+
+Both are on the fluent builder too, where `.limit()` becomes the **page size**
+rather than a total:
+
+```typescript
+const rows = await client.data.orders
+    .where("status", "==", "pending")
+    .orderBy("createdAt", "asc")
+    .limit(500)          // rows per request
+    .findAll();
+```
+
+Three options shape the walk:
+
+| Option | Default | What it does |
+|--------|---------|--------------|
+| `pageSize` | 200 | Rows per request. |
+| `cursor` | — | Seek on a column instead of paging by offset. See below. |
+| `maxPages` | 10 000 | Ceiling on requests, so a server that never stops saying `hasMore` cannot spin forever. |
+| `maxRows` | 10 000 | `findAll()` only. Exceeding it **throws** rather than returning a truncated array as if it were the whole answer. Pass `Infinity` to opt out, or use `iterate()`. |
+
+**Prefer `cursor` whenever the collection has a unique, sortable column.**
+Offset paging re-counts rows on every request, so a row inserted or deleted
+*while the walk runs* shifts the window and the walk silently skips or repeats
+rows. Seeking asks for rows strictly after the last one seen, which concurrent
+writes before the cursor cannot move:
+
+```typescript
+for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
+```
+
+The column must be unique — a repeated value at a page boundary either skips
+rows or stalls, and the iterator throws rather than looping — and the query is
+ordered by it, so a `cursor` alongside a conflicting `orderBy` is an error
+rather than a silent override.
+
 ## Sorting
 
 ```typescript
@@ -487,7 +550,7 @@ told "no matches" when the truth is "not supported".
 A `json` or `jsonb` column can be filtered by path, using Postgres's own arrow
 syntax:
 
-```typescript no-verify
+```typescript
 // Orders whose metadata says the country is US
 const { data } = await client.data.orders
     .where("metadata->>country", "==", "US")
@@ -510,7 +573,7 @@ Path segments are always sent as bound parameters, never spliced into SQL.
 `->>` yields **text**, so comparisons are text comparisons — except that an
 ordering operator (`>`, `>=`, `<`, `<=`) given a **number** casts to numeric:
 
-```typescript no-verify
+```typescript
 await client.data.orders.where("metadata->>score", ">", 100).find();     // numeric: 9 < 100
 await client.data.orders.where("metadata->>version", ">", "1.2").find(); // text
 ```
@@ -774,6 +837,14 @@ const { data } = await client.data.talents.find({
 
 // Clients, busiest first.
 orderBy: [[{ relation: "orders", agg: "count" }, "desc"]]
+```
+
+The fluent builder takes the same key:
+
+```typescript
+const { data } = await client.data.clients
+    .orderBy({ relation: "orders", agg: "count" }, "desc")
+    .find();
 ```
 
 `min`, `max`, `count`, `sum` and `avg`. `field` is required by all of them
