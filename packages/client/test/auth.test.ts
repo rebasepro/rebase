@@ -913,6 +913,105 @@ message: "Verified" })
         });
     });
 
+    /**
+     * The backend has served `/auth/anonymous` and `/auth/mfa/*` since they
+     * landed; the SDK exposed neither, so an app that wanted either hand-wrote
+     * `fetch` calls — the auth header, the cookie flag, the session adoption —
+     * which is the whole job of a client.
+     */
+    describe("Anonymous sessions", () => {
+        it("signInAnonymously adopts the session it is handed", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ tokens: mockTokens(), user: { ...mockUser, isAnonymous: true } })
+            });
+
+            const result = await auth.signInAnonymously();
+
+            expect(mockFetch).toHaveBeenCalledWith(
+                "http://localhost/api/v1/auth/anonymous",
+                expect.objectContaining({ method: "POST" })
+            );
+            expect(result.user.uid).toBe("usr_1");
+            // Adopted, not merely returned: the next request carries the token.
+            expect(auth.getSession()?.accessToken).toBe("fake-jwt");
+        });
+
+        it("linkAnonymous keeps the id and re-adopts the upgraded session", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            mockRequest.mockResolvedValueOnce({
+                tokens: mockTokens(),
+                user: { ...mockUser, isAnonymous: false }
+            });
+
+            const result = await auth.linkAnonymous("user@example.com", "pw");
+
+            expect(mockRequest).toHaveBeenCalledWith("/auth/anonymous/link", expect.objectContaining({
+                method: "POST",
+                body: JSON.stringify({ email: "user@example.com", password: "pw" })
+            }));
+            expect(result.user.uid).toBe("usr_1");
+            expect(auth.getSession()?.accessToken).toBe("fake-jwt");
+        });
+    });
+
+    describe("MFA", () => {
+        it("enroll posts to /auth/mfa/enroll and returns the secret and recovery codes", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            mockRequest.mockResolvedValueOnce({
+                factor: { id: "f1", factorType: "totp" },
+                totp: { secret: "S", uri: "otpauth://x", qrUri: "otpauth://x" },
+                recoveryCodes: ["a", "b"]
+            });
+
+            const result = await auth.mfa.enroll({ friendlyName: "Phone" });
+
+            expect(mockRequest).toHaveBeenCalledWith("/auth/mfa/enroll", expect.objectContaining({
+                method: "POST",
+                body: JSON.stringify({ friendlyName: "Phone" })
+            }));
+            expect(result.recoveryCodes).toEqual(["a", "b"]);
+        });
+
+        it("listFactors unwraps the envelope", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            mockRequest.mockResolvedValueOnce({ factors: [{ id: "f1", factorType: "totp", verified: true }] });
+
+            const factors = await auth.mfa.listFactors();
+
+            expect(mockRequest).toHaveBeenCalledWith("/auth/mfa/factors", { method: "GET" });
+            expect(factors).toHaveLength(1);
+        });
+
+        it("unenroll uses DELETE, which is the method the route answers to", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            mockRequest.mockResolvedValueOnce({ success: true, message: "removed" });
+
+            await auth.mfa.unenroll("f1");
+
+            expect(mockRequest).toHaveBeenCalledWith("/auth/mfa/unenroll", expect.objectContaining({
+                method: "DELETE"
+            }));
+        });
+
+        it("verifyChallenge adopts the aal2 session it mints", async () => {
+            // The whole point of the challenge: the tokens it returns replace
+            // the aal1 ones the sign-in handed back.
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            mockRequest.mockResolvedValueOnce({ tokens: mockTokens(), user: mockUser });
+
+            const result = await auth.mfa.verifyChallenge("ch1", "418293");
+
+            expect(mockRequest).toHaveBeenCalledWith("/auth/mfa/challenge/verify", expect.objectContaining({
+                method: "POST",
+                body: JSON.stringify({ challengeId: "ch1", code: "418293" })
+            }));
+            expect(result.user.uid).toBe("usr_1");
+            expect(auth.getSession()?.accessToken).toBe("fake-jwt");
+        });
+    });
+
     // -----------------------------------------------------------------------
     // Session management
     // -----------------------------------------------------------------------
