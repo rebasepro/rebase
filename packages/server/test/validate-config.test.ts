@@ -104,7 +104,7 @@ describe("known-renamed keys", () => {
         const relationName = found.find(p => p.path === "posts.properties.author.relationName");
         expect(relationName?.message).toContain("no longer read here");
         expect(relationName?.message).toContain("move `relationName` inside `relation`");
-        expect(relationName?.message).toContain("relations-tagged-union.mjs");
+        expect(relationName?.message).not.toContain("tooling/");
     });
 
     it("errors on `direction`, which the tagged union replaced rather than moved", () => {
@@ -131,7 +131,7 @@ describe("known-renamed keys", () => {
         expect(problem.path).toBe("posts.icon");
         expect(problem.message).toContain("moved into the collection's `admin` block in 0.11");
         expect(problem.message).toContain("admin: { icon: … }");
-        expect(problem.message).toContain("collections-admin-block.mjs");
+        expect(problem.message).not.toContain("tooling/");
     });
 
     it("errors on a property-level `ui`, which became `admin`", () => {
@@ -692,5 +692,77 @@ describe("the two kinds of problem are reported apart", () => {
             spy.mockRestore();
         }
         expect(logged.join("\n")).toContain("REBASE_STRICT_COLLECTION_CONFIG");
+    });
+});
+
+/**
+ * Every message here is read by somebody who installed `@rebasepro/server` from
+ * npm, and who has none of this repository on disk.
+ *
+ * Two of them used to end with "Run `node
+ * tooling/scripts/codemod/relations-tagged-union.mjs` to migrate the whole
+ * project". `tooling/` is not in the published package, so the single actionable
+ * instruction those messages carried was the one thing the reader could not do
+ * — and it sat where the per-key "write this instead" should have been.
+ *
+ * A grep over the source would not hold this: the same string is legitimate in a
+ * comment about this repo's own gates. So this asserts the property that
+ * matters — no path into this repository reaches a *message* — by driving the
+ * validator over every migrated key it knows and reading what comes out.
+ */
+describe("no message names a path inside this repository", () => {
+    const everyKnownMistake = (): unknown[] => [
+        // Collection-level keys that moved into the admin block.
+        { ...valid(), icon: "Article", group: "Content", listProperties: ["title"] },
+        // The admin block's own removed key.
+        { ...valid(), admin: { icon: "Article", titleProperty: "name" } },
+        // A property with presentation left at the top level, and a `ui` block.
+        {
+            ...valid(),
+            properties: {
+                ...valid().properties,
+                title: { name: "Title", type: "string", readOnly: true, multiline: true },
+                body: { name: "Body", type: "string", ui: { markdown: true } }
+            }
+        },
+        // A pre-0.11 flat relation, and the fields the tagged union dropped.
+        {
+            ...valid(),
+            properties: {
+                ...valid().properties,
+                author: {
+                    name: "Author",
+                    type: "relation",
+                    target: () => ({}),
+                    localKey: "author_id",
+                    direction: "owning",
+                    cardinality: "one",
+                    inverseRelationName: "posts"
+                }
+            }
+        },
+        // A relation with no `kind` at all.
+        {
+            ...valid(),
+            properties: {
+                ...valid().properties,
+                author: { name: "Author", type: "relation", relation: { target: () => ({}) } }
+            }
+        },
+        // An unknown key, which takes the other message path.
+        { ...valid(), whatIsThis: true, admin: { icon: "Article", multilne: true } }
+    ];
+
+    it("says nothing about `tooling/`, `packages/` or a `.mjs` script", () => {
+        const problems = findCollectionConfigProblems(everyKnownMistake());
+
+        // A guard over an empty list guards nothing.
+        expect(problems.length).toBeGreaterThan(10);
+
+        for (const problem of problems) {
+            expect(problem.message).not.toContain("tooling/");
+            expect(problem.message).not.toContain("packages/");
+            expect(problem.message).not.toMatch(/\.mjs\b/);
+        }
     });
 });

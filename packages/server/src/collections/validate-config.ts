@@ -293,11 +293,21 @@ const RELATION_LINK_FIELDS = ["localKey", "foreignKeyOnTarget", "sourceKey", "th
 //   • 0.10 `33d096cd5` — `editable` removed; everything is editable by default.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * A key that moved or died, and what to do about it.
+ *
+ * There is no `codemod` field. Two of these messages used to end with "Run
+ * `node <this repo>/codemod/relations-tagged-union.mjs` to migrate the whole
+ * project" — a path inside the Rebase monorepo, which is the one place the
+ * reader of the message never is. A project installs `@rebasepro/server` from
+ * npm, and that directory is not in the package, so the single actionable
+ * instruction the message offered was the one thing nobody could do. Every
+ * `fix` below says what to write instead, per key, which is the part that
+ * survives being read by somebody else.
+ */
 interface Migration {
     /** What to do about it, in the imperative. */
     fix: string;
-    /** The codemod that does it, if one exists. */
-    codemod?: string;
 }
 
 /**
@@ -321,8 +331,7 @@ const COLLECTION_MIGRATIONS: Record<string, Migration> = {
 
 for (const key of ADMIN_COLLECTION_KEYS) {
     COLLECTION_MIGRATIONS[key] = {
-        fix: `\`${key}\` moved into the collection's \`admin\` block in 0.11 — write \`admin: { ${key}: … }\``,
-        codemod: "node tooling/scripts/codemod/collections-admin-block.mjs"
+        fix: `\`${key}\` moved into the collection's \`admin\` block in 0.11 — write \`admin: { ${key}: … }\``
     };
 }
 
@@ -365,12 +374,10 @@ const RELATION_PROPERTY_MIGRATIONS: Record<string, Migration> = {
     relationName: { fix: "move `relationName` inside `relation` — `relation: { kind: …, relationName: … }`" }
 };
 
-const RELATION_UNION_CODEMOD = "node tooling/scripts/codemod/relations-tagged-union.mjs";
-
 /** Fields the old flat `Relation` carried that the tagged union does not. */
 const RELATION_MIGRATIONS: Record<string, Migration> = {
-    direction: { fix: RELATION_PROPERTY_MIGRATIONS.direction.fix, codemod: RELATION_UNION_CODEMOD },
-    inverseRelationName: { fix: RELATION_PROPERTY_MIGRATIONS.inverseRelationName.fix, codemod: RELATION_UNION_CODEMOD },
+    direction: { fix: RELATION_PROPERTY_MIGRATIONS.direction.fix },
+    inverseRelationName: { fix: RELATION_PROPERTY_MIGRATIONS.inverseRelationName.fix },
     // Not a rename: the key already existed one level up, and the two answers
     // were read by different generators. Silence here would leave the surviving
     // one — the property's — unset, and a required relation would quietly
@@ -412,8 +419,7 @@ class ProblemCollector {
     migrated(path: string, key: string, migration: Migration): void {
         this.error(
             path,
-            `\`${key}\` is no longer read here. ${migration.fix}.` +
-            (migration.codemod ? ` Run \`${migration.codemod}\` to migrate the whole project.` : ""),
+            `\`${key}\` is no longer read here. ${migration.fix}.`,
             "key"
         );
     }
@@ -455,7 +461,9 @@ function checkRelation(
         collect.error(
             path,
             "a relation has no `kind`. Relations became a tagged union in 0.11 — pick one of " +
-            `${RELATION_KINDS.join(", ")}. Run \`${RELATION_UNION_CODEMOD}\` to migrate the whole project.`
+            `${RELATION_KINDS.join(", ")}. Which one: the side that holds the foreign key is ` +
+            "`belongsTo`; the side that is pointed at is `hasOne` for one row and `hasMany` for " +
+            "many; a junction table is `manyToMany`; anything else is a read-only `via` with a `joinPath`."
         );
     } else if (!RELATION_KINDS.includes(kind)) {
         collect.error(path, `\`kind: "${kind}"\` is not a relation kind. Expected one of ${RELATION_KINDS.join(", ")}.`);
@@ -692,7 +700,7 @@ function checkProperty(
         // A relation's flat fields are checked first: `localKey` at the top of a
         // property is a 0.10 config, not an unknown key.
         if (type === "relation" && RELATION_PROPERTY_MIGRATIONS[key]) {
-            collect.migrated(`${path}.${key}`, key, { ...RELATION_PROPERTY_MIGRATIONS[key], codemod: RELATION_UNION_CODEMOD });
+            collect.migrated(`${path}.${key}`, key, RELATION_PROPERTY_MIGRATIONS[key]);
             continue;
         }
 
