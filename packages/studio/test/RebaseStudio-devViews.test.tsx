@@ -25,7 +25,7 @@ const dispatch = {
 };
 
 const translation = {
-    t: (key: string) => (en as Record<string, string>)[key] ?? key,
+    t: (key: string) => en[key as keyof typeof en] ?? key,
     i18n: { language: "en" }
 };
 

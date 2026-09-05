@@ -17,7 +17,7 @@ let registryCollections: unknown[] | undefined;
 
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => ({
-        t: (key: string) => (en as Record<string, string>)[key] ?? key,
+        t: (key: string) => en[key as keyof typeof en] ?? key,
         i18n: { language: "en" }
     }),
     useNavigationGroupLabel: () => (group: string) => group,

@@ -52,11 +52,15 @@ All 9 tools are enabled by default. The `schema` tool (collection editor) is aut
 | `BreadcrumbEntry` | Type | Single breadcrumb item |
 | `BreadcrumbsController` | Type | Breadcrumb controller interface |
 
-Individual tools (e.g. `SQLEditor`, `SchemaVisualizer`) are **not** re-exported from the barrel to preserve code splitting. Use deep imports if needed:
+Individual tools (e.g. `SQLEditor`, `SchemaVisualizer`) are **not** exported —
+not from the barrel, and not by path either. `@rebasepro/studio` exports `.`
+and nothing else, so a deep import fails at resolution with
+`ERR_PACKAGE_PATH_NOT_EXPORTED`.
 
-```typescript
-import { SQLEditor } from "@rebasepro/studio/components/SQLEditor/SQLEditor";
-```
+That is the point: `RebaseStudio` registers a route per tool and fetches its
+chunk when the route is opened, and an importable `SQLEditor` would put Monaco
+in the initial bundle of anyone who reached for it. To add a tool of your own
+beside them, pass an `AppView` to `<RebaseStudio devViews>`.
 
 ## Quick Start
 

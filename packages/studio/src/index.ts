@@ -25,7 +25,14 @@ export type {
 export * from "./components/RebaseStudio";
 export * from "./components/StudioHomePage";
 
-// ─── Direct tool imports (for advanced usage) ───────────────────────
-// Consumers that need direct access to a tool should use deep imports:
-//   import { SQLEditor } from "@rebasepro/studio/components/SQLEditor/SQLEditor";
-// This avoids pulling all tools into their bundle.
+// ─── The tools themselves are not importable ────────────────────────
+// This used to recommend `@rebasepro/studio/components/SQLEditor/SQLEditor`,
+// which is not a path this package exports: following it fails at resolution
+// with ERR_PACKAGE_PATH_NOT_EXPORTED, and there is nothing to configure that
+// would make it work.
+//
+// Nor should there be. A tool is reached by opening it — `RebaseStudio`
+// registers a route per tool and lazy-loads the chunk when that route is
+// visited, and an importable `SQLEditor` would put Monaco in the initial
+// bundle of anyone who touched it. To ship a tool of your own beside them,
+// pass an `AppView` to `<RebaseStudio devViews>`.

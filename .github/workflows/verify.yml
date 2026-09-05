@@ -275,6 +275,13 @@ jobs:
       - name: "<Rebase> props table"
         run: pnpm run check:rebase-props
 
+      # Two places recommended `@rebasepro/studio/components/SQLEditor/SQLEditor`
+      # as a deep import. That package exports `.` and nothing else, so
+      # following the advice fails with ERR_PACKAGE_PATH_NOT_EXPORTED and there
+      # is nothing the reader can configure to fix it.
+      - name: Subpath imports resolve
+        run: pnpm run check:subpath-imports
+
       # Astro and JSX drop the newline between a word and an adjacent tag rather
       # than collapsing it to a space, so a paragraph broken across two source
       # lines at that boundary renders "or runrebase dev". Invisible in the
