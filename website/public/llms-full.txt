@@ -506,10 +506,30 @@ All configuration is done via environment variables in your `.env` file at the p
 | `PORT` | Port for the backend HTTP server. Read by `rebase start`; **`rebase dev` ignores it** and binds a port derived from the project path so several projects can run at once — use `rebase dev --port` to pin one. | `3001` |
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
-| `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. | — |
-| `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS. | — |
+| `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |
+| `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS, in both environments. | — |
 | `ADMIN_CONNECTION_STRING` | Admin-level database connection string (used for schema introspection and admin operations). | `DATABASE_URL` |
 | `DISABLE_DB_ROLE_SWITCHING` | Disable PostgreSQL role-switching in SQL Editor (useful for custom authentication where DB roles are not mapped). | `false` |
+
+##### CORS in development
+
+Development allows **localhost, plus whatever `CORS_ORIGINS` (or `FRONTEND_URL`)
+names** — the same list production uses, with localhost added rather than
+substituted. So the variable works the same way in both environments, and the
+cases that need it in development are the ordinary ones:
+
+```bash
+# A phone on the LAN, a colleague's machine, an ngrok tunnel,
+# a forwarded Codespaces port — all non-localhost origins.
+CORS_ORIGINS=http://192.168.1.5:5173
+```
+
+An origin that is neither localhost nor listed is refused, and the refusal is
+logged **once per origin** with the exact line that would allow it. Refusing is
+not caution for its own sake: the API sends credentials, so reflecting an
+arbitrary `Origin` would let any site the developer happens to visit make
+authenticated requests against the dev server with their session and read the
+answers.
 
 #### Authentication
 
@@ -738,7 +758,7 @@ await initializeRebaseBackend({
 
     history: true,           // Enable entity change history
 
-    enableSwagger: true,     // Enable OpenAPI docs at /api/data/docs
+    enableSwagger: true,     // Enable OpenAPI docs at /api/docs
 
     logging: {
         level: "info"
@@ -4447,11 +4467,12 @@ After initialization, these routes are mounted:
 | `/api/auth/*` | Authentication (signup, login, refresh, OAuth, magic links, one-time codes, MFA) |
 | `/api/admin/*` | User and role management (admin-only) |
 | `/api/storage/*` | File upload, download, and deletion |
-| `/api/data/collections` | Collection metadata endpoint |
 | `/api/data/:slug` | CRUD operations per collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
-| `/api/data/docs` | OpenAPI spec (when `enableSwagger: true`) |
-| `/api/data/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
+| `/api/docs` | OpenAPI spec (when `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
+| `/api/meta/contract` | The project's collection schema (admin-only) |
+| `/api/meta/schema-version` | A version string for that schema (unauthenticated) |
 | `/api/functions/*` | Custom function routes (when `functionsDir` is set) |
 | `/api/cron/*` | Cron job management (admin-only, when `cronsDir` is set) |
 | WebSocket on upgrade | Real-time subscriptions |
@@ -4498,8 +4519,7 @@ If the database is unreachable during boot (e.g., PostgreSQL is starting or netw
   {
     "error": {
       "message": "Database connection is not ready.",
-      "code": "service-unavailable",
-      "status": 503
+      "code": "SERVICE_UNAVAILABLE"
     }
   }
   ```
@@ -4629,14 +4649,42 @@ The backend uses PostgreSQL `LISTEN/NOTIFY` internally. For multi-instance deplo
 
 ### Error Handling
 
-The backend includes an error handler that catches all exceptions and returns structured error responses:
+Every failure — from any route, in any subsystem — comes back in one envelope:
 
 ```json
 {
     "error": {
         "message": "Entity not found",
-        "code": "not-found",
-        "status": 404
+        "code": "NOT_FOUND",
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
+    }
+}
+```
+
+| Field | Always present | What it is |
+|-------|:--------------:|------------|
+| `message` | yes | Written for a person reading a console. Names the obstacle, not the rule. |
+| `code` | yes | `SCREAMING_SNAKE_CASE` and stable. This is the field to branch on. |
+| `details` | no | Structured payload when the refusal is *about* something — a list of failing paths, a set of unknown fields. |
+| `requestId` | no | Present when the request carried or was assigned one; echoes `X-Request-ID`. Quote it in a bug report. |
+
+The HTTP status is on the response, not in the body. Branch on `code`, not on
+`message` — messages are written for humans and are free to change.
+
+The client SDK turns every one of these into a `RebaseApiError` carrying
+`status`, `code` and `details` — including the failures that never reached a
+server at all. A refused connection, a DNS failure, CORS or an abort arrives as
+`status: 0`, `code: "NETWORK_ERROR"`, with the runtime's own error on `cause`,
+rather than as whatever `fetch` felt like rejecting with. So application code
+catches one class:
+
+```typescript
+async function setPrice(id: string, price: number) {
+    try {
+        return await client.data.products.update(id, { price });
+    } catch (e) {
+        if (e instanceof RebaseApiError && e.code === "NOT_FOUND") return null;
+        throw e;
     }
 }
 ```
@@ -4789,6 +4837,59 @@ GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
 GET /api/data/products?and=(active.eq.true,price.gt.0)
 ```
 
+**One group per request, and `or` wins.** If a request carries both `?or=` and
+`?and=`, the `and` is ignored — they are two spellings of the same slot, not two
+filters. Nest instead:
+
+```bash
+GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
+```
+
+Groups may nest 32 levels deep; past that the request is refused with
+`INVALID_LOGICAL_GROUP`.
+
+A group **narrows** alongside the field filters rather than replacing them — see
+[How the filters combine](#how-the-filters-combine).
+
+#### The `where` JSON dialect
+
+The field filters above are one of two ways to send a filter. The other is a
+single JSON object, which is what the OpenAPI document publishes on every
+`GET /api/data/{slug}` and what the nested subcollection routes take:
+
+```bash
+GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
+```
+
+Each key is a field, each value a canonical `[operator, value]` tuple — the same
+tuples the SDK writes. A value may also be a pre-serialized dot-string
+(`{"status":"eq.active"}`) or a bare scalar (`{"status":"active"}`); all three
+compile to the same condition.
+
+The difference worth knowing: **JSON carries types.** `?price=gte.100` sends the
+string `"100"` and the driver casts it by column type, while
+`?where={"price":[">=",100]}` sends a number. For a column whose text and
+numeric readings differ — a version string, a zero-padded code — that is the
+parameter to reach for.
+
+A malformed `where` is a 400 `INVALID_WHERE`, not a silently dropped filter:
+dropping it would run the read unfiltered and return everything row-level
+security happens to allow.
+
+#### How the filters combine
+
+`?field=op.value`, `?where=`, `?or=`/`?and=` and `?searchString=` are
+independent, and every one of them that is present must match:
+
+```text
+(field filters and `where`, AND-ed together)
+  AND (the logical group)
+  AND (the search string)
+```
+
+There is no way to OR one against another. Anything that is not a plain AND of
+those groups belongs inside a single `or=`/`and=` tree.
+
 ### Sorting
 
 Use `orderBy` with the format `field:direction`:
@@ -4838,6 +4939,12 @@ GET /api/data/products?page=3
 
 The default limit is **50**, the maximum is **1000**. Both come from `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, which the generated OpenAPI spec reports too — a `limit` above the maximum is rejected rather than clamped.
 
+All three window parameters are refused rather than repaired, and each names
+itself: `INVALID_LIMIT`, `INVALID_OFFSET` (a whole number of 0 or more) and
+`INVALID_PAGE` (a whole number of 1 or more). A window quietly different from
+the one asked for cannot be told apart from having reached the end of the
+collection, which is why none of them is clamped or ignored.
+
 #### Response Format
 
 List responses include pagination metadata:
@@ -4867,6 +4974,52 @@ Single entity responses return a flat object:
     "createdAt": "2026-01-15T10:30:00Z"
 }
 ```
+
+### Errors
+
+Every failure, from every route, comes back in one envelope:
+
+```json
+{
+    "error": {
+        "message": "Unknown filter operator 'contains' on field 'title'.",
+        "code": "UNKNOWN_FILTER_OPERATOR",
+        "details": { "field": "title", "operator": "contains" },
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
+    }
+}
+```
+
+`message` and `code` are always present. `details` appears when the refusal is
+*about* something — the field that was wrong, the paths that failed. `requestId`
+appears when the request carried an `X-Request-ID` header or was assigned one;
+it is echoed on the response header too, and it is the thing to quote in a bug
+report.
+
+**Branch on `code`, never on `message` or on the status alone.** Codes are
+`SCREAMING_SNAKE_CASE` and stable; messages are written for a person reading a
+console and are free to change. The HTTP status is on the response, not in the
+body.
+
+| Status | Typical code | Means |
+|--------|--------------|-------|
+| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | The request is malformed or asks for something impossible |
+| 401 | `UNAUTHORIZED` | No credential, or one that identifies nobody |
+| 403 | `FORBIDDEN`, `DB_PERMISSION_DENIED` | A credential that identifies somebody without the right |
+| 404 | `NOT_FOUND` | The thing addressed does not exist |
+| 409 | `CONFLICT` | The state conflicts — a duplicate key, a dirty tree |
+| 501 | varies | The surface exists but is **not configured** on this deployment |
+| 503 | `SERVICE_UNAVAILABLE` | A dependency is down; the request never reached it |
+
+A surface that is absent because this deployment did not enable it answers 501
+with a code and a reason, not 404 — an unexplained 404 on a route the UI just
+called reads as a broken deploy.
+
+Routes add their own more specific codes on top of these (`EMAIL_EXISTS`,
+`TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), so treat the list of codes as
+open. The client SDK turns all of them into a single `RebaseApiError` carrying
+`status`, `code` and `details` — see
+[Error handling](/docs/backend#error-handling).
 
 ### Text Search
 
@@ -5126,13 +5279,28 @@ Keys can be listed, updated, and revoked via `/api/admin/api-keys` or the
 API_KEY_SELF_MANAGEMENT_FORBIDDEN`, whatever its `admin` flag. Key management
 requires an admin user's session or the service key.
 
-### Metadata Endpoint
+### Schema Metadata
 
-Get a list of all available collections and their structure:
+The project's full collection schema — every collection, property and relation —
+is served to an authenticated admin:
 
 ```bash
-GET /api/collections
+GET /api/meta/contract
 ```
+
+It is **admin-only**, and on a deployment with no authentication configured it
+is not served at all (404 `CONTRACT_UNAVAILABLE`) rather than exposing the
+schema to anyone. Its sibling returns a version string that stands for the
+schema without describing it, and is deliberately reachable with no credential
+— which is what a CI job polls:
+
+```bash
+GET /api/meta/schema-version
+```
+
+For the shape of the endpoints rather than the schema behind them, the OpenAPI
+document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
+`enableSwagger` is on.
 
 ### Next Steps
 
@@ -7774,6 +7942,8 @@ The limit worth watching is not capacity, it is that every notification is a que
 
 Per client, the socket accepts up to **7,200 channel frames a minute** (120/s — 60 fps of cursor broadcasts plus the presence update each one carries), counted separately from the budget queries and subscriptions share. Frames past that are refused with a `RATE_LIMITED` error rather than queued.
 
+The refusal arrives on `channel.onError()`, not as a rejected `broadcast()` — see [When a channel frame is refused](#when-a-channel-frame-is-refused).
+
 If you are still pushing it after that, throttle cursor-grade events on the client (last-write-wins state does not need 60 updates a second), and consider routing a document's collaborators to the same instance — sticky routing drops cross-instance traffic to nearly nothing regardless of user count. Only past that is another transport worth it, and then the answer is a transport package, not a fork. See [Writing your own transport](#writing-your-own-transport).
 
 #### Coalescing
@@ -7848,7 +8018,7 @@ Delivery to local clients is not your concern — the realtime service owns whic
 `pg_notify` refuses a payload of 8000 bytes or more. Cursors and presence fit with room to spare; a document snapshot does not. Rebase handles this the same way it handles large entity changes — by sending an address instead of a body:
 
 - **On a retained channel** (see [Channel Retention](#channel-retention)) the message is already stored with a sequence number, so the notification carries only `(channel, seq)` and each receiving instance reads the body back. There is no size limit at all.
-- **On an ephemeral channel** there is nothing to point at. The broadcast is delivered locally, the sender receives a `CHANNEL_BUS_PAYLOAD_TOO_LARGE` error, and a warning names the channel — rather than the message silently reaching half the cluster.
+- **On an ephemeral channel** there is nothing to point at. The broadcast is delivered locally, the sender receives a `CHANNEL_BUS_PAYLOAD_TOO_LARGE` error on `channel.onError()`, and a warning names the channel — rather than the message silently reaching half the cluster.
 
 If you broadcast large messages, give that channel a retention rule. That is the whole fix.
 
@@ -7923,6 +8093,37 @@ To prevent client requests from hanging indefinitely, all pending WebSocket oper
 If the server does not respond within this 30-second window, the client automatically deletes the pending request and rejects the promise with an `ApiError` with the message `"Request timed out"`.
 
 One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
+
+#### When a channel frame is refused
+
+A channel frame is fire-and-forget: `await channel.broadcast(...)` resolves when
+the frame is written to the socket, **not** when the server has accepted it. That
+is deliberate — a collaborative app broadcasts a cursor position sixty times a
+second, and waiting for an acknowledgement on each would make every one a round
+trip.
+
+So a refusal cannot be a rejected promise. It arrives on `onError`:
+
+```typescript
+const channel = client.realtime.channel("doc:42");
+
+channel.onError((error) => {
+    if (error.code === "CHANNEL_FORBIDDEN") showReadOnlyBanner();
+    if (error.code === "RATE_LIMITED") throttleCursorUpdates();
+});
+```
+
+| Code | Means |
+|------|-------|
+| `CHANNEL_FORBIDDEN` | An authorizer refused the join, broadcast or history read |
+| `RATE_LIMITED` | Past the channel frame budget above |
+| `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
+| `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
+| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | The broadcast reached this instance only — see [The 8 KB limit on the Postgres bus](#the-8-kb-limit-on-the-postgres-bus) |
+
+With no handler attached, these are logged as a warning. They used to be
+discarded entirely: there was no promise to reject and no channel to deliver to,
+so a forbidden broadcast was indistinguishable from a delivered one.
 
 ### Next Steps
 
@@ -13702,13 +13903,19 @@ const { data } = await client.data.products
 | Method | Description | Example |
 |--------|-------------|---------|
 | `.where(field, op, value)` | Add a filter condition | `.where("age", ">=", 18)` |
+| `.where(path, op, value)` | Filter on a [relation](#querying-through-a-relation) or [JSON](#filtering-inside-json) path | `.where("author.name", "==", "bob")` |
+| `.where(group)` | Add an [OR/AND group](#logical-conditions-or--and) | `.where(or(cond(…), cond(…)))` |
 | `.orderBy(field, dir)` | Sort results | `.orderBy("name", "asc")` |
+| `.orderBy(aggregate, dir)` | Sort by an [aggregate over a relation](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
 | `.limit(n)` | Limit result count | `.limit(25)` |
 | `.offset(n)` | Skip first N results | `.offset(50)` |
 | `.search(text)` | Text search — see [Search](/docs/backend/search) | `.search("laptop")` |
 | `.vectorSearch(prop, vector, opts?)` | Nearest-neighbour search over a `vector` property | `.vectorSearch("embedding", vec)` |
 | `.include(...relations)` | Include related entities | `.include("author", "tags")` |
-| `.find()` | Execute the query | Returns `FindResponse<M>` |
+| `.find()` | Execute the query | Returns `FindResult<M>` |
+| `.iterate(options?)` | [Stream every matching row](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
+| `.findAll(options?)` | [Collect every matching row](#reading-everything-iterate-and-findall) | Returns `M[]` |
+| `.count()` | Count the matching rows | Returns `number` |
 | `.listen(onUpdate, onError?)` | Subscribe to real-time updates | Returns `unsubscribe()` |
 
 #### Filter Operators
@@ -13760,6 +13967,76 @@ await client.data.products.find({
 
 > **Note:** Pre-serialized PostgREST strings (format 2) are an escape hatch for passing filter values that are already in wire format. Prefer tuple syntax for type safety and readability.
 
+### Logical Conditions (OR / AND)
+
+Every field in `where` is AND-ed. To OR conditions together, build a **logical
+condition** with the `or`, `and` and `cond` helpers the SDK exports:
+
+```typescript
+
+const { data } = await client.data.products.find({
+    logical: or(
+        cond("status", "==", "active"),
+        and(
+            cond("status", "==", "draft"),
+            cond("authorId", "==", currentUserId)
+        )
+    )
+});
+```
+
+The fluent builder takes the same tree:
+
+```typescript
+const { data } = await client.data.products
+    .where(or(cond("status", "==", "active"), cond("featured", "==", true)))
+    .orderBy("createdAt", "desc")
+    .find();
+```
+
+`cond` takes the canonical operator — the left column of the
+[Filter Operators](#filter-operators) table. An operator the dialect does not
+have is a `TypeError` when the query is serialized, not a silently different
+query.
+
+#### How it composes with the rest of the query
+
+`where`, `logical` and `search` are three independent groups, AND-ed with each
+other:
+
+```
+(where fields, AND-ed)  AND  (logical group)  AND  (search)
+```
+
+There is no way to OR `where` against `logical`. Anything that is not a plain
+AND of the three has to be expressed inside one `logical` tree — move the
+fields you need OR-ed into it.
+
+#### On the wire
+
+A logical group travels as a single `or=` or `and=` query parameter, in the
+same dot-syntax the field filters use:
+
+```
+GET /api/data/products?or=(status.eq.active,featured.eq.true)
+```
+
+Three encodings are worth knowing, because they are the ones a hand-written
+query string gets wrong:
+
+| Condition | Wire form | Note |
+|-----------|-----------|------|
+| `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` is a search for the four-character string `null` |
+| `cond("id", "in", [])` | `id.in.(\)` | `in.()` is a list holding one empty string, which is a different query |
+| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | a [relation path](#querying-through-a-relation) keeps its dot |
+
+Commas, parentheses and backslashes inside a value are backslash-escaped, so
+`cond("name", "==", "Doe, John")` travels as `name.eq.Doe\, John` and does not
+split the group.
+
+Groups may nest 32 levels deep. Past that the request is rejected with
+`INVALID_LOGICAL_GROUP` — flatten it, since `or(a,or(b,c))` is `or(a,b,c)`.
+
 ### Pagination
 
 ```typescript
@@ -13780,6 +14057,77 @@ const page = await client.data.products.find({ page: 2, limit: 20 });
 negative, or fractional one — is refused with a 400 `INVALID_LIMIT` rather than
 clamped, because a silently smaller page cannot be told apart from the last one.
 To read past that ceiling, walk the pages with `iterate()` or `findAll()`.
+
+#### Which reads are wrapped, and which are not
+
+Two shapes, and one rule: **a window is wrapped, a whole answer is not.**
+
+| Method | Returns | Why |
+|--------|---------|-----|
+| `find()`, `listen()` | `{ data, meta }` | One page. `meta.total` / `meta.hasMore` are the only way to know there is more |
+| `findAll()`, `createMany()`, `updateMany()` | `M[]` | Nothing left over to report — the walk finished, or the batch *is* the rows |
+| `iterate()` | one row at a time | Nothing is materialised at all |
+| `findById()`, `get()`, `create()`, `update()` | one row | Not a list |
+
+`data` is not a wrapper the SDK sometimes adds and sometimes forgets. It is
+where the pagination metadata lives, and it is there exactly when there is some.
+
+#### Reading everything: `iterate()` and `findAll()`
+
+`iterate()` streams every row a query matches, one at a time, fetching a page at
+a time behind the scenes. Nothing accumulates, so it is the one to use for a
+collection you cannot hold in memory:
+
+```typescript
+for await (const order of client.data.orders.iterate({
+    where: { status: ["==", "pending"] }
+})) {
+    await handleOrder(order);
+}
+```
+
+`findAll()` is the same walk collected into an array:
+
+```typescript
+const stale = await client.data.sessions.findAll({
+    where: { expiresAt: ["<", cutoff] }
+});
+```
+
+Both are on the fluent builder too, where `.limit()` becomes the **page size**
+rather than a total:
+
+```typescript
+const rows = await client.data.orders
+    .where("status", "==", "pending")
+    .orderBy("createdAt", "asc")
+    .limit(500)          // rows per request
+    .findAll();
+```
+
+Three options shape the walk:
+
+| Option | Default | What it does |
+|--------|---------|--------------|
+| `pageSize` | 200 | Rows per request. |
+| `cursor` | — | Seek on a column instead of paging by offset. See below. |
+| `maxPages` | 10 000 | Ceiling on requests, so a server that never stops saying `hasMore` cannot spin forever. |
+| `maxRows` | 10 000 | `findAll()` only. Exceeding it **throws** rather than returning a truncated array as if it were the whole answer. Pass `Infinity` to opt out, or use `iterate()`. |
+
+**Prefer `cursor` whenever the collection has a unique, sortable column.**
+Offset paging re-counts rows on every request, so a row inserted or deleted
+*while the walk runs* shifts the window and the walk silently skips or repeats
+rows. Seeking asks for rows strictly after the last one seen, which concurrent
+writes before the cursor cannot move:
+
+```typescript
+for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
+```
+
+The column must be unique — a repeated value at a page boundary either skips
+rows or stalls, and the iterator throws rather than looping — and the query is
+ordered by it, so a `cursor` alongside a conflicting `orderBy` is an error
+rather than a silent override.
 
 ### Sorting
 
@@ -13890,7 +14238,7 @@ told "no matches" when the truth is "not supported".
 A `json` or `jsonb` column can be filtered by path, using Postgres's own arrow
 syntax:
 
-```typescript no-verify
+```typescript
 // Orders whose metadata says the country is US
 const { data } = await client.data.orders
     .where("metadata->>country", "==", "US")
@@ -13913,7 +14261,7 @@ Path segments are always sent as bound parameters, never spliced into SQL.
 `->>` yields **text**, so comparisons are text comparisons — except that an
 ordering operator (`>`, `>=`, `<`, `<=`) given a **number** casts to numeric:
 
-```typescript no-verify
+```typescript
 await client.data.orders.where("metadata->>score", ">", 100).find();     // numeric: 9 < 100
 await client.data.orders.where("metadata->>version", ">", "1.2").find(); // text
 ```
@@ -14179,6 +14527,14 @@ const { data } = await client.data.talents.find({
 orderBy: [[{ relation: "orders", agg: "count" }, "desc"]]
 ```
 
+The fluent builder takes the same key:
+
+```typescript
+const { data } = await client.data.clients
+    .orderBy({ relation: "orders", agg: "count" }, "desc")
+    .find();
+```
+
 `min`, `max`, `count`, `sum` and `avg`. `field` is required by all of them
 except `count`, which counts the related rows when you leave it out and counts
 the rows with a non-null column when you don't.
@@ -14258,6 +14614,14 @@ const result = await client.call<{ summary: string }>(
     { articleId: 42 }
 );
 ```
+
+Both return **the function's response body, verbatim**. Neither reaches into it
+for a `data` key, so a function that answers `{ data: [...] }` gives you that
+object and you read `.data` yourself.
+
+`call()` takes a full path and always POSTs; `invoke()` takes a function name
+and can take a method, a sub-path and headers. Use `invoke()` unless you are
+calling something that is not a function.
 
 ### Next Steps
 
@@ -14367,6 +14731,151 @@ await client.auth.signInWithOAuth("custom-provider", {
 });
 ```
 
+### Magic Links
+
+A one-click sign-in link by email. The link lands on a page of yours carrying a
+token; hand the token back to trade it for a session.
+
+```typescript
+// 1. Ask for the link. `redirectTo` is where the link points.
+await client.auth.sendMagicLink("user@example.com");
+
+// 2. On the landing page, trade the token for a session.
+const token = new URLSearchParams(location.search).get("token")!;
+const { user } = await client.auth.verifyMagicLink(token);
+```
+
+`sendMagicLink` answers the same thing whether or not the address has an
+account. That is deliberate: an endpoint that said "no such user" is an account
+enumeration oracle, so do not use the result to tell a person whether they are
+registered — it does not know.
+
+Both need an email service configured on the backend, or they answer 503
+`EMAIL_NOT_CONFIGURED`.
+
+### One-Time Codes
+
+A six-digit code by email, for the same job where a link is awkward — a native
+app, a second device, a browser that mangles links.
+
+```typescript
+const { expiresInSeconds } = await client.auth.sendEmailOtp("user@example.com");
+
+// The address goes back with the code, because the code is only valid for it.
+const { user } = await client.auth.verifyEmailOtp("user@example.com", "418293");
+```
+
+Sending the address with the code is what keeps a six-digit guess a guess
+against *one* account rather than against every account at once.
+
+### Anonymous Sessions
+
+Sign a visitor in with no credentials at all, so they can start using the app
+before they have a reason to sign up:
+
+```typescript
+const { user } = await client.auth.signInAnonymously();
+user.isAnonymous;   // true
+```
+
+The account is real: it has an id, roles and a session, so row-level security
+scopes its rows exactly as it would a signed-up user's. What it does not have is
+a way back — nobody can sign in *as* it a second time, so everything it owns is
+lost with the session.
+
+`linkAnonymous` is how it stops being throwaway. The user **keeps their id**, so
+everything they created while anonymous stays theirs:
+
+```typescript
+await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
+```
+
+| Failure | Means |
+|---------|-------|
+| `ANONYMOUS_AUTH_DISABLED` (403) | The backend has not enabled anonymous auth |
+| `NOT_ANONYMOUS` (400) | The current session belongs to an ordinary account |
+| `EMAIL_EXISTS` (409) | The address already has an account — sign in to that one instead |
+
+### Linking a Provider to an Existing Account
+
+`signInWithGoogle` and friends sign a user *in*. `linkProvider` attaches a
+provider identity to the account already signed in, so the same person can come
+back through either door:
+
+```typescript
+await client.auth.linkProvider("google", { idToken });
+```
+
+The session already proves account ownership, so unlike sign-in this does not
+require the provider to have verified the email, and the two addresses need not
+match. It succeeds idempotently (`alreadyLinked: true`) when that identity is
+already on this account, and refuses with `IDENTITY_ALREADY_LINKED` (409) when
+it belongs to a different one.
+
+### Looking Up a User by Email
+
+```typescript
+const profile = await client.auth.findUserByEmail("user@example.com");
+// { uid, displayName, photoURL } | null
+```
+
+Three non-sensitive fields and nothing else — enough to show "you are inviting
+Jane" before an invitation is sent.
+
+### Multi-Factor Authentication
+
+TOTP factors — an authenticator app — plus the challenge that raises a session
+from `aal1` to `aal2`.
+
+#### Enrolling a factor
+
+```typescript
+const { factor, totp, recoveryCodes } = await client.auth.mfa.enroll({
+    friendlyName: "Phone"
+});
+
+showQrCode(totp.uri);        // otpauth://… — what the authenticator scans
+showRecoveryCodes(recoveryCodes);
+```
+
+**Show the recovery codes once and never again.** Only their hashes are stored,
+so nothing can display them later.
+
+The factor is not usable until the user proves their authenticator produced a
+code from that secret:
+
+```typescript
+await client.auth.mfa.verify(factor.id, "418293");
+```
+
+#### Signing in with MFA
+
+A sign-in against an MFA-enrolled account returns a session at `aal1`. Open a
+challenge and answer it to get the real one:
+
+```typescript
+const factors = await client.auth.mfa.listFactors();
+const { challengeId } = await client.auth.mfa.challenge(factors[0].id);
+
+// A TOTP code, or one of the recovery codes.
+const { user } = await client.auth.mfa.verifyChallenge(challengeId, "418293");
+```
+
+`verifyChallenge` mints the `aal2` session and this client adopts it, replacing
+the tokens the sign-in handed back. A challenge expires after five minutes, and
+a challenge that has been guessed at its limit stays spent for the rest of its
+life — otherwise one open challenge is unlimited guesses at six digits.
+
+#### Removing a factor
+
+```typescript
+await client.auth.mfa.unenroll(factorId);
+```
+
+Requires an `aal2` session — one that has already answered a challenge — so a
+stolen `aal1` token cannot turn MFA off. Removing the last verified factor also
+discards the recovery codes.
+
 ### Sign Out
 
 ```typescript
@@ -14408,6 +14917,80 @@ Token refresh happens automatically, but you can trigger it manually:
 const session = await client.auth.refreshSession();
 ```
 
+### Where the Session Lives: `authFlowMode`
+
+```typescript
+const client = createRebaseClient({
+    baseUrl: API_URL,
+    auth: { authFlowMode: "cookie" }
+});
+```
+
+| Mode | Where the refresh token is | When to use it |
+|------|----------------------------|----------------|
+| `"json"` *(default)* | Returned in the response body, kept in `localStorage` | A native app, a script, anything without a browser's cookie jar |
+| `"cookie"` | An **HttpOnly** cookie the backend sets | A browser app. Script running on your page cannot read it, which is what makes it XSS-safe |
+
+Cookie mode needs `auth.cookieAuth` on the backend, and it is what the generated
+frontend template uses.
+
+### Waiting for the Session to Be Restored
+
+**A restored session is not available on the first render.** `getSession()` is
+synchronous, so on page load it answers `null` while the restore is still in
+flight — and in cookie mode a restore is *always* in flight, because the refresh
+token is in a cookie the page cannot read, so the client has to ask the server
+for a fresh access token.
+
+Reading it synchronously is what produces a logged-out flash on every reload:
+
+```typescript no-verify
+// Wrong: renders the signed-out view for one round trip, every reload.
+const session = client.auth.getSession();
+if (!session) return <SignIn />;
+```
+
+`isInitialized()` resolves once the client has finished trying — whether it
+found a session or not:
+
+```typescript
+async function currentUser() {
+    await client.auth.isInitialized();
+    return client.auth.getSession()?.user ?? null;
+}
+```
+
+In React, that is one effect:
+
+```tsx
+
+function useCurrentUser() {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        client.auth.isInitialized().then(() => {
+            if (cancelled) return;
+            setUser(client.auth.getSession()?.user ?? null);
+            setLoading(false);
+        });
+        return () => { cancelled = true; };
+    }, []);
+
+    return { user, loading };
+}
+```
+
+`useRebaseAuthController` in `@rebasepro/app` already does this, so an app built
+on the generated template gets it for free.
+
+A successful restore also reaches `onAuthStateChange` as `TOKEN_REFRESHED` — it
+*is* a refresh — but a listener alone cannot tell you that the restore finished:
+a boot with no session emits nothing at all, which is indistinguishable from one
+still in progress. Await `isInitialized()` for that question and use the
+listener for changes after it.
+
 ### Auth State Listener
 
 React to authentication changes across your application:
@@ -14422,6 +15005,13 @@ const unsubscribe = client.auth.onAuthStateChange((event, session) => {
 // Stop listening
 unsubscribe();
 ```
+
+| Event | When |
+|-------|------|
+| `SIGNED_IN` | A sign-in or sign-up completed |
+| `TOKEN_REFRESHED` | The access token was renewed — including the silent renewal that restores a session on page load |
+| `USER_UPDATED` | `updateUser()` changed the profile |
+| `SIGNED_OUT` | A sign-out, or a refresh that failed for good |
 
 ### Password Management
 
@@ -14587,38 +15177,41 @@ const unsubscribe = client.data.orders.listen(
 
 ```typescript no-verify
 listen(
-    params: FindParams | undefined,
-    onUpdate: (response: FindResponse<M>) => void,
+    params: FindParams<M> | undefined,
+    onUpdate: (result: FindResult<M>) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-#### Two-Phase Meta
+`FindResult<M>` is the same shape `find()` returns: flat rows in `data`, and
+`{ total, limit, offset, hasMore }` in `meta`.
 
-When `listen()` fires, it emits updates in up to two phases:
+#### One emission per change
 
-1. **Immediate (estimated):** The first callback fires instantly with the entities and heuristic pagination metadata (`total` = number of returned entities, `hasMore` = whether the count equals the requested limit). This emission carries `meta.total: true`.
+Each server push calls your callback **once**, with metadata that describes the
+rows beside it. There is no separate first-paint emission and no flag to check:
 
-2. **Authoritative (optional):** An async count query runs in the background. If the authoritative `total` or `hasMore` differs from the estimate, a second callback fires with corrected metadata and **no** `estimated` flag. If the values match, the second emission is skipped entirely — your callback fires only once.
-
-If the count query **fails**, no second emission occurs. The first emission's `estimated: true` flag remains as the signal that the metadata is heuristic. This is not treated as a subscription error.
+- A `count()` runs for the query before the emission, so `meta.total` and
+  `meta.hasMore` are authoritative.
+- If a push arrives while that count is still in flight, the older emission is
+  dropped — you are never called back with a total belonging to a previous page.
+- If the count **fails**, the last total a count actually returned is reused. A
+  failed count says nothing about how big the collection is, so it must not be
+  allowed to overwrite a real answer. This is not a subscription error, and
+  `onError` is not called.
+- If no count has ever succeeded for this subscription, `meta.total` is a
+  **lower bound** — the rows on this page plus the ones paged past to reach
+  them — and `meta.hasMore` is `true` when the page came back full.
 
 ```typescript
 client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
-    (response) => {
-        if (response.meta.total) {
-            // First-paint: render immediately, total/hasMore may change
-            renderProducts(response.data, { loading: true });
-        } else {
-            // Authoritative: safe to render final pagination controls
-            renderProducts(response.data, { loading: false });
-        }
+    (result) => {
+        renderProducts(result.data);
+        renderPager({ total: result.meta.total, hasMore: result.meta.hasMore });
     }
 );
 ```
-
-> **Tip:** If you don't need to distinguish between estimated and authoritative metadata, you can ignore the `estimated` flag — both emissions carry the same `data` array.
 
 ### Subscribing to a Single Entity
 
@@ -14628,7 +15221,7 @@ Use `listenById()` to watch a specific record by its ID:
 // The SDK hands back a flat row, not an `Entity` — there is no `.values`.
 const unsubscribe = client.data
     .collection<{ id: number; name: string }>("products")
-    .listenById!(
+    .listenById(
     42,
     (product) => {
         if (product) {
@@ -14648,12 +15241,13 @@ const unsubscribe = client.data
 ```typescript no-verify
 listenById(
     id: string | number,
-    onUpdate: (entity: Entity<M> | undefined) => void,
+    onUpdate: (row: M | undefined) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-The callback receives `undefined` when the entity is deleted.
+The callback receives a flat row — not an `Entity`, so there is no `.values` —
+and `undefined` when the record is deleted.
 
 ### Fluent Query Builder
 
@@ -14731,7 +15325,7 @@ This matters for apps with meaningful signed-out traffic — marketing pages, pu
 
 Two related behaviours:
 
-- `realtime: false` remains a hard opt-out: no socket ever, and `client.realtime.channel()` throws.
+- `realtime: false` remains a hard opt-out: no socket ever, and `client.realtime.channel()` throws. So do `listen()` and `listenById()` — they are always there to call, and on a client with no socket they throw a `RebaseClientError` naming the option that would enable them. `observe()` does not: it degrades to a single fetch.
 - `client.close()` is final. It releases the socket and its reconnect timer, and nothing queued afterwards will redial. In Node, an open socket keeps the event loop alive, so a script that never calls it will not exit on its own.
 
 ### Broadcast Channels

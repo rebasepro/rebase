@@ -49,11 +49,12 @@ Après l'initialisation, ces routes sont montées :
 | `/api/auth/*` | Authentification (inscription, connexion, rafraîchissement, OAuth, liens magiques, codes à usage unique, MFA) |
 | `/api/admin/*` | Gestion des utilisateurs et des rôles (réservé aux administrateurs) |
 | `/api/storage/*` | Téléchargement, téléversement et suppression de fichiers |
-| `/api/data/collections` | Point d'extrémité des métadonnées de collection |
 | `/api/data/:slug` | Opérations CRUD par collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Historique des modifications d'entité (si activé) |
-| `/api/data/docs` | Spécification OpenAPI (lorsque `enableSwagger: true`) |
-| `/api/data/swagger` | Interface utilisateur Swagger (mode dev, lorsque `enableSwagger: true`) |
+| `/api/docs` | Spécification OpenAPI (quand `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (mode développement, quand `enableSwagger: true`) |
+| `/api/meta/contract` | Le schéma de collections du projet (admin uniquement) |
+| `/api/meta/schema-version` | Une chaîne de version pour ce schéma (non authentifié) |
 | `/api/functions/*` | Routes de fonctions personnalisées (lorsque `functionsDir` est défini) |
 | `/api/cron/*` | Gestion des tâches cron (réservé aux administrateurs, lorsque `cronsDir` est défini) |
 | WebSocket sur mise à niveau | Abonnements en temps réel |
@@ -159,11 +160,21 @@ Le backend inclut un gestionnaire d'erreurs qui intercepte toutes les exceptions
 {
     "error": {
         "message": "Entity not found",
-        "code": "not-found",
-        "status": 404
+        "code": "NOT_FOUND",
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
     }
 }
 ```
+
+| Champ | Toujours présent | Ce que c'est |
+|-------|:----------------:|--------------|
+| `message` | oui | Écrit pour la personne qui le lira dans une console. Nomme l'obstacle, pas la règle. |
+| `code` | oui | `SCREAMING_SNAKE_CASE` et stable. C'est le champ sur lequel brancher. |
+| `details` | non | Charge structurée quand le refus porte *sur* quelque chose — une liste de chemins en échec, un ensemble de champs inconnus. |
+| `requestId` | non | Présent quand la requête en portait un ou s'en est vu attribuer un ; reflète `X-Request-ID`. À citer dans un rapport de bug. |
+
+Le statut HTTP est sur la réponse, pas dans le corps. Branchez sur `code`, pas
+sur `message` — les messages sont écrits pour des humains et peuvent changer.
 
 Si l'initialisation échoue (par exemple, erreur de connexion à la base de données), le serveur démarre tout de même mais retourne 503 pour toutes les requêtes API, avec un message d'erreur descriptif dans les journaux.
 

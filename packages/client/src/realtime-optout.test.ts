@@ -1,4 +1,5 @@
 import { jest } from "@jest/globals";
+import { isUnsupported } from "@rebasepro/types";
 import { createRebaseClient } from "./index";
 
 /**
@@ -76,7 +77,7 @@ describe("realtime opt-out", () => {
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
         expect(opened).toHaveLength(0);
 
-        client.collection("posts").listen!(undefined, () => { /* noop */ });
+        client.collection("posts").listen(undefined, () => { /* noop */ });
 
         expect(opened).toHaveLength(1);
     });
@@ -87,8 +88,8 @@ describe("realtime opt-out", () => {
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
 
-        client.collection("posts").listen!(undefined, () => { /* noop */ });
-        client.collection("authors").listen!(undefined, () => { /* noop */ });
+        client.collection("posts").listen(undefined, () => { /* noop */ });
+        client.collection("authors").listen(undefined, () => { /* noop */ });
         void client.realtime.channel("doc:1").join();
 
         expect(opened).toHaveLength(1);
@@ -161,7 +162,7 @@ describe("realtime opt-out", () => {
         globalThis.WebSocket = FakeWebSocket;
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
-        client.collection("posts").listen!(undefined, () => { /* noop */ });
+        client.collection("posts").listen(undefined, () => { /* noop */ });
         expect(opened).toHaveLength(1);
 
         client.close();
@@ -177,11 +178,11 @@ describe("realtime opt-out", () => {
         globalThis.WebSocket = FakeWebSocket;
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
-        client.collection("posts").listen!(undefined, () => { /* noop */ });
+        client.collection("posts").listen(undefined, () => { /* noop */ });
         expect(opened).toHaveLength(1);
 
         client.close();
-        client.collection("authors").listen!(undefined, () => { /* noop */ });
+        client.collection("authors").listen(undefined, () => { /* noop */ });
 
         expect(opened).toHaveLength(1);
     });
@@ -260,7 +261,7 @@ isAnonymous: false }
         client.close();
     });
 
-    it("leaves listen() absent so callers can feature-detect, and says why via the query builder", () => {
+    it("keeps listen() callable and says why, at every level", () => {
         const { FakeWebSocket } = trackingWebSocket();
         globalThis.WebSocket = FakeWebSocket;
 
@@ -269,11 +270,43 @@ isAnonymous: false }
             realtime: false
         });
 
-        // `listen` stays undefined rather than becoming a throwing stub: the
-        // optional type is what makes `if (client.listen)` work and what makes
-        // TypeScript reject a bare call.
-        expect(client.collection("posts").listen).toBeUndefined();
+        // `listen` used to be *absent* here, so the same failure read as
+        // "realtime: false" through the query builder and as `undefined is not
+        // a function` one call earlier. It is now a stub carrying the sentence,
+        // and both spellings answer with it.
+        expect(() => client.collection("posts").listen(undefined, () => { /* noop */ }))
+            .toThrow(/realtime: false/);
+        expect(() => client.collection("posts").listenById("p1", () => { /* noop */ }))
+            .toThrow(/realtime: false/);
         expect(() => client.data.posts.include("author").listen(() => { /* noop */ }))
             .toThrow(/realtime: false/);
+    });
+
+    it("still lets an adapter ask whether this client can subscribe", () => {
+        // The capability question the absent property used to answer. The admin
+        // panel asks it to choose between subscribing and a one-shot `find()`,
+        // and a UI that subscribes into a throw is worse than one that polls.
+        const { FakeWebSocket } = trackingWebSocket();
+        globalThis.WebSocket = FakeWebSocket;
+
+        const off = createRebaseClient({ baseUrl: "http://localhost:3000", realtime: false });
+        expect(isUnsupported(off.collection("posts").listen)).toBe(true);
+        expect(isUnsupported(off.collection("posts").listenById)).toBe(true);
+
+        const on = createRebaseClient({ baseUrl: "http://localhost:3000" });
+        expect(isUnsupported(on.collection("posts").listen)).toBe(false);
+        expect(isUnsupported(on.collection("posts").listenById)).toBe(false);
+    });
+
+    it("observes without a socket instead of throwing", () => {
+        // `observe()` degrades to the single fetch; only `listen()` throws.
+        const { FakeWebSocket, opened } = trackingWebSocket();
+        globalThis.WebSocket = FakeWebSocket;
+
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000", realtime: false });
+        const stop = client.data.posts.observe(undefined, () => { /* noop */ }, () => { /* noop */ });
+
+        expect(opened).toHaveLength(0);
+        stop();
     });
 });

@@ -1,13 +1,20 @@
 import {
+    FindAllParams,
     FindParams,
     FindResult,
+    IterateParams,
     LogicalCondition,
     OrderByTuple,
+    PageWalkOptions,
+    RelationAggregateSort,
     SDKCollectionClient,
     SDKQueryBuilderInterface,
     WhereFilterOp,
     WhereValueFor,
-    type ComputedSortField
+    sortKeyToString,
+    type ComputedSortField,
+    type FieldPath,
+    type NonColumnFieldPath
 } from "@rebasepro/types";
 import { normalizeOrderBy } from "@rebasepro/common";
 
@@ -40,10 +47,21 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * client.data.users.where('age', '>=', 18).find()
      */
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
+    /** A relation path (`author.name`) or a JSON path (`metadata->>tier`). */
+    where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): this;
     where(logicalCondition: LogicalCondition): this;
     where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown): this {
         if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {
-            this.params.logical = columnOrCondition as LogicalCondition;
+            // A second group **narrows** rather than replaces. Every other
+            // `.where()` on this builder adds a condition, and `find()`'s
+            // `where`/`logical`/`search` are AND-ed with each other — so a
+            // second `.where(or(…))` silently discarding the first was the one
+            // call on the chain that widened the result set instead. An `or`
+            // that is dropped returns rows the caller filtered out.
+            const next = columnOrCondition as LogicalCondition;
+            this.params.logical = this.params.logical
+                ? { type: "and", conditions: [this.params.logical, next] }
+                : next;
             return this;
         }
 
@@ -80,9 +98,11 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * `.orderBy("roles").orderBy("created_at", "desc")` sorts by role and
      * shows the newest first within each one.
      */
-    orderBy(column: (keyof M & string) | ComputedSortField, direction: "asc" | "desc" = "asc"): this {
+    orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction: "asc" | "desc" = "asc"): this {
         const existing = normalizeOrderBy(this.params.orderBy) ?? [];
-        this.params.orderBy = [...existing, [column, direction] as OrderByTuple];
+        // `sortKeyToString` encodes a relation aggregate — `count(applications)`
+        // — which is the single-string form every layer below here speaks.
+        this.params.orderBy = [...existing, [sortKeyToString(column), direction] as OrderByTuple];
         return this;
     }
 
@@ -182,25 +202,45 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
     }
 
     /**
+     * Page through everything this query matches, one row at a time.
+     *
+     * `.limit()` on the builder becomes the page size, so the ceiling on a
+     * single `find()` is not a ceiling on what the query can read.
+     */
+    iterate(options?: PageWalkOptions<M>): AsyncIterableIterator<M> {
+        return this.collection.iterate({
+            ...(this.params as FindParams<M>),
+            ...(this.params.limit !== undefined && { pageSize: this.params.limit }),
+            ...options
+        } as IterateParams<M>);
+    }
+
+    /** Collect everything this query matches into one array. */
+    findAll(options?: PageWalkOptions<M> & { maxRows?: number }): Promise<M[]> {
+        return this.collection.findAll({
+            ...(this.params as FindParams<M>),
+            ...(this.params.limit !== undefined && { pageSize: this.params.limit }),
+            ...options
+        } as FindAllParams<M>);
+    }
+
+    /**
      * Count the records matching this query.
      */
     async count(): Promise<number> {
-        if (!this.collection.count) {
-            throw new Error("count() is not supported by this collection client.");
-        }
         return this.collection.count(this.params as FindParams<M>);
     }
 
     /**
      * Listen to realtime updates matching this query.
+     *
+     * The guard that used to stand here — `if (!this.collection.listen) throw`
+     * — has moved onto the client itself, which is where the same failure had
+     * to be diagnosed anyway: `client.data.posts.listen(…)`, one call short of
+     * this builder, answered `undefined is not a function`. The message is now
+     * the same either way.
      */
     listen(onUpdate: (data: FindResult<M>) => void, onError?: (error: Error) => void): () => void {
-        if (!this.collection.listen) {
-            throw new Error(
-                "Listen is only available when RebaseClient is configured with a websocketUrl, " +
-                "and not when it was created with realtime: false."
-            );
-        }
         return this.collection.listen(this.params as FindParams<M>, onUpdate, onError);
     }
 }

@@ -48,7 +48,14 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
     where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown): this {
         // Handle LogicalCondition signature
         if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {
-            this.params.logical = columnOrCondition as LogicalCondition;
+            // A second group narrows rather than replaces — see the SDK builder
+            // in `@rebasepro/client`, which had the same defect: every other
+            // `.where()` adds a condition, so the one that silently dropped the
+            // previous group was also the one that widened the result set.
+            const next = columnOrCondition as LogicalCondition;
+            this.params.logical = this.params.logical
+                ? { type: "and", conditions: [this.params.logical, next] }
+                : next;
             return this;
         }
 

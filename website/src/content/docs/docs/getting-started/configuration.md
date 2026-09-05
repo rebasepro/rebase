@@ -68,10 +68,30 @@ All configuration is done via environment variables in your `.env` file at the p
 | `PORT` | Port for the backend HTTP server. Read by `rebase start`; **`rebase dev` ignores it** and binds a port derived from the project path so several projects can run at once — use `rebase dev --port` to pin one. | `3001` |
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
-| `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. | — |
-| `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS. | — |
+| `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |
+| `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS, in both environments. | — |
 | `ADMIN_CONNECTION_STRING` | Admin-level database connection string (used for schema introspection and admin operations). | `DATABASE_URL` |
 | `DISABLE_DB_ROLE_SWITCHING` | Disable PostgreSQL role-switching in SQL Editor (useful for custom authentication where DB roles are not mapped). | `false` |
+
+#### CORS in development
+
+Development allows **localhost, plus whatever `CORS_ORIGINS` (or `FRONTEND_URL`)
+names** — the same list production uses, with localhost added rather than
+substituted. So the variable works the same way in both environments, and the
+cases that need it in development are the ordinary ones:
+
+```bash
+# A phone on the LAN, a colleague's machine, an ngrok tunnel,
+# a forwarded Codespaces port — all non-localhost origins.
+CORS_ORIGINS=http://192.168.1.5:5173
+```
+
+An origin that is neither localhost nor listed is refused, and the refusal is
+logged **once per origin** with the exact line that would allow it. Refusing is
+not caution for its own sake: the API sends credentials, so reflecting an
+arbitrary `Origin` would let any site the developer happens to visit make
+authenticated requests against the dev server with their session and read the
+answers.
 
 ### Authentication
 
@@ -303,7 +323,7 @@ await initializeRebaseBackend({
 
     history: true,           // Enable entity change history
 
-    enableSwagger: true,     // Enable OpenAPI docs at /api/data/docs
+    enableSwagger: true,     // Enable OpenAPI docs at /api/docs
 
     logging: {
         level: "info"

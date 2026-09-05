@@ -9,9 +9,15 @@ type Row = Record<string, unknown>;
 
 /**
  * A fake collection client backed by an in-memory table, with a switch that
- * makes every call fail the way fetch does when the network is down. This is
- * exactly the failure the manager keys on, so the tests exercise the real
- * online/offline decision logic rather than a mock of it.
+ * makes every call fail the way the transport does when the network is down.
+ * This is exactly the failure the manager keys on, so the tests exercise the
+ * real online/offline decision logic rather than a mock of it.
+ *
+ * It used to throw a bare `TypeError("fetch failed")`, which is what the
+ * *runtime's* `fetch` rejects with — but the manager never sees one: every
+ * method here stands in for a `createCollectionClient` method, and those go
+ * through `transport.request`, which wraps a transport failure into a
+ * `RebaseApiError` with `status: 0` before anything above it can see it.
  */
 function createFakeServer() {
     const state: { online: boolean; rejectNextCreate?: Error; rejectEveryCreate?: Error } = { online: true };
@@ -24,7 +30,13 @@ function createFakeServer() {
     }
 
     function assertOnline() {
-        if (!state.online) throw new TypeError("fetch failed");
+        if (!state.online) {
+            throw new RebaseApiError("Could not reach the server: fetch failed", {
+                status: 0,
+                code: "NETWORK_ERROR",
+                cause: new TypeError("fetch failed")
+            });
+        }
     }
 
     function client(slug: string): CollectionClient<Row> {

@@ -101,6 +101,27 @@ describe("RealtimeService — the channel gate", () => {
             expect(member.send).toBeDefined();
         });
 
+        /**
+         * The client has nowhere to put an error that names no channel: channel
+         * frames are fire-and-forget, so there is no pending request to reject
+         * and no subscription id to match, and a refusal fell through into a
+         * console warning. It already routes channel-addressed frames by name,
+         * so naming the channel is what makes `channel.onError()` possible.
+         */
+        it("names the channel on the refusal, so the client can deliver it", async () => {
+            const stranger = createClient(service, "stranger");
+
+            await service.handleClientMessage("stranger", {
+                type: "broadcast",
+                payload: { channel: "doc:42", event: "op", payload: { forged: true } }
+            });
+
+            const frame = framesOfType(stranger, "error")[0];
+            expect(frame?.payload?.error?.code).toBe("CHANNEL_FORBIDDEN");
+            expect(frame?.channel).toBe("doc:42");
+            expect(frame?.payload?.channel).toBe("doc:42");
+        });
+
         it("refuses channel_history for a channel the client never joined", async () => {
             await service.configureChannelHistory([{ match: "doc:*", limit: 500 }]);
             const stranger = createClient(service, "stranger");

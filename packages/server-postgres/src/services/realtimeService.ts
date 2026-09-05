@@ -1265,12 +1265,27 @@ roles: activeAuth.roles },
         }
     }
 
-    private sendError(clientId: string, error: string, subscriptionId?: string, code?: string) {
+    /**
+     * `channel` addresses the error to the channel frame it is about.
+     *
+     * Without it the client had nowhere to deliver a channel error: channel
+     * frames are fire-and-forget, so there is no pending request to reject and
+     * no subscription id to match, and `CHANNEL_FORBIDDEN`, `RATE_LIMITED` and
+     * the two history failures fell through every branch of the client's
+     * message handler into a console warning. The client already routes
+     * channel-addressed frames by name — `onChannelMessage(channel, …)` — so
+     * naming the channel is all that was missing.
+     *
+     * Additive on the wire: a client that does not read it behaves as before.
+     */
+    private sendError(clientId: string, error: string, subscriptionId?: string, code?: string, channel?: string) {
         const message = {
             type: "error" as const,
             subscriptionId,
+            ...(channel !== undefined && { channel }),
             payload: {
-                error: code ? { message: error, code } : error
+                error: code ? { message: error, code } : error,
+                ...(channel !== undefined && { channel })
             },
             error
         };
@@ -1468,7 +1483,8 @@ roles: activeAuth.roles },
             clientId,
             `Refused ${action} on channel "${channel}": ${reason}`,
             undefined,
-            "CHANNEL_FORBIDDEN"
+            "CHANNEL_FORBIDDEN",
+            channel
         );
     }
 
@@ -1580,7 +1596,8 @@ roles: activeAuth.roles },
                 clientId,
                 `Could not persist broadcast on retained channel "${channel}"`,
                 undefined,
-                "CHANNEL_HISTORY_WRITE_FAILED"
+                "CHANNEL_HISTORY_WRITE_FAILED",
+                channel
             );
             return;
         }
@@ -1758,7 +1775,8 @@ roles: activeAuth.roles },
             clientId,
             `Broadcast on "${channel}" was too large to reach other instances. ${remedy}`,
             undefined,
-            "CHANNEL_BUS_PAYLOAD_TOO_LARGE"
+            "CHANNEL_BUS_PAYLOAD_TOO_LARGE",
+            channel
         );
     }
 
@@ -1858,7 +1876,7 @@ roles: activeAuth.roles },
             this.sendChannelHistory(clientId, channel, messages, true, latestSeq);
         } catch (error) {
             logger.error(`❌ [ChannelHistory] Replay failed for "${channel}"`, { error });
-            this.sendError(clientId, `Could not replay history for channel "${channel}"`, undefined, "CHANNEL_HISTORY_READ_FAILED");
+            this.sendError(clientId, `Could not replay history for channel "${channel}"`, undefined, "CHANNEL_HISTORY_READ_FAILED", channel);
         }
     }
 

@@ -1083,146 +1083,12 @@ pks: ID_PKS }) });
     // -----------------------------------------------------------------------
     // collection_entity_patch handling
     // -----------------------------------------------------------------------
-    describe("collection_patch", () => {
-        it("patches existing row in collection", () => {
-            const client = createClient();
-            jest.runAllTimers();
-            const ws = getWs();
+    // The `collection_patch` block was here — three tests for the immediate
+    // row-level patch. Nothing sends one: the server replaced it with a scoped
+    // refetch, which is the only delivery on any path, and the client's handler
+    // for it went with these. The cache-merge rules they covered are asserted
+    // on the refetch in `realtime-row-identity.test.ts`, where they now live.
 
-            const onUpdate = jest.fn();
-            client.listenCollection({ path: "posts" }, onUpdate);
-
-            const subMsg = JSON.parse(ws.sentMessages[0]);
-            const subId = subMsg.payload.subscriptionId;
-
-            // Initial data
-            ws.onmessage!({ data: JSON.stringify({
-                type: "collection_update",
-                subscriptionId: subId,
-                rows: [
-                    { id: "1",
-title: "Old" },
-                    { id: "2",
-title: "Two" }
-                ],
-                pks: ID_PKS
-            }) });
-
-            onUpdate.mockClear();
-
-            // Patch row 1. The server names the row by its address in the
-            // envelope `id`; the row itself is columns only.
-            ws.onmessage!({ data: JSON.stringify({
-                type: "collection_patch",
-                subscriptionId: subId,
-                id: "1",
-                row: { id: "1",
-title: "New" }
-            }) });
-
-            expect(onUpdate).toHaveBeenCalledTimes(1);
-            const updatedEntities = onUpdate.mock.calls[0][0];
-            expect(updatedEntities).toHaveLength(2);
-            expect(updatedEntities[0]).toEqual({ id: "1",
-title: "New" });
-            expect(updatedEntities[1]).toEqual({ id: "2",
-title: "Two" });
-        });
-
-        it("adds new row via patch (prepends)", () => {
-            const client = createClient();
-            jest.runAllTimers();
-            const ws = getWs();
-
-            const onUpdate = jest.fn();
-            client.listenCollection({ path: "posts" }, onUpdate);
-
-            const subMsg = JSON.parse(ws.sentMessages[0]);
-            const subId = subMsg.payload.subscriptionId;
-
-            // Initial data
-            ws.onmessage!({ data: JSON.stringify({
-                type: "collection_update",
-                subscriptionId: subId,
-                rows: [{ id: "1" }]
-            }) });
-            onUpdate.mockClear();
-
-            // New row via patch
-            ws.onmessage!({ data: JSON.stringify({
-                type: "collection_patch",
-                subscriptionId: subId,
-                id: "new",
-                row: { id: "new",
-title: "Fresh" }
-            }) });
-
-            const result = onUpdate.mock.calls[0][0];
-            expect(result).toHaveLength(2);
-            expect(result[0].id).toBe("new"); // Prepended
-        });
-
-        it("removes row from collection on null patch", () => {
-            const client = createClient();
-            jest.runAllTimers();
-            const ws = getWs();
-
-            const onUpdate = jest.fn();
-            client.listenCollection({ path: "posts" }, onUpdate);
-
-            const subMsg = JSON.parse(ws.sentMessages[0]);
-            const subId = subMsg.payload.subscriptionId;
-
-            // Initial data
-            ws.onmessage!({ data: JSON.stringify({
-                type: "collection_update",
-                subscriptionId: subId,
-                rows: [
-                    { id: "1" },
-                    { id: "2" }
-                ],
-                pks: ID_PKS
-            }) });
-            onUpdate.mockClear();
-
-            // Delete row 1
-            ws.onmessage!({ data: JSON.stringify({
-                type: "collection_patch",
-                subscriptionId: subId,
-                row: null,
-                id: "1"
-            }) });
-
-            const result = onUpdate.mock.calls[0][0];
-            expect(result).toHaveLength(1);
-            expect(result[0].id).toBe("2");
-        });
-
-        it("ignores patches before initial data is received", () => {
-            const client = createClient();
-            jest.runAllTimers();
-            const ws = getWs();
-
-            const onUpdate = jest.fn();
-            client.listenCollection({ path: "posts" }, onUpdate);
-
-            const subMsg = JSON.parse(ws.sentMessages[0]);
-            const subId = subMsg.payload.subscriptionId;
-
-            // Patch before any collection_update
-            ws.onmessage!({ data: JSON.stringify({
-                type: "collection_patch",
-                subscriptionId: subId,
-                row: { id: "1" }
-            }) });
-
-            expect(onUpdate).not.toHaveBeenCalled();
-        });
-    });
-
-    // -----------------------------------------------------------------------
-    // Subscription error handling
-    // -----------------------------------------------------------------------
     describe("Subscription errors", () => {
         it("calls onError for collection subscription errors", () => {
             const client = createClient();
@@ -2228,7 +2094,7 @@ value: "2025-09-15T18:30:00.000Z" }
             expect(row.updatedAt.toISOString()).toBe("2025-09-15T18:30:00.000Z");
         });
 
-        it("rehydrates dates in collection_entity_patch updates", () => {
+        it("rehydrates dates in collection updates", () => {
             const client = createClient();
             jest.runAllTimers();
             const ws = getWs();
@@ -2249,17 +2115,16 @@ title: "Original" }]
 
             onUpdate.mockClear();
 
-            // Now send a patch with a date
+            // Now send a refetch carrying a date.
             ws.onmessage!({ data: JSON.stringify({
-                type: "collection_patch",
+                type: "collection_update",
                 subscriptionId: subId,
-                id: "1",
-                row: {
+                rows: [{
                     id: "1",
                     title: "Patched",
                     patchedAt: { __type: "date",
 value: "2025-10-01T00:00:00.000Z" }
-                }
+                }]
             }) });
 
             expect(onUpdate).toHaveBeenCalledTimes(1);

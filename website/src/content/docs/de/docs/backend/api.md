@@ -433,13 +433,28 @@ API_KEY_SELF_MANAGEMENT_FORBIDDEN` abgelehnt, unabhängig von ihrem
 `admin`-Flag. Die Schlüsselverwaltung erfordert die Sitzung eines
 Admin-Benutzers oder den Service-Schlüssel.
 
-## Metadaten-Endpunkt
+## Schema-Metadaten
 
-Rufen Sie eine Liste aller verfügbaren Collections und ihrer Struktur ab:
+Das vollständige Sammlungsschema des Projekts — jede Sammlung, Eigenschaft und
+Beziehung — wird an einen authentifizierten Admin ausgeliefert:
 
 ```bash
-GET /api/collections
+GET /api/meta/contract
 ```
+
+Es ist **nur für Admins**, und auf einer Bereitstellung ohne konfigurierte
+Authentifizierung wird es gar nicht ausgeliefert (404 `CONTRACT_UNAVAILABLE`),
+statt das Schema für jeden offenzulegen. Das Gegenstück liefert eine
+Versionszeichenfolge, die für das Schema steht, ohne es zu beschreiben, und ist
+bewusst ohne Anmeldedaten erreichbar — das ist, was ein CI-Job abfragt:
+
+```bash
+GET /api/meta/schema-version
+```
+
+Für die Form der Endpunkte statt des Schemas dahinter liegt das
+OpenAPI-Dokument unter `GET /api/docs`, mit Swagger UI unter `/api/swagger`,
+wenn `enableSwagger` aktiviert ist.
 
 ## Nächste Schritte
 

@@ -60,11 +60,12 @@ After initialization, these routes are mounted:
 | `/api/auth/*` | Authentication (signup, login, refresh, OAuth, magic links, one-time codes, MFA) |
 | `/api/admin/*` | User and role management (admin-only) |
 | `/api/storage/*` | File upload, download, and deletion |
-| `/api/data/collections` | Collection metadata endpoint |
 | `/api/data/:slug` | CRUD operations per collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
-| `/api/data/docs` | OpenAPI spec (when `enableSwagger: true`) |
-| `/api/data/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
+| `/api/docs` | OpenAPI spec (when `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
+| `/api/meta/contract` | The project's collection schema (admin-only) |
+| `/api/meta/schema-version` | A version string for that schema (unauthenticated) |
 | `/api/functions/*` | Custom function routes (when `functionsDir` is set) |
 | `/api/cron/*` | Cron job management (admin-only, when `cronsDir` is set) |
 | WebSocket on upgrade | Real-time subscriptions |
@@ -111,8 +112,7 @@ If the database is unreachable during boot (e.g., PostgreSQL is starting or netw
   {
     "error": {
       "message": "Database connection is not ready.",
-      "code": "service-unavailable",
-      "status": 503
+      "code": "SERVICE_UNAVAILABLE"
     }
   }
   ```
@@ -242,14 +242,42 @@ The backend uses PostgreSQL `LISTEN/NOTIFY` internally. For multi-instance deplo
 
 ## Error Handling
 
-The backend includes an error handler that catches all exceptions and returns structured error responses:
+Every failure — from any route, in any subsystem — comes back in one envelope:
 
 ```json
 {
     "error": {
         "message": "Entity not found",
-        "code": "not-found",
-        "status": 404
+        "code": "NOT_FOUND",
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
+    }
+}
+```
+
+| Field | Always present | What it is |
+|-------|:--------------:|------------|
+| `message` | yes | Written for a person reading a console. Names the obstacle, not the rule. |
+| `code` | yes | `SCREAMING_SNAKE_CASE` and stable. This is the field to branch on. |
+| `details` | no | Structured payload when the refusal is *about* something — a list of failing paths, a set of unknown fields. |
+| `requestId` | no | Present when the request carried or was assigned one; echoes `X-Request-ID`. Quote it in a bug report. |
+
+The HTTP status is on the response, not in the body. Branch on `code`, not on
+`message` — messages are written for humans and are free to change.
+
+The client SDK turns every one of these into a `RebaseApiError` carrying
+`status`, `code` and `details` — including the failures that never reached a
+server at all. A refused connection, a DNS failure, CORS or an abort arrives as
+`status: 0`, `code: "NETWORK_ERROR"`, with the runtime's own error on `cause`,
+rather than as whatever `fetch` felt like rejecting with. So application code
+catches one class:
+
+```typescript
+async function setPrice(id: string, price: number) {
+    try {
+        return await client.data.products.update(id, { price });
+    } catch (e) {
+        if (e instanceof RebaseApiError && e.code === "NOT_FOUND") return null;
+        throw e;
     }
 }
 ```

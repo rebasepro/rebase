@@ -138,6 +138,59 @@ GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
 GET /api/data/products?and=(active.eq.true,price.gt.0)
 ```
 
+**One group per request, and `or` wins.** If a request carries both `?or=` and
+`?and=`, the `and` is ignored — they are two spellings of the same slot, not two
+filters. Nest instead:
+
+```bash
+GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
+```
+
+Groups may nest 32 levels deep; past that the request is refused with
+`INVALID_LOGICAL_GROUP`.
+
+A group **narrows** alongside the field filters rather than replacing them — see
+[How the filters combine](#how-the-filters-combine).
+
+### The `where` JSON dialect
+
+The field filters above are one of two ways to send a filter. The other is a
+single JSON object, which is what the OpenAPI document publishes on every
+`GET /api/data/{slug}` and what the nested subcollection routes take:
+
+```bash
+GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
+```
+
+Each key is a field, each value a canonical `[operator, value]` tuple — the same
+tuples the SDK writes. A value may also be a pre-serialized dot-string
+(`{"status":"eq.active"}`) or a bare scalar (`{"status":"active"}`); all three
+compile to the same condition.
+
+The difference worth knowing: **JSON carries types.** `?price=gte.100` sends the
+string `"100"` and the driver casts it by column type, while
+`?where={"price":[">=",100]}` sends a number. For a column whose text and
+numeric readings differ — a version string, a zero-padded code — that is the
+parameter to reach for.
+
+A malformed `where` is a 400 `INVALID_WHERE`, not a silently dropped filter:
+dropping it would run the read unfiltered and return everything row-level
+security happens to allow.
+
+### How the filters combine
+
+`?field=op.value`, `?where=`, `?or=`/`?and=` and `?searchString=` are
+independent, and every one of them that is present must match:
+
+```text
+(field filters and `where`, AND-ed together)
+  AND (the logical group)
+  AND (the search string)
+```
+
+There is no way to OR one against another. Anything that is not a plain AND of
+those groups belongs inside a single `or=`/`and=` tree.
+
 ## Sorting
 
 Use `orderBy` with the format `field:direction`:
@@ -187,6 +240,12 @@ GET /api/data/products?page=3
 
 The default limit is **50**, the maximum is **1000**. Both come from `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, which the generated OpenAPI spec reports too — a `limit` above the maximum is rejected rather than clamped.
 
+All three window parameters are refused rather than repaired, and each names
+itself: `INVALID_LIMIT`, `INVALID_OFFSET` (a whole number of 0 or more) and
+`INVALID_PAGE` (a whole number of 1 or more). A window quietly different from
+the one asked for cannot be told apart from having reached the end of the
+collection, which is why none of them is clamped or ignored.
+
 ### Response Format
 
 List responses include pagination metadata:
@@ -216,6 +275,52 @@ Single entity responses return a flat object:
     "createdAt": "2026-01-15T10:30:00Z"
 }
 ```
+
+## Errors
+
+Every failure, from every route, comes back in one envelope:
+
+```json
+{
+    "error": {
+        "message": "Unknown filter operator 'contains' on field 'title'.",
+        "code": "UNKNOWN_FILTER_OPERATOR",
+        "details": { "field": "title", "operator": "contains" },
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
+    }
+}
+```
+
+`message` and `code` are always present. `details` appears when the refusal is
+*about* something — the field that was wrong, the paths that failed. `requestId`
+appears when the request carried an `X-Request-ID` header or was assigned one;
+it is echoed on the response header too, and it is the thing to quote in a bug
+report.
+
+**Branch on `code`, never on `message` or on the status alone.** Codes are
+`SCREAMING_SNAKE_CASE` and stable; messages are written for a person reading a
+console and are free to change. The HTTP status is on the response, not in the
+body.
+
+| Status | Typical code | Means |
+|--------|--------------|-------|
+| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | The request is malformed or asks for something impossible |
+| 401 | `UNAUTHORIZED` | No credential, or one that identifies nobody |
+| 403 | `FORBIDDEN`, `DB_PERMISSION_DENIED` | A credential that identifies somebody without the right |
+| 404 | `NOT_FOUND` | The thing addressed does not exist |
+| 409 | `CONFLICT` | The state conflicts — a duplicate key, a dirty tree |
+| 501 | varies | The surface exists but is **not configured** on this deployment |
+| 503 | `SERVICE_UNAVAILABLE` | A dependency is down; the request never reached it |
+
+A surface that is absent because this deployment did not enable it answers 501
+with a code and a reason, not 404 — an unexplained 404 on a route the UI just
+called reads as a broken deploy.
+
+Routes add their own more specific codes on top of these (`EMAIL_EXISTS`,
+`TOKEN_EXPIRED`, `UNKNOWN_FILTER_OPERATOR`, …), so treat the list of codes as
+open. The client SDK turns all of them into a single `RebaseApiError` carrying
+`status`, `code` and `details` — see
+[Error handling](/docs/backend#error-handling).
 
 ## Text Search
 
@@ -476,13 +581,28 @@ Keys can be listed, updated, and revoked via `/api/admin/api-keys` or the
 API_KEY_SELF_MANAGEMENT_FORBIDDEN`, whatever its `admin` flag. Key management
 requires an admin user's session or the service key.
 
-## Metadata Endpoint
+## Schema Metadata
 
-Get a list of all available collections and their structure:
+The project's full collection schema — every collection, property and relation —
+is served to an authenticated admin:
 
 ```bash
-GET /api/collections
+GET /api/meta/contract
 ```
+
+It is **admin-only**, and on a deployment with no authentication configured it
+is not served at all (404 `CONTRACT_UNAVAILABLE`) rather than exposing the
+schema to anyone. Its sibling returns a version string that stands for the
+schema without describing it, and is deliberately reachable with no credential
+— which is what a CI job polls:
+
+```bash
+GET /api/meta/schema-version
+```
+
+For the shape of the endpoints rather than the schema behind them, the OpenAPI
+document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
+`enableSwagger` is on.
 
 ## Next Steps
 

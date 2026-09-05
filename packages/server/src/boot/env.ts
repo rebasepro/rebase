@@ -306,19 +306,47 @@ export type CorsOriginResolver = (origin: string) => string | null;
  * `FRONTEND_URL`, so an empty list here can only mean the values were blank
  * strings — still worth failing on, because the alternative is an API that
  * quietly rejects its own frontend.
+ *
+ * Development reflects localhost *and* whatever that same allow-list names. The
+ * list is the same one in both environments; the difference is that development
+ * adds localhost to it rather than replacing it.
  */
 export function resolveCorsOrigin(env: RebaseBootEnv): CorsOriginResolver {
     const isProduction = env.NODE_ENV === "production";
-
-    if (!isProduction) {
-        return (origin: string) => {
-            if (!origin) return "*";
-            return isLocalhostOrigin(origin) ? origin : null;
-        };
-    }
-
     const raw = env.CORS_ORIGINS || env.FRONTEND_URL || "";
     const allowed = raw.split(",").map(s => s.trim()).filter(Boolean);
+
+    if (!isProduction) {
+        // Development reflects localhost, **plus** anything the developer
+        // explicitly listed. The list used to be ignored outside production, so
+        // setting `CORS_ORIGINS` — the variable the error message names, the
+        // one the docs describe — changed nothing in the environment where it
+        // is most often needed: a phone or a colleague's machine hitting the
+        // dev server over the LAN, an ngrok tunnel, a Codespaces forwarded
+        // port. Every one of those is a non-localhost origin, and every one of
+        // them was refused with no way to allow it.
+        //
+        // Localhost stays reflected without being listed, and an origin that is
+        // *neither* is still refused: credentials are enabled, so reflecting an
+        // arbitrary `Origin` would let any site the developer happens to visit
+        // make credentialed requests against the dev server with their session.
+        const denied = new Set<string>();
+        return (origin: string) => {
+            if (!origin) return "*";
+            if (isLocalhostOrigin(origin) || allowed.includes(origin)) return origin;
+            // Once per origin: a refused preflight is retried on every request,
+            // and the message is a fix, not an incident.
+            if (!denied.has(origin)) {
+                denied.add(origin);
+                console.warn(
+                    `[Rebase] Refused a cross-origin request from ${origin}. ` +
+                    "In development only localhost is allowed by default. " +
+                    `To allow it, set CORS_ORIGINS=${origin} (comma-separated for several).`
+                );
+            }
+            return null;
+        };
+    }
 
     if (allowed.length === 0) {
         throw new Error(

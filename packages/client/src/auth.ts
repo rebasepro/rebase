@@ -1,4 +1,5 @@
 import { RebaseApiError, Transport } from "./transport";
+import { RebaseClientError } from "@rebasepro/types";
 import type { AuthAdapterCapabilities, AuthChangeEvent, RebaseSession, AuthTokens, DeviceSession, User } from "@rebasepro/types";
 
 // Re-export canonical types so `import { RebaseSession } from "@rebasepro/client"` keeps working
@@ -560,7 +561,13 @@ redirectUri });
 
     async function doRefreshSession(): Promise<RebaseSession> {
         if (authFlowMode !== "cookie" && !currentSession?.refreshToken) {
-            throw new Error("No active session to refresh");
+            // A `RebaseClientError`, not a bare `Error`: the SDK documents one
+            // class a `catch` block has to check for, and this is raised before
+            // any request is made, which is exactly what that class is.
+            throw new RebaseClientError(
+                "No active session to refresh. Sign in first, or set `authFlowMode: \"cookie\"` " +
+                "if the refresh token is held in an HttpOnly cookie."
+            );
         }
         const fetchFn = getFetch();
         const res = await fetchFn(authUrl("/refresh"), {
@@ -788,6 +795,142 @@ accessToken: session.accessToken,
 refreshToken: session.refreshToken };
     }
 
+    /**
+     * Sign in without credentials, as a throwaway account.
+     *
+     * The account is real — it has an id, roles and a session, so row-level
+     * security scopes its data exactly as it would a signed-up user's. What it
+     * does not have is a way back: nobody can sign in *as* it a second time, so
+     * everything it owns is lost when the session is. `linkAnonymous` is how it
+     * stops being throwaway.
+     *
+     * Refused with `ANONYMOUS_AUTH_DISABLED` unless the backend has it on.
+     */
+    async function signInAnonymously() {
+        const fetchFn = getFetch();
+        const res = await fetchFn(authUrl("/anonymous"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: authFlowMode === "cookie" ? "include" : undefined
+        } as RequestInit);
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throwApiError(res.status, body, res.statusText);
+        const session = handleAuthResponse(body, "SIGNED_IN");
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
+    }
+
+    /**
+     * Put an email and password on the anonymous account this client holds.
+     *
+     * The user keeps their id, so everything they created while anonymous stays
+     * theirs — which is the point: the alternative is asking a visitor to sign
+     * up before they have any reason to.
+     *
+     * Requires a live anonymous session. `NOT_ANONYMOUS` (400) if the session
+     * belongs to an ordinary account, `EMAIL_EXISTS` (409) if the address is
+     * taken.
+     */
+    async function linkAnonymous(email: string, password: string) {
+        const body = await transport.request<{ tokens: AuthTokens; user: Record<string, unknown> }>(
+            authPath + "/anonymous/link",
+            {
+                method: "POST",
+                body: JSON.stringify({ email, password })
+            }
+        );
+        const session = handleAuthResponse(body, "USER_UPDATED");
+        return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
+    }
+
+    /**
+     * Multi-factor authentication: TOTP factors, and the challenge that raises
+     * a session to `aal2`.
+     *
+     * The backend has served all six of these since MFA landed; the SDK exposed
+     * none of them, so every app that wanted MFA hand-wrote `fetch` calls
+     * against `/auth/mfa/*` — including the auth header and the cookie flag,
+     * which is exactly what a client is for.
+     */
+    const mfa = {
+        /**
+         * Start enrolling a TOTP factor.
+         *
+         * Returns the secret and an `otpauth://` URI to render as a QR code,
+         * plus ten single-use recovery codes. **Show the recovery codes once
+         * and never again** — only their hashes are stored.
+         *
+         * The factor is not usable until `verify` confirms the user's
+         * authenticator produced a correct code from it.
+         */
+        async enroll(options?: { friendlyName?: string; issuer?: string }) {
+            return transport.request<{
+                factor: { id: string; factorType: string; friendlyName?: string };
+                totp: { secret: string; uri: string; qrUri: string };
+                recoveryCodes: string[];
+            }>(authPath + "/mfa/enroll", {
+                method: "POST",
+                body: JSON.stringify(options ?? {})
+            });
+        },
+
+        /** Confirm an enrolment with a code from the authenticator app. */
+        async verify(factorId: string, code: string) {
+            return transport.request<{ success: boolean; factor: { id: string; verified: boolean } }>(
+                authPath + "/mfa/verify",
+                { method: "POST", body: JSON.stringify({ factorId, code }) }
+            );
+        },
+
+        /** The factors on this account, verified or not. */
+        async listFactors() {
+            const data = await transport.request<{
+                factors: { id: string; factorType: string; friendlyName?: string; verified: boolean; createdAt: string }[];
+            }>(authPath + "/mfa/factors", { method: "GET" });
+            return data.factors;
+        },
+
+        /**
+         * Remove a factor. Requires an `aal2` session — one that has already
+         * answered a challenge — so a stolen `aal1` token cannot turn MFA off.
+         */
+        async unenroll(factorId: string) {
+            return transport.request<{ success: boolean; message: string }>(
+                authPath + "/mfa/unenroll",
+                { method: "DELETE", body: JSON.stringify({ factorId }) }
+            );
+        },
+
+        /** Open a challenge against a verified factor. Expires in five minutes. */
+        async challenge(factorId: string) {
+            return transport.request<{ challengeId: string; factorId: string; expiresAt: string }>(
+                authPath + "/mfa/challenge",
+                { method: "POST", body: JSON.stringify({ factorId }) }
+            );
+        },
+
+        /**
+         * Answer a challenge with a TOTP code or a recovery code.
+         *
+         * This is where an MFA-enrolled account's real session is minted, at
+         * `aal2` — so the returned tokens replace the ones the sign-in handed
+         * back, and this client adopts them.
+         */
+        async verifyChallenge(challengeId: string, code: string) {
+            const body = await transport.request<{ tokens: AuthTokens; user: Record<string, unknown> }>(
+                authPath + "/mfa/challenge/verify",
+                { method: "POST", body: JSON.stringify({ challengeId, code }) }
+            );
+            const session = handleAuthResponse(body, "SIGNED_IN");
+            return { user: session.user,
+accessToken: session.accessToken,
+refreshToken: session.refreshToken };
+        }
+    };
+
     async function getSessions(): Promise<DeviceSession[]> {
         const data = await transport.request<{ sessions: DeviceSession[] }>(authPath + "/sessions", { method: "GET" });
         return data.sessions;
@@ -885,6 +1028,9 @@ refreshToken: session.refreshToken };
         signInWithBitbucket,
         signInWithSlack,
         signInWithSpotify,
+        signInAnonymously,
+        linkAnonymous,
+        mfa,
         signOut,
         stopAutoRefresh,
         refreshSession,

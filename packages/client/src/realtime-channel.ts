@@ -61,6 +61,7 @@ export interface BroadcastEvent {
  */
 export type { ChannelHistoryEntry } from "@rebasepro/types";
 import type { ChannelHistoryEntry } from "@rebasepro/types";
+import { RebaseApiError } from "@rebasepro/types";
 
 /** The answer to a catch-up request. */
 export interface ChannelHistoryResult {
@@ -119,6 +120,7 @@ const CATCH_UP_TIMEOUT_MS = 10_000;
 export class RebaseRealtimeChannel {
     private presenceHandlers = new Set<(state: PresenceState, diff?: PresenceDiff) => void>();
     private broadcastHandlers = new Set<(event: BroadcastEvent) => void>();
+    private errorHandlers = new Set<(error: RebaseApiError) => void>();
     private unsubscribers: (() => void)[] = [];
 
     /** Last known roster, kept so handlers always get a full picture. */
@@ -347,10 +349,41 @@ export class RebaseRealtimeChannel {
         return () => this.presenceHandlers.delete(handler);
     }
 
-    /** Send a broadcast. The sender does not receive its own message. */
+    /**
+     * Send a broadcast. The sender does not receive its own message.
+     *
+     * Resolves when the frame is written to the socket, **not** when the server
+     * has accepted it. Channel frames are fire-and-forget by design — a
+     * collaborative app broadcasts a cursor position sixty times a second, and
+     * waiting for an acknowledgement on each would make that a round trip.
+     *
+     * A refusal therefore arrives on {@link onError}, not as a rejection here.
+     */
     async broadcast(event: string, payload: unknown): Promise<void> {
         await this.join();
         await this.send("broadcast", { event, payload });
+    }
+
+    /**
+     * Observe refusals about this channel.
+     *
+     * `CHANNEL_FORBIDDEN` when an authorizer refuses a join, a broadcast or a
+     * history read; `RATE_LIMITED` past the channel frame budget;
+     * `CHANNEL_HISTORY_WRITE_FAILED` / `CHANNEL_HISTORY_READ_FAILED` when
+     * retention cannot be served; `CHANNEL_BUS_PAYLOAD_TOO_LARGE` when a
+     * broadcast on an ephemeral channel is too big to cross the bus.
+     *
+     * These used to be dropped on the floor — there is no promise to reject on
+     * a fire-and-forget frame, so a forbidden broadcast looked exactly like a
+     * delivered one. With no handler attached they are logged as a warning,
+     * because an unobserved refusal is the failure this exists for.
+     *
+     * @returns An unsubscribe function.
+     */
+    onError(handler: (error: RebaseApiError) => void): () => void {
+        this.errorHandlers.add(handler);
+        void this.join();
+        return () => this.errorHandlers.delete(handler);
     }
 
     /** Observe broadcasts. Pass an event name to filter. */
@@ -508,6 +541,41 @@ export class RebaseRealtimeChannel {
                 }
 
                 this.flushPendingLive();
+                break;
+            }
+            case "ERROR":
+            case "error": {
+                // The server refused something about this channel. Channel
+                // frames are fire-and-forget — there is no promise to reject —
+                // so this is where a refusal becomes visible.
+                const payload = message.payload as { error?: unknown } | undefined;
+                const raw = payload?.error;
+                const asObject = typeof raw === "object" && raw !== null
+                    ? raw as { message?: string; code?: string }
+                    : undefined;
+                const text = asObject?.message
+                    ?? (typeof raw === "string" ? raw : undefined)
+                    ?? (typeof message.error === "string" ? message.error : undefined)
+                    ?? "The server refused a channel operation.";
+                const error = new RebaseApiError(text, {
+                    ...(asObject?.code ? { code: asObject.code } : {})
+                });
+                if (this.errorHandlers.size === 0) {
+                    // Not silence: an unobserved refusal is exactly the failure
+                    // this branch exists for.
+                    console.warn(
+                        `[Rebase] Channel "${this.name}" error${asObject?.code ? ` (${asObject.code})` : ""}: ${text}. ` +
+                        "Attach `channel.onError(...)` to handle it."
+                    );
+                    break;
+                }
+                for (const handler of [...this.errorHandlers]) {
+                    try {
+                        handler(error);
+                    } catch (e) {
+                        console.error("Error in channel error handler:", e);
+                    }
+                }
                 break;
             }
         }

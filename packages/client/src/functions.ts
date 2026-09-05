@@ -1,4 +1,5 @@
 import type { Transport } from "./transport";
+import { RebaseClientError } from "@rebasepro/types";
 
 /**
  * Client interface for invoking custom backend functions.
@@ -72,7 +73,7 @@ export function createFunctionsClient(transport: Transport): FunctionsClient {
             // — including to the person who had implemented it. The sub-path
             // belongs in `options.path`.
             if (name.includes("/")) {
-                throw new Error(
+                throw new RebaseClientError(
                     `Invalid function name "${name}": a function name is a single path segment. ` +
                     "Pass anything after it as `options.path` — " +
                     `invoke("${name.split("/")[0]}", payload, { path: "${name.split("/").slice(1).join("/")}" }).`
@@ -101,6 +102,10 @@ export function createFunctionsClient(transport: Transport): FunctionsClient {
                 init.headers = options.headers;
             }
 
+            // The function's body, verbatim: nothing here reaches in for a
+            // `data` key. `client.call()` used to, which made the documented
+            // "shorthand for invoke" return a different value for any function
+            // that answered `{ data: … }`.
             return transport.request<T>(routePath, init);
         }
     };

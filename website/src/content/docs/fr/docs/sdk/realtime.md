@@ -49,38 +49,43 @@ const unsubscribe = client.data.orders.listen(
 
 ```typescript no-verify
 listen(
-    params: FindParams | undefined,
-    onUpdate: (response: FindResponse<M>) => void,
+    params: FindParams<M> | undefined,
+    onUpdate: (result: FindResult<M>) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-### Métadonnées en deux phases
+`FindResult<M>` est la forme que renvoie `find()` : des lignes plates dans `data` et
+`{ total, limit, offset, hasMore }` dans `meta`.
 
-Lorsque `listen()` se déclenche, il émet des mises à jour en deux phases au maximum :
+### Une émission par changement
 
-1. **Immédiate (estimée) :** Le premier callback se déclenche instantanément avec les entités et des métadonnées de pagination heuristiques (`total` = nombre d'entités renvoyées, `hasMore` = si le compte est égal à la limite demandée). Cette émission porte `meta.total: true`.
+Chaque envoi du serveur appelle votre callback **une fois**, avec des métadonnées qui
+décrivent les lignes qui l'accompagnent. Il n'y a pas de première émission distincte ni
+d'indicateur à vérifier :
 
-2. **Faisant autorité (facultative) :** Une requête de comptage asynchrone s'exécute en arrière-plan. Si le `total` ou `hasMore` faisant autorité diffère de l'estimation, un second callback se déclenche avec des métadonnées corrigées et **sans** l'indicateur `estimated`. Si les valeurs correspondent, la seconde émission est entièrement ignorée — votre callback ne se déclenche qu'une fois.
-
-Si la requête de comptage **échoue**, aucune seconde émission ne se produit. L'indicateur `estimated: true` de la première émission demeure comme signal que les métadonnées sont heuristiques. Ceci n'est pas traité comme une erreur d'abonnement.
+- Un `count()` est exécuté pour la requête avant l'émission, donc `meta.total` et
+  `meta.hasMore` font autorité.
+- Si un envoi arrive pendant que ce comptage est en cours, l'émission plus ancienne est
+  abandonnée — vous n'êtes jamais rappelé avec un total appartenant à une page
+  précédente.
+- Si le comptage **échoue**, le dernier total réellement renvoyé par un comptage est
+  réutilisé. Un comptage en échec ne dit rien de la taille de la collection : il ne doit
+  donc pas écraser une vraie réponse. Ce n'est pas une erreur d'abonnement, et `onError`
+  n'est pas appelé.
+- Si aucun comptage n'a jamais abouti pour cet abonnement, `meta.total` est une **borne
+  inférieure** — les lignes de cette page plus celles sautées pour y arriver — et
+  `meta.hasMore` vaut `true` quand la page est revenue pleine.
 
 ```typescript
 client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
-    (response) => {
-        if (response.meta.total) {
-            // First-paint: render immediately, total/hasMore may change
-            renderProducts(response.data, { loading: true });
-        } else {
-            // Authoritative: safe to render final pagination controls
-            renderProducts(response.data, { loading: false });
-        }
+    (result) => {
+        renderProducts(result.data);
+        renderPager({ total: result.meta.total, hasMore: result.meta.hasMore });
     }
 );
 ```
-
-> **Astuce :** Si vous n'avez pas besoin de distinguer les métadonnées estimées de celles faisant autorité, vous pouvez ignorer l'indicateur `estimated` — les deux émissions portent le même tableau `data`.
 
 ## S'abonner à une seule entité
 
@@ -107,12 +112,13 @@ const unsubscribe = client.data.products.listenById(
 ```typescript
 listenById(
     id: string | number,
-    onUpdate: (entity: Entity<M> | undefined) => void,
+    onUpdate: (row: M | undefined) => void,
     onError?: (error: Error) => void
 ): () => void   // returns unsubscribe function
 ```
 
-Le callback reçoit `undefined` lorsque l'entité est supprimée.
+Le callback reçoit une ligne plate — pas une `Entity`, donc pas de `.values` — et
+`undefined` lorsque l'enregistrement est supprimé.
 
 ## Constructeur de requêtes fluide
 
