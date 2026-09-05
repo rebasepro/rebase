@@ -38,14 +38,22 @@ pnpm run build
 cd app/backend && docker compose up -d db && cd ../..
 ```
 
-4. **Push the schema**. `db:push` reads `app/config/collections`, so it runs from
+4. **Point the app at it**. Nothing creates `app/.env` for you, and without it
+   `db:push` has no `DATABASE_URL` to push to. The example file already carries
+   the compose credentials:
+
+```bash
+cp app/.env.example app/.env
+```
+
+5. **Push the schema**. `db:push` reads `app/config/collections`, so it runs from
    `app/`:
 
 ```bash
 cd app && pnpm run db:push && cd ..
 ```
 
-5. **Launch the dev server**:
+6. **Launch the dev server**:
 
 ```bash
 pnpm run dev
