@@ -37,22 +37,12 @@ export const EXPERIMENTS: Experiment[] = [
     {
         id: "navigation-structure",
         variants: ["control", "flat-nav"],
-        // Parked at 0%: the mega-nav carries the backend / admin-panel split that the
-        // rest of the site is built around, and the flat variant hides it.
-        weights: [100, 0],
-        expires: "2026-08-01",
-    },
-    {
-        id: "manifesto-banner-text",
-        variants: ["control", "mission", "founders"],
-        // Parked at 0%, like `navigation-structure`. The banner it varied is no
-        // longer mounted on the home page: it sat ABOVE the header, which
-        // SITE-STORY §6 rules out, on the raw brand blue, which the same section
-        // rules out as a ground — and it was the first sentence a cold reader
-        // met, ahead of the product one. The manifesto link lives in the footer.
-        // Flip the weights back if the banner ever returns.
-        weights: [100, 0, 0],
-        expires: "2026-09-01"
+        // Live 50/50. The mega-nav teaches the backend / admin-panel split the rest
+        // of the site is built around and the flat variant hides it, which is why
+        // this sat parked — so the split is the thing under test, not a detail.
+        // Dial the exposure here (e.g. [90, 10]) rather than switching it off.
+        weights: [50, 50],
+        expires: "2027-09-30",
     }
 ];
 

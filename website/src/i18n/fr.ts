@@ -570,8 +570,6 @@ export const fr = {
   "manifesto.signature": "L'équipe Rebase",
   "manifesto.signatureSubtitle": "Madrid · Outils open source pour développeurs depuis 2020",
   "banner.title.control": "Vos données vous appartiennent.<br/> Hébergez-les où vous voulez.",
-  "banner.title.mission": "Nous reprenons le contrôle de notre stack.",
-  "banner.title.founders": "Lettre ouverte aux développeurs qui tiennent à la maîtrise de leurs données.",
   "banner.cta": "Lire le Manifeste",
   "demo.page.title": "Un vrai backend, dans votre navigateur.",
   "demo.page.subtitle": "L'API, le SDK et le panneau sur une seule base de données ; changez une ligne et regardez les trois.",

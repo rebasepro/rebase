@@ -1,6 +1,5 @@
 ---
 import { getLangFromUrl, useTranslations, useTranslatedPath } from "../i18n/ui";
-import ABVariant from "./ABVariant.astro";
 
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
@@ -45,15 +44,7 @@ const translatePath = useTranslatedPath(lang);
 
     <div class="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 flex items-center justify-center gap-x-4 gap-y-1 flex-wrap pr-12 text-center">
         <p class="text-sm sm:text-base leading-6 text-white">
-            <ABVariant experiment="manifesto-banner-text" variant="control" class="inline">
-                <span set:html={t("banner.title.control")} />
-            </ABVariant>
-            <ABVariant experiment="manifesto-banner-text" variant="mission" class="inline">
-                {t("banner.title.mission")}
-            </ABVariant>
-            <ABVariant experiment="manifesto-banner-text" variant="founders" class="inline">
-                {t("banner.title.founders")}
-            </ABVariant>
+            <span set:html={t("banner.title.control")} />
         </p>
 
         <a
@@ -107,10 +98,6 @@ const translatePath = useTranslatedPath(lang);
         if (cta) {
             cta.addEventListener("click", () => {
                 localStorage.setItem("rb_manifesto_banner_dismissed", "true");
-                const win = window as Window & { trackConversion?: (exp: string, val: string) => void };
-                if (typeof win.trackConversion === "function") {
-                    win.trackConversion("manifesto-banner-text", "cta_click");
-                }
             });
         }
 

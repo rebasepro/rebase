@@ -598,7 +598,13 @@ const flatNavLinks = [
                             link_text: linkText,
                             link_url: href,
                             is_mobile: isMobile,
-                            page_path: window.location.pathname
+                            page_path: window.location.pathname,
+                            // Which nav a click came from is the whole question the
+                            // navigation-structure experiment asks, and this is the only
+                            // event that records nav clicks. Without the variant on it,
+                            // the two arms are indistinguishable in GA4 and the test
+                            // reports nothing about the thing it varies.
+                            variant_id: document.documentElement.getAttribute('data-ab-navigation-structure') || 'unassigned'
                         });
                     }
 

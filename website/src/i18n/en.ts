@@ -662,8 +662,6 @@ export const en = {
 
   // Manifesto Banner
   "banner.title.control": "Own your data.<br/> Run it anywhere.",
-  "banner.title.mission": "We are taking back control of our stack.",
-  "banner.title.founders": "An open letter to developers who care about data ownership.",
   "banner.cta": "Read the Manifesto",
 
 
