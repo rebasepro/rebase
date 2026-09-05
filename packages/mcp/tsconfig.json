@@ -11,7 +11,11 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "declaration": true,
-        "declarationMap": true,
+        // No declarationMap: a .d.ts.map points at `../src/*.ts`, and `src` is
+        // not published. Emitting one ships a go-to-definition target that
+        // resolves to a file the tarball does not contain. The JS sourcemaps
+        // carry full `sourcesContent`, so stepping through the real sources
+        // still works — it is only this dangling pointer that goes.
         "sourceMap": true,
         "resolveJsonModule": true
     },

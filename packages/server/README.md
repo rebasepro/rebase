@@ -24,7 +24,7 @@ This is the central orchestrator for any Rebase backend. It provides the framewo
 | `RebaseAuthConfig` | Auth config type (JWT, OAuth providers, hooks, service key). |
 | `RebaseBackendInstance` | Return type — includes `driver`, `healthCheck()`, `shutdown()`, `cronScheduler`, `storageController`, etc. |
 | `RebaseEnv` | Zod-inferred type of validated environment variables. |
-| `z` | Re-exported Zod instance for extending `loadEnv`. |
+| `z` | The runtime's own Zod instance. Build `loadEnv({ extend })` schemas with this one — a schema from a second copy of zod is silently ignored. |
 | `_setRebaseMock` / `_resetRebaseMock` | Test helpers to mock the `rebase` singleton (NODE_ENV=test only). |
 
 Also re-exports all abstract interfaces (`DatabaseAdapter`, `AuthAdapter`, `DataDriver`, etc.), API types (`HonoEnv`, `ApiConfig`), auth module, email module, storage module, history module, cron module, custom functions, logging utilities, and driver registry.

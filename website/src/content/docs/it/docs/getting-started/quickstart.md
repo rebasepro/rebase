@@ -20,7 +20,7 @@ Questo crea la struttura di un progetto con tre pacchetti:
 
 ## Prerequisiti
 
-- **Node.js** 18+
+- **Node.js** 22.22 o successivo (la versione in `.nvmrc`)
 - **pnpm** (consigliato) o npm
 
 Nessun database da installare, e niente Docker. `rebase dev` esegue un PostgreSQL gestito per il progetto, con i dati sotto `.rebase/`. Vedi [Variante: il tuo PostgreSQL](#variante-il-tuo-postgresql) se preferisci fornirne uno tu — un'installazione locale, Neon, Supabase o il container incluso in questa struttura.

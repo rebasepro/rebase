@@ -21,25 +21,8 @@ import { appsCommand } from "./commands/apps";
 import { requireProjectRoot } from "./utils/project";
 import { parseCommandArgs } from "./utils/args";
 import { unknownCommand } from "./utils/unknown-command";
-import fs from "fs";
+import { cliVersion } from "./utils/version";
 import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-function getVersion(): string {
-    try {
-        // Try to read version from package.json
-        const pkgPath = path.resolve(__dirname, "../package.json");
-        if (fs.existsSync(pkgPath)) {
-            return JSON.parse(fs.readFileSync(pkgPath, "utf-8")).version;
-        }
-    } catch {
-        // ignore
-    }
-    return "unknown";
-}
 
 /**
  * Silence dotenv's own banner, for this process and everything it spawns.
@@ -78,7 +61,7 @@ export async function entry(args: string[]) {
     );
 
     if (parsedArgs["--version"]) {
-        console.log(getVersion());
+        console.log(cliVersion());
         return;
     }
 

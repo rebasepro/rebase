@@ -18,11 +18,13 @@
     "directory": "packages/plugin-ai"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=22.22.0"
+  },
   "type": "module",
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
-  "source": "src/index.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -42,8 +44,8 @@
     "@rebasepro/utils": "workspace:*"
   },
   "peerDependencies": {
-    "react": ">=19.2.7",
-    "react-dom": ">=19.2.7",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "react-router": "^8.3.0"
   },
   "scripts": {
@@ -110,14 +112,7 @@
     ]
   },
   "files": [
-    "dist",
-    "src",
-    "!src/**/*.test.ts",
-    "!src/**/*.test.tsx",
-    "!src/**/*.spec.ts",
-    "!src/**/*.spec.tsx",
-    "!src/**/__tests__/**",
-    "!src/tests/**"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"

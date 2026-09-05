@@ -20,7 +20,7 @@ Ceci échafaude un projet avec trois packages :
 
 ## Prérequis
 
-- **Node.js** 18+
+- **Node.js** 22.22 ou plus récent (la version dans `.nvmrc`)
 - **pnpm** (recommandé) ou npm
 
 Aucune base de données à installer, et pas de Docker. `rebase dev` exécute un PostgreSQL géré pour le projet, dont les données vivent sous `.rebase/`. Voir [Variante : votre propre PostgreSQL](#variante--votre-propre-postgresql) si vous préférez en fournir un — une installation locale, Neon, Supabase, ou le conteneur livré avec cet échafaudage.

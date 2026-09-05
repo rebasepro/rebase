@@ -208,6 +208,17 @@ jobs:
       - name: Publishable-set guard
         run: pnpm run check:publishable-set
 
+      # Seven different Node floors at once: three packages said 22.22.0, eleven
+      # said 20, seven said nothing, the dogfood app said 18, and five
+      # translated quickstarts told readers 18+ — while .nvmrc, which is what
+      # everyone actually installs, said 22.22.0. pnpm enforces `engines` on
+      # install, so an understated floor is not cosmetic: it lets someone
+      # through on Node 20 and moves the failure into a transitive dependency.
+      # The React peer floor decayed the same way: `app` and `cms` require
+      # 19.2.7, the five packages they pull in still said >=19.0.0.
+      - name: Declared floors
+        run: pnpm run check:floors
+
       # `files: ["dist", "src"]` ships the sources on purpose and the tests
       # beside them by accident. Invisible from the repository: whether a
       # package publishes its tests depends only on whether its author put them

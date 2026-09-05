@@ -27,10 +27,10 @@
     },
     "dependencies": {
         "@rebasepro/client": "workspace:*",
-        "dotenv": "^16.0.0"
+        "dotenv": "^17.4.2"
     },
     "engines": {
-        "node": ">=20"
+        "node": ">=22.22.0"
     },
     "pnpm": {
         "onlyBuiltDependencies": [

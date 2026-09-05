@@ -22,7 +22,7 @@
   },
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.22.0"
   },
   "author": "rebase.pro",
   "main": "./dist/index.es.js",
@@ -79,12 +79,6 @@
       "import": "./dist/index.es.js",
       "default": "./dist/index.es.js"
     }
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "sharp"
-    ]
   },
   "optionalDependencies": {
     "@electric-sql/pglite": "0.5.6",

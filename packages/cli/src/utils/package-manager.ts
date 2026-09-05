@@ -9,6 +9,29 @@ import fs from "fs";
 import path from "path";
 import { spawnSync } from "child_process";
 
+/**
+ * The two package managers the CLI can scaffold for.
+ *
+ * Yarn and bun are deliberately absent, and this is the note that says so
+ * rather than leaving it to be discovered. A yarn or bun user gets an npm
+ * project: `detectPackageManager` finds no `pnpm-lock.yaml` and no
+ * `package-lock.json`, falls through to the pnpm probe, and lands on npm —
+ * silently, and with a `yarn.lock` or `bun.lockb` sitting right there in the
+ * directory it was asked about.
+ *
+ * The reason is not indifference. Every generated project is a workspace, and
+ * the scaffold writes one protocol for the workspace links —
+ * `workspaceProtocol` below is `"workspace:*"` or `"*"`. Yarn understands
+ * `workspace:*` and bun does not; the two also disagree with pnpm about where
+ * `node_modules` goes, which is what `rebase dev` walks to find the backend.
+ * Supporting them means a fourth and fifth scaffold shape, each needing its own
+ * end-to-end test, and neither exists.
+ *
+ * So the honest position is: pnpm (recommended) or npm. A yarn or bun user is
+ * better served knowing they will get an npm workspace than finding out from
+ * the lockfile that appears after their first install. See
+ * {@link detectPackageManager}, which now says so out loud.
+ */
 export type PackageManager = "pnpm" | "npm";
 
 export interface PMCommands {
@@ -137,6 +160,19 @@ export function detectPackageManager(targetDir?: string): PackageManager {
     for (const dir of dirs) {
         if (fs.existsSync(path.join(dir, "pnpm-lock.yaml"))) return "pnpm";
         if (fs.existsSync(path.join(dir, "package-lock.json"))) return "npm";
+
+        // A yarn or bun lockfile is a stated choice this CLI cannot honour —
+        // see the note on `PackageManager`. Say so once, here, rather than
+        // scaffolding an npm workspace beside their lockfile without comment.
+        for (const [lock, name] of [["yarn.lock", "yarn"], ["bun.lockb", "bun"], ["bun.lock", "bun"]] as const) {
+            if (!fs.existsSync(path.join(dir, lock))) continue;
+            console.warn(
+                `[rebase] Found ${lock}, but Rebase scaffolds pnpm or npm workspaces only — ` +
+                `${name} is not supported yet. Continuing with ` +
+                `${isPnpmAvailable() ? "pnpm" : "npm"}.`
+            );
+            return isPnpmAvailable() ? "pnpm" : "npm";
+        }
     }
 
     // 2. Prefer pnpm whenever it's installed.

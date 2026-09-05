@@ -1,4 +1,4 @@
-import { FindParams as TypesFindParams, FindResponse as TypesFindResponse, RebaseApiError } from "@rebasepro/types";
+import { FindParams as TypesFindParams, FindResponse as TypesFindResponse, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
 import { serializeFilter, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
 import { rebaseReviver } from "./reviver";
 
@@ -79,6 +79,30 @@ export interface RebaseClientConfig {
      * and nothing is ever warned about.
      */
     anonymous?: boolean;
+    /**
+     * The schema this client was generated against, sent as `x-rebase-schema`.
+     *
+     * `rebase generate-sdk` writes the value into `schema.meta.ts` as
+     * `SCHEMA_VERSION`; pass it here and every request carries it. Advisory —
+     * nothing is ever refused for it — but it is what lets a server say "this
+     * client was built against a schema three deploys old" instead of
+     * answering a renamed field with a bare 400.
+     *
+     * The compatibility matrix has listed this header as something the SDK
+     * sends since it was written. Nothing sent it: the constant existed, the
+     * server echoed it back on two routes, and no client ever put it on a
+     * request. This is the missing half.
+     */
+    schemaVersion?: string;
+    /**
+     * Headers added to every request, beneath any per-request `headers`.
+     *
+     * For identifying the caller, not for authenticating it — the CLI uses it
+     * to send `User-Agent: rebase-cli/<version>`, which is what a control plane
+     * needs before it can refuse a CLI that is too old by name. `Authorization`
+     * is not settable here; it always comes from the token.
+     */
+    headers?: Record<string, string>;
 }
 
 /**
@@ -353,9 +377,18 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
         console.warn(ANONYMOUS_SERVER_CLIENT_WARNING);
     }
 
+    // Built once, and applied *under* `Authorization`: a default header set
+    // that could overwrite the token would turn a caller's convenience into an
+    // authentication bug.
+    const defaultHeaders: Record<string, string> = {
+        ...(config.headers ?? {}),
+        ...(config.schemaVersion ? { [SCHEMA_VERSION_HEADER]: config.schemaVersion } : {})
+    };
+
     function getHeaders(activeToken: string | undefined, init?: RequestInit) {
         return {
             "Content-Type": "application/json",
+            ...defaultHeaders,
             ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
             ...((init?.headers as Record<string, string>) || {})
         };

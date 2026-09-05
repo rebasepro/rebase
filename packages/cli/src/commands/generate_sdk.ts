@@ -425,6 +425,9 @@ export async function generateSdkCommand(args: GenerateSDKArgs): Promise<void> {
 //
 //     curl -s <api-url>/api/meta/schema-version
 //
+// Pass it to the client as \`schemaVersion\` and every request carries it in
+// the \`x-rebase-schema\` header, so the server can name the drift instead of
+// answering a renamed field with a bare 400.
 export const SCHEMA_VERSION = ${JSON.stringify(schemaVersion)};
 `
     });
@@ -440,14 +443,20 @@ export const SCHEMA_VERSION = ${JSON.stringify(schemaVersion)};
     console.log(chalk.green.bold("  ✓ SDK generated successfully!"));
     console.log("");
     const typesImport = `./${path.relative(cwd, path.join(resolvedOutput, "database.types"))}`;
+    const metaImport = `./${path.relative(cwd, path.join(resolvedOutput, "schema.meta"))}`;
     const exampleSlug = collections[0]?.slug || "my_collection";
 
     console.log(chalk.gray("  Usage:"));
     console.log(chalk.gray("    import { createRebaseClient } from '@rebasepro/client';"));
     console.log(chalk.gray(`    import { collectionsDictionary, type Database } from '${typesImport}';`));
+    console.log(chalk.gray(`    import { SCHEMA_VERSION } from '${metaImport}';`));
     console.log("");
     console.log(chalk.gray("    const rebase = createRebaseClient<Database>({"));
     console.log(chalk.gray(`        baseUrl: '${resolveExampleBaseUrl(cwd)}',`));
+    // Sent as `x-rebase-schema` on every request. Costs one line here and is
+    // the difference between a server that can say "this client is three
+    // deploys behind" and one that can only reject a field it does not know.
+    console.log(chalk.gray("        schemaVersion: SCHEMA_VERSION,"));
     // Without the dictionary a hyphenated slug is not resolvable from the
     // property name alone, and the request 404s at runtime.
     console.log(chalk.gray("        collections: collectionsDictionary,"));

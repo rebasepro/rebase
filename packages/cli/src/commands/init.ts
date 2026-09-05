@@ -9,6 +9,7 @@ import { cp } from "fs/promises";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
+import { cliVersion } from "../utils/version";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { resolveCloudUrl, writeLink } from "./cloud/context";
 import type { PackageManager, PMCommands } from "../utils/package-manager";
@@ -943,85 +944,67 @@ force: true });
     }
 }
 
+/**
+ * The one registry call `init` makes, and what it is for.
+ *
+ * Every `@rebasepro/*` package in this repository carries the same version —
+ * `check:publishable-set` fails the build on the first PR after a bump if any
+ * of them drifts — so the version to pin is known before the network is
+ * touched: it is this CLI's own. Asking npm eleven times, once per package,
+ * bought nothing but eleven chances to hang. On a slow connection that was the
+ * slowest part of `init`; on no connection it was eleven timeouts before a
+ * fallback to `"latest"`, which is the one answer that produces a project
+ * mixing framework eras.
+ *
+ * One call remains, and it asks a different question. Lockstep is enforced in
+ * the repository, not on the registry: a release can still ship the CLI and
+ * leave a package behind, which is exactly what happened to
+ * `@rebasepro/agent-skills` across three releases. So this probes a single
+ * package — `@rebasepro/server`, the one a project cannot run without — to see
+ * whether this version really made it out. A gap is a refusal, because the
+ * alternative is scaffolding a project that cannot install.
+ *
+ * Unreachable is NOT a refusal. `init` offline is a legitimate thing to do,
+ * and the pin it would write is the same pin the probe would have confirmed.
+ * It says so and carries on.
+ */
+type ReleaseProbe =
+    | { kind: "published" }
+    | { kind: "gap"; found: string }
+    | { kind: "unreachable"; reason: string };
+
+/** The package the probe asks about. Not the CLI: the CLI is what is running. */
+const RELEASE_PROBE_PACKAGE = "@rebasepro/server";
+
+async function probeRelease(version: string): Promise<ReleaseProbe> {
+    try {
+        const { stdout } = await execa("npm", ["view", `${RELEASE_PROBE_PACKAGE}@${version}`, "version"]);
+        if (stdout.trim() === version) return { kind: "published" };
+        // npm answers an unpublished version with empty output rather than an
+        // error on some registries. Empty is a gap, not a success.
+        return { kind: "gap", found: stdout.trim() || "nothing" };
+    } catch (error) {
+        const text = `${(error as { stderr?: string }).stderr ?? ""}${(error as Error).message ?? ""}`;
+        if (/E404|404 Not Found|No match(ing)? version/i.test(text)) {
+            return { kind: "gap", found: "nothing" };
+        }
+        return { kind: "unreachable", reason: firstLine(text) || "the registry could not be reached" };
+    }
+}
+
+function firstLine(text: string): string {
+    return text.split("\n").map(l => l.trim()).filter(Boolean)[0] ?? "";
+}
+
 async function replacePlaceholders(options: InitOptions) {
     const filesToProcess = TEMPLATE_PLACEHOLDER_FILES;
 
-    const packageJsonPath = path.resolve(cliRoot!, "package.json");
-    let cliVersion = "latest";
-    if (fs.existsSync(packageJsonPath)) {
-        const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-        cliVersion = pkg.version || "latest";
-    }
+    // `unknown` only when the manifest could not be read at all, which is the
+    // same "nothing to pin, nothing to confirm" case `latest` used to stand for.
+    const version = cliVersion();
 
-    const versionCache = new Map<string, string>();
-    /** Packages with no release matching the CLI's own version. */
-    const unreleased = new Map<string, string>();
-    /**
-     * Packages for which every registry query failed, not just the version-pinned one.
-     *
-     * The difference matters and used to be invisible. With no network, all
-     * three lookups throw, every package falls back to "latest", and the
-     * refusal below fired with the words "not a problem with your machine,
-     * your network, or your package manager" — telling a developer on a train
-     * to report a release gap in Rebase.
-     */
-    const unreachable = new Set<string>();
-
-    // Use npm view for registry queries — it's universal and works regardless of PM
-    const viewBin = "npm";
-
-    const getPackageVersion = async (pkgName: string) => {
-        if (versionCache.has(pkgName)) return versionCache.get(pkgName)!;
-        if (process.env.REBASE_E2E === "true") {
-            versionCache.set(pkgName, cliVersion);
-            return cliVersion;
-        }
-        let versionToUse = cliVersion;
-        try {
-            // First try to check if the specific cliVersion exists for this package
-            const { stdout } = await execa(viewBin, ["view", `${pkgName}@${cliVersion}`, "version"]);
-            // Caught immediately below, and named anyway: an empty stdout from
-            // `npm view` is indistinguishable from a network failure at the
-            // catch, and if either ever escapes this function a bare "Not
-            // found" says nothing about which package or which version.
-            if (!stdout.trim()) throw new Error(`No published ${pkgName}@${cliVersion}`);
-            versionToUse = stdout.trim();
-        } catch {
-            try {
-                // If specific version doesn't exist, try the matching tag (canary or latest)
-                const tag = cliVersion.includes("canary") ? "canary" : "latest";
-                const { stdout } = await execa(viewBin, ["view", `${pkgName}@${tag}`, "version"]);
-                if (!stdout.trim()) throw new Error(`No ${pkgName}@${tag} on the registry`);
-                versionToUse = stdout.trim();
-            } catch {
-                try {
-                    // Fallback to absolute latest
-                    const { stdout } = await execa(viewBin, ["view", pkgName, "version"]);
-                    versionToUse = stdout.trim() || "latest";
-                } catch {
-                    // Not "this package has no such version" — the registry
-                    // answered nothing at all, for any query.
-                    unreachable.add(pkgName);
-                    versionToUse = "latest";
-                }
-            }
-
-            // The fallbacks above answer "what can I install?", not "what matches
-            // this CLI?". When a package has no release at the CLI's own version,
-            // they quietly pin whatever the registry last tagged — which can be a
-            // prerelease from an entirely different era of the framework. Record
-            // it so we can refuse rather than scaffold a mixed-version app.
-            if (versionToUse !== cliVersion) {
-                unreleased.set(pkgName, versionToUse);
-            }
-        }
-        versionCache.set(pkgName, versionToUse);
-        return versionToUse;
-    };
-
-    // First, find all unique @rebasepro packages across all files to process in parallel
-    const allPackages = new Set<string>();
     const fileContents = new Map<string, string>();
+    const allPackages = new Set<string>();
 
     for (const file of filesToProcess) {
         const fullPath = path.resolve(options.targetDirectory, file);
@@ -1030,66 +1013,46 @@ async function replacePlaceholders(options: InitOptions) {
         fileContents.set(fullPath, content);
 
         const matches = [...content.matchAll(/"(@rebasepro\/[^"]+)":\s*"workspace:\*"/g)];
-        for (const match of matches) {
-            allPackages.add(match[1]);
-        }
+        for (const match of matches) allPackages.add(match[1]);
     }
 
-    console.log(chalk.gray("  Resolving package versions..."));
+    // `latest` means this CLI could not read its own manifest — there is no
+    // version to confirm, and nothing to gain from asking.
+    const skipProbe = process.env.REBASE_E2E === "true" || version === "unknown";
+    const probe: ReleaseProbe = skipProbe ? { kind: "published" } : await probeRelease(version);
 
-    // Resolve all versions in parallel
-    await Promise.all(Array.from(allPackages).map(getPackageVersion));
-
-    // A stable CLI whose packages resolve only to a prerelease means those
-    // packages were never released at this version — the usual cause is a rename
-    // that left the new name published on the canary tag alone. Scaffolding
-    // anyway mixes eras (say @rebasepro/types@0.9.0 beside a 0.0.1 canary) and
-    // hands the user an app that fails at install or, worse, at runtime. Neither
-    // failure names this as the cause, so stop here and say it plainly.
-    const cliIsStable = cliVersion !== "latest" && !cliVersion.includes("-");
-    const prereleasePins = [...unreleased].filter(([, version]) => version === "latest" || version.includes("-"));
-
-    // Every package unreachable is a connectivity failure, not a release gap.
-    // Both produce the same symptom — nothing resolved, so everything pinned
-    // "latest" — and only one of them is worth a bug report.
-    if (unreachable.size > 0 && unreachable.size === versionCache.size) {
+    if (probe.kind === "gap") {
         throw new Error(
-            "Could not reach the npm registry.\n\n" +
-            `Every version lookup failed (${unreachable.size} package(s)), so nothing could be\n` +
-            "pinned. This is a network or registry problem, not a problem with Rebase:\n" +
-            "check your connection, your proxy, and `npm config get registry`.\n\n" +
-            "Stopped before writing dependency versions or installing anything. The\n" +
-            `project directory ${path.basename(options.targetDirectory)}/ was created and is safe to delete.`
-        );
-    }
-
-    if (cliIsStable && prereleasePins.length > 0) {
-        const lines = prereleasePins.map(([name, version]) => `    ${name} → ${version}`).join("\n");
-        throw new Error(
-            `Rebase ${cliVersion} is not fully published to npm.\n\n` +
-            `These packages have no ${cliVersion} release, so the newest thing on the\n` +
-            `registry is a prerelease:\n\n${lines}\n\n` +
-            `Scaffolding would pin those alongside the ${cliVersion} packages and produce\n` +
-            "an app that cannot install or run. That is a release gap in Rebase itself —\n" +
-            "not a problem with your machine, your network, or your package manager.\n\n" +
+            `Rebase ${version} is not fully published to npm.\n\n` +
+            `${RELEASE_PROBE_PACKAGE} has no ${version} release — the registry has ${probe.found}.\n` +
+            `Every @rebasepro package ships at one version, so scaffolding would pin ${allPackages.size}\n` +
+            `dependencies at a version that is not there, and the install would fail.\n\n` +
+            "That is a release gap in Rebase itself — not a problem with your machine,\n" +
+            "your network, or your package manager.\n\n" +
             "Stopped before writing dependency versions or installing anything. The\n" +
             `project directory ${path.basename(options.targetDirectory)}/ was created and is safe to delete.\n` +
-            "Please report this with the list above."
+            "Please report this."
         );
     }
 
-    // Perform replacements
+    if (probe.kind === "published") {
+        console.log(chalk.gray(`  Pinning ${allPackages.size} @rebasepro package(s) to ${version}...`));
+    }
+
+    if (probe.kind === "unreachable") {
+        console.log(chalk.gray(`  Pinning @rebasepro packages to ${version} (this CLI's version).`));
+        console.log(chalk.yellow(`  Could not reach npm to confirm the release: ${probe.reason}`));
+        console.log(chalk.gray("  The pin is right either way — install will say so if the version is missing."));
+    }
+
     for (const [fullPath, originalContent] of fileContents.entries()) {
         let content = originalContent.replace(/\{\{PROJECT_NAME\}\}/g, options.projectName);
-
-        // Replace workspace:* with the dynamically resolved version
-        const matches = [...content.matchAll(/"(@rebasepro\/[^"]+)":\s*"workspace:\*"/g)];
-        for (const match of matches) {
-            const pkgName = match[1];
-            const resolvedVersion = versionCache.get(pkgName) || "latest";
-            content = content.replace(new RegExp(`"${pkgName}":\\s*"workspace:\\*"`, "g"), `"${pkgName}": "${resolvedVersion}"`);
+        for (const pkgName of allPackages) {
+            content = content.replace(
+                new RegExp(`"${pkgName}":\\s*"workspace:\\*"`, "g"),
+                `"${pkgName}": "${version}"`
+            );
         }
-
         fs.writeFileSync(fullPath, content, "utf-8");
     }
 }
@@ -1164,16 +1127,8 @@ async function findAvailablePort(startPort: number): Promise<number> {
  * names a version that was never published.
  */
 function readCliVersion(): string {
-    try {
-        const manifest = path.resolve(cliRoot!, "package.json");
-        if (fs.existsSync(manifest)) {
-            const pkg = JSON.parse(fs.readFileSync(manifest, "utf-8"));
-            if (typeof pkg.version === "string" && pkg.version) return pkg.version;
-        }
-    } catch {
-        // Fall through — see the doc comment.
-    }
-    return "latest";
+    const version = cliVersion();
+    return version === "unknown" ? "latest" : version;
 }
 
 /**

@@ -291,6 +291,18 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | `@rebasepro/plugin-ai` | AI-powered data enhancement plugin |
 | `@rebasepro/plugin-insights` | Analytics and insights plugin |
 
+### ESM only
+
+Every `@rebasepro/*` package ships ES modules and nothing else — `"type":
+"module"`, no CommonJS build, no `require()` entry point. A CommonJS project
+reaches them with a dynamic `await import()`; `require("@rebasepro/client")`
+throws `ERR_REQUIRE_ESM`. This is stated here because the failure names the
+loader rather than the decision, and because it is not recoverable by
+configuration: there is no dual build to fall back to.
+
+Node 22.22 is the floor, from [`.nvmrc`](.nvmrc) and enforced by
+`pnpm check:floors`.
+
 ### Versioning
 
 Rebase is `0.x`: the authored TypeScript API can still change in a minor, and

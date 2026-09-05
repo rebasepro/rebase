@@ -19,6 +19,9 @@
     "directory": "packages/forms"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=22.22.0"
+  },
   "type": "module",
   "publishConfig": {
     "access": "public"
@@ -35,10 +38,9 @@
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
   "types": "dist/index.d.ts",
-  "source": "src/index.ts",
   "peerDependencies": {
-    "react": ">=19.0.0",
-    "react-dom": ">=19.0.0"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "dependencies": {
     "fast-equals": "6.0.2"
@@ -65,14 +67,7 @@
   },
   "files": [
     "dist",
-    "src",
-    "bin",
-    "!src/**/*.test.ts",
-    "!src/**/*.test.tsx",
-    "!src/**/*.spec.ts",
-    "!src/**/*.spec.tsx",
-    "!src/**/__tests__/**",
-    "!src/tests/**"
+    "bin"
   ],
   "jest": {
     "transform": {

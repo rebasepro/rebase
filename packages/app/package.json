@@ -30,7 +30,6 @@
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
-  "source": "src/index.ts",
   "engines": {
     "node": ">=22.22.0"
   },
@@ -75,10 +74,10 @@
     "react-i18next": "^17.0.11"
   },
   "peerDependencies": {
-    "react": ">=19.2.7",
-    "react-dom": ">=19.2.7",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "react-router": "^8.3.0",
-    "typescript": ">=5.0.0"
+    "typescript": "^6.0.0"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",
@@ -103,14 +102,7 @@
     "vite": "^8.1.5"
   },
   "files": [
-    "dist",
-    "src",
-    "!src/**/*.test.ts",
-    "!src/**/*.test.tsx",
-    "!src/**/*.spec.ts",
-    "!src/**/*.spec.tsx",
-    "!src/**/__tests__/**",
-    "!src/tests/**"
+    "dist"
   ],
   "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
   "publishConfig": {

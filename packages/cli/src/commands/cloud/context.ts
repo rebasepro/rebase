@@ -23,6 +23,7 @@ import inquirer from "inquirer";
 import { createRebaseClient, type AuthStorage } from "@rebasepro/client";
 import { findProjectRoot } from "../../utils/project";
 import { parseCommandArgs } from "../../utils/args";
+import { cliUserAgent } from "../../utils/version";
 import { summarizeError, wantsRawError } from "./errors";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -210,6 +211,12 @@ export function createCloudClient(url: string): CloudClient {
         // between "no socket, because I never asked for one" and "no socket, and
         // I do not know why".
         realtime: false,
+        // Every control-plane request says which CLI is calling. The control
+        // plane's wire format moves ahead of what is published to npm, so it
+        // has to be able to answer an old client with `CLI_TOO_OLD` and the
+        // minimum version — and it cannot do that for a caller that never
+        // identified itself. Until this line, none of them did.
+        headers: { "User-Agent": cliUserAgent() },
         auth: {
             storage: createFileAuthStorage(url),
             persistSession: true,

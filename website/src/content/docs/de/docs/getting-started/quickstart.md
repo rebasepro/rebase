@@ -20,7 +20,7 @@ Dies erstellt ein Projekt mit drei Paketen:
 
 ## Voraussetzungen
 
-- **Node.js** 18+
+- **Node.js** 22.22 oder neuer (die Version in `.nvmrc`)
 - **pnpm** (empfohlen) oder npm
 
 Keine Datenbank zu installieren, und kein Docker. `rebase dev` betreibt eine verwaltete PostgreSQL für das Projekt, deren Daten unter `.rebase/` liegen. Siehe [Variante: Ihre eigene PostgreSQL](#variante-ihre-eigene-postgresql), wenn Sie lieber selbst eine bereitstellen — eine lokale Installation, Neon, Supabase oder den Container, den dieser Scaffold mitliefert.
