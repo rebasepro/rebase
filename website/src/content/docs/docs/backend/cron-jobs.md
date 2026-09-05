@@ -46,6 +46,10 @@ export default defineCron({
 });
 ```
 
+`rebase dev` watches the crons directory, so a job added while it is running is
+registered on the next reload — no restart. (It has to be told: the directory is
+scanned rather than imported, so the watcher cannot infer it.)
+
 :::note
 `defineCron` is an identity function — it returns the same object you pass in. A plain default-exported `CronJobDefinition` object works identically; `defineCron` simply provides compile-time type checking and editor autocomplete.
 :::

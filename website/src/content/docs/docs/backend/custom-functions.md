@@ -30,6 +30,10 @@ export default defineFunction((app) => {
 
 This mounts at **`/api/functions/hello`**. The filename (without extension) becomes the route prefix.
 
+`rebase dev` watches the functions directory, so a file added while it is
+running is mounted on the next reload — no restart. (It has to be told: the
+directory is scanned rather than imported, so the watcher cannot infer it.)
+
 :::important
 Import from **`@rebasepro/server/functions`**, not from `@rebasepro/server`.
 
