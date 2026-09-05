@@ -54,7 +54,7 @@ type CollectionCallbacks = {
     beforeSave?(props):  Partial<Values>;           // Modify values before writing to DB
     afterSave?(props):   void;                      // After the write, still in the transaction
     afterSaveError?(props): void;                   // Side-effects after a failed save
-    beforeDelete?(props): boolean | void;           // Return false or throw to block deletion
+    beforeDelete?(props): boolean | void;           // Return false (403) or throw to block deletion
     afterDelete?(props): void;                      // After the delete, still in the transaction
 };
 ```
@@ -118,7 +118,7 @@ Each callback receives a single props object. Common fields:
 transaction that carries the write.** There is no "fire and forget" tier: the
 row and everything its callbacks did commit together or not at all.
 
-- **`beforeSave`, `beforeDelete`** — if the callback throws, the operation is rejected with an HTTP 400 carrying your message and the code `CALLBACK_REJECTED`, and the database write never happens. Throw a `RebaseApiError` from `@rebasepro/types` to pick the status yourself — see [Entity Callbacks](/docs/collections/callbacks#beforesave).
+- **`beforeSave`, `beforeDelete`** — if the callback throws, the operation is rejected with an HTTP 400 carrying your message and the code `CALLBACK_REJECTED`, and the database write never happens. Throw a `RebaseApiError` from `@rebasepro/types` to pick the status yourself — see [Entity Callbacks](/docs/collections/callbacks#beforesave). A `beforeDelete` that *returns* `false` is the same refusal with no message, and answers **403** with that code.
 - **`afterRead`** — the returned row (or transformed row) is what the caller receives. Its transaction is `READ ONLY` — see [below](#afterread-cannot-write).
 - **`afterSave`, `afterDelete`** — run *before* the commit, awaited. A throw here rolls the row back and answers the same **400 `CALLBACK_REJECTED`**, with `details.stage` naming the hook. They hold the transaction open while they run, so a slow one is a lock held.
 - **`afterSaveError`** — runs when the save failed, on the way out.

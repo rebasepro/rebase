@@ -77,3 +77,29 @@ export function toCallbackError(error: unknown, stage: string, path: string): un
         cause: error
     });
 }
+
+/**
+ * The refusal a callback expresses by returning `false` rather than throwing.
+ *
+ * `beforeDelete` is typed `boolean | void` and documented as "return false or
+ * throw to block deletion". Returning `false` did stop the delete — and then the
+ * route answered `204 No Content`, which says the row is gone. The admin panel
+ * removed it from the list, a client that trusted the status dropped it from its
+ * cache, and the next reload brought it back. A veto that reports success is
+ * worse than no veto.
+ *
+ * 403, not the 400 a throw produces: a throw carries the author's message and
+ * reads as "this input is wrong", while `false` is a flat refusal with no
+ * explanation — the server understood the request and will not perform it. The
+ * code is the same either way, so a client can handle both in one branch.
+ *
+ * @param stage The callback name, for `details.stage`.
+ * @param path  The collection path, for `details.path`.
+ */
+export function callbackRefusal(stage: string, path: string): RebaseApiError {
+    return new RebaseApiError(`${stage} refused the operation`, {
+        status: 403,
+        code: CALLBACK_REJECTED,
+        details: { stage, path }
+    });
+}

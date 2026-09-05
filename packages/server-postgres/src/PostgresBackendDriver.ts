@@ -31,7 +31,7 @@ import {
     User
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
-import { buildPropertyCallbacks, buildSdkData, classifyTable, detectJunctionTables, resolveCollectionRelations, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
+import { buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, resolveCollectionRelations, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress } from "./services/collection-helpers";
 import { HistoryService } from "./history/HistoryService";
@@ -1219,7 +1219,12 @@ export class PostgresBackendDriver implements DataDriver {
                     }
                 }
                 if (preventDefault) {
-                    return;
+                    // A veto, not a silent no-op. Returning early left the route
+                    // answering `204 No Content` — "the row is gone" — for a row
+                    // that is still there, so the panel dropped it from the list
+                    // and the next reload brought it back. Same code a throw
+                    // produces, so one branch handles both.
+                    throw callbackRefusal("beforeDelete", targetPath);
                 }
             }
         } catch (callbackError) {

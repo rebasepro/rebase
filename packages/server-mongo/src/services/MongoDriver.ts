@@ -27,7 +27,7 @@ import {
 import { MongoDataService } from "../db/MongoDataService";
 import { MongoRealtimeService } from "./MongoRealtimeService";
 import { MongoHistoryService } from "./MongoHistoryService";
-import { buildPropertyCallbacks, buildSdkData, checkOperation, PolicyClauses, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
+import { buildPropertyCallbacks, buildSdkData, callbackRefusal, checkOperation, PolicyClauses, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
 import { mergeDeep } from "@rebasepro/utils";
 import { Filter, Document } from "mongodb";
 import { ApiError } from "@rebasepro/server";
@@ -578,7 +578,9 @@ propertyCallbacks: undefined };
                     }
                 }
                 if (preventDefault) {
-                    return;
+                    // Same as the Postgres driver: a veto that answered 204 told
+                    // the caller the row was gone when it was not.
+                    throw callbackRefusal("beforeDelete", row.path);
                 }
             }
         } catch (callbackError) {

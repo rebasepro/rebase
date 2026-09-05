@@ -272,7 +272,8 @@ after the read returns.
 
 ### `beforeDelete`
 
-Called before a entity is deleted. Throw to block deletion.
+Called before a entity is deleted. Throw to block deletion — the caller gets
+**400 `CALLBACK_REJECTED`** with your message, and the row stays:
 
 ```typescript
 beforeDelete: async ({
@@ -285,6 +286,22 @@ beforeDelete: async ({
     }
 }
 ```
+
+Returning `false` blocks it too, and is the right shape when there is nothing to
+say. That answers **403** with the same code — a refusal with no message, rather
+than the 400 that means "your input was wrong":
+
+```typescript
+beforeDelete: ({ row }) => row.status !== "published"
+```
+
+:::caution[This used to answer 204]
+A `beforeDelete` that returned `false` stopped the delete and then let the route
+reply `204 No Content` — which says the row is gone. The panel dropped it from
+the list, clients dropped it from their caches, and the next reload brought it
+back. If you have code that treats a 2xx from `DELETE` as "vetoed", it now sees
+a 403.
+:::
 
 ### `afterDelete`
 
