@@ -18,6 +18,52 @@ function generateSecret(bytes = 48): string {
 const boolString = z.enum(["true", "false", ""]).default("false").transform(v => v === "true");
 
 /**
+ * Refuse an `extend` schema that a *different copy* of zod built.
+ *
+ * This has one specific, expensive failure behind it. A managed bundle that
+ * installed its own zod ran with two copies loaded: the image's, which
+ * `loadEnv` uses, and the project's, which built the schema handed to
+ * `extend`. `.merge()` accepts it — the shapes are structurally identical — and
+ * then `.parse()` rejects every field carrying a `.default()`, because a default
+ * is recognised by class identity and these instances belong to the other copy.
+ * The deploy came up, reported success, and ran zero crons. Nothing in the
+ * failure mentioned zod.
+ *
+ * `instanceof` is the probe precisely because it is what breaks: it is false
+ * across two copies of the same package at the same version, which is the
+ * condition we need to name. The `_def` check separates the two ways to be
+ * wrong, so "you passed a plain object" does not get a lecture about
+ * deduplication.
+ *
+ * Thrown, not warned. A boot that continues here is the outcome this exists to
+ * prevent — a server that runs and quietly does less than it was asked to.
+ */
+function assertSameZod(extend: unknown): void {
+    if (extend instanceof z.ZodType) return;
+
+    const looksLikeZod = typeof extend === "object" && extend !== null
+        && typeof (extend as { _def?: unknown })._def === "object"
+        && (extend as { _def: Record<string, unknown> })._def !== null;
+
+    if (looksLikeZod) {
+        throw new Error(
+            "loadEnv({ extend }) was given a schema built by a different copy of zod.\n" +
+            "  Two copies are loaded — the runtime's and this project's — and merging across them " +
+            "silently drops every `.default()`, so validation fails on fields you did set.\n" +
+            "  Fix: remove `zod` from your project's dependencies (the runtime provides it), or, if " +
+            "you must declare it, match the runtime's major and let your bundler dedupe it. " +
+            "Import `z` from the same place the rest of your backend does."
+        );
+    }
+
+    throw new Error(
+        "loadEnv({ extend }) expects a zod object schema — e.g. " +
+        "`loadEnv({ extend: z.object({ STRIPE_KEY: z.string() }) })`. " +
+        `Received ${extend === null ? "null" : typeof extend}.`
+    );
+}
+
+/**
  * Zod coercion helper for optional boolean strings.
  */
 const optionalBoolString = z.enum(["true", "false", ""]).optional().transform(v => v === "true");
@@ -240,6 +286,8 @@ export function loadEnv(options?: { extend?: z.ZodObject<z.ZodRawShape> }): Reco
             );
         }
     }
+
+    if (options?.extend) assertSameZod(options.extend);
 
     // Merge base schema with user extensions (if provided).
     const combinedSchema = options?.extend
