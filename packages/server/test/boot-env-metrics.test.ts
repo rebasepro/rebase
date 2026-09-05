@@ -1,4 +1,4 @@
-import { isLocalhostOrigin, resolveCorsOrigin, resolveEnableSwagger } from "../src/boot/env";
+import { isLocalhostOrigin, loadBootEnv, resolveCorsOrigin, resolveEnableSwagger } from "../src/boot/env";
 import type { RebaseBootEnv } from "../src/boot/env";
 import { MetricsRegistry, classifySurface } from "../src/metrics";
 
@@ -230,5 +230,40 @@ describe("MetricsRegistry", () => {
         const output = new MetricsRegistry().render();
         expect(output).toContain("rebase_process_heap_bytes");
         expect(output).toContain("rebase_uptime_seconds");
+    });
+});
+
+/**
+ * The message an operator who forgot a variable actually reads.
+ *
+ * `loadBootEnv` restates a ZodError as a list of variables, and its "this one
+ * is simply missing" branch tested for zod 3's `"Invalid input"` — a string zod
+ * 4 never produces. Every missing variable therefore printed the validator's
+ * own wording, which says `expected string, received undefined` rather than the
+ * one thing the reader needs to know.
+ */
+describe("loadBootEnv", () => {
+    const saved = { ...process.env };
+
+    afterEach(() => {
+        for (const key of Object.keys(process.env)) delete process.env[key];
+        Object.assign(process.env, saved);
+    });
+
+    it("says a missing variable is required, and quotes the rule for a wrong one", () => {
+        // Production so that nothing is auto-generated into process.env and no
+        // dev-secret file is written beside the test.
+        process.env.NODE_ENV = "production";
+        process.env.JWT_SECRET = "j".repeat(48);
+        process.env.REBASE_SERVICE_KEY = "s".repeat(48);
+        process.env.CORS_ORIGINS = "https://app.example.com";
+        delete process.env.DATABASE_URL;
+
+        expect(() => loadBootEnv()).toThrow(/DATABASE_URL: is required/);
+
+        // A variable that IS set, and wrong, keeps the rule it broke — "is
+        // required" would be a lie there.
+        process.env.DATABASE_URL = "not-a-url";
+        expect(() => loadBootEnv()).toThrow(/DATABASE_URL must be a valid URL/);
     });
 });

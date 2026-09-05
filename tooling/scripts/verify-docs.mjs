@@ -132,10 +132,10 @@ if (only === "both" || only === "names") {
     const { findings: bad, scanned } = checkDeployBuildContext(ROOT);
     console.log(`${DIM}Scanned ${scanned} deployment docs.${NC}`);
     if (!bad.length) {
-        console.log(`${GREEN}✓ No build instruction uses ./backend or ./frontend as its context.${NC}`);
+        console.log(`${GREEN}✓ No deploy guide builds a Dockerfile the scaffold does not ship, or names ./backend as a context.${NC}`);
     } else {
         findings += bad.length;
-        console.log(`${RED}✗ ${bad.length} bad build-context reference(s) — context must be the project root:${NC}`);
+        console.log(`${RED}✗ ${bad.length} bad build reference(s) — deploy guides build the bundle, not the source tree:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}:${b.line}${NC} ${DIM}[${b.rule}]${NC}`);
             console.log(`      ${DIM}${b.text}${NC}`);

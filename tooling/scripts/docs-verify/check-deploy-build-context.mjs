@@ -55,6 +55,25 @@ const RULES = [
         // compose long form: `context: ./backend`
         re: /^\s*context:\s*\.\/(backend|frontend)\b/,
         hint: "context must be the project root: `context: .`"
+    },
+    {
+        id: "scaffold-dockerfile",
+        // The rule above assumed a `backend/Dockerfile` whose context was
+        // merely wrong. There is no such file: `rebase init` scaffolds a
+        // project whose compose stack mounts a bundle into the PUBLISHED
+        // runtime image, and the only Dockerfile the CLI writes comes from
+        // `rebase eject`, at the project root. Six guides told the reader to
+        // build one anyway — `docker build -f backend/Dockerfile .` against a
+        // path that does not exist, which is where every one of them stopped.
+        re: /backend\/Dockerfile/,
+        // English only: the five other locales are machine-translated from
+        // these files and are refreshed by `website/scripts/translate_docs.mjs`,
+        // not by hand. Failing on a stale translation would block the fix to
+        // the page it was translated from.
+        only: /^website\/src\/content\/docs\/docs\//,
+        hint: "the scaffold ships no backend/Dockerfile — use `rebase build` plus " +
+            "`FROM rebasepro/server:<version>` / `COPY dist-bundle /bundle`, the shape " +
+            "self-hosting.md and hetzner.md use"
     }
 ];
 
@@ -79,6 +98,7 @@ export function checkDeployBuildContext(root) {
         const lines = readFileSync(path.join(root, rel), "utf8").split("\n");
         lines.forEach((text, i) => {
             for (const rule of RULES) {
+                if (rule.only && !rule.only.test(rel)) continue;
                 if (rule.re.test(text)) {
                     findings.push({ file: rel, line: i + 1, text: text.trim(), rule: rule.id, hint: rule.hint });
                 }
