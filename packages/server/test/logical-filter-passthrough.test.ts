@@ -107,19 +107,19 @@ describe("logical filter groups reach the driver", () => {
  * `packages/client/src/transport.ts`) and `parseLogicalGroup` here are the two
  * halves of one wire format, and only this test holds them against each other.
  * The leaf encoder used to have two copies; the copy the SDK used wrote
- * `deleted_at.eq.null`, `id.in.()` and — for any operator spelled the way the
- * wire spells it — `eq`, all of which this parser accepted and turned into a
- * query that ran and answered something else.
+ * `deleted_at.eq.null`, `id.in.()` and, for any operator it did not recognise,
+ * `eq` — all of which this parser accepted and turned into a query that ran
+ * and answered something else.
  */
 describe("the SDK's wire form parses back to the conditions it was built from", () => {
     const wireFor = (conditions: FilterCondition[], type: "or" | "and" = "or") =>
         `?${type}=${encodeURIComponent(`(${conditions.map(serializeLogicalCondition).join(",")})`)}`;
 
-    it("round-trips a null test, a relation path, a REST-spelled operator and an empty list", async () => {
+    it("round-trips a null test, a relation path, a comparison and an empty list", async () => {
         const conditions = [
             { column: "deleted_at", operator: "==" as WhereFilterOp, value: null },
             { column: "author.name", operator: "==" as WhereFilterOp, value: "bob" },
-            { column: "age", operator: "gte" as WhereFilterOp, value: 18 },
+            { column: "age", operator: ">=" as WhereFilterOp, value: 18 },
             { column: "id", operator: "in" as WhereFilterOp, value: [] }
         ];
 

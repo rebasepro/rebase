@@ -401,13 +401,17 @@ function serializeOperatorAndValue(
         );
     }
 
-    // REST short-codes resolve too. `deserializeFilter` has accepted both
-    // spellings since `readTuple` was fixed; serializing only the canonical
-    // half left `{ operator: "gte" }` — the spelling the wire itself uses, and
-    // the one a hand-built condition object most often carries — falling
-    // through to a fallback of `eq`.
-    const canonical = toCanonicalOp(op);
-    const restOp = canonical && CANONICAL_OP_LOOKUP.get(canonical);
+    // Canonical spellings only, on purpose: this codec parses liberally and
+    // emits strictly. `deserializeFilter` accepts a REST short-code because one
+    // arrives off the wire; a *caller* handing one to the serializer has a
+    // condition object built by hand, and the spelling it wants is the one the
+    // types name.
+    //
+    // The throw is the fix. `serializeLogicalCondition` used to end this lookup
+    // with `?? "eq"`, so `{ operator: "gte" }` — the spelling the wire uses, and
+    // therefore the one most often guessed — was sent as `age.eq.18`: a query
+    // that ran, returned rows, and answered a different question.
+    const restOp = CANONICAL_OP_LOOKUP.get(op);
     if (!restOp) {
         throw new TypeError(
             `${where}: unknown operator "${op}". Valid operators: ${Object.keys(CANONICAL_TO_REST).join(", ")}`
@@ -425,15 +429,15 @@ function serializeOperatorAndValue(
     // These are the same query: SQL `= NULL` is never true, so `== null` can
     // only mean IS NULL. Emitting it as such is unambiguous in both directions
     // and leaves `eq.null` free to mean the literal string, which it now does.
-    if (value === null && (canonical === "==" || canonical === "!=")) {
-        return canonical === "==" ? "isnull.null" : "notnull.null";
+    if (value === null && (op === "==" || op === "!=")) {
+        return op === "==" ? "isnull.null" : "notnull.null";
     }
 
     // A null test has no operand. Whatever was parked in `value` is dropped
     // here rather than on the way back, so the encoding is stable: both
     // deserializers normalize `isnull.<anything>` to `null`, and re-encoding
     // that must land on the same string it came from.
-    if (NULL_OPS.has(canonical)) return `${restOp}.null`;
+    if (NULL_OPS.has(op)) return `${restOp}.null`;
 
     if (Array.isArray(value)) {
         // The empty list needs a spelling of its own.

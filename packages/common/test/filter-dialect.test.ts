@@ -471,20 +471,29 @@ describe("logical leaf encoding", () => {
         });
     });
 
-    it("accepts the REST spelling of an operator", () => {
-        // Was silently rewritten to `eq`: `age.eq.18` instead of `age.gte.18`.
-        const wire = serializeLogicalCondition(cond("age", "gte", 18));
+    it("round-trips a comparison", () => {
+        const wire = serializeLogicalCondition(cond("age", ">=", 18));
         expect(wire).toBe("age.gte.18");
         expect(deserializeLogicalCondition(wire)).toEqual({
             column: "age", operator: ">=", value: "18"
         });
     });
 
-    it("refuses an operator the dialect does not have", () => {
-        expect(() => serializeLogicalCondition(cond("title", "contains", "x")))
-            .toThrow(TypeError);
-        expect(() => serializeLogicalCondition(cond("title", "contains", "x")))
-            .toThrow(/unknown operator "contains"/);
+    it("refuses an operator the dialect does not have, including the wire spelling", () => {
+        // `?? "eq"` used to swallow both of these. `gte` is the dangerous one:
+        // it is the spelling the wire itself uses, so it is what a hand-built
+        // condition object most often carries, and `age >= 18` went out as
+        // `age.eq.18` — a query that ran and answered something else.
+        //
+        // Rejected rather than accepted, which matches `serializeTuple`: this
+        // codec parses liberally (a REST short-code arrives off the wire) and
+        // emits strictly (a caller's spelling should be the one the types name).
+        for (const op of ["gte", "contains", "LIKE"]) {
+            expect(() => serializeLogicalCondition(cond("age", op, 18)))
+                .toThrow(TypeError);
+            expect(() => serializeLogicalCondition(cond("age", op, 18)))
+                .toThrow(new RegExp(`unknown operator "${op}"`));
+        }
     });
 
     it("encodes the empty list distinctly from a list holding the empty string", () => {
