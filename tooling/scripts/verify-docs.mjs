@@ -261,14 +261,14 @@ if (only === "both" || only === "names") {
 }
 
 if (only === "both" || only === "names") {
-    console.log(`\n${YELLOW}━━━ Agent-bundle manifests ━━━${NC}`);
+    console.log(`\n${YELLOW}━━━ Agent bundle: manifests, tool names, repository URLs ━━━${NC}`);
     const { findings: bad, scanned } = checkAgentBundle(ROOT);
-    console.log(`${DIM}Scanned ${scanned} MCP manifest(s) in tooling/rebase-agent-skills/.${NC}`);
+    console.log(`${DIM}Scanned ${scanned} MCP manifest(s), plus every tool name and first-party URL in tooling/rebase-agent-skills/.${NC}`);
     if (!bad.length) {
-        console.log(`${GREEN}✓ Every MCP server manifest names something that exists.${NC}`);
+        console.log(`${GREEN}✓ Every launcher, tool name and repository URL in the bundle names something that exists.${NC}`);
     } else {
         findings += bad.length;
-        console.log(`${RED}✗ ${bad.length} manifest(s) pointing at nothing:${NC}`);
+        console.log(`${RED}✗ ${bad.length} reference(s) pointing at nothing:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);
