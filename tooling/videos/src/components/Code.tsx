@@ -95,8 +95,16 @@ export const Code: React.FC<{
     step?: number;
     /** Lines held at full strength — the one thing the shot is about. */
     emphasise?: number[];
+    /** Per-line arrival, overriding `delay + i * step`. For a file that is
+     *  mostly already there when a few lines get ADDED to it. */
+    delays?: number[];
+    /** Keep a line out of the layout until its frame, so the frame grows as
+     *  lines are inserted — an editor, not a reveal. Without it every line
+     *  holds its height from the start and a file waiting for four lines to
+     *  be added shows a four-line hole. */
+    lazy?: boolean;
     style?: React.CSSProperties;
-}> = ({ code, sql = false, size = 22, delay = 0, step = 2.5, emphasise, style }) => {
+}> = ({ code, sql = false, size = 22, delay = 0, step = 2.5, emphasise, delays, lazy = false, style }) => {
     const frame = useCurrentFrame();
     const lines = code.split("\n");
 
@@ -112,7 +120,9 @@ export const Code: React.FC<{
             }}
         >
             {lines.map((line, i) => {
-                const t = ramp(frame, delay + i * step, 14);
+                const at = delays?.[i] ?? delay + i * step;
+                if (lazy && frame < at) return null;
+                const t = ramp(frame, at, 14);
                 const dim = emphasise && !emphasise.includes(i) ? 0.42 : 1;
                 return (
                     <div

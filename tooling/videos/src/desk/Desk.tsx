@@ -28,6 +28,7 @@ import { TONE } from "../theme";
  */
 
 const HOOK = beat("hook");
+const INIT = beat("init");
 const RULE = beat("rule");
 const PUSH = beat("push");
 const USERS = beat("users");
@@ -36,14 +37,16 @@ const PANEL = beat("panel");
 const VIEWS = beat("views");
 const SCHEMA = beat("schema");
 const STUDIO = beat("studio");
-const COMMANDS = beat("commands");
 
-/* The scan re-runs once `db push` has printed — timed against the shell's
-   own typing so the second command starts the moment the first window is
-   done. See Shell.tsx for the session; these are its arithmetic. */
-const SHELL_AT = PUSH.start + 6;
-const RERUN_AT = SHELL_AT + 96;
-const DEV_AT = COMMANDS.start + 20;
+/* The shell's three commands, on the film's clock. `init` types as the
+   camera lands on the terminal; `db push` types on the return visit; the
+   scan re-runs the moment push has printed "RLS policies applied"; `dev`
+   types once the scan has come back clean. See Shell.tsx for the session
+   itself — these are its arithmetic (typing at 0.55 frames a character). */
+const SHELL_AT = INIT.start + 8;
+const PUSH_AT = PUSH.start + 14;
+const RERUN_AT = PUSH_AT + 8 + 40 + 4;
+const DEV_AT = RERUN_AT + 70;
 
 const Chroma: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <ToneOverride.Provider value={TONE.claim}>{children}</ToneOverride.Provider>
@@ -98,7 +101,7 @@ export const Desk: React.FC = () => {
                         lines={["Anyone can have a backend by lunch.", "Nobody can tell you if it's safe."]}
                     />
                 </On>
-                <On beats={["hook", "push", "all"]}>
+                <On beats={["hook", "init", "push", "all"]}>
                     <AgentSession x={200} y={550} w={740} at={HOOK.start + 30} />
                     {/* Wide enough that the tool's own clean line — 70 characters
                         of it — sits on one row. Wrapped, it read as two findings. */}
@@ -106,19 +109,9 @@ export const Desk: React.FC = () => {
                     <ScanNote x={1010} y={868} at={RERUN_AT + 70} />
                 </On>
 
-                {/* ── (0,½) PUSH, then (0,¾) THE THREE COMMANDS ──────── */}
-                <On beats={["push", "commands", "all"]}>
-                    <Shell x={870} y={1080} w={1020} at={SHELL_AT} devAt={DEV_AT} />
-                </On>
-                <On beats={["commands", "all"]}>
-                    <Title
-                        x={200}
-                        y={1090}
-                        at={COMMANDS.start}
-                        eyebrow="The first five minutes"
-                        lines={["Init.", "Push.", "Run."]}
-                        width={560}
-                    />
+                {/* ── (0,½) THE TERMINAL — init, then push, then dev ─── */}
+                <On beats={["init", "push", "all"]}>
+                    <Shell x={200} y={1000} w={1690} at={SHELL_AT} pushAt={PUSH_AT} devAt={DEV_AT} />
                 </On>
 
                 {/* ── (1,0) THE RULE — on the blue field ─────────────── */}

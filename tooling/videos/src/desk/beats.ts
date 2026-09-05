@@ -19,17 +19,18 @@ import type { Ground } from "../theme";
  * Layout, by cell (each cell is one 1920 x 1080 frame of world):
  *
  *     (0,0) the hook       (1,0) the rule       (2,0) the agent
- *     (0,½) push + rescan  (1,1) two people     (2,1) the panel
+ *     (0,½) the terminal   (1,1) two people     (2,1) the panel
  *     (0,2) studio         (1,2) the schema     (2,2) every view
  *
- * The push view sits half a cell down from the hook on purpose: it shares
- * the scan window with it. The scan re-running in the SAME window, next to
- * the agent's own terminal, is the payoff of the opening, and a copy of that
- * window somewhere else would not be the same scan.
+ * The terminal view sits half a cell down from the hook on purpose: it
+ * shares the scan window with it. The scan re-running in the SAME window,
+ * next to the agent's own terminal, is the payoff of the opening, and a copy
+ * of that window somewhere else would not be the same scan.
  *
- * The camera path is a snake — right, back and down, right and down, right
- * and up, down, down, left, left, up, out — so no two consecutive moves are
- * the same direction and no move crosses the whole desk except the last.
+ * The camera path: down to the terminal, right and up to the rule, back to
+ * the terminal, right and down, right and up, down, down, left, left, out.
+ * No two consecutive moves share a direction and no move crosses the whole
+ * desk except the last.
  */
 
 export const CELL = { w: 1920, h: 1080 } as const;
@@ -74,7 +75,7 @@ const COLD_OPEN = 66;
 export const tempo = (raw: number): number => COLD_OPEN + Math.round((raw - COLD_OPEN) * TEMPO);
 
 /** The whole desk, framed on its content rather than its edges: the windows
- *  span roughly 240..5680 by 180..3160, and a 0.34 zoom from (150, 120) puts
+ *  span roughly 200..5680 by 180..3160, and a 0.34 zoom from (150, 120) puts
  *  that box on the frame. */
 const ALL: View = { x: 150, y: 120, zoom: 0.34 };
 
@@ -84,24 +85,46 @@ const ALL: View = { x: 150, y: 120, zoom: 0.34 };
  *  going rather than as a backdrop that happens to be dim. */
 const FINAL: View = { x: -226, y: -92, zoom: 0.3 };
 
+/** The view that holds the terminal: half a cell below the hook, so the
+ *  agent's own window and the scan stay in frame above it. Visited twice —
+ *  once to point Rebase at the database, once to push and re-run the scan —
+ *  and the return is the story: back to the terminal, next command. */
+const TERMINAL: View = { x: 0, y: 420, zoom: 1 };
+
+/**
+ * THE ORDER IS CAUSAL. Each beat is what the previous one made happen:
+ *
+ *   hook    an agent's backend, three ways in
+ *   init    so point Rebase at the same database — it writes a file per table
+ *   rule    the rule goes in that file, and compiles to a policy
+ *   push    push it; the same scan runs again and finds nothing; run it
+ *   users   the API on :3001 answers two people differently
+ *   agent   and answers an agent the same way
+ *   panel   the panel on :5173 — then every view, the schema, Studio
+ *   all     pull back; three commands; the address
+ *
+ * A first cut showed the rule BEFORE init (a file that did not exist yet),
+ * and returned to "Init. Push. Run." as its own beat forty seconds after
+ * both had already run. It was a tour with a story stapled to the front.
+ */
 export const BEATS: Beat[] = [
     { id: "hook", start: tempo(66), view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.3 },
-    { id: "rule", start: tempo(340), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
-    { id: "push", start: tempo(600), view: { x: 0, y: 420, zoom: 1 }, roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "users", start: tempo(860), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
-    { id: "agent", start: tempo(1096), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
-    { id: "panel", start: tempo(1290), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "views", start: tempo(1550), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
-    { id: "schema", start: tempo(1650), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
-    { id: "studio", start: tempo(1770), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
-    { id: "commands", start: tempo(1870), view: { x: 0, y: 900, zoom: 1 }, roll: 0.7, ground: "base", reveal: 0.3 },
-    { id: "all", start: tempo(2050), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "init", start: tempo(340), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "rule", start: tempo(560), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
+    { id: "push", start: tempo(800), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.3 },
+    { id: "users", start: tempo(1040), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
+    { id: "agent", start: tempo(1280), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
+    { id: "panel", start: tempo(1480), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "views", start: tempo(1740), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "schema", start: tempo(1850), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
+    { id: "studio", start: tempo(1970), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
+    { id: "all", start: tempo(2080), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
 ];
 
 /** The cold open holds the camera on the hook before anything is on it. */
 export const OPENING: View = cell(0, 0);
 
-export const DESK_DURATION = tempo(2350);
+export const DESK_DURATION = tempo(2400);
 
 export const beat = (id: string): Beat => {
     const b = BEATS.find((x) => x.id === id);

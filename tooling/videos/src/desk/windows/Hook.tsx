@@ -16,7 +16,7 @@ import { CHROMA, FONT, INK } from "../../theme";
 
 const SHIPPED = [
     "auth · email, sessions, refresh",
-    "CRUD for 8 tables",
+    "CRUD for 9 tables",
     "REST + OpenAPI",
     "deployed · api.acme.com",
 ];
@@ -80,7 +80,7 @@ const FOUND: { text: string; tone: "crit" | "body" }[] = [
 /* What the tool prints when there is nothing to print — verbatim from
    packages/rls-check/src/report.ts, the green line and the summary line. */
 const CLEAN = "No findings. Every table, view and policy in scope passed all checks.";
-const CLEAN_SUMMARY = "0 confirmed · 0 worth checking · 15 checks run against 8 tables in 1 schema";
+const CLEAN_SUMMARY = "0 confirmed · 0 worth checking · 15 checks run against 9 tables in 1 schema";
 
 const CMD = "npx @rebasepro/rls-check $DATABASE_URL";
 

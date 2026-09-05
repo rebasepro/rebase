@@ -40,7 +40,23 @@ export const Terminal: React.FC<{
     prompt?: string;
     /** Keep the caret blinking after the command is typed. */
     caret?: boolean;
-}> = ({ command, output = [], delay = 0, rate = 1.15, size = 24, prompt = "$", caret = true }) => {
+    /** Leave a line out of the DOM until its frame. By default every line is
+     *  laid out from the start at opacity 0, so the window has its final
+     *  height before anything prints; a shell that SCROLLS needs the
+     *  opposite — content that grows, so older lines are pushed off the top. */
+    lazy?: boolean;
+    lineHeight?: number;
+}> = ({
+    command,
+    output = [],
+    delay = 0,
+    rate = 1.15,
+    size = 24,
+    prompt = "$",
+    caret = true,
+    lazy = false,
+    lineHeight = 1.75,
+}) => {
     const frame = useCurrentFrame();
 
     // Ease the run rather than typing linearly: quick after the first few
@@ -56,7 +72,7 @@ export const Terminal: React.FC<{
     const blink = typing || Math.floor((frame - doneAt) / 16) % 2 === 0;
 
     return (
-        <div style={{ fontFamily: FONT.mono, fontSize: size, lineHeight: 1.75 }}>
+        <div style={{ fontFamily: FONT.mono, fontSize: size, lineHeight }}>
             <div style={{ display: "flex", gap: 12, opacity: frame >= delay ? 1 : 0 }}>
                 <span style={{ color: INK.muted }}>{prompt}</span>
                 <span style={{ color: INK.high }}>
@@ -78,6 +94,7 @@ export const Terminal: React.FC<{
 
             {output.map((line, i) => {
                 const at = doneAt + line.at;
+                if (lazy && frame < at) return null;
                 const o = ramp(frame, at, 9);
                 const tone = line.tone ?? "plain";
                 return (
@@ -126,7 +143,12 @@ export const Session: React.FC<{
     rate?: number;
     size?: number;
     prompt?: string;
-}> = ({ steps, delay = 0, rate = 1.15, size = 24, prompt = "$" }) => {
+    /** Pixel height of the window's body. When set, the session is anchored
+     *  to the bottom and older lines scroll off the top as new ones print —
+     *  what a terminal does. */
+    scroll?: number;
+    lineHeight?: number;
+}> = ({ steps, delay = 0, rate = 1.15, size = 24, prompt = "$", scroll, lineHeight = 1.75 }) => {
     const frame = useCurrentFrame();
 
     const starts: number[] = [];
@@ -139,14 +161,27 @@ export const Session: React.FC<{
         at += typed + last + 9 + (step.pause ?? 18);
     }
 
-    return (
-        <div style={{ fontFamily: FONT.mono, fontSize: size, lineHeight: 1.75 }}>
+    /* A shell fills from the top and only starts scrolling once it is full.
+       Bottom-aligning the content with flex did the second half and not the
+       first: seven lines sat at the foot of an empty window. Pinning an
+       inner box to the bottom with a min-height of the whole window does
+       both — short content lays out from the top of that box, and content
+       taller than it overflows upward, where it is clipped. */
+    const body = (
+        <div
+            style={{
+                fontFamily: FONT.mono,
+                fontSize: size,
+                lineHeight,
+                ...(scroll ? { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: "100%" } : {}),
+            }}
+        >
             {steps.map((step, i) => {
                 const start = starts[i];
                 if (frame < start) return null;
                 const isLast = i === steps.length - 1;
                 return (
-                    <div key={i} style={{ marginTop: i === 0 ? 0 : size * 0.9 }}>
+                    <div key={i} style={{ marginTop: i === 0 ? 0 : size * 0.9, flexShrink: 0 }}>
                         <Terminal
                             command={step.command}
                             output={step.output}
@@ -154,6 +189,8 @@ export const Session: React.FC<{
                             rate={rate}
                             size={size}
                             prompt={prompt}
+                            lazy={scroll !== undefined}
+                            lineHeight={lineHeight}
                             /* Only the live prompt has a caret. Three blinking
                                carets is three shells, not one session. */
                             caret={isLast || frame < (starts[i + 1] ?? Infinity)}
@@ -163,4 +200,6 @@ export const Session: React.FC<{
             })}
         </div>
     );
+    if (!scroll) return body;
+    return <div style={{ position: "relative", height: scroll, overflow: "hidden" }}>{body}</div>;
 };
