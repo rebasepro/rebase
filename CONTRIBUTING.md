@@ -18,9 +18,17 @@ means agreeing to our [Code of Conduct](CODE_OF_CONDUCT.md).
 1. **Fork & clone** the repository:
 
 ```bash
-git clone https://github.com/<your-username>/rebase.git
+git clone --filter=blob:none https://github.com/<your-username>/rebase.git
 cd rebase
 ```
+
+   `--filter=blob:none` is worth typing. The repository is about 890 MB on the
+   server and 195 MB checked out: the difference is historical revisions of the
+   marketing videos and screenshots under `website/public/` and
+   `tooling/videos/`. A blobless clone fetches file contents on demand, so you
+   get the same working tree and the same full history without the old copies of
+   a 3 MB `.webm`. Everything works normally; `git log -p` over an old binary
+   file is the only thing that has to go to the network.
 
 2. **Install dependencies and build the packages**. The build is not optional:
    the `rebase` CLI used by the next steps runs from `packages/cli/dist`, which
