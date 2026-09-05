@@ -111,6 +111,8 @@ export function App() {
                 client={rebaseClient}
                 authController={authController}
             >
+                {/* The sign-in screen. On its own this changes nothing —
+                    it is where you pass `loginView` to replace it. */}
                 <RebaseAuth />
                 <RebaseCMS
                     collections={collections}
