@@ -254,7 +254,7 @@ projectId }
 
 export function printDomainsHelp(): void {
     printGroupHelp({
-        group: "domains",
+        command: "cloud domains",
         title: "Custom domain",
         actions: [
             { action: "list",

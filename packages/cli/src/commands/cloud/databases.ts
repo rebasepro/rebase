@@ -738,7 +738,7 @@ acknowledgeNoCutover: true },
 
 export function printDbHelp(): void {
     printGroupHelp({
-        group: "db",
+        command: "cloud db",
         title: "Database & backups",
         actions: [
             { action: "list",

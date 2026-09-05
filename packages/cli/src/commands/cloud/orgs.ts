@@ -182,7 +182,7 @@ function slugify(s: string): string {
 
 export function printOrgsHelp(): void {
     printGroupHelp({
-        group: "orgs",
+        command: "cloud orgs",
         title: "Organizations",
         actions: [
             { action: "list",

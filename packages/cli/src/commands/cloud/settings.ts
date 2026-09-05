@@ -146,7 +146,7 @@ updated: patch }
 
 export function printSettingsHelp(): void {
     printGroupHelp({
-        group: "settings",
+        command: "cloud settings",
         title: "Project configuration",
         actions: [
             { action: "show",

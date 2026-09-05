@@ -256,7 +256,7 @@ extensionName: name }, { path: "disable" });
 
 export function printExtensionsHelp(): void {
     printGroupHelp({
-        group: "extensions",
+        command: "cloud extensions",
         title: "Postgres extensions",
         actions: [
             { action: "list",

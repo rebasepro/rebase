@@ -131,15 +131,36 @@ function documentableKeys(spec: Record<string, unknown>): string[] {
  * of `dist/index.es.js` by somebody deploying a real project.
  */
 function commandsThatParseTheirOwnLine(): string[] {
-    const dir = __dirname;
     const found = new Set<string>();
-    for (const file of fs.readdirSync(dir)) {
-        // Not action-help.ts: its own entries carry the same literal, so
-        // including it would make the check compare the list with itself.
-        if (!file.endsWith(".ts") || file.includes(".test.") || file === "action-help.ts") continue;
-        const source = fs.readFileSync(path.join(dir, file), "utf8");
+    for (const source of cloudSources()) {
         for (const match of source.matchAll(/command:\s*"cloud ([^"]+)"/g)) {
             found.add(match[1]);
+        }
+    }
+    // A group page names itself the same way — `printGroupHelp({ command:
+    // "cloud db", … })` — and IS the page for that word. Subtracted rather than
+    // pattern-matched apart, so the two producers of the literal cannot be
+    // told apart by regex luck.
+    for (const group of commandsWithAGroupPage()) found.delete(group);
+    return [...found].sort();
+}
+
+/** Every non-test module in this directory, minus the page file itself. */
+function cloudSources(): string[] {
+    const dir = __dirname;
+    return fs.readdirSync(dir)
+        // Not action-help.ts: its own entries carry the same literal, so
+        // including it would make the check compare the list with itself.
+        .filter(file => file.endsWith(".ts") && !file.includes(".test.") && file !== "action-help.ts")
+        .map(file => fs.readFileSync(path.join(dir, file), "utf8"));
+}
+
+/** The commands answered by a rendered group page rather than an `ACTION_HELP` entry. */
+function commandsWithAGroupPage(): string[] {
+    const found = new Set<string>();
+    for (const source of cloudSources()) {
+        for (const match of source.matchAll(/printGroupHelp\(\{\s*command:\s*"cloud ?([^"]*)"/g)) {
+            if (match[1]) found.add(match[1]);
         }
     }
     return [...found].sort();
@@ -229,6 +250,16 @@ describe("ACTION_HELP", () => {
         // Without this, a rename of `parseCloudArgs`'s `command` field would
         // make the check above vacuous and silent.
         expect(commandsThatParseTheirOwnLine().length).toBeGreaterThan(10);
+    });
+
+    it("finds the group pages it subtracts, so the subtraction cannot swallow the sweep", () => {
+        // The other half of the same guard: if `printGroupHelp` were renamed,
+        // this would return nothing and the subtraction would be a no-op — which
+        // is the safe direction, but silent. If it returned everything, the
+        // sweep above would pass vacuously.
+        expect(commandsWithAGroupPage().sort()).toEqual(
+            ["db", "debug", "domains", "env", "extensions", "orgs", "settings", "storage"]
+        );
     });
 
     it("pairs every page with a spec, or with an explicit null", () => {

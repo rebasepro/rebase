@@ -1022,7 +1022,7 @@ title: "📄 Logs" });
 
 export function printDebugHelp(): void {
     printGroupHelp({
-        group: "debug",
+        command: "cloud debug",
         title: "Find out why a deployed project is misbehaving",
         actions: [
             {

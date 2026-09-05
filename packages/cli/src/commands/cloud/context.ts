@@ -714,8 +714,8 @@ export interface HelpAction {
 
 /** A whole group page — `rebase cloud env --help`. */
 export interface GroupHelp {
-    /** The group word, no leading `cloud`: `env`, `db`. */
-    group: string;
+    /** The command words, no leading `rebase`: `cloud env`, or `cloud` itself. */
+    command: string;
     /** The title's tail: "Environment variables". */
     title: string;
     actions: HelpAction[];
@@ -788,14 +788,14 @@ function pad(text: string, width: number): string {
  */
 export function printGroupHelp(page: GroupHelp): void {
     emitHelp(
-        `cloud ${page.group}`,
+        page.command,
         page.actions,
         () => {
             console.log("");
-            console.log(`${chalk.bold(`rebase cloud ${page.group}`)} — ${page.title}`);
+            console.log(`${chalk.bold(`rebase ${page.command}`)} — ${page.title}`);
             console.log("");
             console.log(chalk.green.bold("Usage"));
-            console.log(`  rebase cloud ${page.group} ${chalk.blue("<action>")} [options]`);
+            console.log(`  rebase ${page.command} ${chalk.blue("<action>")} [options]`);
 
             let section: string | undefined;
             for (const entry of page.actions) {
@@ -836,7 +836,7 @@ export function printGroupHelp(page: GroupHelp): void {
             console.log("");
         },
         {
-            usage: `rebase cloud ${page.group} <action> [options]`,
+            usage: `rebase ${page.command} <action> [options]`,
             summary: page.title,
             options: (page.options ?? []).map(([flag, description]) => ({ flag,
 description })),

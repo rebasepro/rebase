@@ -31,7 +31,14 @@ import {
     billingCommand,
     printStorageHelp
 } from "./resources";
-import { requireProjectRef, initOutputMode, emitHelp, fail, GLOBAL_CLOUD_FLAGS } from "./context";
+import {
+    requireProjectRef,
+    initOutputMode,
+    printGroupHelp,
+    fail,
+    GLOBAL_CLOUD_FLAGS,
+    type HelpAction
+} from "./context";
 import { ACTION_HELP, printActionHelp } from "./action-help";
 
 /**
@@ -337,101 +344,75 @@ async function deploymentsGroup(action: string | undefined, rawArgs: string[]): 
 }
 
 /**
- * Every group `cloudCommand` dispatches, canonical name first.
+ * Every group `cloudCommand` dispatches, canonical name first, with the line the
+ * index page prints for it.
  *
- * This is the index page's JSON form, and the list an agent discovers the
- * family from. `cloud-help.test.ts` holds it to the dispatch switch, so a group
- * added there without being added here is a test failure rather than a
- * command that exists but cannot be found.
+ * One list, rendered twice. It used to be two: a bare array of words for the
+ * JSON form and a hand-formatted template literal for the terminal — which is
+ * how `clusters` came to be listed on the page twice, under two different
+ * descriptions, in the same section. The page is generated from this now, so a
+ * group appears exactly as often as it appears here, and `cloud-help.test.ts`
+ * holds the list to the dispatch switch and to the pages.
+ *
+ * Sub-actions are deliberately not here. Every group answers `--help` with its
+ * own page now, listing its actions, their arguments and their flags; repeating
+ * a subset of that on the index is the duplication this replaced.
  */
-export const CLOUD_GROUPS = [
-    "login", "logout", "whoami",
-    "link", "unlink", "use", "open",
-    "projects",
-    "deploy", "logs", "deployments", "rollback", "cancel",
-    "start", "stop", "restart", "status", "metrics", "debug",
-    "env", "domains", "extensions", "settings",
-    "orgs",
-    "db",
+export const CLOUD_GROUPS: HelpAction[] = [
+    { action: "login", section: "Auth", description: "Sign in to the control plane" },
+    { action: "logout", section: "Auth", description: "Sign out" },
+    { action: "whoami", section: "Auth", description: "Show the current session" },
+
+    { action: "link", section: "Project link", args: "[url]", description: "Bind this directory to a cloud project, or straight to a backend URL" },
+    { action: "unlink", section: "Project link", description: "Remove the link" },
+    { action: "use", section: "Project link", args: "[org]", description: "Select the active organization" },
+    { action: "open", section: "Project link", description: "Open the console in a browser" },
+
+    { action: "projects", section: "Projects", description: "Create, list, inspect and delete projects" },
+
+    { action: "deploy", section: "Deploy & observe", args: "[app]", description: "Build, upload and ship an app, following it to a terminal state" },
+    { action: "logs", section: "Deploy & observe", description: "Build logs, or the runtime's with --runtime" },
+    { action: "deployments", section: "Deploy & observe", description: "Deployment history: status, duration, trigger" },
+    { action: "rollback", section: "Deploy & observe", args: "[id]", description: "Put a previous successful deployment back into service" },
+    { action: "cancel", section: "Deploy & observe", description: "Stop the build in flight" },
+    { action: "start", section: "Deploy & observe", description: "Bring a stopped project back" },
+    { action: "stop", section: "Deploy & observe", description: "Stop the project. Downtime, so it confirms" },
+    { action: "restart", section: "Deploy & observe", description: "Stop and start it again" },
+    { action: "status", section: "Deploy & observe", description: "One glance: URL, last deploy, and what it is waiting on" },
+    { action: "metrics", section: "Deploy & observe", description: "Live CPU, memory and disk" },
+    { action: "debug", section: "Deploy & observe", description: "Diagnose a misbehaving deployment. Read-only" },
+
+    { action: "env", section: "Config", description: "Environment variables" },
+    { action: "domains", section: "Config", description: "Custom domain, its DNS records, and verification" },
+    { action: "extensions", section: "Config", description: "The Postgres extension allowlist" },
+    { action: "settings", section: "Config", description: "Name, subdomain, repository, branch" },
+
+    { action: "orgs", section: "Organizations", description: "Organizations you belong to, and their members" },
+
+    { action: "db", section: "Data", description: "Attach a database, back it up, restore, point-in-time recovery" },
+    { action: "storage", section: "Data", description: "The project's object storage" },
+
+    { action: "webhooks", section: "Other resources", description: "Outbound webhooks on a table's row changes" },
     // `resources` dispatches, has a page, and was absent from this list — so the
     // one command that names what a project costs was undiscoverable from
     // `rebase cloud --help`, which is where an agent finds the family.
-    "webhooks", "storage", "resources", "clusters", "billing"
+    { action: "resources", section: "Other resources", description: "What this project reserves, what it costs, and how to change it" },
+    { action: "clusters", section: "Other resources", description: "The clusters tenants run on. Platform-admin only" },
+    { action: "billing", section: "Other resources", description: "The organization's billing account and card on file" }
 ];
 
+/** The dispatch words alone — what `--help` routing and the tests iterate. */
+export const CLOUD_GROUP_NAMES = CLOUD_GROUPS.map(g => g.action);
+
 function printCloudHelp(): void {
-    emitHelp("cloud", CLOUD_GROUPS, () => {
-        console.log(`
-${chalk.bold("rebase cloud")} — Manage your apps on Rebase Cloud
-
-${chalk.green.bold("Usage")}
-  rebase cloud ${chalk.blue("<command>")} [options]
-
-${chalk.green.bold("Auth")}
-  ${chalk.blue.bold("login")}                   Sign in to the control plane
-  ${chalk.blue.bold("logout")}                  Sign out
-  ${chalk.blue.bold("whoami")}                  Show the current session
-
-${chalk.green.bold("Project link")}
-  ${chalk.blue.bold("link")}                    Link this directory to a cloud project
-  ${chalk.blue.bold("unlink")}                  Remove the link
-  ${chalk.blue.bold("use")} ${chalk.gray("[org]")}               Select the active organization
-  ${chalk.blue.bold("open")}                    Open the dashboard in a browser
-
-${chalk.green.bold("Projects")}
-  ${chalk.blue.bold("projects list")}           List projects
-  ${chalk.blue.bold("projects create")}         Create a project ${chalk.gray("(--link to link it)")}
-  ${chalk.blue.bold("projects info")} ${chalk.gray("[id]")}      Show project details
-  ${chalk.blue.bold("projects delete")} ${chalk.gray("[id]")}    Delete a project
-
-${chalk.green.bold("Deploy & observe")}
-  ${chalk.blue.bold("deploy")} ${chalk.gray("[app] [--source .]")}    Deploy an app + stream build logs ${chalk.gray("(default: the backend)")}
-  ${chalk.blue.bold("logs")} ${chalk.gray("[--runtime] [-f]")}   Show build (or runtime) logs
-  ${chalk.blue.bold("deployments list")} ${chalk.gray("[--limit N|--all]")}  Deployment history ${chalk.gray("(status, duration, trigger)")}
-  ${chalk.blue.bold("rollback")} ${chalk.gray("[id] [-y]")}       Roll back to a successful deploy
-  ${chalk.blue.bold("cancel")} ${chalk.gray("[-y]")}             Cancel the in-flight build
-  ${chalk.blue.bold("start|stop|restart")} ${chalk.gray("[-y]")}  Power ops ${chalk.gray("(stop/restart need -y)")}
-  ${chalk.blue.bold("status")}                  One-glance project status
-  ${chalk.blue.bold("metrics")}                 Live CPU / memory / disk
-  ${chalk.blue.bold("debug")} ${chalk.gray("[health|logs|…]")}    Diagnose a misbehaving deployment ${chalk.gray("(read-only)")}
-
-${chalk.green.bold("Config")}
-  ${chalk.blue.bold("env list|set|unset|reveal|pull")}
-  ${chalk.blue.bold("domains list|add|verify|remove")}
-  ${chalk.blue.bold("extensions list|enable|disable")}
-  ${chalk.blue.bold("settings show|set")}       Name / branch / repo / subdomain
-
-${chalk.green.bold("Organizations")}
-  ${chalk.blue.bold("orgs list|create|members")}
-
-${chalk.green.bold("Databases")}
-  ${chalk.blue.bold("db list|create|info|test")}
-  ${chalk.blue.bold("db backup list|create|restore|status|download")}
-  ${chalk.blue.bold("db pitr status|restore|cutover|discard")}
-
-${chalk.green.bold("Other resources")}
-  ${chalk.blue.bold("webhooks list|create|delete")}
-  ${chalk.blue.bold("clusters")}                List the clusters tenants run on
-  ${chalk.blue.bold("clusters add")}            Register a cluster from a kubeconfig
-  ${chalk.blue.bold("clusters verify")}         Ask a cluster whether it can host tenants
-  ${chalk.blue.bold("resources")}               Show what this project reserves, and what it costs per month
-  ${chalk.blue.bold("resources set")}           Change it (--cpu, --memory, --replicas, --spot, --scale-to-zero,
-                          --db-mode, --db-instances, --db-cpu, --db-memory, --storage,
-                          --autoscale-max, --autoscale-cpu-target, --no-autoscale)
-  ${chalk.blue.bold("storage")}                 List storage buckets
-  ${chalk.blue.bold("storage create")}          Provision platform-managed storage
-  ${chalk.blue.bold("storage attach")}          Attach your own S3-compatible bucket
-  ${chalk.blue.bold("clusters")}                List compute clusters
-  ${chalk.blue.bold("billing setup")}           Attach a card to the org ${chalk.gray("(one-time, opens browser)")}
-  ${chalk.blue.bold("billing")}                 Show billing account + card on file
-
-${chalk.green.bold("Global options")}
-  ${chalk.blue("--json")}                  Machine-readable output ${chalk.gray("(also when piped, or REBASE_JSON=1)")}
-  ${chalk.blue("--url <origin>")}          Target a specific control plane ${chalk.gray("(or REBASE_CLOUD_URL)")}
-  ${chalk.blue("--project, -p <id>")}      Operate on a project without linking
-
-${chalk.gray("Most commands act on the linked project (.rebase/cloud.json) unless --project is given.")}
-${chalk.gray("Docs: https://rebase.pro/docs")}
-`);
+    printGroupHelp({
+        command: "cloud",
+        title: "Manage your apps on Rebase Cloud",
+        actions: CLOUD_GROUPS,
+        notes: [
+            "Most commands act on the linked project (.rebase/cloud.json) unless --project is given.",
+            "Every group answers `--help` with its own page: actions, arguments and flags.",
+            "Docs: https://rebase.pro/docs"
+        ]
     });
 }

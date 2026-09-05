@@ -462,7 +462,7 @@ skipped }
 
 export function printEnvHelp(): void {
     printGroupHelp({
-        group: "env",
+        command: "cloud env",
         title: "Environment variables",
         actions: [
             { action: "list",

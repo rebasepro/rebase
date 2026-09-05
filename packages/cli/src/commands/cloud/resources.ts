@@ -706,7 +706,7 @@ export async function storageCommand(action: string | undefined, rawArgs: string
 
 export function printStorageHelp(): void {
     printGroupHelp({
-        group: "storage",
+        command: "cloud storage",
         title: "The project's object storage",
         actions: [
             { action: "list",
