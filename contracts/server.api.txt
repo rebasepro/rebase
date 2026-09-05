@@ -311,7 +311,7 @@ interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit
 interface UserData { createdAt, displayName, email, emailVerificationSentAt, emailVerificationToken, emailVerified, id, isAnonymous, metadata, passwordHash, photoUrl, updatedAt }
 interface UserIdentityData { createdAt, id, profileData, provider, providerId, uid, updatedAt }
 interface UserRepository { assignDefaultRole, createUser, deleteUser, getUserByEmail, getUserById, getUserByIdentity, getUserByVerificationToken, getUserIdentities, getUserRoleIds, getUserRoles, getUserWithRoles, linkUserIdentity, listUsers, listUsersPaginated, setEmailVerified, setUserRoles, setVerificationToken, updatePassword, updateUser }
-interface ValidateCollectionConfigOptions { unknownKeys }
+interface ValidateCollectionConfigOptions { sources, unknownKeys }
 interface WebhookConfig { enabled, events, headers, id, secret, table, url }
 interface WebhookDeliveryResult { attemptNumber, event, payload, responseBody, statusCode, success, webhookId }
 interface WebhookDispatcherOptions { allowPrivateNetworks, jobQueue, lookup, onDelivery, timeoutMs }

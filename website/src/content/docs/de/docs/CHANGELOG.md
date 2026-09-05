@@ -149,6 +149,25 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ### Fixed
 
+- **A second collection claiming the same `slug` or table was dropped without a
+  word.** `CollectionRegistry` registers by slug and by table name, and returns
+  early when the table is already taken — so the second file's routes never
+  existed, its relations resolved to the *other* collection's rows, and the file
+  sat in `config/collections` looking loaded. Boot now fails, naming both files:
+
+  ```
+    • posts
+        2 collections declare `slug: "posts"`: posts.ts, blog_posts.ts. …
+  ```
+
+  The file names come from the loader, which is the only thing that has them;
+  passed through `ValidateCollectionConfigOptions.sources`, and falling back to
+  the collection's index for callers that validate an array they built
+  themselves. The table is resolved with `getTableName` — the same function the
+  registry and both generators use — so two slugs that *derive* the same table
+  are caught as well as two that declare it, and a duplicate slug says it once
+  rather than twice.
+
 - **A typo inside an `admin` block was the one config mistake with no signal at
   all.** The boot validator checked the collection's keys, each property's keys
   and each relation's keys — and then stopped at the edge of `admin`, on the

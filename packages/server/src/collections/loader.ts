@@ -104,8 +104,13 @@ export async function loadCollectionsFromDirectory(
     options: { validate?: false | ValidateCollectionConfigOptions } = {}
 ): Promise<CollectionConfig[]> {
     const resolved = path.resolve(source);
-    const validate = (collections: CollectionConfig[]): CollectionConfig[] => {
-        if (options.validate !== false) assertCollectionConfigs(collections, options.validate ?? {});
+    // The file each collection came from, in the order they were pushed. Only
+    // the checks that compare two collections use it — "two collections declare
+    // `slug: "posts"`" is unactionable without saying which two files.
+    const validate = (collections: CollectionConfig[], sources?: string[]): CollectionConfig[] => {
+        if (options.validate !== false) {
+            assertCollectionConfigs(collections, { ...(options.validate ?? {}), sources });
+        }
         return collections;
     };
 
@@ -124,6 +129,7 @@ export async function loadCollectionsFromDirectory(
     }
 
     const collections: CollectionConfig[] = [];
+    const sources: string[] = [];
     const failures: string[] = [];
 
     for (const file of fs.readdirSync(resolved).filter(isCollectionFile)) {
@@ -131,6 +137,7 @@ export async function loadCollectionsFromDirectory(
             const mod = await importModule(path.join(resolved, file));
             if (mod?.default) {
                 collections.push(mod.default as CollectionConfig);
+                sources.push(file);
             } else {
                 failures.push(`${file}: no default export`);
             }
@@ -147,5 +154,5 @@ export async function loadCollectionsFromDirectory(
         );
     }
 
-    return validate(applyCollectionDefaults(collections, await readDefaults(resolved)));
+    return validate(applyCollectionDefaults(collections, await readDefaults(resolved)), sources);
 }

@@ -464,6 +464,83 @@ describe("unrecognised keys", () => {
     });
 });
 
+/**
+ * Two questions no collection can answer about itself.
+ *
+ * `CollectionRegistry` registers by slug and by table name, and
+ * `_registerRecursively` returns early when the table is already there — so the
+ * second collection to claim either one was dropped without a word. Its routes
+ * did not exist, its relations resolved to the other collection's rows, and the
+ * file sat in `config/collections` looking loaded.
+ */
+describe("two collections claiming one identity", () => {
+    it("errors on a duplicate slug, naming both files", () => {
+        const a = { ...valid(), table: "posts_a" };
+        const b = { ...valid(), table: "posts_b" };
+
+        const [problem] = errors([a, b], { sources: ["posts.ts", "blog_posts.ts"] });
+
+        expect(problem.path).toBe("posts");
+        expect(problem.message).toContain("2 collections declare `slug: \"posts\"`");
+        expect(problem.message).toContain("posts.ts");
+        expect(problem.message).toContain("blog_posts.ts");
+    });
+
+    it("refuses to boot on it", () => {
+        expect(() => assertCollectionConfigs([
+            { ...valid(), table: "posts_a" },
+            { ...valid(), table: "posts_b" }
+        ])).toThrow(/declare `slug: "posts"`/);
+    });
+
+    it("falls back to the index when no source is given", () => {
+        const [problem] = errors([{ ...valid(), table: "a" }, { ...valid(), table: "b" }]);
+        expect(problem.message).toContain("collection[0]");
+        expect(problem.message).toContain("collection[1]");
+    });
+
+    it("errors on two slugs resolving to one table", () => {
+        const a = { ...valid(), slug: "posts", table: "content" };
+        const b = { ...valid(), slug: "articles", table: "content" };
+
+        const [problem] = errors([a, b], { sources: ["posts.ts", "articles.ts"] });
+
+        expect(problem.path).toBe("public.content");
+        expect(problem.message).toContain("resolve to the table `public.content`");
+        expect(problem.message).toContain("articles.ts");
+    });
+
+    // The table is derived from the slug when none is declared, so this is the
+    // shape a duplicate usually arrives in.
+    it("catches a duplicate table that nobody wrote down", () => {
+        const a = { ...valid(), slug: "posts", table: undefined };
+        const b = { ...valid(), slug: "posts", table: undefined };
+
+        expect(errors([a, b]).length).toBeGreaterThan(0);
+    });
+
+    it("says it once when the slug is what collided", () => {
+        // Both errors would fire — same slug, therefore same derived table —
+        // and the second adds nothing the first did not say.
+        const found = errors([{ ...valid(), table: undefined }, { ...valid(), table: undefined }]);
+        expect(found.map(p => p.path)).toEqual(["posts"]);
+    });
+
+    it("lets two collections share a name in different schemas", () => {
+        const a = { ...valid(), slug: "posts", table: "posts" };
+        const b = { ...valid(), slug: "archived_posts", table: "posts", schema: "archive" };
+
+        expect(errors([a, b])).toEqual([]);
+    });
+
+    it("says nothing about a directory of distinct collections", () => {
+        const a = { ...valid(), slug: "posts", table: "posts" };
+        const b = { ...valid(), slug: "authors", table: "authors" };
+
+        expect(findCollectionConfigProblems([a, b])).toEqual([]);
+    });
+});
+
 describe("reporting", () => {
     it("reports every problem across every collection in one pass", () => {
         // A user migrating wants the whole list, not one boot per defect.
@@ -471,6 +548,9 @@ describe("reporting", () => {
         const b = {
             ...valid(),
             slug: "authors",
+            // Its own table: `valid()` carries `table: "posts"`, and two
+            // collections resolving to one table is now its own error.
+            table: "authors",
             hideFromNavigation: true,
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },

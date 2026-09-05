@@ -1,6 +1,7 @@
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
-import type { PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property } from "@rebasepro/types";
 
+import { getTableName } from "@rebasepro/common";
 import { suggestNearMiss } from "@rebasepro/utils";
 
 import { logger } from "../utils/logger";
@@ -67,6 +68,16 @@ export interface ValidateCollectionConfigOptions {
      * when that is unset.
      */
     unknownKeys?: UnknownKeyPolicy;
+    /**
+     * Where each collection came from, parallel to the array being checked.
+     *
+     * Used only in messages, and only by the checks that compare two
+     * collections: when two of them claim the same slug, "posts" names both, and
+     * the one thing the author needs is which two *files* to open. The loader
+     * has that and this module does not, so it is passed in rather than guessed
+     * at. Absent, the messages fall back to the collection's index.
+     */
+    sources?: readonly (string | undefined)[];
 }
 
 /**
@@ -908,7 +919,92 @@ export function findCollectionConfigProblems(
 ): ConfigProblem[] {
     const collect = new ProblemCollector(options.unknownKeys ?? unknownKeyPolicyFromEnv());
     collections.forEach((collection, index) => checkCollection(collection, index, collect));
+    checkCollectionsTogether(collections, options.sources, collect);
     return collect.problems;
+}
+
+/**
+ * The two questions no single collection can answer about itself.
+ *
+ * A `slug` is an identity — the URL, the API path, and the key every relation's
+ * `target()` resolves to. A table is where the rows are. Both were registered
+ * into a `Map`, and `CollectionRegistry._registerRecursively` returns early when
+ * the table name is already there, so the second collection to claim either one
+ * was **dropped without a word**: its routes did not exist, its relations
+ * resolved to the other collection's rows, and the config file sat in the
+ * directory looking loaded.
+ *
+ * Reported here rather than in the registry because this is where a config
+ * problem is *rendered* — with a path, alongside every other one, in a single
+ * pass — and because the registry has one collection at a time by then.
+ *
+ * The table is resolved through {@link getTableName}, the same function the
+ * registry and both generators use, so "duplicate" means the same thing here as
+ * it does to the database. A collection that declares no `table` still has one.
+ */
+function checkCollectionsTogether(
+    collections: readonly unknown[],
+    sources: readonly (string | undefined)[] | undefined,
+    collect: ProblemCollector
+): void {
+    /** How to name collection `i` to somebody who has to go and open it. */
+    const describe = (i: number): string => {
+        const source = sources?.[i];
+        if (source) return source;
+        const collection = collections[i];
+        const name = isPlainObject(collection) && typeof collection.name === "string" ? collection.name : undefined;
+        return name ? `collection[${i}] ("${name}")` : `collection[${i}]`;
+    };
+
+    const bySlug = new Map<string, number[]>();
+    const byTable = new Map<string, number[]>();
+
+    collections.forEach((collection, index) => {
+        if (!isPlainObject(collection)) return;
+
+        const slug = typeof collection.slug === "string" && collection.slug ? collection.slug : undefined;
+        if (slug) {
+            const seen = bySlug.get(slug);
+            if (seen) seen.push(index); else bySlug.set(slug, [index]);
+        }
+
+        const table = getTableName(collection as unknown as CollectionConfig);
+        if (!table) return;
+        const schema = typeof collection.schema === "string" && collection.schema ? collection.schema : "public";
+        const qualified = `${schema}.${table}`;
+        const seen = byTable.get(qualified);
+        if (seen) seen.push(index); else byTable.set(qualified, [index]);
+    });
+
+    for (const [slug, indexes] of bySlug) {
+        if (indexes.length < 2) continue;
+        collect.error(
+            slug,
+            `${indexes.length} collections declare \`slug: "${slug}"\`: ${indexes.map(describe).join(", ")}. ` +
+            "The slug is the collection's identity — its URL, its API path, and what every relation's " +
+            "`target()` resolves to — so only the first is registered and the rest are dropped silently. " +
+            "Give each one its own slug."
+        );
+    }
+
+    for (const [qualified, indexes] of byTable) {
+        if (indexes.length < 2) continue;
+        // A duplicate slug already produced a message for these; saying it twice
+        // about the table the slug derives adds nothing.
+        const slugs = new Set(indexes.map(i => {
+            const c = collections[i];
+            return isPlainObject(c) && typeof c.slug === "string" ? c.slug : undefined;
+        }));
+        if (slugs.size < indexes.length) continue;
+
+        collect.error(
+            qualified,
+            `${indexes.length} collections resolve to the table \`${qualified}\`: ${indexes.map(describe).join(", ")}. ` +
+            "A table has one owner: only the first is registered, and the others' routes, policies and " +
+            "generated columns never exist. Set `table` on each, or rename a slug — the table defaults to " +
+            "`toSnakeCase(slug)`."
+        );
+    }
 }
 
 function render(problems: ConfigProblem[]): string {
