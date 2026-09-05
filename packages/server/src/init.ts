@@ -27,7 +27,8 @@ import {
     logForeignCollections,
     provisionCollectionPolicies,
     provisionCollectionTables,
-    provisionTargetFor
+    provisionTargetFor,
+    verifyProvisioningConnection
 } from "./boot/provision";
 import { enforceSchemaStamp, resolveSchemaMismatchPolicy } from "./boot/schema-stamp";
 import { DEFAULT_DRIVER_ID, DefaultDriverRegistry, DriverRegistry } from "./services/driver-registry";
@@ -938,6 +939,9 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
         initializeAuth: dbAdapter.initializeAuth,
         initializeHistory: dbAdapter.initializeHistory,
         initializeWebsockets: dbAdapter.initializeWebsockets,
+        verifyConnection: dbAdapter.verifyConnection
+            ? (driverResult) => dbAdapter.verifyConnection!(driverResult)
+            : undefined,
         ensureCollectionSchema: dbAdapter.ensureCollectionSchema
             ? (collections, driverResult, log) =>
                 dbAdapter.ensureCollectionSchema!(collections, driverResult, log)
@@ -1113,6 +1117,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         declaredDataSources.map(source => ({ key: source.key, engine: source.engine ?? provisionTarget.engine }))
     );
     logForeignCollections(activeCollections, provisionable, { engine: provisionTarget.engine });
+
+    // Before that first query: ask the database whether it is there at all. The
+    // adapter's connection diagnosis — the box that names the host, the port and
+    // `docker compose up -d db` — used to live only inside `initializeDriver`,
+    // which runs after this, so the one failure it was written for never reached
+    // it. See `verifyProvisioningConnection`.
+    await verifyProvisioningConnection(provisionTarget);
 
     const schemaOutcome = await provisionCollectionTables(provisionable, provisionTarget, {
         introspecting: introspectCollections,

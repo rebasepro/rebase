@@ -492,7 +492,7 @@ interface AuthUserListOptions { limit, offset, orderBy, orderDir, roleId, search
 interface AuthUserListResult { limit, offset, total, users }
 interface AuthenticatedPolicyExpression { kind }
 interface AuthenticatedUser { claims, displayName, email, isAdmin, isAnonymous, photoUrl, rawToken, roles, uid }
-interface BackendBootstrapper { ensureCollectionPolicies, ensureCollectionSchema, finalizeSecurityPosture, getAdmin, id, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, isDefault, mountRoutes, readCollectionsSchemaVersion, runMigrations, stampCollectionsSchemaVersion, type }
+interface BackendBootstrapper { ensureCollectionPolicies, ensureCollectionSchema, finalizeSecurityPosture, getAdmin, id, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, isDefault, mountRoutes, readCollectionsSchemaVersion, runMigrations, stampCollectionsSchemaVersion, type, verifyConnection }
 interface BackendConfig { connection, schema, type }
 interface BackendInstance { admin, collectionRegistry, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider }
 interface BackendLifecycle { destroy, healthCheck, initialize }
@@ -536,7 +536,7 @@ interface DataRepository { checkUniqueField, count, delete, fetchCollection, fet
 interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 interface DataSourceDefinition { databaseId, engine, key, label, transport }
 interface DataTransformer { deserializeFromDatabase, serializeToDatabase }
-interface DatabaseAdapter { destroy, ensureCollectionPolicies, ensureCollectionSchema, finalizeSecurityPosture, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readCollectionsSchemaVersion, stampCollectionsSchemaVersion, type }
+interface DatabaseAdapter { destroy, ensureCollectionPolicies, ensureCollectionSchema, finalizeSecurityPosture, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readCollectionsSchemaVersion, stampCollectionsSchemaVersion, type, verifyConnection }
 interface DatabaseAdapterInitConfig { baas, collectionRegistry, collections, introspectCollections, realtime, schemaProvisioning }
 interface DatabaseConnection { close, isConnected, type }
 interface DatabaseOptions { databaseId, engine, extensions, label, migrations, transport }

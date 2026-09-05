@@ -306,6 +306,9 @@ export function adapterToBootstrapper(
         initializeAuth: adapter.initializeAuth,
         initializeHistory: adapter.initializeHistory,
         initializeWebsockets: adapter.initializeWebsockets,
+        verifyConnection: adapter.verifyConnection
+            ? (driverResult) => adapter.verifyConnection!(driverResult)
+            : undefined,
         // Load-bearing for a managed boot: the runtime creates a fresh tenant's
         // tables and RLS through these at boot. Dropping them here (the previous
         // shape did) left the schema-ensure feature dead on the real adapter

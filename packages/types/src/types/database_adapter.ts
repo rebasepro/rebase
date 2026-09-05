@@ -100,6 +100,17 @@ export interface DatabaseAdapter {
     ): Promise<void> | void;
 
     /**
+     * Ask the database whether it is there, before boot's first real query. See
+     * `BackendBootstrapper.verifyConnection` for the contract.
+     *
+     * Same forwarding requirement as the hooks below, and the symptom of
+     * dropping it is the failure this hook exists to prevent: a stopped database
+     * reported as `Failed query: [redacted]` and a stack through drizzle
+     * internals, naming no host, no port and no reason.
+     */
+    verifyConnection?(driverResult?: InitializedDriver): Promise<void>;
+
+    /**
      * Bring the database's collection tables up to date, additively — the boot
      * companion to `db push`. See `BackendBootstrapper.ensureCollectionSchema`
      * for the contract (create-only; never drop, narrow, or rewrite).

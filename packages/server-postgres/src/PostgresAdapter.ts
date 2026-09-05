@@ -51,6 +51,10 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
         // this adapter is wrapped back into a bootstrapper. Omitting either left
         // a managed tenant with no tables (500 on every data route) or tables
         // but no policies (401 on every read) — the create step never ran.
+        verifyConnection: bootstrapper.verifyConnection
+            ? (driverResult) => bootstrapper.verifyConnection!(driverResult)
+            : undefined,
+
         ensureCollectionSchema: bootstrapper.ensureCollectionSchema
             ? (collections, driverResult, log) =>
                 bootstrapper.ensureCollectionSchema!(collections, driverResult, log)

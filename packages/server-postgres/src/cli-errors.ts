@@ -90,8 +90,13 @@ export function isDependencyDropError(err: unknown): boolean {
 
 /**
  * Parse host:port from a DATABASE_URL for display purposes.
+ *
+ * Exported because every message about a connection has to name the thing it
+ * could not reach, and the boot path needs the same rendering the CLI banners
+ * use — including the same refusal to print the URL itself, which carries the
+ * password.
  */
-function parseHostInfo(databaseUrl: string): string {
+export function parseHostInfo(databaseUrl: string): string {
     try {
         const parsed = new URL(databaseUrl);
         return `${parsed.hostname}:${parsed.port || 5432}`;
@@ -101,9 +106,45 @@ function parseHostInfo(databaseUrl: string): string {
 }
 
 /**
+ * The sentence the operating system actually produced, dug out of the wrappers.
+ *
+ * `connect ECONNREFUSED 127.0.0.1:5432` is written by `net`, then wrapped by
+ * `pg`, then wrapped again by Drizzle as `Failed query: …` — and on a
+ * dual-stack host it is not in `.cause` at all but inside the
+ * `AggregateError.errors` array of one attempt per resolved address. Printing
+ * the banner without it loses the one token every search engine, runbook and
+ * colleague recognises.
+ */
+export function deepestErrorMessage(err: unknown): string | null {
+    if (!err || typeof err !== "object") return null;
+    const e = err as { message?: string; code?: string; cause?: unknown; errors?: unknown[] };
+
+    if (Array.isArray(e.errors)) {
+        for (const inner of e.errors) {
+            const deeper = deepestErrorMessage(inner);
+            if (deeper) return deeper;
+        }
+    }
+    if (e.cause) {
+        const deeper = deepestErrorMessage(e.cause);
+        if (deeper) return deeper;
+    }
+    if (typeof e.message === "string" && e.message && !e.message.startsWith("Failed query:")) {
+        return e.code ? `${e.message} (${e.code})` : e.message;
+    }
+    return null;
+}
+
+/** One indented line naming the driver's own reason, or nothing. */
+function driverReasonLine(err: unknown): string {
+    const reason = err === undefined ? null : deepestErrorMessage(err);
+    return reason ? `  The driver said: ${reason}\n\n` : "";
+}
+
+/**
  * Format a diagnostic banner for ECONNREFUSED errors.
  */
-function formatConnectionRefusedBanner(databaseUrl: string): string {
+function formatConnectionRefusedBanner(databaseUrl: string, err?: unknown): string {
     const hostInfo = parseHostInfo(databaseUrl);
     return (
         `\n` +
@@ -111,6 +152,7 @@ function formatConnectionRefusedBanner(databaseUrl: string): string {
         `  ❌  Cannot connect to PostgreSQL at ${hostInfo}\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `\n` +
+        driverReasonLine(err) +
         `  The database server is not running or is not accepting\n` +
         `  connections. Common fixes:\n` +
         `\n` +
@@ -125,7 +167,7 @@ function formatConnectionRefusedBanner(databaseUrl: string): string {
 /**
  * Format a diagnostic banner for authentication failures.
  */
-function formatAuthFailureBanner(databaseUrl: string): string {
+function formatAuthFailureBanner(databaseUrl: string, err?: unknown): string {
     const hostInfo = parseHostInfo(databaseUrl);
     let username = "unknown";
     try {
@@ -138,6 +180,7 @@ function formatAuthFailureBanner(databaseUrl: string): string {
         `  ❌  Authentication failed for user "${username}" at ${hostInfo}\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `\n` +
+        driverReasonLine(err) +
         `  PostgreSQL rejected the credentials. Common fixes:\n` +
         `\n` +
         `    • Check the username and password in DATABASE_URL\n` +
@@ -221,11 +264,11 @@ export async function checkDatabaseConnectivity(databaseUrl: string): Promise<vo
         await client.query("SELECT 1");
     } catch (err: unknown) {
         if (isEconnrefused(err)) {
-            outError(formatConnectionRefusedBanner(databaseUrl));
+            outError(formatConnectionRefusedBanner(databaseUrl, err));
             process.exit(1);
         }
         if (isAuthFailure(err)) {
-            outError(formatAuthFailureBanner(databaseUrl));
+            outError(formatAuthFailureBanner(databaseUrl, err));
             process.exit(1);
         }
         if (isSslNotEnabled(err)) {
@@ -251,10 +294,10 @@ export async function checkDatabaseConnectivity(databaseUrl: string): Promise<vo
  */
 export function diagnoseDbError(err: unknown, databaseUrl?: string): string | null {
     if (isEconnrefused(err)) {
-        return formatConnectionRefusedBanner(databaseUrl || "");
+        return formatConnectionRefusedBanner(databaseUrl || "", err);
     }
     if (isAuthFailure(err)) {
-        return formatAuthFailureBanner(databaseUrl || "");
+        return formatAuthFailureBanner(databaseUrl || "", err);
     }
     if (isSslNotEnabled(err)) {
         return formatSslNotEnabledBanner(databaseUrl || "");
