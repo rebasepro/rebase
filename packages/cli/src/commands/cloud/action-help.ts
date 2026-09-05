@@ -533,8 +533,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             + "Prompts for whatever is missing when attached to a terminal, and refuses rather than "
             + "hangs when it is not.",
         flags: [
-            ["--email, -e <address>", "The account's email. Prompted when omitted"],
-            ["--password <password>", "The password. Prefer the prompt: a password written here is recorded in your shell history"]
+            ["--email, -e <address>", "The account's email. Prompted when omitted, or REBASE_CLOUD_EMAIL"],
+            ["--password <password>", "Discouraged: a password written here is recorded in your shell history and visible in the process table. Prefer the prompt, or REBASE_CLOUD_PASSWORD"]
         ],
         examples: [
             "rebase cloud login",
@@ -542,7 +542,9 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "rebase cloud login --url https://cloud.example.com"
         ],
         notes: [
-            "There is no machine token yet, so CI needs a human's credentials. Pass them from a secret store, never inline."
+            "--password warns, once, before the request: by the time a login succeeds the password is already in the history file.",
+            "There is no machine token yet, so CI genuinely needs a human's credentials. REBASE_CLOUD_EMAIL and "
+                + "REBASE_CLOUD_PASSWORD are how a secret store hands them over without them appearing on a command line."
         ]
     },
 

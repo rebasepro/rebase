@@ -186,7 +186,10 @@ Stated plainly, because finding out later is worse:
 - **No preview or branch deploys**, and no first-party GitHub App. Deploy hooks —
   secret URLs you point a repository webhook at — are the supported automation.
 - **CI needs a human's credentials.** There is no machine token yet;
-  `rebase cloud login` takes an email and a password.
+  `rebase cloud login` takes an email and a password. Pass them as
+  `REBASE_CLOUD_EMAIL` and `REBASE_CLOUD_PASSWORD` from a secret store —
+  `--password` puts the password in your shell history and in the process table,
+  and says so before it signs you in.
 - **Point-in-time recovery is CLI-only.** The console shows backups; the staged
   PITR workflow is `rebase cloud db pitr`.
 

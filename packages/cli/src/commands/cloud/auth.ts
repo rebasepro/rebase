@@ -19,6 +19,7 @@ import {
     emit,
     note,
     noteBlank,
+    warn,
     requireInteractive
 } from "./context";
 
@@ -36,6 +37,32 @@ export const LOGIN_FLAGS = {
     "-e": "--email"
 } as const;
 
+/**
+ * Where credentials may come from, in the order this command prefers them.
+ *
+ * The environment is the non-interactive route, and it exists so `--password`
+ * does not have to be. A password written as an argument is in the shell's
+ * history file and in the process table for as long as the command runs, and
+ * neither is something this CLI can redact after the fact — the same reasoning
+ * `rls-check` states for its connection string, which carries one too.
+ *
+ * There is no machine token yet, so CI genuinely does need a human's password;
+ * `REBASE_CLOUD_PASSWORD` is how a secret store hands it over without it
+ * appearing on a command line.
+ */
+export const PASSWORD_ENV = "REBASE_CLOUD_PASSWORD";
+export const EMAIL_ENV = "REBASE_CLOUD_EMAIL";
+
+/**
+ * Whether this line put a password in the shell's history.
+ *
+ * Exported for its test: the warning is the whole feature, so "it warns exactly
+ * when the flag was used" is the thing worth pinning.
+ */
+export function passwordOnTheCommandLine(args: { "--password"?: string }): boolean {
+    return typeof args["--password"] === "string" && args["--password"] !== "";
+}
+
 export async function loginCommand(rawArgs: string[]): Promise<void> {
     const args = arg(LOGIN_FLAGS, { argv: rawArgs.slice(3),
 permissive: true });
@@ -45,19 +72,34 @@ permissive: true });
     note(`Signing in to ${chalk.cyan(url)}`);
     noteBlank();
 
+    // Once, and before the request: by the time this succeeds the password is
+    // already in the history file, and a warning after the fact is advice about
+    // something that has happened.
+    if (passwordOnTheCommandLine(args)) {
+        warn(
+            "--password puts your password in your shell history and in the process table.",
+            `Prefer the prompt, or pass it as ${PASSWORD_ENV} from a secret store.`
+        );
+    }
+
+    const envEmail = (process.env[EMAIL_ENV] ?? "").trim();
+    const envPassword = process.env[PASSWORD_ENV] ?? "";
+
     // Collect any missing credentials interactively — but only where a terminal
     // can supply them. Piped, this used to hang on a password prompt.
-    if (!args["--email"] || !args["--password"]) {
-        requireInteractive("credentials", "--email and --password");
+    const needsEmail = !args["--email"] && !envEmail;
+    const needsPassword = !args["--password"] && !envPassword;
+    if (needsEmail || needsPassword) {
+        requireInteractive("credentials", `--email and --password, or ${EMAIL_ENV} and ${PASSWORD_ENV}`);
     }
 
     const prompts: Array<Record<string, unknown>> = [];
-    if (!args["--email"]) {
+    if (needsEmail) {
         prompts.push({ type: "input",
 name: "email",
 message: "Email:" });
     }
-    if (!args["--password"]) {
+    if (needsPassword) {
         prompts.push({ type: "password",
 name: "password",
 message: "Password:",
@@ -67,8 +109,8 @@ mask: "•" });
         ? await inquirer.prompt(prompts as unknown as Parameters<typeof inquirer.prompt>[0])
         : {};
 
-    const email = (args["--email"] || (answers as { email?: string }).email || "").trim();
-    const password = args["--password"] || (answers as { password?: string }).password || "";
+    const email = (args["--email"] || envEmail || (answers as { email?: string }).email || "").trim();
+    const password = args["--password"] || envPassword || (answers as { password?: string }).password || "";
 
     if (!email || !password) {
         fail("Email and password are required.");
