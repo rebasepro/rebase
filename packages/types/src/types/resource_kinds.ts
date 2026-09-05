@@ -27,6 +27,9 @@ import { DEFAULT_STORAGE_SOURCE_KEY, type StorageSourceDefinition } from "./stor
 
 registerResourceKind({
     kind: "database",
+    // Revision 1: the env bindings were corrected after 0.17.3 (25f1a97e3), so
+    // a driver that inlined the 0.17.3 spec meets a different definition.
+    revision: 1,
     engines: ["postgres", "mongodb", "firestore", "sqlite"],
     defaultEngine: "postgres",
     // Exactly the bases `resolveDataSources` reads, and no others. REBASE_DRIVER
@@ -156,6 +159,9 @@ export function declaredDatabaseExtensions(): readonly string[] {
 
 registerResourceKind({
     kind: "bucket",
+    // Revision 1: the env bindings were corrected after 0.17.3 (25f1a97e3), so
+    // a driver that inlined the 0.17.3 spec meets a different definition.
+    revision: 1,
     engines: ["local", "s3", "gcs", "azure", "firebase"],
     defaultEngine: "local",
     // Exactly the bases `resolveStorageBackend` reads. This list said
