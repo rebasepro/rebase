@@ -83,7 +83,11 @@ export default defineConfig({
                         { label: "Project Structure", slug: "docs/getting-started/project-structure" },
                         { label: "Environment & Configuration", slug: "docs/getting-started/configuration" },
                         { label: "Upgrading", slug: "docs/upgrading" },
-                        { label: "Compatibility", slug: "docs/compatibility" }
+                        { label: "Compatibility", slug: "docs/compatibility" },
+                        // Published, mirrored from the repo root on every
+                        // `generate-all`, linked from the upgrade guide — and
+                        // reachable only by typing the URL until now.
+                        { label: "Changelog", slug: "docs/changelog" }
                     ]
                 },
                 {
