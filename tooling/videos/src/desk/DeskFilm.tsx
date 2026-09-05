@@ -8,6 +8,8 @@ import { ramp, SHIFT } from "../components/motion";
 import { FONT, FRAME, INK } from "../theme";
 import { Narration } from "../Narration";
 import { DESK_FRAMES_PER_WORD, DESK_NARRATION } from "./script";
+import { Presenter } from "./Presenter";
+import { CLOSE, FLY_TO_CLOSE, PRESENTER_IN } from "./Presenter";
 
 /**
  * The film: the ribbon, the desk on it, and two things in SCREEN space that
@@ -20,27 +22,29 @@ export const RebaseDesk: React.FC = () => (
         <Desk />
         <ColdOpen />
         <Close />
+        <Presenter />
     </AbsoluteFill>
 );
 
-/** With the prompter, for timing the read. Not a deliverable. */
+/** With the prompter, for timing the read. Not a deliverable. The prompter
+ *  is pushed left of the presenter's corner so the two never overlap. */
 export const RebaseDeskVO: React.FC = () => (
     <>
         <RebaseDesk />
-        <Narration script={DESK_NARRATION} framesPerWord={DESK_FRAMES_PER_WORD} />
+        <Narration script={DESK_NARRATION} framesPerWord={DESK_FRAMES_PER_WORD} insetRight={340} />
     </>
 );
 
 const HOOK = beat("hook");
 
 /** Black, then the mark building facet by facet, then the name. It fades as
- *  the first headline rises behind it on the desk. */
+ *  the presenter fades in over the ribbon where it stood. */
 const ColdOpen: React.FC = () => {
     const frame = useCurrentFrame();
     const up = ramp(frame, 0, 22, SHIFT);
-    const out = 1 - ramp(frame, HOOK.start - 4, 14, SHIFT);
+    const out = 1 - ramp(frame, PRESENTER_IN - 8, 14, SHIFT);
     if (out <= 0) return null;
-    const word = ramp(frame, 40, 22);
+    const word = ramp(frame, 28, 20);
     const push = interpolate(frame, [0, HOOK.start], [1, 1.03], { extrapolateRight: "clamp" });
     return (
         <AbsoluteFill style={{ opacity: out }}>
@@ -53,7 +57,7 @@ const ColdOpen: React.FC = () => {
                 }}
             >
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 34 }}>
-                    <Mark size={214} delay={8} spread={28} />
+                    <Mark size={214} delay={6} spread={22} />
                     <div style={{ overflow: "hidden", paddingBottom: "0.12em", marginBottom: "-0.12em" }}>
                         <div
                             style={{
@@ -78,29 +82,32 @@ const ALL = beat("all");
 
 /** The address, over the whole desk pulled back: every window the film
  *  visited, small, for as long as the pull-back takes — then they go, and
- *  the one thing to take away is what is left.
+ *  what is left is the presenter, saying the last line to camera, and the
+ *  one thing to take away beside them.
  *
- *  The mark starts assembling while the camera is still pulling out, and the
- *  desk is most of the way to black by the time the wordmark is up. A first
- *  cut held the mosaic at 38% under the whole address, and with nine windows
- *  and three headlines behind it the close had more on screen than any
- *  other shot in the film — the one shot that should have the least. */
+ *  Two columns: the presenter's window on the left (CLOSE in presenter.ts),
+ *  the mark, the address and the command centred in what remains. The
+ *  desk is most of the way to black by the time the wordmark is up; a first
+ *  cut held the mosaic at 38% under the whole address, and with nine
+ *  windows and three headlines behind it the close had more on screen than
+ *  any other shot in the film — the one shot that should have the least. */
 const Close: React.FC = () => {
     const frame = useCurrentFrame();
-    const at = ALL.start + 24;
+    const at = FLY_TO_CLOSE + 20;
     const mark = ramp(frame, at, 1);
     if (mark <= 0) return null;
-    const scrim = ramp(frame, at + 10, 44);
+    const scrim = ramp(frame, at + 6, 44);
     const url = ramp(frame, at + 26, 26);
     const cmd = ramp(frame, at + 48, 24);
     const foot = ramp(frame, at + 66, 22);
     /* And to black entirely under the last line, so the final frame is the
-       mark, the address and the command on ground. */
+       presenter, the mark, the address and the command on ground. */
     const dark = ramp(frame, DESK_DURATION - 70, 56, SHIFT);
+    const left = CLOSE.x + CLOSE.w + 60;
     return (
         <AbsoluteFill>
             <AbsoluteFill style={{ background: "#000", opacity: 0.86 * scrim + 0.14 * dark }} />
-            <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
+            <AbsoluteFill style={{ left, width: 1920 - left - 120, alignItems: "center", justifyContent: "center" }}>
                 <Mark size={116} delay={at} spread={18} />
                 <div style={{ overflow: "hidden", marginTop: 38, paddingBottom: "0.1em" }}>
                     <div

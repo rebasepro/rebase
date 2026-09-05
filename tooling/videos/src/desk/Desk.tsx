@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { beat, cameraAt, cameraStill, DESK, DESK_DURATION, windowOpacity } from "./beats";
+import { FLY_TO_CORNER } from "./Presenter";
 import { Title } from "./Title";
 import { AgentSession, ScanNote, ScanWindow } from "./windows/Hook";
 import { RuleWindows } from "./windows/Rule";
@@ -21,6 +22,13 @@ import { TONE } from "../theme";
  * the cell's left edge, headline at 180 from its top — so a held shot on the
  * desk is composed exactly like a slide was. The camera is what changed, not
  * the typography.
+ *
+ * THE BOTTOM-RIGHT CORNER OF EVERY VIEW IS RESERVED — 1600..1860 by 760..1020
+ * in screen space — for the presenter (Presenter.tsx). Nothing that has to
+ * be read sits there: the shell and the agent console stop at 1580, the two
+ * users' panels are 640 wide, the panel and Studio windows sit high enough
+ * to end above 760, the bento is scaled to end at 1600. A window's empty
+ * right margin may run under the corner; its text may not.
  *
  * Nothing here is ever unmounted once it has appeared. The last shot pulls
  * back to show the whole desk, and a window that had been tidied away would
@@ -93,25 +101,30 @@ export const Desk: React.FC = () => {
                     this cell's bottom half, so the hook keeps to its top two
                     thirds — and set at 180 that left a third of the frame
                     empty under two small windows. */}
+                {/* The hook's windows arrive as the presenter leaves the middle
+                    of the frame for the corner: the headline first, the agent's
+                    summary under it, and the scan last, so its findings print
+                    under "found three ways in". */}
                 <On beats={["hook", "all"]}>
                     <Title
                         x={200}
-                        y={250}
-                        at={HOOK.start - 4}
+                        y={230}
+                        at={FLY_TO_CORNER + 12}
                         lines={["Anyone can have a backend by lunch.", "Nobody can tell you if it's safe."]}
                     />
                 </On>
                 <On beats={["hook", "init", "push", "all"]}>
-                    <AgentSession x={200} y={550} w={740} at={HOOK.start + 30} />
+                    <AgentSession x={200} y={530} w={740} at={FLY_TO_CORNER + 18} />
                     {/* Wide enough that the tool's own clean line — 70 characters
-                        of it — sits on one row. Wrapped, it read as two findings. */}
-                    <ScanWindow x={1010} y={550} w={880} at={HOOK.start + 130} rerunAt={RERUN_AT} />
-                    <ScanNote x={1010} y={868} at={RERUN_AT + 70} />
+                        of it — sits on one row at 18px. Wrapped, it read as two
+                        findings; wider, it ran under the presenter. */}
+                    <ScanWindow x={1010} y={530} w={820} at={FLY_TO_CORNER + 26} rerunAt={RERUN_AT} />
+                    <ScanNote x={1010} y={846} at={RERUN_AT + 70} />
                 </On>
 
                 {/* ── (0,½) THE TERMINAL — init, then push, then dev ─── */}
                 <On beats={["init", "push", "all"]}>
-                    <Shell x={200} y={1000} w={1690} at={SHELL_AT} pushAt={PUSH_AT} devAt={DEV_AT} />
+                    <Shell x={200} y={1000} w={1380} at={SHELL_AT} pushAt={PUSH_AT} devAt={DEV_AT} />
                 </On>
 
                 {/* ── (1,0) THE RULE — on the blue field ─────────────── */}
@@ -150,7 +163,7 @@ export const Desk: React.FC = () => {
                             eyebrow="Agent-native"
                             lines={["An agent gets your permissions.", "No way around them."]}
                         />
-                        <AgentConsole x={4040} y={500} w={1520} at={AGENT.start + 26} />
+                        <AgentConsole x={4040} y={500} w={1380} at={AGENT.start + 26} />
                     </ToneOverride.Provider>
                 </On>
 
@@ -158,14 +171,14 @@ export const Desk: React.FC = () => {
                 <On beats={["panel", "all"]}>
                     <Title
                         x={4040}
-                        y={1380}
+                        y={1300}
                         at={PANEL.start - 4}
                         eyebrow="The panel"
                         lines={["And an app for", "everyone else."]}
                         size={DISPLAY.split}
                         width={520}
                     />
-                    <Panel x={4040} y={1330} at={PANEL.start + 6} tail={DESK_DURATION - PANEL.start} />
+                    <Panel x={4040} y={1250} at={PANEL.start + 6} tail={DESK_DURATION - PANEL.start} />
                 </On>
 
                 {/* ── (2,2) EVERY VIEW ───────────────────────────────── */}
@@ -182,14 +195,14 @@ export const Desk: React.FC = () => {
                 <On beats={["studio", "all"]}>
                     <Title
                         x={200}
-                        y={2440}
+                        y={2360}
                         at={STUDIO.start - 4}
                         eyebrow="Studio"
                         lines={["Run the database", "from the same app."]}
                         size={DISPLAY.split}
                         width={520}
                     />
-                    <Studio x={200} y={2410} at={STUDIO.start + 6} />
+                    <Studio x={200} y={2330} at={STUDIO.start + 6} />
                 </On>
             </div>
         </AbsoluteFill>

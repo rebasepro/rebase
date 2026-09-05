@@ -52,13 +52,14 @@ export const Side: React.FC<{
     x: number;
     /** Vertical position; defaults to the reel's own. */
     y?: number;
+    w?: number;
     accent: string;
     who: string;
     role: string;
     count: string;
     rows: Row[];
     delay: number;
-}> = ({ x, y = PANEL.y, accent, who, role, count, rows, delay }) => {
+}> = ({ x, y = PANEL.y, w = PANEL.w, accent, who, role, count, rows, delay }) => {
     const frame = useCurrentFrame();
     const up = ramp(frame, delay, 20);
     return (
@@ -67,7 +68,7 @@ export const Side: React.FC<{
                 position: "absolute",
                 left: x,
                 top: y,
-                width: PANEL.w,
+                width: w,
                 height: PANEL.h,
                 borderRadius: 16,
                 border: `1px solid ${INK.rule}`,

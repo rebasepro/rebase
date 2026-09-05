@@ -106,7 +106,7 @@ export const ScanWindow: React.FC<{
 
 const ScanBody: React.FC<{ rerunAt: number }> = ({ rerunAt }) => {
     const frame = useCurrentFrame();
-    const rate = 0.6;
+    const rate = 0.5;
     const typed1 = Math.round(ramp(frame, 8, CMD.length * rate) * CMD.length);
     const report1 = 8 + CMD.length * rate + 8;
 
@@ -119,7 +119,7 @@ const ScanBody: React.FC<{ rerunAt: number }> = ({ rerunAt }) => {
 
     return (
         <Frame title="rls-check · the same database" delay={0} bodyStyle={{ padding: "24px 30px 28px" }}>
-            <div style={{ fontFamily: FONT.mono, fontSize: 19, lineHeight: 1.7 }}>
+            <div style={{ fontFamily: FONT.mono, fontSize: 18, lineHeight: 1.7 }}>
                 <div style={{ color: INK.high }}>
                     <span style={{ color: INK.muted, marginRight: 12 }}>$</span>
                     {CMD.slice(0, typed1)}
@@ -138,9 +138,9 @@ const ScanBody: React.FC<{ rerunAt: number }> = ({ rerunAt }) => {
                             key={l.text}
                             style={{
                                 paddingLeft: l.tone === "body" ? 26 : 0,
-                                fontSize: l.tone === "body" ? 17 : 19,
+                                fontSize: l.tone === "body" ? 16 : 18,
                                 color: l.tone === "crit" ? CHROMA.coral : INK.muted,
-                                opacity: ramp(frame, report1 + i * 9, 12),
+                                opacity: ramp(frame, report1 + i * 7, 12),
                                 whiteSpace: "pre",
                             }}
                         >
@@ -152,7 +152,7 @@ const ScanBody: React.FC<{ rerunAt: number }> = ({ rerunAt }) => {
                             marginTop: 12,
                             color: CHROMA.coral,
                             letterSpacing: "0.04em",
-                            opacity: ramp(frame, report1 + 58, 14),
+                            opacity: ramp(frame, report1 + 44, 14),
                         }}
                     >
                         2 critical · 1 high
@@ -171,7 +171,7 @@ const ScanBody: React.FC<{ rerunAt: number }> = ({ rerunAt }) => {
                         <div
                             style={{
                                 marginTop: 6,
-                                fontSize: 17,
+                                fontSize: 16,
                                 color: INK.muted,
                                 opacity: ramp(frame, report2 + 14, 12),
                             }}
@@ -181,7 +181,7 @@ const ScanBody: React.FC<{ rerunAt: number }> = ({ rerunAt }) => {
                         <div
                             style={{
                                 marginTop: 6,
-                                fontSize: 17,
+                                fontSize: 16,
                                 color: INK.copy,
                                 opacity: ramp(frame, report2 + 26, 12),
                             }}
@@ -211,7 +211,7 @@ export const ScanNote: React.FC<{ x: number; y: number; at: number }> = ({ x, y,
                 opacity: ramp(frame, at, 20),
             }}
         >
-            Free · no signup · nothing leaves your machine · any Postgres
+            Free · no signup · nothing leaves your machine
         </div>
     );
 };

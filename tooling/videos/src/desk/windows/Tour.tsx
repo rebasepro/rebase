@@ -42,9 +42,11 @@ export const Views: React.FC<{ x: number; y: number; at: number; hold: number }>
     <Sequence from={at} layout="none">
         {/* The bento positions its own tiles absolutely, so it takes the
             world box directly. Composed for the slide film's 240-frame
-            window, then held for the pull-back. */}
+            window, then held for the pull-back. Scaled uniformly to 0.84 so
+            it ends at x 1600, clear of the presenter's corner, with every
+            tile's aspect — and so its clip's crop — unchanged. */}
         <BentoTiles
-            box={{ x: x + 80, y: y + 80, w: 1760, h: 920, gap: 16 }}
+            box={{ x: x + 120, y: y + 153, w: 1480, h: 774, gap: 14 }}
             duration={240}
             hold={hold}
             travel={110}

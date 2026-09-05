@@ -37,8 +37,10 @@ const UsersBody: React.FC = () => {
                 {QUERY.slice(0, typed)}
                 <span style={{ opacity: frame % 32 < 16 ? 1 : 0, color: CHROMA.cyan }}>▌</span>
             </div>
-            <Side x={0} y={90} accent={CHROMA.cyan} who="Robert" role="customer" count="2 rows" rows={MINE} delay={44} />
-            <Side x={780} y={90} accent={CHROMA.yellow} who="Dana" role="support" count="48 rows" rows={ALL} delay={44} />
+            {/* 640 wide, not 740: Dana's amounts column ran under the
+                presenter's corner. */}
+            <Side x={0} y={90} w={640} accent={CHROMA.cyan} who="Robert" role="customer" count="2 rows" rows={MINE} delay={44} />
+            <Side x={700} y={90} w={640} accent={CHROMA.yellow} who="Dana" role="support" count="48 rows" rows={ALL} delay={44} />
         </>
     );
 };

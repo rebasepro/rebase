@@ -37,6 +37,40 @@ lines with the terminal doing the talking between them.
 | 11 | Studio | 72.0s | 8 | And a database workspace, in the same app. | 1.0s beat |
 | 12 | The whole desk | 75.9s | 31 | Three commands. Open source, and it runs anywhere — your laptop, your servers, any cloud. Nobody else holds your data. So build it by lunch. This time, you'll know it's safe. | — |
 
+## The presenter
+
+You are on screen. Three places, one video element (`src/desk/Presenter.tsx`):
+
+- **Open** — large and centred over the ribbon for the first two sentences,
+  "This backend was built by an agent in an afternoon. It works." Then the
+  window flies to the corner while the hook's windows arrive behind it.
+- **Corner** — a 260px rounded square, bottom right, for the whole demo.
+  Every desk composition keeps that corner clear of text.
+- **Close** — you grow out of the corner into the left column as the desk
+  recedes; the address lands beside you. The last line is to camera.
+
+**At the climax, look at the scan.** "Push it, and run the same scan again.
+Nothing found." — glance left toward the terminal as the green line prints,
+then back to the lens for "Then run it." The silence there is yours.
+
+### Shooting
+
+- 4K, head and shoulders, eyes on the lens; the prompter (`RebaseDesk-VO`)
+  on a screen right beside it. One take of the whole film, two or three
+  times; pick the best.
+- **Do not key it.** A real room, slightly out of focus, on the dark side.
+  Plain top, no stripes — they moiré at 260px.
+- Your audio is the narration. Record it well (lav or a close mic).
+
+### Dropping the take in
+
+1. Put the file at `public/presenter/take.mp4`.
+2. In `src/desk/Presenter.tsx`, set `TAKE = { src: "presenter/take.mp4",
+   startFrom: <frames to trim from the head> }`.
+3. Do not chase the prompter's frames. Send me the take: I transcribe it with
+   word timestamps and derive the beat starts from where each line actually
+   begins, so the film fits the read rather than the other way round.
+
 ## Recording notes
 
 - The prompter in `RebaseDesk-VO` lights each word as it should be spoken and

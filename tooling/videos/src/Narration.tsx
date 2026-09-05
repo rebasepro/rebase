@@ -24,10 +24,12 @@ const READ_AHEAD = 36;
 const HOLD = 16;
 const FADE = 10;
 
-export const Narration: React.FC<{ script?: typeof NARRATION; framesPerWord?: number }> = ({
-    script = NARRATION,
-    framesPerWord = FRAMES_PER_WORD,
-}) => {
+export const Narration: React.FC<{
+    script?: typeof NARRATION;
+    framesPerWord?: number;
+    /** Room kept clear on the right, for a presenter window in the corner. */
+    insetRight?: number;
+}> = ({ script = NARRATION, framesPerWord = FRAMES_PER_WORD, insetRight = 0 }) => {
     const frame = useCurrentFrame();
 
     let line: (typeof NARRATION)[number] | undefined;
@@ -60,7 +62,7 @@ export const Narration: React.FC<{ script?: typeof NARRATION; framesPerWord?: nu
                 style={{
                     position: "absolute",
                     left: 0,
-                    right: 0,
+                    right: insetRight,
                     bottom: 54,
                     display: "flex",
                     justifyContent: "center",
@@ -70,7 +72,7 @@ export const Narration: React.FC<{ script?: typeof NARRATION; framesPerWord?: nu
                 <div
                     style={{
                         position: "relative",
-                        maxWidth: 1460,
+                        maxWidth: 1460 - insetRight,
                         padding: "18px 34px",
                         borderRadius: 14,
                         overflow: "hidden",
