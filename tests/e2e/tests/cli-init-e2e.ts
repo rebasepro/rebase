@@ -1012,21 +1012,46 @@ height: 800 }
             await page.waitForTimeout(5000);
             await page.screenshot({ path: path.join(screenshotDir, "0-immediate-load.png") });
 
-            // Verify welcome screen
-            const welcomeText = page.locator("text=Welcome!");
-            await welcomeText.waitFor({ state: "visible",
+            /*
+             * Sign in, rather than bootstrap.
+             *
+             * This waited 90 seconds for "Welcome!" — the panel's setup screen,
+             * which it shows only when the user table is empty. `rebase init`
+             * now writes `REBASE_ADMIN_EMAIL` and a generated
+             * `REBASE_ADMIN_PASSWORD` into the project's `.env` and boot creates
+             * that account, so by the time a browser reaches a stock scaffold
+             * there IS a user and the panel offers a sign-in instead. The screen
+             * this waited for is one no new project shows any more.
+             *
+             * The credentials are read from the scaffold's own `.env` rather
+             * than typed here: the password is generated per project, and the
+             * address is a template default that is free to change. Absent, this
+             * fails naming them instead of timing out on a screen — the failure
+             * mode that cost a CI run to read.
+             */
+            const adminEmail = readEnvVar(projectPath, "REBASE_ADMIN_EMAIL");
+            const adminPassword = readEnvVar(projectPath, "REBASE_ADMIN_PASSWORD");
+            if (!adminEmail || !adminPassword) {
+                throw new Error(
+                    "The scaffold's .env names no seeded admin: "
+                    + `REBASE_ADMIN_EMAIL=${adminEmail ?? "(unset)"}, `
+                    + `REBASE_ADMIN_PASSWORD=${adminPassword ? "(set)" : "(unset)"}. `
+                    + "`rebase init` writes both, and the panel's first screen depends on which."
+                );
+            }
+
+            console.log(`Signing in as the seeded admin (${adminEmail})...`);
+            const signInWithEmail = page.locator("button", { hasText: "Sign in with email" });
+            await signInWithEmail.waitFor({ state: "visible",
 timeout: 90000 });
-            await page.screenshot({ path: path.join(screenshotDir, "1-bootstrap-welcome.png") });
+            await page.screenshot({ path: path.join(screenshotDir, "1-login-providers.png") });
+            await signInWithEmail.click();
 
-            // Fill registration form
-            console.log("Filling admin account details...");
-            await page.fill('input[placeholder="Jane Doe (optional)"]', "Francesco Admin");
-            await page.fill('input[placeholder="you@example.com"]', "admin@rebase.pro");
-            await page.fill('input[placeholder="••••••••"]', "SecureAdmin123!");
-            await page.screenshot({ path: path.join(screenshotDir, "2-bootstrap-details-filled.png") });
+            await page.fill('input[placeholder="you@example.com"]', adminEmail);
+            await page.fill('input[placeholder="••••••••"]', adminPassword);
+            await page.screenshot({ path: path.join(screenshotDir, "2-login-details-filled.png") });
 
-            // Click Create Account
-            console.log("Submitting Admin Bootstrap registration form...");
+            console.log("Submitting the sign-in form...");
             await page.click('button[type="submit"]');
 
             // Wait for dashboard redirect
