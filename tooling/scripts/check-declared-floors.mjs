@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 /**
- * One Node floor, stated once.
+ * Declared floors: what a package promises it will run on.
+ *
+ * Two of them, `engines.node` and the React peer range, held to one value each
+ * because they decay the same way and cost the same thing when they are wrong.
+ *
+ * ## Node
  *
  * `engines.node` is a promise about what a package will run on, and this
  * repository was making seven different ones at the same time. Three packages
@@ -34,7 +39,22 @@
  * Prose is checked too: the quickstart is where a reader learns the floor, and
  * a translated copy saying `18+` is a wrong instruction in four languages.
  *
- * Run: pnpm run check:node-floor
+ * ## React
+ *
+ * The same decay, one dependency over. `@rebasepro/app` and `@rebasepro/cms`
+ * were moved to `>=19.2.7` when react-router 8 made it mandatory; `ui`, `forms`,
+ * `firebase`, `plugin-insights` and `cms-types` — which those two pull in —
+ * stayed at `>=19.0.0`, a range whose lower half cannot satisfy the app that
+ * depends on them. An installer picking 19.0.0 to satisfy `ui` produces a tree
+ * that resolves cleanly and breaks at render.
+ *
+ * `^` rather than `>=`, and this is the part worth stating: an open-ended peer
+ * range is a promise about versions that do not exist yet. `>=19.0.0` claims
+ * React 20 compatibility, which nobody has tested and which for a component
+ * library is exactly the claim that will be false. The caret says "19.x, at
+ * least 19.2.7" — which is what is actually true.
+ *
+ * Run: pnpm run check:floors
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -105,6 +125,31 @@ for (const file of found) {
 }
 
 /**
+ * The React peer floor.
+ *
+ * A constant, because there is no `.nvmrc` for React: the number comes from
+ * react-router 8's own requirement, which is what forced it. Move it here when
+ * the floor genuinely moves, and the gate moves the eight packages with it.
+ */
+const REACT_FLOOR = "^19.2.7";
+const REACT_PEERS = ["react", "react-dom"];
+
+for (const file of found) {
+    let manifest;
+    try {
+        manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch {
+        continue;
+    }
+    const rel = path.relative(root, file);
+    for (const dep of REACT_PEERS) {
+        const declared = manifest.peerDependencies?.[dep];
+        if (declared === undefined || declared === REACT_FLOOR) continue;
+        problems.push(`${rel}: peerDependencies.${dep} is ${JSON.stringify(declared)}, expected ${JSON.stringify(REACT_FLOOR)}`);
+    }
+}
+
+/**
  * The quickstart's prerequisite line, in every locale.
  *
  * The English one carried a carve-out ("a headless project needs only 20") that
@@ -140,10 +185,14 @@ if (problems.length > 0) {
     console.error(`✗ ${problems.length} place(s) disagree with .nvmrc (${floor}):`);
     for (const p of problems) console.error(`    ${p}`);
     console.error("");
-    console.error(`  One floor, from .nvmrc. Set engines.node to "${expected}" (Node ${major}) everywhere, or`);
-    console.error("  change .nvmrc if the floor itself is meant to move.");
+    console.error(`  One Node floor, from .nvmrc: set engines.node to "${expected}" (Node ${major}) everywhere,`);
+    console.error("  or change .nvmrc if the floor itself is meant to move.");
+    console.error(`  One React floor: peer ranges are "${REACT_FLOOR}", set in this file.`);
     console.error("");
     process.exit(1);
 }
 
-console.log(`✓ one Node floor: ${expected}, from .nvmrc, across ${found.length} manifest(s) and ${quickstarts.length} quickstart(s).`);
+console.log(
+    `✓ one Node floor (${expected}, from .nvmrc) and one React peer floor (${REACT_FLOOR}) ` +
+    `across ${found.length} manifest(s) and ${quickstarts.length} quickstart(s).`
+);

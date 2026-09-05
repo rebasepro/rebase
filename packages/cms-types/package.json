@@ -58,8 +58,8 @@
     "vite": "^8.1.5"
   },
   "peerDependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "files": [
     "dist",

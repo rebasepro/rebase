@@ -88,8 +88,8 @@
     "tailwind-merge": "^3.6.0"
   },
   "peerDependencies": {
-    "react": ">=19.0.0",
-    "react-dom": ">=19.0.0"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",

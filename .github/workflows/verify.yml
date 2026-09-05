@@ -214,8 +214,10 @@ jobs:
       # everyone actually installs, said 22.22.0. pnpm enforces `engines` on
       # install, so an understated floor is not cosmetic: it lets someone
       # through on Node 20 and moves the failure into a transitive dependency.
-      - name: One Node floor
-        run: pnpm run check:node-floor
+      # The React peer floor decayed the same way: `app` and `cms` require
+      # 19.2.7, the five packages they pull in still said >=19.0.0.
+      - name: Declared floors
+        run: pnpm run check:floors
 
       # `files: ["dist", "src"]` ships the sources on purpose and the tests
       # beside them by accident. Invisible from the repository: whether a

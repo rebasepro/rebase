@@ -40,8 +40,8 @@
   "types": "dist/index.d.ts",
   "source": "src/index.ts",
   "peerDependencies": {
-    "react": ">=19.0.0",
-    "react-dom": ">=19.0.0"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "dependencies": {
     "fast-equals": "6.0.2"
