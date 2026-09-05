@@ -522,13 +522,28 @@ Keys can be listed, updated, and revoked via `/api/admin/api-keys` or the
 API_KEY_SELF_MANAGEMENT_FORBIDDEN`, whatever its `admin` flag. Key management
 requires an admin user's session or the service key.
 
-## Metadata Endpoint
+## Schema Metadata
 
-Get a list of all available collections and their structure:
+The project's full collection schema — every collection, property and relation —
+is served to an authenticated admin:
 
 ```bash
-GET /api/collections
+GET /api/meta/contract
 ```
+
+It is **admin-only**, and on a deployment with no authentication configured it
+is not served at all (404 `CONTRACT_UNAVAILABLE`) rather than exposing the
+schema to anyone. Its sibling returns a version string that stands for the
+schema without describing it, and is deliberately reachable with no credential
+— which is what a CI job polls:
+
+```bash
+GET /api/meta/schema-version
+```
+
+For the shape of the endpoints rather than the schema behind them, the OpenAPI
+document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
+`enableSwagger` is on.
 
 ## Next Steps
 

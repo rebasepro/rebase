@@ -49,11 +49,12 @@ Após a inicialização, estas rotas são montadas:
 | `/api/auth/*` | Autenticação (registo, login, refresh, OAuth, magic links, códigos de uso único, MFA) |
 | `/api/admin/*` | Gestão de utilizadores e funções (apenas para administradores) |
 | `/api/storage/*` | Upload, download e eliminação de ficheiros |
-| `/api/data/collections` | Endpoint de metadados de coleção |
 | `/api/data/:slug` | Operações CRUD por coleção (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Histórico de alterações de entidade (quando ativado) |
-| `/api/data/docs` | Especificação OpenAPI (quando `enableSwagger: true`) |
-| `/api/data/swagger` | Swagger UI (modo de desenvolvimento, quando `enableSwagger: true`) |
+| `/api/docs` | Especificação OpenAPI (quando `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (modo de desenvolvimento, quando `enableSwagger: true`) |
+| `/api/meta/contract` | O esquema de coleções do projeto (apenas admin) |
+| `/api/meta/schema-version` | Uma string de versão para esse esquema (não autenticada) |
 | `/api/functions/*` | Rotas de funções personalizadas (quando `functionsDir` está definido) |
 | `/api/cron/*` | Gestão de tarefas cron (apenas para administradores, quando `cronsDir` está definido) |
 | WebSocket on upgrade | Subscrições em tempo real |

@@ -49,11 +49,12 @@ Dopo l'inizializzazione, queste rotte vengono montate:
 | `/api/auth/*` | Autenticazione (registrazione, login, refresh, OAuth, magic link, codici monouso, MFA) |
 | `/api/admin/*` | Gestione utenti e ruoli (solo per admin) |
 | `/api/storage/*` | Caricamento, download ed eliminazione di file |
-| `/api/data/collections` | Endpoint per i metadati delle collezioni |
 | `/api/data/:slug` | Operazioni CRUD per collezione (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Cronologia delle modifiche delle entità (quando abilitata) |
-| `/api/data/docs` | Specifica OpenAPI (quando `enableSwagger: true`) |
-| `/api/data/swagger` | Swagger UI (modalità sviluppo, quando `enableSwagger: true`) |
+| `/api/docs` | Specifica OpenAPI (quando `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (modalità sviluppo, quando `enableSwagger: true`) |
+| `/api/meta/contract` | Lo schema delle collezioni del progetto (solo admin) |
+| `/api/meta/schema-version` | Una stringa di versione per quello schema (non autenticata) |
 | `/api/functions/*` | Rotte per funzioni personalizzate (quando `functionsDir` è impostato) |
 | `/api/cron/*` | Gestione dei Cron job (solo per admin, quando `cronsDir` è impostato) |
 | WebSocket on upgrade | Sottoscrizioni in tempo reale |

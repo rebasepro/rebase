@@ -433,13 +433,28 @@ recusada com `403 API_KEY_SELF_MANAGEMENT_FORBIDDEN`, qualquer que seja o seu
 sinalizador `admin`. O gerenciamento de chaves exige a sessão de um usuário
 administrador ou a chave de serviço.
 
-## Endpoint de Metadados
+## Metadados do esquema
 
-Obtenha uma lista de todas as coleções disponíveis e sua estrutura:
+O esquema de coleções completo do projeto — cada coleção, propriedade e relação
+— é servido a um administrador autenticado:
 
 ```bash
-GET /api/collections
+GET /api/meta/contract
 ```
+
+É **apenas para administradores**, e num deployment sem autenticação
+configurada não é servido de todo (404 `CONTRACT_UNAVAILABLE`) em vez de expor
+o esquema a qualquer pessoa. O seu irmão devolve uma string de versão que
+representa o esquema sem o descrever, e é deliberadamente alcançável sem
+credenciais — que é o que um job de CI consulta:
+
+```bash
+GET /api/meta/schema-version
+```
+
+Para a forma dos endpoints em vez do esquema por trás deles, o documento
+OpenAPI está em `GET /api/docs`, com Swagger UI em `/api/swagger` quando
+`enableSwagger` está ativo.
 
 ## Próximos Passos
 

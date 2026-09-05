@@ -737,7 +737,7 @@ await initializeRebaseBackend({
 
     history: true,           // Enable entity change history
 
-    enableSwagger: true,     // Enable OpenAPI docs at /api/data/docs
+    enableSwagger: true,     // Enable OpenAPI docs at /api/docs
 
     logging: {
         level: "info"
@@ -4419,11 +4419,12 @@ After initialization, these routes are mounted:
 | `/api/auth/*` | Authentication (signup, login, refresh, OAuth, magic links, one-time codes, MFA) |
 | `/api/admin/*` | User and role management (admin-only) |
 | `/api/storage/*` | File upload, download, and deletion |
-| `/api/data/collections` | Collection metadata endpoint |
 | `/api/data/:slug` | CRUD operations per collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
-| `/api/data/docs` | OpenAPI spec (when `enableSwagger: true`) |
-| `/api/data/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
+| `/api/docs` | OpenAPI spec (when `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
+| `/api/meta/contract` | The project's collection schema (admin-only) |
+| `/api/meta/schema-version` | A version string for that schema (unauthenticated) |
 | `/api/functions/*` | Custom function routes (when `functionsDir` is set) |
 | `/api/cron/*` | Cron job management (admin-only, when `cronsDir` is set) |
 | WebSocket on upgrade | Real-time subscriptions |
@@ -5140,13 +5141,28 @@ Keys can be listed, updated, and revoked via `/api/admin/api-keys` or the
 API_KEY_SELF_MANAGEMENT_FORBIDDEN`, whatever its `admin` flag. Key management
 requires an admin user's session or the service key.
 
-### Metadata Endpoint
+### Schema Metadata
 
-Get a list of all available collections and their structure:
+The project's full collection schema — every collection, property and relation —
+is served to an authenticated admin:
 
 ```bash
-GET /api/collections
+GET /api/meta/contract
 ```
+
+It is **admin-only**, and on a deployment with no authentication configured it
+is not served at all (404 `CONTRACT_UNAVAILABLE`) rather than exposing the
+schema to anyone. Its sibling returns a version string that stands for the
+schema without describing it, and is deliberately reachable with no credential
+— which is what a CI job polls:
+
+```bash
+GET /api/meta/schema-version
+```
+
+For the shape of the endpoints rather than the schema behind them, the OpenAPI
+document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
+`enableSwagger` is on.
 
 ### Next Steps
 

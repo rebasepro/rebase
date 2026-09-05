@@ -49,11 +49,12 @@ Après l'initialisation, ces routes sont montées :
 | `/api/auth/*` | Authentification (inscription, connexion, rafraîchissement, OAuth, liens magiques, codes à usage unique, MFA) |
 | `/api/admin/*` | Gestion des utilisateurs et des rôles (réservé aux administrateurs) |
 | `/api/storage/*` | Téléchargement, téléversement et suppression de fichiers |
-| `/api/data/collections` | Point d'extrémité des métadonnées de collection |
 | `/api/data/:slug` | Opérations CRUD par collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Historique des modifications d'entité (si activé) |
-| `/api/data/docs` | Spécification OpenAPI (lorsque `enableSwagger: true`) |
-| `/api/data/swagger` | Interface utilisateur Swagger (mode dev, lorsque `enableSwagger: true`) |
+| `/api/docs` | Spécification OpenAPI (quand `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (mode développement, quand `enableSwagger: true`) |
+| `/api/meta/contract` | Le schéma de collections du projet (admin uniquement) |
+| `/api/meta/schema-version` | Une chaîne de version pour ce schéma (non authentifié) |
 | `/api/functions/*` | Routes de fonctions personnalisées (lorsque `functionsDir` est défini) |
 | `/api/cron/*` | Gestion des tâches cron (réservé aux administrateurs, lorsque `cronsDir` est défini) |
 | WebSocket sur mise à niveau | Abonnements en temps réel |

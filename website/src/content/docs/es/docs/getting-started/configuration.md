@@ -116,7 +116,7 @@ await initializeRebaseBackend({
 
     history: true,           // Enable entity change history
 
-    enableSwagger: true,     // Enable OpenAPI docs at /api/data/docs
+    enableSwagger: true,     // Enable OpenAPI docs at /api/docs
 
     logging: {
         level: "info"
