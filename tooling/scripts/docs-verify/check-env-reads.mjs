@@ -55,10 +55,14 @@ const NC = "[0m";
 /**
  * Not part of Rebase's environment contract.
  *
- * Three groups: variables somebody else owns (`NODE_ENV`, dotenv's own),
+ * Four groups: variables somebody else owns (`NODE_ENV`, dotenv's own),
  * variables a *platform* sets that the runtime reads to work out where it is
- * running (`K_SERVICE`, `KUBERNETES_SERVICE_HOST`), and test hooks that exist so
- * the suite can drive a code path.
+ * running (`K_SERVICE`, `KUBERNETES_SERVICE_HOST`), test hooks that exist so
+ * the suite can drive a code path, and names that appear only in a kind
+ * literal frozen at what 0.17.3 shipped — kept byte-identical for the copies
+ * of `@rebasepro/types` inlined in published drivers, which compare it and
+ * throw on a difference. This runtime binds from the amendment beside it, so
+ * those names are not reads here; the page lists what the amendment names.
  *
  * Each entry is a variable a reader would be confused to find on a
  * configuration page, not one that is inconvenient to document.
@@ -84,7 +88,11 @@ const NOT_OURS = new Map([
     ["REBASE_RESET_EMAIL", "a test hook for `rebase auth reset-password`"],
     ["REBASE_RESET_PASSWORD", "a test hook for `rebase auth reset-password`"],
     ["REBASE_DEV_PROJECT_ROOT", "set by `rebase dev` for the child process it spawns"],
-    ["REBASE_JSON", "set by the CLI for its own subprocesses"]
+    ["REBASE_JSON", "set by the CLI for its own subprocesses"],
+    // Only in the frozen 0.17.3 `bucket` literal in resource_kinds.ts; the
+    // runtime binds from the amendment, which the page documents.
+    ["STORAGE_BUCKET", "the frozen 0.17.3 bucket literal; not read by this runtime"],
+    ["STORAGE_PUBLIC_URL", "the frozen 0.17.3 bucket literal; not read by this runtime"]
 ]);
 
 /**
