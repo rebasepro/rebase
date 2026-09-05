@@ -15,6 +15,7 @@ import {
     DEFAULT_RESOURCE_KEY,
     declareResource,
     declaredResources,
+    amendResourceKind,
     registerResourceKind,
     type DeclareOptions,
     type ResourceDeclaration,
@@ -26,18 +27,19 @@ import { DEFAULT_STORAGE_SOURCE_KEY, type StorageSourceDefinition } from "./stor
 // ── database ─────────────────────────────────────────────────────────────────
 
 registerResourceKind({
+    // FROZEN at the 0.17.3 literal — every published driver up to 0.17.3
+    // inlines this package and compares the shared registry's entry against
+    // this exact object at load. Corrections go in the amendment below.
     kind: "database",
-    // Revision 1: the env bindings were corrected after 0.17.3 (25f1a97e3), so
-    // a driver that inlined the 0.17.3 spec meets a different definition.
-    revision: 1,
     engines: ["postgres", "mongodb", "firestore", "sqlite"],
     defaultEngine: "postgres",
-    // Exactly the bases `resolveDataSources` reads, and no others. REBASE_DRIVER
-    // overrides the engine's default driver package; the pool settings are
-    // per-source because one source can be a single-session PGlite and another a
-    // real server. A name here that the resolver does not read is worse than an
-    // omission — it is a variable somebody sets and nothing consults — so
-    // `resource-env-bases.test.ts` holds this list to the resolver's own source.
+    envBases: ["DATABASE_URL", "REBASE_DRIVER", "REBASE_DB_POOL_MAX"],
+    optionKeys: ["databaseId", "migrations", "extensions"],
+    implicitDefault: true
+});
+// What a database actually binds from. The 0.17.3 list named two variables
+// the resolver never read and omitted five it does (25f1a97e3).
+amendResourceKind("database", {
     envBases: [
         "DATABASE_URL",
         "DATABASE_READ_URL",
@@ -46,21 +48,7 @@ registerResourceKind({
         "DB_POOL_MAX",
         "DB_POOL_IDLE_TIMEOUT",
         "DB_POOL_CONNECT_TIMEOUT"
-    ],
-    // `REBASE_DB_POOL_MAX` is deliberately absent, and was listed here once. It
-    // is a real variable — `poolMaxCeiling` in @rebasepro/server-postgres reads
-    // it — but a process-global ceiling rather than a per-source binding, so
-    // `REBASE_DB_POOL_MAX__ANALYTICS` would read nothing. Every name here is
-    // one a binder appends `__<KEY>` to; a global belongs to the process, not
-    // to a resource.
-    //
-    // No per-engine narrowing: every engine binds from the same set, and the
-    // driver package that differs between them is named by REBASE_DRIVER either
-    // way.
-    optionKeys: ["databaseId", "migrations", "extensions"],
-    // A backend without a database is not a backend, so one exists whether or
-    // not a project says so.
-    implicitDefault: true
+    ]
 });
 
 /** Options a database accepts beyond the common ones. */
@@ -158,17 +146,23 @@ export function declaredDatabaseExtensions(): readonly string[] {
 // ── bucket ───────────────────────────────────────────────────────────────────
 
 registerResourceKind({
+    // FROZEN at the 0.17.3 literal, for the reason given on `database`.
     kind: "bucket",
-    // Revision 1: the env bindings were corrected after 0.17.3 (25f1a97e3), so
-    // a driver that inlined the 0.17.3 spec meets a different definition.
-    revision: 1,
     engines: ["local", "s3", "gcs", "azure", "firebase"],
     defaultEngine: "local",
-    // Exactly the bases `resolveStorageBackend` reads. This list said
-    // STORAGE_BUCKET, STORAGE_ENDPOINT, STORAGE_REGION and STORAGE_PUBLIC_URL,
-    // none of which the runtime has ever read — so a generator or control plane
-    // binding from it produced a bucket the backend then skipped as
-    // unconfigured. `resource-env-bases.test.ts` holds it to the resolver.
+    envBases: ["S3_BUCKET", "GCS_BUCKET", "STORAGE_BUCKET", "STORAGE_PUBLIC_URL"],
+    envBasesByEngine: {
+        local: ["STORAGE_BUCKET"],
+        s3: ["S3_BUCKET", "STORAGE_ENDPOINT", "STORAGE_REGION", "STORAGE_PUBLIC_URL"],
+        gcs: ["GCS_BUCKET", "STORAGE_PUBLIC_URL"],
+        azure: ["STORAGE_BUCKET", "STORAGE_PUBLIC_URL"],
+        firebase: ["STORAGE_BUCKET", "STORAGE_PUBLIC_URL"]
+    },
+    optionKeys: ["publicRead", "prefix", "account"],
+    implicitDefault: false
+});
+// What a bucket actually binds from, per engine (25f1a97e3).
+amendResourceKind("bucket", {
     envBases: [
         "STORAGE_TYPE",
         "STORAGE_PATH",
@@ -194,17 +188,9 @@ registerResourceKind({
             "S3_FORCE_PATH_STYLE"
         ],
         gcs: ["STORAGE_TYPE", "GCS_BUCKET", "GCS_PROJECT_ID", "GCS_KEY_FILENAME"],
-        // The backend holds no controller for these: they are reached by a
-        // provider SDK in the browser, so a bucket on one is declared with
-        // `transport: "direct"` and the server binds nothing for it. An empty
-        // list is the honest answer, and better than naming variables that
-        // would be set and never read.
         azure: [],
         firebase: []
-    },
-    optionKeys: ["publicRead", "prefix", "account"],
-    // Storage is genuinely optional: plenty of projects store nothing.
-    implicitDefault: false
+    }
 });
 
 /** Options a bucket accepts beyond the common ones. */

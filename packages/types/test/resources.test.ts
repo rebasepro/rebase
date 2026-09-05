@@ -25,6 +25,7 @@ import {
     resetDeclaredSubscriptions,
     resourceEnvSuffix,
     resourceKeyOf,
+    resourceKind,
     resourceKinds,
     setTopicRuntime,
     topic
@@ -206,13 +207,84 @@ describe("kinds are registered, not hardcoded", () => {
         });
     });
 
-    it("the kinds that changed since 0.17.3 carry a revision, so an inlined 0.17.3 copy defers", () => {
-        // 25f1a97e3 corrected the env bindings of `database` and `bucket`. A
-        // driver published at 0.17.3 registers those kinds at revision 0 from
-        // its own inlined copy; without a bump here it would throw at load.
-        for (const kind of ["database", "bucket"]) {
-            expect(resourceKinds().find(k => k.kind === kind)?.revision ?? 0).toBeGreaterThanOrEqual(1);
-        }
+    describe("kinds that shipped in inlined copies keep their published literal", () => {
+        // A published driver inlines this package into its dist. The copy it
+        // carries compares the shared registry's entry for each built-in kind
+        // against its own literal by JSON.stringify and THROWS on a difference —
+        // code that is in the field and cannot be changed. So the registered
+        // literal of every kind that has shipped is frozen at what shipped; what
+        // it binds is corrected through amendResourceKind, which the old copy
+        // never sees. These are the literals exactly as @rebasepro/types@0.17.3
+        // registers them. Changing one here means changing the source, and
+        // means every bundle built with a driver ≤ 0.17.3 dies at load.
+        const shippedAt0173 = {
+            database: {
+                kind: "database",
+                engines: ["postgres", "mongodb", "firestore", "sqlite"],
+                defaultEngine: "postgres",
+                envBases: ["DATABASE_URL", "REBASE_DRIVER", "REBASE_DB_POOL_MAX"],
+                optionKeys: ["databaseId", "migrations", "extensions"],
+                implicitDefault: true
+            },
+            bucket: {
+                kind: "bucket",
+                engines: ["local", "s3", "gcs", "azure", "firebase"],
+                defaultEngine: "local",
+                envBases: ["S3_BUCKET", "GCS_BUCKET", "STORAGE_BUCKET", "STORAGE_PUBLIC_URL"],
+                envBasesByEngine: {
+                    local: ["STORAGE_BUCKET"],
+                    s3: ["S3_BUCKET", "STORAGE_ENDPOINT", "STORAGE_REGION", "STORAGE_PUBLIC_URL"],
+                    gcs: ["GCS_BUCKET", "STORAGE_PUBLIC_URL"],
+                    azure: ["STORAGE_BUCKET", "STORAGE_PUBLIC_URL"],
+                    firebase: ["STORAGE_BUCKET", "STORAGE_PUBLIC_URL"]
+                },
+                optionKeys: ["publicRead", "prefix", "account"],
+                implicitDefault: false
+            },
+            topic: {
+                kind: "topic",
+                engines: ["jobs"],
+                defaultEngine: "jobs",
+                envBases: ["REBASE_TOPIC_URL"],
+                optionKeys: ["delivery", "maxAttempts"],
+                implicitDefault: false
+            }
+        } as const;
+
+        it("registering the 0.17.3 literal of each built-in kind neither throws nor warns", () => {
+            // Exactly what an inlined 0.17.3 copy does at driver load, after the
+            // runtime's copy registered first.
+            const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+            try {
+                for (const literal of Object.values(shippedAt0173)) {
+                    expect(() => registerResourceKind(JSON.parse(JSON.stringify(literal)))).not.toThrow();
+                }
+                expect(warn).not.toHaveBeenCalled();
+            } finally {
+                warn.mockRestore();
+            }
+        });
+
+        it("still binds the corrected variables after the old copy re-registered its literal", () => {
+            // The 0.17.3 registerResourceKind also SETS its own object after the
+            // identity check passes, replacing the entry. The correction must
+            // survive that, because it lives beside the registry, not in it.
+            registerResourceKind(JSON.parse(JSON.stringify(shippedAt0173.database)));
+            expect(resourceKind("database")?.envBases).toContain("DB_POOL_MAX");
+            expect(resourceKind("database")?.envBases).not.toContain("REBASE_DB_POOL_MAX");
+            registerResourceKind(JSON.parse(JSON.stringify(shippedAt0173.bucket)));
+            expect(resourceKind("bucket")?.envBasesByEngine?.local).toEqual(["STORAGE_TYPE", "STORAGE_PATH"]);
+        });
+
+        it("the shared registry holds the shipped literal, byte for byte", () => {
+            // What the old copy compares: the raw entry, not the amended view.
+            const shared = (globalThis as Record<symbol, { kinds: Map<string, unknown> }>)[
+                Symbol.for("@rebasepro/types.resourceRegistry")
+            ];
+            for (const [kind, literal] of Object.entries(shippedAt0173)) {
+                expect(JSON.stringify(shared.kinds.get(kind))).toBe(JSON.stringify(literal));
+            }
+        });
     });
 });
 

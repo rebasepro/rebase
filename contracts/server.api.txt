@@ -400,6 +400,7 @@ const RLS_UID_SQL
 const RUNTIME_CONTRACT_VERSION
 const SCHEMA_VERSION_HEADER
 const policy { and, authRoles, authUid, authenticated, compare, existsIn, false, field, literal, not, or, outerField, raw, registered, rolesContain, rolesOverlap, serverContext, true }
+function amendResourceKind
 function bucket
 function buildResourceGraph
 function canonicalSchemaPayload

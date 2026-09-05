@@ -69,6 +69,11 @@ export interface ResourceKindSpec {
      * With one, the higher revision wins whichever copy loads first, and the
      * older copy is told so. Missing means 0, which is what every copy shipped
      * before revisions existed reports.
+     *
+     * Only copies that know about revisions honour them. A copy published
+     * BEFORE they existed still compares the whole literal and throws, so a
+     * kind that has shipped in such a copy cannot change its literal at all —
+     * not even to add this field. Correct those kinds with `amendResourceKind`.
      */
     revision?: number;
     /** Engines this kind ships with. `custom:<id>` is always additionally valid. */
@@ -174,6 +179,40 @@ function registry(): Registry {
     return existing;
 }
 
+/**
+ * Corrections this copy applies on top of a registered kind.
+ *
+ * Deliberately a module local — per COPY of this package — where the registry
+ * above is deliberately shared. A published driver inlines this package into
+ * its dist, and the copy it carries compares the shared registry's entry for a
+ * kind against its own literal by `JSON.stringify` and throws if they differ
+ * (see `registerResourceKind` before revisions existed). That code is in the
+ * field and cannot be changed, so the registered literal of any kind that has
+ * ever shipped is frozen: change one enumerable key and every bundle built with
+ * an older driver dies at driver load on the next image. What a kind actually
+ * binds can still be corrected — here, read through `resourceKind()` and
+ * everything built on it, invisible to the older copy, which keeps binding the
+ * way it did when it was published.
+ */
+type KindAmendment = Partial<Pick<ResourceKindSpec, "envBases" | "envBasesByEngine" | "optionKeys">>;
+const amendments = new Map<string, KindAmendment>();
+
+/**
+ * Correct a registered kind without touching its registered literal.
+ *
+ * Use this, never an edit to the literal, for a kind that has shipped in a
+ * published package. The amendment applies to reads through this copy only.
+ */
+export function amendResourceKind(kind: string, amendment: KindAmendment): void {
+    amendments.set(kind, { ...amendments.get(kind), ...amendment });
+}
+
+/** A registered kind as this copy sees it: the shared literal plus this copy's amendments. */
+function effectiveKind(spec: ResourceKindSpec): ResourceKindSpec {
+    const amendment = amendments.get(spec.kind);
+    return amendment ? { ...spec, ...amendment } : spec;
+}
+
 /** `kind:key`, the graph's primary key. */
 function declarationId(kind: string, key: string): string {
     return `${kind}:${key}`;
@@ -219,12 +258,13 @@ export function registerResourceKind(spec: ResourceKindSpec): void {
 
 /** Every registered kind, for validators and for `rebase doctor`. */
 export function resourceKinds(): ResourceKindSpec[] {
-    return [...registry().kinds.values()];
+    return [...registry().kinds.values()].map(effectiveKind);
 }
 
 /** One registered kind, or undefined. */
 export function resourceKind(kind: string): ResourceKindSpec | undefined {
-    return registry().kinds.get(kind);
+    const spec = registry().kinds.get(kind);
+    return spec && effectiveKind(spec);
 }
 
 /** Options every kind accepts. */
@@ -256,7 +296,7 @@ export function declareResource(
     key: string = DEFAULT_RESOURCE_KEY,
     options: DeclareOptions = {}
 ): ResourceHandle {
-    const spec = registry().kinds.get(kind);
+    const spec = resourceKind(kind);
     if (!spec) {
         const known = [...registry().kinds.keys()].sort().join(", ") || "none";
         throw new Error(
