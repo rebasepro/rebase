@@ -1,2 +1,3 @@
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](ai-instructions.md).
+Install the Rebase skills for this assistant: `rebase skills install --agent codex`.

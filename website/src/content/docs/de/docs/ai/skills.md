@@ -22,7 +22,7 @@ rebase skills install --agent claude,cursor
 rebase skills install --agent all
 ```
 
-Vier Ziele werden unterstützt:
+Sieben Ziele werden unterstützt – eines für jede Pointer-Datei, die `rebase init` schreibt:
 
 | `--agent` | Assistent | Geschrieben nach |
 |---|---|---|
@@ -30,6 +30,9 @@ Vier Ziele werden unterstützt:
 | `claude` | Claude Code | `.claude/skills/<skill>/SKILL.md` |
 | `windsurf` | Windsurf | `.windsurf/rules/<skill>.md` |
 | `gemini` | Gemini CLI / Antigravity | `.agents/skills/<skill>/SKILL.md` |
+| `codex` | Codex CLI | `.codex/skills/<skill>/SKILL.md` |
+| `kiro` | Kiro | `.kiro/steering/<skill>.md` |
+| `copilot` | GitHub Copilot | `.github/instructions/<skill>.instructions.md` |
 
 `gemini` deckt **sowohl** Gemini CLI als auch Antigravity ab – beide lesen dasselbe `.agents/`-Verzeichnis, daher gibt es keinen separaten `antigravity`-Wert.
 

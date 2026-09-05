@@ -28,7 +28,7 @@ rebase skills install --agent claude,cursor
 rebase skills install --agent all
 ```
 
-Quatro destinos são suportados:
+Sete destinos são suportados — um para cada arquivo de ponteiro que o `rebase init` escreve:
 
 | `--agent` | Assistente | Gravado em |
 |---|---|---|
@@ -36,6 +36,9 @@ Quatro destinos são suportados:
 | `claude` | Claude Code | `.claude/skills/<skill>/SKILL.md` |
 | `windsurf` | Windsurf | `.windsurf/rules/<skill>.md` |
 | `gemini` | Gemini CLI / Antigravity | `.agents/skills/<skill>/SKILL.md` |
+| `codex` | Codex CLI | `.codex/skills/<skill>/SKILL.md` |
+| `kiro` | Kiro | `.kiro/steering/<skill>.md` |
+| `copilot` | GitHub Copilot | `.github/instructions/<skill>.instructions.md` |
 
 O `gemini` cobre **tanto** o Gemini CLI quanto o Antigravity — eles leem o mesmo
 diretório `.agents/`, portanto não há um valor `antigravity` separado.

@@ -17,43 +17,82 @@ mostrare il blocco di configurazione.
 
 ## Connessione di un client
 
-Il server è pubblicato su npm e non richiede alcun passaggio di installazione; `npx` lo recupera automaticamente.
+Il server è pubblicato su npm e non richiede installazione: `npx` lo scarica.
+Ogni blocco qui sotto è l'intera integrazione.
 
-Per **Claude Code**, aggiungilo a `.mcp.json` nella root del tuo progetto:
+**Claude Code** — `.mcp.json` nella radice del progetto. `rebase init` scrive questo file al posto tuo:
 
 ```json title=".mcp.json"
 {
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
-      "env": {
-        "REBASE_PROJECT_DIR": "/absolute/path/to/your/project"
-      }
+      "args": ["-y", "@rebasepro/mcp"]
     }
   }
 }
 ```
 
-**Cursor** usa la stessa struttura in `.cursor/mcp.json`, e **Gemini CLI** in
-`.gemini/settings.json`. Qualsiasi client MCP in grado di avviare un server stdio funziona:
-il blocco sopra rappresenta l'intera integrazione.
+**Cursor** — la stessa forma, in `.cursor/mcp.json`:
 
-`REBASE_PROJECT_DIR` deve essere la directory contenente `rebase.json`. Se lo
-ometti, il server utilizza la propria directory di lavoro corrente, ovvero quella in cui il client
-lo ha avviato.
+```json title=".cursor/mcp.json"
+{
+  "mcpServers": {
+    "rebase": {
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"]
+    }
+  }
+}
+```
 
-### Configurazione
+**Gemini CLI** — `.gemini/settings.json`, sotto la stessa chiave:
 
-| Variabile | Predefinito | Descrizione |
-|---|---|---|
-| `REBASE_PROJECT_DIR` | `process.cwd()` | Root del progetto — usata per trovare le collezioni, `.env` e lo stato del server di sviluppo |
-| `REBASE_BASE_URL` | `http://localhost:3001` | URL del backend |
-| `REBASE_API_TOKEN` / `REBASE_TOKEN` | *(vuoto)* | Il token utilizzato per ogni chiamata API |
-| `REBASE_MCP_ALLOW_REMOTE_WRITES` | `false` | Esclude gli strumenti distruttivi dal gate di loopback |
+```json title=".gemini/settings.json"
+{
+  "mcpServers": {
+    "rebase": {
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"]
+    }
+  }
+}
+```
 
-Il server carica `.env` da `$REBASE_PROJECT_DIR/.env` o
-`$REBASE_PROJECT_DIR/app/.env` all'avvio.
+**Codex CLI** — TOML invece di JSON, in `~/.codex/config.toml`. È a livello utente, non per progetto, quindi indica qui la directory del progetto:
+
+```toml title="~/.codex/config.toml"
+[mcp_servers.rebase]
+command = "npx"
+args = ["-y", "@rebasepro/mcp"]
+env = { REBASE_PROJECT_DIR = "/absolute/path/to/your/project" }
+```
+
+**Kiro** — `.kiro/settings/mcp.json`:
+
+```json title=".kiro/settings/mcp.json"
+{
+  "mcpServers": {
+    "rebase": {
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"]
+    }
+  }
+}
+```
+
+Funziona qualsiasi client MCP in grado di avviare un server stdio; la forma è sempre la stessa.
+
+### Su quale directory agisce
+
+`REBASE_PROJECT_DIR` deve essere la directory che contiene `rebase.json`. Se la
+ometti, il server usa la propria directory di lavoro, che per un file di
+configurazione a livello di progetto è il progetto stesso — ed è il motivo per
+cui solo il blocco Codex, a livello utente, la imposta.
+
+Se la imposti, vince: l'ambiente ricostruisce il progetto `default` a ogni avvio,
+quindi un percorso assoluto in una configurazione utente ha la precedenza su
+qualsiasi cosa sia memorizzata in `~/.rebase/projects.json`.
 
 ## Cosa può raggiungere il server
 

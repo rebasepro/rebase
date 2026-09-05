@@ -11,6 +11,12 @@ const require = createRequire(import.meta.url);
 /**
  * Supported agent environments and their target directories.
  *
+ * Every agent `rebase init` writes a pointer file for has an entry here. That
+ * was not true: `rebase init` writes `CLAUDE.md`, `AGENTS.md`, `.cursorrules`,
+ * `.windsurfrules` and `.github/copilot-instructions.md`, and the installer
+ * covered four of the five — so a Codex or Copilot user was told, by a file in
+ * their own repository, to run an installer that had nothing to offer them.
+ *
  * `flatLayout` says where the installed rule file sits relative to the skill's
  * own assets. A subdirectory layout writes `<skill>/SKILL.md`, so a link the
  * skill spells `references/x.md` resolves as written; a flat layout writes
@@ -59,6 +65,39 @@ const AGENTS = {
         /** Gemini uses the standard SKILL.md format in subdirectories. */
         transformFile: (skillName: string, content: string) => ({
             fileName: path.join(skillName, "SKILL.md"),
+            content
+        })
+    },
+    codex: {
+        label: "Codex CLI",
+        detectDir: ".codex",
+        targetDir: ".codex/skills",
+        flatLayout: false,
+        /** Codex reads AGENTS.md; the skills sit beside its own config. */
+        transformFile: (skillName: string, content: string) => ({
+            fileName: path.join(skillName, "SKILL.md"),
+            content
+        })
+    },
+    kiro: {
+        label: "Kiro",
+        detectDir: ".kiro",
+        targetDir: ".kiro/steering",
+        flatLayout: true,
+        /** Kiro calls them steering documents, and reads them flat. */
+        transformFile: (skillName: string, content: string) => ({
+            fileName: `${skillName}.md`,
+            content
+        })
+    },
+    copilot: {
+        label: "GitHub Copilot",
+        detectDir: ".github",
+        targetDir: ".github/instructions",
+        flatLayout: true,
+        /** Copilot reads `*.instructions.md` from `.github/instructions/`. */
+        transformFile: (skillName: string, content: string) => ({
+            fileName: `${skillName}.instructions.md`,
             content
         })
     }

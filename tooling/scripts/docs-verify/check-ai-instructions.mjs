@@ -17,7 +17,9 @@
  *      publishes, read from its own `exports` map — which catches the other
  *      half of the same drift, a guard import pointed at a subpath that is not
  *      there.
- *   3. Every script in the scaffold's own `package.json` is named in the
+ *   3. Every pointer file the scaffold writes names an agent the skills
+ *      installer actually supports.
+ *   4. Every script in the scaffold's own `package.json` is named in the
  *      instruction file, and the scaffold ships an `.mcp.json` pointing at
  *      `@rebasepro/mcp`. An assistant that has to guess at the run scripts
  *      invents `npm run migrate`; one with no MCP block never finds the tools
@@ -156,6 +158,7 @@ export function checkAiInstructions(root) {
     }
 
     checkScaffold(root, findings);
+    checkPointerAgents(root, findings);
     return { findings, scanned };
 }
 
@@ -215,6 +218,67 @@ function checkScaffold(root, findings) {
             file: `${SCAFFOLD}/.mcp.json`,
             line: 0,
             message: `\`mcpServers.rebase\` does not run \`@rebasepro/mcp\` (args: ${JSON.stringify(args)})`
+        });
+    }
+}
+
+/**
+ * Every pointer file the scaffold writes names an agent the installer supports.
+ *
+ * `rebase init` writes five: `CLAUDE.md`, `AGENTS.md`, `.cursorrules`,
+ * `.windsurfrules` and `.github/copilot-instructions.md`. `skills.ts` knew four
+ * agents, and neither Codex nor Copilot was among them — so two of the five
+ * files a project ships told their reader, in the project's own repository, to
+ * run an installer that would answer "unknown agent".
+ *
+ * Each pointer file carries its own `rebase skills install --agent <key>` line,
+ * which is what makes this checkable rather than a hardcoded table: the mapping
+ * lives in the file it describes, and the keys are read out of `AGENTS`.
+ */
+function checkPointerAgents(root, findings) {
+    let source;
+    try {
+        source = readFileSync(path.join(root, "packages/cli/src/commands/skills.ts"), "utf8");
+    } catch {
+        return;
+    }
+    const block = /const AGENTS = \{([\s\S]*?)\n\} as const;/.exec(source);
+    if (!block) {
+        findings.push({
+            file: "packages/cli/src/commands/skills.ts",
+            line: 0,
+            message: "could not read the `AGENTS` map — the pointer-file check is not running."
+        });
+        return;
+    }
+    const keys = new Set([...block[1].matchAll(/^ {4}([a-z][\w]*):\s*\{/gm)].map((m) => m[1]));
+
+    const pointers = globSync(
+        [`${SCAFFOLD}/*.md`, `${SCAFFOLD}/.cursorrules`, `${SCAFFOLD}/.windsurfrules`, `${SCAFFOLD}/.github/*.md`],
+        { cwd: root }
+    );
+    for (const rel of pointers) {
+        const text = readFileSync(path.join(root, rel), "utf8");
+        // Only the pointer files — `ai-instructions.md` and `README.md` are not.
+        if (!/instructions defined in \[ai-instructions\.md\]/.test(text)) continue;
+        const named = /rebase skills install --agent ([a-z][\w]*)/.exec(text);
+        if (!named) {
+            findings.push({
+                file: rel,
+                line: 0,
+                message:
+                    "a pointer file with no `rebase skills install --agent <key>` line. " +
+                    "It is what says which installer target serves this assistant."
+            });
+            continue;
+        }
+        if (keys.has(named[1])) continue;
+        findings.push({
+            file: rel,
+            line: 0,
+            message:
+                `names \`--agent ${named[1]}\`, which \`AGENTS\` in packages/cli/src/commands/skills.ts ` +
+                `does not define. Known: ${[...keys].sort().join(", ")}`
         });
     }
 }

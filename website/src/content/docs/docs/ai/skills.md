@@ -28,7 +28,7 @@ rebase skills install --agent claude,cursor
 rebase skills install --agent all
 ```
 
-Four targets are supported:
+Seven targets are supported — one for every pointer file `rebase init` writes:
 
 | `--agent` | Assistant | Written to |
 |---|---|---|
@@ -36,12 +36,16 @@ Four targets are supported:
 | `claude` | Claude Code | `.claude/skills/<skill>/SKILL.md` |
 | `windsurf` | Windsurf | `.windsurf/rules/<skill>.md` |
 | `gemini` | Gemini CLI / Antigravity | `.agents/skills/<skill>/SKILL.md` |
+| `codex` | Codex CLI | `.codex/skills/<skill>/SKILL.md` |
+| `kiro` | Kiro | `.kiro/steering/<skill>.md` |
+| `copilot` | GitHub Copilot | `.github/instructions/<skill>.instructions.md` |
 
 `gemini` covers **both** Gemini CLI and Antigravity — they read the same
 `.agents/` directory, so there is no separate `antigravity` value.
 
 With no `--agent`, the command detects which assistants a project already uses by
-looking for `.cursor/`, `.claude/`, `.windsurf/` and `.agents/`. If it finds
+looking for `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/`,
+`.kiro/` and `.github/`. If it finds
 none it prompts you to choose.
 
 :::note[A freshly scaffolded project always prompts]
