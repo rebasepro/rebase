@@ -531,6 +531,27 @@ describe("template package.json contracts", () => {
         expect(workspace).toContain("config");
     });
 
+    it("the .gitignore ignores the generated SDK", () => {
+        // `rebase generate-sdk` writes ./generated/sdk from the collections.
+        // A committed copy is a stale copy the moment a collection changes.
+        const ignore = fs.readFileSync(path.join(TEMPLATE_DIR, "gitignore"), "utf-8");
+        expect(ignore).toMatch(/^generated\/$/m);
+    });
+
+    it("links no favicon it does not ship", () => {
+        // The link said `type="image/svg+xml"` and `href="/favicon.ico"`, and
+        // frontend/public/ has neither — so the first page load of every new
+        // project logged a 404 for a file nobody had asked for.
+        const html = fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "index.html"), "utf-8");
+        const iconHrefs = [...html.matchAll(/<link[^>]*rel="icon"[^>]*href="([^"]+)"/g)].map(m => m[1]);
+        for (const href of iconHrefs) {
+            expect(
+                fs.existsSync(path.join(TEMPLATE_DIR, "frontend", "public", href.replace(/^\//, ""))),
+                `index.html links ${href}, which the template does not ship`
+            ).toBe(true);
+        }
+    });
+
     it("the .env.example PORT is the one dev.ts treats as unchosen", () => {
         // `rebase dev` derives a per-project port and warns when .env names a
         // different one. Every scaffold ships this line unread, so without a

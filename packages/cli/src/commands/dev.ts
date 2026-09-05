@@ -534,7 +534,18 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             const api = `http://localhost:${resolvedBackendPort}`;
             /** `[label, value]` per line; an empty pair is a blank line. */
             const lines: Array<[string, string]> = declaresStaticApp
-                ? [["", ""], ["✦ Rebase Admin App is ready!", ""], ["➜ Frontend URL: ", stripAnsi(frontendUrl)], ["", ""]]
+                ? [
+                    ["", ""],
+                    ["✦ Rebase Admin App is ready!", ""],
+                    ["➜ Admin: ", stripAnsi(frontendUrl)],
+                    // Both, because both are needed and only one was printed.
+                    // The admin URL is where you log in; the API URL is what
+                    // every SDK client, curl and Swagger link needs — and it is
+                    // not derivable from the other, since the two ports are
+                    // derived separately from this project's path.
+                    ["➜ API:   ", api],
+                    ["", ""]
+                ]
                 : [["", ""], ["✦ Rebase API is ready!", ""], ["➜ API:      ", api]];
 
             if (!declaresStaticApp) {

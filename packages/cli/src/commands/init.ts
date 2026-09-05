@@ -247,7 +247,9 @@ ${chalk.bold("Usage")}
 ${chalk.bold("Options")}
   ${chalk.blue("-t, --template")} ${chalk.gray("<preset>")}   blog | ecommerce | blank ${chalk.gray("(default: blog)")}
   ${chalk.blue("--headless")}                Backend only — no admin panel, no collections
-  ${chalk.blue("-y, --yes")}                 Accept defaults, never prompt ${chalk.gray("(required for CI / non-TTY)")}
+  ${chalk.blue("-y, --yes")}                 Never prompt ${chalk.gray("(required for CI / non-TTY)")}
+                            ${chalk.gray("Skips git init and dependency install — the interactive")}
+                            ${chalk.gray("defaults say yes to both. Pass --git / --install for those.")}
   ${chalk.blue("-i, --install")}             Install dependencies after scaffolding
   ${chalk.blue("--no-install")}              Scaffold only, install nothing ${chalk.gray("(the default)")}
   ${chalk.blue("-g, --git")}                 Initialize a git repository and make an initial commit
@@ -594,6 +596,12 @@ async function createProject(options: InitOptions) {
     // Rename .env.example to .env if it exists and randomize secrets
     await configureEnvFile(options.targetDirectory, options.databaseUrl);
 
+    // The manifest's build command is the project's package manager, not npm.
+    // The template has to spell one of them, and `npm run build --workspace
+    // frontend` in a pnpm project is a second package manager reading a
+    // lockfile it did not write.
+    await useProjectPackageManagerInManifest(options.targetDirectory, options.pmCommands);
+
     // Create the repository now, but commit at the very end — see
     // commitScaffold below for why the two halves are separated.
     let gitInitialized = false;
@@ -856,6 +864,43 @@ force: true });
     });
 }
 
+/**
+ * Rewrite `rebase.json`'s static-app build command for this project's package manager.
+ *
+ * The template must spell one of them, and it spells npm. In a pnpm project
+ * that is a second package manager invoked against a lockfile it did not
+ * write — `rebase build` then either installs a second tree or fails on a
+ * workspace flag npm and pnpm spell differently.
+ */
+async function useProjectPackageManagerInManifest(
+    targetDirectory: string,
+    pmCommands: PMCommands
+): Promise<void> {
+    const manifestPath = path.join(targetDirectory, "rebase.json");
+    if (!fs.existsSync(manifestPath)) return;
+
+    try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
+            apps?: Record<string, { type?: string; root?: string; build?: string }>;
+        };
+        let changed = false;
+        for (const app of Object.values(manifest.apps ?? {})) {
+            if (app.type !== "static" || !app.root || !app.build) continue;
+            const rewritten = pmCommands.runWorkspace(app.root, "build").join(" ");
+            if (rewritten !== app.build) {
+                app.build = rewritten;
+                changed = true;
+            }
+        }
+        if (changed) {
+            fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 4)}\n`, "utf8");
+        }
+    } catch {
+        // A manifest that will not parse is `rebase build`'s problem to report,
+        // and scaffolding must not fail on a cosmetic rewrite.
+    }
+}
+
 async function applyPreset(targetDirectory: string, preset: TemplatePreset): Promise<void> {
     const collectionsDir = path.join(targetDirectory, "config", "collections");
     const presetsDir = path.join(collectionsDir, "presets");
@@ -911,6 +956,16 @@ async function replacePlaceholders(options: InitOptions) {
     const versionCache = new Map<string, string>();
     /** Packages with no release matching the CLI's own version. */
     const unreleased = new Map<string, string>();
+    /**
+     * Packages for which every registry query failed, not just the version-pinned one.
+     *
+     * The difference matters and used to be invisible. With no network, all
+     * three lookups throw, every package falls back to "latest", and the
+     * refusal below fired with the words "not a problem with your machine,
+     * your network, or your package manager" — telling a developer on a train
+     * to report a release gap in Rebase.
+     */
+    const unreachable = new Set<string>();
 
     // Use npm view for registry queries — it's universal and works regardless of PM
     const viewBin = "npm";
@@ -940,6 +995,9 @@ async function replacePlaceholders(options: InitOptions) {
                     const { stdout } = await execa(viewBin, ["view", pkgName, "version"]);
                     versionToUse = stdout.trim() || "latest";
                 } catch {
+                    // Not "this package has no such version" — the registry
+                    // answered nothing at all, for any query.
+                    unreachable.add(pkgName);
                     versionToUse = "latest";
                 }
             }
@@ -986,6 +1044,20 @@ async function replacePlaceholders(options: InitOptions) {
     // failure names this as the cause, so stop here and say it plainly.
     const cliIsStable = cliVersion !== "latest" && !cliVersion.includes("-");
     const prereleasePins = [...unreleased].filter(([, version]) => version === "latest" || version.includes("-"));
+
+    // Every package unreachable is a connectivity failure, not a release gap.
+    // Both produce the same symptom — nothing resolved, so everything pinned
+    // "latest" — and only one of them is worth a bug report.
+    if (unreachable.size > 0 && unreachable.size === versionCache.size) {
+        throw new Error(
+            "Could not reach the npm registry.\n\n" +
+            `Every version lookup failed (${unreachable.size} package(s)), so nothing could be\n` +
+            "pinned. This is a network or registry problem, not a problem with Rebase:\n" +
+            "check your connection, your proxy, and `npm config get registry`.\n\n" +
+            "Stopped before writing dependency versions or installing anything. The\n" +
+            `project directory ${path.basename(options.targetDirectory)}/ was created and is safe to delete.`
+        );
+    }
 
     if (cliIsStable && prereleasePins.length > 0) {
         const lines = prereleasePins.map(([name, version]) => `    ${name} → ${version}`).join("\n");
