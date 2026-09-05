@@ -542,7 +542,7 @@ applies it inside the query. Use a callback only to stamp the tenant on write.
 -- The filter: enforced by the database on every read, for every caller.
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 CREATE POLICY documents_tenant ON documents FOR ALL TO public
-    USING (tenant_id = (rebase.jwt() -> 'tenant_id')::text);
+    USING (tenant_id = rebase.jwt() ->> 'tenant_id');
 ```
 
 ```typescript
