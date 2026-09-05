@@ -17855,7 +17855,7 @@ docker compose -f infra/docker/docker-compose.selfhost.yml \
 You do not need to start the database separately — `api` waits on its
 healthcheck.
 
-#### The four values it needs
+#### The six values it needs
 
 `quickstart.sh` generates these for you. To write the `.env` yourself:
 
@@ -17865,10 +17865,12 @@ POSTGRES_PASSWORD=$(openssl rand -hex 32)
 JWT_SECRET=$(openssl rand -hex 32)
 REBASE_SERVICE_KEY=$(openssl rand -hex 32)
 CORS_ORIGINS=https://app.example.com
+REBASE_ADMIN_EMAIL=you@example.com
+REBASE_ADMIN_PASSWORD=$(openssl rand -hex 16)
 EOF
 ```
 
-Three secrets and one fact:
+Three secrets, one fact, and the account you sign in with:
 
 - **`POSTGRES_PASSWORD`** — the database password. Changing it later means
   changing it in the volume too, so pick it once.
@@ -17880,10 +17882,26 @@ Three secrets and one fact:
   Not a secret, and not optional: the runtime refuses to start in production
   without it rather than guessing, because an API that guesses its allowed
   origins eventually allows the wrong one.
+- **`REBASE_ADMIN_EMAIL`** / **`REBASE_ADMIN_PASSWORD`** — the first
+  administrator. A fresh database has no users, and outside production the
+  registration policy admits the first sign-up and promotes it to admin —
+  otherwise an empty database is a dead end, because bootstrapping an admin
+  needs a caller who is already signed in. The moment this stack answers on a
+  hostname that convenience is a race the operator can lose, so in production
+  the window is shut and the account is named here instead. The runtime creates
+  it once, while the user table is empty, and does nothing on every boot after
+  that.
 
-Each of the three secrets must be at least 32 characters. The compose file
-declares them with `${VAR:?…}`, so a missing one stops the stack with a message
-naming it rather than starting something half-configured.
+Each of the three secrets must be at least 32 characters, and the admin password
+at least 12. Use an address with a dot in its domain: `POST /auth/login` parses
+its body with `z.string().email()`, so `admin@localhost` would seed an account
+and then refuse every attempt to use it. The compose file declares all six with
+`${VAR:?…}`, so a missing one stops the stack with a message naming it rather
+than starting something half-configured — and self-registration ships off
+(`DISABLE_SELF_REGISTRATION`, default `true`), so nothing is left to be claimed.
+
+Sign in with those credentials and change the password: they are sitting in a
+file on the host.
 
 ### Dependencies
 
@@ -18796,7 +18814,19 @@ POSTGRES_PASSWORD=a_long_random_string
 JWT_SECRET=another_long_random_string_at_least_32_chars
 REBASE_SERVICE_KEY=a_third_long_random_string_at_least_32_chars
 CORS_ORIGINS=https://app.yourdomain.com
+REBASE_ADMIN_EMAIL=you@yourdomain.com
+REBASE_ADMIN_PASSWORD=at_least_twelve_characters
 ```
+
+All six are required — the Compose file declares them with `${VAR:?…}` and
+refuses to interpolate without them.
+
+The last two are the first administrator. A fresh database has no users, and
+outside production the first sign-up is promoted to admin — which is a race the
+moment this box answers on a hostname, because Caddy has TLS up before you have
+typed anything. So in production that window is shut and the account is named
+here instead; the runtime creates it once, while the user table is empty, and
+does nothing on every boot after that. Sign in and change the password.
 
 Then bring it up:
 
