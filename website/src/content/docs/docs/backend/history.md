@@ -12,6 +12,11 @@ Entity history records a entity of entity values on every create, update, and de
 
 ### Backend
 
+:::note[Where this goes]
+**Managed runtime:** `REBASE_HISTORY` (`true` by default; set `false` to turn it off). Retention settings have no environment form — eject to change them.
+**Ejected:** `initializeRebaseBackend({ history })` in `backend/src/index.ts`.
+:::
+
 Enable history in `initializeRebaseBackend`:
 
 ```typescript no-verify

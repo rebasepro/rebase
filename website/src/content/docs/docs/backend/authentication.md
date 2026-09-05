@@ -18,6 +18,12 @@ Rebase includes a complete backend authentication system:
 
 ## Configuration
 
+:::note[Where this goes]
+**Managed runtime:** environment — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` and the provider `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs. The users collection is whichever one the bundle names (`collections/users` by convention).
+**No managed route:** `auth.hooks`. They are functions; eject to pass them.
+**Ejected:** `initializeRebaseBackend({ auth })` in `backend/src/index.ts`.
+:::
+
 The `auth` block in `initializeRebaseBackend` controls all backend authentication:
 
 ```typescript no-verify

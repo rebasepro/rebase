@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { BUNDLE_FORMAT_VERSION, RUNTIME_CONTRACT_VERSION } from "@rebasepro/types";
-import { BundleError, createSourceBundle, loadBundle, readBundleManifest } from "../src/boot/bundle";
+import { BundleError, createSourceBundle, loadBundle, loadBundleConfigExports, readBundleManifest } from "../src/boot/bundle";
 import { warnOnUnusableBundleShape } from "../src/boot/boot";
 
 /**
@@ -190,5 +190,65 @@ describe("warnOnUnusableBundleShape", () => {
         warnOnUnusableBundleShape(bundle({ config: "config", collections: "config/collections" }));
         expect(warn).toHaveBeenCalled();
         warn.mockRestore();
+    });
+});
+
+/**
+ * The managed runtime reads four names out of `config/index.ts`. Every docs page
+ * that shows an `initializeRebaseBackend` option tempts a reader to export it
+ * from the one file the runtime reads — and the export was dropped in silence,
+ * so the feature simply did not happen and nothing said why.
+ */
+describe("unread config exports", () => {
+    /** Write a config package whose index exports the given names. */
+    async function configExporting(names: string[]) {
+        const configDir = path.join(scratch, "config");
+        fs.mkdirSync(configDir, { recursive: true });
+        // CommonJS, because jest resolves the runtime's dynamic `import()`
+        // through `require`. What matters to the code under test is the shape of
+        // the namespace object, which is the same either way.
+        const literal = (name: string) =>
+            name === "dataSources" || name === "storageSources" ? "[]" : "{}";
+        fs.writeFileSync(
+            path.join(configDir, "index.js"),
+            names.map(name => `exports.${name} = ${literal(name)};`).join("\n")
+        );
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+        await loadBundleConfigExports({
+            dir: scratch,
+            manifest: { entry: { config: "config" } },
+            collectionsDir: undefined,
+            functionsDir: undefined,
+            cronsDir: undefined,
+            staticApps: []
+        } as never);
+        const messages = warn.mock.calls.map(call => String(call[0])).join("\n");
+        warn.mockRestore();
+        return messages;
+    }
+
+    it("names an option with no managed route, and what to do instead", async () => {
+        const messages = await configExporting(["storagePolicies"]);
+        expect(messages).toContain("storagePolicies");
+        expect(messages).toContain("storageAuthorize");
+    });
+
+    it("lists every unread option in one message", async () => {
+        const messages = await configExporting(["jobs", "rateLimit", "webhooks"]);
+        for (const name of ["jobs", "rateLimit", "webhooks"]) {
+            expect(messages).toContain(name);
+        }
+    });
+
+    it("says nothing about the exports it does read", async () => {
+        expect(await configExporting(["dataSources", "storageSources", "callbacks", "collections"]))
+            .toBe("");
+    });
+
+    it("says nothing about a project's own helpers", async () => {
+        // The config module belongs to the project. A shared constant there is
+        // not a mistake, and a boot that complained about one would be noise on
+        // every start.
+        expect(await configExporting(["TAX_RATE", "formatMoney"])).toBe("");
     });
 });

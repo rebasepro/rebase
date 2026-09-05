@@ -25,6 +25,14 @@ external system.
 
 ## Enabling
 
+:::caution[Where this goes]
+**Managed runtime: nowhere.** A task is a function, and no environment variable
+can carry one — exporting `jobs` from `config/index.ts` does nothing, and the
+runtime says so at boot. Do the work in a [custom
+function](/docs/backend/custom-functions) instead, or eject.
+**Ejected:** `initializeRebaseBackend({ jobs })` in `backend/src/index.ts`.
+:::
+
 ```typescript no-verify
 await initializeRebaseBackend({
     jobs: {

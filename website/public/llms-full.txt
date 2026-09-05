@@ -4468,6 +4468,17 @@ The Rebase backend is a **Node.js server** built on [Hono](https://hono.dev/) th
 
 Everything is initialized with a single function:
 
+:::note[Where this goes]
+The call below is what an **ejected** backend has, in `backend/src/index.ts`. On
+the **managed runtime** there is no such file: the runtime makes the call, and
+you configure it through environment variables and the four exports it reads
+from `config/index.ts` (`dataSources`, `storageSources`, `storageAuthorize`,
+`callbacks`). Every page in this section says which of the two applies to the
+option it documents, and names the ones that have no managed form. Export an
+option the runtime does not read and it warns you at boot rather than dropping
+it in silence.
+:::
+
 ```typescript
 
 const instance = await initializeRebaseBackend({
@@ -5501,6 +5512,12 @@ Rebase includes a complete backend authentication system:
 
 ### Configuration
 
+:::note[Where this goes]
+**Managed runtime:** environment — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` and the provider `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs. The users collection is whichever one the bundle names (`collections/users` by convention).
+**No managed route:** `auth.hooks`. They are functions; eject to pass them.
+**Ejected:** `initializeRebaseBackend({ auth })` in `backend/src/index.ts`.
+:::
+
 The `auth` block in `initializeRebaseBackend` controls all backend authentication:
 
 ```typescript no-verify
@@ -6523,6 +6540,11 @@ Rebase supports three storage backends:
 - **Google Cloud Storage / Firebase Storage** — Native GCS support via `@google-cloud/storage`
 
 ### Configuration
+
+:::note[Where this goes]
+**Managed runtime:** environment — `STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH` and their credentials (suffix `__<KEY>` for a named source). Access rules come from `export const storageAuthorize` in `config/index.ts`; extra buckets from `export const storageSources`.
+**Ejected:** `initializeRebaseBackend({ storage, storageAuthorize })` in `backend/src/index.ts`.
+:::
 
 Storage is configured in the `storage` block of `initializeRebaseBackend`:
 
@@ -7578,6 +7600,13 @@ By default a broadcast reaches currently-connected members and is then gone. Tha
 
 For an operation stream — collaborative editing, anything where a silent gap causes divergence — a channel can be configured to **retain** its messages. Retained broadcasts are given a per-channel sequence number and stored, so a client that reconnects can ask for everything after the last one it saw.
 
+:::caution[Where this goes]
+**Managed runtime: nowhere.** Channel retention and `realtime.bus` are part of
+the database adapter the managed runtime constructs itself, and neither has an
+environment form. Eject to configure them.
+**Ejected:** `createPostgresAdapter({ realtime })` in `backend/src/index.ts`.
+:::
+
 Retention is opt-in and configured here, on the server:
 
 ```typescript
@@ -8521,6 +8550,11 @@ The **filename** (without extension) becomes the job's unique ID — e.g., `heal
 
 ### Configuration
 
+:::note[Where this goes]
+**Managed runtime:** nothing to configure — the runtime discovers `backend/crons/` on its own (`entry.crons` in `rebase.json` if you moved it). `REBASE_CRON_SCHEDULER` decides which process runs the scheduler.
+**Ejected:** `initializeRebaseBackend({ cronsDir })` in `backend/src/index.ts`.
+:::
+
 Enable cron jobs by adding `cronsDir` to your backend config:
 
 ```typescript no-verify
@@ -8935,6 +8969,14 @@ external system.
 
 ### Enabling
 
+:::caution[Where this goes]
+**Managed runtime: nowhere.** A task is a function, and no environment variable
+can carry one — exporting `jobs` from `config/index.ts` does nothing, and the
+runtime says so at boot. Do the work in a [custom
+function](/docs/backend/custom-functions) instead, or eject.
+**Ejected:** `initializeRebaseBackend({ jobs })` in `backend/src/index.ts`.
+:::
+
 ```typescript no-verify
 await initializeRebaseBackend({
     jobs: {
@@ -9144,6 +9186,11 @@ See [Runtime portability](#runtime-portability) for the full contract.
 :::
 
 ### Configuration
+
+:::note[Where this goes]
+**Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`entry.functions` in `rebase.json` if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
+**Ejected:** `initializeRebaseBackend({ functionsDir })` in `backend/src/index.ts`.
+:::
 
 Enable custom functions by adding `functionsDir` to your backend config:
 
@@ -9628,6 +9675,11 @@ Use global callbacks for:
 
 ### Configuration
 
+:::note[Where this goes]
+**Managed runtime:** `export const callbacks` from `config/index.ts` — the runtime reads it at boot.
+**Ejected:** `initializeRebaseBackend({ callbacks })` in `backend/src/index.ts`.
+:::
+
 Pass the `callbacks` key to `initializeRebaseBackend`:
 
 ```typescript no-verify
@@ -9877,6 +9929,11 @@ Entity history records a entity of entity values on every create, update, and de
 ### Enabling History
 
 #### Backend
+
+:::note[Where this goes]
+**Managed runtime:** `REBASE_HISTORY` (`true` by default; set `false` to turn it off). Retention settings have no environment form — eject to change them.
+**Ejected:** `initializeRebaseBackend({ history })` in `backend/src/index.ts`.
+:::
 
 Enable history in `initializeRebaseBackend`:
 

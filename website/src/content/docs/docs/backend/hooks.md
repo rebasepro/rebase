@@ -24,6 +24,11 @@ Use global callbacks for:
 
 ## Configuration
 
+:::note[Where this goes]
+**Managed runtime:** `export const callbacks` from `config/index.ts` — the runtime reads it at boot.
+**Ejected:** `initializeRebaseBackend({ callbacks })` in `backend/src/index.ts`.
+:::
+
 Pass the `callbacks` key to `initializeRebaseBackend`:
 
 ```typescript no-verify

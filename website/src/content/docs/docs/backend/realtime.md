@@ -210,6 +210,13 @@ By default a broadcast reaches currently-connected members and is then gone. Tha
 
 For an operation stream — collaborative editing, anything where a silent gap causes divergence — a channel can be configured to **retain** its messages. Retained broadcasts are given a per-channel sequence number and stored, so a client that reconnects can ask for everything after the last one it saw.
 
+:::caution[Where this goes]
+**Managed runtime: nowhere.** Channel retention and `realtime.bus` are part of
+the database adapter the managed runtime constructs itself, and neither has an
+environment form. Eject to configure them.
+**Ejected:** `createPostgresAdapter({ realtime })` in `backend/src/index.ts`.
+:::
+
 Retention is opt-in and configured here, on the server:
 
 ```typescript

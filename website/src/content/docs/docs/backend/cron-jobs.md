@@ -59,6 +59,11 @@ The **filename** (without extension) becomes the job's unique ID — e.g., `heal
 
 ## Configuration
 
+:::note[Where this goes]
+**Managed runtime:** nothing to configure — the runtime discovers `backend/crons/` on its own (`entry.crons` in `rebase.json` if you moved it). `REBASE_CRON_SCHEDULER` decides which process runs the scheduler.
+**Ejected:** `initializeRebaseBackend({ cronsDir })` in `backend/src/index.ts`.
+:::
+
 Enable cron jobs by adding `cronsDir` to your backend config:
 
 ```typescript no-verify

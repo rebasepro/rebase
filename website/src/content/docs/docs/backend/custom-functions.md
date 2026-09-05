@@ -89,6 +89,11 @@ See [Runtime portability](#runtime-portability) for the full contract.
 
 ## Configuration
 
+:::note[Where this goes]
+**Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`entry.functions` in `rebase.json` if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
+**Ejected:** `initializeRebaseBackend({ functionsDir })` in `backend/src/index.ts`.
+:::
+
 Enable custom functions by adding `functionsDir` to your backend config:
 
 ```typescript no-verify

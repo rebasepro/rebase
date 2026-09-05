@@ -18,6 +18,17 @@ The Rebase backend is a **Node.js server** built on [Hono](https://hono.dev/) th
 
 Everything is initialized with a single function:
 
+:::note[Where this goes]
+The call below is what an **ejected** backend has, in `backend/src/index.ts`. On
+the **managed runtime** there is no such file: the runtime makes the call, and
+you configure it through environment variables and the four exports it reads
+from `config/index.ts` (`dataSources`, `storageSources`, `storageAuthorize`,
+`callbacks`). Every page in this section says which of the two applies to the
+option it documents, and names the ones that have no managed form. Export an
+option the runtime does not read and it warns you at boot rather than dropping
+it in silence.
+:::
+
 ```typescript
 import { initializeRebaseBackend } from "@rebasepro/server";
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
