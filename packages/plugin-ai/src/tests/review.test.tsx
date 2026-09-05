@@ -432,15 +432,19 @@ json: async () => ({ available: true }) });
         });
 
         const setFieldValue = jest.fn();
+        // Same provider the shared helper above supplies — `useAuthController`
+        // throws without it now, rather than handing back an empty object.
         const wrapper = ({ children }: { children: React.ReactNode }) => (
-            <DataEnhancementControllerProvider
-                path={"posts"}
-                collection={collection}
-                formContext={{ values: {},
+            <AuthControllerContext.Provider value={{ user: null } as any}>
+                <DataEnhancementControllerProvider
+                    path={"posts"}
+                    collection={collection}
+                    formContext={{ values: {},
 setFieldValue } as any}
-                {...({} as any)}>
-                {children}
-            </DataEnhancementControllerProvider>
+                    {...({} as any)}>
+                    {children}
+                </DataEnhancementControllerProvider>
+            </AuthControllerContext.Provider>
         );
         const { result } = renderHook(() => useDataEnhancementController(), { wrapper });
         await waitFor(() => expect(result.current.enabled).toBe(true));
