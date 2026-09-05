@@ -45,6 +45,7 @@ import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
 import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
+import { checkErrorCodes } from "./docs-verify/check-error-codes.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -76,6 +77,7 @@ if (asJson) {
         out.versionPins = checkVersionPins(ROOT).findings;
         out.envReference = checkEnvReference(ROOT).findings;
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
+        out.errorCodes = checkErrorCodes(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -175,6 +177,19 @@ if (only === "both" || only === "names") {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} stated count(s) disagree with the tool:${NC}`);
         for (const b of bad) console.log(`  ${RED}${b.file}:${b.line}${NC}\n      ${DIM}${b.message}${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Error-code reference ━━━${NC}`);
+    const { findings: bad, scanned, total } = checkErrorCodes(ROOT);
+    console.log(`${DIM}Found ${total} error code(s) across ${scanned} source file(s).${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every code the server can raise is documented, and every documented code exists.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} error-code reference problem(s):${NC}`);
+        for (const b of bad) console.log(`  ${RED}${b.code}${NC}\n      ${DIM}${b.message}${NC}`);
     }
 }
 

@@ -88,24 +88,40 @@ When you invoke `initializeRebaseBackend()`, the framework triggers a sequential
 
 ---
 
-## Startup Fail-Closed Protection
+## What happens when boot fails
 
-Rebase enforces a strict **fail-closed security posture** during database connection outages. 
+**Boot fails loudly.** If the database is unreachable, the credentials are
+wrong, or the collection schema cannot be applied, `initializeRebaseBackend`
+throws, nothing is served, and the process exits `1`. There is no degraded mode
+and no partial server: a container that cannot reach its database restarts, and
+the error that killed it is the last thing in its logs.
 
-If the database is unreachable during boot (e.g., PostgreSQL is starting or network routes are severed):
-- The server does **not** crash or enter a restart loop. Instead, the bootstrapper transitions the backend into a **degraded status mode**.
-- The HTTP server starts successfully to preserve health check endpoints, but all REST and WebSocket controllers are immediately locked.
-- Any client attempting to read or write data gets a uniform `503 Service Unavailable` response:
-  ```json
-  {
-    "error": {
-      "message": "Database connection is not ready.",
-      "code": "service-unavailable",
-      "status": 503
-    }
-  }
-  ```
-- The framework attempts to re-establish the connection pool in the background, recovering automatically when the database becomes healthy.
+That is deliberate. A server that comes up answering sign-in while every
+`/api/data/*` route fails is far harder to diagnose than one that never comes
+up — and an orchestrator can act on a crash loop.
+
+Before the first query, boot probes the connection and prints the diagnosis: the
+host and port it could not reach, the driver's own reason (`ECONNREFUSED`,
+`password authentication failed for user "app"`), and the fix. See
+[Troubleshooting](/docs/troubleshooting/) for the failure-by-failure list.
+
+### Once it is serving: `/livez` and `/health`
+
+Two probes, answering two different questions.
+
+| Path | Touches the database | Answers |
+| --- | --- | --- |
+| `/livez` | No | `200 {"status":"ok"}` while the process is running. Use it for a liveness probe. |
+| `/health` | Yes, every data source | `200 {"status":"ok"}` when every configured data source answers; `503 {"status":"degraded"}` when one does not. Use it for a readiness probe. |
+
+A liveness probe on `/health` is a mistake worth naming: a database blip would
+make the orchestrator kill an otherwise healthy process, turning a short outage
+into a restart loop.
+
+`/health` is unauthenticated, so it publishes the verdict and not the reason —
+outside development it names which data source is degraded and nothing else. The
+driver's error text quotes the host, port, database name and role, and that goes
+to the logs. Both paths are also served under `basePath` (`/api/health`).
 
 ---
 

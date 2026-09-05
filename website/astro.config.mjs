@@ -82,6 +82,7 @@ export default defineConfig({
                         { label: "Quickstart", slug: "docs/getting-started/quickstart" },
                         { label: "Project Structure", slug: "docs/getting-started/project-structure" },
                         { label: "Environment & Configuration", slug: "docs/getting-started/configuration" },
+                        { label: "Troubleshooting", slug: "docs/troubleshooting" },
                         { label: "Upgrading", slug: "docs/upgrading" },
                         { label: "Compatibility", slug: "docs/compatibility" }
                     ]
@@ -103,6 +104,7 @@ export default defineConfig({
                     items: [
                         { label: "Backend Setup", slug: "docs/backend" },
                         { label: "REST API", slug: "docs/backend/api" },
+                        { label: "Error codes", slug: "docs/backend/errors" },
                         { label: "Live schema editing", slug: "docs/backend/live-schema-editing" },
                         { label: "Authentication", slug: "docs/backend/authentication" },
                         { label: "Storage Configuration", slug: "docs/backend/storage" },
