@@ -253,7 +253,10 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
 
     const issues: ResourceIssue[] = [];
     const usedBy = new Map<string, string[]>();
-    const use = (resource: string, by: string): void => {
+    // `recordUse`, not `use`: React 19 made `use` a hook name, and
+    // `react-hooks/rules-of-hooks` refuses a call to one from a plain function
+    // — a lint error on a file with no React in it.
+    const recordUse = (resource: string, by: string): void => {
         const list = usedBy.get(resource) ?? [];
         if (!list.includes(by)) list.push(by);
         usedBy.set(resource, list);
@@ -346,7 +349,7 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
             }
             for (const imported of report.resourceImports) {
                 const resource = handleExports.get(imported);
-                if (resource) use(resource, `function:${report.name}`);
+                if (resource) recordUse(resource, `function:${report.name}`);
             }
         }
     }
@@ -354,15 +357,15 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
     // ── Edges ────────────────────────────────────────────────────────────
     const declared = new Set(declaredResources().map(r => resourceId(r.kind, r.key)));
     for (const collection of collections) {
-        for (const [resource, by] of collectionEdges(collection, declared)) use(resource, by);
+        for (const [resource, by] of collectionEdges(collection, declared)) recordUse(resource, by);
     }
     for (const sub of declaredSubscriptions()) {
         const id = resourceId("topic", sub.topic);
-        if (declared.has(id)) use(id, `subscription:${sub.topic}.${sub.name}`);
+        if (declared.has(id)) recordUse(id, `subscription:${sub.topic}.${sub.name}`);
     }
     for (const consumer of declaredQueueConsumers()) {
         const id = resourceId("queue", consumer.queue);
-        if (declared.has(id)) use(id, `handler:${consumer.queue}`);
+        if (declared.has(id)) recordUse(id, `handler:${consumer.queue}`);
     }
 
     const graph = buildResourceGraph(usedBy);

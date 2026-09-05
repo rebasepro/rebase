@@ -131,7 +131,6 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
 
     const { name: backendName, app: backendApp } = backend;
     const paths = resolveBackendPaths(backendApp, projectRoot);
-    const configDir = path.join(projectRoot, paths.config);
 
     const { graph, issues } = await deriveResourceGraph(deriveOptionsFor(projectRoot, backendApp));
     if (issues.length > 0) {
