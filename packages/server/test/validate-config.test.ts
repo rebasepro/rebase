@@ -234,6 +234,91 @@ describe("a `validation.matches` that cannot compile", () => {
     });
 });
 
+/**
+ * An enum's ids are the labels of a Postgres enum type, and Postgres will not
+ * hold the same label twice.
+ *
+ * `CREATE TYPE "posts_status" AS ENUM ('draft', 'draft')` raises `23505` on
+ * `pg_enum_typid_label_index` — verified against PGlite — and boot read every
+ * `pg_catalog` unique violation as a lost race with a peer pod. So it skipped
+ * the statement, the type was never created, and the column became plain `TEXT`:
+ * the config said "one of these three", the database accepted any string, and
+ * nothing anywhere said so.
+ */
+describe("enum ids and labels", () => {
+    const withEnum = (values: unknown) => {
+        const collection = valid();
+        return {
+            ...collection,
+            properties: {
+                ...collection.properties,
+                status: { name: "Status", type: "string", enum: values }
+            }
+        };
+    };
+
+    it("errors on two entries sharing an id, naming the property", () => {
+        const [problem] = errors([withEnum([
+            { id: "draft", label: "Draft" },
+            { id: "published", label: "Published" },
+            { id: "draft", label: "Also draft" }
+        ])]);
+
+        expect(problem?.path).toBe("posts.properties.status.enum[2]");
+        expect(problem?.message).toContain("repeats the id `draft`");
+        expect(problem?.message).toMatch(/falls back to plain text/);
+    });
+
+    it("refuses to boot on it", () => {
+        expect(() => assertCollectionConfigs([withEnum([
+            { id: "draft", label: "Draft" },
+            { id: "draft", label: "Draft again" }
+        ])])).toThrow(/repeats the id/);
+    });
+
+    it("errors on a blank id", () => {
+        const [problem] = errors([withEnum([{ id: "  ", label: "Nothing" }])]);
+        expect(problem?.path).toBe("posts.properties.status.enum[0]");
+        expect(problem?.message).toContain("blank `id`");
+    });
+
+    it("errors on a blank label", () => {
+        const [problem] = errors([withEnum([{ id: "draft", label: "" }])]);
+        expect(problem?.message).toContain("blank `label`");
+    });
+
+    // A repeated label is not a database error — it is two dropdown options
+    // that read the same. Worth saying, not worth refusing to boot over.
+    it("warns on a repeated label", () => {
+        const found = warnings([withEnum([
+            { id: "draft", label: "Draft" },
+            { id: "wip", label: "Draft" }
+        ])]);
+        expect(found[0]?.message).toContain("repeats the label \"Draft\"");
+        expect(errors([withEnum([
+            { id: "draft", label: "Draft" },
+            { id: "wip", label: "Draft" }
+        ])])).toEqual([]);
+    });
+
+    it("accepts the record form, whose keys cannot collide", () => {
+        expect(errors([withEnum({ draft: "Draft", published: "Published" })])).toEqual([]);
+    });
+
+    it("errors on a blank label in the record form", () => {
+        const [problem] = errors([withEnum({ draft: "" })]);
+        expect(problem?.path).toBe("posts.properties.status.enum.draft");
+        expect(problem?.message).toContain("blank `label`");
+    });
+
+    it("says nothing about a well-formed enum", () => {
+        expect(findCollectionConfigProblems([withEnum([
+            { id: "draft", label: "Draft" },
+            { id: "published", label: "Published" }
+        ])])).toEqual([]);
+    });
+});
+
 describe("unrecognised keys", () => {
     it("warns rather than failing, because configs carry legitimate metadata", () => {
         const collection = { ...valid(), somethingOfOurOwn: true };

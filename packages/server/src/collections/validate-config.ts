@@ -519,6 +519,91 @@ function checkValidationPattern(
     }
 }
 
+/**
+ * An enum's ids and labels, which become a Postgres type and a dropdown.
+ *
+ * The ids are the enum's SQL labels — `CREATE TYPE "posts_status" AS ENUM
+ * ('draft', 'published')` — so a duplicate id is a statement Postgres refuses:
+ * `23505` on `pg_enum_typid_label_index`. Boot read that as a lost race with a
+ * peer (every `pg_catalog` index violation was one), skipped it, and carried on;
+ * the type was never created and the column silently became `TEXT`. The config
+ * said "one of these three", the database said "any string", and nothing said
+ * anything.
+ *
+ * A blank id is the same statement with an empty label. A duplicate or blank
+ * *label* is not a database error at all — it is a dropdown with two identical
+ * options, or one with no text, which is a bug the author cannot see from the
+ * config. Both are reported here, where the property has a name.
+ *
+ * Both forms are checked: the array of `{ id, label }`, and the record whose
+ * keys are the ids. The record form cannot have duplicate keys, so only blanks
+ * apply to it.
+ */
+function checkEnumValues(
+    values: unknown,
+    path: string,
+    collect: ProblemCollector
+): void {
+    const blank = (value: unknown): boolean =>
+        typeof value === "string" ? value.trim() === "" : value === undefined || value === null;
+
+    const seenIds = new Map<string, number>();
+    const seenLabels = new Map<string, number>();
+
+    const check = (id: unknown, label: unknown, at: string, describe: string): void => {
+        if (blank(id)) {
+            collect.error(at, `${describe} has a blank \`id\`. The id is the value stored in the column and the label of the Postgres enum type; neither can be empty.`);
+        } else if (typeof id === "string" || typeof id === "number") {
+            const key = String(id);
+            const first = seenIds.get(key);
+            if (first !== undefined) {
+                collect.error(
+                    at,
+                    `${describe} repeats the id \`${key}\`, already used at index ${first}. ` +
+                    "The ids become the labels of one Postgres enum type, which cannot hold the same label twice — " +
+                    "so the `CREATE TYPE` fails and the column falls back to plain text with no enum behind it."
+                );
+            } else {
+                seenIds.set(key, seenIds.size);
+            }
+        } else {
+            collect.error(at, `${describe} has an \`id\` that is neither a string nor a number.`);
+        }
+
+        if (blank(label)) {
+            collect.error(at, `${describe} has a blank \`label\`, so it renders as an empty option nobody can read.`);
+        } else if (typeof label === "string") {
+            const first = seenLabels.get(label);
+            if (first !== undefined) {
+                collect.warn(at, `${describe} repeats the label "${label}", already used at index ${first}. Two options that read identically cannot be told apart in the panel.`);
+            } else {
+                seenLabels.set(label, seenLabels.size);
+            }
+        }
+    };
+
+    if (Array.isArray(values)) {
+        values.forEach((entry, index) => {
+            if (!isPlainObject(entry)) {
+                collect.error(`${path}[${index}]`, "an enum entry must be an object with `id` and `label`.");
+                return;
+            }
+            check(entry.id, entry.label, `${path}[${index}]`, `enum entry ${index}`);
+        });
+        return;
+    }
+
+    if (isPlainObject(values)) {
+        for (const [id, entry] of Object.entries(values)) {
+            const label = isPlainObject(entry) ? entry.label : entry;
+            check(id, label, `${path}.${id}`, `enum entry \`${id}\``);
+        }
+        return;
+    }
+
+    collect.error(path, "`enum` must be an array of `{ id, label }` or a record of id → label.");
+}
+
 function checkProperty(
     property: unknown,
     path: string,
@@ -572,6 +657,10 @@ function checkProperty(
 
     if (type === "relation" && property.relation !== undefined) {
         checkRelation(property.relation, `${path}.relation`, collect);
+    }
+
+    if (property.enum !== undefined) {
+        checkEnumValues(property.enum, `${path}.enum`, collect);
     }
 
     checkValidationPattern(property.validation, `${path}.validation`, collect);

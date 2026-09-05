@@ -145,6 +145,24 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ### Fixed
 
+- **Two enum entries with the same `id` silently removed the enum.** The ids are
+  the labels of a Postgres enum type, so a duplicate makes `CREATE TYPE
+  "posts_status" AS ENUM ('draft', 'draft')` — which Postgres refuses with
+  `23505` on `pg_enum_typid_label_index`. Boot treated *every* unique violation on
+  a `pg_catalog` index as a lost race with a peer pod, skipped the statement, and
+  carried on: the type was never created and the column became plain `TEXT`. The
+  config said "one of these three" and the database accepted any string, with
+  nothing in the log.
+
+  The config validator now rejects a duplicate or blank enum `id`, and a blank
+  `label`, naming the property and the index of the entry; a repeated *label* is
+  a warning, since two options that read the same is a panel problem rather than
+  a database one. And `pg_enum_typid_label_index` is off the duplicate-object-race
+  allowlist, so a config that reaches the database with one fails loudly. The
+  concurrent-boot case that allowlist exists for is untouched: two pods adding the
+  same label race on `ALTER TYPE … ADD VALUE`, which raises `42710`, and the
+  generator writes `IF NOT EXISTS` anyway.
+
 - **`rebase resources --check` failed every project that declares nothing.** A
   backend has a default database and a default bucket whether or not anyone says
   so, and a project with no declarations has nothing to record — but the check

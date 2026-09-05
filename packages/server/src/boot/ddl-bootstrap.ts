@@ -102,6 +102,8 @@ const DUPLICATE_OBJECT_SQLSTATES = new Set([
  * what a lost `CREATE TYPE`/`CREATE TABLE` race raises (`pg_type_typname_nsp_index`
  * is the one seen in practice); a unique violation on user data names the user's
  * own constraint and is left to the caller.
+ *
+ * With one exception, in {@link NOT_A_RACE_PG_INDEXES}.
  */
 export function isDuplicateObjectRace(err: unknown): boolean {
     return hasInCauseChain(err, (e) => {
@@ -112,9 +114,34 @@ export function isDuplicateObjectRace(err: unknown): boolean {
         // carry it in the detail text, so check both rather than miss the race.
         const constraint = typeof e.constraint === "string" ? e.constraint : "";
         const detail = typeof e.detail === "string" ? e.detail : "";
+        for (const index of NOT_A_RACE_PG_INDEXES) {
+            if (constraint === index || detail.includes(index)) return false;
+        }
         return constraint.startsWith("pg_") || /\bpg_[a-z_]+_index\b/.test(detail);
     });
 }
+
+/**
+ * `pg_catalog` indexes whose `23505` is never a race.
+ *
+ * `pg_enum_typid_label_index` is unique on (type, label), and one statement
+ * violates it on its own: `CREATE TYPE t AS ENUM ('draft', 'draft')` — which is
+ * what a collection with two enum entries carrying the same `id` generates.
+ * Under the `pg_` prefix rule that read as "a peer created it first", so the
+ * type was never created, boot carried on, and the column fell back to `TEXT`
+ * with no enum behind it. Verified against PGlite: the duplicate `CREATE TYPE`
+ * raises exactly this.
+ *
+ * The concurrent-boot case this rule exists for does not come through here at
+ * all. Two pods adding the same label race on `ALTER TYPE … ADD VALUE`, which
+ * raises `42710` (already in {@link DUPLICATE_OBJECT_SQLSTATES}) — and the
+ * generator writes `ADD VALUE IF NOT EXISTS`, so it usually raises nothing.
+ *
+ * The duplicate `id` is rejected earlier now, by `validate-config`, which names
+ * the property. This is the second line: a config that reaches the database with
+ * one fails loudly instead of degrading.
+ */
+const NOT_A_RACE_PG_INDEXES = ["pg_enum_typid_label_index"];
 
 export interface DdlBootstrapper {
     /**
