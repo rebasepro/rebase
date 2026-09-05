@@ -1,4 +1,4 @@
-import { Hono, type Context } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
@@ -111,6 +111,8 @@ export class RestApiGenerator {
      * Generate REST routes using existing DataDriver
      */
     generateRoutes(): Hono<HonoEnv> {
+        this.nameTheCollection();
+
         this.collections.forEach(collection => {
             this.createCollectionRoutes(collection);
         });
@@ -124,6 +126,35 @@ export class RestApiGenerator {
         this.createUnmatchedRoute();
 
         return this.router;
+    }
+
+    /**
+     * Record which collection a request is about, before anything can fail.
+     *
+     * One middleware rather than a `c.set` in each of the fifteen handlers,
+     * because the value has to be there for the ones that throw *before*
+     * reaching a handler body — an API-key permission check, a query parser
+     * refusing an operator — which is exactly the set of requests whose log
+     * line is worth reading.
+     *
+     * The slug is validated against the collections this backend serves, so the
+     * field is always a real collection and never whatever a caller typed. An
+     * unknown slug leaves it unset; the path is still logged, and the
+     * unmatched-route handler already says the collection does not exist.
+     */
+    private nameTheCollection(): void {
+        const known = new Set(this.collections.map(collection => collection.slug));
+        // A route param, not `c.req.path`: inside a mounted sub-app the latter
+        // is still the FULL request path (`/api/data/posts`), so splitting it
+        // yields `api`. `:maybeSlug` is matched relative to where this router
+        // was mounted, which is the thing being asked for.
+        const remember: MiddlewareHandler<HonoEnv> = async (c, next) => {
+            const slug = c.req.param("maybeSlug");
+            if (slug && known.has(slug)) c.set("collection", slug);
+            await next();
+        };
+        this.router.use("/:maybeSlug", remember);
+        this.router.use("/:maybeSlug/*", remember);
     }
 
     /**
