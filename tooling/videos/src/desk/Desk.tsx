@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
-import { beat, cameraAt, cameraStill, DESK, DESK_DURATION } from "./beats";
+import { beat, cameraAt, cameraStill, DESK, DESK_DURATION, windowOpacity } from "./beats";
 import { Title } from "./Title";
 import { AgentSession, ScanNote, ScanWindow } from "./windows/Hook";
 import { RuleWindows } from "./windows/Rule";
@@ -49,6 +49,21 @@ const Chroma: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <ToneOverride.Provider value={TONE.claim}>{children}</ToneOverride.Provider>
 );
 
+/** On camera during these beats; fades across the moves between. See
+ *  `windowOpacity` in beats.ts for why. The wrapper is not positioned, so
+ *  the absolutely placed windows inside still measure from the desk.
+ *
+ *  Headlines start four frames BEFORE their beat — while the camera is still
+ *  settling — because the outgoing windows are gone by the middle of the move
+ *  and a headline that waited for the camera to stop left six frames of bare
+ *  ground between the two. */
+const On: React.FC<{ beats: string[]; children: React.ReactNode }> = ({ beats, children }) => {
+    const frame = useCurrentFrame();
+    const o = windowOpacity(frame, beats);
+    if (o <= 0) return null;
+    return <div style={o < 1 ? { opacity: o } : undefined}>{children}</div>;
+};
+
 export const Desk: React.FC = () => {
     const frame = useCurrentFrame();
     const cam = cameraAt(frame);
@@ -75,92 +90,114 @@ export const Desk: React.FC = () => {
                     this cell's bottom half, so the hook keeps to its top two
                     thirds — and set at 180 that left a third of the frame
                     empty under two small windows. */}
-                <Title
-                    x={200}
-                    y={250}
-                    at={HOOK.start + 4}
-                    lines={["Anyone can have a backend by lunch.", "Nobody can tell you if it's safe."]}
-                />
-                <AgentSession x={200} y={550} w={740} at={HOOK.start + 30} />
-                {/* Wide enough that the tool's own clean line — 70 characters
-                    of it — sits on one row. Wrapped, it read as two findings. */}
-                <ScanWindow x={1010} y={550} w={880} at={HOOK.start + 130} rerunAt={RERUN_AT} />
-                <ScanNote x={1010} y={868} at={RERUN_AT + 70} />
+                <On beats={["hook", "all"]}>
+                    <Title
+                        x={200}
+                        y={250}
+                        at={HOOK.start - 4}
+                        lines={["Anyone can have a backend by lunch.", "Nobody can tell you if it's safe."]}
+                    />
+                </On>
+                <On beats={["hook", "push", "all"]}>
+                    <AgentSession x={200} y={550} w={740} at={HOOK.start + 30} />
+                    {/* Wide enough that the tool's own clean line — 70 characters
+                        of it — sits on one row. Wrapped, it read as two findings. */}
+                    <ScanWindow x={1010} y={550} w={880} at={HOOK.start + 130} rerunAt={RERUN_AT} />
+                    <ScanNote x={1010} y={868} at={RERUN_AT + 70} />
+                </On>
 
                 {/* ── (0,½) PUSH, then (0,¾) THE THREE COMMANDS ──────── */}
-                <Shell x={870} y={1080} w={1020} at={SHELL_AT} devAt={DEV_AT} />
-                <Title
-                    x={200}
-                    y={1090}
-                    at={COMMANDS.start + 8}
-                    eyebrow="The first five minutes"
-                    lines={["Init.", "Push.", "Run."]}
-                    width={560}
-                />
+                <On beats={["push", "commands", "all"]}>
+                    <Shell x={870} y={1080} w={1020} at={SHELL_AT} devAt={DEV_AT} />
+                </On>
+                <On beats={["commands", "all"]}>
+                    <Title
+                        x={200}
+                        y={1090}
+                        at={COMMANDS.start}
+                        eyebrow="The first five minutes"
+                        lines={["Init.", "Push.", "Run."]}
+                        width={560}
+                    />
+                </On>
 
                 {/* ── (1,0) THE RULE — on the blue field ─────────────── */}
-                <Chroma>
-                    <Title
-                        x={2120}
-                        y={180}
-                        at={RULE.start + 4}
-                        eyebrow="Row-level security"
-                        lines={["Security lives in the database."]}
-                    />
-                    <RuleWindows x={2120} y={480} at={RULE.start + 24} />
-                </Chroma>
+                <On beats={["rule", "all"]}>
+                    <Chroma>
+                        <Title
+                            x={2120}
+                            y={180}
+                            at={RULE.start - 4}
+                            eyebrow="Row-level security"
+                            lines={["Security lives in the database."]}
+                        />
+                        <RuleWindows x={2120} y={480} at={RULE.start + 24} />
+                    </Chroma>
+                </On>
 
                 {/* ── (1,1) TWO PEOPLE ───────────────────────────────── */}
-                <Title
-                    x={2120}
-                    y={1260}
-                    at={USERS.start + 4}
-                    eyebrow="Row-level security, running"
-                    lines={["The same query, twice."]}
-                />
-                <UsersWindows x={2120} y={1440} at={USERS.start + 20} />
+                <On beats={["users", "all"]}>
+                    <Title
+                        x={2120}
+                        y={1260}
+                        at={USERS.start - 4}
+                        eyebrow="Row-level security, running"
+                        lines={["The same query, twice."]}
+                    />
+                    <UsersWindows x={2120} y={1440} at={USERS.start + 20} />
+                </On>
 
                 {/* ── (2,0) THE AGENT — on the deep field ────────────── */}
-                <ToneOverride.Provider value={TONE.deep}>
-                    <Title
-                        x={4040}
-                        y={180}
-                        at={AGENT.start + 4}
-                        eyebrow="Agent-native"
-                        lines={["An agent gets your permissions.", "No way around them."]}
-                    />
-                    <AgentConsole x={4040} y={500} w={1520} at={AGENT.start + 26} />
-                </ToneOverride.Provider>
+                <On beats={["agent", "all"]}>
+                    <ToneOverride.Provider value={TONE.deep}>
+                        <Title
+                            x={4040}
+                            y={180}
+                            at={AGENT.start - 4}
+                            eyebrow="Agent-native"
+                            lines={["An agent gets your permissions.", "No way around them."]}
+                        />
+                        <AgentConsole x={4040} y={500} w={1520} at={AGENT.start + 26} />
+                    </ToneOverride.Provider>
+                </On>
 
                 {/* ── (2,1) THE PANEL ────────────────────────────────── */}
-                <Title
-                    x={4040}
-                    y={1380}
-                    at={PANEL.start + 4}
-                    eyebrow="The panel"
-                    lines={["And an app for", "everyone else."]}
-                    size={DISPLAY.split}
-                    width={520}
-                />
-                <Panel x={4040} y={1330} at={PANEL.start + 6} tail={DESK_DURATION - PANEL.start} />
+                <On beats={["panel", "all"]}>
+                    <Title
+                        x={4040}
+                        y={1380}
+                        at={PANEL.start - 4}
+                        eyebrow="The panel"
+                        lines={["And an app for", "everyone else."]}
+                        size={DISPLAY.split}
+                        width={520}
+                    />
+                    <Panel x={4040} y={1330} at={PANEL.start + 6} tail={DESK_DURATION - PANEL.start} />
+                </On>
 
                 {/* ── (2,2) EVERY VIEW ───────────────────────────────── */}
-                <Views x={3840} y={2160} at={VIEWS.start - 6} hold={DESK_DURATION - VIEWS.start} />
+                <On beats={["views", "all"]}>
+                    <Views x={3840} y={2160} at={VIEWS.start - 6} hold={DESK_DURATION - VIEWS.start} />
+                </On>
 
                 {/* ── (1,2) THE SCHEMA ───────────────────────────────── */}
-                <Schema x={1920} y={2160} at={SCHEMA.start - 4} />
+                <On beats={["schema", "all"]}>
+                    <Schema x={1920} y={2160} at={SCHEMA.start - 4} />
+                </On>
 
                 {/* ── (0,2) STUDIO ───────────────────────────────────── */}
-                <Title
-                    x={200}
-                    y={2440}
-                    at={STUDIO.start + 4}
-                    eyebrow="Studio"
-                    lines={["Run the database", "from the same app."]}
-                    size={DISPLAY.split}
-                    width={520}
-                />
-                <Studio x={200} y={2410} at={STUDIO.start + 6} />
+                <On beats={["studio", "all"]}>
+                    <Title
+                        x={200}
+                        y={2440}
+                        at={STUDIO.start - 4}
+                        eyebrow="Studio"
+                        lines={["Run the database", "from the same app."]}
+                        size={DISPLAY.split}
+                        width={520}
+                    />
+                    <Studio x={200} y={2410} at={STUDIO.start + 6} />
+                </On>
             </div>
         </AbsoluteFill>
     );

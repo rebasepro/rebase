@@ -104,7 +104,57 @@ export const MOVE_LEAD = 8;
 export function moveFrames(from: View, to: View): number {
     if (to.zoom !== from.zoom) return 64;
     const d = Math.hypot(to.x - from.x, to.y - from.y);
-    return Math.round(24 + d / 240);
+    return Math.round(30 + d / 300);
+}
+
+/**
+ * WHAT A MOVE LOOKS LIKE, and why the windows fade.
+ *
+ * A pan to the next cell is a full frame of travel, and there is no way to
+ * make it less: whatever the pitch of the grid, bringing the neighbour fully
+ * into view displaces the screen by exactly one frame. The first cut let the
+ * outgoing windows ride that whole sweep at full strength, and every
+ * transition read as a whip — the complaint was "too much displacement".
+ *
+ * So the windows a beat is leaving behind fade over the first half of the
+ * move, and are gone before the camera reaches speed; what crosses the
+ * middle of the move is the ground and the ribbon turning, neither of which
+ * travels. Windows the next beat shares with this one (the scan, the shell)
+ * stay; windows it brings back (the hook's, on the way into push) fade in
+ * over the second half. Measured on the eased curve, a window now travels
+ * about a fifth of the distance before it is gone — the displacement a slide
+ * used to have, not a pan's.
+ *
+ * The pull-back at the end is the one move that fades everything IN: the
+ * desk reveals itself as the camera lifts off it.
+ */
+const FADE_OUT_BY = 0.55;
+const FADE_IN_FROM = 0.45;
+
+/** Which beat the camera is in or moving into, and how far along the move. */
+export function deskPhase(frame: number): { beat: number; moving: boolean; t: number } {
+    for (let i = 0; i < BEATS.length; i++) {
+        const a = KEY_AT[2 * i + 1];
+        const z = KEY_AT[2 * i + 2];
+        if (frame < a) return { beat: i - 1, moving: false, t: 0 };
+        if (frame < z) return { beat: i, moving: true, t: (frame - a) / (z - a) };
+    }
+    return { beat: BEATS.length - 1, moving: false, t: 0 };
+}
+
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+/** Opacity of a window that is on camera during `shown` beats. */
+export function windowOpacity(frame: number, shown: readonly string[]): number {
+    const { beat, moving, t } = deskPhase(frame);
+    const has = (i: number) => i >= 0 && shown.includes(BEATS[i].id);
+    if (!moving) return has(beat) ? 1 : 0;
+    const from = has(beat - 1);
+    const to = has(beat);
+    if (from && to) return 1;
+    if (!from && !to) return 0;
+    if (from) return 1 - clamp01(t / FADE_OUT_BY);
+    return clamp01((t - FADE_IN_FROM) / (1 - FADE_IN_FROM));
 }
 
 /* Piecewise: hold at a view, ease to the next across its move window. Built
