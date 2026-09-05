@@ -66,8 +66,8 @@ interface CmsCase {
     expected: string;
     /**
      * Rows the API should report afterwards. The blank preset's only
-     * collection is the auth users table, which already holds the admin that
-     * registering created.
+     * collection is the auth users table, which already holds the admin
+     * `rebase init` named in `.env` and boot created.
      */
     expectedTotal: number;
 }
