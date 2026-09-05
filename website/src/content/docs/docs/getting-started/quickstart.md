@@ -10,7 +10,11 @@ description: Create a new Rebase project and get it running locally in under 2 m
 pnpm dlx @rebasepro/cli init my-app
 ```
 
-This scaffolds a project with three packages:
+This scaffolds a project with three packages. If any of *collection*, *Studio*,
+*managed runtime*, *bundle* or *resource* is new, the five-word box on
+[Project Structure](/docs/getting-started/project-structure/) defines them.
+
+
 
 | Folder | Description |
 |--------|-------------|
@@ -62,7 +66,7 @@ Pin a port with `rebase dev --port 3001`.
 | Flag | On | What it does |
 |---|---|---|
 | `--yes` | `init` | Accept every default. **Required when there is no terminal to prompt**, such as CI |
-| `--headless` | `init` | A backend with no collection files and no UI — see [below](#just-the-api-headless) |
+| `--headless` | `init` | A backend with no collection files and no UI — see [Backend only](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Start from a template other than the default |
 | `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
 | `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one |
@@ -82,7 +86,8 @@ touched, and one pointing anywhere other than this machine is left alone
 entirely.
 
 With your own database you also get the migration commands, which the managed one
-cannot offer — they plan changes with Atlas, which needs a second empty database
+cannot offer — they plan changes with [Atlas](https://atlasgo.io/), the schema-migration engine
+Rebase plans with, which needs a second empty database
 to compare against, and PGlite serves exactly one:
 
 ```bash
@@ -90,7 +95,9 @@ pnpm run db:push
 ```
 
 Boot already creates missing tables additively, so `db push` is for the two
-things it deliberately leaves alone: junction-table RLS on many-to-many
+things it deliberately leaves alone: junction-table
+[RLS](/docs/collections/security-rules/) — PostgreSQL's row-level security, which is
+how Rebase enforces who may read a row — on many-to-many
 relations, and any change that is not purely additive — a renamed column, a
 narrowed type, a removed field.
 

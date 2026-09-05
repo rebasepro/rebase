@@ -51,8 +51,8 @@ Après l'initialisation, ces routes sont montées :
 | `/api/storage/*` | Téléchargement, téléversement et suppression de fichiers |
 | `/api/data/:slug` | Opérations CRUD par collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Historique des modifications d'entité (si activé) |
-| `/api/docs` | Spécification OpenAPI (quand `enableSwagger: true`) |
-| `/api/swagger` | Swagger UI (mode développement, quand `enableSwagger: true`) |
+| `/api/docs` | Spécification OpenAPI (lorsque `enableSwagger: true`) |
+| `/api/swagger` | Interface utilisateur Swagger (mode dev, lorsque `enableSwagger: true`) |
 | `/api/meta/contract` | Le schéma de collections du projet (admin uniquement) |
 | `/api/meta/schema-version` | Une chaîne de version pour ce schéma (non authentifié) |
 | `/api/functions/*` | Routes de fonctions personnalisées (lorsque `functionsDir` est défini) |

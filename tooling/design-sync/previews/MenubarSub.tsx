@@ -18,7 +18,7 @@ import {
 // itself listens for), then a tick later fires a real click on the
 // submenu's SubTrigger (what Radix's MenuSubTrigger listens for to open) —
 // once it has actually mounted into the now-open MenubarContent.
-function useOpenMenuWithSub(ref: React.RefObject<HTMLDivElement>, triggerIndex: number) {
+function useOpenMenuWithSub(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
     React.useEffect(() => {
         const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
         trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));

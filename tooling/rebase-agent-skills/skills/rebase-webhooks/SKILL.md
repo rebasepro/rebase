@@ -88,7 +88,7 @@ dispatcher.setWebhooks([
 
 ### Dispatch on Entity Changes
 
-Call `onEntityChange()` whenever a entity is created, updated, or deleted. The dispatcher checks all registered webhooks and fires matching ones.
+Call `onEntityChange()` whenever a record is created, updated, or deleted. The dispatcher checks all registered webhooks and fires matching ones.
 
 ```typescript
 const results = await dispatcher.onEntityChange(
@@ -649,7 +649,7 @@ The dispatcher supports three event types, passed as the `event` parameter to `o
 |-------|-------------|--------------------|-----------------------|
 | `INSERT` | A new entity was created | The new entity | `undefined` |
 | `UPDATE` | An existing entity was modified | The updated entity | The entity before update |
-| `DELETE` | a entity was removed | The deleted entity (or `null`) | `undefined` |
+| `DELETE` | a record was removed | The deleted entity (or `null`) | `undefined` |
 
 ## Error Handling
 

@@ -6,9 +6,17 @@ description: Track every change to your entities with a full audit trail — who
 
 ## Overview
 
-Entity history records a entity of entity values on every create, update, and delete. This gives you a full audit trail with diffs.
+Entity history records a snapshot of entity values on every create, update, and delete. This gives you a full audit trail with diffs.
 
 ## Enabling History
+
+:::note[Where this goes]
+**Managed runtime** — on by default. `REBASE_HISTORY=false` in `.env` turns it off.
+
+**Ejected** — `history: true` in `initializeRebaseBackend({ … })`. The object form below — `{ maxEntries, ttlDays }` — is ejected-only; the environment variable is a boolean.
+
+The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
+:::
 
 ### Backend
 
@@ -53,7 +61,7 @@ const ordersCollection = defineCollection({
 ## How It Works
 
 1. The backend creates a `rebase.entity_history` table automatically.
-2. On every create, update, or delete, a entity is recorded with:
+2. On every create, update, or delete, a snapshot is recorded with:
    - Entity ID, collection slug, and table name
    - The full entity values (before and after)
    - Timestamp and user ID
@@ -70,7 +78,7 @@ To avoid recording redundant logs where fields are saved but no values change, t
 ### Non-Blocking Post-Save Pruning
 
 Unlike traditional systems that rely entirely on slow periodic batch scripts, Rebase enforces your retention policies continuously:
-- Right after a entity is saved or deleted, the server schedules an **inline asynchronous sweep** in a non-blocking, fire-and-forget promise.
+- Right after an entity is saved or deleted, the server schedules an **inline asynchronous sweep** in a non-blocking, fire-and-forget promise.
 - This sweep immediately checks retention limits for that specific entity ID and prunes older entries exceeding `maxEntries` or `ttlDays`.
 
 ## REST Endpoint

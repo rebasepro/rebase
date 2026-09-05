@@ -51,6 +51,53 @@ const instance = await initializeRebaseBackend({
 });
 ```
 
+## Where each option lives
+
+That call is the **ejected** shape — the one you write yourself after `rebase
+eject`, or in a custom server. A scaffolded project does not have it: the
+published runtime boots the project, and each option arrives as an environment
+variable in `.env`, an export from `config/index.ts`, or a directory the bundle
+declares in `rebase.json`.
+
+Both paths reach the same `RebaseBackendConfig`. This is the whole map.
+
+| Option | Managed runtime |
+|---|---|
+| `basePath` | `REBASE_BASE_PATH` (default `/api`) |
+| `collections`, `collectionsDir` | the `config/collections/` directory, declared by `rebase.json` |
+| `functionsDir` | `backend/functions/` |
+| `cronsDir` | `backend/crons/` |
+| `bootstrappers`, `database` | `DATABASE_URL`, plus `export const dataSources` from `config/index.ts` |
+| `auth` | `JWT_SECRET`, the `OAUTH_*` variables, and `config/collections/users` |
+| `storage` | the `STORAGE_*` variables, plus `export const storageSources` from `config/index.ts` |
+| `storageAuthorize` | `export const storageAuthorize` from `config/index.ts` |
+| `storagePublicRead` | `STORAGE_PUBLIC_READ` |
+| `storageRenditionCache` | `STORAGE_RENDITION_CACHE` |
+| `storageInsecureAllowAnyAuthenticated` | `STORAGE_ALLOW_ANY_AUTHENTICATED` |
+| `callbacks` | `export const callbacks` from `config/index.ts` |
+| `history` | `REBASE_HISTORY` (on by default) — the boolean form only |
+| `enableSwagger` | `REBASE_ENABLE_SWAGGER`; unset means on outside production |
+| `compression` | `REBASE_COMPRESSION` |
+| `maxBodySize` | `REBASE_MAX_BODY_SIZE` |
+| `logging` | `LOG_LEVEL` |
+| `provisionSchema`, `surfaces`, `ownership`, `functionsSelection`, `functionsUpstream` | `REBASE_ROLE` — see [Split Processes](/docs/deployment/split-processes/) |
+| `corsHandled` | CORS is installed by the runtime from `CORS_ORIGINS` |
+| `schemaVersion`, `runtimeVersion` | the build stamps both into the bundle |
+| `app`, `server`, `provisioningDriverResult` | the runtime creates them |
+
+### Options with no managed route
+
+These have no environment variable and no config export. They are reachable
+only from a hand-written `initializeRebaseBackend` call — `rebase eject`, or a
+[custom server](/docs/backend/custom-server/):
+
+`rateLimit` · `jobs` · `csrf` · `cronPersistence` · `functionsTimeoutMs` ·
+`storagePolicies` · `storageTriggers` · `baas` · `liveSchema` · `rlsAudit` ·
+`history` in its object form (`{ maxEntries, ttlDays }`)
+
+`schemaEditor` is forced off in a built bundle: the editor rewrites collection
+*source* files, and a bundle holds compiled output.
+
 ## What Gets Created
 
 After initialization, these routes are mounted:
@@ -234,7 +281,7 @@ The REST API is auto-generated from your collections. Every collection gets thes
 | `GET` | `/api/data/:slug` | List entities (with filter, sort, limit, search) |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
 | `POST` | `/api/data/:slug` | Create a new entity |
-| `DELETE` | `/api/data/:slug/:id` | Delete a entity |
+| `DELETE` | `/api/data/:slug/:id` | Delete a record |
 
 ### Query Parameters
 

@@ -321,3 +321,9 @@ backfilled after the fact.
    no version to refuse on, because a column carries no version stamp. The step
    that replaces them is deciding not to make the change — see the section above
    for what the alternative looks like.
+
+## Related
+
+- [Upgrading](/docs/upgrading/) — what actually broke, release by release
+- [Changelog](/docs/changelog/) — every change, including the ones that broke nothing
+- [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) — contract 3 — the bundle format a deployed project is already built against

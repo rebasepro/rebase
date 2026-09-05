@@ -4,6 +4,25 @@ sidebar_label: Project Structure
 description: Understand the structure of a Rebase project — frontend, backend, and collections configuration.
 ---
 
+:::note[Five words this page uses]
+Every one of them means something specific here, and four of them mean something
+else elsewhere in the industry.
+
+- **Collection** — one table, described in TypeScript. The schema, the API and
+  the admin screen all come from the same file.
+- **Studio** — the developer half of the admin panel: schema editor, SQL
+  console, policy browser. The same app your content team uses, behind a toggle.
+- **Managed runtime** — the published `rebasepro/server` image boots your
+  project. You write no server file, and you get runtime upgrades without a
+  rebuild. The alternative is `rebase eject`, below.
+- **Bundle** — what `rebase build` produces: your collections, functions and
+  crons, compiled, with a manifest saying where each one is. It is what the
+  managed runtime boots.
+- **Resource** — something the project needs from wherever it runs: a database,
+  a bucket, a topic. Declared in `config/resources.ts`, bound by environment
+  variables.
+:::
+
 A Rebase starter project has three interconnected packages:
 
 ```
@@ -138,8 +157,19 @@ The runtime sets up:
 Configuration comes from `rebase.json`, the `config/` directory and environment
 variables. See [Environment & Configuration](/docs/getting-started/configuration).
 
+`rebase build` turns all of it into a **bundle** — the compiled collections,
+functions and crons plus a manifest — which the managed runtime boots. Nothing
+about the bundle is written by hand; if you want to see one,
+[Runtime & Bundles](/docs/architecture/runtime-and-bundles/) is what is in it.
+
+The panel the frontend serves has two halves. **Studio** is the developer one —
+the schema editor, the SQL console, the RLS policy browser — and it is behind
+the toggle in the drawer, not a separate deployment. See [Studio](/docs/studio/).
+
 To take ownership of the process instead — your own middleware, routes and auth
-wiring — run `rebase eject`. It writes an entry point that calls
+wiring — run `rebase eject`. **Everything below this paragraph is ejected-only**:
+a scaffolded project has none of those files, and nothing in it calls
+`initializeRebaseBackend`. It writes an entry point that calls
 `initializeRebaseBackend` directly, plus a Dockerfile and a compose file that
 builds it; from then on you maintain the server and platform runtime upgrades no
 longer reach the project. That surface is documented in

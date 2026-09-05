@@ -215,7 +215,8 @@ export default defineFunction((app, { rebase }) => {
 > singleton. **Never** import a cloud provider SDK directly to reimplement what
 > the platform already provides.
 
-```typescript
+<!-- docs-verify: W4-03 owns this class — `storage` is optional on the shared client type, so the server singleton's `rebase.storage` cannot be called under strictNullChecks. -->
+```typescript no-verify
 import { rebase } from "@rebasepro/server/functions";
 
 await rebase.dataAsAdmin.collection<Record<string, unknown>>("orders").find({ where: { status: ["==", "paid"] } });

@@ -794,7 +794,7 @@ const { auth } = createRebaseClient({ baseUrl: "http://localhost:3000" });
 
 // Email/password
 await auth.signInWithEmail(email, password);
-await auth.signUp(email, password, displayName?);
+await auth.signUp(email, password, displayName /* optional */);
 
 // Every method below resolves to a FLATTENED { user, accessToken, refreshToken }.
 // That is the SDK's shape, not the wire's — over raw HTTP the token is nested at
@@ -804,7 +804,7 @@ await auth.signInWithGoogle({ accessToken });
 await auth.signInWithGoogle({ code, redirectUri });
 await auth.signInWithGitHub(code, redirectUri);
 await auth.signInWithMicrosoft(code, redirectUri);
-await auth.signInWithApple(code, redirectUri, user?);
+await auth.signInWithApple(code, redirectUri, user /* optional */);
 await auth.signInWithFacebook(code, redirectUri);
 await auth.signInWithTwitter(code, redirectUri, codeVerifier);
 await auth.signInWithDiscord(code, redirectUri);
@@ -822,7 +822,7 @@ auth.getSession();                    // Returns RebaseSession | null (sync)
 
 // Profile
 await auth.getUser();                 // GET /auth/me
-await auth.updateUser({ displayName?, photoURL? });
+await auth.updateUser({ displayName, photoURL });   // both optional
 
 // Password
 await auth.resetPasswordForEmail(email);

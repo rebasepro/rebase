@@ -263,6 +263,8 @@ the pre-1.0 `auth` schema is still checked.
 
 ### policy-authenticated-tautology
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
 **Policy admits every signed-in caller to every row.** High.
 
 The corrected form of the check above — `rebase.uid() IS NOT NULL AND rebase.uid() <>
@@ -458,3 +460,6 @@ worse than none.
 
 - [Security Rules (RLS)](/docs/collections/security-rules) — defining row-level security in
   Rebase collections, which compiles to the policies this tool audits.
+- [Backend only](/docs/getting-started/headless/) — why a table with no policy is not
+  served at all in a headless project.
+- [REST API](/docs/backend/api/) — the surface a permissive policy exposes.

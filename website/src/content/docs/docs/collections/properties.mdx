@@ -73,6 +73,9 @@ price: {
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Field width over the four-column form grid |
 | `admin.Field` | `React.ComponentType` | Custom field component |
 | `admin.Preview` | `React.ComponentType` | Custom table cell component |
+| `admin.Filter` | `React.ComponentType` | Custom filter field for this property. Wins over the collection-level `Collection.FilterField` override and the built-in per-type field |
+| `admin.filterOperators` | `WhereFilterOp[]` | Narrow the operators offered when filtering on this property. The offered set is the **intersection** of the engine's capabilities, the type's defaults and this list — you can only restrict, never add an operator the engine cannot run. `[]` disables filtering on the property |
+| `admin.customProps` | `unknown` | Anything your own `Field` or `Preview` needs. Rebase passes it through untouched |
 
 ## String Properties
 
@@ -226,6 +229,7 @@ locales: {
 | `userSelect` | `boolean` | Render as a user picker |
 | `admin.previewAsTag` | `boolean` | Render this string as a tag in previews |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
+| `admin.urlPreview` | `PreviewType` | How to render a string that holds a URL: a link, or an inline image, audio or video preview. Presentation only — whether the value *is* a URL is the `url` flag on the property, which is what the OpenAPI contract is generated from |
 
 ## Number Properties
 
@@ -255,6 +259,7 @@ Number fields render as a standard text input with numeric validation.
 | `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
 | `isId` | `string` | ID generation strategy |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
+| `admin.format` | `NumberFormatOptions` | Write the number out as currency, a percentage, or with fixed decimals. Omitted, the raw value renders — a number in the database is shown as the number in the database |
 
 ## Boolean Properties
 
@@ -477,6 +482,7 @@ These apply to both `reference` and `relation` properties.
 | `admin.includeId` | `boolean` | Show the related entity's id in previews (default: true) |
 | `admin.includeEntityLink` | `boolean` | Show a link that opens the related entity (default: true) |
 | `admin.previewProperties` | `string[]` | Which of the target's properties appear in the preview (max 3) |
+| `admin.renderInForm` | `boolean` | Render a **many**-relation as a picker inside the form as well as the tab it already gets. `false` by default: the entity view already lists the related rows as a tab, so the two surfaces are redundant by construction. No effect on a to-one relation, which gets no tab |
 
 ## Vector Properties
 

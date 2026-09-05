@@ -64,6 +64,22 @@ const META_OPT_OUT = /(^|\s)no-verify(\s|$)/;
 const COMMENT_OPT_OUT = /<!--\s*docs-verify:\s*ignore\s*-->/;
 
 /**
+ * A ratchet on the opt-out.
+ *
+ * Every `no-verify` is a fence the reader can copy and the verifier will not
+ * read. The mechanism is necessary — some fences really are pseudocode — but it
+ * is also the cheapest way to make a failing check go away, and nothing stopped
+ * the number climbing. It sat at 96 before the strictNullChecks and
+ * whole-declaration passes landed; those turned up 25 more fences whose owners
+ * are other workstreams (W2-03, W4-03, W10-02), each marked with an HTML
+ * comment naming the task that will unmark it.
+ *
+ * So: the number may go down, never up. Lower this constant when you clear
+ * fences; raising it needs a reason written next to it.
+ */
+export const NO_VERIFY_BUDGET = 121;
+
+/**
  * The repository's own agent instructions.
  *
  * These are documentation by every definition that matters — an agent reads
@@ -112,12 +128,14 @@ export const DEFAULT_GLOBS = [
 /**
  * @param {string} root
  * @param {string[]} [globs]
- * @returns {{ snippets: Snippet[], skipped: number, files: number }}
+ * @returns {{ snippets: Snippet[], skipped: number, skippedFences: Array<{ file: string, line: number, lang: string }>, files: number }}
  */
 export function extractSnippets(root, globs = DEFAULT_GLOBS) {
     const files = [...new Set(globs.flatMap((g) => globSync(g, { cwd: root })))].sort();
     /** @type {Snippet[]} */
     const snippets = [];
+    /** @type {Array<{ file: string, line: number, lang: string }>} */
+    const skippedFences = [];
     let skipped = 0;
 
     for (const file of files) {
@@ -167,6 +185,7 @@ export function extractSnippets(root, globs = DEFAULT_GLOBS) {
                 if (CHECKED_LANGS.has(lang)) {
                     if (optedOut) {
                         skipped++;
+                        skippedFences.push({ file, line: bodyStart, lang });
                     } else {
                         const dedented = body
                             .map((l) => (fenceIndent && l.startsWith(fenceIndent) ? l.slice(fenceIndent.length) : l));
@@ -188,5 +207,5 @@ export function extractSnippets(root, globs = DEFAULT_GLOBS) {
         }
     }
 
-    return { snippets, skipped, files: files.length };
+    return { snippets, skipped, skippedFences, files: files.length };
 }

@@ -19,7 +19,7 @@ The REST API underneath returns the token nested instead, as
 `{ user, tokens: { accessToken, … } }`. That difference only matters if you also
 call `/api/auth/*` directly with `fetch`, where `body.accessToken` is `undefined`
 and the token is at `body.tokens.accessToken`. See
-[the wire format](/docs/backend/authentication#response-format).
+[the wire format](/docs/backend/auth-endpoints/#response-format).
 :::
 
 ## Email / Password
@@ -468,7 +468,7 @@ import { createRebaseClient, createCookieStorage } from "@rebasepro/client";
 
 // Use cookies instead of localStorage
 const client = createRebaseClient({
-    baseUrl: "http://localhost:3001",
+    baseUrl: import.meta.env.VITE_API_URL,
     auth: {
         storage: createCookieStorage({
             path: "/",

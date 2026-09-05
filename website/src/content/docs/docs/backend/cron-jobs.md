@@ -60,8 +60,11 @@ The **filename** (without extension) becomes the job's unique ID — e.g., `heal
 ## Configuration
 
 :::note[Where this goes]
-**Managed runtime:** nothing to configure — the runtime discovers `backend/crons/` on its own (`entry.crons` in `rebase.json` if you moved it). `REBASE_CRON_SCHEDULER` decides which process runs the scheduler.
-**Ejected:** `initializeRebaseBackend({ cronsDir })` in `backend/src/index.ts`.
+**Managed runtime** — put the files in `backend/crons/`; the runtime discovers that directory on its own, and `entry.crons` in `rebase.json` is only needed if you moved it. `REBASE_CRON_SCHEDULER` in `.env` decides whether *this* process runs the timers.
+
+**Ejected** — `cronsDir` on `initializeRebaseBackend({ … })`, as below.
+
+The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
 :::
 
 Enable cron jobs by adding `cronsDir` to your backend config:
@@ -279,8 +282,11 @@ All cron routes require **admin authentication** (`requireAuth` + `requireAdmin`
 
 ### Example: List All Jobs
 
+`$API_URL` is whatever `rebase dev` printed — the port is derived from the
+project's path, so there is no fixed one.
+
 ```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/admin/cron
+curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/admin/cron"
 ```
 
 ```json
@@ -336,7 +342,7 @@ field.
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3001/api/admin/cron/health-check/trigger
+    "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
 ## Client SDK
@@ -346,7 +352,7 @@ The Rebase client SDK exposes a `cron` namespace for all operations:
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
 
-const client = createRebaseClient({ baseUrl: "http://localhost:3001" });
+const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
 
 // List all jobs
 const { jobs } = await client.cron.listJobs();

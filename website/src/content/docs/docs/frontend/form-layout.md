@@ -157,3 +157,9 @@ the main column.
 | `admin.form.showRecordMeta` | `boolean` | Show id/created/updated at the foot of the rail |
 
 `FormSection` is `{ key, title?, properties, collapsed?, collapsible? }`.
+
+## Related
+
+- [Custom Fields](/docs/frontend/custom-fields/) — the field a layout is arranging
+- [Entity Views](/docs/frontend/entity-views/) — a whole tab of your own next to the form
+- [Properties](/docs/collections/properties/) — the property options a layout reads

@@ -80,7 +80,7 @@ securityRules: [
 ```
 
 `policy.authenticated()` is true for anonymous *sign-in* too, which mints a real
-user row and a real session. Use `policy.registered()` where a guest should not
+user row and a real session. Use `policy.registered()` <span class="since-badge" data-since="0.18">Since 0.18</span> where a guest should not
 qualify — writing a review, joining an organization, spending money.
 
 ### Role-based Access
@@ -141,7 +141,7 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.rolesOverlap(roles)` | the caller has **any** of these app roles |
 | `policy.rolesContain(roles)` | the caller has **all** of these app roles |
 | `policy.authenticated()` | signed in — `rebase.uid()` is set **and is not an anonymous sentinel**. `IS NOT NULL` alone would be a tautology, since an anonymous request sets a sentinel rather than leaving it unset |
-| `policy.registered()` | signed in **with an account** — `authenticated()` and not a guest. See below |
+| `policy.registered()` <span class="since-badge" data-since="0.18">Since 0.18</span> | signed in **with an account** — `authenticated()` and not a guest. See below |
 | `policy.serverContext()` | `rebase.uid() IS NULL` — see the caution below |
 | `policy.existsIn({ collection, where })` | a correlated `EXISTS` subquery |
 | `policy.raw(sql)` | an escape hatch, inserted verbatim |
@@ -155,6 +155,8 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.authRoles()` | `rebase.roles()` |
 
 ### `authenticated()` and `registered()`
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Two different things are called anonymous, and it is worth being precise about
 which one a rule means.

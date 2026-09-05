@@ -123,3 +123,9 @@ import type { CollectionActionsProps, NavigationSlotProps } from "@rebasepro/cms
 ```
 
 Each props type provides access to the context relevant to the slot's location — collection metadata, entity data, navigation state, and more. Refer to the individual type definitions for full property details.
+
+## Related
+
+- [Component Overrides (Swizzling)](/docs/frontend/component-overrides/) — when a slot is not enough
+- [Extending Rebase](/docs/frontend/extending/) — the rest of the extension surface
+- [Plugins](/docs/plugins/) — shipping slot content as a plugin

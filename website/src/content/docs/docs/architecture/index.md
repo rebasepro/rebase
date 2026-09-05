@@ -97,13 +97,13 @@ Like drivers, storage backends are registered in a registry. You can have multip
 6. WebSocket keeps the view synced in real-time
 
 ### Write Flow
-1. User edits a entity in the form
+1. User edits an entity in the form
 2. `beforeSave` callbacks run (validation, transformation)
 3. Client SDK sends `PATCH /api/data/:slug/:id`
 4. Backend serializes values, runs Drizzle `UPDATE`
 5. `afterSave` callbacks run (side effects)
 6. `NOTIFY` broadcast triggers WebSocket update to all clients
-7. If history is enabled, a entity is recorded
+7. If history is enabled, a snapshot is recorded
 
 ## Next Steps
 

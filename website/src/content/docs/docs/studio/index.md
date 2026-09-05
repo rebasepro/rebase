@@ -6,6 +6,22 @@ description: Rebase Studio provides developer tools for visual schema editing, S
 
 ## Overview
 
+Studio is the developer half of the admin panel. The same application your
+content team uses to edit rows also carries a schema editor, a SQL console, a
+JavaScript scratchpad, an RLS policy browser and a storage browser — and Studio
+is the mode that unlocks them. Nothing to install and nothing to deploy: it is
+already in the panel, behind the toggle in the drawer.
+
+![The collection editor, the flagship Studio tool: a visual schema editor that writes your TypeScript back](/img/collection_editor.png)
+
+It exists because the alternative is a second set of credentials. Editing a
+collection, checking what a policy really allows, or running one query against
+production otherwise means a database client, a copy of the connection string
+and an audit trail that ends at "someone with psql". Studio does all of it as
+the signed-in admin, through the same authorization the API uses.
+
+## The three modes
+
 The panel has three modes — `"cms" | "studio" | "settings"`:
 
 - **CMS** (`"cms"`) — For content editors and operations teams. Shows collections and data management. This is the default.
@@ -26,9 +42,7 @@ migrated to `"cms"` on read.
 
 ### Collection Editor
 
-A visual schema editor that lets you create and modify collections through a drag-and-drop UI. When you save changes, it uses [ts-morph](https://ts-morph.com/) to update your TypeScript source files via AST manipulation — preserving all existing code and custom logic.
-
-![Collection editor](/img/collection_editor.png)
+A visual schema editor that lets you create and modify collections through a drag-and-drop UI. When you save changes, it uses [ts-morph](https://ts-morph.com/) to update your TypeScript source files via AST manipulation — preserving all existing code and custom logic. It is the screenshot at the top of this page.
 
 ```tsx
 import { RebaseCMS } from "@rebasepro/cms";

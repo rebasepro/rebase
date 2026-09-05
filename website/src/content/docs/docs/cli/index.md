@@ -237,12 +237,12 @@ PostgreSQL will not copy or drop a database anything else is connected to, and
 the usual "anything else" is your own `rebase dev`. `create` and `delete` name
 what is holding the database open; `--force` disconnects those sessions first.
 
-Every branch is a full copy on disk, so they need clearing out. `prune` removes
+<span class="since-badge" data-since="0.18">Since 0.18</span> Every branch is a full copy on disk, so they need clearing out. `prune` removes
 three things: an entry whose database was dropped outside Rebase, a branch
 database whose entry was never written, and — only with `--older-than` — branches
 past an age you name. It asks before removing anything unless you pass `--yes`.
 
-`switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
+<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
 takes precedence over `DATABASE_URL` in `.env` and loses to `--database-url` or a
 `DATABASE_URL` in the shell, so a flag on the command line always outranks a
 switch made earlier. Deleting the branch you are on returns you to the main
@@ -271,6 +271,8 @@ rebase apps config <app>     # what one app resolves to
 ```
 
 ### `rebase status`
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Everything this project declares, and whether the environment actually binds it:
 
@@ -327,23 +329,107 @@ Everything to do with Rebase Cloud, which is in private beta. See the
 [Rebase Cloud guide](/docs/deployment/cloud/) for what it is and what the beta
 does not include.
 
+Every group answers `--help`, and `--help` never runs the command. Most commands
+act on the linked project in `.rebase/cloud.json`; `--project <id>` operates on
+one without linking.
+
+Three options apply everywhere: `--json` for machine-readable output (also the
+default when piped, or with `REBASE_JSON=1`), `--url <origin>` to target a
+specific control plane (or `REBASE_CLOUD_URL`), and `--project, -p <id>`.
+
+#### Auth
+
 ```bash
-rebase cloud login | logout | whoami
-rebase cloud link | unlink | use | open
-rebase cloud projects list | create | info | delete
-rebase cloud deploy [--bundle]
-rebase cloud logs [--runtime]
-rebase cloud deployments | rollback | cancel
-rebase cloud start | stop | restart
-rebase cloud status | metrics | debug
-rebase cloud env list | set | unset | reveal | pull
-rebase cloud domains list | add | verify | remove
-rebase cloud db list | create | info | test | backup | pitr
-rebase cloud extensions list | enable | disable
-rebase cloud storage | settings | orgs | webhooks | billing | clusters
+rebase cloud login      # sign in to the control plane
+rebase cloud logout     # sign out
+rebase cloud whoami     # show the current session
 ```
 
-Every group answers `--help`, and `--help` never runs the command.
+#### Project link
+
+```bash
+rebase cloud link       # link this directory to a cloud project
+rebase cloud unlink     # remove the link
+rebase cloud use [org]  # select the active organization
+rebase cloud open       # open the dashboard in a browser
+```
+
+#### Projects
+
+```bash
+rebase cloud projects list
+rebase cloud projects create [--link]
+rebase cloud projects info [id]
+rebase cloud projects delete [id]
+```
+
+#### Deploy and observe
+
+```bash
+rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
+rebase cloud logs [--runtime] [-f]       # build logs, or the running process's
+rebase cloud deployments list [--limit N|--all]
+rebase cloud rollback [id] [-y]          # back to a successful deploy
+rebase cloud cancel [-y]                 # cancel the in-flight build
+rebase cloud start | stop | restart [-y] # stop and restart need -y
+rebase cloud status                      # one-glance project status
+rebase cloud metrics                     # live CPU / memory / disk
+rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
+```
+
+`deploy` with no app name deploys the backend.
+
+#### Config
+
+```bash
+rebase cloud env list | set | unset | reveal | pull
+rebase cloud domains list | add | verify | remove
+rebase cloud extensions list | enable | disable
+rebase cloud settings show | set        # name, branch, repo, subdomain
+```
+
+#### Organizations
+
+```bash
+rebase cloud orgs list | create | members
+```
+
+#### Databases
+
+```bash
+rebase cloud db list | create | info | test
+rebase cloud db backup list | create | restore | status | download
+rebase cloud db pitr status | restore | cutover | discard
+```
+
+#### Resources
+
+What the project reserves, and what that costs.
+
+```bash
+rebase cloud resources          # the current reservation and its monthly cost
+rebase cloud resources set      # change it
+```
+
+`resources set` takes `--cpu`, `--memory`, `--replicas`, `--spot`,
+`--scale-to-zero`, `--db-mode`, `--db-instances`, `--db-cpu`, `--db-memory`,
+`--storage`, `--autoscale-max`, `--autoscale-cpu-target` and `--no-autoscale`.
+There are no plan tiers: everything is priced per resource. See
+[Rebase Cloud](/docs/deployment/cloud/).
+
+#### Storage, webhooks, clusters and billing
+
+```bash
+rebase cloud storage             # list storage buckets
+rebase cloud storage create      # provision platform-managed storage
+rebase cloud storage attach      # attach your own S3-compatible bucket
+rebase cloud webhooks list | create | delete
+rebase cloud clusters            # the clusters tenants run on
+rebase cloud clusters add        # register one from a kubeconfig
+rebase cloud clusters verify     # ask a cluster whether it can host tenants
+rebase cloud billing             # the billing account and card on file
+rebase cloud billing setup       # attach a card, one-time, opens a browser
+```
 
 ### `rebase generate-sdk`
 

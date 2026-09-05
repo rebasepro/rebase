@@ -123,6 +123,11 @@ async function startServer() {
     const readDb = driverInternals.readDb;
 
     // 5. Mount Realtime WebSockets
+    // Both halves are optional on the contract: a driver need not create a
+    // realtime provider, and a bootstrapper need not serve websockets at all.
+    if (!realtimeProvider || !bootstrapper.initializeWebsockets) {
+        throw new Error("This driver does not support realtime websockets.");
+    }
     await bootstrapper.initializeWebsockets(server, realtimeProvider, driver, {
         requireAuth: true // Enforces authentication token checks
     });
@@ -226,3 +231,9 @@ You do not have to choose between Rebase and Drizzle. The bootstrapper compiles 
 ### Graceful Connection Draining
 In serverless environments or orchestrators (like Kubernetes), terminating pods can result in broken connections. Always implement signal handlers that invoke `realtimeProvider.stopListening()` (which terminates the dedicated pg LISTEN client) and `pool.end()` to prevent leaking connection slots in your database server.
 
+
+## Related
+
+- [Backend Overview](/docs/backend/) — where each option lives when the runtime boots instead
+- [Split Processes](/docs/deployment/split-processes/) — the roles a custom server has to reproduce
+- [Storage Configuration](/docs/backend/storage/) — the sources a custom server must resolve itself

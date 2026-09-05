@@ -67,3 +67,9 @@ Take this when you already have a Firebase project and want a better admin panel
 over it. If you are choosing a backend rather than adapting to one you have,
 the [PostgreSQL path](/docs/getting-started/quickstart/) is the one the rest of
 this documentation is about.
+
+## Related
+
+- [Frontend Setup](/docs/frontend/) — the panel this replaces the data layer of
+- [Authentication & Login](/docs/frontend/authentication/) — the sign-in surface, either way
+- [Defining Collections](/docs/collections/) — the collection shape both drivers read

@@ -148,3 +148,9 @@ props type you can import and reuse: `CollectionViewProps` (`@rebasepro/ui`);
 `FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps` and
 `EntityFormActionsProps` (`@rebasepro/cms`). The rest have no exported props
 type — write the shape you actually read.
+
+## Related
+
+- [Extending Rebase](/docs/frontend/extending/) — the extension points that do not need an override
+- [Custom Fields](/docs/frontend/custom-fields/) — replacing one property's editor rather than a component
+- [Slots](/docs/frontend/slots/) — adding to a component instead of replacing it

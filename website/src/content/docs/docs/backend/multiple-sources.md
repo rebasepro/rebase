@@ -265,3 +265,9 @@ local directory, so `bucket("media")` plus `rebase dev` is enough to upload a
 file. That never happens in production, or on the managed runtime: a bucket
 invented there would write uploads to a container filesystem that vanishes on
 the next rollout.
+
+## Related
+
+- [Backend Overview](/docs/backend/) — `dataSources` and where the declaration lives
+- [Storage Configuration](/docs/backend/storage/) — the same shape for buckets
+- [Environment & Configuration](/docs/getting-started/configuration/) — the `__SUFFIX` convention that binds a source to its variables

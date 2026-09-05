@@ -43,6 +43,8 @@ import { checkAgentBundle } from "./docs-verify/check-agent-bundle.mjs";
 import { checkProseTypes } from "./docs-verify/check-prose-types.mjs";
 import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
+import { checkEnvReads } from "./docs-verify/check-env-reads.mjs";
+import { checkEndpointIndex } from "./docs-verify/check-endpoint-index.mjs";
 import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
 import { checkErrorCodes } from "./docs-verify/check-error-codes.mjs";
@@ -50,6 +52,9 @@ import { checkMcpToolTables } from "./docs-verify/check-mcp-tool-tables.mjs";
 import { checkAiInstructions } from "./docs-verify/check-ai-instructions.mjs";
 import { checkSkillClaims } from "./docs-verify/check-skill-claims.mjs";
 import { checkRlsCheckFlags } from "./docs-verify/check-rls-check-flags.mjs";
+import { checkUnreleasedBadges } from "./docs-verify/check-unreleased-badges.mjs";
+import { checkDocsLinks } from "./docs-verify/check-docs-links.mjs";
+import { checkTranslationFreshness } from "./docs-verify/check-translation-freshness.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -80,16 +85,22 @@ if (asJson) {
         out.proseTypes = checkProseTypes(ROOT).findings;
         out.versionPins = checkVersionPins(ROOT).findings;
         out.envReference = checkEnvReference(ROOT).findings;
+        out.envReads = checkEnvReads(ROOT).findings;
+        out.endpointIndex = checkEndpointIndex(ROOT).findings;
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
         out.errorCodes = checkErrorCodes(ROOT).findings;
         out.mcpToolTables = checkMcpToolTables(ROOT).findings;
         out.aiInstructions = checkAiInstructions(ROOT).findings;
         out.skillClaims = checkSkillClaims(ROOT).findings;
+        out.unreleasedBadges = checkUnreleasedBadges(ROOT).findings;
+        out.docsLinks = checkDocsLinks(ROOT).findings;
+        out.translationFreshness = checkTranslationFreshness(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
         out.setupErrors = r.setupErrors;
         out.unresolvedImports = r.unresolved;
+        out.noVerify = { count: r.skipped, budget: r.budget, fences: r.skippedFences };
         out.snippets = r.failures.map((f) => ({
             file: f.snippet.file,
             fenceLine: f.snippet.line,
@@ -201,6 +212,49 @@ if (only === "both" || only === "names") {
 }
 
 if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Translation freshness ━━━${NC}`);
+    const { findings: bad, missing, unstamped, fresh, sources, locales } =
+        checkTranslationFreshness(ROOT);
+    console.log(
+        `${DIM}${sources} translatable page(s) × ${locales} locales: ${fresh} fresh, ` +
+            `${unstamped.length} unstamped, ${missing.length} missing.${NC}`
+    );
+    if (!bad.length) {
+        console.log(`${GREEN}✓ No translation contradicts the English page it was made from.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} translation(s) made from an older English page:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+    if (missing.length || unstamped.length) {
+        console.log(
+            `      ${DIM}${unstamped.length} predate the stamp and ${missing.length} do not exist ` +
+                `(Starlight falls back to English). Neither fails this check; ` +
+                `\`node scripts/translate_docs.mjs --dry-run\` in website/ lists them.${NC}`
+        );
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Documentation link graph ━━━${NC}`);
+    const { findings: bad, scanned, links } = checkDocsLinks(ROOT);
+    console.log(`${DIM}Resolved ${links} internal link(s) across ${scanned} English docs page(s).${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every link resolves, and every page leads somewhere.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} broken or dead-end page(s):${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Error-code reference ━━━${NC}`);
     const { findings: bad, scanned, total } = checkErrorCodes(ROOT);
     console.log(`${DIM}Found ${total} error code(s) across ${scanned} source file(s).${NC}`);
@@ -210,6 +264,25 @@ if (only === "both" || only === "names") {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} error-code reference problem(s):${NC}`);
         for (const b of bad) console.log(`  ${RED}${b.code}${NC}\n      ${DIM}${b.message}${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Unreleased-feature badges ━━━${NC}`);
+    const { findings: bad, tokens, scanned } = checkUnreleasedBadges(ROOT);
+    console.log(
+        `${DIM}${tokens.length} unreleased feature name(s) across ${scanned} English docs page(s)` +
+            (tokens.length ? `: ${tokens.join(", ")}` : "") + `.${NC}`
+    );
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every page describing an unreleased feature says so.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} section(s) a reader on the released version cannot use:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
     }
 }
 
@@ -224,6 +297,39 @@ if (only === "both" || only === "names") {
         console.log(`${RED}✗ ${bad.length} validated variable(s) missing from the reference:${NC}`);
         for (const key of bad) console.log(`  ${RED}${key}${NC}`);
         console.log(`      ${DIM}That page promises it lists every variable the schema validates.${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Endpoint index ━━━${NC}`);
+    const { findings: bad, routes, modules } = checkEndpointIndex(ROOT);
+    console.log(`${DIM}Extracted ${routes} route(s) from ${modules} router module(s).${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every mounted route is in the endpoint index.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} route(s) the index does not account for:${NC}`);
+        for (const b of bad) console.log(`  ${RED}${b.kind}${NC} ${DIM}${b.message}${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Environment variables the code reads ━━━${NC}`);
+    const { findings: bad, dead, scanned, files } = checkEnvReads(ROOT);
+    console.log(`${DIM}Found ${scanned} distinct variable(s) read across ${files} source file(s).${NC}`);
+    if (!bad.length && !dead.length) {
+        console.log(`${GREEN}✓ Every variable the code reads is on the configuration page.${NC}`);
+    } else {
+        findings += bad.length + dead.length;
+        if (bad.length) {
+            console.log(`${RED}✗ ${bad.length} variable(s) the code reads and the page does not name:${NC}`);
+            for (const b of bad) {
+                console.log(`  ${RED}${b.name}${NC} ${DIM}${b.files.slice(0, 3).join(", ")}${NC}`);
+            }
+        }
+        for (const name of dead) {
+            console.log(`  ${RED}${name}${NC} ${DIM}is exempted in NOT_OURS but nothing reads it — delete the entry.${NC}`);
+        }
     }
 }
 
@@ -341,12 +447,28 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "snippets") {
     console.log(`\n${YELLOW}━━━ Docs snippet typecheck (en + skills) ━━━${NC}`);
-    const { failures, snippetCount, skipped, files, stubbed, setupErrors, unresolved, externalCount } =
-        await typecheckSnippets(ROOT);
+    const {
+        failures, snippetCount, skipped, files, stubbed, setupErrors, unresolved,
+        externalCount, overBudget, budget
+    } = await typecheckSnippets(ROOT);
     console.log(
         `${DIM}Compiled ${snippetCount} snippets from ${files} files ` +
-            `(${skipped} opted out via no-verify, ${externalCount} third-party module(s) stubbed).${NC}`
+            `(${skipped}/${budget} opted out via no-verify, ${externalCount} third-party module(s) stubbed).${NC}`
     );
+
+    // The opt-out ratchet, reported before the results: a fence nobody compiles
+    // cannot fail, so a rising count reads exactly like a passing suite.
+    if (overBudget) {
+        findings += 1;
+        console.log(
+            `${RED}✗ ${overBudget.count} no-verify fences, budget ${overBudget.budget} — ` +
+                `the opt-out may go down, never up.${NC}`
+        );
+        console.log(
+            `      ${DIM}Fix the fence, or say why it cannot be checked and raise ` +
+                `NO_VERIFY_BUDGET in tooling/scripts/docs-verify/extract.mjs with the reason.${NC}`
+        );
+    }
 
     // A misconfigured verifier reports "clean" for the snippets it can no longer
     // check, so surface it before the results it produced.

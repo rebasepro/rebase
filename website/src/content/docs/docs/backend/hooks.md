@@ -25,8 +25,11 @@ Use global callbacks for:
 ## Configuration
 
 :::note[Where this goes]
-**Managed runtime:** `export const callbacks` from `config/index.ts` — the runtime reads it at boot.
-**Ejected:** `initializeRebaseBackend({ callbacks })` in `backend/src/index.ts`.
+**Managed runtime** — `export const callbacks = { … }` from `config/index.ts`. The runtime reads that export at boot; nothing else needs changing.
+
+**Ejected** — the `callbacks` key on `initializeRebaseBackend({ … })`.
+
+The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
 :::
 
 Pass the `callbacks` key to `initializeRebaseBackend`:

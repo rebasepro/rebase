@@ -230,7 +230,7 @@ You now have a fully functional blog CMS with:
 - Draft → Review → Published workflow
 - Auto-generated URL slugs
 - RLS policies limiting authors to their own posts
-- Full audit trail via entity history
+- Full audit trail through entity history
 
 ## Querying from the SDK
 
@@ -265,3 +265,9 @@ for (const article of articles) {
 }
 ```
 
+
+## Related
+
+- [Defining Collections](/docs/collections/) — the collection API this recipe uses
+- [Relations](/docs/collections/relations/) — the author and tag links, in full
+- [Security Rules (RLS)](/docs/collections/security-rules/) — publishing without exposing drafts

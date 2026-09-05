@@ -32,6 +32,13 @@ export const PACKAGE_ENTRIES = {
     "@rebasepro/ui": "packages/ui/src/index.ts",
     "@rebasepro/app": "packages/app/src/index.ts",
     "@rebasepro/cms": "packages/cms/src/index.ts",
+    // The React-flavoured half of the type surface, and the package a scaffold
+    // actually installs: `AdminPropertyOptions`, `FieldProps`, `EntityCollection`
+    // and the rest of the admin vocabulary live here, not in `@rebasepro/types`.
+    // It was missing from this map for as long as the map existed, which meant
+    // every `import { … } from "@rebasepro/cms-types"` in the docs asserted
+    // nothing at all — the name check skips a specifier it has no export set for.
+    "@rebasepro/cms-types": "packages/cms-types/src/index.ts",
     "@rebasepro/forms": "packages/forms/src/index.ts",
     "@rebasepro/studio": "packages/studio/src/index.ts",
     "@rebasepro/codegen": "packages/codegen/src/index.ts",
@@ -47,7 +54,7 @@ let cached = null;
 
 /**
  * @param {string} root monorepo root
- * @returns {{ ts: any, program: any, checker: any, byPackage: Map<string, Set<string>>, ownerOf: Map<string, string>, membersOf: (pkg: string, typeName: string) => Set<string> }}
+ * @returns {{ ts: any, program: any, checker: any, byPackage: Map<string, Set<string>>, ownerOf: Map<string, string>, membersOf: (pkg: string, typeName: string) => Set<string>, missingEntries: Array<{ specifier: string, entry: string }> }}
  *   `byPackage` maps a specifier to its exported names; `ownerOf` maps an
  *   exported name to the package that should be imported from for it. When a
  *   name is exported by several packages the first entry in PACKAGE_ENTRIES
@@ -63,9 +70,15 @@ export function loadSdkExports(root) {
         root
     );
 
-    const entries = Object.entries(PACKAGE_ENTRIES).filter(([, rel]) =>
-        existsSync(path.join(root, rel))
-    );
+    // An entry whose file has moved or whose package was deleted used to be
+    // filtered out here in silence, and a specifier with no export set is
+    // *skipped* by the name check rather than failing it — so a stale entry
+    // reads as "clean" for every fence that imports it. Record them instead.
+    const all = Object.entries(PACKAGE_ENTRIES);
+    const entries = all.filter(([, rel]) => existsSync(path.join(root, rel)));
+    const missingEntries = all
+        .filter(([, rel]) => !existsSync(path.join(root, rel)))
+        .map(([specifier, rel]) => ({ specifier, entry: rel }));
     const program = ts.createProgram(
         entries.map(([, rel]) => path.join(root, rel)),
         { ...parsed.options, noEmit: true }
@@ -131,6 +144,6 @@ export function loadSdkExports(root) {
         );
     }
 
-    cached = { ts, program, checker, byPackage, ownerOf, membersOf };
+    cached = { ts, program, checker, byPackage, ownerOf, membersOf, missingEntries };
     return cached;
 }

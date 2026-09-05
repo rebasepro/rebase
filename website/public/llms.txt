@@ -39,7 +39,15 @@
 - [Environment & Configuration](https://rebase.pro/docs/getting-started/configuration): All environment variables and configuration options for Rebase projects.
 - [Troubleshooting](https://rebase.pro/docs/troubleshooting): The failures that stop a Rebase backend from starting or serving — an unreachable database, wrong credentials, a missing extension, an RLS refusal, schema drift, a busy port, a function that will not load — and what each one looks like.
 - [Upgrading](https://rebase.pro/docs/upgrading): What breaks when you move an existing app to the current release, and what to do about each one.
+- [Upgrading 0.14 to 0.17](https://rebase.pro/docs/upgrading/0-14-to-0-17): The admin package renames, declared resources, and the bundle format change that stops an older build booting on a current runtime.
+- [Upgrading 0.13 to 0.14](https://rebase.pro/docs/upgrading/0-13-to-0-14): Every wire key becomes camelCase, anonymous sign-in becomes opt-in, and one package is removed.
+- [Upgrading 0.12 to 0.13](https://rebase.pro/docs/upgrading/0-12-to-0-13): The auth schema removal, the package renames, and the three ways access could be granted that you did not ask for.
 - [Compatibility](https://rebase.pro/docs/compatibility): What Rebase promises across versions and what it does not — the six versioned contracts, how each one fails, and what may still change in a minor.
+- [Changelog](https://rebase.pro/docs/changelog): Every released change to Rebase — new features, fixes, and the breaking changes each version asks you to migrate.
+- [Backend only (headless)](https://rebase.pro/docs/getting-started/headless): Run Rebase as a headless Backend-as-a-Service over your own PostgreSQL — a REST API, auth, storage and realtime, with no admin panel and no collection files.
+- [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
+- [Client SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
+- [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Collections](https://rebase.pro/docs/collections): Collections are the core building block of Rebase — each collection maps to a database table and defines its schema, relations, security, and UI behavior.
 - [Properties](https://rebase.pro/docs/collections/properties): Property types define the data type, validation, and UI rendering for each field in a collection. Rebase supports string, number, boolean, date, array, map, reference, relation, and geopoint types.
 - [Relations](https://rebase.pro/docs/collections/relations): Define one-to-one, one-to-many, and many-to-many SQL relations between collections with foreign keys, junction tables, and multi-hop joins.
@@ -48,8 +56,11 @@
 - [Backend Overview](https://rebase.pro/docs/backend): The Rebase backend provides a complete server with REST API, authentication, storage, WebSocket real-time, and entity history — all initialized with a single function call.
 - [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
 - [Error codes](https://rebase.pro/docs/backend/errors): Every error code a Rebase backend can return, with its HTTP status, what it means and what to do about it — plus the response envelope, X-Request-ID and the details rules.
+- [Endpoint index](https://rebase.pro/docs/backend/endpoints): Every HTTP route a Rebase backend mounts — data, auth, storage, admin, meta — with the gate on each one and the page that explains it.
 - [Live schema editing](https://rebase.pro/docs/backend/live-schema-editing): Create and alter collections against a running backend — committed to your repository first, then applied.
-- [Authentication](https://rebase.pro/docs/backend/authentication): Configure JWT authentication, OAuth providers, SMTP email, auth hooks, and custom auth adapters on the backend.
+- [Authentication](https://rebase.pro/docs/backend/authentication): Configure JWT authentication, OAuth providers, SMTP email, bot protection and the users collection on the Rebase backend.
+- [Auth endpoints and tokens](https://rebase.pro/docs/backend/auth-endpoints): The authentication routes the Rebase backend mounts, their response shapes, multi-factor authentication, the database context a policy sees, JWKS and service keys.
+- [Custom auth adapters](https://rebase.pro/docs/backend/auth-adapters): Replace Rebase's built-in authentication with Clerk, Firebase Auth or your own identity provider by implementing the AuthAdapter contract.
 - [Storage Configuration](https://rebase.pro/docs/backend/storage): Configure local filesystem, S3-compatible, or GCS/Firebase Storage backends for file uploads, images, and media.
 - [Multiple Databases and Buckets](https://rebase.pro/docs/backend/multiple-sources): Route collections to different databases and properties to different storage buckets, and configure each one from the environment.
 - [MongoDB](https://rebase.pro/docs/backend/mongodb): @rebasepro/server-mongo runs Rebase on MongoDB: a complete data driver, change-stream realtime and snapshot history — and no row-level security.
@@ -80,6 +91,7 @@
 - [Data Import & Export](https://rebase.pro/docs/frontend/data-import-export): Import data from CSV, JSON, and Excel files into your collections, and export collection data to CSV or JSON with optional computed fields.
 - [Plugin System](https://rebase.pro/docs/plugins): Extend Rebase with plugins — inject UI components, modify collections, add toolbar actions, and create custom field builders.
 - [Hooks Reference](https://rebase.pro/docs/hooks): React hooks provided by Rebase for accessing auth, data, navigation, side panels, storage, and UI state.
+- [Studio Tools](https://rebase.pro/docs/studio): Rebase Studio provides developer tools for visual schema editing, SQL queries, JavaScript scripting, RLS policy management, and storage browsing.
 - [Client SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
 - [Querying Data](https://rebase.pro/docs/sdk/querying): CRUD operations, fluent query builder, filter operators, pagination, sorting, and relation fetching with the Rebase Client SDK.
 - [Authentication](https://rebase.pro/docs/sdk/authentication): Client-side authentication with the Rebase SDK — email/password sign-in, OAuth providers, session management, and auth state listeners.
@@ -92,7 +104,6 @@
 - [AI Instruction Files](https://rebase.pro/docs/ai/instruction-files): Every scaffolded Rebase project ships ai-instructions.md plus one-line pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md — one source of truth, many filenames.
 - [CLI Reference](https://rebase.pro/docs/cli): Rebase CLI commands for project initialization, schema generation, database migrations, and SDK generation.
 - [Schema Generation](https://rebase.pro/docs/cli/schema): Generate Drizzle ORM schemas from collection definitions, create SQL migrations, and keep your database in sync with the Rebase CLI.
-- [Studio Tools](https://rebase.pro/docs/studio): Rebase Studio provides developer tools for visual schema editing, SQL queries, JavaScript scripting, RLS policy management, and storage browsing.
 - [rls-check](https://rebase.pro/docs/rls-check): Audit row-level security on any PostgreSQL database — Supabase, Neon, RDS, or your own server. Read-only, no signup, no Rebase required.
 - [Architecture Overview](https://rebase.pro/docs/architecture): Understand how Rebase's backend, frontend, client SDK, and database integrate to form a complete Backend-as-a-Service.
 - [Schema as Code](https://rebase.pro/docs/architecture/schema-as-code): How Rebase uses TypeScript collections as the single source of truth for your database schema, UI, and API.
