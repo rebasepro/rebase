@@ -75,6 +75,19 @@ only — so a BaaS install had nothing to resolve them against. This scans
 the text of core sources AND built .d.ts, plus the manifests.`
     },
     {
+        run: "check:browser-deps",
+        why: `The mirror of check:headless, and the half nothing asked: does the
+BROWSER reach the server's dependencies? It did. \`@rebasepro/types\`
+declared a hono peer for one \`import type\` in an adapter a browser can
+never call, and npm 7+ and pnpm 8+ auto-install peers — so every app that
+ran \`npm install @rebasepro/client\` got a 2.8 MB server framework in its
+node_modules, its lockfile and its security scanners.
+
+It has run in no pipeline since it was written. A gate in package.json
+and in no job is a gate that does not exist, which is why docs/gates.md
+and check:gates-doc now exist too.`
+    },
+    {
         run: "check:baas-types",
         env: BIG_HEAP,
         why: `And the end-to-end proof: a real BaaS project (server + driver + client,
