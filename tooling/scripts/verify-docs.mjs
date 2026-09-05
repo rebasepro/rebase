@@ -47,6 +47,7 @@ import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
 import { checkUnreleasedBadges } from "./docs-verify/check-unreleased-badges.mjs";
 import { checkDocsLinks } from "./docs-verify/check-docs-links.mjs";
+import { checkTranslationFreshness } from "./docs-verify/check-translation-freshness.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -80,6 +81,7 @@ if (asJson) {
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
         out.unreleasedBadges = checkUnreleasedBadges(ROOT).findings;
         out.docsLinks = checkDocsLinks(ROOT).findings;
+        out.translationFreshness = checkTranslationFreshness(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -180,6 +182,33 @@ if (only === "both" || only === "names") {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} stated count(s) disagree with the tool:${NC}`);
         for (const b of bad) console.log(`  ${RED}${b.file}:${b.line}${NC}\n      ${DIM}${b.message}${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Translation freshness ━━━${NC}`);
+    const { findings: bad, missing, unstamped, fresh, sources, locales } =
+        checkTranslationFreshness(ROOT);
+    console.log(
+        `${DIM}${sources} translatable page(s) × ${locales} locales: ${fresh} fresh, ` +
+            `${unstamped.length} unstamped, ${missing.length} missing.${NC}`
+    );
+    if (!bad.length) {
+        console.log(`${GREEN}✓ No translation contradicts the English page it was made from.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} translation(s) made from an older English page:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+    if (missing.length || unstamped.length) {
+        console.log(
+            `      ${DIM}${unstamped.length} predate the stamp and ${missing.length} do not exist ` +
+                `(Starlight falls back to English). Neither fails this check; ` +
+                `\`node scripts/translate_docs.mjs --dry-run\` in website/ lists them.${NC}`
+        );
     }
 }
 

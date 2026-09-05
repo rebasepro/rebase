@@ -1,17 +1,28 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// `--dry-run` lists what is missing or stale and calls nothing, so the state of
+// the translations can be inspected without a key and without spending a run.
+const dryRun = process.argv.includes('--dry-run');
+// `--only <path>` restricts the run to one English source, relative to
+// src/content/docs (e.g. `docs/backend/branching.md`). Re-translating one page
+// is the common case after an edit; re-translating 79 is not.
+const onlyIndex = process.argv.indexOf('--only');
+const only = onlyIndex === -1 ? null : process.argv[onlyIndex + 1];
 
 // Initialize Gemini API
 // Make sure to export GEMINI_API_KEY in your terminal before running this script
 const apiKey = process.env.GEMINI_API_KEY;
-if (!apiKey) {
+if (!apiKey && !dryRun) {
     console.error('Error: GEMINI_API_KEY environment variable is missing.');
+    console.error('Pass --dry-run to see what is missing or stale without translating.');
     process.exit(1);
 }
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 // Using gemini-3.7-flash as it's fast and excellent for translation tasks
-const model = genAI.getGenerativeModel({ model: 'gemini-3.7-flash' });
+const model = genAI ? genAI.getGenerativeModel({ model: 'gemini-3.7-flash' }) : null;
 
 const TARGET_LANGUAGES = ['es', 'de', 'fr', 'it', 'pt'];
 const CONTENT_DIR = path.resolve('./src/content/docs');
@@ -41,6 +52,41 @@ const EXCLUDED_DIRS = ['docs/ui'];
  * being one release behind is worst.
  */
 const EXCLUDED_FILES = ['docs/CHANGELOG.md'];
+
+/**
+ * The English source this translation was made from.
+ *
+ * Until now the script's only question was "does the target file exist", so a
+ * translation was written once and never again: every later edit to the English
+ * page stayed English-only, and five locales quietly described the software as
+ * it had been on the day they were generated. Nothing reported it — a stale
+ * translation is a *present* file, which is exactly what the check was looking
+ * for.
+ *
+ * So each translated file records the hash of the source it was made from.
+ * A mismatch is a re-translation; a match is a skip; no stamp at all means the
+ * file predates this and its source is unknown, which is treated as stale
+ * rather than as fresh. That backlog is real — it is every translation in the
+ * tree — so it is reported before it is acted on: `--dry-run` lists it, and
+ * `--only <path>` works through it a page at a time.
+ */
+export function sourceHash(content) {
+    return crypto.createHash('sha256').update(content, 'utf8').digest('hex').slice(0, 16);
+}
+
+/** The `sourceHash:` a translated file records, or null if it has none. */
+export function readSourceHash(text) {
+    const frontmatter = text.match(/^---\n([\s\S]*?)\n---/);
+    if (!frontmatter) return null;
+    const line = frontmatter[1].match(/^sourceHash:\s*([0-9a-f]+)\s*$/m);
+    return line ? line[1] : null;
+}
+
+/** Writes (or replaces) the `sourceHash` line in a file's frontmatter. */
+function stampSourceHash(text, hash) {
+    const stripped = text.replace(/^(---\n[\s\S]*?)^sourceHash:.*\n([\s\S]*?^---\n)/m, '$1$2');
+    return stripped.replace(/^---\n/, `---\nsourceHash: ${hash}\n`);
+}
 
 // Helper to recursively get all markdown files
 async function getMarkdownFiles(dir, fileList = []) {
@@ -190,29 +236,51 @@ async function main() {
     console.log(`Target languages: ${TARGET_LANGUAGES.join(', ')}`);
 
     const allFiles = await getMarkdownFiles(CONTENT_DIR);
-    console.log(`Found ${allFiles.length} source files to check.`);
+    const sources = only
+        ? allFiles.filter(f => path.relative(CONTENT_DIR, f) === only)
+        : allFiles;
+    if (only && sources.length === 0) {
+        console.error(`--only ${only} matches no English source under ${CONTENT_DIR}.`);
+        process.exit(1);
+    }
+    console.log(`Found ${sources.length} source file(s) to check.`);
 
-    for (const sourceFilePath of allFiles) {
+    const missing = [];
+    const stale = [];
+    let fresh = 0;
+
+    for (const sourceFilePath of sources) {
         // Calculate the relative path from CONTENT_DIR
         const relativePath = path.relative(CONTENT_DIR, sourceFilePath);
-        
+
         const content = await fs.readFile(sourceFilePath, 'utf-8');
+        const hash = sourceHash(content);
 
         for (const lang of TARGET_LANGUAGES) {
             // Construct target path, e.g., src/content/docs/es/docs/architecture/index.mdx
             const targetFilePath = path.join(CONTENT_DIR, lang, relativePath);
             const targetDir = path.dirname(targetFilePath);
 
+            let reason = 'missing';
             try {
-                // Check if file already exists so we don't re-translate
-                await fs.access(targetFilePath);
-                console.log(`Skipping: [${lang}] ${relativePath} (already exists)`);
-                continue;
+                const existing = await fs.readFile(targetFilePath, 'utf-8');
+                const stamped = readSourceHash(existing);
+                if (stamped === hash) {
+                    console.log(`Skipping: [${lang}] ${relativePath} (up to date)`);
+                    fresh++;
+                    continue;
+                }
+                reason = stamped === null ? 'never stamped' : 'source changed';
             } catch (err) {
                 // File doesn't exist, proceed with translation
             }
 
-            console.log(`Translating: [${lang}] ${relativePath} ...`);
+            if (reason === 'missing') missing.push(`[${lang}] ${relativePath}`);
+            else stale.push(`[${lang}] ${relativePath} (${reason})`);
+
+            if (dryRun) continue;
+
+            console.log(`Translating: [${lang}] ${relativePath} (${reason}) ...`);
             
             try {
                 // Ensure target directory exists
@@ -240,8 +308,8 @@ async function main() {
                     continue;
                 }
 
-                // Write translated file
-                await fs.writeFile(targetFilePath, translatedContent, 'utf-8');
+                // Write translated file, stamped with the source it came from.
+                await fs.writeFile(targetFilePath, stampSourceHash(translatedContent, hash), 'utf-8');
                 console.log(`✅ Saved: ${targetFilePath}`);
 
                 // Add a small delay to avoid hitting rate limits
@@ -253,7 +321,17 @@ async function main() {
         }
     }
     
-    console.log('Translation process complete!');
+    console.log('');
+    console.log(`Up to date: ${fresh}`);
+    console.log(`Missing:    ${missing.length}`);
+    for (const m of missing) console.log(`  ${m}`);
+    console.log(`Stale:      ${stale.length}`);
+    for (const m of stale) console.log(`  ${m}`);
+    console.log(dryRun ? 'Dry run — nothing was translated.' : 'Translation process complete!');
 }
 
-main().catch(console.error);
+// Importable for the freshness gate, which needs `readSourceHash` and
+// `sourceHash` and must not start a translation run to get them.
+if (process.argv[1] && process.argv[1].endsWith('translate_docs.mjs')) {
+    main().catch(console.error);
+}
