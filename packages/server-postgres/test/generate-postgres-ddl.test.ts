@@ -1,5 +1,5 @@
 import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
-import { generatePostgresDdl, generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
+import { generatePostgresDdl, generatePostgresPoliciesDdl, planRelationalColumns } from "../src/schema/generate-postgres-ddl-logic";
 
 describe("generatePostgresDdl", () => {
     const cleanDdl = (ddl: string) => {
@@ -106,6 +106,72 @@ describe("generatePostgresDdl", () => {
 
         expect(cleanResult).toContain("\"author_id\" TEXT");
         expect(cleanResult).toContain("ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE SET NULL;");
+    });
+
+    // `NOT NULL` says the child cannot exist without a parent. It does not say
+    // deleting the parent should delete the child — and defaulting to CASCADE
+    // made `onDelete`, a field nobody has to write, turn every parent delete
+    // into a silent cascade.
+    it("defaults a required belongsTo to ON DELETE RESTRICT, not CASCADE", async () => {
+        const usersCollection: CollectionConfig = {
+            slug: "users",
+            table: "users",
+            name: "Users",
+            properties: { name: { type: "string" } }
+        };
+        const postsCollection: CollectionConfig = {
+            slug: "posts",
+            table: "posts",
+            name: "Posts",
+            properties: {
+                title: { type: "string" },
+                author: { type: "relation", relationName: "author", validation: { required: true } }
+            },
+            relations: [
+                {
+                    kind: "belongsTo",
+                    relationName: "author",
+                    target: () => usersCollection,
+                    localKey: "author_id"
+                }
+            ]
+        };
+
+        const cleanResult = cleanDdl(await generatePostgresDdl([usersCollection, postsCollection]));
+
+        expect(cleanResult).toContain("\"author_id\" TEXT NOT NULL");
+        expect(cleanResult).toContain("ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE RESTRICT;");
+        expect(cleanResult).not.toContain("\"posts_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE CASCADE");
+    });
+
+    // The desired state boot-ensure diffs the live database against has to
+    // carry the same default, or every boot plans a constraint rewrite.
+    it("plans the same RESTRICT default for a required belongsTo", () => {
+        const usersCollection: CollectionConfig = {
+            slug: "users",
+            table: "users",
+            name: "Users",
+            properties: { name: { type: "string" } }
+        };
+        const postsCollection: CollectionConfig = {
+            slug: "posts",
+            table: "posts",
+            name: "Posts",
+            properties: {
+                title: { type: "string" },
+                author: { type: "relation", relationName: "author", validation: { required: true } },
+                editor: { type: "relation", relationName: "editor" }
+            },
+            relations: [
+                { kind: "belongsTo", relationName: "author", target: () => usersCollection, localKey: "author_id" },
+                { kind: "belongsTo", relationName: "editor", target: () => usersCollection, localKey: "editor_id" }
+            ]
+        };
+
+        const plans = planRelationalColumns([usersCollection, postsCollection]);
+
+        expect(plans.find(p => p.column === "author_id")?.foreignKey?.sql).toContain("ON DELETE RESTRICT");
+        expect(plans.find(p => p.column === "editor_id")?.foreignKey?.sql).toContain("ON DELETE SET NULL");
     });
 
     it("should generate many-to-many junction tables", async () => {

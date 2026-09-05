@@ -9,6 +9,9 @@ import { out, outWarn, outError } from "./cli-output";
 import { formatRelativeTime } from "@rebasepro/utils";
 import {
     diagnoseMissingBin,
+    detectProjectPackageManager,
+    describeBuildScriptRemedy,
+    describeDevAddCommand,
     resolveLocalBin,
     getTableIncludes,
     getDevDatabaseUrl,
@@ -31,6 +34,8 @@ import { detectDestructiveStatements, decidePushSafety } from "./schema/destruct
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { acceptsExcludeFlag, buildAtlasArgs } from "./schema/atlas-argv";
 import { unexpectedBranchArgs } from "./branch-argv";
+import { assertKnownFlags } from "./cli-flags";
+import { backupActionOf } from "./backup-argv";
 
 import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
 
@@ -77,6 +82,13 @@ export async function runPluginCommand(args: string[]) {
     await loadEnv();
     const domain = args[0]; // "db" or "schema"
     const subcommand = args[1];
+
+    // Before anything reads the line: every parser below runs `permissive`,
+    // which turns an undeclared flag into a positional rather than an error, so
+    // `db push --alow-destructive` pushed with the destructive gate still shut
+    // and `schema generate --ouput x` wrote the default path in silence. See
+    // cli-flags.ts for why the check has to be here and not in those parsers.
+    assertKnownFlags(domain, subcommand, args);
 
     if (domain === "db") {
         await dbCommand(subcommand, args);
@@ -201,7 +213,12 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
 
     if (subcommand === "backup" || subcommand === "restore" || subcommand === "backups") {
         const { backupCommand, restoreCommand, backupsCommand } = await import("./backup/backup-cli");
-        if (subcommand === "backup") await backupCommand(rawArgs);
+        // `rebase cloud db backup list` is how the cloud family spells this, and
+        // locally the same words *created a backup*: "list" was a positional
+        // `backupCommand` ignored. One CLI, two spellings, and the wrong guess
+        // wrote a dump instead of reading one. Both spellings list now.
+        if (subcommand === "backup" && backupActionOf(rawArgs) === "list") await backupsCommand(rawArgs);
+        else if (subcommand === "backup") await backupCommand(rawArgs);
         else if (subcommand === "restore") await restoreCommand(rawArgs);
         else await backupsCommand(rawArgs);
         return;
@@ -211,6 +228,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         {
             "--collections": String,
             "--allow-destructive": Boolean,
+            "--dry-run": Boolean,
             "--yes": Boolean,
             "-c": "--collections",
             "-y": "--yes"
@@ -345,10 +363,16 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             await schemaCommand("generate", rawArgs);
             await generatePostgresDdlCommand(rawArgs);
             out("");
-            out(chalk.gray("  Step 2/3: Pushing schema to database with Atlas..."));
+            const dryRun = argsList["--dry-run"] === true;
+            out(chalk.gray(dryRun
+                ? "  Step 2/3: Planning the change against the database (nothing is applied)..."
+                : "  Step 2/3: Pushing schema to database with Atlas..."));
             out("");
             const databaseUrl = process.env.DATABASE_URL;
-            if (databaseUrl) {
+            // Skipped under --dry-run: this creates the auth schema and its
+            // functions, which is a write. "Show me what would happen" that
+            // changes something on the way is not a plan.
+            if (databaseUrl && !dryRun) {
                 await ensureAuthSchemaAndFunctions(databaseUrl);
             }
 
@@ -363,6 +387,40 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 { captureStdout: true }
             );
             const destructive = detectDestructiveStatements(plan);
+
+            // `--dry-run` stops here, having printed the SQL and nothing else.
+            //
+            // It exists because the only way to see this plan was to trigger
+            // the destructive gate, and the gate prints the plan while exiting
+            // 1 — so "what would this do?" was answerable only by a command
+            // that looked like a failure, and unanswerable at all when the
+            // change was additive. An agent with no way to show the SQL either
+            // asks a human to approve something neither of them has read, or
+            // runs the push to find out.
+            if (dryRun) {
+                out(chalk.gray("  Step 3/3: --dry-run — nothing was applied."));
+                out("");
+                if (plan.trim()) {
+                    out(chalk.bold("  Planned changes:"));
+                    out(chalk.gray(plan.trim().split("\n").map((l) => `       ${l}`).join("\n")));
+                } else {
+                    out(chalk.green("  ✓ No changes: the database already matches these collections."));
+                }
+                out("");
+                if (destructive.length > 0) {
+                    outWarn(chalk.yellow(`  ⚠️  ${destructive.length} of those DESTROY data:`));
+                    for (const d of destructive) {
+                        outWarn(chalk.red(`       ${d.kind}: `) + chalk.gray(d.statement.replace(/\s+/g, " ")));
+                    }
+                    outWarn("");
+                    outWarn(chalk.yellow("  Applying them needs `rebase db push --allow-destructive`. Back up first: rebase db backup"));
+                    outWarn("");
+                }
+                out(chalk.gray("  The auth schema step was skipped, because it writes. A real push runs it first."));
+                out("");
+                return;
+            }
+
             const allowDestructive = argsList["--allow-destructive"] === true || argsList["--yes"] === true;
             const decision = decidePushSafety({
                 destructiveCount: destructive.length,
@@ -1015,27 +1073,32 @@ async function runAtlas(
         // that produces the far more common of the two states.
         outError(chalk.red("\n✗ The atlas binary is missing, so the schema cannot be applied.\n"));
 
+        // Every remedy below is package-manager specific, and this used to print
+        // pnpm's unconditionally. npm 12 blocks a dependency's install scripts
+        // the same way pnpm 10 does, so an npm reader was handed `pnpm
+        // approve-builds` and a `"pnpm"` package.json key — correct advice, for
+        // somebody else. Read the lockfile and answer the reader in front of us.
+        const manager = detectProjectPackageManager();
+
         if (diagnoseMissingBin("@ariga/atlas") === "build-script-blocked") {
             outError(chalk.yellow("  @ariga/atlas IS installed — only its binary is missing.\n"));
             outError(chalk.gray(
-                "  It downloads that binary in a `preinstall` script, and pnpm 10+ does not\n" +
-                "  run a dependency's scripts unless you allow it. The install still exits 0,\n" +
-                "  so the only sign is `Ignored build scripts: @ariga/atlas` in its output.\n"
+                "  It downloads that binary in a `preinstall` script, and pnpm 10+ and npm 12+\n" +
+                "  do not run a dependency's scripts unless you allow it. The install still\n" +
+                "  exits 0, so the only sign is a line several screens up: pnpm's\n" +
+                "  `Ignored build scripts: @ariga/atlas`, or npm's `install scripts blocked`.\n"
             ));
             outError("  Fix it with either:\n");
-            outError(chalk.bold("    pnpm approve-builds\n"));
-            outError("  or, to record it in the project (what `rebase init` scaffolds):\n");
-            outError(chalk.bold(
-                "    // package.json\n" +
-                "    \"pnpm\": { \"onlyBuiltDependencies\": [\"@ariga/atlas\"] }\n"
-            ));
-            outError(chalk.gray("  Then re-run `pnpm install`.\n"));
+            for (const line of describeBuildScriptRemedy("@ariga/atlas", manager)) {
+                outError(line ? chalk.bold(line) : "");
+            }
+            outError("");
         } else {
             outError(chalk.gray("  It is not installed in this project.\n"));
             outError("  Install it with:\n");
-            outError(chalk.bold("    pnpm add -D @ariga/atlas\n"));
+            outError(chalk.bold(`    ${describeDevAddCommand("@ariga/atlas", manager)}\n`));
             outError(chalk.gray(
-                "  If pnpm then reports `Ignored build scripts`, also run `pnpm approve-builds` —\n" +
+                "  If the install then reports blocked or ignored build scripts, allow them too —\n" +
                 "  the package carries a `preinstall` script that fetches the binary.\n"
             ));
         }
@@ -1303,6 +1366,23 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
 }
 
 async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<void> {
+    // The same second line of defence `dbCommand` above carries, for the same
+    // reason: this file is also its own CLI, spawned directly by
+    // `resolvePluginCliScript` and executable on its own. Nothing here had a
+    // `--help` case, so `schema generate --help` regenerated the schema and
+    // `schema introspect --help` rewrote the collection files — a flag whose
+    // entire job is to print text, overwriting authored source.
+    //
+    // Guarded by a real subcommand: the internal callers below re-enter this
+    // function with a synthesised argv, and none of them can carry `--help`.
+    if (subcommand && (rawArgs.includes("--help") || rawArgs.includes("-h"))) {
+        out("");
+        out(chalk.bold(`  rebase schema ${subcommand}`));
+        out(chalk.gray("  Run `rebase schema --help` for the full page — this is the driver's own entry point."));
+        out("");
+        return;
+    }
+
     if (subcommand === "stale") {
         await schemaStaleCommand(rawArgs);
         return;

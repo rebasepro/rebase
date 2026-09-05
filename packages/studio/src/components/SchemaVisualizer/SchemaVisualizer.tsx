@@ -27,7 +27,8 @@ import {
 } from "@rebasepro/ui";
 import {
     useStudioCollectionRegistry,
-    IconForView
+    IconForView,
+    useTranslation
 } from "@rebasepro/app";
 
 import { isPostgresCollectionConfig } from "@rebasepro/types";
@@ -625,17 +626,24 @@ duration: 400 }
 // ─── Outer wrapper (provides ReactFlowProvider) ────────────────────────
 
 export const SchemaVisualizer = () => {
+    const { t } = useTranslation();
     const { collections: registryCollections } =
         useStudioCollectionRegistry() as {
             collections?: AdminCollection[];
         };
 
-    // Merge registry collections with any passed collections
-    const collections = useMemo(() => {
-        return registryCollections ?? [];
-    }, [registryCollections]);
-
-    if (!collections || collections.length === 0) {
+    /**
+     * `undefined` and `[]` are different answers, and this view used to render
+     * the same spinner for both. A project that declares no collections — a
+     * fresh scaffold, a backend-only project someone opened the console
+     * against — sat on "Loading schema…" forever, because there was nothing
+     * coming.
+     *
+     * `undefined` is the Studio bridge before the admin's collection registry
+     * has registered itself: genuinely still loading. `[]` is that registry
+     * saying there is nothing to draw.
+     */
+    if (registryCollections === undefined) {
         return (
             <div className="flex items-center justify-center h-full w-full">
                 <div className="text-center space-y-3">
@@ -650,6 +658,26 @@ export const SchemaVisualizer = () => {
             </div>
         );
     }
+
+    if (registryCollections.length === 0) {
+        return (
+            <div className="flex items-center justify-center h-full w-full p-6">
+                <div className="max-w-md text-center space-y-2">
+                    <Typography variant="subtitle2" className="block">
+                        {t("studio_schema_no_collections")}
+                    </Typography>
+                    <Typography variant="body2" color="secondary" className="block">
+                        {t("studio_schema_no_collections_body")}
+                    </Typography>
+                    <Typography variant="body2" color="secondary" className="block">
+                        {t("studio_schema_introspect_hint")}
+                    </Typography>
+                </div>
+            </div>
+        );
+    }
+
+    const collections = registryCollections;
 
     return (
         <div className="flex h-full w-full bg-white dark:bg-surface-950 overflow-hidden text-text-primary dark:text-text-primary-dark">

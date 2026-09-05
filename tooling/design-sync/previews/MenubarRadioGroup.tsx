@@ -12,7 +12,7 @@ import {
     MenubarItem
 } from "@rebasepro/ui";
 
-function useOpenMenu(ref: React.RefObject<HTMLDivElement>, triggerIndex: number) {
+function useOpenMenu(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
     React.useEffect(() => {
         const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
         trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));

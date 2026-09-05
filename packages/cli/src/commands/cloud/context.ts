@@ -23,6 +23,7 @@ import inquirer from "inquirer";
 import { createRebaseClient, type AuthStorage } from "@rebasepro/client";
 import { findProjectRoot } from "../../utils/project";
 import { parseCommandArgs } from "../../utils/args";
+import { cliUserAgent } from "../../utils/version";
 import { summarizeError, wantsRawError } from "./errors";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -210,6 +211,12 @@ export function createCloudClient(url: string): CloudClient {
         // between "no socket, because I never asked for one" and "no socket, and
         // I do not know why".
         realtime: false,
+        // Every control-plane request says which CLI is calling. The control
+        // plane's wire format moves ahead of what is published to npm, so it
+        // has to be able to answer an old client with `CLI_TOO_OLD` and the
+        // minimum version — and it cannot do that for a caller that never
+        // identified itself. Until this line, none of them did.
+        headers: { "User-Agent": cliUserAgent() },
         auth: {
             storage: createFileAuthStorage(url),
             persistSession: true,
@@ -588,10 +595,15 @@ let JSON_MODE = false;
 export function initOutputMode(rawArgs: string[]): boolean {
     const parsed = arg({ "--json": Boolean }, { argv: rawArgs.slice(2),
 permissive: true });
-    JSON_MODE =
-        Boolean(parsed["--json"]) ||
-        process.env.REBASE_JSON === "1" ||
-        process.stdout.isTTY !== true;
+    // Most explicit wins. `REBASE_JSON=0` is the half that was missing: the
+    // "stdout is not a TTY" rule is right for a result, and wrong for the reader
+    // who ran `rebase cloud env --help | less` and got a JSON object. There was
+    // no way to say so — `--json` could only turn the mode ON, and `REBASE_JSON`
+    // was tested against "1" alone, so any other value including "0" fell
+    // through to the TTY test and set it anyway.
+    if (parsed["--json"]) JSON_MODE = true;
+    else if (process.env.REBASE_JSON === "0") JSON_MODE = false;
+    else JSON_MODE = process.env.REBASE_JSON === "1" || process.stdout.isTTY !== true;
     return JSON_MODE;
 }
 
@@ -668,13 +680,178 @@ export type JsonArg<T> = T extends (...args: never[]) => unknown ? never : T;
  */
 export function emitHelp(
     command: string,
-    actions: string[],
+    actions: Array<string | HelpAction>,
     human: () => void,
     extra: Record<string, unknown> = {}
 ): void {
     emit(human, { command,
-actions,
+actions: actions.map(entry => describeAction(entry, command)),
 ...extra });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Group help pages
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * One action on a group's help page.
+ *
+ * The page used to exist twice: a hand-formatted template literal for a
+ * terminal, and a bare list of action WORDS for everything else. So the two
+ * answers to `--help` were not the same answer — piped, `rebase cloud env
+ * --help` said `["list","set","unset","reveal","pull"]` and not one description,
+ * not one flag, and not the sentence about build-time variables that is the
+ * whole reason the page exists. This family forces JSON mode off a TTY, so that
+ * was every scripted and every agent-driven read of it.
+ *
+ * One description, rendered twice.
+ */
+export interface HelpAction {
+    /** The action word: `set`, `backup restore`. */
+    action: string;
+    /** The usage tail after the word: `KEY=VALUE`, `<domain>`, `[-y]`. */
+    args?: string;
+    /** One line: what it does. */
+    description: string;
+    /** Flags this action takes of its own, `[flag, description]`. */
+    flags?: Array<[string, string]>;
+    /** The heading it sits under, on a page that groups its actions. */
+    section?: string;
+}
+
+/** A whole group page — `rebase cloud env --help`. */
+export interface GroupHelp {
+    /** The command words, no leading `rebase`: `cloud env`, or `cloud` itself. */
+    command: string;
+    /** The title's tail: "Environment variables". */
+    title: string;
+    actions: HelpAction[];
+    /** Options that belong to the group rather than to one action. */
+    options?: Array<[string, string]>;
+    /** Closing paragraphs — the things a reader gets wrong more than once. */
+    notes?: string[];
+}
+
+/**
+ * Normalise an action for the JSON form. Strings stay legal — the index page
+ * lists group names, which are not actions of the command being described.
+ *
+ * `command` is the page's own command (`cloud env`), so the usage line a caller
+ * reads is a line it can run: without it the answer said `rebase cloud set
+ * KEY=VALUE`, which is a command that does not exist.
+ */
+function describeAction(entry: string | HelpAction, command: string): Record<string, unknown> {
+    if (typeof entry === "string") return { action: entry,
+description: "",
+flags: [] };
+    return {
+        action: entry.action,
+        usage: `rebase ${command} ${entry.action}${entry.args ? ` ${entry.args}` : ""}`,
+        description: entry.description,
+        flags: (entry.flags ?? []).map(([flag, description]) => ({ flag,
+description }))
+    };
+}
+
+/**
+ * Flags every cloud command accepts, documented once.
+ *
+ * Lives here rather than in `action-help.ts` because both help renderers print
+ * it and `action-help` imports this module, not the other way round.
+ */
+export const GLOBAL_HELP_FLAGS: Array<[string, string]> = [
+    ["--project, -p <slug>", "Operate on a project without linking this directory"],
+    ["--json", "Machine-readable output (also when piped, or REBASE_JSON=1)"],
+    ["--url <origin>", "Target a specific control plane (or REBASE_CLOUD_URL)"],
+    ["--yes, -y", "Skip confirmation prompts"],
+    ["--debug", "Print the untouched error body after a failure"]
+];
+
+/**
+ * Flag names `parseCloudArgs` adds to every command in the family.
+ *
+ * Derived from `GLOBAL_CLOUD_FLAGS` rather than listed again — a second copy is
+ * how a global gains a spelling that the collision sweep does not know about.
+ * `--debug` is the one addition: `bin/rebase.js` takes it off `process.argv`
+ * itself, so no cloud spec declares it and every command still accepts it.
+ */
+export const GLOBAL_SPEC_KEYS = new Set([...Object.keys(GLOBAL_CLOUD_FLAGS), "--debug"]);
+
+/** Column width for an action word (+ its args) before its description. */
+const HELP_COLUMN = 28;
+
+/**
+ * The gap after `text` in a `width`-wide column, never less than one space.
+ *
+ * `padEnd` returns the string unchanged when it is already at the width, which
+ * glues the description onto the flag: `--connection-string <url>The external…`.
+ */
+function pad(text: string, width: number): string {
+    return " ".repeat(Math.max(1, width - text.length));
+}
+
+/**
+ * Print a group's page — the human one, and the same content as JSON when piped.
+ */
+export function printGroupHelp(page: GroupHelp): void {
+    emitHelp(
+        page.command,
+        page.actions,
+        () => {
+            console.log("");
+            console.log(`${chalk.bold(`rebase ${page.command}`)} — ${page.title}`);
+            console.log("");
+            console.log(chalk.green.bold("Usage"));
+            console.log(`  rebase ${page.command} ${chalk.blue("<action>")} [options]`);
+
+            let section: string | undefined;
+            for (const entry of page.actions) {
+                const heading = entry.section ?? "Commands";
+                if (heading !== section) {
+                    section = heading;
+                    console.log("");
+                    console.log(chalk.green.bold(heading));
+                }
+                const word = `${entry.action}${entry.args ? ` ${entry.args}` : ""}`;
+                console.log(
+                    `  ${chalk.blue.bold(entry.action)}${entry.args ? ` ${chalk.gray(entry.args)}` : ""}`
+                    + `${pad(word, HELP_COLUMN)}${entry.description}`
+                );
+                for (const [flag, description] of entry.flags ?? []) {
+                    console.log(`      ${chalk.blue(flag)}${pad(flag, HELP_COLUMN - 4)}${chalk.gray(description)}`);
+                }
+            }
+
+            if (page.options?.length) {
+                console.log("");
+                console.log(chalk.green.bold("Options"));
+                for (const [flag, description] of page.options) {
+                    console.log(`  ${chalk.blue(flag)}${pad(flag, HELP_COLUMN)}${description}`);
+                }
+            }
+
+            console.log("");
+            console.log(chalk.green.bold("Global options"));
+            for (const [flag, description] of GLOBAL_HELP_FLAGS) {
+                console.log(`  ${chalk.blue(flag)}${pad(flag, HELP_COLUMN)}${chalk.gray(description)}`);
+            }
+
+            if (page.notes?.length) {
+                console.log("");
+                for (const note of page.notes) console.log(chalk.gray(`  ${note}`));
+            }
+            console.log("");
+        },
+        {
+            usage: `rebase ${page.command} <action> [options]`,
+            summary: page.title,
+            options: (page.options ?? []).map(([flag, description]) => ({ flag,
+description })),
+            globalFlags: GLOBAL_HELP_FLAGS.map(([flag, description]) => ({ flag,
+description })),
+            notes: page.notes ?? []
+        }
+    );
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -862,6 +1039,36 @@ positionals: parsed.positionals };
     } catch (err) {
         fail(err instanceof Error ? err.message : String(err), undefined, "usage");
     }
+}
+
+/**
+ * Refuse an action word its group does not dispatch. Returns for `undefined`,
+ * which is every group's default action.
+ *
+ * The groups that switch on their action already do this in a `default:` case.
+ * The groups written as a chain of `if (action === "x") return …` did not: a
+ * word that matched nothing fell out of the chain into the *default* action, so
+ * `rebase cloud storage creat` listed the buckets and exited 0, and
+ * `rebase cloud billing usage` printed the account. Reporting a typo as a
+ * successful run of a different command is the failure mode this family exists
+ * to not have — an agent branching on the exit code learns nothing, and a person
+ * reads the output of a command they did not ask for.
+ *
+ * One spelling, so the code is `unknown_command` everywhere rather than the
+ * default `"error"` half of them used, and the hint always names the group's own
+ * `--help` rather than the index page.
+ */
+export function requireKnownAction(
+    group: string,
+    action: string | undefined,
+    known: readonly string[]
+): void {
+    if (action === undefined || known.includes(action)) return;
+    fail(
+        `Unknown ${group} command: ${action}`,
+        `Run \`rebase cloud ${group} --help\`. Actions: ${known.join(", ")}.`,
+        "unknown_command"
+    );
 }
 
 /**

@@ -144,10 +144,12 @@ export function _resetRebaseMock(): void {
  * request handler, run user-scoped queries through the request-scoped driver
  * (`c.var.driver`), which carries the caller's identity.
  *
- * `rebase.data` is **gone from the type**: `RebaseServerClient` omits it, so the
- * admin-scoped accessor has exactly one name and the privilege is visible at the
- * call site. The property still exists at runtime, aliasing `dataAsAdmin`, so an
- * untyped JavaScript caller keeps working rather than failing on `undefined`.
+ * `rebase.data` is **gone**: `RebaseServerClient` omits it, and the property is
+ * removed from the object at boot, so the admin-scoped accessor has exactly one
+ * name and the privilege is visible at the call site. It was left as a runtime
+ * alias for a while — which defeated the point, since untyped code could still
+ * reach the privileged plane by the name that means *user-scoped* everywhere
+ * else. Use `rebase.dataAsAdmin`.
  *
  * **Control plane** (`rebase.auth`, `rebase.admin`, `rebase.storage`, etc.):
  * Routes through the Hono app's internal request handler. An internal per-boot

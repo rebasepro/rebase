@@ -24,11 +24,13 @@ import {
     AlertCircleIcon,
     CheckCircleIcon
 } from "@rebasepro/ui";
-import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
+import { useRebaseClient, useSnackbarController, useTranslation } from "@rebasepro/app";
 import type { ApiKeyMasked, ApiKeyWithSecret, RebaseClient } from "@rebasepro/types";
 
 import { CreateApiKeyDialog } from "./CreateApiKeyDialog";
 import { permissionSummary, resourceLabel, resourcePhrase } from "./permissions";
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { LoadFailureView } from "../load-failure-view";
 
 /* ═══════════════════════════════════════════════════════════════
    Helpers
@@ -67,6 +69,7 @@ function keyStatus(key: ApiKeyMasked): { label: string; color: string } {
 export function ApiKeysView() {
     const client = useRebaseClient<RebaseClient>();
     const snackbar = useSnackbarController();
+    const { t } = useTranslation();
     const [keys, setKeys] = useState<ApiKeyMasked[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -74,6 +77,8 @@ export function ApiKeysView() {
     const [showSecret, setShowSecret] = useState<ApiKeyWithSecret | null>(null);
     const [revoking, setRevoking] = useState<string | null>(null);
     const [confirmRevoke, setConfirmRevoke] = useState<ApiKeyMasked | null>(null);
+    /** Why the key listing failed, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
 
     const clientRef = useRef(client);
     clientRef.current = client;
@@ -86,11 +91,12 @@ export function ApiKeysView() {
         try {
             const res = await c.apiKeys.listKeys();
             setKeys(res.keys);
+            setFailure(null);
         } catch (e: unknown) {
-            snackbarRef.current.open({
-                type: "error",
-                message: e instanceof Error ? e.message : String(e)
-            });
+            // "No API keys yet" is a claim about the project. A refused listing
+            // is a claim about the caller, and only one of the two is an
+            // invitation to create a key.
+            setFailure(classifyLoadFailure(e));
         } finally {
             setLoading(false);
         }
@@ -132,7 +138,7 @@ export function ApiKeysView() {
                     <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
                         <div className="flex items-center gap-2">
                             <KeyRoundIcon size={iconSize.smallest} className="text-primary"/>
-                            <Typography variant="subtitle2" className="font-semibold">API Keys</Typography>
+                            <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_api_keys")}</Typography>
                             <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{activeKeys.length}</Chip>
                         </div>
                         <div className="flex items-center gap-1">
@@ -143,7 +149,16 @@ export function ApiKeysView() {
                         </div>
                     </div>
                     <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                        {activeKeys.length === 0 && inactiveKeys.length === 0 && (
+                        {failure && (
+                            <LoadFailureView
+                                failure={failure}
+                                title={t("studio_api_keys_read_failed")}
+                                deniedTitle={t("studio_api_keys_denied_title")}
+                                deniedHint={t("studio_api_keys_denied_hint")}
+                                onRetry={loadKeys}
+                            />
+                        )}
+                        {!failure && activeKeys.length === 0 && inactiveKeys.length === 0 && (
                             <div className="flex flex-col items-center justify-center h-full gap-3 text-center p-6">
                                 <KeyRoundIcon size={iconSize.medium} className="text-surface-300 dark:text-surface-600"/>
                                 <Typography variant="body2" color="secondary">No API keys yet</Typography>

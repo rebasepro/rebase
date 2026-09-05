@@ -629,9 +629,13 @@ describe("listen() — include", () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         expect(() => c.include("author").listen(jest.fn())).toThrow("Listen is only available");
     });
-    it("listen is undefined without ws", () => {
+    it("throws the same sentence one call earlier, straight off the client", () => {
+        // `listen` used to be absent here, so the two spellings of the same
+        // mistake failed differently: this one said `undefined is not a
+        // function`, the builder above said "realtime: false".
         const { transport } = createMockTransport();
-        expect(createCollectionClient<PostModel>(transport, "posts").listen).toBeUndefined();
+        expect(() => createCollectionClient<PostModel>(transport, "posts").listen(undefined, jest.fn()))
+            .toThrow("Listen is only available");
     });
     /**
      * LIMITATION, not a contract: the realtime subscription payload
@@ -1218,7 +1222,13 @@ websocketUrl: "" });
         const result = await client.call("my-endpoint", { foo: "bar" });
         const calledUrl = fetchMock.mock.calls[0][0] as string;
         expect(calledUrl).toContain("/my-endpoint");
-        expect(result).toEqual({ result: "ok" });
+        // The body, verbatim. This used to be `{ result: "ok" }` — `call()`
+        // unwrapped a top-level `data` key when it saw one, which the
+        // documented sibling `functions.invoke()` does not, so the two returned
+        // different values for any function that answers `{ data: … }`. A
+        // caller who wants `.data` writes it; a caller whose function's own
+        // payload has a `data` field could not get it back at all.
+        expect(result).toEqual({ data: { result: "ok" } });
     });
     it("call() with leading slash", async () => {
         const fetchMock = jest.fn() as jest.Mock<typeof globalThis.fetch>;

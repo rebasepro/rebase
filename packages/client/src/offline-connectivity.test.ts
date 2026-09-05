@@ -12,12 +12,19 @@ import { RebaseApiError } from "./transport";
  * never notices the network came back.
  */
 describe("network error classification", () => {
+    /**
+     * One question — `status === 0` — because the transport now wraps every
+     * `fetch` rejection into a `RebaseApiError` carrying it before anything
+     * above can see the runtime's own shape. This used to sniff for those
+     * shapes instead: a `TypeError`, an `AbortError`, a `TimeoutError` — a list
+     * that had to be kept in step with three runtimes, and was wrong in both
+     * directions.
+     */
     it("recognises a request that never reached the server", () => {
-        expect(isNetworkError(new TypeError("Failed to fetch"))).toBe(true);
-        expect(isNetworkError(new TypeError("fetch failed"))).toBe(true);
-        expect(isNetworkError(Object.assign(new Error("aborted"), { name: "AbortError" }))).toBe(true);
-        expect(isNetworkError(Object.assign(new Error("timed out"), { name: "TimeoutError" }))).toBe(true);
         expect(isNetworkError(new RebaseApiError("no response", { status: 0 }))).toBe(true);
+        expect(isNetworkError(new RebaseApiError("refused", {
+            status: 0, code: "NETWORK_ERROR", cause: new TypeError("fetch failed")
+        }))).toBe(true);
     });
 
     it("does not mistake a server's answer for a dead network", () => {
@@ -25,10 +32,14 @@ describe("network error classification", () => {
         expect(isNetworkError(new RebaseApiError("boom", { status: 500 }))).toBe(false);
         // A programming error must propagate, not be swallowed as "offline".
         expect(isNetworkError(new RangeError("bug"))).toBe(false);
+        // Including a `TypeError`, which the shape-sniffing version read as a
+        // dead network — so a bug thrown inside an application callback was
+        // answered from the cache instead of surfacing.
+        expect(isNetworkError(new TypeError("cannot read property of undefined"))).toBe(false);
     });
 
     it("retries what will pass and gives up on what will not", () => {
-        expect(isRetryableError(new TypeError("Failed to fetch"))).toBe(true);
+        expect(isRetryableError(new RebaseApiError("refused", { status: 0, code: "NETWORK_ERROR" }))).toBe(true);
         expect(isRetryableError(new RebaseApiError("busy", { status: 429 }))).toBe(true);
         expect(isRetryableError(new RebaseApiError("down", { status: 503 }))).toBe(true);
         expect(isRetryableError(new RebaseApiError("gateway", { status: 502 }))).toBe(true);

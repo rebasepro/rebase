@@ -117,7 +117,9 @@ export * from "./collection_editor/useLiveSchemaEditing";
 // `SchemaChangeDialog` is deliberately absent, like `CollectionEditorDialog`
 // and `PropertyFormDialog` beside it: re-exporting it from the barrel puts it
 // back in the eager bundle and undoes the `lazyChunk` in `useLiveSchemaEditing`.
-// Import it by path if you need the component itself.
+// It is reachable from `@rebasepro/cms/collection_editor_ui`, with the other
+// two — this used to say "import it by path", which named no path and had none
+// to name.
 
 
 export { CreationResultDialog } from "./components/admin/CreationResultDialog";

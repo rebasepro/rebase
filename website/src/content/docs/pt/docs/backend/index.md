@@ -49,11 +49,12 @@ Após a inicialização, estas rotas são montadas:
 | `/api/auth/*` | Autenticação (registo, login, refresh, OAuth, magic links, códigos de uso único, MFA) |
 | `/api/admin/*` | Gestão de utilizadores e funções (apenas para administradores) |
 | `/api/storage/*` | Upload, download e eliminação de ficheiros |
-| `/api/data/collections` | Endpoint de metadados de coleção |
 | `/api/data/:slug` | Operações CRUD por coleção (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Histórico de alterações de entidade (quando ativado) |
-| `/api/data/docs` | Especificação OpenAPI (quando `enableSwagger: true`) |
-| `/api/data/swagger` | Swagger UI (modo de desenvolvimento, quando `enableSwagger: true`) |
+| `/api/docs` | Especificação OpenAPI (quando `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (modo de desenvolvimento, quando `enableSwagger: true`) |
+| `/api/meta/contract` | O esquema de coleções do projeto (apenas admin) |
+| `/api/meta/schema-version` | Uma string de versão para esse esquema (não autenticada) |
 | `/api/functions/*` | Rotas de funções personalizadas (quando `functionsDir` está definido) |
 | `/api/cron/*` | Gestão de tarefas cron (apenas para administradores, quando `cronsDir` está definido) |
 | WebSocket on upgrade | Subscrições em tempo real |
@@ -159,11 +160,21 @@ O backend inclui um manipulador de erros que captura todas as exceções e retor
 {
     "error": {
         "message": "Entity not found",
-        "code": "not-found",
-        "status": 404
+        "code": "NOT_FOUND",
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
     }
 }
 ```
+
+| Campo | Sempre presente | O que é |
+|-------|:---------------:|---------|
+| `message` | sim | Escrito para a pessoa que o lê numa consola. Nomeia o obstáculo, não a regra. |
+| `code` | sim | `SCREAMING_SNAKE_CASE` e estável. É o campo sobre o qual ramificar. |
+| `details` | não | Carga estruturada quando a recusa é *sobre* alguma coisa — uma lista de caminhos falhados, um conjunto de campos desconhecidos. |
+| `requestId` | não | Presente quando o pedido trazia um ou lhe foi atribuído; reflete `X-Request-ID`. Cite-o num relatório de erro. |
+
+O estado HTTP está na resposta, não no corpo. Ramifique sobre `code`, não sobre
+`message` — as mensagens são escritas para pessoas e podem mudar.
 
 Se a inicialização falhar (por exemplo, erro de conexão à base de dados), o servidor ainda inicia, mas retorna 503 para todos os pedidos da API, com uma mensagem de erro descritiva nos logs.
 

@@ -88,82 +88,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Authoritative type gate. Resolves @rebasepro/* to SOURCE (not dist), so it
-      # is immune to stale build output, build ordering, and incremental caches —
-      # unlike `pnpm build` (esbuild), which strips types WITHOUT checking them.
-      # This is what stops a type regression from silently merging.
-      #
-      # It runs two programs: the monorepo, and `tsconfig.tests.json` for test
-      # files, which nothing type-checked at all until a deleted type name survived
-      # in a test for an entire refactor.
-      - name: Type check
-        run: pnpm run typecheck
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-
-      # The core packages ALONE, with @rebasepro/cms-types absent from the program.
-      # The type check above includes cms-types, and a TypeScript augmentation applies
-      # to the whole program — so the `admin` field it declares is visible to every core
-      # package there, which makes that gate structurally unable to catch a core package
-      # using it. `packages/inference` was writing `admin.readOnly`, `pnpm typecheck`
-      # said 0 errors, and only a per-package tsc found it.
-      - name: Core-only type check (admin surface absent)
-        run: pnpm run check:core-types
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-
-      # Proves BaaS mode stays honest: imports every collection file and server
-      # package under a loader hook that rejects React and @rebasepro UI packages.
-      # Reads source directly, so it needs no build and fails fast.
-      - name: Headless guard
-        run: pnpm run check:headless
-
-      # The type-level counterpart. check:headless proves the backend never
-      # *executes* React and passed for months while 13 shipped .d.ts files began
-      # with `import React from "react"` and @types/react was a devDependency
-      # only — so a BaaS install had nothing to resolve them against. This scans
-      # the text of core sources AND built .d.ts, plus the manifests.
-      - name: Type-level headless guard
-        run: pnpm run check:types-headless
-
-      # And the end-to-end proof: a real BaaS project (server + driver + client,
-      # a collection file, SDK calls) typechecked with `react` mapped to a stub
-      # that stands in for its absence. Catches a React type reached through an
-      # alias, which a text scan cannot see.
-      - name: BaaS typecheck (React absent)
-        run: pnpm run check:baas-types
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-
-      # The scaffold hands every new project a compose file naming a container
-      # image. 0.13.0 shipped with that image published nowhere, so the first
-      # command in the file failed with "repository does not exist" — and nothing
-      # noticed, because `verify-selfhost.mts` deliberately covers everything about
-      # self-hosting EXCEPT the container and the tag. Hermetic: it asserts an
-      # automatically-triggered workflow publishes the image, not that the registry
-      # currently answers. The live probe belongs to the release, and runs there.
-      - name: Shipped image references have a publisher
-        run: pnpm run check:runtime-image
-
-      # The image promises to supply @rebasepro/common, /utils and friends so a
-      # bundle does not vendor them. Nothing checked those copies could actually
-      # load: three of their dependencies were missing from the image's npm
-      # install, and the first one surfaced only when a project was promoted to
-      # the managed runtime and could not read a single collection.
-      #
-      # It also reads required PEERS and version RANGES, because "missing" has
-      # three shapes and only one of them is absence: the image installed
-      # nodemailer ^6.9.0 against a declared ^9.0.0 — present, three majors
-      # behind, and lazily imported, so it would have failed on some tenant's
-      # first outgoing email rather than at boot.
-      - name: Runtime-provided dependencies are installed
-        run: pnpm run check:runtime-deps
-
-      # The chart shipped with no coverage of any kind, and its failure mode is
-      # a cluster that comes up looking right: nineteen refusals in
-      # `_validate.tpl` guard topologies that produce no runtime error, and not
-      # one of them was ever reached. This lints, renders the three documented
-      # topologies and asserts every refusal is still reachable.
+      # Helm, because one gate in the list renders the chart. CI installs it
+      # rather than skipping that gate: `ci:static` refuses to skip a gate when
+      # `CI` is set, precisely so the pipeline cannot quietly run a smaller set
+      # than it reports.
       - name: Set up Helm
         uses: azure/setup-helm@v4
         with:
@@ -172,149 +100,13 @@ jobs:
           # use is a guide making a promise nobody checks.
           version: v4.2.4
 
-      - name: Helm chart renders and refuses
-        run: pnpm run check:chart
-
-      # The gate every other one could not be. `check:chart` reads a rendered
-      # manifest, `check:runtime-image` reads tags — and a manifest that is
-      # entirely correct still produced a container that refused to start,
-      # because an image ENV and an entrypoint guard defeated it from inside.
-      # Nothing had ever executed infra/docker/entrypoint.mjs or booted the image;
-      # `bundle.mode=url` shipped dead and stayed dead as a result. This builds
-      # the image and starts it against a real Postgres, both ways a bundle can
-      # arrive, and checks it still refuses when given neither.
-      - name: Runtime image boots, both ways a bundle can arrive
-        run: pnpm run check:runtime-image:boots
-
-      # Renames leak where a codemod cannot see them: a bare name in an array,
-      # a .astro file, an extensionless .env.example, a Tailwind @source path.
-      - name: Package name guard
-        run: pnpm run check:names
-
-      # An undeclared import resolves here and under npm/yarn hoisting, and
-      # fails under pnpm's isolated layout — so it type-checks, builds and tests
-      # green, then breaks on first import for an installing user.
-      # `@rebasepro/firebase` shipped that way with seven `@firebase/*` imports.
-      - name: Declared-dependency guard
-        run: pnpm run check:deps
-
-      # The release must not enumerate its own contents. `publish.yml` named its
-      # publishable packages as literal paths; one of those directories moved on
-      # 2026-08-24, pnpm matched nothing, exited 0, and @rebasepro/agent-skills
-      # silently fell out of four releases — while the CLI, which depends on it
-      # as `workspace:*`, baked the stale version into its published manifest.
-      # Every check in the pipeline asked whether the packages it FOUND were
-      # right; none asked whether it had found them all.
-      - name: Publishable-set guard
-        run: pnpm run check:publishable-set
-
-      # `files: ["dist", "src"]` ships the sources on purpose and the tests
-      # beside them by accident. Invisible from the repository: whether a
-      # package publishes its tests depends only on whether its author put them
-      # in `src/` or in `test/`. @rebasepro/client was shipping twenty-seven of
-      # them, and these tests are written to name the defect they pin.
-      - name: Published-tarball contents
-        run: pnpm run check:package-contents
-
-      # Nothing in any pipeline ran ESLint. `verify-quality.sh` does, but that is
-      # a script a human chooses to run, so a lint error could sit on main
-      # indefinitely — and one was: a `no-control-regex` error in
-      # packages/rls-check. `--quiet` (errors only) matches what that script
-      # treats as a hard failure; warnings stay advisory.
-      - name: Lint
-        run: npx eslint . --quiet
-
-      # The 184th stale closure, which the 183 already there would hide.
-      #
-      # `exhaustive-deps` cannot be an error — adding the missing dependency is
-      # as often the bug as the fix — so it is a warning, and `eslint --quiet`
-      # above does not print warnings at all. That left 183 candidate stale
-      # closures accumulating where nobody would see a new one arrive.
-      #
-      # This pins them in tooling/scripts/hooks-baseline.json and fails on anything new.
-      # It also fails when a finding is FIXED, asking for the baseline to be
-      # banked — otherwise the file slowly describes a codebase that no longer
-      # exists, which is the same lie as a stale gate.
-      - name: React hooks ratchet
-        run: pnpm run check:hooks
-
-      # `@typescript-eslint/no-unused-vars` reports at `warn`, and every lint
-      # script runs eslint with `--quiet`, which prints errors only — so the rule
-      # has been firing into nothing. This ratchets the half that means work was
-      # computed and discarded, which is where the bugs are: a kanban board's
-      # search term and a plugin's error view were both sitting in that list,
-      # read into a variable and then used nowhere.
-      - name: Discarded-value ratchet
-        run: pnpm run check:unused
-
-      # `pnpm -r test` walks the packages that define a `test` script, so one
-      # without it is not reported as skipped — it is not reported at all.
-      # `packages/firebase` has five tests, written against a declared
-      # `@jest/globals`, that have never executed in any pipeline.
-      - name: Test-script coverage
-        run: pnpm run check:test-scripts
-
-      # A literal NUL inside a sentinel string in `packages/client/src/collection.ts`
-      # made grep and ripgrep classify the file as binary and skip it in silence:
-      # 418 lines of the client's core collection API returned nothing for every
-      # search anyone ran, and an empty result reads exactly like "no matches".
-      - name: Control characters in sources
-        run: pnpm run check:control-chars
-
-      # The admin ships seven non-English locales and 200-odd strings that have
-      # a translation key are also written out as English literals, where no
-      # translation reaches them. Found by looking at the running panel: a
-      # product card with a missing image said "File not found", and
-      # `file_not_found` is translated seven ways.
-      - name: Untranslated-string ratchet
-        run: pnpm run check:untranslated
-
-      # Astro and JSX drop the newline between a word and an adjacent tag rather
-      # than collapsing it to a space, so a paragraph broken across two source
-      # lines at that boundary renders "or runrebase dev". Invisible in the
-      # source and in the diff; seven instances were shipping across three
-      # marketing pages, all found by measuring the rendered gap between two
-      # boxes rather than by reading.
-      - name: Prose glued to an inline tag
-        run: pnpm run check:glued-code
-
-      # The docs verifier existed but ran in no pipeline at all, and defaulted to
-      # exit 0, so documented APIs could drift from the source indefinitely — and
-      # had: a wiring example that could not compile and a `userManagement` prop
-      # that does not exist. The baseline is clean now, so it runs `--strict`.
-      - name: Docs API drift
-        run: pnpm run verify:docs:strict
-
-      # Column names, constraint names, policy names, junction tables: the
-      # identifiers this framework DERIVES and writes into a customer's database,
-      # where they then outlive every release that follows. 0.13 improved the
-      # foreign-key derivation and every aged database in the field disagreed with
-      # the code the moment it upgraded. Runs before the build on purpose — it
-      # reads source (TSX_TSCONFIG_PATH maps @rebasepro/* onto src), so a stale
-      # dist cannot make it pass.
-      - name: Derived database identifiers
-        run: pnpm run check:derived-names
-
-      # What the request path depends on Node for. A ratchet, not a wall: the
-      # baseline may shrink and may never grow, so a branch that puts a new
-      # `node:crypto` or a new Node-only package in front of every request has
-      # to say so here rather than a year from now, inside a runtime port.
-      - name: Portable request path
-        run: pnpm run check:portable-core
-
-      # The checked-in `schema.generated.ts` can stop describing the schema
-      # without anybody editing anything — a library upgrade moves a derived
-      # foreign-key name, the collections watcher never fires, and boot-ensure
-      # renames the column while relation validation refuses to start on the
-      # stale module. It can also go stale the ordinary way: a collection added,
-      # the generator not re-run. `rebase dev` runs the first check with `--fix`
-      # on a developer's machine; nothing ran either against this repository,
-      # whose generated schema is also what the self-host acceptance gate builds
-      # its bundle from — and which broke every deploy once already.
-      #
-      # Reads source, like the step above, so a stale dist cannot make it pass.
-      - name: Generated Drizzle schema is current
-        run: pnpm run check:schema-fresh
+      # Every gate that reads source, as one command. The list and the reason
+      # each gate exists live in tooling/scripts/ci-static.mjs, and are rendered
+      # as a table in docs/gates.md — so a contributor runs exactly what CI runs
+      # instead of a smaller set a shell script happened to name. Twenty-five
+      # copied YAML steps were a list only CI knew.
+      - name: Static gates
+        run: pnpm run ci:static
 
   # The build, and only the gates that read what it emitted — published .d.ts,
   # the template and ejected-project typechecks, the API surface, the eager-JS
@@ -564,10 +356,10 @@ jobs:
           done
 
       - name: Install Playwright Browsers
-        run: npx playwright install chromium --with-deps
+        run: pnpm exec playwright install chromium --with-deps
 
       - name: Run E2E Test Suite
-        run: npx tsx tests/e2e/tests/cli-init-e2e.ts
+        run: pnpm exec tsx tests/e2e/tests/cli-init-e2e.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
           SCREENSHOT_DIR: ${{ github.workspace }}/.artifacts/e2e-screenshots
@@ -584,7 +376,7 @@ jobs:
       # report from being suppressed by the first.
       - name: Run BaaS E2E
         if: always()
-        run: npx tsx tests/e2e/tests/cli-init-baas-e2e.ts
+        run: pnpm exec tsx tests/e2e/tests/cli-init-baas-e2e.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
@@ -615,7 +407,7 @@ jobs:
       # `always()` for the same reason as its neighbours.
       - name: Client SDK E2E (end-user auth, RLS, storage, realtime)
         if: always()
-        run: npx tsx tests/e2e/tests/client-sdk-e2e.ts
+        run: pnpm exec tsx tests/e2e/tests/client-sdk-e2e.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
@@ -675,7 +467,7 @@ jobs:
           done
 
       - name: Install Playwright Browsers
-        run: npx playwright install chromium --with-deps
+        run: pnpm exec playwright install chromium --with-deps
 
       # The admin panel itself, driven in a browser. `cli-init-e2e` proves a
       # scaffolded project installs and answers HTTP; nothing until now opened
@@ -708,8 +500,8 @@ jobs:
         run: |
           docker exec rebase-postgres createdb -U rebase rebase_admin_e2e
           (cd app && pnpm exec rebase db push --yes)
-          (cd app/backend && npx tsx src/seed.ts)
-          npx playwright test -c tests/e2e/playwright.config.ts
+          (cd app/backend && pnpm exec tsx src/seed.ts)
+          pnpm exec playwright test -c tests/e2e/playwright.config.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
           # sslmode=disable: the CI Postgres container serves no TLS, and Atlas
@@ -808,10 +600,16 @@ jobs:
       # non-default ports, and fetches from OUTSIDE the container: the SPA, a
       # 401 on an unauthenticated collection read, the collections served to a
       # service key (which is how boot-time provisioning proves it happened),
-      # and first-run reporting that it needs setup. Then it restarts the api,
+      # and a seeded admin who can actually sign in. Then it restarts the api,
       # because provisioning runs on every boot and the second one is where a
       # non-idempotent step surfaces — otherwise as a crash loop on somebody's
       # server days after they deployed.
+      #
+      # It then does the whole thing again with the compose file `rebase init`
+      # generates, whose environment contract is a different one answered by a
+      # different writer (`configureEnvFile`, called here rather than
+      # transcribed). Both halves have shipped broken independently, and from a
+      # terminal each looks like the other's fault.
       #
       # `always()` for the same reason as its neighbours.
       - name: Self-host container acceptance

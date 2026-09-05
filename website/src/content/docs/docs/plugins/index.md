@@ -6,7 +6,13 @@ description: Extend Rebase with plugins — inject UI components, modify collect
 
 ## Overview
 
-Plugins are the primary extension mechanism in Rebase. They can:
+**Plugins are an admin-panel concept.** They run in the browser, inside the
+React admin, and are registered where you build it. Nothing in this page reaches
+the backend: a plugin cannot add a route, a callback or a cron. For those, see
+[Custom Functions](/docs/backend/custom-functions), [Entity
+Callbacks](/docs/collections/callbacks) and [Cron Jobs](/docs/backend/cron-jobs).
+
+Plugins are the primary extension mechanism in the panel. They can:
 
 - Wrap the entire app with a **provider** (context, state management)
 - Add **home page actions** and widgets
@@ -48,13 +54,45 @@ the **[Slots](/docs/frontend/slots)** page.
 
 ## Using Plugins
 
-Pass plugin instances to the navigation controller:
+Plugins go on `<Rebase>`, next to the client. Everything below it — the
+navigation, the collection views, the forms — reads them from there:
 
-```typescript
-const dataEnhancementPlugin = useDataEnhancementPlugin();
+```tsx
+import { Rebase, useRebaseAuthController } from "@rebasepro/app";
+import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 
-const plugins = [dataEnhancementPlugin];
+export function App() {
+    const authController = useRebaseAuthController({ client });
+    const dataEnhancementPlugin = useDataEnhancementPlugin();
 
+    return (
+        <Rebase
+            client={client}
+            authController={authController}
+            plugins={[dataEnhancementPlugin]}
+        >
+            <RebaseCMS collections={collections}/>
+            <RebaseShell title="My App"/>
+        </Rebase>
+    );
+}
+```
+
+Plugins are usually built by a hook, so the array is rebuilt on every render;
+that is fine, and it is why `plugins` is a prop rather than something you
+memoize by hand. Two plugins with the same `key` are a mistake — `<Rebase>`
+logs the duplicates rather than silently dropping one.
+
+For a single contribution you do not need a plugin at all: `<Rebase slots>`
+takes the same `SlotContribution` entries directly.
+
+### Under manual composition
+
+Only if you have replaced `<RebaseShell>` with the layers underneath it does
+the plugin list have to be threaded by hand, into the navigation controller:
+
+```tsx
 const navigationStateController = useBuildNavigationStateController({
     plugins,
     collections: () => collections,
@@ -65,6 +103,10 @@ const navigationStateController = useBuildNavigationStateController({
     urlController
 });
 ```
+
+`<RebaseNavigation>` does exactly this call for you, reading `plugins` off the
+customization controller `<Rebase>` provides. See
+[Advanced: manual layout](/docs/frontend#advanced-manual-layout).
 
 ## Building a Plugin
 
@@ -109,6 +151,30 @@ const enhancementPlugin = useDataEnhancementPlugin();
 ```
 
 ![Data enhancement](/img/data_enhancement.png)
+
+:::caution[This one sends data off your machine]
+Autofill posts the entity's field values to a hosted service to generate a
+suggestion. By default that service is **`https://app.rebase.pro/api/functions/ai`**,
+which Rebase runs — free to use, no configuration, and no credential attached:
+the requests are anonymous, bounded by rate limit rather than by identity. Your
+JWT is not sent.
+
+Whether that is acceptable depends on what is in the fields. Point `endpoint` at
+your own deployment to keep generation inside your infrastructure:
+
+```typescript no-verify
+const enhancementPlugin = useDataEnhancementPlugin({
+    endpoint: "https://ai.internal.example.com"
+});
+```
+
+The wire format is the whole contract — see `api.ts` in `@rebasepro/plugin-ai`,
+with a reference implementation in the control plane's `functions/ai.ts`. The
+plugin renders nothing until the host it points at reports itself available on
+`GET /status`, so a wrong URL is a missing button rather than a failed request.
+
+Every other built-in plugin is local to the browser and sends nothing anywhere.
+:::
 
 ## Collection Injection
 

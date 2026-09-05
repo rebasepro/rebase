@@ -205,7 +205,7 @@ This layer runs on every REST request. If the API key lacks the required permiss
 
 ## Layer 3: Global callbacks (every data path)
 
-Global callbacks are the **primary mechanism for backend-level security** when you cannot or do not want to use database-level RLS. They apply to **every** collection — a single cross-cutting point — and, unlike an API-boundary interceptor, they fire on *every* data path: REST, WebSocket/realtime, and server-side `rebase.data`. There is no read path that bypasses `afterRead`, which is what makes it safe to rely on for redaction.
+Global callbacks are the **primary mechanism for backend-level security** when you cannot or do not want to use database-level RLS. They apply to **every** collection — a single cross-cutting point — and, unlike an API-boundary interceptor, they fire on *every* data path: REST, WebSocket/realtime, and server-side `rebase.dataAsAdmin`. There is no read path that bypasses `afterRead`, which is what makes it safe to rely on for redaction.
 
 ### Configuration
 
@@ -332,7 +332,7 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
         beforeSave: async ({ values, context }) => {
             // Enforce business rule: only admins can set high-value orders
             const user = context.user;
-            if (values.total > 10000 && !user?.roles?.includes("admin")) {
+            if ((values.total ?? 0) > 10000 && !user?.roles?.includes("admin")) {
                 throw new Error("High-value orders require admin approval");
             }
             return values;
@@ -542,7 +542,7 @@ applies it inside the query. Use a callback only to stamp the tenant on write.
 -- The filter: enforced by the database on every read, for every caller.
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 CREATE POLICY documents_tenant ON documents FOR ALL TO public
-    USING (tenant_id = (rebase.jwt() -> 'tenant_id')::text);
+    USING (tenant_id = rebase.jwt() ->> 'tenant_id');
 ```
 
 ```typescript

@@ -103,3 +103,148 @@ describe("unmatched realtime error frames", () => {
         expect(warn).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * The console warning was the floor, not the answer. The server now names the
+ * channel on a refusal about one, which is all the client needed: channel
+ * frames were already routed by name, so a named error reaches the channel it
+ * is about and `channel.onError()` observes it.
+ *
+ * `broadcast()` still resolves on write. A collaborative app broadcasts sixty
+ * times a second; making each one wait for an acknowledgement would turn a
+ * fire-and-forget frame into a round trip, which is the reason it is
+ * fire-and-forget in the first place.
+ */
+describe("the socket routes a named error to its channel", () => {
+    let warn: any;
+
+    beforeEach(() => {
+        jest.useFakeTimers();
+        warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        warn.mockRestore();
+        jest.useRealTimers();
+    });
+
+    const connect = async () => {
+        const { RebaseWebSocketClient } = await import("./websocket");
+        const { FakeWS, deliver } = fakeSocket();
+        const client = new RebaseWebSocketClient({
+            websocketUrl: "ws://localhost:3000",
+            WebSocket: FakeWS
+        });
+        client.ensureConnected();
+        await jest.advanceTimersByTimeAsync(1);
+        return { client, deliver };
+    };
+
+    it("delivers it to that channel's handlers and to no others", async () => {
+        const { client, deliver } = await connect();
+        const mine: unknown[] = [];
+        const theirs: unknown[] = [];
+        client.onChannelMessage("doc:42", (m) => mine.push(m));
+        client.onChannelMessage("doc:99", (m) => theirs.push(m));
+
+        deliver({
+            type: "error",
+            channel: "doc:42",
+            payload: {
+                error: { message: 'Refused broadcast on channel "doc:42": not a member', code: "CHANNEL_FORBIDDEN" },
+                channel: "doc:42"
+            }
+        });
+
+        expect(mine).toHaveLength(1);
+        expect(theirs).toHaveLength(0);
+        // Routed, so the catch-all warning does not also fire.
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("still warns for an error that names no channel", async () => {
+        // Including one from a server older than the change that names it.
+        const { deliver } = await connect();
+
+        deliver({
+            type: "ERROR",
+            payload: { error: { message: "Too many channel messages.", code: "RATE_LIMITED" } }
+        });
+
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+});
+
+/**
+ * The channel end of the same path, against the transport seam rather than a
+ * socket — `ChannelTransport` is the interface `RebaseRealtimeChannel` is
+ * written against.
+ */
+describe("channel.onError", () => {
+    let warn: any;
+
+    beforeEach(() => {
+        warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    });
+    afterEach(() => warn.mockRestore());
+
+    const openChannel = async (name: string) => {
+        const { RebaseRealtimeChannel } = await import("./realtime-channel");
+        let deliver: (message: Record<string, unknown>) => void = () => {};
+        const transport = {
+            sendMessage: jest.fn(async () => undefined),
+            onChannelMessage: (_channel: string, handler: (m: Record<string, unknown>) => void) => {
+                deliver = handler;
+                return () => {};
+            },
+            onReconnect: () => () => {}
+        };
+        const channel = new RebaseRealtimeChannel(name, transport, {});
+        await channel.join();
+        return { channel, deliver: (m: Record<string, unknown>) => deliver(m) };
+    };
+
+    const refusal = {
+        type: "error",
+        channel: "doc:42",
+        payload: {
+            error: { message: 'Refused broadcast on channel "doc:42": not a member', code: "CHANNEL_FORBIDDEN" },
+            channel: "doc:42"
+        }
+    };
+
+    it("hands a CHANNEL_FORBIDDEN to the handler", async () => {
+        const { channel, deliver } = await openChannel("doc:42");
+        const seen: { message: string; code?: string }[] = [];
+        channel.onError((e) => seen.push({ message: e.message, code: e.code }));
+
+        deliver(refusal);
+
+        expect(seen).toHaveLength(1);
+        expect(seen[0].code).toBe("CHANNEL_FORBIDDEN");
+        expect(seen[0].message).toContain("not a member");
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("warns when nobody is watching, rather than dropping it", async () => {
+        const { deliver } = await openChannel("doc:42");
+
+        deliver(refusal);
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(String(warn.mock.calls[0][0])).toContain("CHANNEL_FORBIDDEN");
+        expect(String(warn.mock.calls[0][0])).toContain("onError");
+    });
+
+    it("stops delivering after unsubscribe", async () => {
+        const { channel, deliver } = await openChannel("doc:42");
+        const seen: unknown[] = [];
+        const off = channel.onError((e) => seen.push(e));
+
+        deliver(refusal);
+        off();
+        deliver(refusal);
+
+        expect(seen).toHaveLength(1);
+    });
+});

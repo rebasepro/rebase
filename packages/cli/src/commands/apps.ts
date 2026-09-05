@@ -26,6 +26,7 @@ import {
     writeManifest
 } from "../manifest";
 import { readLink } from "./cloud/context";
+import { unknownCommand } from "../utils/unknown-command";
 
 function printHelp(): void {
     console.log(`
@@ -42,6 +43,9 @@ ${chalk.bold("Options")}
   -h, --help                   Show this help
 `.trim());
 }
+
+/** Everything the switch below dispatches, for the did-you-mean. */
+const APPS_SUBCOMMANDS = ["list", "init", "config"] as const;
 
 export async function appsCommand(subcommand: string | undefined, rawArgs: string[] = []): Promise<void> {
     // Help is answered before parsing, so `rebase apps config --help` prints the
@@ -76,10 +80,7 @@ export async function appsCommand(subcommand: string | undefined, rawArgs: strin
             await printAppConfig(positionals[1], Boolean(args["--json"]));
             break;
         default:
-            console.error(chalk.red(`Unknown subcommand: ${subcommand}`));
-            console.log("");
-            printHelp();
-            process.exit(1);
+            unknownCommand(subcommand, APPS_SUBCOMMANDS, "apps");
     }
 }
 
@@ -215,7 +216,11 @@ async function printAppConfig(appName: string | undefined, asJson: boolean): Pro
 
     if (!apiUrl) {
         console.log(chalk.yellow("This checkout is not linked to a project yet."));
-        console.log(chalk.dim(`  Run ${chalk.cyan("rebase link")} (cloud) or ${chalk.cyan("rebase link <url>")} (self-hosted).`));
+        // `rebase cloud link`, not `rebase link`. There has never been a
+        // top-level `link` command — `cli.ts` dispatches `cloud`, and the link
+        // lives inside that family — so this hint named something that exits 1
+        // on the very screen that exists to tell you what to run next.
+        console.log(chalk.dim(`  Run ${chalk.cyan("rebase cloud link")} (cloud) or ${chalk.cyan("rebase cloud link <url>")} (self-hosted).`));
         console.log("");
     }
 

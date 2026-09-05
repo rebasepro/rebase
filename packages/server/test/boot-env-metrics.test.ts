@@ -1,4 +1,4 @@
-import { isLocalhostOrigin, resolveCorsOrigin, resolveEnableSwagger } from "../src/boot/env";
+import { isLocalhostOrigin, loadBootEnv, resolveCorsOrigin, resolveEnableSwagger } from "../src/boot/env";
 import type { RebaseBootEnv } from "../src/boot/env";
 import { MetricsRegistry, classifySurface } from "../src/metrics";
 
@@ -24,6 +24,53 @@ describe("resolveCorsOrigin", () => {
     it("allows a request with no Origin in development", () => {
         // curl, same-origin and server-to-server calls send no Origin header.
         expect(resolveCorsOrigin(env({ NODE_ENV: "development" }))("")).toBe("*");
+    });
+
+    /**
+     * `CORS_ORIGINS` used to be read only in production, so setting it in
+     * development did nothing — and development is where it is most often
+     * needed: a phone on the LAN, an ngrok tunnel, a forwarded Codespaces port.
+     * All non-localhost, all refused, with the variable that names the fix
+     * having no effect.
+     */
+    it("adds CORS_ORIGINS to localhost in development rather than ignoring it", () => {
+        const origin = resolveCorsOrigin(env({
+            NODE_ENV: "development",
+            CORS_ORIGINS: "http://192.168.1.5:5173"
+        }));
+
+        expect(origin("http://192.168.1.5:5173")).toBe("http://192.168.1.5:5173");
+        // Localhost still works without being listed…
+        expect(origin("http://localhost:5173")).toBe("http://localhost:5173");
+        // …and an origin that is neither is still refused. Credentials are on,
+        // so reflecting an arbitrary Origin would hand any site the developer
+        // visits their dev session.
+        expect(origin("https://evil.example.com")).toBeNull();
+    });
+
+    it("reads FRONTEND_URL in development too", () => {
+        const origin = resolveCorsOrigin(env({
+            NODE_ENV: "development",
+            FRONTEND_URL: "http://192.168.1.5:5173"
+        }));
+
+        expect(origin("http://192.168.1.5:5173")).toBe("http://192.168.1.5:5173");
+    });
+
+    it("names the variable that would allow a refused origin, once", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => { /* capture */ });
+        try {
+            const origin = resolveCorsOrigin(env({ NODE_ENV: "development" }));
+            origin("http://192.168.1.5:5173");
+            origin("http://192.168.1.5:5173");
+
+            // A refused preflight is retried on every request; one line is the
+            // fix, a line per request is noise that buries it.
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(String(warn.mock.calls[0][0])).toContain("CORS_ORIGINS=http://192.168.1.5:5173");
+        } finally {
+            warn.mockRestore();
+        }
     });
 
     it("serves an explicit allow-list in production and nothing else", () => {
@@ -183,5 +230,40 @@ describe("MetricsRegistry", () => {
         const output = new MetricsRegistry().render();
         expect(output).toContain("rebase_process_heap_bytes");
         expect(output).toContain("rebase_uptime_seconds");
+    });
+});
+
+/**
+ * The message an operator who forgot a variable actually reads.
+ *
+ * `loadBootEnv` restates a ZodError as a list of variables, and its "this one
+ * is simply missing" branch tested for zod 3's `"Invalid input"` — a string zod
+ * 4 never produces. Every missing variable therefore printed the validator's
+ * own wording, which says `expected string, received undefined` rather than the
+ * one thing the reader needs to know.
+ */
+describe("loadBootEnv", () => {
+    const saved = { ...process.env };
+
+    afterEach(() => {
+        for (const key of Object.keys(process.env)) delete process.env[key];
+        Object.assign(process.env, saved);
+    });
+
+    it("says a missing variable is required, and quotes the rule for a wrong one", () => {
+        // Production so that nothing is auto-generated into process.env and no
+        // dev-secret file is written beside the test.
+        process.env.NODE_ENV = "production";
+        process.env.JWT_SECRET = "j".repeat(48);
+        process.env.REBASE_SERVICE_KEY = "s".repeat(48);
+        process.env.CORS_ORIGINS = "https://app.example.com";
+        delete process.env.DATABASE_URL;
+
+        expect(() => loadBootEnv()).toThrow(/DATABASE_URL: is required/);
+
+        // A variable that IS set, and wrong, keeps the rule it broke — "is
+        // required" would be a lie there.
+        process.env.DATABASE_URL = "not-a-url";
+        expect(() => loadBootEnv()).toThrow(/DATABASE_URL must be a valid URL/);
     });
 });

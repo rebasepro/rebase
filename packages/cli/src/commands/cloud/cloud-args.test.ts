@@ -49,7 +49,16 @@ import { resolveDomainArg } from "./domains";
 import { resolveExtensionArgs } from "./extensions";
 import { resolveDeploymentIdArg } from "./deployments";
 import { resolveBackupArgs } from "./databases";
-import { resolveWebhookIdArg, webhooksCommand, resolveClusterVerifyArgs, resolveClusterAddArgs } from "./resources";
+import {
+    resolveWebhookIdArg,
+    webhooksCommand,
+    resolveClusterVerifyArgs,
+    resolveClusterAddArgs,
+    storageCommand,
+    clustersCommand,
+    resourcesCommand,
+    billingCommand
+} from "./resources";
 import { resolveProjectArg } from "./projects";
 import { resolveDeployArgs } from "./deploy";
 
@@ -406,6 +415,58 @@ pendingRedeploy: true }));
         expect(del).toHaveBeenCalledTimes(1);
         expect(del.mock.calls[0][0]).toBe("42");
     });
+
+    /**
+     * `webhooks create` names its destination `--endpoint`, and the reason is
+     * not taste.
+     *
+     * `--url` is a GLOBAL in this family: `resolveCloudUrl` reads it off the raw
+     * line, ahead of the env var and ahead of the link file, for every command.
+     * So the documented `webhooks create … --url https://example.com/hook` sent
+     * the customer's webhook endpoint to `requireClient` as the control plane to
+     * authenticate against — the one command whose whole argument is somebody
+     * else's URL. Both halves are asserted: the row gets the endpoint, and the
+     * control plane is still the control plane.
+     */
+    it("`webhooks create --endpoint <url>` does not retarget the control plane", async () => {
+        const created: Array<Record<string, unknown>> = [];
+        const client = {
+            functions: { invoke: vi.fn(async () => ({})) },
+            data: {
+                collection: () => ({
+                    find: async () => ({ data: [] }),
+                    findById: async () => undefined,
+                    update: async () => ({}),
+                    create: async (row: Record<string, unknown>) => {
+                        created.push(row);
+                        return { id: 7 };
+                    },
+                    delete: async () => ({})
+                })
+            }
+        };
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client,
+            url: "https://cp.example"
+        });
+
+        const line = argv(
+            "webhooks", "create",
+            "--name", "notify", "--table", "orders",
+            "--endpoint", "https://example.com/hook"
+        );
+
+        const log = vi.spyOn(console, "log").mockImplementation(() => {});
+        await webhooksCommand("create", line);
+        log.mockRestore();
+
+        expect(created).toHaveLength(1);
+        expect(created[0].url).toBe("https://example.com/hook");
+        // The half that was the bug. `resolveCloudUrl` is the real one — the
+        // module mock above leaves it alone — so this is the same read the
+        // client factory makes.
+        expect(context.resolveCloudUrl(line)).not.toBe("https://example.com/hook");
+    });
 });
 
 /**
@@ -452,6 +513,55 @@ baseline: true });
     it("refuses an undeclared flag rather than verifying a cluster named after it", async () => {
         const err = await refusalOf(() => resolveClusterVerifyArgs(argv("clusters", "verify", "--baselin")));
         expect(err.code).toBe("usage");
+    });
+});
+
+/**
+ * A mistyped action word refuses. It used to run the group's DEFAULT action.
+ *
+ * These four groups are written as a chain of `if (action === "x") return …`
+ * with the listing at the bottom, so anything that matched nothing fell through
+ * to it: `storage creat` listed the buckets and exited 0, `clusters verifyy`
+ * listed the clusters, `resources et --cpu 500m` printed the current dials, and
+ * `billing usage` printed the billing account. Every one of them reports a typo
+ * as a successful run of a command nobody asked for — which is worse than an
+ * error, because an agent branching on the exit code learns nothing and a person
+ * reads plausible output.
+ *
+ * The refusal comes before the client is built, so none of these needs a
+ * session — which is also what makes it cheap enough to do on every group.
+ */
+describe("a mistyped action word refuses instead of running the default", () => {
+    it.each([
+        ["storage", (line: string[]) => storageCommand("creat", line)],
+        ["clusters", (line: string[]) => clustersCommand("verifyy", line)],
+        ["resources", (line: string[]) => resourcesCommand("et", line)],
+        ["webhooks", (line: string[]) => webhooksCommand("creat", line)]
+    ])("%s", async (group, run) => {
+        const err = await refusalOf(() => run(argv(group, "typo")));
+        expect(err.code).toBe("unknown_command");
+        expect(err.message).toContain(group);
+    });
+
+    it("billing, whose action is a positional rather than the dispatcher's", async () => {
+        const err = await refusalOf(() => billingCommand(argv("billing", "usage")));
+        expect(err.code).toBe("unknown_command");
+    });
+
+    it("still runs the default action when no word was given at all", async () => {
+        // The guard must not swallow the bare form, which is every one of these
+        // groups' listing.
+        const client = {
+            functions: { invoke: vi.fn(async () => ({})) },
+            data: { collection: () => ({ find: async () => ({ data: [] }) }) }
+        };
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client,
+            url: "https://cp.example"
+        });
+        const log = vi.spyOn(console, "log").mockImplementation(() => {});
+        await storageCommand(undefined, argv("storage"));
+        log.mockRestore();
     });
 });
 

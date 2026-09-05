@@ -80,10 +80,20 @@ release carries `version-pin: ignore`.
 
 ## What is globbed
 
-`website/`, `tooling/rebase-agent-skills/`, `examples/*/`, the marketing components, the
-MCP manifests — and the repository's own agent instructions: `AGENT.md`,
-`.agents/*.md` and `.agent/workflows/*.md` (`AGENT_INSTRUCTION_GLOBS` in
-`extract.mjs`).
+`website/`, `tooling/rebase-agent-skills/`, `examples/*/`, `packages/*/README.md`,
+the marketing components, the MCP manifests — and the repository's own agent
+instructions: `AGENT.md` and `.agent/workflows/*.md`
+(`AGENT_INSTRUCTION_GLOBS` in `extract.mjs`).
+
+The package READMEs joined late, and paid for themselves on the first run:
+`@rebasepro/mcp` told two different readers to run `npx rebase-mcp`, which is
+this package's *binary* name and an unrelated third party's package on npm.
+That is the npm landing page for the server, and the check that catches the
+mistake had existed for months — it had just never been pointed at the file.
+
+`check-mcp-tool-tables.mjs` covers the other half of that README. Its eight tool
+tables are generated from `ALL_TOOLS` by `pnpm generate:mcp-readme` and diffed
+here, because a hand-maintained table of forty tools is a table that says six.
 
 That last group was added because the gap was load-bearing. While every checked
 surface reported zero findings, `AGENT.md` and

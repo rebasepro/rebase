@@ -37,7 +37,7 @@ import {
     MenubarSubTriggerIndicator
 } from "@rebasepro/ui";
 
-function useOpenMenuWithSub(ref: React.RefObject<HTMLDivElement>, triggerIndex: number) {
+function useOpenMenuWithSub(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
     React.useEffect(() => {
         const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
         trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));

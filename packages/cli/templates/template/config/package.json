@@ -16,7 +16,7 @@
     "@rebasepro/types": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^20.19.41",
+    "@types/node": "^22.19.4",
     "typescript": "^5.9.2"
   },
   "exports": {

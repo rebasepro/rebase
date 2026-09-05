@@ -10,7 +10,11 @@ description: Create a new Rebase project and get it running locally in under 2 m
 pnpm dlx @rebasepro/cli init my-app
 ```
 
-This scaffolds a project with three packages:
+This scaffolds a project with three packages. If any of *collection*, *Studio*,
+*managed runtime*, *bundle* or *resource* is new, the five-word box on
+[Project Structure](/docs/getting-started/project-structure/) defines them.
+
+
 
 | Folder | Description |
 |--------|-------------|
@@ -20,9 +24,10 @@ This scaffolds a project with three packages:
 
 ## Prerequisites
 
-- **Node.js** 22.22+ (a headless `--headless` project needs only 20)
-- **Docker** — to run the included PostgreSQL container. (Or bring your own PostgreSQL: local install, Neon, Supabase, etc.)
+- **Node.js** 22.22+, the version in `.nvmrc` (a headless `--headless` project needs only 20)
 - **pnpm** (recommended) or npm
+
+No database to install, and no Docker. `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. See [Variant: use your own PostgreSQL](#variant-use-your-own-postgresql) if you would rather supply one — a local install, Neon, Supabase, or the container this scaffold ships.
 
 ## Your Environment Is Already Configured
 
@@ -61,11 +66,11 @@ Pin a port with `rebase dev --port 3001`.
 | Flag | On | What it does |
 |---|---|---|
 | `--yes` | `init` | Accept every default. **Required when there is no terminal to prompt**, such as CI |
-| `--headless` | `init` | A backend with no collection files and no UI — see [below](#just-the-api-headless) |
+| `--headless` | `init` | A backend with no collection files and no UI — see [Backend only](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Start from a template other than the default |
 | `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
 | `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one |
-| `--no-db` | `dev` | Touch no database at all; you bring one |
+| `--no-db` | `dev` | Start no database at all — not the container and not the managed one. Set `DATABASE_URL` yourself |
 
 ## Variant: use your own PostgreSQL
 
@@ -81,7 +86,8 @@ touched, and one pointing anywhere other than this machine is left alone
 entirely.
 
 With your own database you also get the migration commands, which the managed one
-cannot offer — they plan changes with Atlas, which needs a second empty database
+cannot offer — they plan changes with [Atlas](https://atlasgo.io/), the schema-migration engine
+Rebase plans with, which needs a second empty database
 to compare against, and PGlite serves exactly one:
 
 ```bash
@@ -89,7 +95,9 @@ pnpm run db:push
 ```
 
 Boot already creates missing tables additively, so `db push` is for the two
-things it deliberately leaves alone: junction-table RLS on many-to-many
+things it deliberately leaves alone: junction-table
+[RLS](/docs/collections/security-rules/) — PostgreSQL's row-level security, which is
+how Rebase enforces who may read a row — on many-to-many
 relations, and any change that is not purely additive — a renamed column, a
 narrowed type, a removed field.
 
@@ -173,28 +181,31 @@ export const collections = [
 
 ## Create the Table
 
-Restart the dev servers. `rebase dev` regenerates the schema from your
-collections and boot creates the new table, so your **Products** collection
-appears in the navigation.
+Save the file. That is the whole step: `rebase dev` regenerates
+`backend/src/schema.generated.ts` from your collections, restarts the backend,
+and boot creates the new table — so your **Products** collection appears in the
+navigation.
 
-On your own PostgreSQL you can also apply it without restarting:
+The same is true of a property added to a collection you already have: save,
+and the column is there.
+
+`rebase db push` is for the changes boot deliberately leaves alone — a renamed
+column, a narrowed type, a removed field, and junction-table RLS on
+many-to-many relations. It needs your own PostgreSQL:
 
 ```bash
 pnpm run db:push
 ```
 
-That is also the command for the changes boot leaves alone — a renamed column, a
-narrowed type, a removed field.
-
 ## Database Commands Reference
 
 | Command | Description |
 |---------|-------------|
-| `rebase schema generate` | Generate Drizzle schema from your TypeScript collections |
+| `rebase schema generate` | Generate the Drizzle schema from your TypeScript collections. No database needed — `rebase dev` runs it for you |
 | `rebase schema introspect` | Generate TypeScript collections from an existing database |
-| `rebase db push` | Push schema changes directly to the database (dev only) |
-| `rebase db generate` | Generate SQL migration files |
-| `rebase db migrate` | Run pending migrations |
+| `rebase db push` | Push schema changes directly to the database. Needs your own PostgreSQL |
+| `rebase db generate` | Generate SQL migration files. Needs your own PostgreSQL |
+| `rebase db migrate` | Run pending migrations. Needs your own PostgreSQL |
 
 ## What's Next
 

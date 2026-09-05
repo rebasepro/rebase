@@ -8,10 +8,20 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check existing session synchronously
-    const session: RebaseSession | null = client.auth.getSession();
-    if (session?.user) setUser(session.user);
-    setLoading(false);
+    let cancelled = false;
+
+    // Wait for the client to finish restoring a session before deciding there
+    // is none. `getSession()` is synchronous and answers `null` while a restore
+    // is still in flight — which is always, on the first render of a cookie-mode
+    // app: the refresh token is in an HttpOnly cookie the page cannot read, so
+    // the client has to ask the server. Reading it synchronously rendered the
+    // signed-out view for one round trip on every reload.
+    client.auth.isInitialized().then(() => {
+      if (cancelled) return;
+      const session: RebaseSession | null = client.auth.getSession();
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
     // Subscribe to auth changes
     const unsubscribe = client.auth.onAuthStateChange((event, session) => {
@@ -22,7 +32,10 @@ export function useAuth() {
       }
     });
 
-    return unsubscribe;
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {

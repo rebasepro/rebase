@@ -10,17 +10,54 @@ import {
     WhereFilterOp,
     WhereValueFor,
     WriteOptions,
-    type ComputedSortField
+    isUnsupported,
+    unsupportedMethod,
+    type ComputedSortField,
+    type FieldPath,
+    type RelationAggregateSort
 } from "@rebasepro/types";
 import { collectAllPages, normalizeOrderBy, paginateFind, resolveFindWindow } from "@rebasepro/common";
 
 import { SDKQueryBuilder } from "./sdk_query_builder";
 
 /**
- * Counts currently in flight, keyed by the exact request they issue. Entries
- * live only for the duration of the request — see `count()` for why.
+ * What `listen`/`listenById` say on a client that has no socket.
+ *
+ * One sentence, in one place: it used to live in `SDKQueryBuilder.listen` only,
+ * so the same failure reached callers of `client.data.posts.listen` as
+ * `undefined is not a function`.
  */
-const inflightCounts = new Map<string, Promise<number>>();
+const NO_SOCKET =
+    "Listen is only available when RebaseClient is configured with a websocketUrl, "
+    + "and not when it was created with realtime: false.";
+
+/**
+ * Counts currently in flight, **per client**, keyed by the exact request they
+ * issue. Entries live only for the duration of the request — see `count()` for
+ * why they exist at all.
+ *
+ * The map used to be module-level, shared by every client in the process. A
+ * request key is a path and a query string: it says nothing about *who* is
+ * asking. So two clients holding different credentials — an admin panel beside
+ * a signed-in user's client, a per-request server client in a Node process, a
+ * test asserting one client's calls — counting the same collection would share
+ * one request, and whichever arrived second was answered with the first one's
+ * total. Row-level security makes those genuinely different numbers.
+ *
+ * Keyed on the transport instead, which is the object a credential lives on.
+ * A `WeakMap`, so a closed client's entry goes with it.
+ */
+const inflightCounts = new WeakMap<Transport, Map<string, Promise<number>>>();
+
+/** The in-flight map for one transport, created on first use. */
+function inflightCountsFor(transport: Transport): Map<string, Promise<number>> {
+    let map = inflightCounts.get(transport);
+    if (!map) {
+        map = new Map<string, Promise<number>>();
+        inflightCounts.set(transport, map);
+    }
+    return map;
+}
 
 /**
  * A live query result: a normal {@link FindResult} plus what an interface
@@ -204,10 +241,13 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
          * and the route now name one verb, and a spec-validating gateway in
          * front of the API sees the operation the server actually implements.
          */
-        async update(id: string | number, data: Partial<M>) {
+        async update(id: string | number, data: Partial<M>, options?: WriteOptions) {
             const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
                 method: "PATCH",
-                body: JSON.stringify(data)
+                body: JSON.stringify(data),
+                ...(options?.idempotencyKey
+                    ? { headers: { "Idempotency-Key": options.idempotencyKey } }
+                    : {})
             });
             return raw as M;
         },
@@ -289,17 +329,18 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             // The entry is dropped as soon as it settles, so this merges
             // concurrent calls only and never serves a cached total.
             const key = basePath + "/count" + qs;
-            const inflight = inflightCounts.get(key);
-            if (inflight) return inflight;
+            const inflight = inflightCountsFor(transport);
+            const existing = inflight.get(key);
+            if (existing) return existing;
 
             const request = transport
                 .request<{ count: number }>(key, { method: "GET" })
                 .then((raw) => raw.count ?? 0);
-            inflightCounts.set(key, request);
+            inflight.set(key, request);
             try {
                 return await request;
             } finally {
-                inflightCounts.delete(key);
+                inflight.delete(key);
             }
         },
 
@@ -341,7 +382,10 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             client.find(params).then((result) => deliver(result, false)).catch((error) => {
                 if (!closed) onError?.(error as Error);
             });
-            const live = options?.realtime !== false && client.listen
+            // `observe()` degrades to the single fetch above rather than
+            // throwing, so it asks the capability question explicitly — the
+            // method itself is always there now.
+            const live = options?.realtime !== false && !isUnsupported(client.listen)
                 ? client.listen(params, (result) => deliver(result, true), onError)
                 : undefined;
             return () => {
@@ -374,7 +418,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             client.findById(id).then((row) => deliver(row, false)).catch((error) => {
                 if (!closed) onError?.(error as Error);
             });
-            const live = options?.realtime !== false && client.listenById
+            const live = options?.realtime !== false && !isUnsupported(client.listenById)
                 ? client.listenById(id, (row) => deliver(row, true), onError)
                 : undefined;
             return () => {
@@ -391,7 +435,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             }
             return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValueFor<WhereFilterOp, M[keyof M & string]>);
         },
-        orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc") {
+        orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction?: "asc" | "desc") {
             return new SDKQueryBuilder<M>(client).orderBy(column, direction);
         },
         limit(count: number) {
@@ -412,7 +456,16 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         },
         include(...relations: string[]) {
             return new SDKQueryBuilder<M>(client).include(...relations);
-        }
+        },
+
+        // `listen`/`listenById` are part of the contract, so they are always
+        // here to call. Without a socket they are stubs that say why, rather
+        // than absent properties every call site had to null-check — a check
+        // that was indistinguishable from "does this transport support
+        // realtime?", which is `isUnsupported()` and is what the admin panel
+        // actually asks before choosing to poll instead.
+        listen: unsupportedMethod(NO_SOCKET),
+        listenById: unsupportedMethod(NO_SOCKET)
     };
 
     if (ws) {
@@ -479,34 +532,35 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                         });
                     };
 
-                    // With no count to go on, the only defensible total is a
-                    // lower bound: the rows on this page plus the ones paged
-                    // past to reach them. Reporting `rows.length` claimed a
-                    // collection read at offset 10 held two rows.
-                    const emitWithoutCount = () => emit(
-                        offset + rows.length,
-                        rows.length >= requestedLimit
-                    );
-
-                    if (client.count) {
-                        client.count(params)
-                            .then((total) => {
-                                lastKnownTotal = total;
-                                emit(total, offset + rows.length < total);
-                            })
-                            .catch(() => {
-                                // A count that failed is not evidence about the
-                                // size of the collection. Keep the last real
-                                // answer; only guess if there has never been one.
-                                if (lastKnownTotal !== undefined) {
-                                    emit(lastKnownTotal, offset + rows.length < lastKnownTotal);
-                                } else {
-                                    emitWithoutCount();
-                                }
-                            });
-                    } else {
-                        emitWithoutCount();
-                    }
+                    // One emission per push, and it waits for the count: a
+                    // subscriber is called back once, with metadata that
+                    // describes the rows beside it. (The docs used to promise
+                    // two emissions and an `estimated` flag; neither has ever
+                    // existed here.)
+                    //
+                    // A push that lands while a count is in flight bumps
+                    // `lastUpdateId`, and `emit` drops the stale one — so the
+                    // wait cannot deliver a total belonging to an older page.
+                    client.count(params)
+                        .then((total) => {
+                            lastKnownTotal = total;
+                            emit(total, offset + rows.length < total);
+                        })
+                        .catch(() => {
+                            // A count that failed is not evidence about the
+                            // size of the collection. Keep the last real
+                            // answer; only guess if there has never been one.
+                            if (lastKnownTotal !== undefined) {
+                                emit(lastKnownTotal, offset + rows.length < lastKnownTotal);
+                                return;
+                            }
+                            // With no count to go on, the only defensible total
+                            // is a lower bound: the rows on this page plus the
+                            // ones paged past to reach them. Reporting
+                            // `rows.length` claimed a collection read at offset
+                            // 10 held two rows.
+                            emit(offset + rows.length, rows.length >= requestedLimit);
+                        });
                 },
                 onError
             );

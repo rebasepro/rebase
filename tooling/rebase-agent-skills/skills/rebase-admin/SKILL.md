@@ -1,13 +1,13 @@
 ---
 name: rebase-admin
-description: Guide for navigating the Rebase admin panel, opening entities in side drawers, building URLs, embedding collection panels, using the collection registry, and programmatic navigation. Use this skill when an agent or user needs to navigate to a collection view, open a entity in the side panel/drawer, build admin URLs, embed a collection inside a custom page, use the entity selection dialog, or access admin-specific controllers.
+description: Guide for navigating the Rebase admin panel, opening entities in side drawers, building URLs, embedding collection panels, using the collection registry, and programmatic navigation. Use this skill when an agent or user needs to navigate to a collection view, open an entity in the side panel/drawer, build admin URLs, embed a collection inside a custom page, use the entity selection dialog, or access admin-specific controllers.
 ---
 
 # Rebase Admin (`@rebasepro/cms`)
 
 The `@rebasepro/cms` package provides the admin-panel layer for Rebase. It handles collection views, entity editing, navigation, side panels (drawers), URL routing, breadcrumbs, and the full admin context. This skill covers the **programmatic APIs** for navigating and interacting with the admin.
 
-> **IMPORTANT FOR AGENTS:** All hooks in this skill must be called **inside** the `<RebaseShell>` component tree. They rely on React contexts provided by `<RebaseNavigation>`, `<SideEntityProvider>`, and `<RebaseRouteDefs>`.
+> **IMPORTANT FOR AGENTS:** All hooks in this skill must be called **inside** the `<RebaseShell>` component tree. They rely on React contexts provided by `<RebaseNavigation>`, `<SidePanelProvider>`, and `<RebaseRouteDefs>`.
 
 > **Building the view itself?** This skill covers navigation and admin plumbing. For what the view should *look* like, read the **`rebase-design-language`** skill first — custom views render inside the admin shell and must match it. It ships whole-view skeletons and points at the live UI reference at `/debug/ui`.
 
@@ -21,7 +21,7 @@ The `@rebasepro/cms` package provides the admin-panel layer for Rebase. It handl
 | Embed a collection in a custom page | `<CollectionPanel>` | `@rebasepro/cms` |
 | Add custom top-level views | `<RebaseCMS views={[...]}>` | `@rebasepro/cms` |
 | Replace how one property is edited or shown | `admin: { Field, Preview }` | see §12 |
-| Open a entity selection dialog | `useSelectionDialog()` | `@rebasepro/cms` |
+| Open an entity selection dialog | `useSelectionDialog()` | `@rebasepro/cms` |
 | Open a custom side dialog | `useSideDialogsController()` | `@rebasepro/cms` |
 | Set breadcrumbs | `useBreadcrumbsController()` | `@rebasepro/cms` |
 | Access full admin context | `useAdminContext()` | `@rebasepro/cms` |
@@ -372,7 +372,7 @@ function MyComponent() {
     const { open, close } = useSelectionDialog<Product>({
         path: "products",
         onSingleEntitySelected: (entity) => {
-            console.log("Selected:", entity.id);
+            console.log("Selected:", entity?.id);
             close();
         }
     });
@@ -572,7 +572,7 @@ context.data;           // DataSource from RebaseContext
 
 ## 10. Common Patterns
 
-### Navigate to a collection and open a entity
+### Navigate to a collection and open an entity
 
 ```tsx
 import { useUrlController, useSidePanel } from "@rebasepro/cms";
@@ -760,14 +760,21 @@ const isAdmin = window.location.pathname.startsWith("/admin");
 const ProductApp = lazy(() => import("./App"));
 const AdminApp = lazy(() => import("./AdminApp"));
 
-if (isAdmin) {
-    // The admin uses useBlocker → needs a DATA router
-    const router = createBrowserRouter([{ path: "/admin/*", element: <AdminApp /> }]);
-    root.render(<RouterProvider router={router} />);
-} else {
-    root.render(<BrowserRouter><ProductApp /></BrowserRouter>);
-}
+// The admin uses useBlocker → needs a DATA router. Use one for both halves.
+const router = isAdmin
+    ? createBrowserRouter([{ path: "/*", element: <AdminApp/> }], { basename: "/admin" })
+    : createBrowserRouter([{ path: "/*", element: <ProductApp/> }]);
+
+root.render(<RouterProvider router={router}/>);
 ```
+
+When the admin is the whole frontend, do not hand-write the prefix at all: set
+`apps.<name>.path` in `rebase.json` and `rebase build` passes it to Vite as
+`base`, which the scaffold's `main.tsx` already reads back out of
+`import.meta.env.BASE_URL` and gives to the router as `basename`.
+
+The alternative, when the admin is nested inside a route of a larger app with
+no `basename`, is to tell the CMS about the prefix instead:
 
 ```tsx
 // frontend/src/AdminApp.tsx — tell the admin about the prefix
@@ -887,8 +894,8 @@ The admin package exports the following components (from `@rebasepro/cms`):
 | `getLastSegment(path)` | Get last path segment |
 | `getCollectionBySlugWithin(collections, slug)` | Find collection in array |
 | `mergeEntityActions(...)` | Merge entity action arrays |
-| `resolveEntityAction(...)` | Resolve a entity action |
-| `resolveEntityView(...)` | Resolve a entity view |
+| `resolveEntityAction(...)` | Resolve an entity action |
+| `resolveEntityView(...)` | Resolve an entity view |
 | `isReferenceProperty(prop)` | Check if property is a reference |
 | `isRelationProperty(prop)` | Check if property is a relation |
 | `getIconForProperty(prop)` | Get icon for a property type |

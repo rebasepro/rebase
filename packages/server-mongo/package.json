@@ -29,9 +29,8 @@
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
-  "source": "src/index.ts",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.22.0"
   },
   "scripts": {
     "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found \u2014 use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
@@ -39,6 +38,7 @@
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
     "test:lint": "eslint \"src/**\" --quiet",
     "test": "jest --passWithNoTests --forceExit",
+    "test:watch": "jest --watch",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
   },
   "exports": {
@@ -76,14 +76,7 @@
     }
   },
   "files": [
-    "dist",
-    "src",
-    "!src/**/*.test.ts",
-    "!src/**/*.test.tsx",
-    "!src/**/*.spec.ts",
-    "!src/**/*.spec.tsx",
-    "!src/**/__tests__/**",
-    "!src/tests/**"
+    "dist"
   ],
   "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
   "publishConfig": {

@@ -1210,12 +1210,14 @@ keyToIconComponent("arrow_right"); // "ArrowRightIcon"
 keyToIconComponent("database");    // "DatabaseIcon"
 ```
 
+<!-- docs-verify: ignore -->
 > **NOT IMPORTABLE.** `@rebasepro/ui` does not re-export this from its entry
 > point, and its `exports` map has no `./util/*` subpath — the deep import
 > `@rebasepro/ui/util/key_to_icon_component` resolves inside this repository and
 > fails for every installed consumer. It is documented because framework code
-> uses it internally. In app code, map the key yourself or use the `<Icon>`
-> component, which already accepts an icon key.
+> uses it internally. In app code, map the key yourself, or use `<LucideIconByName name="…" />`
+> from `@rebasepro/ui`, which renders an icon by name and fetches the set on
+> first use. There is no `<Icon>` component.
 
 ### Custom Icons
 

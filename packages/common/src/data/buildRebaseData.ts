@@ -1,10 +1,23 @@
-import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, RebaseApiError, RebaseData, RebaseSdkData, SDKCollectionClient, SDKQueryBuilderInterface, type ComputedSortField, type SearchMatch, WhereFilterOp, WhereValueFor } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type ComputedSortField, type FieldPath, type NonColumnFieldPath, type SearchMatch, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
 import { collectAllPages, paginateFind, resolveFindWindow } from "./paginate";
 import { normalizeOrderBy } from "./sort-dialect";
 import { deserializeFilter } from "./filter-dialect";
 import { buildCompositeId, resolvePrimaryKeys, PrimaryKeyInfo } from "../util/identity";
+
+/**
+ * What a client says when its data source cannot subscribe.
+ *
+ * Named rather than inlined so the sentence a caller sees does not depend on
+ * which of the two adapters below happened to build the client.
+ */
+const noRealtime = (slug: string): string =>
+    `Realtime is not available for "${slug}": its data source does not support subscriptions.`;
+
+/** What a client says when its data source cannot count. */
+const noCount = (slug: string): string =>
+    `Counting is not available for "${slug}": its data source does not support it.`;
 
 export interface EntityDataOptions {
     /**
@@ -456,10 +469,17 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
     constructor(private client: SDKCollectionClient<M>) {}
 
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
+    /** A relation path (`author.name`) or a JSON path (`metadata->>tier`). */
+    where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): this;
     where(logicalCondition: LogicalCondition): this;
     where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown): this {
         if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {
-            this.params.logical = columnOrCondition as LogicalCondition;
+            // A second group narrows rather than replaces — see the SDK
+            // builder in `@rebasepro/client`, which had the same defect.
+            const next = columnOrCondition as LogicalCondition;
+            this.params.logical = this.params.logical
+                ? { type: "and", conditions: [this.params.logical, next] }
+                : next;
             return this;
         }
         if (!this.params.where) this.params.where = {};
@@ -483,9 +503,9 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
     }
 
     /** Called again, this adds a tie-breaker rather than replacing the sort. */
-    orderBy(column: (keyof M & string) | ComputedSortField, direction: "asc" | "desc" = "asc"): this {
+    orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction: "asc" | "desc" = "asc"): this {
         const existing = normalizeOrderBy(this.params.orderBy) ?? [];
-        this.params.orderBy = [...existing, [column, direction] as OrderByTuple];
+        this.params.orderBy = [...existing, [sortKeyToString(column), direction] as OrderByTuple];
         return this;
     }
 
@@ -511,14 +531,42 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
         return this.client.find(this.params as FindParams<M>);
     }
 
+    /**
+     * Page through everything this query matches, one row at a time.
+     *
+     * `.limit()` on the builder becomes the page size, so the ceiling on a
+     * single `find()` is not a ceiling on what the query can read.
+     */
+    iterate(options?: PageWalkOptions<M>): AsyncIterableIterator<M> {
+        return this.client.iterate({
+            ...(this.params as FindParams<M>),
+            ...(this.params.limit !== undefined && { pageSize: this.params.limit }),
+            ...options
+        } as IterateParams<M>);
+    }
+
+    /** Collect everything this query matches into one array. */
+    findAll(options?: PageWalkOptions<M> & { maxRows?: number }): Promise<M[]> {
+        return this.client.findAll({
+            ...(this.params as FindParams<M>),
+            ...(this.params.limit !== undefined && { pageSize: this.params.limit }),
+            ...options
+        } as FindAllParams<M>);
+    }
+
+    /**
+     * Count the records matching this query.
+     *
+     * This used to answer `0` when the client had no `count` — a number, from a
+     * source that had not counted anything, indistinguishable from an empty
+     * collection. It now does what the client does, which on a source that
+     * cannot count is throw and say so.
+     */
     async count(): Promise<number> {
-        return this.client.count ? this.client.count(this.params as FindParams<M>) : 0;
+        return this.client.count(this.params as FindParams<M>);
     }
 
     listen(onUpdate: (data: FindResult<M>) => void, onError?: (error: Error) => void): () => void {
-        if (!this.client.listen) {
-            throw new Error("Listen is only available when the driver supports realtime.");
-        }
         return this.client.listen(this.params as FindParams<M>, onUpdate, onError);
     }
 }
@@ -617,15 +665,21 @@ data: u.data as Partial<EntityValues<M>> }))
             }
             await snap.deleteMany(ids);
         },
-        count: snap.count ? (params?: FindParams<M>) => snap.count!(params) : undefined,
+        // The three are non-optional on `SDKCollectionClient`: where the
+        // underlying accessor cannot serve one, a stub says so when called
+        // rather than being absent. `isUnsupported()` is how an adapter asks
+        // the capability question — see `toEntityAccessor` below, which has to.
+        count: snap.count
+            ? (params?: FindParams<M>) => snap.count!(params)
+            : unsupportedMethod(noCount(slug)),
         listen: snap.listen
             ? (params: FindParams<M> | undefined, onUpdate: (r: FindResult<M>) => void, onError?: (e: Error) => void) =>
                 snap.listen!(params, (res) => onUpdate({ data: res.data.map(entityToRow), meta: res.meta }), onError)
-            : undefined,
+            : unsupportedMethod(noRealtime(slug)),
         listenById: snap.listenById
             ? (id: string | number, onUpdate: (r: M | undefined) => void, onError?: (e: Error) => void) =>
                 snap.listenById!(id, (s) => onUpdate(s ? entityToRow(s) : undefined), onError)
-            : undefined,
+            : unsupportedMethod(noRealtime(slug)),
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
             const builder = new SdkQueryBuilder<M>(client);
             if (typeof columnOrCondition === "object") {
@@ -633,7 +687,7 @@ data: u.data as Partial<EntityValues<M>> }))
             }
             return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValueFor<WhereFilterOp, M[keyof M & string]>);
         },
-        orderBy: (column: keyof M & string, direction?: "asc" | "desc") => new SdkQueryBuilder<M>(client).orderBy(column, direction),
+        orderBy: (column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction?: "asc" | "desc") => new SdkQueryBuilder<M>(client).orderBy(column, direction),
         limit: (count: number) => new SdkQueryBuilder<M>(client).limit(count),
         offset: (count: number) => new SdkQueryBuilder<M>(client).offset(count),
         search: (searchString: string) => new SdkQueryBuilder<M>(client).search(searchString),
@@ -687,15 +741,20 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         delete(id: string | number): Promise<void> {
             return sdk.delete(id);
         },
-        count: sdk.count ? (params?: FindParams<M>) => sdk.count!(params) : undefined,
-        listen: sdk.listen
-            ? (params: FindParams<M> | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) =>
-                sdk.listen!(params, (res) => onUpdate({ data: res.data.map((row) => rowToEntity<M>(row, slug, getPks())), meta: res.meta }), onError)
-            : undefined,
-        listenById: sdk.listenById
-            ? (id: string | number, onUpdate: (s: Entity<M> | undefined) => void, onError?: (e: Error) => void) =>
-                sdk.listenById!(id, (row) => onUpdate(row ? rowToEntity<M>(row, slug, getPks()) : undefined), onError)
-            : undefined,
+        // `CollectionAccessor` keeps these optional, and the optionality is
+        // load-bearing: the admin panel picks between subscribing and a
+        // one-shot `find()` on exactly this property, and a UI that subscribes
+        // into a throw is worse than one that polls. The client's method is
+        // always present now, so the capability is read off the stub instead.
+        count: isUnsupported(sdk.count) ? undefined : (params?: FindParams<M>) => sdk.count(params),
+        listen: isUnsupported(sdk.listen)
+            ? undefined
+            : (params: FindParams<M> | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) =>
+                sdk.listen(params, (res) => onUpdate({ data: res.data.map((row) => rowToEntity<M>(row, slug, getPks())), meta: res.meta }), onError),
+        listenById: isUnsupported(sdk.listenById)
+            ? undefined
+            : (id: string | number, onUpdate: (s: Entity<M> | undefined) => void, onError?: (e: Error) => void) =>
+                sdk.listenById(id, (row) => onUpdate(row ? rowToEntity<M>(row, slug, getPks()) : undefined), onError),
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
             const builder = new QueryBuilder<M>(accessor);
             if (typeof columnOrCondition === "object") {
@@ -796,7 +855,7 @@ export function wrapAsSdkData(entityData: RebaseData): RebaseSdkData {
  * Build a flat {@link RebaseSdkData} from a `DataDriver`.
  *
  * This is the developer-facing SDK data layer used by backend framework
- * callbacks & scripts (`context.data` / `rebase.data`). It returns flat rows —
+ * callbacks & scripts (`context.data` / `rebase.dataAsAdmin`). It returns flat rows —
  * identical in shape to the frontend SDK client, down to how a relation is
  * served: a foreign key stays a foreign key, and a relation named in `include`
  * arrives as the target's own columns. The `{ __type: "relation" }` envelope is

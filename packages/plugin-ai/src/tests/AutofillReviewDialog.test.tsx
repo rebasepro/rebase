@@ -20,6 +20,8 @@ import React from "react";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import { AuthControllerContext } from "@rebasepro/app";
+
 import {
     DataEnhancementControllerProvider,
     useDataEnhancementController
@@ -95,6 +97,24 @@ json: async () => ({ prompts: [] }) });
     });
 }
 
+/**
+ * `<Rebase>`'s auth context, which the provider under test reaches through
+ * `useAuthController`.
+ *
+ * It used to be possible to leave this out: the context defaulted to
+ * `{} as AuthController`, so a hook outside the tree got a truthy empty object
+ * and every one of these tests passed without ever supplying an identity. That
+ * default is gone — the hook now throws and names the provider — so the suite
+ * has to say what it was always assuming.
+ */
+function WithAuth({ children }: { children: React.ReactNode }) {
+    return (
+        <AuthControllerContext.Provider value={{ user: null } as any}>
+            {children}
+        </AuthControllerContext.Provider>
+    );
+}
+
 let controller: DataEnhancementController;
 
 function Capture() {
@@ -108,14 +128,16 @@ async function mount(formValues: Record<string, unknown> = {}) {
 setFieldValue } as any;
 
     render(
-        <DataEnhancementControllerProvider
-            path={"products"}
-            collection={COLLECTION}
-            formContext={formContext}
-            {...({} as any)}>
-            <Capture/>
-            <AutofillReviewDialog/>
-        </DataEnhancementControllerProvider>
+        <WithAuth>
+            <DataEnhancementControllerProvider
+                path={"products"}
+                collection={COLLECTION}
+                formContext={formContext}
+                {...({} as any)}>
+                <Capture/>
+                <AutofillReviewDialog/>
+            </DataEnhancementControllerProvider>
+        </WithAuth>
     );
 
     // Let the /status probe resolve so the controller reports enabled.
@@ -316,15 +338,17 @@ json: async () => ({ available: true }) });
 
         const setFieldValue = jest.fn();
         render(
-            <DataEnhancementControllerProvider
-                path={"posts"}
-                collection={collection}
-                formContext={{ values: {},
+            <WithAuth>
+                <DataEnhancementControllerProvider
+                    path={"posts"}
+                    collection={collection}
+                    formContext={{ values: {},
 setFieldValue } as any}
-                {...({} as any)}>
-                <Capture/>
-                <AutofillReviewDialog/>
-            </DataEnhancementControllerProvider>
+                    {...({} as any)}>
+                    <Capture/>
+                    <AutofillReviewDialog/>
+                </DataEnhancementControllerProvider>
+            </WithAuth>
         );
         await act(async () => {
             await Promise.resolve();

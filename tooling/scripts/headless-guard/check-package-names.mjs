@@ -122,6 +122,26 @@ const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", ".astro", "p
 // `upgrading.mdx` into the corpus the table arrived with it and the guard went
 // red on a file no edit can fix. Both halves are the same artifact of the same
 // pages; neither is a place a name can go stale on its own.
+/**
+ * Directories where naming history is the subject, not a stale reference.
+ *
+ * `upgrading.mdx` was one page with the rename table in it, and one entry in
+ * SKIP_FILES covered it. It is now a landing page and one page per hop, and the
+ * table moved into `0-14-to-0-17.mdx` — where the guard promptly found three
+ * violations in the very section whose job is to say `@rebasepro/admin` is now
+ * `@rebasepro/cms`. Rewriting the left column would make it read
+ * `@rebasepro/cms → @rebasepro/cms`.
+ *
+ * A prefix rather than three more filenames: the next hop page will carry the
+ * next rename, and it should not have to rediscover this.
+ */
+const SKIP_DIR_SEGMENTS = [
+    // Every locale, not just English: the translation pass writes
+    // `website/src/content/docs/<locale>/docs/upgrading/…` from these pages, and
+    // a rename table is a rename table in German too.
+    "/docs/upgrading/"
+];
+
 const SKIP_FILES = new Set([
     "CHANGELOG.md",
     "upgrading.mdx",
@@ -169,7 +189,12 @@ function trackedFiles() {
         const out = execSync("git ls-files -z", { cwd, maxBuffer: 64 * 1024 * 1024 }).toString();
         for (const f of out.split("\0").filter(Boolean)) files.push(prefix + f);
     }
-    return files.filter((f) => !SKIP_FILES.has(f) && !SKIP_FILES.has(path.basename(f)));
+    return files.filter(
+        (f) =>
+            !SKIP_FILES.has(f) &&
+            !SKIP_FILES.has(path.basename(f)) &&
+            !SKIP_DIR_SEGMENTS.some((d) => f.includes(d))
+    );
 }
 
 const hits = [];

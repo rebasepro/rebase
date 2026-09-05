@@ -432,13 +432,28 @@ API. Qualsiasi richiesta a `/api/admin/api-keys` autenticata con una chiave
 il suo flag `admin`. La gestione delle chiavi richiede la sessione di un utente
 admin, oppure la chiave di servizio.
 
-## Endpoint dei Metadati
+## Metadati dello schema
 
-Ottieni un elenco di tutte le collezioni disponibili e della loro struttura:
+Lo schema completo delle collezioni del progetto — ogni collezione, proprietà e
+relazione — viene servito a un amministratore autenticato:
 
 ```bash
-GET /api/collections
+GET /api/meta/contract
 ```
+
+È **solo per amministratori**, e su un deployment senza autenticazione
+configurata non viene servito affatto (404 `CONTRACT_UNAVAILABLE`) invece di
+esporre lo schema a chiunque. Il suo gemello restituisce una stringa di versione
+che sta per lo schema senza descriverlo, ed è deliberatamente raggiungibile
+senza credenziali — che è ciò che interroga un job di CI:
+
+```bash
+GET /api/meta/schema-version
+```
+
+Per la forma degli endpoint invece dello schema dietro di essi, il documento
+OpenAPI è su `GET /api/docs`, con Swagger UI su `/api/swagger` quando
+`enableSwagger` è attivo.
 
 ## Prossimi Passi
 

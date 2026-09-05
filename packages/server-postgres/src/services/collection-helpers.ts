@@ -93,7 +93,7 @@ export function getCollectionByPath(collectionPath: string, registry: PostgresCo
  * thing against the *config* and is skipped on four paths — `strictWrites:
  * false`, a collection declaring no properties, an auth adapter that owns the
  * body's shape, and a nested route whose target cannot be walked — and it never
- * sees an in-process `rebase.data` write at all.
+ * sees an in-process `rebase.dataAsAdmin` write at all.
  *
  * It also gives `strictWrites: false` a truthful implementation. The flag is
  * documented for "a column that really does exist which the config never
@@ -121,10 +121,19 @@ export function assertWritableColumns(
     // error is reachable on paths where the REST field check was skipped, and
     // an `excludeFromApi` column is documented as never being served to a
     // caller. Naming what was sent is the actionable half anyway.
+    //
+    // The remedy is named because the overwhelmingly common cause is not a
+    // typo. It is a property that was added to the collection while the
+    // generated schema module still describes the table as it was: the column
+    // exists in the database — boot's additive ensure created it — and this
+    // check reads the module, so the first save of a row carrying the new
+    // property answered 400 and said only that the column did not exist.
     throw ApiError.badRequest(
         `'${collectionPath}' has no column${unknown.length > 1 ? "s" : ""} ` +
         `${unknown.map(key => `'${key}'`).join(", ")}, so the value${unknown.length > 1 ? "s" : ""} ` +
-        "would have been dropped before the statement was built.",
+        "would have been dropped before the statement was built. " +
+        "If you just added the propert" + (unknown.length > 1 ? "ies" : "y") +
+        ", the generated schema is behind the collection: run `rebase schema generate`.",
         "VALIDATION_UNKNOWN_FIELDS"
     );
 }

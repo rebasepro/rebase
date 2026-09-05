@@ -2,10 +2,11 @@
 #
 # Bring a self-hosted Rebase up in one command.
 #
-# The compose file next to this script requires four values and refuses to start
-# without them, which is right for a deployment and wrong for the first thirty
-# seconds of trying one. This generates them once, into `infra/docker/.env`, tells you
-# it did, and then runs the compose file unchanged.
+# The compose file next to this script requires six values and refuses to start
+# without them — three secrets, the allowed origins, and the first admin account
+# — which is right for a deployment and wrong for the first thirty seconds of
+# trying one. This generates them once, into `infra/docker/.env`, tells you it
+# did, and then runs the compose file unchanged.
 #
 #   ./infra/docker/quickstart.sh        # up, attached
 #   ./infra/docker/quickstart.sh -d     # any argument is passed through to compose

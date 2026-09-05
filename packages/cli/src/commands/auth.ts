@@ -14,8 +14,13 @@ import {
     requireBackendDir,
     findEnvFile,
     readEnvFile,
-    resolveTsx
+    resolveTsx,
+    exitDependenciesNotInstalled
 } from "../utils/project";
+import { unknownCommand } from "../utils/unknown-command";
+
+/** Everything the switch below dispatches, for the did-you-mean. */
+const AUTH_SUBCOMMANDS = ["reset-password"] as const;
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 
 /** A user as the admin API returns it, reduced to what this command needs. */
@@ -94,10 +99,7 @@ export async function authCommand(subcommand: string | undefined, rawArgs: strin
             await resetPassword(rawArgs);
             break;
         default:
-            console.error(chalk.red(`Unknown auth command: ${subcommand}`));
-            console.log("");
-            printAuthHelp();
-            process.exit(1);
+            unknownCommand(subcommand, AUTH_SUBCOMMANDS, "auth");
     }
 }
 
@@ -283,8 +285,7 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
     const tsxBin = resolveTsx(projectRoot);
 
     if (!tsxBin) {
-        console.error(chalk.red("✗ Could not find tsx binary."));
-        process.exit(1);
+        exitDependenciesNotInstalled(projectRoot);
     }
 
     try {

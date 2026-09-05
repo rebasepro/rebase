@@ -197,7 +197,15 @@ function warnUnknownFields(name: string, raw: Record<string, unknown>, type: str
     }
 }
 
-/** One edit apart, ignoring case: enough for a typo, tight enough to stay quiet. */
+/**
+ * One edit apart, ignoring case: enough for a typo, tight enough to stay quiet.
+ *
+ * The same rule as `isNearMiss` in `@rebasepro/utils`, which the collection
+ * validator uses for unknown `admin` keys. It is a copy rather than an import
+ * because the CLI does not depend on `@rebasepro/utils`, and adding the
+ * dependency is a lockfile change; collapsing the two is worth doing the next
+ * time this package's dependencies are touched.
+ */
 function isNearMiss(a: string, b: string): boolean {
     const x = a.toLowerCase();
     const y = b.toLowerCase();

@@ -219,7 +219,9 @@ export default defineFunction((app, { rebase }) => {
 import { rebase } from "@rebasepro/server/functions";
 
 await rebase.dataAsAdmin.collection<Record<string, unknown>>("orders").find({ where: { status: ["==", "paid"] } });
-await rebase.storage.putObject({ key, file });   // → storageUrl (gs://|s3://|local://)
+// `storage` is undefined when the deployment configured none — check, or
+// `requireStorage()` and let the 503 say so.
+await rebase.storage?.putObject({ key, file });  // → storageUrl (gs://|s3://|local://)
 await rebase.email.send({ to, subject, html: "<p>Thanks for your order.</p>" });
 ```
 

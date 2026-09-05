@@ -469,13 +469,17 @@ isId: "increment" },
         expect(ts).toContain("authorId?: string | number | null;");
     });
 
-    it("supports relation validation constraints making FK required", () => {
+    // `required` lives on the property, next to every other field's. It used to
+    // also live on the relation, and the two readers disagreed: the DDL
+    // generator asked the property and made the column NOT NULL, codegen asked
+    // the relation and typed the field optional. A `create()` without it
+    // typechecked and then failed at the database.
+    it("a required relation property yields a non-null Row field and a mandatory Insert field", () => {
         const authorsCol = {
             slug: "authors",
             driver: "postgres",
             properties: {
-                id: { type: "string",
-isId: "uuid" }
+                id: { type: "string", isId: "uuid" }
             }
         } as unknown as CollectionConfig;
 
@@ -483,23 +487,13 @@ isId: "uuid" }
             slug: "posts",
             driver: "postgres",
             properties: {
-                id: { type: "number",
-isId: "increment" },
+                id: { type: "number", isId: "increment" },
                 author: {
                     type: "relation",
-                    relationName: "author_rel",
-                    collectionPath: "authors"
+                    validation: { required: true },
+                    relation: { kind: "belongsTo", target: () => authorsCol, localKey: "author_id" }
                 }
-            },
-            relations: [
-                {
-                    kind: "belongsTo",
-                    relationName: "author_rel",
-                    target: () => authorsCol,
-                    localKey: "author_id",
-                    validation: { required: true }
-                }
-            ]
+            }
         } as unknown as CollectionConfig;
 
         const ts = generateTypedefs([postsCol, authorsCol]);
@@ -507,6 +501,43 @@ isId: "increment" },
         expect(ts).toContain("posts: {");
         expect(ts).toContain("Row: {");
         // target is a string uuid and the relation is required
+        expect(ts).toContain("authorId: string;");
+        expect(ts).not.toContain("authorId?: string | null;");
+        // …and the write side agrees: no `?`.
+        expect(ts).toContain("author: string;");
+    });
+
+    // Same fact, declared the other way: the relation lives in `relations` and
+    // a property addresses it by name. The property is still where `required`
+    // is read from.
+    it("reads required from the property that addresses a relations[] entry", () => {
+        const authorsCol = {
+            slug: "authors",
+            driver: "postgres",
+            properties: {
+                id: { type: "string", isId: "uuid" }
+            }
+        } as unknown as CollectionConfig;
+
+        const postsCol = {
+            slug: "posts",
+            driver: "postgres",
+            properties: {
+                id: { type: "number", isId: "increment" },
+                author: { type: "relation", validation: { required: true } }
+            },
+            relations: [
+                {
+                    kind: "belongsTo",
+                    relationName: "author",
+                    target: () => authorsCol,
+                    localKey: "author_id"
+                }
+            ]
+        } as unknown as CollectionConfig;
+
+        const ts = generateTypedefs([postsCol, authorsCol]);
+
         expect(ts).toContain("authorId: string;");
     });
 
@@ -635,6 +666,36 @@ describe("generateSDK configurations", () => {
         const types = files.find(f => f.path === "database.types.ts")!;
         expect(types.content).toContain("export interface Database");
         expect(types.content).toContain("authors:");
+    });
+
+    /**
+     * The README is the first thing a developer reads after generating, and it
+     * taught the naming rule from before 0.14: that a field keeps its *column*
+     * name, so `created_at` is `row.created_at`. It has not been true since —
+     * a declared property is its key in the collection, and a foreign key
+     * derived from a relation arrives camelCased (`author_id` → `authorId`).
+     *
+     * A reader who believed it wrote `row.created_at` and `{ author_id: 5 }`,
+     * both of which are compile errors against the types generated in the same
+     * directory. Two snake_case examples were the whole of the damage, so the
+     * check is that neither spelling comes back.
+     */
+    it("teaches the wire names, not the column names", () => {
+        const readme = generateSDK([authorsCollection])
+            .find(f => f.path === "README.md")!.content;
+
+        // The old paragraph's own two examples, banned outright.
+        expect(readme).not.toContain("created_at");
+        expect(readme).not.toContain("author_id");
+
+        // And the rule behind them, so a different snake_case field cannot
+        // reintroduce the same advice under another name.
+        expect(readme).not.toMatch(/\brow\.[a-z0-9]+_/);
+        expect(readme).not.toMatch(/\{\s*[a-z0-9]+_[a-z0-9_]*:/);
+
+        // What replaced it.
+        expect(readme).toContain("row.authorId");
+        expect(readme).toContain("row.createdAt");
     });
 });
 

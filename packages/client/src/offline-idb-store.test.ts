@@ -218,16 +218,16 @@ describe("two tabs over one database", () => {
         const state = { online: true };
         const client = {
             async find() {
-                if (!state.online) throw new TypeError("fetch failed");
+                if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
                 const data = [...table.values()];
                 return { data, meta: { total: data.length, limit: 20, offset: 0, hasMore: false } };
             },
             async findById(id: string | number) {
-                if (!state.online) throw new TypeError("fetch failed");
+                if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
                 return table.get(String(id));
             },
             async create(data: Record<string, unknown>) {
-                if (!state.online) throw new TypeError("fetch failed");
+                if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
                 table.set(String(data.id), data);
                 return data;
             },
@@ -299,16 +299,16 @@ describe("OfflineManager over IndexedDB", () => {
         const state = { online: true };
         const fakeClient = {
             async find() {
-                if (!state.online) throw new TypeError("fetch failed");
+                if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
                 const data = [...table.values()];
                 return { data, meta: { total: data.length, limit: 20, offset: 0, hasMore: false } };
             },
             async findById(id: string | number) {
-                if (!state.online) throw new TypeError("fetch failed");
+                if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
                 return table.get(String(id));
             },
             async create(data: Record<string, unknown>) {
-                if (!state.online) throw new TypeError("fetch failed");
+                if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
                 table.set(String(data.id), data);
                 return data;
             },

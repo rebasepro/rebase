@@ -15,7 +15,7 @@
 import fs from "fs";
 import path from "path";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
@@ -42,19 +42,70 @@ const SECTION_LABEL = {
     icons: "Icons"
 };
 
-/** Pull the props interface body out of an emitted .d.ts. */
-function readProps(dts, name) {
+/**
+ * Pull the props interface body out of an emitted .d.ts.
+ *
+ * The doc comment is the thing that goes in the Description column, and this
+ * used to read only the single-line form (`/** text *\/` on one line). tsc
+ * emits a multi-line block for anything longer than a few words, and every one
+ * of those was dropped on the floor: the line matched `startsWith("*")`, was
+ * skipped, and the property arrived with `doc` still empty. 488 cells across
+ * the component reference said nothing, next to a documented library.
+ *
+ * A cell is one line, so a multi-line comment is flattened to its summary — the
+ * text before the first `@tag`. `@param` and `@see` belong in the source, not
+ * in a four-column table.
+ */
+export function readProps(dts, name) {
     const re = new RegExp(`export interface ${name}Props(?:<[^>]*>)?\\s*\\{([\\s\\S]*?)\\n\\}`);
     const m = dts.match(re);
     if (!m) return [];
     const rows = [];
     let doc = "";
+    /** Lines of the block comment currently open, if one is. */
+    let block = null;
+
+    const summarize = (lines) => {
+        const text = [];
+        for (const line of lines) {
+            // The summary ends at the first tag; `@default` and `@param` are
+            // for the source, not for a table cell.
+            if (line.startsWith("@")) break;
+            text.push(line);
+        }
+        return text.join(" ").replace(/\s+/g, " ").trim();
+    };
+
     for (const raw of m[1].split("\n")) {
         const line = raw.trim();
         if (!line) continue;
-        const jsdoc = line.match(/^\/\*\*\s*(.*?)\s*\*\/$/);
-        if (jsdoc) { doc = jsdoc[1]; continue; }
+
+        if (block !== null) {
+            if (line === "*/" || line.endsWith("*/")) {
+                const last = line.replace(/\*\/$/, "").replace(/^\*\s?/, "").trim();
+                if (last) block.push(last);
+                doc = summarize(block);
+                block = null;
+                continue;
+            }
+            block.push(line.replace(/^\*\s?/, "").trim());
+            continue;
+        }
+
+        // `/** text */` all on one line.
+        const oneLine = line.match(/^\/\*\*\s*(.*?)\s*\*\/$/);
+        if (oneLine) { doc = summarize([oneLine[1]]); continue; }
+
+        // The opening of a multi-line block. Anything after `/**` on the same
+        // line is the first line of it.
+        if (line.startsWith("/**")) {
+            block = [];
+            const first = line.slice(3).trim();
+            if (first) block.push(first);
+            continue;
+        }
         if (line.startsWith("/*") || line.startsWith("*")) continue;
+
         // name?: Type;   — Type may contain ; inside generics, so take to the last ;
         const p = line.match(/^"?([A-Za-z_$][\w$-]*)"?(\?)?:\s*(.+);$/);
         if (!p) { doc = ""; continue; }
@@ -220,62 +271,74 @@ function readExample(name) {
 // escaping <> would render the entities literally.
 const esc = s => String(s).replace(/\|/g, "\\|");
 
-fs.rmSync(OUT, { recursive: true, force: true });
+/**
+ * Generating is a side effect, and `readProps` is worth testing without it:
+ * the props table's Description column comes out of that one parser, and it
+ * needs `ds-bundle/` — a build artifact — to run end to end. Importing this
+ * module used to wipe the docs directory as a side effect of asking for the
+ * function.
+ */
+function main() {
+    fs.rmSync(OUT, { recursive: true, force: true });
 
-const bySection = {};
-let total = 0, withExample = 0, withProps = 0;
+    const bySection = {};
+    let total = 0, withExample = 0, withProps = 0;
 
-for (const group of fs.readdirSync(SRC)) {
-    const section = SECTION[group];
-    if (!section) { console.warn(`  ! unmapped group "${group}" — skipped`); continue; }
-    for (const name of fs.readdirSync(path.join(SRC, group))) {
-        const dtsPath = path.join(SRC, group, name, `${name}.d.ts`);
-        if (!fs.existsSync(dtsPath)) continue;
-        const dts = fs.readFileSync(dtsPath, "utf8");
-        const props = readProps(dts, name);
-        const example = readExample(name);
-        const summary = (dts.match(/\/\*\*\s*\n\s*\*\s*(.+?)\s*\n/) || [])[1] || `${name} from @rebasepro/ui.`;
+    for (const group of fs.readdirSync(SRC)) {
+        const section = SECTION[group];
+        if (!section) { console.warn(`  ! unmapped group "${group}" — skipped`); continue; }
+        for (const name of fs.readdirSync(path.join(SRC, group))) {
+            const dtsPath = path.join(SRC, group, name, `${name}.d.ts`);
+            if (!fs.existsSync(dtsPath)) continue;
+            const dts = fs.readFileSync(dtsPath, "utf8");
+            const props = readProps(dts, name);
+            const example = readExample(name);
+            const summary = (dts.match(/\/\*\*\s*\n\s*\*\s*(.+?)\s*\n/) || [])[1] || `${name} from @rebasepro/ui.`;
 
-        let md = `---\ntitle: ${name}\nsidebar_label: ${name}\n`;
-        md += `description: ${name} — a component from @rebasepro/ui, the library the Rebase admin panel is built from.\n---\n\n`;
-        md += `\`\`\`ts\nimport { ${name} } from "@rebasepro/ui";\n\`\`\`\n\n`;
+            let md = `---\ntitle: ${name}\nsidebar_label: ${name}\n`;
+            md += `description: ${name} — a component from @rebasepro/ui, the library the Rebase admin panel is built from.\n---\n\n`;
+            md += `\`\`\`ts\nimport { ${name} } from "@rebasepro/ui";\n\`\`\`\n\n`;
 
-        if (props.length) {
-            withProps++;
-            md += `## Props\n\n| Prop | Type | Required | Description |\n| --- | --- | --- | --- |\n`;
-            for (const p of props) {
-                md += `| \`${p.name}\` | \`${esc(p.type)}\` | ${p.required ? "yes" : "—"} | ${esc(p.doc)} |\n`;
+            if (props.length) {
+                withProps++;
+                md += `## Props\n\n| Prop | Type | Required | Description |\n| --- | --- | --- | --- |\n`;
+                for (const p of props) {
+                    md += `| \`${p.name}\` | \`${esc(p.type)}\` | ${p.required ? "yes" : "—"} | ${esc(p.doc)} |\n`;
+                }
+                md += `\n`;
+            } else {
+                md += `> This component takes no documented props, or its type could not be flattened. See the source.\n\n`;
             }
-            md += `\n`;
-        } else {
-            md += `> This component takes no documented props, or its type could not be flattened. See the source.\n\n`;
-        }
 
-        if (example) {
-            withExample++;
-            md += `## Example\n\nThis is the example the design-system sync renders and verifies for this component.\n\n`;
-            md += "```tsx\n" + example + "\n```\n";
-        }
+            if (example) {
+                withExample++;
+                md += `## Example\n\nThis is the example the design-system sync renders and verifies for this component.\n\n`;
+                md += "```tsx\n" + example + "\n```\n";
+            }
 
-        const dir = path.join(OUT, section);
-        fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(path.join(dir, `${name}.mdx`), md);
-        (bySection[section] ||= []).push(name);
-        total++;
+            const dir = path.join(OUT, section);
+            fs.mkdirSync(dir, { recursive: true });
+            fs.writeFileSync(path.join(dir, `${name}.mdx`), md);
+            (bySection[section] ||= []).push(name);
+            total++;
+        }
     }
+
+    // section index pages so the sidebar has a landing entry per group
+    for (const [section, names] of Object.entries(bySection)) {
+        const label = SECTION_LABEL[section] || section;
+        let md = `---\ntitle: ${label}\nsidebar_label: Overview\n`;
+        md += `description: ${label} in @rebasepro/ui — the component library the Rebase admin panel is built from.\n---\n\n`;
+        md += `${names.length} components.\n\n`;
+        md += names.sort().map(n => `- [${n}](/docs/ui/${section}/${n.toLowerCase()})`).join("\n") + "\n";
+        fs.writeFileSync(path.join(OUT, section, "index.mdx"), md);
+    }
+
+    console.log(`generated ${total} component pages into website/src/content/docs/docs/ui/`);
+    console.log(`  with props table: ${withProps}`);
+    console.log(`  with verified example: ${withExample}`);
+    Object.entries(bySection).forEach(([s, n]) => console.log(`  ${s}: ${n.length}`));
+
 }
 
-// section index pages so the sidebar has a landing entry per group
-for (const [section, names] of Object.entries(bySection)) {
-    const label = SECTION_LABEL[section] || section;
-    let md = `---\ntitle: ${label}\nsidebar_label: Overview\n`;
-    md += `description: ${label} in @rebasepro/ui — the component library the Rebase admin panel is built from.\n---\n\n`;
-    md += `${names.length} components.\n\n`;
-    md += names.sort().map(n => `- [${n}](/docs/ui/${section}/${n.toLowerCase()})`).join("\n") + "\n";
-    fs.writeFileSync(path.join(OUT, section, "index.mdx"), md);
-}
-
-console.log(`generated ${total} component pages into website/src/content/docs/docs/ui/`);
-console.log(`  with props table: ${withProps}`);
-console.log(`  with verified example: ${withExample}`);
-Object.entries(bySection).forEach(([s, n]) => console.log(`  ${s}: ${n.length}`));
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

@@ -19,14 +19,18 @@
  *
  * Run: node tooling/scripts/docs-verify/check-upgrade-coverage.mjs
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, globSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(HERE, "..", "..", "..");
 const CHANGELOG = "CHANGELOG.md";
+// The guide is a hub plus one page per hop, so "the guide" is all of them:
+// reading only the hub would call a version uncovered because its section
+// moved to the page for its hop.
 const GUIDE = "website/src/content/docs/docs/upgrading.mdx";
+const GUIDE_PAGES = "website/src/content/docs/docs/upgrading/*.mdx";
 
 const GREEN = "[0;32m";
 const RED = "[0;31m";
@@ -48,7 +52,10 @@ const isOlder = (a, b) => a[0] - b[0] < 0 || (a[0] === b[0] && (a[1] - b[1] < 0 
  */
 export function checkUpgradeCoverage(root = DEFAULT_ROOT) {
     const changelog = readFileSync(path.join(root, CHANGELOG), "utf8");
-    const guide = readFileSync(path.join(root, GUIDE), "utf8");
+    const guide = [
+        readFileSync(path.join(root, GUIDE), "utf8"),
+        ...globSync(GUIDE_PAGES, { cwd: root }).map(f => readFileSync(path.join(root, f), "utf8"))
+    ].join("\n");
 
     // Split the changelog into per-version blocks, then keep the ones that
     // declare a breaking change.

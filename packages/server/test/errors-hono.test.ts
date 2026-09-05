@@ -238,6 +238,27 @@ describe("Error Handler (Hono)", () => {
             expect(body.error.details.detail).toContain("already exists");
         });
 
+        it("names the callback when a read-only transaction refuses a write (25006)", async () => {
+            // The only user code on a read path is `afterRead`, and every
+            // request-scoped read opens `READ ONLY`. So this SQLSTATE has one
+            // cause, and the answer should say which file to open — rather than
+            // the 500 "Internal Server Error" it used to be, which reads as the
+            // database being down.
+            const app = createDbApp(nestedDbError({
+                code: "25006",
+                message: "cannot execute INSERT in a read-only transaction"
+            }));
+            const res = await app.request("/boom");
+            expect(res.status).toBe(409);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("READ_ONLY_TRANSACTION");
+            expect(body.error.message).toContain("afterRead");
+            expect(body.error.message).toContain("READ ONLY");
+            expect(body.error.details.dbCode).toBe("25006");
+            // The 4xx arm must not echo the driver's own "Failed query: …" text.
+            expect(body.error.message).not.toContain("Failed query");
+        });
+
         it("does not treat non-SQLSTATE codes as database errors", async () => {
             const err = new Error("boom") as Error & { code: string };
             err.code = "ERR_SOMETHING";
@@ -260,5 +281,43 @@ describe("Error Handler (Hono)", () => {
             expect(body.error).toHaveProperty("message");
             expect(body.error).toHaveProperty("code");
         }
+    });
+
+    /**
+     * The envelope is a published contract, and the docs had been publishing a
+     * different one — `{ message, code, status }` with kebab-case codes like
+     * `"not-found"`. A reader who branched on either got code that never fired.
+     *
+     * `status` in particular must stay out of the body: it is on the response,
+     * and a second copy is a field that can disagree with it. These two assert
+     * the shape itself rather than the prose that describes it.
+     */
+    describe("the envelope is exactly four fields", () => {
+        const paths = [
+            "/bad-request", "/unauthorized", "/forbidden", "/not-found",
+            "/conflict", "/internal", "/service-unavailable", "/generic-error",
+            "/error-with-code"
+        ];
+
+        it("carries no key outside message / code / details / requestId", async () => {
+            const app = createApp();
+            for (const path of paths) {
+                const body = await (await app.request(path)).json() as { error: Record<string, unknown> };
+                expect(Object.keys(body)).toEqual(["error"]);
+                for (const key of Object.keys(body.error)) {
+                    expect(["message", "code", "details", "requestId"]).toContain(key);
+                }
+                expect(body.error).not.toHaveProperty("status");
+                expect(body.error).not.toHaveProperty("statusCode");
+            }
+        });
+
+        it("spells every code SCREAMING_SNAKE_CASE", async () => {
+            const app = createApp();
+            for (const path of paths) {
+                const body = await (await app.request(path)).json() as { error: { code: string } };
+                expect(body.error.code).toMatch(/^[A-Z][A-Z0-9_]*$/);
+            }
+        });
     });
 });

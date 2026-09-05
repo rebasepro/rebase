@@ -26,7 +26,7 @@ describe("createRebaseClient({ offline })", () => {
         const requests: { method: string; url: string; body?: unknown }[] = [];
         const fetchStub: typeof fetch = async (input, init) => {
             const url = String(input);
-            if (!network.online) throw new TypeError("fetch failed");
+            if (!network.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
             if (network.serverError) {
                 return new Response(JSON.stringify({ error: { message: "boom", code: "internal" } }), {
                     status: 500,

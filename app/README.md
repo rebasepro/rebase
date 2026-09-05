@@ -1,159 +1,64 @@
-# Rebase PostgreSQL App Example
+# Rebase reference application
 
-A complete example application demonstrating how to use Rebase with a PostgreSQL backend, featuring a unified monorepo structure with config collections and optimal developer experience.
+The example this monorepo develops against: a backend, an admin panel, and the
+collections both read. It is what `pnpm run dev` at the repository root starts,
+and what the end-to-end suites drive.
 
-## 🏗️ Architecture
+Setting it up is part of the repository's setup — see
+**[CONTRIBUTING.md](../CONTRIBUTING.md)**, which covers the clone, the install,
+the database and the first run. This file describes the app itself.
 
-This application consists of three main parts:
+## Layout
 
-- **`frontend/`** - React application using Rebase with PostgreSQL data source
-- **`backend/`** - Node.js server with PostgreSQL/Drizzle ORM and WebSocket support
-- **`config/`** - Shared collections and types used by both frontend and backend
+| Path | What it is |
+|---|---|
+| `frontend/` | The React admin panel, built with Vite |
+| `backend/` | The Node server: Postgres via Drizzle, plus WebSocket realtime |
+| `config/` | The collections, display config and locales both sides read |
+| `rebase.json` | What the CLI reads: the two apps, and where each one's code lives |
 
-## 🚀 Quick Start
+`config/collections/` is the single definition. Adding a property there changes
+the database schema, the admin panel and the generated SDK types together —
+which is the point of the example.
 
-### Prerequisites
-
-- Node.js 18+ 
-- PostgreSQL database
-- pnpm
-
-### Installation
-
-```bash
-# Install dependencies
-pnpm install
-```
-
-### Environment Setup
-
-1. Copy `.env` and configure your database connection:
-```bash
-# Update the DATABASE_URL and other settings
-DATABASE_URL=postgresql://username:password@localhost:5432/your_database
-```
-
-### Development
-
-Start both frontend and backend with a single command:
+## Running it
 
 ```bash
+cp .env.example .env    # the compose credentials, ready to use
 pnpm dev
 ```
 
-This will:
-- Start the backend server on `http://localhost:3001`
-- Start the frontend development server
-- Enable hot reloading for both applications
-- Provide real-time WebSocket synchronization
+`pnpm dev` is `rebase dev`. It starts the backend and the frontend together, and
+applies the collections to the development database at boot, additively.
 
-### Individual Development Commands
+**It picks a free port per project rather than fixed ones**, and prints the
+admin-panel and API URLs it settled on — read them from its output, they differ
+between checkouts. The `PORT` and `VITE_API_URL` in `.env` apply to
+`rebase start` (the production server), not to `rebase dev`.
 
-```bash
-# Backend only
-pnpm dev:backend
+## The scripts
 
-# Frontend only  
-pnpm dev:frontend
+Run from this directory.
 
-# Database operations
-rebase schema generate # Generate schema from collections
-rebase db push         # Push schema changes to development database
-rebase db generate     # Generate SQL migrations (for production)
-rebase db migrate      # Run database migrations (for production)
-rebase db studio       # Open Drizzle Studio
-```
+| Command | What it does |
+|---|---|
+| `pnpm dev` | Backend and frontend, watching (`rebase dev`) |
+| `pnpm build` | Builds `frontend`, `backend` and `config` |
+| `pnpm start` | The production server, which also serves the built frontend |
+| `pnpm run schema:generate` | Regenerate `backend/src/schema.generated.ts` from the collections |
+| `pnpm run db:push` | Apply the collections to the development database (Atlas) |
+| `pnpm run db:generate` | Write a SQL migration instead of pushing — the production path |
+| `pnpm run db:migrate` | Run pending migrations |
+| `pnpm run schema:introspect` | Read an existing database back into collection definitions |
+| `pnpm run generate:sdk` | Regenerate the typed client SDK |
+| `pnpm run deploy` | Deploy the demo (maintainers) |
 
-## 📦 Production Deployment
+`db:push` needs a real Postgres — it plans with Atlas, which needs a second
+empty database to compare against, and the managed development database serves
+exactly one. `.env.example` points at the compose database in
+`backend/docker-compose.yml`, which is what the root CONTRIBUTING starts.
 
-### Build Everything
+## Requirements
 
-```bash
-pnpm build
-```
-
-This builds:
-1. Shared collections package
-2. Frontend application (static files)
-3. Backend application
-
-### Deploy
-
-```bash
-pnpm deploy
-```
-
-Or start the production server:
-
-```bash
-pnpm start
-```
-
-The backend serves the frontend statically in production, so you only need to deploy one application.
-
-## 🗂️ Project Structure
-
-```
-app/
-├── package.json          # Root package with unified scripts
-├── .env                  # Environment configuration
-├── frontend/            # React Rebase application
-│   ├── src/
-│   ├── package.json
-│   └── vite.config.ts
-├── backend/            # PostgreSQL backend server
-│   ├── src/
-│   ├── package.json
-│   └── drizzle.config.ts
-└── config/            # Shared collections and types
-    ├── collections/
-    ├── index.ts
-    └── package.json
-```
-
-## 🔧 Features
-
-- **Unified Development**: Single command to start both frontend and backend
-- **Shared Collections**: No duplication between frontend and backend
-- **Static Serving**: Backend serves frontend in production
-- **Real-time Sync**: WebSocket-based real-time updates
-- **Type Safety**: Full TypeScript support across all packages
-- **Hot Reloading**: Fast development with instant updates
-
-## 🛠️ Available Scripts
-
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start both frontend and backend |
-| `pnpm build` | Build all packages |
-| `pnpm start` | Start production server |
-| `pnpm deploy` | Build and deploy |
-| `pnpm clean` | Clean all build artifacts |
-| `rebase schema generate` | Generate DB schema |
-| `rebase db push` | Push changes to development database |
-| `rebase db generate` | Generate SQL migration files |
-| `rebase db migrate` | Run database migrations |
-| `rebase db studio` | Open database studio |
-
-## 📊 Database
-
-The application uses PostgreSQL with Drizzle ORM for:
-- Type-safe database operations
-- Automatic schema generation from Rebase collections
-- Real-time synchronization via WebSockets
-- Migration management
-
-## 🔐 Authentication
-
-Currently configured with built-in authentication, but can be easily adapted to other auth providers.
-
-## 🎯 Development Tips
-
-1. **Shared Collections**: Edit collections in `config/collections/` - changes are immediately available to both frontend and backend
-2. **Environment Variables**: All configuration is in the root `.env` file
-3. **Hot Reloading**: Both frontend and backend support hot reloading during development
-4. **Database Schema**: Run `rebase schema generate` and then `rebase db push` after changing collections
-
-## 📝 License
-
-MIT
+Node.js ≥ 22.22 and pnpm ≥ 11, the same floors as the repository. Postgres comes
+from `backend/docker-compose.yml`; you do not need one installed.

@@ -1,4 +1,4 @@
-import { FindParams as TypesFindParams, FindResponse as TypesFindResponse, RebaseApiError } from "@rebasepro/types";
+import { FindParams as TypesFindParams, FindResponse as TypesFindResponse, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
 import { serializeFilter, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
 import { rebaseReviver } from "./reviver";
 
@@ -79,6 +79,30 @@ export interface RebaseClientConfig {
      * and nothing is ever warned about.
      */
     anonymous?: boolean;
+    /**
+     * The schema this client was generated against, sent as `x-rebase-schema`.
+     *
+     * `rebase generate-sdk` writes the value into `schema.meta.ts` as
+     * `SCHEMA_VERSION`; pass it here and every request carries it. Advisory —
+     * nothing is ever refused for it — but it is what lets a server say "this
+     * client was built against a schema three deploys old" instead of
+     * answering a renamed field with a bare 400.
+     *
+     * The compatibility matrix has listed this header as something the SDK
+     * sends since it was written. Nothing sent it: the constant existed, the
+     * server echoed it back on two routes, and no client ever put it on a
+     * request. This is the missing half.
+     */
+    schemaVersion?: string;
+    /**
+     * Headers added to every request, beneath any per-request `headers`.
+     *
+     * For identifying the caller, not for authenticating it — the CLI uses it
+     * to send `User-Agent: rebase-cli/<version>`, which is what a control plane
+     * needs before it can refuse a CLI that is too old by name. `Authorization`
+     * is not settable here; it always comes from the token.
+     */
+    headers?: Record<string, string>;
 }
 
 /**
@@ -270,7 +294,42 @@ function resolveBaseUrl(configured?: string): string {
 }
 
 export function createTransport(config: RebaseClientConfig, environment?: TransportEnvironment): Transport {
-    const fetchFn = config.fetch || globalThis.fetch;
+    const rawFetch = config.fetch || globalThis.fetch;
+
+    /**
+     * `fetch`, but its rejection is a `RebaseApiError` like everything else
+     * this client throws.
+     *
+     * A transport failure — DNS, a refused connection, CORS, an aborted
+     * request — rejects with whatever the runtime's `fetch` felt like: a
+     * `TypeError` reading "Failed to fetch" in a browser, a `TypeError` with a
+     * `cause` in undici, a `DOMException` on abort. So the one class the SDK
+     * documents as "a `catch` block only ever needs to check for this" did not
+     * cover the most common failure of all, and `e.status` / `e.code` were
+     * undefined on the error every app hits first: the server being down.
+     *
+     * `status: 0` rather than a made-up 5xx. There was no response, and 0 is
+     * how `XMLHttpRequest` has always spelled that; a fabricated 503 would be
+     * indistinguishable from one the server actually sent. The original error
+     * is on `cause`, so nothing is hidden.
+     *
+     * Wrapped once, at construction, because the request path reads `fetchFn`
+     * twice — the first attempt and the post-refresh retry — and a wrapper
+     * applied at one call site is a wrapper missing from the other.
+     */
+    const fetchFn: typeof globalThis.fetch = async (input, init) => {
+        try {
+            return await rawFetch(input, init);
+        } catch (e) {
+            if (e instanceof RebaseApiError) throw e;
+            const url = typeof input === "string" ? input : String((input as Request).url ?? input);
+            throw new RebaseApiError(
+                `Could not reach the server at ${url}: ${e instanceof Error ? e.message : String(e)}`,
+                { status: 0, code: "NETWORK_ERROR", cause: e }
+            );
+        }
+    };
+
     const apiPath = config.apiPath || "/api";
 
     // `apiPath` is appended to `baseUrl`, so a `baseUrl` that already ends in it
@@ -318,9 +377,18 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
         console.warn(ANONYMOUS_SERVER_CLIENT_WARNING);
     }
 
+    // Built once, and applied *under* `Authorization`: a default header set
+    // that could overwrite the token would turn a caller's convenience into an
+    // authentication bug.
+    const defaultHeaders: Record<string, string> = {
+        ...(config.headers ?? {}),
+        ...(config.schemaVersion ? { [SCHEMA_VERSION_HEADER]: config.schemaVersion } : {})
+    };
+
     function getHeaders(activeToken: string | undefined, init?: RequestInit) {
         return {
             "Content-Type": "application/json",
+            ...defaultHeaders,
             ...(activeToken ? { Authorization: `Bearer ${activeToken}` } : {}),
             ...((init?.headers as Record<string, string>) || {})
         };
@@ -344,6 +412,67 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
             "fallback serving index.html, or a proxy error page — so check the API URL configuration " +
             `(e.g. VITE_API_URL). The body began: ${JSON.stringify(text.slice(0, 120))}`,
             { status, code: "INVALID_JSON_RESPONSE" }
+        );
+    }
+
+    /**
+     * The server always emits the canonical
+     * `{ error: { message, code, details?, requestId? } }` envelope (formatted
+     * by the central `errorHandler`), so a field is read strictly from
+     * `body.error.*` and never from the top level.
+     */
+    function getErrorField(obj: Record<string, unknown>, field: string): unknown {
+        const err = obj?.error;
+        if (err && typeof err === "object" && err !== null) {
+            return (err as Record<string, unknown>)[field];
+        }
+        return undefined;
+    }
+
+    /**
+     * `Retry-After` as whole seconds, or `undefined`.
+     *
+     * The header is either a number of seconds or an HTTP date; both spellings
+     * are legal and servers use both, so both are read. A date in the past —
+     * which happens on a clock skew — is clamped to 0 rather than negative.
+     */
+    function parseRetryAfter(header: string | null): number | undefined {
+        if (!header) return undefined;
+        const seconds = Number(header.trim());
+        if (Number.isFinite(seconds)) return Math.max(0, Math.floor(seconds));
+        const at = Date.parse(header);
+        if (Number.isNaN(at)) return undefined;
+        return Math.max(0, Math.round((at - Date.now()) / 1000));
+    }
+
+    /**
+     * Everything a failed response says about itself, in one place.
+     *
+     * The request path reads a response twice — the first attempt and the
+     * post-refresh retry — and the two used to build their error separately.
+     * Which is how they came to disagree: both dropped `requestId` and
+     * `Retry-After`, and a fix applied to one would have missed the other.
+     */
+    function errorFrom(
+        res: { status: number; statusText: string; headers?: { get(name: string): string | null } },
+        body: Record<string, unknown>,
+        fallbackMessage: string
+    ): RebaseApiError {
+        const requestId = getErrorField(body, "requestId")
+            ?? res.headers?.get("X-Request-ID")
+            ?? undefined;
+        return new RebaseApiError(
+            String(getErrorField(body, "message") || fallbackMessage || `Request failed with status ${res.status}`),
+            {
+                status: res.status,
+                code: getErrorField(body, "code") as string | undefined,
+                details: getErrorField(body, "details"),
+                ...(typeof requestId === "string" && requestId ? { requestId } : {}),
+                ...(() => {
+                    const retryAfter = parseRetryAfter(res.headers?.get("Retry-After") ?? null);
+                    return retryAfter === undefined ? {} : { retryAfterSeconds: retryAfter };
+                })()
+            }
         );
     }
 
@@ -402,17 +531,6 @@ headers });
             }
         }
 
-        // The server always emits the canonical `{ error: { message, code, details? } }`
-        // envelope (formatted by the central errorHandler), so we read strictly
-        // from `body.error.*`.
-        const getErrorField = (obj: Record<string, unknown>, field: string): unknown => {
-            const err = obj?.error;
-            if (err && typeof err === "object" && err !== null) {
-                return (err as Record<string, unknown>)[field];
-            }
-            return undefined;
-        };
-
         if (res.status === 401 && onUnauthorizedHandler) {
             const retried = await onUnauthorizedHandler();
             if (retried) {
@@ -445,14 +563,7 @@ headers: retryHeaders });
                         const method = init?.method || "GET";
                         fallbackMessage = `Endpoint not found (${method} ${path}). This usually means the collection is not registered on the backend, or the frontend API URL configuration (e.g. VITE_API_URL) is missing or pointing to the wrong host.`;
                     }
-                    throw new RebaseApiError(
-                        String(getErrorField(retryBody, "message") || fallbackMessage || `Request failed with status ${retryRes.status}`),
-                        {
-                            status: retryRes.status,
-                            code: getErrorField(retryBody, "code") as string | undefined,
-                            details: getErrorField(retryBody, "details")
-                        }
-                    );
+                    throw errorFrom(retryRes, retryBody, fallbackMessage);
                 }
                 if (retryUnreadable) throw unreadableResponse(retryRes.status, retryText);
                 return retryBody as T;
@@ -465,14 +576,7 @@ headers: retryHeaders });
                 const method = init?.method || "GET";
                 fallbackMessage = `Endpoint not found (${method} ${path}). This usually means the collection is not registered on the backend, or the frontend API URL configuration (e.g. VITE_API_URL) is missing or pointing to the wrong host.`;
             }
-            throw new RebaseApiError(
-                String(getErrorField(body, "message") || fallbackMessage || `Request failed with status ${res.status}`),
-                {
-                    status: res.status,
-                    code: getErrorField(body, "code") as string | undefined,
-                    details: getErrorField(body, "details")
-                }
-            );
+            throw errorFrom(res, body, fallbackMessage);
         }
 
         if (unreadableBody) throw unreadableResponse(res.status, text);

@@ -16,7 +16,7 @@ import {
 // visible). Radix only opens a menu from a real pointer event on the
 // trigger, so we dispatch one on mount to force the open state for the
 // static capture.
-function useOpenMenu(ref: React.RefObject<HTMLDivElement>, triggerIndex: number) {
+function useOpenMenu(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
     React.useEffect(() => {
         const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
         trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));

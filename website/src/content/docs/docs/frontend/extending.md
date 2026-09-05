@@ -24,9 +24,10 @@ This guide helps you pick the right mechanism for your use case, then links to t
 | Inject UI at a collection toolbar slot | `collection.actions` slot | app/plugin | [Slots](/docs/frontend/slots) |
 | Add a computed column to a table | `additionalFields` | collection | [Additional Columns](/docs/frontend/additional-columns) |
 | Add a custom field widget for a property type | `propertyConfigs` | property type | [Custom Fields](/docs/frontend/custom-fields) |
-| Add a entity tab | `entityViews` | entity | [Entity Views](/docs/frontend/entity-views) |
+| Add an entity tab | `entityViews` | entity | [Entity Views](/docs/frontend/entity-views) |
 | Render one collection's rows a different way | `admin.customViews` | collection | [below](#customviews) |
 | Add a row/context action or entity button | `entityActions` | entity | [Entity Actions](/docs/frontend/entity-actions) |
+| Put a figure on a collection's home-page card | `home.card.widget` slot | app/plugin | [Slots](/docs/frontend/slots) |
 | Inject UI at a specific chrome location | `slots` | app/plugin | [Slots](/docs/frontend/slots) |
 | Ship several extensions as one installable unit | `plugins` | app | [Plugins](/docs/plugins) |
 | Style the thing I just built | `@rebasepro/ui` + theme tokens | any | [Styling Custom UI](/docs/frontend/styling) |

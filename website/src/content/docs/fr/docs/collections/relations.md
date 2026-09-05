@@ -225,6 +225,38 @@ relations: [
 | `"set null"` | Définir la colonne de clé étrangère à NULL |
 | `"set default"` | Définir la colonne de clé étrangère à sa valeur par défaut |
 
+### Ce que vous obtenez si vous ne dites rien
+
+`onDelete` est optionnel, donc la plupart des relations n'en nomment jamais. La
+valeur par défaut dépend du caractère obligatoire de la relation :
+
+| Relation | `onDelete` par défaut |
+|--------|----------|
+| `belongsTo`, optionnelle | `"set null"` — le pointeur est vidé |
+| `belongsTo`, `validation: { required: true }` | `"restrict"` — la suppression du parent échoue |
+| `manyToMany` (lignes de jonction) | `"cascade"` — le lien part, la ligne cible reste |
+
+Une relation obligatoire n'est **pas** une cascade. `required` dit qu'un enfant
+ne peut pas exister sans parent ; il ne dit pas que supprimer le parent doit
+détruire l'enfant. Ce sont deux affirmations différentes, et une seule supprime
+des lignes que vous n'avez pas nommées. La valeur par défaut fait donc échouer la
+suppression et nomme la contrainte, et `"cascade"` est quelque chose que vous
+demandez explicitement :
+
+```typescript
+{
+    kind: "belongsTo",
+    relationName: "order",
+    target: () => ordersCollection,
+    // Une ligne de commande n'a aucun sens sans sa commande — dites-le.
+    onDelete: "cascade"
+}
+```
+
+`onUpdate` n'a pas de valeur par défaut : sans rien de défini, Postgres applique
+`NO ACTION`. Mettez `"cascade"` quand la clé de la cible est modifiable par une
+personne — un slug, une référence produit — pour que les pointeurs la suivent.
+
 ## Récupération des Relations dans le SDK
 
 Lors de l'interrogation de données via le SDK client Rebase, les relations ne sont **pas** incluses par défaut. Utilisez la méthode `include()` pour demander les entités liées en même temps que les données primaires.
@@ -293,7 +325,6 @@ interface RelationBase {
     onUpdate?: "cascade" | "restrict" | "no action" | "set null" | "set default";
     onDelete?: "cascade" | "restrict" | "no action" | "set null" | "set default";
     overrides?: Partial<CollectionConfig>;
-    validation?: { required?: boolean };
 }
 
 // ...and only the fields its own kind uses:

@@ -433,13 +433,29 @@ clé d'API. Toute requête vers `/api/admin/api-keys` authentifiée avec une cl�
 son drapeau `admin`. La gestion des clés requiert la session d'un utilisateur
 admin, ou la clé de service.
 
-## Endpoint de métadonnées
+## Métadonnées du schéma
 
-Obtenez une liste de toutes les collections disponibles et de leur structure :
+Le schéma de collections complet du projet — chaque collection, propriété et
+relation — est servi à un administrateur authentifié :
 
 ```bash
-GET /api/collections
+GET /api/meta/contract
 ```
+
+Il est **réservé aux administrateurs**, et sur un déploiement sans
+authentification configurée il n'est pas servi du tout (404
+`CONTRACT_UNAVAILABLE`) plutôt que d'exposer le schéma à tout le monde. Son
+voisin renvoie une chaîne de version qui représente le schéma sans le décrire,
+et est délibérément accessible sans identifiants — c'est ce qu'interroge un job
+de CI :
+
+```bash
+GET /api/meta/schema-version
+```
+
+Pour la forme des endpoints plutôt que le schéma derrière eux, le document
+OpenAPI est à `GET /api/docs`, avec Swagger UI à `/api/swagger` quand
+`enableSwagger` est activé.
 
 ## Étapes suivantes
 

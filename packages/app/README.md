@@ -97,7 +97,6 @@ This package is **framework-agnostic** in the sense that it doesn't depend on an
 | `LanguageToggle` | i18n language switcher |
 | `BootstrapAdminBanner` | First-user setup banner |
 | `RebaseLogo` | Rebase branding logo |
-| `UIStyleGuide` / `UIReferenceView` | Debug/reference components |
 
 ### Contexts
 

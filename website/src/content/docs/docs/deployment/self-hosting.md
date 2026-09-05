@@ -16,11 +16,31 @@ why it is split that way.
 
 ## Docker Compose
 
-The compose file lives in the repository, at
+**If your project came from `rebase init`, use its own `docker-compose.yml`.**
+It is in your repository, `init` filled in its secrets, its first admin account
+and its pinned runtime version, and it is the file
+[Deployment](/docs/getting-started/deployment/#docker-compose-recommended)
+describes:
+
+```bash
+rebase build
+docker compose up -d
+```
+
+The rest of this page is the same deployment without a scaffold behind it —
+somebody else's project, a bundle built in CI, or the two things the generated
+file deliberately leaves out: a connection pooler and the split-process shapes.
+That one lives in the repository, at
 [`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml).
-Use that one rather than copying a snippet out of this page: it is the file the
-project's own acceptance gate boots on every push, so it cannot drift from what
+Use it rather than copying a snippet out of this page: both files are booted by
+the project's own acceptance gate on every push, so neither can drift from what
 actually works.
+
+The two agree on every environment variable except the database password, and
+that is because each is written for its own writer: this one reads
+`POSTGRES_PASSWORD`, which `quickstart.sh` generates; the generated one reads
+`DATABASE_PASSWORD`, which `rebase init` also embeds in the `DATABASE_URL` it
+writes into your `.env`.
 
 ```bash
 rebase build                    # produces ./dist-bundle
@@ -38,7 +58,9 @@ docker compose -f infra/docker/docker-compose.selfhost.yml \
 You do not need to start the database separately — `api` waits on its
 healthcheck.
 
-### The four values it needs
+### The six values it needs
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 `quickstart.sh` generates these for you. To write the `.env` yourself:
 
@@ -48,10 +70,12 @@ POSTGRES_PASSWORD=$(openssl rand -hex 32)
 JWT_SECRET=$(openssl rand -hex 32)
 REBASE_SERVICE_KEY=$(openssl rand -hex 32)
 CORS_ORIGINS=https://app.example.com
+REBASE_ADMIN_EMAIL=you@example.com
+REBASE_ADMIN_PASSWORD=$(openssl rand -hex 16)
 EOF
 ```
 
-Three secrets and one fact:
+Three secrets, one fact, and the account you sign in with:
 
 - **`POSTGRES_PASSWORD`** — the database password. Changing it later means
   changing it in the volume too, so pick it once.
@@ -63,10 +87,26 @@ Three secrets and one fact:
   Not a secret, and not optional: the runtime refuses to start in production
   without it rather than guessing, because an API that guesses its allowed
   origins eventually allows the wrong one.
+- **`REBASE_ADMIN_EMAIL`** / **`REBASE_ADMIN_PASSWORD`** — the first
+  administrator. A fresh database has no users, and outside production the
+  registration policy admits the first sign-up and promotes it to admin —
+  otherwise an empty database is a dead end, because bootstrapping an admin
+  needs a caller who is already signed in. The moment this stack answers on a
+  hostname that convenience is a race the operator can lose, so in production
+  the window is shut and the account is named here instead. The runtime creates
+  it once, while the user table is empty, and does nothing on every boot after
+  that.
 
-Each of the three secrets must be at least 32 characters. The compose file
-declares them with `${VAR:?…}`, so a missing one stops the stack with a message
-naming it rather than starting something half-configured.
+Each of the three secrets must be at least 32 characters, and the admin password
+at least 12. Use an address with a dot in its domain: `POST /auth/login` parses
+its body with `z.string().email()`, so `admin@localhost` would seed an account
+and then refuse every attempt to use it. The compose file declares all six with
+`${VAR:?…}`, so a missing one stops the stack with a message naming it rather
+than starting something half-configured — and self-registration ships off
+(`DISABLE_SELF_REGISTRATION`, default `true`), so nothing is left to be claimed.
+
+Sign in with those credentials and change the password: they are sitting in a
+file on the host.
 
 ## Dependencies
 
@@ -145,9 +185,39 @@ outlives the container:
 ```yaml
       STORAGE_TYPE: local
       STORAGE_PATH: /data/uploads
+      FORCE_LOCAL_STORAGE: "true"
     volumes:
       - uploads:/data/uploads
 ```
+
+`FORCE_LOCAL_STORAGE` is not optional there: in production a `local` backend is
+dropped rather than registered, because the alternative is uploads that succeed
+into a filesystem about to be destroyed. The variable is how you say the mount
+is durable.
+
+### Storage needs an access-control model
+
+Once a bucket **is** configured, the runtime **refuses to boot in production**
+until the deployment states how objects are protected. Storage is not under
+row-level security and its keys share one flat namespace, so with no rule the
+only thing separating two users' files is key unguessability — which
+`GET /storage/list?prefix=` defeats. Any one of these satisfies it:
+
+- a **`storageAuthorize` hook** (or `storagePolicies`) in your project's config,
+  which is the real answer and what the scaffold ships in `config/storage.ts` —
+  no environment variable can express "this user may read this key";
+- **`STORAGE_PUBLIC_READ=true`**, for a bucket that genuinely is a public
+  read-only CDN;
+- **`STORAGE_ALLOW_ANY_AUTHENTICATED=true`**, for a single-tenant app where
+  every signed-in account is trusted with every file.
+
+Outside production the same condition is a loud warning rather than a refusal,
+so this is a boot failure you meet on the deploy rather than on the laptop. It
+is deliberate: the failure it replaces is silent.
+
+Set `MFA_ENCRYPTION_KEY` too if you use TOTP. Left unset, stored authenticator
+secrets are encrypted with `JWT_SECRET` — so rotating that signs everybody out
+*and* makes every enrolled device undecryptable.
 
 ## Other platforms
 
@@ -187,7 +257,32 @@ npm install -g @rebasepro/server @rebasepro/server-postgres
 rebase-server /srv/myapp/dist-bundle
 ```
 
-Run it under systemd, with `Environment=` lines for the variables above.
+`rebase-server --help` lists the variables it reads. Under systemd:
+
+```ini title="/etc/systemd/system/rebase.service"
+[Service]
+ExecStart=/usr/bin/rebase-server /srv/myapp/dist-bundle
+Restart=always
+Environment=NODE_ENV=production
+Environment=DATABASE_URL=postgresql://rebase:...@127.0.0.1:5432/rebase
+Environment=JWT_SECRET=...
+Environment=REBASE_SERVICE_KEY=...
+Environment=CORS_ORIGINS=https://app.example.com
+Environment=DISABLE_SELF_REGISTRATION=true
+Environment=REBASE_ADMIN_EMAIL=you@example.com
+Environment=REBASE_ADMIN_PASSWORD=...
+```
+
+`NODE_ENV=production` is not decoration. Left unset the process runs in
+development mode: it reflects localhost origins, serves the OpenAPI spec, and
+**leaves the first-admin window open** — so the first stranger to find the
+sign-up form becomes the administrator. The two `REBASE_ADMIN_*` lines are what
+replace that window; see [Your first
+admin](/docs/getting-started/deployment/#your-first-admin).
+
+Prefer `EnvironmentFile=/etc/rebase.env` with the file at mode 0600 over
+`Environment=` lines for the secrets: a unit file is world-readable, and
+`systemctl show` prints every `Environment=` value.
 
 ## Connection pooling
 

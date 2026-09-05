@@ -75,17 +75,11 @@ idempotent, or don't write it.
 ## Defining Callbacks
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-// The row shape. Without it every `values.x` below is `unknown`.
-type Article = {
-    title: string;
-    slug: string;
-    createdAt: string;
-    updatedAt: string;
-};
-
-const articlesCollection: PostgresCollectionConfig<Article> = {
+// The row shape is inferred from `properties`, so `values.title` below is a
+// `string` without anything being written twice.
+const articlesCollection = defineCollection({
     slug: "articles",
     name: "Articles",
     table: "articles",
@@ -128,8 +122,7 @@ const articlesCollection: PostgresCollectionConfig<Article> = {
             // Transform data after loading
             return row;
         }
-    },
-    properties: { /* ... */ }
+    }
 });
 ```
 
@@ -137,7 +130,7 @@ const articlesCollection: PostgresCollectionConfig<Article> = {
 
 ### `beforeSave`
 
-Called before a entity is written to the database. Return the modified values.
+Called before a record is written to the database. Return the modified values.
 
 ```typescript
 beforeSave: async ({
@@ -244,7 +237,7 @@ afterRead: async ({
 
 ### `beforeDelete`
 
-Called before a entity is deleted. Throw to block deletion.
+Called before a record is deleted. Throw to block deletion.
 
 ```typescript
 beforeDelete: async ({
@@ -320,7 +313,7 @@ Each collection accessor (`context.data.<slug>`) provides these methods:
 | `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Fetch a single entity by ID |
 | `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Create a new entity |
 | `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Update an existing entity |
-| `.delete()` | `delete(id: string \| number) → void` | Delete a entity |
+| `.delete()` | `delete(id: string \| number) → void` | Delete a record |
 | `.count()` | `count(params?: FindParams) → number` | Count matching entities |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Real-time subscription (where supported) |
 | `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single entity |
@@ -450,17 +443,9 @@ afterSave: async ({ values, entityId, context }) => {
 One of the most powerful uses of callbacks is **syncing data across collections** using `context.data`:
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-type Submission = {
-    title: string;
-    description: string;
-    company_id: string;
-    status: string;
-    promoted_job_id: string;
-};
-
-const submissionsCollection: PostgresCollectionConfig<Submission> = {
+const submissionsCollection = defineCollection({
     slug: "job_submissions",
     name: "Job Submissions",
     table: "job_submissions",
@@ -489,8 +474,7 @@ const submissionsCollection: PostgresCollectionConfig<Submission> = {
                 });
             }
         }
-    },
-    properties: { /* ... */ }
+    }
 });
 ```
 

@@ -13,8 +13,11 @@ import {
     getActiveBackendPlugin,
     resolvePluginCliScript,
     resolveTsx,
-    findEnvFile
+    findEnvFile,
+    dependenciesNotInstalled
 } from "../utils/project";
+import { reportSpawnFailure } from "../utils/spawn-error";
+import { argsFromCommand, commandWords } from "../utils/command-words";
 import { recordEvent } from "../telemetry";
 
 /**
@@ -169,7 +172,7 @@ const ATLAS_BACKED_SUBCOMMANDS = new Set(["push", "generate", "migrate"]);
  */
 export function refuseAtlasOnManagedDatabase(rawArgs: string[], kind: string): void {
     if (kind !== "managed") return;
-    const [domain, subcommand] = rawArgs.slice(2);
+    const [domain, subcommand] = commandWords(rawArgs, "db");
     if (domain !== "db" || !ATLAS_BACKED_SUBCOMMANDS.has(subcommand ?? "")) return;
 
     console.error("");
@@ -221,7 +224,7 @@ export function refuseAtlasOnManagedDatabase(rawArgs: string[], kind: string): v
  */
 export function refuseBranchOnManagedDatabase(rawArgs: string[], kind: string): void {
     if (kind !== "managed") return;
-    const [domain, subcommand] = rawArgs.slice(2);
+    const [domain, subcommand] = commandWords(rawArgs, "db");
     if (domain !== "db" || subcommand !== "branch") return;
 
     console.error("");
@@ -263,7 +266,7 @@ async function resolveDriverCli(): Promise<{
     }
     const pluginCli = resolvePluginCliScript(backendDir, activePlugin);
     if (!pluginCli) {
-        throw new Error(`Could not find CLI entry point for ${activePlugin}.`);
+        throw new Error(dependenciesNotInstalled(projectRoot));
     }
 
     const envFile = findEnvFile(projectRoot);
@@ -285,7 +288,7 @@ async function execDriverCli(
     const isTs = pluginCli.endsWith(".ts");
     if (isTs) {
         const tsxBin = resolveTsx(projectRoot);
-        if (!tsxBin) throw new Error("Could not find tsx binary.");
+        if (!tsxBin) throw new Error(dependenciesNotInstalled(projectRoot));
         await execa(tsxBin, [pluginCli, ...childArgs], { cwd: backendDir, stdio, env });
         return;
     }
@@ -325,7 +328,7 @@ export async function runDriverDbCommand(
 
     const pluginCli = resolvePluginCliScript(backendDir, activePlugin);
     if (!pluginCli) {
-        throw new Error(`Could not find CLI entry point for ${activePlugin}.`);
+        throw new Error(dependenciesNotInstalled(projectRoot));
     }
 
     // Set up environment with DOTENV_CONFIG_PATH
@@ -373,12 +376,17 @@ export async function runDriverDbCommand(
 
     // Resolved against the directory the developer is standing in, before the
     // child is handed a different one. See absolutizeLocalPathArgs.
-    const childArgs = absolutizeLocalPathArgs(rawArgs.slice(2), process.cwd());
+    //
+    // From the command word, not from index 2: the driver reads its domain out
+    // of `args[0]`, so `rebase --debug db push` spawned it with ["--debug",
+    // "db", "push"] and it answered "Unknown domain command: --debug" — for a
+    // flag this CLI prints after every failure as the thing to re-run with.
+    const childArgs = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "db"), process.cwd());
 
     const isTs = pluginCli.endsWith(".ts");
     if (isTs) {
         const tsxBin = resolveTsx(projectRoot);
-        if (!tsxBin) throw new Error("Could not find tsx binary.");
+        if (!tsxBin) throw new Error(dependenciesNotInstalled(projectRoot));
         await execa(tsxBin, [pluginCli, ...childArgs], { cwd: backendDir, stdio: "inherit", env });
         return;
     }
@@ -430,12 +438,18 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         return;
     }
 
+    if (subcommand === "url") {
+        await printDatabaseUrl(projectRoot, rawArgs);
+
+        return;
+    }
+
     // Handled here rather than by the driver, for the same reason `stop` and
     // `reset` are: it writes per-checkout CLI state. The driver creates and
     // drops the databases; which one this checkout talks to is not its
     // business, and it runs as a child process that could not persist the
     // answer anyway.
-    if (subcommand === "branch" && rawArgs.slice(2)[2] === "switch") {
+    if (subcommand === "branch" && commandWords(rawArgs, "db")[2] === "switch") {
         await switchBranch(projectRoot, rawArgs);
 
         return;
@@ -448,12 +462,52 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         // A child that exited non-zero already printed its diagnostics through
         // inherited stdio; only the errors raised above have a message worth
         // adding here.
-        const message = error instanceof Error ? error.message : "";
-        if (message && !/Command failed|exited with code/i.test(message)) {
-            console.error(chalk.red(`✗ ${message}`));
-        }
+        reportSpawnFailure(error);
         process.exit(1);
     }
+}
+
+/**
+ * `rebase db url` — the connection string this project is using, on stdout.
+ *
+ * The managed database is the one case where nothing on disk names it: `.env`
+ * ships `DATABASE_URL` commented out on purpose, the port is derived from the
+ * project path, and the data lives under `.rebase/`. A headless project has no
+ * admin panel to open either, so before this there was no way to point `psql`,
+ * a GUI client or a seeding script at the database `rebase dev` had just
+ * created — short of reading the CLI's source.
+ *
+ * Resolution is the same ordered rule every other command uses, so this prints
+ * your own `DATABASE_URL` when you have set one rather than inventing a second
+ * answer. Nothing but the URL goes to stdout, so it pipes:
+ *
+ *     psql "$(rebase db url)"
+ *
+ * It starts the managed database if it is not running, because a connection
+ * string for a database nobody is serving is not an answer.
+ */
+async function printDatabaseUrl(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
+    const { prepareDatabaseEnv } = await import("../dev-db/prepare");
+    const { readEnvFile } = await import("../utils/project");
+
+    const prepared = await prepareDatabaseEnv(projectRoot, {
+        flagUrl: readFlagValue(rawArgs, "--database-url"),
+        flagDocker: rawArgs.includes("--docker"),
+        quiet: true,
+        // Progress goes to stderr: stdout is the URL and nothing else.
+        onProgress: message => console.error(chalk.gray(`  ${message}`))
+    });
+
+    const url = prepared.env.DATABASE_URL
+        ?? readEnvFile(projectRoot).DATABASE_URL
+        ?? process.env.DATABASE_URL;
+    if (!url) {
+        console.error(chalk.red("  ✗ This project has no database URL to print."));
+        console.error(chalk.gray("    Set DATABASE_URL in .env, or run `rebase dev` to start the managed one."));
+        process.exit(1);
+    }
+
+    console.log(url);
 }
 
 /**
@@ -731,7 +785,7 @@ async function restoreAppRole(target: string): Promise<void> {
  * is none of this function's business.
  */
 async function forgetDeletedBranch(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
-    const [domain, subcommand, action, name] = rawArgs.slice(2);
+    const [domain, subcommand, action, name] = commandWords(rawArgs, "db");
     if (domain !== "db" || subcommand !== "branch" || action !== "delete" || !name) return;
 
     const { clearActiveBranch, readActiveBranch } = await import("../dev-db/branch-pointer");
@@ -777,9 +831,9 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     // every page that documents it.
     const goingOff = rawArgs.includes("--off") || rawArgs.includes("--main");
 
-    // `rawArgs` is the whole of `process.argv`, so the command's own words start
-    // at index 2: ["db", "branch", "switch", <name>].
-    const name = rawArgs.slice(2)[3];
+    // ["db", "branch", "switch", <name>], with any flags taken back out —
+    // `rebase --debug db branch switch feature` read the name as "switch".
+    const name = commandWords(rawArgs, "db")[3];
     const base = readEnvFile(projectRoot).DATABASE_URL?.trim();
 
     // `switch` with no argument reports rather than changes. "Which branch am I
@@ -874,9 +928,12 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
  */
 const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: string[] }> = {
     push: {
-        usage: "rebase db push [--collections <dir>] [--allow-destructive] [--yes]",
+        usage: "rebase db push [--collections <dir>] [--dry-run] [--allow-destructive] [--yes]",
         summary: "Apply the schema straight to the database. Development only — it does not write a migration.",
-        notes: ["A change that would drop data needs --allow-destructive."]
+        notes: [
+            "--dry-run prints the SQL and applies nothing. Read it before you approve it.",
+            "A change that would drop data needs --allow-destructive."
+        ]
     },
     generate: {
         usage: "rebase db generate [--collections <dir>]",
@@ -896,9 +953,25 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
     },
     backup: {
         usage: "rebase db backup [--out <path|s3://…>]",
-        summary: "Create a pg_dump backup. --out is resolved against the directory you are standing in."
+        summary: "Create a pg_dump backup. --out is resolved against the directory you are standing in.",
+        notes: [
+            "--output is accepted as an alias, as it is on `rebase build`.",
+            "`rebase db backup list` lists them, the way `rebase cloud db backup list` does."
+        ]
     },
-    backups: { usage: "rebase db backups", summary: "List stored backups." },
+    backups: {
+        usage: "rebase db backups list [--out <path|s3://…>]",
+        summary: "List stored backups.",
+        notes: ["`rebase db backup list` is the same command, spelled the cloud family's way."]
+    },
+    url: {
+        usage: "rebase db url",
+        summary: "Print the connection string this project uses. Nothing else goes to stdout, so it pipes.",
+        notes: [
+            "psql \"$(rebase db url)\"",
+            "Starts the managed database if it is not already running."
+        ]
+    },
     restore: {
         usage: "rebase db restore <dump> [--target-db <name>] [--create-db] --yes",
         summary: "Restore a backup with pg_restore.",
@@ -941,6 +1014,7 @@ ${chalk.green.bold("Usage")}
 
 ${chalk.green.bold("Commands")}
   ${chalk.gray("(Commands are provided by your active database driver plugin)")}
+  ${chalk.blue.bold("url")}        Print the connection string this project uses (pipes into psql)
   ${chalk.blue.bold("pull")}       Copy another database into local dev (--from <url>, --anonymize)
   ${chalk.blue.bold("stop")}       Stop the managed development database (data is kept)
   ${chalk.blue.bold("reset")}      Delete the managed development database and start over
@@ -950,7 +1024,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("branch")}     Database branching (create, list, switch, delete, info)
   ${chalk.blue.bold("backup")}     Create a backup with pg_dump (--out <path|s3://…>)
   ${chalk.blue.bold("restore")}    Restore a backup with pg_restore (destructive; needs --yes)
-  ${chalk.blue.bold("backups")}    List stored backups (backups list)
+  ${chalk.blue.bold("backups")}    List stored backups (db backup list is the same)
 
 ${chalk.green.bold("Examples")}
   ${chalk.gray("# Quick development workflow")}

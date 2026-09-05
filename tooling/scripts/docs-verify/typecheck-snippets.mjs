@@ -28,7 +28,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { extractSnippets } from "./extract.mjs";
+import { extractSnippets, NO_VERIFY_BUDGET } from "./extract.mjs";
 import { loadSdkExports } from "./sdk-exports.mjs";
 
 const require = createRequire(import.meta.url);
@@ -49,6 +49,10 @@ const TYPED_AMBIENTS = {
  */
 const THIRD_PARTY_AMBIENTS = {
     Hono: { from: "hono", named: "Hono" },
+    // `Hono<E>` constrains `E extends Env` — hono's `Env`, not an `any` stub. A
+    // stubbed `Env` makes every documented `serveSPA<E extends Env>(app: Hono<E>)`
+    // signature report "Type 'E' does not satisfy the constraint 'Env'".
+    Env: { from: "hono", named: "Env" },
     z: { from: "zod", named: "z" },
     React: { from: "react", namespace: true }
 };
@@ -62,7 +66,11 @@ const THIRD_PARTY_AMBIENTS = {
  */
 const NEVER_AUTO_IMPORT = new Set([
     "Server", "Context", "Client", "Config", "Options",
-    "server", "app", "db", "env", "router", "handler", "collections", "storage"
+    "server", "app", "db", "env", "router", "handler", "collections", "storage",
+    // `@rebasepro/app` exports a function called `isDisabled`. A snippet writing
+    // `isDisabled && "opacity-50"` means its own boolean, and auto-importing the
+    // function turns the guard into "this condition will always return true".
+    "isDisabled"
 ]);
 
 /**
@@ -90,17 +98,84 @@ const MODULE_NOT_FOUND = 2307;
 /**
  * Suppressed because they fire on well-formed fragments rather than on drift.
  * The bar: would a reader copying this block hit a *runtime* failure? Missing
- * parameter annotations and unguarded nulls are prose economy, not a wrong API;
- * a property that does not exist is the bug we are hunting.
+ * parameter annotations are prose economy, not a wrong API; a property that
+ * does not exist is the bug we are hunting.
  */
 const IGNORED_CODES = new Set([
-    1005, 1109, 1128, 1160, 1161, 1434, // fragment/parse artefacts
+    1160, 1161, 1434, // fragment/parse artefacts
     6133, 6196, // declared but never read
     2451, // redeclared block-scoped variable (same name across sibling snippets)
     2657, // "JSX expressions must have one parent" — sibling elements in a fragment
     7006, 7031, 7005, 7034, // implicit any (docs elide parameter types by design)
     2454 // "used before being assigned" across an elided section
 ]);
+
+/**
+ * Syntax errors that a *fragment* raises for reasons the author intended — a
+ * fence that opens mid-object literal, or trails off after two properties — and
+ * that a *whole declaration* raises only when it is genuinely malformed.
+ *
+ * Blanket-ignoring them cost real coverage. `frontend/index.md` shipped
+ * `nestedRoutes: true  // Support sub-paths,` — the trailing comment swallowed
+ * the separator, so the object after it was never parsed and never checked, and
+ * the doc reported clean for months. `collections/callbacks.md` closed a `= {`
+ * declaration with `});`. Both are "1005: ',' expected" / "1128: declaration or
+ * statement expected", and both are copy-paste failures for a reader.
+ *
+ * So they are ignored only for fences that do not stand on their own — see
+ * {@link isWholeDeclaration}.
+ */
+const FRAGMENT_ONLY_CODES = new Set([1005, 1109, 1128]);
+
+/**
+ * An elision: `...` with nothing to spread, or a literal `…`. Both are how a
+ * doc says "and the rest", and both are parse errors by construction.
+ */
+const ELISION = /(?:\.\.\.\s*(?:[)\]},;]|$)|…)/m;
+
+/** The first token of a fence that opens a top-level declaration. */
+const DECLARATION_START =
+    /^(?:export\s+)?(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:import|export|const|let|var|function|class|interface|type|enum|namespace)\b/;
+
+/** Strips line and block comments, so an elision inside one does not count. */
+function stripComments(code) {
+    return code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+}
+
+/**
+ * True when a fence is a self-contained program rather than an excerpt.
+ *
+ * Three conditions, each drawn from a shape the docs actually use:
+ *
+ *   1. It opens with a declaration keyword. A fence that starts `{` or
+ *      `beforeSave: async () => {` was cut out of a larger literal.
+ *   2. It contains no elision. `properties: { ... }` is deliberate.
+ *   3. No *top-level* labeled statement. This is the one that matters: an
+ *      object-literal excerpt pasted at the top of a file — `auth: { jwtSecret:
+ *      "…" }` — parses as a label followed by a block, and the commas inside it
+ *      are the "',' expected" errors. Condition 1 alone misses it, because such
+ *      excerpts are routinely preceded by a real `import` line.
+ */
+function isWholeDeclaration(ts, snippet) {
+    const code = snippet.code;
+    const stripped = stripComments(code);
+    if (ELISION.test(stripped)) return false;
+
+    const first = stripped
+        .split("\n")
+        .map((l) => l.trim())
+        .find((l) => l.length > 0);
+    if (!first || !DECLARATION_START.test(first)) return false;
+
+    const sourceFile = ts.createSourceFile(
+        scratchName(snippet),
+        code,
+        ts.ScriptTarget.ESNext,
+        /* setParentNodes */ false,
+        scratchName(snippet).endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+    );
+    return !sourceFile.statements.some((st) => ts.isLabeledStatement(st));
+}
 
 /**
  * Where a bare specifier resolved from, keyed by the package name a snippet
@@ -128,6 +203,12 @@ const resolvedPackageDirs = new Map();
  */
 const EXTERNAL_PACKAGES = new Set([
     "@aws-sdk/client-ses",
+    // The scaffold's webfonts. Side-effect imports in the template's App.tsx,
+    // which Project Structure quotes verbatim; nothing in this repo renders
+    // that app, so the monorepo carries neither the packages nor a reason to.
+    "@fontsource-variable/instrument-sans",
+    "@fontsource-variable/inter",
+    "@fontsource/jetbrains-mono",
     "bcrypt",
     "dotenv",
     "drizzle-kit",
@@ -318,7 +399,7 @@ function buildPrelude(missing, ownerOf) {
  */
 export async function typecheckSnippets(root, opts = {}) {
     const { ts, ownerOf } = loadSdkExports(root);
-    const { snippets, skipped, files } = extractSnippets(root, opts.globs);
+    const { snippets, skipped, skippedFences, files } = extractSnippets(root, opts.globs);
 
     // Per-process, because `node_modules` is commonly a symlink shared with a
     // worktree (or the primary checkout): two runs on one fixed path overwrite
@@ -340,6 +421,7 @@ export async function typecheckSnippets(root, opts = {}) {
     const prepared = snippets.map((s) => ({
         snippet: s,
         name: scratchName(s),
+        whole: isWholeDeclaration(ts, s),
         code: rewriteImports(s.code, root, `${s.file}:${s.line}`)
     }));
 
@@ -448,7 +530,12 @@ export async function typecheckSnippets(root, opts = {}) {
         // Neither can express API drift, and leaving them on buries the
         // diagnostics that can under hundreds that cannot.
         noImplicitAny: false,
-        strictNullChecks: false,
+        // On. Docs are the one place a reader copies a null-unsafe line into a
+        // strict project and then has to work out which half of it was the
+        // example's shorthand: every scaffold `tsconfig.json` ships `strict`,
+        // so a snippet that only compiles without `strictNullChecks` does not
+        // compile where it is going to be pasted.
+        strictNullChecks: true,
         strictPropertyInitialization: false,
         // Frontend snippets read `import.meta.env.VITE_*`, which is a Vite
         // ambient rather than an SDK API.
@@ -500,10 +587,15 @@ export async function typecheckSnippets(root, opts = {}) {
             // A scratch file the program did not pick up was never checked at
             // all. Silently skipping it reads as a pass; record it instead.
             if (!sf) { byFile.set(p.name, null); continue; }
+            const fragment = !p.whole;
             const diags = [
                 ...program.getSemanticDiagnostics(sf),
                 ...program.getSyntacticDiagnostics(sf)
-            ].filter((d) => !IGNORED_CODES.has(d.code));
+            ].filter(
+                (d) =>
+                    !IGNORED_CODES.has(d.code) &&
+                    !(fragment && FRAGMENT_ONLY_CODES.has(d.code))
+            );
             byFile.set(p.name, diags);
         }
         return byFile;
@@ -571,8 +663,17 @@ export async function typecheckSnippets(root, opts = {}) {
 
     rmSync(scratch, { recursive: true, force: true });
 
+    // The opt-out ratchet. Over budget is a finding in its own right: a fence
+    // nobody compiles is a fence nobody checked, and the count is the only thing
+    // that notices one being added to silence a failure.
+    const overBudget =
+        skipped > NO_VERIFY_BUDGET
+            ? { budget: NO_VERIFY_BUDGET, count: skipped, fences: skippedFences }
+            : null;
+
     return {
-        failures, snippetCount: snippets.length, skipped, files, stubbed,
-        setupErrors, unresolved, externalCount, MODULE_NOT_FOUND
+        failures, snippetCount: snippets.length, skipped, skippedFences, files, stubbed,
+        setupErrors, unresolved, externalCount, overBudget, budget: NO_VERIFY_BUDGET,
+        MODULE_NOT_FOUND
     };
 }

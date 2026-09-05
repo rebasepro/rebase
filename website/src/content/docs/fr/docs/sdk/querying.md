@@ -111,7 +111,7 @@ const { data } = await client.data.products
 | `.offset(n)` | Ignore les N premiers résultats | `.offset(50)` |
 | `.search(text)` | Recherche en texte intégral | `.search("laptop")` |
 | `.include(...relations)` | Inclut les entités liées | `.include("author", "tags")` |
-| `.find()` | Exécute la requête | Renvoie `FindResponse<M>` |
+| `.find()` | Exécute la requête | Renvoie `FindResult<M>` |
 | `.listen(onUpdate, onError?)` | S'abonne aux mises à jour en temps réel | Renvoie `unsubscribe()` |
 
 ### Opérateurs de filtre

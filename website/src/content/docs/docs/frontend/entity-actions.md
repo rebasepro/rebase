@@ -31,9 +31,10 @@ const articlesCollection = defineCollection({
                 name: "Publish",
                 icon: <Upload size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
+                    if (!entity || !context) return;
                     await context.data.collection<Record<string, unknown>>(entity.path)
                             .update(entity.id, { status: "published", publishedAt: new Date() });
-                    context.snackbarController.open({
+                    context.snackbarController?.open({
                         type: "success",
                         message: "Article published!"
                     });
@@ -43,6 +44,7 @@ const articlesCollection = defineCollection({
                 name: "Clone",
                 icon: <Copy size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
+                    if (!entity || !context) return;
                     const { id, ...values } = entity.values;
                     await context.data.collection<Record<string, unknown>>(entity.path)
                             .create({ ...values, name: values.name + " (Copy)" });
@@ -64,12 +66,8 @@ function PublishSelectedAction({ selectionController, context }: CollectionActio
     const handlePublish = async () => {
         const selected = selectionController.selectedEntities;
         for (const entity of selected) {
-            await context.data.save({
-                path: entity.path,
-                entityId: entity.id,
-                values: { status: "published" },
-                collection: context.collection
-            });
+            await context.data.collection<Record<string, unknown>>(entity.path)
+                    .update(entity.id, { status: "published" });
         }
     };
 

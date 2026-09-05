@@ -114,15 +114,30 @@ export function createContractRoutes(config: ContractRoutesConfig): Hono<HonoEnv
     /**
      * Cheap drift check.
      *
-     * Deliberately unauthenticated and deliberately tiny: it returns a version
-     * string and nothing else. A CI job that only wants to know whether its
-     * generated SDK is stale should not need admin credentials, and a version
-     * stamp reveals nothing about the schema it stands for.
+     * Deliberately unauthenticated and deliberately tiny: two version stamps
+     * and nothing else. A CI job that only wants to know whether its generated
+     * SDK is stale should not need admin credentials, and a version stamp
+     * reveals nothing about the schema it stands for.
+     *
+     * `runtime` is here as well as on `/contract` because the two answer
+     * different questions and only one of them was reachable. Which runtime a
+     * project is on decides whether a client's wire format is understood at
+     * all, and it was published solely on the admin-gated route — so a CLI or
+     * an SDK, the two callers that actually need to know, could not ask. That
+     * is the same shape as the header this route echoes: a documented signal
+     * with no reachable sender. `contract` is the number that matters for
+     * compatibility; `version` names the release a human should quote.
      */
     router.get("/schema-version", (c) => {
         const schemaVersion = schemaVersionOf(config.collectionRegistry.getRawCollections());
         c.header(SCHEMA_VERSION_HEADER, schemaVersion);
-        return c.json({ schemaVersion, });
+        return c.json({
+            schemaVersion,
+            runtime: {
+                version: config.runtimeVersion ?? "unknown",
+                contract: RUNTIME_CONTRACT_VERSION
+            }
+        });
     });
 
     logger.debug("Contract routes mounted");

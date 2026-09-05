@@ -25,6 +25,19 @@ external system.
 
 ## Enabling
 
+:::note[Where this goes]
+**Managed runtime** — nowhere. `jobs` takes handler *functions*, which no
+environment variable and no `config/index.ts` export can carry, so a scaffolded
+project cannot enable the queue. Run `rebase eject` (or write a
+[custom server](/docs/backend/custom-server/)) to reach it. `REBASE_JOB_WORKERS`
+in `.env` only decides whether an already-enabled queue's workers run in *this*
+process.
+
+**Ejected** — the `jobs` block on `initializeRebaseBackend({ … })`, as below.
+
+The full map is in [Backend Overview](/docs/backend/#where-each-option-lives).
+:::
+
 ```typescript no-verify
 await initializeRebaseBackend({
     jobs: {

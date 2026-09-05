@@ -37,8 +37,17 @@
 - [Quickstart](https://rebase.pro/docs/getting-started/quickstart): Create a new Rebase project and get it running locally in under 2 minutes.
 - [Project Structure](https://rebase.pro/docs/getting-started/project-structure): Understand the structure of a Rebase project — frontend, backend, and collections configuration.
 - [Environment & Configuration](https://rebase.pro/docs/getting-started/configuration): All environment variables and configuration options for Rebase projects.
+- [Troubleshooting](https://rebase.pro/docs/troubleshooting): The failures that stop a Rebase backend from starting or serving — an unreachable database, wrong credentials, a missing extension, an RLS refusal, schema drift, a busy port, a function that will not load — and what each one looks like.
 - [Upgrading](https://rebase.pro/docs/upgrading): What breaks when you move an existing app to the current release, and what to do about each one.
+- [Upgrading 0.14 to 0.17](https://rebase.pro/docs/upgrading/0-14-to-0-17): The admin package renames, declared resources, and the bundle format change that stops an older build booting on a current runtime.
+- [Upgrading 0.13 to 0.14](https://rebase.pro/docs/upgrading/0-13-to-0-14): Every wire key becomes camelCase, anonymous sign-in becomes opt-in, and one package is removed.
+- [Upgrading 0.12 to 0.13](https://rebase.pro/docs/upgrading/0-12-to-0-13): The auth schema removal, the package renames, and the three ways access could be granted that you did not ask for.
 - [Compatibility](https://rebase.pro/docs/compatibility): What Rebase promises across versions and what it does not — the six versioned contracts, how each one fails, and what may still change in a minor.
+- [Changelog](https://rebase.pro/docs/changelog): Every released change to Rebase — new features, fixes, and the breaking changes each version asks you to migrate.
+- [Backend only (headless)](https://rebase.pro/docs/getting-started/headless): Run Rebase as a headless Backend-as-a-Service over your own PostgreSQL — a REST API, auth, storage and realtime, with no admin panel and no collection files.
+- [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
+- [Client SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
+- [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Collections](https://rebase.pro/docs/collections): Collections are the core building block of Rebase — each collection maps to a database table and defines its schema, relations, security, and UI behavior.
 - [Properties](https://rebase.pro/docs/collections/properties): Property types define the data type, validation, and UI rendering for each field in a collection. Rebase supports string, number, boolean, date, array, map, reference, relation, and geopoint types.
 - [Relations](https://rebase.pro/docs/collections/relations): Define one-to-one, one-to-many, and many-to-many SQL relations between collections with foreign keys, junction tables, and multi-hop joins.
@@ -46,8 +55,12 @@
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Backend Overview](https://rebase.pro/docs/backend): The Rebase backend provides a complete server with REST API, authentication, storage, WebSocket real-time, and entity history — all initialized with a single function call.
 - [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
+- [Error codes](https://rebase.pro/docs/backend/errors): Every error code a Rebase backend can return, with its HTTP status, what it means and what to do about it — plus the response envelope, X-Request-ID and the details rules.
+- [Endpoint index](https://rebase.pro/docs/backend/endpoints): Every HTTP route a Rebase backend mounts — data, auth, storage, admin, meta — with the gate on each one and the page that explains it.
 - [Live schema editing](https://rebase.pro/docs/backend/live-schema-editing): Create and alter collections against a running backend — committed to your repository first, then applied.
-- [Authentication](https://rebase.pro/docs/backend/authentication): Configure JWT authentication, OAuth providers, SMTP email, auth hooks, and custom auth adapters on the backend.
+- [Authentication](https://rebase.pro/docs/backend/authentication): Configure JWT authentication, OAuth providers, SMTP email, bot protection and the users collection on the Rebase backend.
+- [Auth endpoints and tokens](https://rebase.pro/docs/backend/auth-endpoints): The authentication routes the Rebase backend mounts, their response shapes, multi-factor authentication, the database context a policy sees, JWKS and service keys.
+- [Custom auth adapters](https://rebase.pro/docs/backend/auth-adapters): Replace Rebase's built-in authentication with Clerk, Firebase Auth or your own identity provider by implementing the AuthAdapter contract.
 - [Storage Configuration](https://rebase.pro/docs/backend/storage): Configure local filesystem, S3-compatible, or GCS/Firebase Storage backends for file uploads, images, and media.
 - [Multiple Databases and Buckets](https://rebase.pro/docs/backend/multiple-sources): Route collections to different databases and properties to different storage buckets, and configure each one from the environment.
 - [MongoDB](https://rebase.pro/docs/backend/mongodb): @rebasepro/server-mongo runs Rebase on MongoDB: a complete data driver, change-stream realtime and snapshot history — and no row-level security.
@@ -64,6 +77,7 @@
 - [Frontend Overview](https://rebase.pro/docs/frontend): Build and customize the Rebase admin panel with React — controllers, scaffold, routing, and views.
 - [Extending Rebase](https://rebase.pro/docs/frontend/extending): A decision guide for choosing the right extension mechanism — plugins, slots, component overrides, entity views, actions, and more.
 - [Styling Custom UI](https://rebase.pro/docs/frontend/styling): Build custom views, home pages and actions out of the same components and theme tokens as the rest of the admin, so they look native and follow the theme.
+- [Translations](https://rebase.pro/docs/frontend/i18n): Change any string in the Rebase admin, add a language, or read the current locale from your own components.
 - [Component Overrides (Swizzling)](https://rebase.pro/docs/frontend/component-overrides): Override default UI components with custom implementations at the application or collection level.
 - [Authentication & Login](https://rebase.pro/docs/frontend/authentication): Set up the auth controller, login view, and role simulation in your Rebase React frontend.
 - [Storage & File Uploads](https://rebase.pro/docs/frontend/storage): Add file upload fields to your collections, manage files programmatically, and route uploads to different storage backends.
@@ -78,6 +92,7 @@
 - [Data Import & Export](https://rebase.pro/docs/frontend/data-import-export): Import data from CSV, JSON, and Excel files into your collections, and export collection data to CSV or JSON with optional computed fields.
 - [Plugin System](https://rebase.pro/docs/plugins): Extend Rebase with plugins — inject UI components, modify collections, add toolbar actions, and create custom field builders.
 - [Hooks Reference](https://rebase.pro/docs/hooks): React hooks provided by Rebase for accessing auth, data, navigation, side panels, storage, and UI state.
+- [Studio Tools](https://rebase.pro/docs/studio): Rebase Studio provides developer tools for visual schema editing, SQL queries, JavaScript scripting, RLS policy management, and storage browsing.
 - [Client SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
 - [Querying Data](https://rebase.pro/docs/sdk/querying): CRUD operations, fluent query builder, filter operators, pagination, sorting, and relation fetching with the Rebase Client SDK.
 - [Authentication](https://rebase.pro/docs/sdk/authentication): Client-side authentication with the Rebase SDK — email/password sign-in, OAuth providers, session management, and auth state listeners.
@@ -85,12 +100,11 @@
 - [Offline & Local-First Sync](https://rebase.pro/docs/sdk/offline): Enable the Rebase Client SDK's local-first sync engine — a local row database, instant offline writes with rollback, and reactive live queries.
 - [Storage & Files](https://rebase.pro/docs/sdk/storage): Upload, download, list, and delete files using the Rebase Client SDK's storage module.
 - [AI & Agents](https://rebase.pro/docs/ai): What Rebase ships for AI coding assistants and autonomous agents — an MCP server, project-local agent skills, scaffolded instruction files, and the credential model that decides what an agent can actually reach.
-- [MCP Server](https://rebase.pro/docs/ai/mcp): Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 40 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
+- [MCP Server](https://rebase.pro/docs/ai/mcp): Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 41 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
 - [Agent Skills](https://rebase.pro/docs/ai/skills): rebase skills install writes 21 Rebase reference skills into your repo, in the layout your AI assistant expects — Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity.
 - [AI Instruction Files](https://rebase.pro/docs/ai/instruction-files): Every scaffolded Rebase project ships ai-instructions.md plus one-line pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md — one source of truth, many filenames.
 - [CLI Reference](https://rebase.pro/docs/cli): Rebase CLI commands for project initialization, schema generation, database migrations, and SDK generation.
 - [Schema Generation](https://rebase.pro/docs/cli/schema): Generate Drizzle ORM schemas from collection definitions, create SQL migrations, and keep your database in sync with the Rebase CLI.
-- [Studio Tools](https://rebase.pro/docs/studio): Rebase Studio provides developer tools for visual schema editing, SQL queries, JavaScript scripting, RLS policy management, and storage browsing.
 - [rls-check](https://rebase.pro/docs/rls-check): Audit row-level security on any PostgreSQL database — Supabase, Neon, RDS, or your own server. Read-only, no signup, no Rebase required.
 - [Architecture Overview](https://rebase.pro/docs/architecture): Understand how Rebase's backend, frontend, client SDK, and database integrate to form a complete Backend-as-a-Service.
 - [Schema as Code](https://rebase.pro/docs/architecture/schema-as-code): How Rebase uses TypeScript collections as the single source of truth for your database schema, UI, and API.
@@ -106,7 +120,7 @@
 - [Deploying Rebase on Microsoft Azure](https://rebase.pro/docs/deployment/azure): Deploy your Rebase instance securely on Azure using Azure Database for PostgreSQL and Azure Container Apps.
 - [Deploying Rebase on Hetzner Cloud](https://rebase.pro/docs/deployment/hetzner): Deploy Rebase on Hetzner Cloud with Terraform or Docker Compose, for excellent EU-based performance and data sovereignty.
 - [Deploying Rebase on Scaleway](https://rebase.pro/docs/deployment/scaleway): Learn how to deploy Rebase on Scaleway for secure, French-based cloud infrastructure using Serverless Containers.
-- [Deploying Rebase on Railway](https://rebase.pro/docs/deployment/railway): Deploy Rebase effortlessly with Railway natively supported Dockerfile parsing. Maintain EU focus.
+- [Deploying Rebase on Railway](https://rebase.pro/docs/deployment/railway): Deploy Rebase on Railway from the published runtime image and your project bundle. Maintain EU focus.
 - [Deploying Rebase on Fly.io](https://rebase.pro/docs/deployment/flyio): Learn how to deploy Rebase globally or restrict it to European data centers using Fly.io.
 - [Recipe: Blog CMS](https://rebase.pro/docs/recipes/blog-cms): Build a complete blog CMS with articles, authors, categories, rich text editing, and image uploads.
 - [Recipe: Custom Dashboard](https://rebase.pro/docs/recipes/custom-dashboard): Build a custom dashboard view with charts, stats, and data visualizations using Rebase hooks.

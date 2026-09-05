@@ -122,13 +122,16 @@ force: true });
         });
 
         console.log("6. Running db push to migrate the database schema...");
+        // No `--force`: `db push` has never taken one, and the permissive parsers
+        // turned it into a positional rather than an error, so this line has
+        // been asking for nothing since it was written. The database here is
+        // fresh, so nothing destructive needs confirming either.
         await execa("node", [
             cliBin,
             "db",
             "push",
             "--collections",
-            "../config/collections",
-            "--force"
+            "../config/collections"
         ], {
             cwd: scaffoldedDir,
             stdio: "inherit",

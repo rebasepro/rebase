@@ -94,8 +94,8 @@ rather than fixed ones, so they differ between projects. `PORT` and
 
 Useful flags: `--yes` (required when there is no terminal to prompt, such as CI),
 `--headless` (see below), `--template <name>`, and `--install` / `--no-install`
-on `init`; `--docker` on `dev` to use Postgres in a container instead, and
-`--no-db` to bring your own.
+on `init`; `--docker` on `dev` to use the compose Postgres in this project
+instead, and `--no-db` to start nothing — set `DATABASE_URL` yourself.
 
 **To use your own Postgres instead:** uncomment `DATABASE_URL` in `.env` and run
 `pnpm run dev` again. Nothing else changes — a `DATABASE_URL` that is set is
@@ -291,6 +291,18 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | `@rebasepro/plugin-ai` | AI-powered data enhancement plugin |
 | `@rebasepro/plugin-insights` | Analytics and insights plugin |
 
+### ESM only
+
+Every `@rebasepro/*` package ships ES modules and nothing else — `"type":
+"module"`, no CommonJS build, no `require()` entry point. A CommonJS project
+reaches them with a dynamic `await import()`; `require("@rebasepro/client")`
+throws `ERR_REQUIRE_ESM`. This is stated here because the failure names the
+loader rather than the decision, and because it is not recoverable by
+configuration: there is no dual build to fall back to.
+
+Node 22.22 is the floor, from [`.nvmrc`](.nvmrc) and enforced by
+`pnpm check:floors`.
+
 ### Versioning
 
 Rebase is `0.x`: the authored TypeScript API can still change in a minor, and
@@ -335,12 +347,47 @@ Every new project scaffolded with `rebase init` automatically includes a pre-con
 - Structuring custom functions and cron jobs.
 
 ### 2. Built-in MCP Server
-Rebase runs a Model Context Protocol (MCP) server that connects your AI assistant directly to your live Rebase schemas and databases for automated schema discovery, entity management, and data migrations.
+`rebase init` writes `.mcp.json`, so Claude Code, Cursor and any other MCP client can drive the project the moment it is scaffolded:
+
+```json
+{
+  "mcpServers": {
+    "rebase": {
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"]
+    }
+  }
+}
+```
+
+It speaks MCP over stdio and needs no login: while `rebase dev` is running it reads the backend URL and service key from `.rebase/state.json`. Write tools are refused against anything that is not on the loopback interface, which is the single most valuable thing in the package.
+
+[**Setup, the tool list, and what the server can reach →**](https://rebase.pro/docs/ai/mcp) — copy-paste blocks for Claude Code, Cursor, Gemini CLI, Codex and Kiro, and the credential model to read before pointing an assistant at a database you care about.
 
 ### 3. Troubleshooting Database Permissions in Studio
 If your AI coding agent or database role permissions cause a `permission denied for table <table_name>` error when executing queries in the **Rebase Studio SQL Editor**:
 - Add `DISABLE_DB_ROLE_SWITCHING=true` to your `.env` file.
 - This forces the SQL Editor queries to execute under the default connection owner user (e.g. `rebase`) rather than trying to perform a PostgreSQL role switch to a non-existent database-level role.
+
+---
+
+## Contributing
+
+Bug fixes, features and documentation are all welcome.
+**[CONTRIBUTING.md](CONTRIBUTING.md)** is the whole path: clone, install, start
+the database, run the app, and the one command — `pnpm ci:static` — that runs
+what CI runs. It also covers the commit format, the changelog rule, and how to
+run one package's tests.
+
+Two more worth knowing before a first pull request:
+
+- **[.agent/workflows/coding-standards.md](.agent/workflows/coding-standards.md)** —
+  the engineering rules this codebase is held to, and the reasons behind them.
+  No `as any`, no dynamic `require`, no polling on a realtime framework, no
+  hidden dunder properties on data objects. Written for an AI agent, and exactly
+  as binding on a person.
+- **[docs/gates.md](docs/gates.md)** — every automated check, what it protects,
+  and how to bank its baseline when it has one.
 
 ---
 

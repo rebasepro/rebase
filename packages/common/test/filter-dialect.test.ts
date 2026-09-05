@@ -418,3 +418,114 @@ describe("pattern-matching and null operators", () => {
         expect(deserializeLogicalCondition(serialized)).toEqual(original);
     });
 });
+
+// ---------------------------------------------------------------------------
+// The four leaf encodings a group used to get wrong
+//
+// `serializeLogicalCondition` carried its own copy of the leaf encoder, and
+// the copy had drifted from `serializeTuple` on every rule the top-level codec
+// had been fixed for. Each of these is a filter that ran, returned rows, and
+// answered a different question than the one asked — no error anywhere.
+// ---------------------------------------------------------------------------
+describe("logical leaf encoding", () => {
+    const cond = (column: string, operator: string, value: unknown) =>
+        ({ column, operator: operator as WhereFilterOp, value });
+
+    it("encodes a null comparison as the null-testing operator", () => {
+        // Was `deleted_at.eq.null`, i.e. a search for the four-character
+        // string, which on a timestamp column is a 500 and on a text column is
+        // silently the wrong rows.
+        const wire = serializeLogicalCondition(cond("deleted_at", "==", null));
+        expect(wire).toBe("deleted_at.isnull.null");
+        expect(deserializeLogicalCondition(wire)).toEqual({
+            column: "deleted_at", operator: "is-null", value: null
+        });
+        // Stable through a re-encode: the SDK builds it, the server parses it,
+        // a retry serializes it again.
+        expect(serializeLogicalCondition(deserializeLogicalCondition(wire))).toBe(wire);
+    });
+
+    it("encodes `!= null` as the negated null test", () => {
+        const wire = serializeLogicalCondition(cond("published_at", "!=", null));
+        expect(wire).toBe("published_at.notnull.null");
+        expect(deserializeLogicalCondition(wire)).toEqual({
+            column: "published_at", operator: "is-not-null", value: null
+        });
+    });
+
+    it("keeps the dots of a relation path in the column", () => {
+        // Was column `author`, operator `name` — which resolves to nothing, so
+        // the fallback made it `author == "eq.bob"`.
+        const wire = serializeLogicalCondition(cond("author.name", "==", "bob"));
+        expect(wire).toBe("author.name.eq.bob");
+        expect(deserializeLogicalCondition(wire)).toEqual({
+            column: "author.name", operator: "==", value: "bob"
+        });
+    });
+
+    it("keeps a JSON path in the column", () => {
+        const wire = serializeLogicalCondition(cond("metadata->>tier", "==", "gold"));
+        expect(wire).toBe("metadata->>tier.eq.gold");
+        expect(deserializeLogicalCondition(wire)).toEqual({
+            column: "metadata->>tier", operator: "==", value: "gold"
+        });
+    });
+
+    it("round-trips a comparison", () => {
+        const wire = serializeLogicalCondition(cond("age", ">=", 18));
+        expect(wire).toBe("age.gte.18");
+        expect(deserializeLogicalCondition(wire)).toEqual({
+            column: "age", operator: ">=", value: "18"
+        });
+    });
+
+    it("refuses an operator the dialect does not have, including the wire spelling", () => {
+        // `?? "eq"` used to swallow both of these. `gte` is the dangerous one:
+        // it is the spelling the wire itself uses, so it is what a hand-built
+        // condition object most often carries, and `age >= 18` went out as
+        // `age.eq.18` — a query that ran and answered something else.
+        //
+        // Rejected rather than accepted, which matches `serializeTuple`: this
+        // codec parses liberally (a REST short-code arrives off the wire) and
+        // emits strictly (a caller's spelling should be the one the types name).
+        for (const op of ["gte", "contains", "LIKE"]) {
+            expect(() => serializeLogicalCondition(cond("age", op, 18)))
+                .toThrow(TypeError);
+            expect(() => serializeLogicalCondition(cond("age", op, 18)))
+                .toThrow(new RegExp(`unknown operator "${op}"`));
+        }
+    });
+
+    it("encodes the empty list distinctly from a list holding the empty string", () => {
+        // Was `id.in.()`, which splits to `[""]` — a uuid column answers 500,
+        // a text column silently answers with the wrong rows.
+        const wire = serializeLogicalCondition(cond("id", "in", []));
+        expect(deserializeLogicalCondition(wire)).toEqual({
+            column: "id", operator: "in", value: []
+        });
+        const oneEmpty = serializeLogicalCondition(cond("id", "in", [""]));
+        expect(wire).not.toBe(oneEmpty);
+        expect(deserializeLogicalCondition(oneEmpty)).toEqual({
+            column: "id", operator: "in", value: [""]
+        });
+    });
+
+    it("round-trips a relation path inside an or group", () => {
+        const group = {
+            type: "or" as const,
+            conditions: [
+                cond("author.name", "==", "bob"),
+                cond("deleted_at", "==", null)
+            ]
+        };
+        const wire = serializeLogicalCondition(group);
+        expect(wire).toBe("or(author.name.eq.bob,deleted_at.isnull.null)");
+        expect(deserializeLogicalCondition(wire)).toEqual({
+            type: "or",
+            conditions: [
+                { column: "author.name", operator: "==", value: "bob" },
+                { column: "deleted_at", operator: "is-null", value: null }
+            ]
+        });
+    });
+});

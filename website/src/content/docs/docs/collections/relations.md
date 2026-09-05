@@ -309,6 +309,37 @@ relations: [
 | `"set null"` | Set the FK column to NULL |
 | `"set default"` | Set the FK column to its default value |
 
+### What you get when you say nothing
+
+`onDelete` is optional, so most relations never name one. The default depends on
+whether the relation is required:
+
+| Relation | Default `onDelete` |
+|--------|----------|
+| `belongsTo`, optional | `"set null"` — the pointer is emptied |
+| `belongsTo`, `validation: { required: true }` | `"restrict"` — the parent delete fails |
+| `manyToMany` (junction rows) | `"cascade"` — the link goes, the target stays |
+
+A required relation is **not** a cascade. `required` says a child cannot exist
+without a parent; it does not say deleting the parent should destroy the child.
+Those are different claims, and only one of them removes rows you did not name.
+So the default fails the delete and names the constraint, and `"cascade"` is
+something you ask for:
+
+```typescript
+{
+    kind: "belongsTo",
+    relationName: "order",
+    target: () => ordersCollection,
+    // A line item is meaningless without its order — say so.
+    onDelete: "cascade"
+}
+```
+
+`onUpdate` has no default: with nothing set, Postgres applies `NO ACTION`. Set
+`"cascade"` when the target's key is something a person can edit — a slug, a SKU
+— so the pointers follow it.
+
 ## Fetching Relations in the SDK
 
 When querying data through the Rebase Client SDK, relations are **not** included by default. Use the `include()` method to request related entities alongside the primary data.
@@ -459,8 +490,9 @@ interface RelationBase {
     onUpdate?: OnAction;
     onDelete?: OnAction;
     overrides?: Partial<CollectionConfig>;   // applied when rendered as a tab
-    validation?: { required?: boolean };
 }
+// `required` is not here. It is `validation: { required: true }` on the
+// property that declares the relation, the same key every other field uses.
 
 interface BelongsToRelation extends RelationBase {
     kind: "belongsTo";

@@ -344,6 +344,67 @@ export interface AuthedUser {
     accessToken: string;
 }
 
+/**
+ * Read a variable out of a scaffolded project's `.env`.
+ *
+ * A regex rather than a dotenv parse, because the two values this needs are
+ * written by `rebase init` itself, on a line of their own, unquoted.
+ */
+export function readEnvVar(projectDir: string, name: string): string | undefined {
+    const envPath = path.join(projectDir, ".env");
+    if (!fs.existsSync(envPath)) return undefined;
+    const match = fs.readFileSync(envPath, "utf8")
+        .match(new RegExp(`^\\s*${name}=(.*)$`, "m"));
+    return match ? match[1].trim() : undefined;
+}
+
+/**
+ * Sign in as the admin `rebase init` named in the scaffold's `.env`.
+ *
+ * A scaffold no longer boots with an empty user table. `init` writes
+ * `REBASE_ADMIN_EMAIL` and a generated `REBASE_ADMIN_PASSWORD`, and the runtime
+ * creates that account on the first boot — so "register the first user and be
+ * promoted to admin" is a path a new project no longer has, and every suite
+ * that took it got `409 EMAIL_EXISTS` against an address the seed had already
+ * claimed.
+ *
+ * Reading the credentials instead of hardcoding them is the point: the password
+ * is generated per scaffold, and the email is a default the template is free to
+ * change. Missing either is a failure and not a fallback — silently registering
+ * instead would put this back on the path that broke.
+ */
+export async function loginSeededAdmin(projectDir: string, baseUrl: string): Promise<AuthedUser> {
+    const email = readEnvVar(projectDir, "REBASE_ADMIN_EMAIL");
+    const password = readEnvVar(projectDir, "REBASE_ADMIN_PASSWORD");
+    if (!email || !password) {
+        throw new Error(
+            "The scaffold's .env names no seeded admin: "
+            + `REBASE_ADMIN_EMAIL=${email ?? "(unset)"}, `
+            + `REBASE_ADMIN_PASSWORD=${password ? "(set)" : "(unset)"}. `
+            + "`rebase init` writes both; if it stopped, this suite is testing a first run nobody gets."
+        );
+    }
+    return await login(baseUrl, email, password);
+}
+
+/** Log in an account that already exists, and return it with its token. */
+export async function login(baseUrl: string, email: string, password: string): Promise<AuthedUser> {
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+    });
+    const body = await res.json() as any;
+    if (!res.ok || !body?.tokens?.accessToken) {
+        throw new Error(`login failed (${res.status}) for ${email}: ${JSON.stringify(body)}`);
+    }
+    return {
+        uid: body.user.uid,
+        roles: body.user.roles ?? [],
+        accessToken: body.tokens.accessToken
+    };
+}
+
 /** Register a user and return them already logged in. */
 export async function registerAndLogin(baseUrl: string, email: string, password: string): Promise<AuthedUser> {
     const regRes = await fetch(`${baseUrl}/api/auth/register`, {

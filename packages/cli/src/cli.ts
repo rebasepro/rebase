@@ -19,25 +19,10 @@ import { isEnabled } from "./telemetry";
 import { cloudCommand } from "./commands/cloud";
 import { appsCommand } from "./commands/apps";
 import { requireProjectRoot } from "./utils/project";
-import fs from "fs";
+import { parseCommandArgs } from "./utils/args";
+import { unknownCommand } from "./utils/unknown-command";
+import { cliVersion } from "./utils/version";
 import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-function getVersion(): string {
-    try {
-        // Try to read version from package.json
-        const pkgPath = path.resolve(__dirname, "../package.json");
-        if (fs.existsSync(pkgPath)) {
-            return JSON.parse(fs.readFileSync(pkgPath, "utf-8")).version;
-        }
-    } catch {
-        // ignore
-    }
-    return "unknown";
-}
 
 /**
  * Silence dotenv's own banner, for this process and everything it spawns.
@@ -76,7 +61,7 @@ export async function entry(args: string[]) {
     );
 
     if (parsedArgs["--version"]) {
-        console.log(getVersion());
+        console.log(cliVersion());
         return;
     }
 
@@ -134,22 +119,32 @@ export async function entry(args: string[]) {
             break;
 
         case "generate-sdk": {
-            const sdkArgs = arg(
-                {
+            // Strict, and parsed from the whole line rather than `slice(3)`.
+            // Permissive parsing turned a typo into silence: `rebase
+            // generate-sdk --ouput ./sdk` wrote the SDK to the default path and
+            // said nothing, so the next build imported a stale one. And the
+            // fixed slice meant `rebase --debug generate-sdk -o ./sdk` read
+            // `generate-sdk` as the first token of the flag line, dropping the
+            // flags entirely. `parseCommandArgs` fixes both: it consumes flags
+            // wherever they appear and rejects the ones nobody declared.
+            const { flags: sdkArgs, help: sdkHelp } = parseCommandArgs({
+                spec: {
                     "--collections-dir": String,
                     "--output": String,
+                    // The alias `build`, `cloud env pull` and `db backup` carry.
+                    // Two names for one concept across one CLI is a thing you
+                    // have to remember rather than know.
+                    "--out": "--output",
                     "--from": String,
                     "--token": String,
-                    "--help": Boolean,
                     "-c": "--collections-dir",
-                    "-o": "--output",
-                    "-h": "--help"
+                    "-o": "--output"
                 },
-                {
-                    argv: args.slice(3),
-                    permissive: true
-                }
-            );
+                rawArgs: args,
+                commandWords: 1,
+                command: "generate-sdk",
+                maxPositionals: 0
+            });
             // Defaults hang off the project root, not the cwd. `./config/
             // collections` relative to wherever you happen to be standing meant
             // `rebase generate-sdk` worked from the repository root and threw
@@ -158,13 +153,13 @@ export async function entry(args: string[]) {
             // sits — while `rebase db push` and `rebase dev` worked from all of
             // them. An explicitly passed path still resolves against the cwd,
             // which is where the person typing it means it.
-            const sdkRoot = sdkArgs["--help"] ? process.cwd() : requireProjectRoot();
+            const sdkRoot = sdkHelp ? process.cwd() : requireProjectRoot();
             await generateSdkCommand({
                 collectionsDir: sdkArgs["--collections-dir"] || path.join(sdkRoot, "config/collections"),
                 output: sdkArgs["--output"] || path.join(sdkRoot, "generated/sdk"),
                 from: sdkArgs["--from"],
                 token: sdkArgs["--token"],
-                help: sdkArgs["--help"],
+                help: sdkHelp,
                 cwd: process.cwd()
             });
             break;
@@ -229,11 +224,13 @@ export async function entry(args: string[]) {
             break;
 
         default:
-            console.error(chalk.red(`Unknown command: ${command}`));
-            console.log("");
-            printHelp();
+            // One line, with the correction, and no screen of help after it: the
+            // sentence that says what happened must not scroll off the top of a
+            // CI log. `namespacedCommands` is the dispatch itself, so the
+            // suggestion can never name a command that is not there.
+            //
             // A mistyped command must not look like success to a shell or CI.
-            process.exit(1);
+            unknownCommand(command, namespacedCommands);
     }
 }
 
@@ -247,21 +244,25 @@ ${chalk.green.bold("Usage")}
 ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("init")}                    Create a new Rebase project
   ${chalk.blue.bold("dev")}                     Start the development server
-  ${chalk.blue.bold("build")}                   Build all workspace packages
+  ${chalk.blue.bold("build")}                   Build the apps declared in rebase.json into a bundle
   ${chalk.blue.bold("start")}                   Start the backend server ${chalk.gray("(production)")}
   ${chalk.blue.bold("apps list")}               Show the apps this repository declares
-  ${chalk.blue.bold("eject")}                   Take ownership of the server process and image
 
 ${chalk.green.bold("Schema")}
   ${chalk.blue.bold("schema generate")}         Generate Drizzle schema from collections
   ${chalk.blue.bold("schema introspect")}       Introspect database → Rebase collections
+  ${chalk.blue.bold("schema stale")}            Report generated schema files the collections have moved past
   ${chalk.blue.bold("schema")} ${chalk.gray("--help")}           Show schema command help
 
 ${chalk.green.bold("Database")}
   ${chalk.blue.bold("db push")}                 Apply schema directly to database ${chalk.gray("(dev)")}
   ${chalk.blue.bold("db generate")}             Generate SQL migration files
   ${chalk.blue.bold("db migrate")}              Run pending migrations
-  ${chalk.blue.bold("db")} ${chalk.gray("--help")}               Show database command help
+  ${chalk.blue.bold("db pull")}                 Copy another database into local development
+  ${chalk.blue.bold("db branch")}               Create, list, switch and delete database branches
+  ${chalk.blue.bold("db stop")}                 Stop the managed development database ${chalk.gray("(data is kept)")}
+  ${chalk.blue.bold("db reset")}                Delete the managed development database and start over
+  ${chalk.blue.bold("db")} ${chalk.gray("--help")}               Backup, restore, and every flag
 
 ${chalk.green.bold("SDK")}
   ${chalk.blue.bold("generate-sdk")}            Generate a typed TypeScript SDK from collections
@@ -271,9 +272,12 @@ ${chalk.green.bold("Auth")}
   ${chalk.blue.bold("auth")} ${chalk.gray("--help")}             Show auth command help
 
 ${chalk.green.bold("Diagnostics")}
-  ${chalk.blue.bold("doctor")}                  Detect schema drift between collections, schema, and DB
   ${chalk.blue.bold("status")}                  Show every resource and whether its variables are set
+  ${chalk.blue.bold("doctor")}                  Detect schema drift between collections, schema, and DB
   ${chalk.blue.bold("resources")}               List the databases, buckets and topics this project declares
+
+${chalk.green.bold("Take ownership")}
+  ${chalk.blue.bold("eject")}                   Own the server process and the image ${chalk.gray("(one-way)")}
 
 ${chalk.green.bold("AI Agent Skills")}
   ${chalk.blue.bold("skills install")}          Install Rebase agent skills for your AI coding assistant

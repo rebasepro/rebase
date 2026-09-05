@@ -20,9 +20,10 @@ Esto genera la estructura de un proyecto con tres paquetes:
 
 ## Requisitos Previos
 
-- **Node.js** 18+
-- **Docker** — para ejecutar el contenedor de PostgreSQL incluido. (O trae tu propio PostgreSQL: instalación local, Neon, Supabase, etc.)
+- **Node.js** 22.22 o posterior (la versión en `.nvmrc`)
 - **pnpm** (recomendado) o npm
+
+Nada de base de datos que instalar, y sin Docker. `rebase dev` ejecuta un PostgreSQL gestionado para el proyecto, con sus datos en `.rebase/`. Consulta [Variante: usar tu propia PostgreSQL](#variante-usar-tu-propia-postgresql) si prefieres aportar el tuyo — una instalación local, Neon, Supabase o el contenedor que incluye esta estructura.
 
 ## Tu Entorno Ya Está Configurado
 
@@ -193,11 +194,11 @@ Esto regenera el esquema a partir de tus colecciones y lo aplica. Reinicia los s
 
 | Comando | Descripción |
 |---------|-------------|
-| `rebase schema generate` | Genera el esquema de Drizzle a partir de tus colecciones de TypeScript |
+| `rebase schema generate` | Genera el esquema de Drizzle a partir de tus colecciones de TypeScript. No necesita base de datos — `rebase dev` lo ejecuta por ti |
 | `rebase schema introspect` | Genera colecciones de TypeScript a partir de una base de datos existente |
-| `rebase db push` | Envía los cambios de esquema directamente a la base de datos (solo desarrollo) |
-| `rebase db generate` | Genera archivos de migración SQL |
-| `rebase db migrate` | Ejecuta las migraciones pendientes |
+| `rebase db push` | Envía los cambios de esquema directamente a la base de datos. Necesita tu propio PostgreSQL |
+| `rebase db generate` | Genera archivos de migración SQL. Necesita tu propio PostgreSQL |
+| `rebase db migrate` | Ejecuta las migraciones pendientes. Necesita tu propio PostgreSQL |
 
 ## Qué Sigue
 

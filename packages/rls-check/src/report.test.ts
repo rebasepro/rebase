@@ -68,7 +68,8 @@ excludedSchemas: [], unrecognizedGrantees: [] },
         serverVersion: "PostgreSQL 15.6 on aarch64-unknown-linux-gnu",
         platform: "supabase",
         scannerIsPrivileged: false,
-        stats: { schemas: 2, tables: 18, policies: 24, tablesWithoutRls: 3, checksRun: 14 },
+        exposedRoles: ["PUBLIC", "anon", "authenticated"],
+        stats: { schemas: 2, tables: 18, policies: 24, tablesWithoutRls: 3, checksRun: 15 },
         findings: [finding()],
         ...overrides
     };
@@ -389,8 +390,12 @@ describe("renderJson", () => {
         // from "the scan could not look". Without it the two are the same
         // document.
         expect(Object.keys(parsed).sort()).toEqual(
-            ["database", "diagnostics", "findings", "platform", "scannedAt", "scannerIsPrivileged", "serverVersion", "stats"].sort()
+            ["database", "diagnostics", "exposedRoles", "findings", "platform", "scannedAt", "scannerIsPrivileged", "serverVersion", "stats"].sort()
         );
+        // `exposedRoles` is part of the contract for the same reason: every
+        // check gates on it, so a consumer cannot read `findings: []` without
+        // knowing which roles were considered.
+        expect(parsed.exposedRoles).toEqual(["PUBLIC", "anon", "authenticated"]);
         expect(parsed.database).toEqual({ host: "db.abcdefghijkl.supabase.co", name: "postgres" });
         expect(parsed.scannedAt).toBe("2026-07-26T09:00:00.000Z");
         expect(renderJson(result())).not.toMatch(ANSI);

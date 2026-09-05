@@ -15,9 +15,47 @@ import type { PropertySpan } from "./form_layout";
  * @group Entity properties
  */
 export interface AdminPropertyOptions<CustomProps = unknown> {
+    /**
+     * Width of this property's column in the table view, in pixels. Omit and the
+     * table derives one from the property type.
+     *
+     * A person can drag a column wider, and that is remembered per user; this is
+     * the width everyone starts from.
+     */
     columnWidth?: number;
+    /**
+     * Keep this property out of the table and card views. It is still on the
+     * entity form, and still read and written by the API.
+     *
+     * For a field that should not leave the server at all, use
+     * `excludeFromApi` on the property itself — this one is presentation, and
+     * hiding a secret with it hides it from exactly one screen.
+     */
     hideFromCollection?: boolean;
+    /**
+     * Render the **value**, not a control. Defaults to `false`.
+     *
+     * The distinction from {@link disabled} is what the field looks like and
+     * what it can do. `readOnly` shows the value as text: nothing to focus,
+     * nothing to clear, and no explanation owed, because there is no control to
+     * wonder about. Use it for something the server owns — a computed total, an
+     * `autoValue` timestamp.
+     *
+     * A property that is read-only *for some people* is not this: that is a
+     * security rule, and writing it here leaves the column writable through the
+     * API by anyone who skips the panel.
+     */
     readOnly?: boolean;
+    /**
+     * Render the control, greyed out. Defaults to `false`.
+     *
+     * The counterpart to {@link readOnly}: this one is a field that *could* be
+     * edited but is not, right now — usually because of a condition, which is
+     * why it takes a config with a `disabledMessage` saying why and a
+     * `clearOnDisabled` for the value that no longer applies. The control stays
+     * visible so the reader can see the shape of what they are not allowed to
+     * fill in.
+     */
     disabled?: boolean | PropertyDisabledConfig;
 
     /**
@@ -28,8 +66,34 @@ export interface AdminPropertyOptions<CustomProps = unknown> {
      * are declared in.
      */
     span?: PropertySpan;
+    /**
+     * Anything your own {@link Field} or {@link Preview} needs, passed straight
+     * through untouched.
+     *
+     * Typed by the property's own `CustomProps` parameter, so a custom field
+     * declares what it expects and a collection that supplies the wrong shape is
+     * a compile error rather than an `undefined` at render time.
+     */
     customProps?: CustomProps;
+    /**
+     * Replace the form control for this property.
+     *
+     * The component receives `FieldProps` — the value, `setValue`, the resolved
+     * property, the whole entity's values, and any {@link customProps}. It owns
+     * the input; validation, the label and the error line stay with the form.
+     *
+     * A `ComponentRef` rather than a component so a collection stays
+     * serializable: the reference is a registered key, which survives being sent
+     * to the schema editor and written back to the file.
+     */
     Field?: ComponentRef<any>;
+    /**
+     * Replace how this property renders when it is *not* being edited — a table
+     * cell, a card line, a reference chip.
+     *
+     * Separate from {@link Field} because the two are read in different places
+     * and at different sizes; overriding one and not the other is normal.
+     */
     Preview?: ComponentRef<any>;
 
     /**
@@ -80,6 +144,12 @@ export interface AdminStringOptions extends AdminPropertyOptions {
      * Should this string be rendered as a tag instead of just text.
      */
     previewAsTag?: boolean;
+    /**
+     * Add an icon that sets the value to `null`. Defaults to `false`.
+     *
+     * Worth setting where empty and empty-string are different answers — an
+     * unset middle name is not the same as one somebody deleted.
+     */
     clearable?: boolean;
     /**
      * How to render a string that holds a URL: a link, or one of the supported
@@ -117,7 +187,9 @@ export interface NumberFormatOptions {
      * amount read `1,234.50` for one user and `1.234,50` for another.
      */
     locale?: string;
+    /** Pad to at least this many decimals — `2` writes `5` as `5.00`. */
     minimumFractionDigits?: number;
+    /** Round to at most this many decimals. Does not change the stored value. */
     maximumFractionDigits?: number;
     /** `"compact"` renders `12000` as `12K`. Useful in narrow table columns. */
     notation?: "standard" | "compact";
@@ -127,6 +199,12 @@ export interface NumberFormatOptions {
  * @group Entity properties
  */
 export interface AdminNumberOptions extends AdminPropertyOptions {
+    /**
+     * Add an icon that sets the value to `null`. Defaults to `false`.
+     *
+     * Numbers are where this matters most: without it, clearing the input
+     * leaves `0`, and "no price" and "free" become the same row.
+     */
     clearable?: boolean;
     /**
      * Write this number out as currency, a percentage, or with fixed decimals.
@@ -140,6 +218,13 @@ export interface AdminNumberOptions extends AdminPropertyOptions {
  * @group Entity properties
  */
 export interface AdminVectorOptions extends AdminPropertyOptions {
+    /**
+     * Add an icon that sets the embedding to `null`. Defaults to `false`.
+     *
+     * A vector is normally written by whatever generates it, so this is for the
+     * case where a human needs to say "this one is stale" and let it be
+     * recomputed.
+     */
     clearable?: boolean;
 }
 
@@ -157,6 +242,15 @@ export interface AdminDateOptions extends AdminPropertyOptions {
  * @group Entity properties
  */
 export interface AdminReferenceOptions extends AdminPropertyOptions {
+    /**
+     * Which of the *target's* properties are shown in the chip that stands in
+     * for the referenced entity. At most three fit; the rest are ignored.
+     *
+     * Defaults to the target collection's own `admin.previewProperties`, then to
+     * a derived guess. Name them here when the referring context wants different
+     * ones — an order line wants the product's SKU, the catalogue wants its
+     * name.
+     */
     previewProperties?: string[];
 
     /**
@@ -176,6 +270,13 @@ export interface AdminReferenceOptions extends AdminPropertyOptions {
  * @group Entity properties
  */
 export interface AdminRelationOptions extends AdminPropertyOptions {
+    /**
+     * Which of the *target's* properties are shown in the chip that stands in
+     * for the related row. At most three fit; the rest are ignored.
+     *
+     * Defaults to the target collection's own `admin.previewProperties`, then to
+     * a derived guess. Name them here when this side wants different ones.
+     */
     previewProperties?: string[];
 
     /**
@@ -214,7 +315,20 @@ export interface AdminRelationOptions extends AdminPropertyOptions {
  * @group Entity properties
  */
 export interface AdminArrayOptions extends AdminPropertyOptions {
+    /**
+     * Open every element on load instead of collapsing them to one line each.
+     * Defaults to `false`.
+     *
+     * Expanding is right for a short list of small elements and wrong for a long
+     * one: twenty open cards is a form nobody can find the bottom of.
+     */
     expanded?: boolean;
+    /**
+     * Drop the per-element chrome — the frame, the header, the index — and
+     * render the children alone. Defaults to `false`.
+     *
+     * For an array of one simple field, where the chrome is most of the pixels.
+     */
     minimalistView?: boolean;
 
     /**
@@ -234,8 +348,25 @@ export interface AdminArrayOptions extends AdminPropertyOptions {
  * @group Entity properties
  */
 export interface AdminMapOptions extends AdminPropertyOptions {
+    /**
+     * Open the map's fields on load instead of collapsing them behind its
+     * header. Defaults to `false`.
+     */
     expanded?: boolean;
+    /**
+     * Drop the map's frame and header and render its fields alone. Defaults to
+     * `false`.
+     */
     minimalistView?: boolean;
+    /**
+     * Lay the map's fields out as if they were the parent's own, rather than
+     * grouped inside it. Defaults to `false`.
+     *
+     * Presentation only — the values still nest under this property's key in the
+     * row, and in every read the API serves. It is for a group that is a
+     * grouping in the schema and not in the form: an address, a set of
+     * dimensions.
+     */
     spreadChildren?: boolean;
 
     /**
@@ -298,3 +429,18 @@ type AnyAdminPropertyOptionKey =
  * package, and this clause is what stops the data from drifting off the types.
  */
 export const ADMIN_PROPERTY_KEYS = CORE_ADMIN_PROPERTY_KEYS satisfies readonly AnyAdminPropertyOptionKey[];
+
+/**
+ * And the reverse direction: an option key these types declare that core's list
+ * does not name.
+ *
+ * The `satisfies` above only closes one side. This one matters since the boot
+ * validator started warning about unrecognised keys inside a property's `admin`
+ * block: an option missing from the list would make the server call a correct
+ * config a typo, and a check that cries wolf is a check people turn off.
+ */
+type _EveryAdminPropertyOptionIsListed =
+    AssertNeverPropertyKey<Exclude<AnyAdminPropertyOptionKey, typeof CORE_ADMIN_PROPERTY_KEYS[number]>>;
+
+/** Compiles only when `T` is `never`. */
+type AssertNeverPropertyKey<T extends never = never> = T;

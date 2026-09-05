@@ -1,4 +1,4 @@
-import type { ErrorHandler } from "hono";
+import type { Context, ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { HonoEnv } from "./types";
 import { logger } from "../utils/logger";
@@ -23,6 +23,21 @@ interface PgLikeError {
 
 /** 5-character SQLSTATE, e.g. `42501`, `23505`. */
 const SQLSTATE_RE = /^[0-9A-Z]{5}$/;
+
+/**
+ * What SQLSTATE 25006 means here, in the only terms that help the author fix it.
+ *
+ * Every request-scoped read runs `withTransaction(..., { accessMode: "read
+ * only" })`, so a write attempted anywhere under it — including from a
+ * `context.data` call inside an `afterRead` callback — is refused by Postgres
+ * rather than by us. The callback name is in the message because that is the
+ * file the reader has to open, and nothing else on a read path can raise this.
+ */
+const READ_ONLY_TRANSACTION_MESSAGE =
+    "An `afterRead` callback tried to write. Request-scoped reads run in a READ ONLY " +
+    "transaction, so neither the callback nor anything it calls (context.data included) " +
+    "may write. Move the write outside the read: enqueue a background job, or use " +
+    "`rebase.dataAsAdmin` from a job or a custom function.";
 
 /**
  * Walk the cause chain for the underlying database error, identified by a
@@ -167,6 +182,34 @@ export interface RebaseApiError extends Error {
 // know — the driver, which holds the SQLSTATE — raises a real `ApiError`.
 
 /**
+ * Leave the code and the message where the request log will find them.
+ *
+ * A failed request used to produce two lines, each holding half of it: this
+ * handler had the code and the diagnosis, `requestLogger` had the user, the
+ * collection, the status and the latency. Correlating them meant matching on
+ * the request id — which only one of them printed reliably — and the pair cost
+ * twice the volume for less than one line's worth of meaning.
+ */
+function handOffToRequestLog(c: Context<HonoEnv>, code: string, message: string): void {
+    if (typeof c.set !== "function") return;
+    c.set("errorSummary", { code, message });
+}
+
+/**
+ * Is a request line coming for this request?
+ *
+ * `requestLogger` claims it before the handler runs, so by the time an error
+ * reaches here the answer is already known. When nothing claimed it — a router
+ * a project mounted onto its own Hono app, a test driving `app.fetch`
+ * directly — this handler stays the only thing that would report the failure,
+ * so it still writes its own line. Silence is the one outcome neither half may
+ * produce.
+ */
+function requestWillBeLogged(c: Context<HonoEnv>): boolean {
+    return typeof c.get === "function" && c.get("requestLogged") === true;
+}
+
+/**
  * Hono error-handling middleware (`app.onError`).
  * Converts any error into the canonical `{ error: { message, code } }` shape.
  */
@@ -196,12 +239,15 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         // routine outcome (see ApiError.expected), which would otherwise put a
         // warning in the log for every anonymous page view.
         const expected = error instanceof ApiError && error.expected;
-        const line = `[API] ${c.req.method} ${c.req.path} → ${error.statusCode} ${error.code}: ${error.message}` +
-            (reqId ? ` [${reqId}]` : "");
-        if (expected) {
-            logger.debug(line);
-        } else {
-            logger.warn(`⚠️ ${line}`);
+        handOffToRequestLog(c, error.code || "INTERNAL_ERROR", error.message);
+        if (!requestWillBeLogged(c)) {
+            const line = `[API] ${c.req.method} ${c.req.path} → ${error.statusCode} ${error.code}: ${error.message}` +
+                (reqId ? ` [${reqId}]` : "");
+            if (expected) {
+                logger.debug(line);
+            } else {
+                logger.warn(`⚠️ ${line}`);
+            }
         }
         return c.json({
             error: {
@@ -213,7 +259,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         } satisfies ErrorResponse, (error.statusCode || 500) as ContentfulStatusCode);
     }
 
-    const statusCode = error.statusCode || codeToStatus(error.code) || 500;
+    let statusCode = error.statusCode || codeToStatus(error.code) || 500;
     let code = error.code || "INTERNAL_ERROR";
 
     // Handle DB connection and specific system errors for better logging
@@ -267,14 +313,29 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
                 "or a stale FORCE ROW LEVEL SECURITY flag binding the owner connection."
             );
         }
+        // 25006 read_only_sql_transaction. A request-scoped read opens its
+        // transaction `READ ONLY`, so the only way to reach this is user code on
+        // a read path attempting a write — which means an `afterRead` callback,
+        // or something it called. Left in the generic branch it was a 500
+        // "Internal Server Error", indistinguishable from the database being
+        // down; it is the caller's own code, and it is not a server failure.
+        if (dbError.code === "25006") {
+            code = "READ_ONLY_TRANSACTION";
+            statusCode = 409;
+            parts.push(READ_ONLY_TRANSACTION_MESSAGE);
+        }
         logMessage = parts.join(". ");
     }
 
     const isDbSchemaMismatch = code === "SCHEMA_DRIFT";
 
+    // `logMessage`, not the sanitized client message: the request line is a
+    // server log, and the whole point of this branch is the diagnosis it built.
+    handOffToRequestLog(c, code, logMessage);
+
     if (isDbSchemaMismatch) {
         // Database schema mismatch is logged as a warning instead of a fatal error
-        logger.warn(
+        if (!requestWillBeLogged(c)) logger.warn(
             `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
             (reqId ? ` [${reqId}]` : "")
         );
@@ -298,7 +359,15 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
                 ""
             ].join("\n"));
         }
-    } else {
+    } else if (code === "READ_ONLY_TRANSACTION") {
+        // A 4xx: the application's own callback, refused. Not a server fault, so
+        // not an ❌ in the log either — and, like the drift arm above, not a
+        // second line when the request log is already going to carry it.
+        if (!requestWillBeLogged(c)) logger.warn(
+            `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
+            (reqId ? ` [${reqId}]` : "")
+        );
+    } else if (!requestWillBeLogged(c)) {
         // Unexpected errors — log at error level
         logger.error(
             `❌ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
@@ -321,7 +390,11 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // Sanitize the message for the client to prevent leaking sensitive details
     // like SQL queries or internal IP addresses.
     let clientMessage = "An unexpected error occurred";
-    if (statusCode < 500 && error.message) {
+    if (code === "READ_ONLY_TRANSACTION") {
+        // Ahead of the generic 4xx arm below, which would echo the raw driver
+        // message ("Failed query: insert into …") back to the caller.
+        clientMessage = READ_ONLY_TRANSACTION_MESSAGE;
+    } else if (statusCode < 500 && error.message) {
         // If it's a 4xx error (e.g. from validation), it's generally safe to send the message
         clientMessage = error.message;
     } else if (error instanceof ApiError || error.name === "ApiError") {
@@ -379,6 +452,7 @@ function codeToStatus(code?: string): number | undefined {
         CONFLICT: 409,
         EMAIL_EXISTS: 409,
         ROLE_EXISTS: 409,
+        READ_ONLY_TRANSACTION: 409,
         SCHEMA_DRIFT: 500,
         DB_PERMISSION_DENIED: 500,
         INTERNAL_ERROR: 500,

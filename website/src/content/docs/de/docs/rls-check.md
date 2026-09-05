@@ -43,7 +43,9 @@ Wenn dein Passwort `@`, `:`, `/`, `?` oder `#` enthält, kodierte es als Percent
 | Option | Bedeutung |
 | --- | --- |
 | `--json` | Maschinenlesbare Ausgabe auf stdout und sonst nichts auf stdout |
+| `--html <pfad>` | Schreibt zusätzlich einen eigenständigen HTML-Bericht dorthin. Eine Datei, keine Netzwerkaufrufe |
 | `--schema <name>` | Scan auf ein Schema beschränken. Wiederholbar oder durch Kommas getrennt |
+| `--role <name>` | Diese Rolle als eine behandeln, unter der ein nicht vertrauenswürdiger Aufrufer ankommt — zusätzlich zu `anon`, `authenticated`, `web_anon` und `rebase_user`. Wiederholbar oder durch Kommas getrennt |
 | `--fail-on <severity>` | Beenden mit Code 1 bei oder über dieser Schwere (Severity). Standard `high`; `none` schlägt nie fehl |
 | `--only <id>` | Nur diese Prüfungen ausführen. Wiederholbar oder durch Kommas getrennt |
 | `--skip <id>` | Diese Prüfungen überspringen. Wiederholbar oder durch Kommas getrennt |
@@ -52,7 +54,15 @@ Wenn dein Passwort `@`, `:`, `/`, `?` oder `#` enthält, kodierte es als Percent
 | `--quiet` | Nur Ergebnisse — kein Banner, keine Zusammenfassung |
 | `--no-color` | ANSI-Farben deaktivieren (berücksichtigt auch `NO_COLOR` und nicht-TTY stdout) |
 
-Eine unbekannte ID, die an `--only` oder `--skip` übergeben wird, führt zu einem Fehler statt zu einem stillschweigenden No-Op, da ein Tippfehler an dieser Stelle den Scan unbemerkt schwächen würde.
+Eine unbekannte ID, die an `--only` oder `--skip` übergeben wird, führt zu einem Fehler statt zu einem stillschweigenden No-Op, da ein Tippfehler an dieser Stelle den Scan unbemerkt schwächen würde. Eine `--role`, die nicht in `pg_roles` steht, ist aus demselben Grund ein Fehler: Jede Prüfung setzt an einer Berechtigung für eine exponierte Rolle an, also entfernt ein Name, der auf nichts passt, stillschweigend Abdeckung.
+
+Der Kopf des Berichts nennt die Rollen, die der Lauf als exponiert behandelt hat — so siehst du auf einen Blick, ob `No findings` die Rolle abgedeckt hat, mit der deine Anwendung verbindet:
+
+```
+Exposed   PUBLIC, anon, authenticated (add yours with --role)
+```
+
+Verbindet sich der Scan mit einer Rolle, die Row-Level Security tatsächlich einschränken *kann* — kein Superuser, kein Eigentümer, kein `BYPASSRLS` —, wird sie der Menge hinzugefügt, und der Bericht sagt das. Ein Scan mit der Rolle deiner eigenen Anwendung kommt dem, die Datenbank zu fragen, was deine API sieht, am nächsten.
 
 ### Exit-Codes
 
@@ -75,7 +85,9 @@ Eine unbekannte ID, die an `--only` oder `--skip` übergeben wird, führt zu ein
 
 ### JSON-Ausgabe
 
-`--json` gibt ein stabiles Objekt aus: `scannedAt`, `database` (nur Host und Name — niemals Zugangsdaten), `serverVersion`, `platform`, `scannerIsPrivileged`, `stats` und `findings`. Jedes Ergebnis (Finding) enthält `id`, `severity`, `title`, `target`, `detail`, `impact`, `fix`, `docs` und `confidence`.
+`--json` gibt ein stabiles Objekt aus: `scannedAt`, `database` (nur Host und Name — niemals Zugangsdaten), `serverVersion`, `platform`, `scannerIsPrivileged`, `exposedRoles`, `stats`, `findings` und `diagnostics`. Jedes Ergebnis (Finding) enthält `id`, `severity`, `title`, `target`, `detail`, `impact`, `fix`, `docs` und `confidence`.
+
+`exposedRoles` und `diagnostics` gehören zum Vertrag, sie sind kein Beiwerk: Jede Prüfung setzt an der Menge der exponierten Rollen an, und `diagnostics.degraded` ist das, woran ein Konsument „nichts war falsch“ von „der Scan konnte nicht nachsehen“ unterscheidet.
 
 ## So liest du den Bericht
 

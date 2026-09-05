@@ -204,9 +204,9 @@ Uma necessidade comum é permitir que **usuários não autenticados** enviem dad
 ### Recomendado: `access: "public"` com `withCheck`
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const contactMessagesCollection: PostgresCollectionConfig = {
+const contactMessagesCollection = defineCollection({
     slug: "contact_messages",
     name: "Contact Messages",
     table: "contact_messages",
@@ -225,7 +225,7 @@ const contactMessagesCollection: PostgresCollectionConfig = {
     properties: {
         email: { name: "Email", type: "string" }
     }
-};
+});
 ```
 
 O atalho `access: "public"` gera uma política que permite a operação sem exigir autenticação.
@@ -233,9 +233,9 @@ O atalho `access: "public"` gera uma política que permite a operação sem exig
 ### Para Captação de Leads / Inscrições
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const leadSignupsCollection: PostgresCollectionConfig = {
+const leadSignupsCollection = defineCollection({
     slug: "lead_magnet_signups",
     name: "Lead Magnet Signups",
     table: "lead_magnet_signups",
@@ -248,7 +248,7 @@ const leadSignupsCollection: PostgresCollectionConfig = {
     properties: {
         email: { name: "Email", type: "string" }
     }
-};
+});
 ```
 
 ### Como Funcionam as Requisições Anônimas

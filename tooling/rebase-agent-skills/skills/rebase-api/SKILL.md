@@ -44,8 +44,8 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | `GET` | `/api/data/{slug}/aggregate` | Aggregate over matching entities | `200` |
 | `GET` | `/api/data/{slug}/:id` | Get a single entity by ID | `200` |
 | `POST` | `/api/data/{slug}` | Create a new entity | `201` |
-| `PATCH` | `/api/data/{slug}/:id` | Update a entity — partial, only what you send | `200` |
-| `DELETE` | `/api/data/{slug}/:id` | Delete a entity | `204` |
+| `PATCH` | `/api/data/{slug}/:id` | Update a record — partial, only what you send | `200` |
+| `DELETE` | `/api/data/{slug}/:id` | Delete a record | `204` |
 
 ### Subcollection Routes
 
@@ -71,11 +71,13 @@ GET /api/data/authors/111094/posts
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `limit` | integer | `20` | Max results per page (max: `100`) |
+| `limit` | integer | `50` | Max results per page (max: `1000`; a larger one is a 400, not a clamp) |
 | `offset` | integer | `0` | Number of records to skip |
 | `page` | integer | — | Page number (alternative to offset). Calculates offset as `(page - 1) * limit` |
 
-> **IMPORTANT FOR AGENTS:** The default limit is **20**, NOT 25. The max limit is **100**.
+> **IMPORTANT FOR AGENTS:** The default limit is **50** (`DEFAULT_LIST_LIMIT`) and the
+> ceiling is **1000** (`MAX_LIST_LIMIT`). Asking for more is a 400 naming the parameter,
+> not a silent clamp — so a client that assumes it got everything is told otherwise.
 
 ### Sorting
 
@@ -143,7 +145,7 @@ Every field in the collection can be used as a query parameter with an operator 
 | `cs` | `array-contains` | Array contains value | `?tags=cs.javascript` |
 | `csa` | `array-contains-any` | Array contains any of values | `?tags=csa.(javascript,typescript)` |
 
-> **WARNING FOR AGENTS:** There is NO `like` operator. Use `searchString` for text search instead — and read the Text Search section below before telling a user what it will match, because by default it does not see inside JSONB.
+> **IMPORTANT FOR AGENTS:** `like`, `ilike`, `nlike` and `nilike` are real operators — SQL `LIKE`/`ILIKE` with `%` and `_` wildcards. They are the wrong tool for prose: they cannot use a text index, so a leading `%` scans the table. For searching text, use `searchString`, and read the Text Search section below before telling a user what it will match, because by default it does not see inside JSONB.
 
 **Array values** for `in`, `nin`, and `csa` use parenthesized comma-separated lists: `(val1,val2,val3)`.
 
@@ -467,7 +469,7 @@ curl -H "Authorization: Bearer $TOKEN" \
   "https://example.com/api/data/products?status=eq.active&price=gte.50&orderBy=createdAt:desc&limit=10&offset=0&include=category"
 ```
 
-### Create a entity
+### Create a record
 
 ```bash
 curl -X POST \
@@ -477,7 +479,7 @@ curl -X POST \
   "https://example.com/api/data/products"
 ```
 
-### Update a entity
+### Update a record
 
 ```bash
 curl -X PATCH \
@@ -487,7 +489,7 @@ curl -X PATCH \
   "https://example.com/api/data/products/uuid-123"
 ```
 
-### Delete a entity
+### Delete a record
 
 ```bash
 curl -X DELETE \

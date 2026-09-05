@@ -299,6 +299,64 @@ errors: 0 });
             }
         });
 
+        /**
+         * A database that cannot be reached used to end the whole run. The
+         * error escaped `runDoctor`, the CLI's last-resort catch printed a
+         * drizzle stack, and the two phases that need no database — the
+         * generated schema and the SDK types, both read off disk — never ran.
+         * The one command whose job is to say what is wrong said "Doctor
+         * failed".
+         */
+        it("keeps going when the database refuses the connection, and says why", async () => {
+            const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-unreachable-"));
+            const schemaPath = path.join(dir, "schema.generated.ts");
+            fs.writeFileSync(schemaPath, await generateSchema(collections), "utf-8");
+
+            try {
+                const report = await runDoctor({
+                    collectionsPath: dir,
+                    schemaPath,
+                    sdkPath: path.join(dir, "rebase.d.ts"),
+                    // Nothing is listening on port 1.
+                    databaseUrl: "postgresql://u:p@127.0.0.1:1/db"
+                });
+
+                // The phases that never needed a database still ran.
+                expect(report.collectionsToSchema.passed).toBe(true);
+                expect(report.collectionsToSdk.notApplicable).toBeTruthy();
+
+                expect(report.schemaToDatabase.skipped).toContain("127.0.0.1:1");
+                expect(report.schemaToDatabase.skipped).toContain("ECONNREFUSED");
+                // `blocked` is what separates "you did not set DATABASE_URL"
+                // from "the one you set refuses connections" — the exit code
+                // depends on it, and the rendered report does not.
+                expect(report.schemaToDatabase.blocked).toBe(true);
+
+                const output = printed();
+                expect(output).toContain("Collections → Generated Schema");
+                expect(output).not.toContain("All schemas are in sync");
+            } finally {
+                fs.rmSync(dir, { recursive: true });
+            }
+        }, 30_000);
+
+        it("does not mark a deliberately skipped phase as blocked", async () => {
+            // No DATABASE_URL is a local situation somebody may be content
+            // with. Failing the command over it would make `rebase doctor`
+            // useless anywhere the database is not to hand.
+            const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-no-url-"));
+            const schemaPath = path.join(dir, "schema.generated.ts");
+            fs.writeFileSync(schemaPath, await generateSchema(collections), "utf-8");
+
+            try {
+                const report = await runDoctor({ collectionsPath: dir, schemaPath, sdkPath: path.join(dir, "rebase.d.ts") });
+                expect(report.schemaToDatabase.skipped).toBe("DATABASE_URL not set");
+                expect(report.schemaToDatabase.blocked).toBeUndefined();
+            } finally {
+                fs.rmSync(dir, { recursive: true });
+            }
+        });
+
         it("renders the skipped phase as skipped, and never claims everything is in sync", async () => {
             const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-render-skipped-"));
             const schemaPath = path.join(dir, "schema.generated.ts");

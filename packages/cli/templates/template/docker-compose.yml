@@ -22,6 +22,17 @@
 #
 # For development, use `rebase dev` instead.
 #
+# This file is the recommended one for a scaffolded project: it is in your
+# repository, `rebase init` filled in its secrets, its first admin account and
+# its pinned runtime version, and it is booted by the framework's own acceptance
+# gate on every push. The copy in the Rebase repository
+# (`infra/docker/docker-compose.selfhost.yml`) is the reference for a deployment
+# with no scaffold behind it, and adds a pgbouncer profile and the split-process
+# shapes. The two agree on every environment variable except the database
+# password: this file reads DATABASE_PASSWORD, which `rebase init` also embeds
+# in the DATABASE_URL in your .env; that one reads POSTGRES_PASSWORD, generated
+# by its own quickstart script.
+#
 # To upgrade Rebase, change REBASE_VERSION and restart. Your bundle is untouched.
 # To run your OWN server code instead, `rebase eject` — it writes the entrypoint,
 # a Dockerfile and a compose file that builds them.
@@ -98,6 +109,27 @@ services:
       # your own address — but it is still required, because an API that guesses
       # its allowed origins is one that eventually allows the wrong one.
       CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the origin you browse to, e.g. http://localhost:3001}
+
+      # ─── The first account ───────────────────────────────────────────────
+      #
+      # This service runs with NODE_ENV=production, and in production the
+      # first-registration-becomes-admin window is CLOSED. That window is right
+      # for a laptop, where the person at the keyboard is the operator, and
+      # wrong the moment this stack answers on a hostname: the container is
+      # serving before you have typed anything, so whoever reaches the sign-up
+      # form first would own the deployment.
+      #
+      # So the first admin is named here instead. The runtime creates it once,
+      # while the user table is empty, and does nothing on every boot after
+      # that — nothing is left to be claimed, and nothing to race for.
+      #
+      # `rebase init` wrote both into .env with a generated password. Change
+      # the email to yours, sign in, and change the password.
+      REBASE_ADMIN_EMAIL: ${REBASE_ADMIN_EMAIL:?set REBASE_ADMIN_EMAIL in .env — `rebase init` writes one}
+      REBASE_ADMIN_PASSWORD: ${REBASE_ADMIN_PASSWORD:?set REBASE_ADMIN_PASSWORD in .env — `rebase init` generates one, min 12 characters}
+      # Open sign-up instead: set this to false in .env and clear the two above
+      # — but then the first person to reach the form becomes the administrator.
+      DISABLE_SELF_REGISTRATION: ${DISABLE_SELF_REGISTRATION:-true}
 
       # `ensure` (the default) creates missing tables and columns at boot —
       # your collections' as well as auth's — and is additive only: nothing is

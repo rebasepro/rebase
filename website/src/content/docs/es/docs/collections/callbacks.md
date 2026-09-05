@@ -74,17 +74,9 @@ llegue al panel, así que un `browserCallbacks.afterRead` se ejecuta *además* d
 ## Definición de Callbacks
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-// The row shape. Without it every `values.x` below is `unknown`.
-type Article = {
-    title: string;
-    slug: string;
-    createdAt: string;
-    updatedAt: string;
-};
-
-const articlesCollection: PostgresCollectionConfig<Article> = {
+const articlesCollection = defineCollection({
     slug: "articles",
     name: "Articles",
     table: "articles",
@@ -127,8 +119,7 @@ const articlesCollection: PostgresCollectionConfig<Article> = {
             // Transform data after loading
             return entity;
         }
-    },
-    properties: { /* ... */ }
+    }
 });
 ```
 
@@ -426,17 +417,9 @@ afterSave: async ({ values, entityId, context }) => {
 Uno de los usos más potentes de los callbacks es la **sincronización de datos entre colecciones** utilizando `context.data`:
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-type Submission = {
-    title: string;
-    description: string;
-    company_id: string;
-    status: string;
-    promoted_job_id: string;
-};
-
-const submissionsCollection: PostgresCollectionConfig<Submission> = {
+const submissionsCollection = defineCollection({
     slug: "job_submissions",
     name: "Job Submissions",
     table: "job_submissions",
@@ -465,8 +448,7 @@ const submissionsCollection: PostgresCollectionConfig<Submission> = {
                 });
             }
         }
-    },
-    properties: { /* ... */ }
+    }
 });
 ```
 

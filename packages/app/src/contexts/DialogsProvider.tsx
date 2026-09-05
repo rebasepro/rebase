@@ -2,7 +2,8 @@ import type { DialogControllerEntryProps, DialogsController } from "@rebasepro/c
 import React, { PropsWithChildren, useCallback, useRef, useState, useMemo } from "react";
 ;
 
-export const DialogsControllerContext = React.createContext<DialogsController>({} as DialogsController);
+/** `null` outside `<Rebase>` — see `RebaseDataContext`. */
+export const DialogsControllerContext = React.createContext<DialogsController | null>(null);
 
 export const DialogsProvider: React.FC<PropsWithChildren> = ({ children }) => {
 

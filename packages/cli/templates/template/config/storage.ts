@@ -60,7 +60,8 @@ import { isPublicStoragePath, type StorageAuthorize } from "@rebasepro/types";
  * `storagePublicRead: true` when the bucket genuinely is a public read-only CDN,
  * or `storageInsecureAllowAnyAuthenticated: true` for a single-tenant app where
  * every signed-in user is trusted with every file. Both are set on
- * `initializeRebaseBackend` in `backend/src/index.ts`.
+ * `initializeRebaseBackend`, which this project does not call: the published
+ * runtime boots it. `rebase eject` writes that entry point if you want one.
  */
 export const storageAuthorize: StorageAuthorize = ({ key, user, operation }) => {
     // The `public/` prefix is the framework's convention for world-readable

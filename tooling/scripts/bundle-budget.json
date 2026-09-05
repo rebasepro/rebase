@@ -2,15 +2,16 @@
     "targets": {
         "app/frontend/dist": {
             "chunks": {
-                "rebase-core": 1950759,
-                "form": 384075,
-                "index": 240805,
+                "rebase-core": 1791576,
+                "form": 384418,
+                "index": 241888,
+                "rebase-ui": 185881,
                 "vendor-react-dom": 178377,
                 "vendor-prism": 85065,
                 "vendor-zod": 65982,
-                "useHistory": 58255,
+                "useHistory": 58292,
                 "vendor-datefns": 19559,
-                "export": 7933,
+                "export": 7966,
                 "serializable_utils": 7645,
                 "import": 6244,
                 "useCollectionsConfigController": 1827,
@@ -20,8 +21,8 @@
                 "vendor-react-router": 281,
                 "get_import_inference_type": 258
             },
-            "totalBytes": 3009308,
-            "totalGzipBytes": 884071
+            "totalBytes": 3037502,
+            "totalGzipBytes": 892313
         }
     }
 }

@@ -40,7 +40,7 @@ const articlesCollection = defineCollection({
 
 ```
 
-## Building a entity View
+## Building an Entity View
 
 ```tsx
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";

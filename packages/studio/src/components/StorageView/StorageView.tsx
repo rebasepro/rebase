@@ -43,7 +43,7 @@ import {
 } from "@rebasepro/ui";
 import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiBase, useApiConfig } from "@rebasepro/app";
 import { DEFAULT_STORAGE_SOURCE_KEY, type StorageListResult } from "@rebasepro/types";
-import { classifyStorageFailure, type StorageFailure } from "./storage-failure";
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 import { useSearchParams } from "react-router";
 import { useDropzone } from "react-dropzone";
 
@@ -503,8 +503,8 @@ export const StorageView = () => {
     // working; only the namespaced one is ever written.
     const currentPath = searchParams.get(STORAGE_PATH_PARAM) || searchParams.get("path") || "";
     const [loading, setLoading] = useState(true);
-    /** Why the listing failed, classified — see `storage-failure.ts`. */
-    const [failure, setFailure] = useState<StorageFailure | null>(null);
+    /** Why the listing failed, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
 
     // Contents
     const [folders, setFolders] = useState<StorageFile[]>([]);
@@ -582,9 +582,9 @@ export const StorageView = () => {
         } catch (e) {
             console.error("Storage list error:", e);
             // A refusal from the project's own `storageAuthorize` hook is not a
-            // fault — see `storage-failure.ts`. Rendering both the same way told
+            // fault — see `load-failure.ts`. Rendering both the same way told
             // a customer with a working project that their storage was broken.
-            setFailure(classifyStorageFailure(e));
+            setFailure(classifyLoadFailure(e));
         } finally {
             setLoading(false);
         }

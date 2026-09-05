@@ -12,4 +12,8 @@ import { DialogsControllerContext } from "../contexts/DialogsProvider";
  *
  * @group Hooks and utilities
  */
-export const useDialogsController = (): DialogsController => useContext(DialogsControllerContext);
+export const useDialogsController = (): DialogsController => {
+    const controller = useContext(DialogsControllerContext);
+    if (!controller) throw new Error("useDialogsController must be used inside <Rebase>");
+    return controller;
+};

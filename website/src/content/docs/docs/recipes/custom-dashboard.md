@@ -14,9 +14,16 @@ Build a custom dashboard view that displays analytics alongside your admin panel
 import { useRebaseContext } from "@rebasepro/app";
 import { useEffect, useState } from "react";
 
+type OrderRow = { id: string; total: number };
+
 function DashboardView() {
     const context = useRebaseContext();
-    const [stats, setStats] = useState({
+    const [stats, setStats] = useState<{
+        totalOrders: number;
+        totalRevenue: number;
+        activeProducts: number;
+        recentOrders: OrderRow[];
+    }>({
         totalOrders: 0,
         totalRevenue: 0,
         activeProducts: 0,
@@ -29,7 +36,7 @@ function DashboardView() {
             // `find` resolves to { data, meta } — the rows are on `data`, and they are
             // flat, so it is `o.total` rather than `o.values.total`.
             const { data: orders } = await context.data
-                .collection<{ total: number }>("orders")
+                .collection<OrderRow>("orders")
                 .find({ limit: 1000 });
 
             const { data: products } = await context.data
@@ -58,7 +65,7 @@ function DashboardView() {
             <ul>
                 {stats.recentOrders.map(order => (
                     <li key={order.id}>
-                        Order #{order.id} — ${order.values.total}
+                        Order #{order.id} — ${order.total}
                     </li>
                 ))}
             </ul>
@@ -84,10 +91,8 @@ const views: AppView[] = [
         slug: "dashboard",
         name: "Dashboard",
         view: <DashboardView />,
-        admin: {
-            icon: "dashboard",
-            group: "Analytics"
-        }
+        icon: "LayoutDashboard",
+        group: "Analytics"
     }
 ];
 

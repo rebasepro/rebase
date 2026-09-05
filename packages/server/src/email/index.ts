@@ -16,6 +16,7 @@ export type {
 } from "./types";
 
 export { SMTPEmailService, createEmailService } from "./smtp-email-service";
+export { createUnconfiguredEmailService } from "./unconfigured";
 
 // Escaping machinery for custom templates. A `templates.*` override builds its
 // own markup from the same user-controlled `displayName`, so it needs the same

@@ -11,7 +11,8 @@ import os from "os";
 import { cp } from "fs/promises";
 import inquirer from "inquirer";
 import net from "net";
-import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES } from "./init.js";
+import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS } from "./init.js";
+import { SCAFFOLD_DEFAULT_PORT } from "./dev.js";
 
 
 let tmpDir: string;
@@ -529,6 +530,61 @@ describe("template package.json contracts", () => {
         expect(workspace).toContain("frontend");
         expect(workspace).toContain("config");
     });
+
+    it("the .gitignore ignores the generated SDK", () => {
+        // `rebase generate-sdk` writes ./generated/sdk from the collections.
+        // A committed copy is a stale copy the moment a collection changes.
+        const ignore = fs.readFileSync(path.join(TEMPLATE_DIR, "gitignore"), "utf-8");
+        expect(ignore).toMatch(/^generated\/$/m);
+    });
+
+    it("links no favicon it does not ship", () => {
+        // The link said `type="image/svg+xml"` and `href="/favicon.ico"`, and
+        // frontend/public/ has neither — so the first page load of every new
+        // project logged a 404 for a file nobody had asked for.
+        const html = fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "index.html"), "utf-8");
+        const iconHrefs = [...html.matchAll(/<link[^>]*rel="icon"[^>]*href="([^"]+)"/g)].map(m => m[1]);
+        for (const href of iconHrefs) {
+            expect(
+                fs.existsSync(path.join(TEMPLATE_DIR, "frontend", "public", href.replace(/^\//, ""))),
+                `index.html links ${href}, which the template does not ship`
+            ).toBe(true);
+        }
+    });
+
+    it("the .env.example PORT is the one dev.ts treats as unchosen", () => {
+        // `rebase dev` derives a per-project port and warns when .env names a
+        // different one. Every scaffold ships this line unread, so without a
+        // shared constant the warning fired on every first run — and with one,
+        // this is what stops the two drifting apart.
+        const envExample = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.example"), "utf-8");
+        expect(envExample).toMatch(new RegExp(`^PORT=${SCAFFOLD_DEFAULT_PORT}$`, "m"));
+    });
+
+    it("ships everything scripts/example.ts needs to run", () => {
+        // The script is in the template. Its runner and its three imports were
+        // in the baas overlay only, so `pnpm example` in the default scaffold
+        // was a missing script, and running it by hand was three missing
+        // modules. A file that ships has to be a file that runs.
+        const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
+        const example = fs.readFileSync(path.join(TEMPLATE_DIR, "scripts", "example.ts"), "utf-8");
+
+        expect(pkg.scripts.example).toBe("tsx scripts/example.ts");
+        expect(pkg.devDependencies).toHaveProperty("tsx");
+
+        const declared = { ...pkg.dependencies, ...pkg.devDependencies };
+        const imported = [...example.matchAll(/^import [^"']*["']([^"'.][^"']*)["']/gm)]
+            .map(match => match[1])
+            .filter(specifier => !specifier.startsWith("node:"));
+
+        expect(imported.length).toBeGreaterThan(0);
+        for (const specifier of imported) {
+            const name = specifier.startsWith("@")
+                ? specifier.split("/").slice(0, 2).join("/")
+                : specifier.split("/")[0];
+            expect(declared, `scripts/example.ts imports ${name}`).toHaveProperty(name);
+        }
+    });
 });
 
 // =============================================================================
@@ -626,6 +682,41 @@ describe("dual PM compatibility", () => {
             const npmrc = fs.readFileSync(path.join(TEMPLATE_DIR, "npmrc"), "utf-8");
             expect(npmrc).toContain("link-workspace-packages=true");
         });
+
+        /**
+         * Two settings that must live in `pnpm-workspace.yaml` and not in
+         * `.npmrc`, in both scaffolds.
+         *
+         * pnpm 11 stopped reading `verify-deps-before-run` and
+         * `confirm-modules-purge` from `.npmrc` — with the file in place,
+         * `pnpm config get verify-deps-before-run` answers `undefined`, while
+         * `verifyDepsBeforeRun` in the workspace file answers `false`. So they
+         * had quietly stopped applying, and npm 12 was warning about both on
+         * every install and every `npm run`: noise in a first run, for settings
+         * that were no longer doing anything.
+         *
+         * Asserted from both directions because a later edit is as likely to
+         * put them back in `.npmrc` as to drop them from the workspace file, and
+         * neither shows up as a failure anywhere else.
+         */
+        it.each([
+            ["template", path.join(findCliRoot(), "templates", "template")],
+            ["baas overlay", path.join(findCliRoot(), "templates", "overlays", "baas")]
+        ])("%s keeps the pnpm-11 settings out of .npmrc", (_name, dir) => {
+            const workspace = fs.readFileSync(path.join(dir, "pnpm-workspace.yaml"), "utf-8");
+            expect(workspace).toContain("verifyDepsBeforeRun: false");
+            expect(workspace).toContain("confirmModulesPurge: false");
+
+            const npmrcPath = path.join(dir, "npmrc");
+            if (!fs.existsSync(npmrcPath)) return;
+            const npmrc = fs.readFileSync(npmrcPath, "utf-8");
+            const settings = npmrc
+                .split("\n")
+                .filter(line => !line.trim().startsWith("#"))
+                .join("\n");
+            expect(settings).not.toContain("verify-deps-before-run");
+            expect(settings).not.toContain("confirm-modules-purge");
+        });
     });
 
     describe("README documents both package managers", () => {
@@ -676,7 +767,12 @@ describe(".env.example", () => {
         // must be filled in, that they ship empty, and how to produce a value.
         const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.example"), "utf-8");
 
-        expect(envContent).toMatch(/Database connection string \(required\)/);
+        // DATABASE_URL is deliberately NOT among them: `rebase init` writes it
+        // commented out, and that is what puts a new project on the managed
+        // database. Calling it "required" next to a line the scaffold comments
+        // out is the file contradicting itself on its own first section.
+        expect(envContent).not.toMatch(/Database connection string \(required\)/);
+        expect(envContent).toMatch(/unset means the managed database/);
         expect(envContent).toMatch(/JWT Authentication \(required\)/);
 
         // JWT_SECRET must ship empty — a default here is a shared signing key.
@@ -938,6 +1034,64 @@ describe(".env.example", () => {
         for (const name of required) {
             expect(envContent).toMatch(new RegExp(`^${name}=.+$`, "m"));
         }
+    });
+
+    it("configureEnvFile names the first admin, with a password the runtime will accept", async () => {
+        /*
+         * The compose stack runs with NODE_ENV=production, where the
+         * first-registration-becomes-admin window is closed. Without these two
+         * values the stack comes up with an empty user table and no way to
+         * produce the first authenticated caller — and, because the compose
+         * file declares them `${VAR:?…}`, it does not even get that far.
+         *
+         * Two properties, both of which have been broken in shipped artifacts:
+         * the password must clear the runtime's 12-character floor (below it
+         * `seedInitialAdmin` refuses and the deployment has no admin), and the
+         * address must be one `POST /auth/login` accepts — `admin@localhost`
+         * seeds fine and 400s on every sign-in.
+         */
+        const targetDir = await simulateInit("env-first-admin-app");
+        await configureEnvFile(targetDir);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+
+        const email = envContent.match(/^REBASE_ADMIN_EMAIL=(.+)$/m)?.[1];
+        expect(email).toBeTruthy();
+        // The same shape `z.string().email()` insists on: a dot in the domain.
+        expect(email).toMatch(/^[^@\s]+@[^@\s]+\.[^@\s]+$/);
+
+        const password = envContent.match(/^REBASE_ADMIN_PASSWORD=(.+)$/m)?.[1];
+        expect(password!.length).toBeGreaterThanOrEqual(16);
+        // Nothing dotenv or Compose would read back as something else: a `#`
+        // truncates the line, and whitespace ends the value.
+        expect(password).toMatch(/^[A-Za-z0-9_-]+$/);
+
+        // Two runs must not produce the same password.
+        const other = await simulateInit("env-first-admin-app-2");
+        await configureEnvFile(other);
+        const otherPassword = fs.readFileSync(path.join(other, ".env"), "utf-8")
+            .match(/^REBASE_ADMIN_PASSWORD=(.+)$/m)?.[1];
+        expect(otherPassword).not.toBe(password);
+    });
+
+    it("writes the admin credentials even when .env.example predates them", async () => {
+        // A project scaffolded from an older template, or one whose .env.example
+        // somebody edited. Skipping the keys there produces a .env that cannot
+        // satisfy the compose file's `${VAR:?…}`, with nothing pointing back at
+        // the omission.
+        const targetDir = await simulateInit("env-first-admin-legacy-app");
+        const examplePath = path.join(targetDir, ".env.example");
+        fs.writeFileSync(
+            examplePath,
+            fs.readFileSync(examplePath, "utf-8")
+                .replace(/^REBASE_ADMIN_EMAIL=.*$/m, "")
+                .replace(/^REBASE_ADMIN_PASSWORD=.*$/m, "")
+        );
+        await configureEnvFile(targetDir);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+        expect(envContent).toMatch(/^REBASE_ADMIN_EMAIL=.+$/m);
+        expect(envContent).toMatch(/^REBASE_ADMIN_PASSWORD=.+$/m);
     });
 
     it("configureEnvFile correctly uses provided databaseUrl, pinned to public", async () => {
@@ -1328,14 +1482,18 @@ describe("init --help", () => {
     }
 
     it("documents every flag the parser accepts", () => {
-        // The flags used to be discoverable only by triggering the non-TTY
-        // error. If a new one is added to promptForOptions, document it here too.
+        // Read from INIT_FLAGS rather than a hand-kept list. The list was the
+        // list, so a flag added to the parser and left out of the help passed
+        // this test — which is exactly the drift the test exists to catch.
+        // `--no-install` arrived documented in the README and the Quickstart
+        // and absent from both the parser and the help, and nothing noticed.
         const text = helpText();
-        for (const flag of [
-            "--template", "--headless", "--yes", "--install", "--git",
-            "--database-url", "--introspect", "--project", "--setup-key"
-        ]) {
-            expect(text).toContain(flag);
+        const longFlags = Object.entries(INIT_FLAGS)
+            .filter(([name, spec]) => name.startsWith("--") && typeof spec !== "string")
+            .map(([name]) => name);
+        expect(longFlags).toContain("--no-install");
+        for (const flag of longFlags) {
+            expect(text, `${flag} is accepted by the parser but missing from --help`).toContain(flag);
         }
     });
 
@@ -1445,5 +1603,46 @@ describe("choosing a free port for the local database", () => {
     it("still accepts a genuinely free port", async () => {
         // A probe that never says yes would "fix" this by scanning forever.
         expect(await isPortAvailable(await free())).toBe(true);
+    });
+});
+
+/**
+ * The scaffold has to tell *both* supported package managers that
+ * `@ariga/atlas` may run its install script, in each one's own dialect.
+ *
+ * pnpm 10 and npm 12 both refuse a dependency's lifecycle scripts unless the
+ * project allowlists them, and `@ariga/atlas` downloads its binary in
+ * `preinstall`. The scaffold has carried pnpm's key for a long time; npm's
+ * (`allowScripts`) was missing, so on npm the install exited 0 with a warning,
+ * `node_modules/.bin/atlas` never appeared, and `db:push` — the command the
+ * quickstart points at for your own Postgres — failed on a binary nobody had
+ * been told was skipped.
+ *
+ * Asserted as a pair rather than as two separate facts, because the failure is
+ * silent on whichever manager gets forgotten and is only ever noticed by
+ * somebody who already has a broken project.
+ */
+describe("the template's install-script allowlists", () => {
+    const templates: Array<[string, string]> = [
+        ["template", path.join(findCliRoot(), "templates", "template", "package.json")],
+        ["baas overlay", path.join(findCliRoot(), "templates", "overlays", "baas", "package.json")]
+    ];
+
+    it.each(templates)("%s allows @ariga/atlas under both pnpm and npm", (_name, pkgPath) => {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+        expect(pkg.pnpm?.onlyBuiltDependencies).toContain("@ariga/atlas");
+        expect(pkg.allowScripts?.["@ariga/atlas"]).toBe(true);
+    });
+
+    it.each(templates)("%s grants npm no more than it needs", (_name, pkgPath) => {
+        // The npm list is deliberately the shorter one. esbuild and sharp are in
+        // pnpm's for historical reasons; under npm their binaries arrive through
+        // platform optionalDependencies with no script running at all — verified
+        // on npm 12, where the blocked `postinstall` is only a fallback and
+        // `esbuild --version` answers anyway. Allowing a script that is not
+        // needed is a grant with no benefit, so this fails if one is added here
+        // without a reason.
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+        expect(Object.keys(pkg.allowScripts ?? {})).toEqual(["@ariga/atlas"]);
     });
 });

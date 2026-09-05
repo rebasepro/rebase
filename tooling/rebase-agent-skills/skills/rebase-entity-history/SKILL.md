@@ -268,7 +268,7 @@ Use the `meta.hasMore` boolean in the response to determine if more pages are av
 ```typescript
 let offset = 0;
 const limit = 20;
-let allEntries = [];
+const allEntries: unknown[] = [];
 
 while (true) {
     const result = await fetch(`/api/data/products/42/history?limit=${limit}&offset=${offset}`);

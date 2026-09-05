@@ -8,6 +8,14 @@ import {
 /**
  * The hosted service Rebase runs for this plugin.
  *
+ * **This is where the entity's field values go.** Autofill posts them to
+ * generate a suggestion, and unless the host sets `endpoint`, they go to this
+ * address — off their machine, to a service Rebase operates. That is disclosed
+ * on the plugins page rather than only here, because the person who needs to
+ * know is the one deciding whether the data in those fields may leave.
+ *
+ * No credential travels with them; see the note below.
+ *
  * The previous value here was `https://api.rebase.pro`, a FireCMS-era host that
  * resolves but serves nothing — every path 404s — so Autofill had never worked
  * in a Rebase install. This one is served by the control plane

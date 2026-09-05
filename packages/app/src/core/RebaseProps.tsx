@@ -1,6 +1,6 @@
 import React from "react";
 import { User, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, CollectionRegistryController, DatabaseAdmin, RebaseClient } from "@rebasepro/types";
-import { Locale, AuthController, AnalyticsEvent, UserConfigurationPersistence, UrlController, NavigationStateController, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, CollectionCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/cms-types";
+import { Locale, AuthController, AnalyticsEvent, UserConfigurationPersistence, UrlController, NavigationStateController, RebaseContext, EntityLinkBuilder, RebasePlugin, AnySlotContribution, PropertyConfig, EntityCustomView, CollectionCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/cms-types";
 
 /**
  * A data source registered on `<Rebase>`. Extends the shared
@@ -112,18 +112,6 @@ export type RebaseProps<USER extends User, DB = unknown> = {
      * Alternatively, pass a render function that receives { context, loading }.
      */
     children: React.ReactNode | ((props: { context: RebaseContext; loading: boolean }) => React.ReactNode);
-
-    /**
-     * Optional base path for the entire Rebase app.
-     * Defaults to "/"
-     */
-    basePath?: string;
-
-    /**
-     * Optional base path for the admin collections.
-     * Defaults to "/c"
-     */
-    baseCollectionPath?: string;
 
     /**
      * Base URL for the backend API (e.g. "http://localhost:3001").
@@ -271,7 +259,7 @@ export type RebaseProps<USER extends User, DB = unknown> = {
     /**
      * Extra slots for the admin
      */
-    slots?: SlotContribution[];
+    slots?: AnySlotContribution[];
 
     /**
      * Property configs (widgets)

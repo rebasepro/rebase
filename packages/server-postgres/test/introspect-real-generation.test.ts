@@ -631,7 +631,10 @@ describe("generated collections typecheck", () => {
         files.set("film", stale);
         const diagnostics = diagnosticsFor([{ files, junctions: pagila.junctions, context: pagila.context }]);
         expect(diagnostics).toHaveLength(1);
-        expect(diagnostics[0]).toContain("TS2769");
+        // TS2820, not TS2769: `defineCollection` is one signature now, so the
+        // error is reported on the offending key rather than collapsing into a
+        // single "no overload matches this call" at the call site.
+        expect(diagnostics[0]).toContain("TS2820");
         expect(diagnostics[0]).toContain("'\"rentalDuratoin\"' is not assignable");
         // The literal keys are close enough for the compiler to name the column the
         // rename left behind, which is the whole benefit in one line.

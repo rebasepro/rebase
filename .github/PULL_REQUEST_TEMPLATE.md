@@ -15,7 +15,9 @@
 
 ## Testing
 
-- [ ] All existing tests pass (`./tooling/scripts/verify-quality.sh`)
+- [ ] The static gates pass (`pnpm ci:static` — the same list CI runs)
+- [ ] All existing tests pass (`./tooling/scripts/verify-quality.sh`, which
+      runs the build, `ci:static`, the unit suites and the Playwright tests)
 - [ ] Added/updated tests for new functionality (if applicable)
 - [ ] Manually tested the changes
 

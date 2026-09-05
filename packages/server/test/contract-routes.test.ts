@@ -96,6 +96,30 @@ describe("contract routes", () => {
         expect(hash).toHaveBeenCalledTimes(1);
     });
 
+    it("names the runtime on the unauthenticated route, not only the gated one", async () => {
+        // `runtime.version` decides whether a caller's wire format is
+        // understood at all, and it used to be published only on `/contract`,
+        // which is admin-gated. The two callers that need it — a CLI deciding
+        // whether it is too old, an SDK reporting what it built against — hold
+        // no admin credential, so the fact was unreachable by exactly the
+        // clients it exists for.
+        const app = mount({
+            collectionRegistry: { getRawCollections: () => [collection("posts")] },
+            schemaVersion: "v1:deadbeefdeadbeef",
+            runtimeVersion: "0.17.3"
+        });
+
+        const response = await app.request("/api/meta/schema-version");
+        const body = await response.json() as {
+            schemaVersion: string;
+            runtime: { version: string; contract: number };
+        };
+
+        expect(response.status).toBe(200);
+        expect(body.runtime.version).toBe("0.17.3");
+        expect(typeof body.runtime.contract).toBe("number");
+    });
+
     it("omits security rules from the contract payload", async () => {
         // The generator never reads them, and they are the raw SQL of every RLS
         // predicate guarding the project — a description of the authorization

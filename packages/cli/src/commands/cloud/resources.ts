@@ -14,12 +14,13 @@ import {
     readLink,
     colorStatus,
     emit,
-    emitHelp,
+    printGroupHelp,
     keyValues,
     fetchTenantBaseDomain,
     projectHost,
     openUrl,
     parseCloudArgs,
+    requireKnownAction,
     success,
     fail,
     reportError,
@@ -516,16 +517,36 @@ export function resolveWebhookIdArg(rawArgs: string[]): string | undefined {
     }).positionals[0];
 }
 
+/** The action words `rebase cloud webhooks` dispatches. No word means `list`. */
+export const WEBHOOKS_ACTIONS = ["list", "create", "delete"] as const;
+
 export async function webhooksCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
+    // Before the parse and before the client: `webhooks creat` used to fall past
+    // both `if`s and LIST the webhooks, exit 0, and leave the caller believing
+    // one had been created.
+    requireKnownAction("webhooks", subcommand, WEBHOOKS_ACTIONS);
+
     // Both lines are parsed BEFORE the client is built. A line the parser will
     // refuse is refused without first spending a login round-trip on it — and
     // for `delete`, without the ambiguity of a refusal that arrives after the
     // command has already started talking to the control plane.
     const create = subcommand === "create"
         ? parseCloudArgs({
+            // `--endpoint`, not `--url`.
+            //
+            // Every command in this family inherits a global `--url`, which
+            // names the CONTROL PLANE — `resolveCloudUrl` reads it straight off
+            // the raw line, before any per-command spec exists. A second
+            // `--url` here did not shadow it, because the two parses are
+            // independent: `webhooks create --url https://example.com/hook`
+            // sent the customer's webhook endpoint to `requireClient` as the
+            // control plane to authenticate against, so the documented example
+            // could not create a webhook. Renaming is the fix; a per-command
+            // flag cannot be a global's spelling, and `action-help.test.ts`
+            // now sweeps for the class.
             spec: { "--name": String,
 "--table": String,
-"--url": String,
+"--endpoint": String,
 "--events": String },
             rawArgs,
             commandWords: 3, // cloud webhooks create
@@ -546,7 +567,7 @@ export async function webhooksCommand(subcommand: string | undefined, rawArgs: s
             const args = create!;
             const name = args["--name"] || fail("--name is required.", undefined, "usage");
             const table = args["--table"] || fail("--table is required.", undefined, "usage");
-            const url = args["--url"] || fail("--url (endpoint) is required.", undefined, "usage");
+            const url = args["--endpoint"] || fail("--endpoint is required.", "Where the POST goes.", "usage");
             const events = (args["--events"] || "insert,update,delete").split(",").map((s) => s.trim());
 
             const created = (await client.data.collection("webhooks").create({
@@ -622,6 +643,9 @@ projectId });
 
 /* ─── storage ──────────────────────────────────────────────────── */
 
+/** The action words `rebase cloud storage` dispatches. No word means `list`. */
+export const STORAGE_ACTIONS = ["list", "create", "attach"] as const;
+
 export async function storageCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
     // `rebase cloud storage` used to only ever list. A tenant could therefore
     // reach durable storage only by creating a bucket by hand in a cloud
@@ -636,6 +660,9 @@ export async function storageCommand(action: string | undefined, rawArgs: string
     if (action === "create") return storageCreateCommand(rawArgs);
     if (action === "attach") return storageAttachCommand(rawArgs);
     if (action === "help") return printStorageHelp();
+    // Everything that is not one of those, and is not `list` or nothing, is a
+    // typo — and used to LIST, exit 0, and read as a bucket that was created.
+    requireKnownAction("storage", action, STORAGE_ACTIONS);
 
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
@@ -678,26 +705,33 @@ export async function storageCommand(action: string | undefined, rawArgs: string
 }
 
 export function printStorageHelp(): void {
-    emitHelp("storage", ["list", "create", "attach"], () => {
-        console.log("");
-        console.log(chalk.bold("  rebase cloud storage"));
-        console.log("");
-        console.log("  " + chalk.blue.bold("storage") + "                   List this project's storage");
-        console.log("  " + chalk.blue.bold("storage create") + "            Provision platform-managed storage");
-        console.log("  " + chalk.blue.bold("storage attach") + "            Attach your own S3-compatible bucket");
-        console.log("");
-        console.log(chalk.gray("  attach options:"));
-        console.log(chalk.gray("    --bucket <name>          Bucket name (required)"));
-        console.log(chalk.gray("    --access-key-id <id>     Access key ID (required)"));
-        console.log(chalk.gray("    --secret-access-key <s>  Secret access key (required)"));
-        console.log(chalk.gray("    --endpoint <url>         S3 endpoint; omit for AWS"));
-        console.log(chalk.gray("    --region <region>        Region"));
-        console.log(chalk.gray("    --force-path-style       Required by MinIO and some gateways"));
-        console.log("");
-        console.log(chalk.gray("  Without either, file storage stays off: uploads are refused with"));
-        console.log(chalk.gray("  501 STORAGE_NOT_CONFIGURED rather than written to a container"));
-        console.log(chalk.gray("  filesystem that is erased on the next restart."));
-        console.log("");
+    printGroupHelp({
+        command: "cloud storage",
+        title: "The project's object storage",
+        actions: [
+            { action: "list",
+description: "The buckets this project has, and their state" },
+            { action: "create",
+description: "Provision platform-managed storage. Takes no options" },
+            {
+                action: "attach",
+                description: "Attach your own S3-compatible bucket",
+                flags: [
+                    ["--bucket <name>", "Bucket name. Required"],
+                    ["--access-key-id <id>", "Access key ID. Required"],
+                    ["--secret-access-key <s>", "Secret access key. Required"],
+                    ["--endpoint <url>", "S3 endpoint. Omit for AWS"],
+                    ["--region <region>", "Region"],
+                    ["--force-path-style", "Required by MinIO and some gateways"]
+                ]
+            }
+        ],
+        notes: [
+            "Without either, file storage stays off: uploads are refused with 501",
+            "STORAGE_NOT_CONFIGURED rather than written to a container filesystem that is",
+            "erased on the next restart.",
+            "Redeploy after `attach` for the tenant to pick the credentials up."
+        ]
     });
 }
 
@@ -878,6 +912,9 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
 
 /* ─── clusters ─────────────────────────────────────────────────── */
 
+/** The action words `rebase cloud clusters` dispatches. No word means `list`. */
+export const CLUSTERS_ACTIONS = ["list", "add", "verify"] as const;
+
 /**
  * `rebase cloud clusters` — list, register and verify the clusters tenants run on.
  *
@@ -889,6 +926,9 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
 export async function clustersCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
     if (action === "verify") return clustersVerifyCommand(rawArgs);
     if (action === "add") return clustersAddCommand(rawArgs);
+    // `clusters verifyy` used to LIST the clusters and exit 0 — the one command
+    // whose whole purpose is to answer a yes/no question about a specific one.
+    requireKnownAction("clusters", action, CLUSTERS_ACTIONS);
     return clustersListCommand(rawArgs);
 }
 
@@ -1187,6 +1227,18 @@ async function clustersListCommand(rawArgs: string[]): Promise<void> {
 
 /* ─── billing ──────────────────────────────────────────────────── */
 
+/**
+ * The action words `rebase cloud billing` dispatches. No word at all is the
+ * account view, which is why it is not in the list.
+ *
+ * Exported because `action-help.test.ts` holds the page's usage line to it: the
+ * page said `cloud billing [portal|usage]` and the dispatch answered `setup` and
+ * `checkout`, so both documented words fell through to the default and printed
+ * the account — a help page describing a command that does not exist, and a typo
+ * exiting 0.
+ */
+export const BILLING_ACTIONS = ["setup", "checkout"] as const;
+
 export async function billingCommand(rawArgs: string[]): Promise<void> {
     // Parsed before the client is built: an unusable line should be refused
     // without first spending a login round-trip on it.
@@ -1197,6 +1249,7 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
         command: "cloud billing",
         maxPositionals: 1
     }).positionals[0];
+    requireKnownAction("billing", action, BILLING_ACTIONS);
 
     const { client, url } = await requireClient(rawArgs);
     const org = getContextOrg(url);
@@ -1380,6 +1433,12 @@ status: acct.status ?? null }
 
 /* ─── resources: what this project is given ─────────────────────── */
 
+/**
+ * The action words `rebase cloud resources` dispatches. No word, or `show`,
+ * prints the dials and the quote.
+ */
+export const RESOURCES_ACTIONS = ["show", "set"] as const;
+
 /** The dials, and the flag that sets each. */
 const DIAL_FLAGS = {
     "--cpu": "cpu",
@@ -1402,6 +1461,23 @@ const DIAL_FLAGS = {
     "--autoscale-max": "autoscaleMaxReplicas",
     "--autoscale-cpu-target": "autoscaleTargetCpuPercent"
 } as const;
+
+/**
+ * The flags `resources set` accepts, in the shape a spec is written in.
+ *
+ * Derived from `DIAL_FLAGS` rather than written out beside it: `action-help.ts`
+ * documents this command and `action-help.test.ts` pairs the page against this
+ * constant, so a dial added above is a dial the help page has to describe on the
+ * same commit. A hand-copied second list is how the page and the parser drift.
+ *
+ * `buildDialPatch` still scans `rawArgs` itself — it has to, because
+ * `--no-autoscale` is value-less and a dial's value may not be consumed as one
+ * — so this is a description of that line, not a second parser for it.
+ */
+export const RESOURCES_SET_FLAGS: Record<string, unknown> = {
+    ...Object.fromEntries(Object.keys(DIAL_FLAGS).map((flag) => [flag, String])),
+    "--no-autoscale": Boolean
+};
 
 /** Dials whose column is a number, not the text a flag carries. */
 const NUMERIC_DIALS = new Set([
@@ -1429,6 +1505,10 @@ const BOOLEAN_DIALS = new Set(["preemptible", "scaleToZero"]);
  * having — a check in a client only covers the clients that run it.
  */
 export async function resourcesCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
+    // `resources et --cpu 500m` used to SHOW the dials and exit 0, so a caller
+    // that meant to change one was told what it currently is and nothing else.
+    requireKnownAction("resources", action, RESOURCES_ACTIONS);
+
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
 

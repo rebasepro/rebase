@@ -22,14 +22,28 @@ rebase skills install --agent claude,cursor
 rebase skills install --agent all
 ```
 
-Se admiten cuatro destinos:
+Se admiten siete destinos, uno por cada archivo de puntero que escribe `rebase init`:
 
 | `--agent` | Asistente | Destino |
 |---|---|---|
-| `cursor` | Cursor | `.cursor/rules/<skill>.mdc` |
+| `cursor` | Cursor | `.cursor/rules/rebase.mdc` + `.cursor/rules/<skill>/SKILL.md` |
 | `claude` | Claude Code | `.claude/skills/<skill>/SKILL.md` |
-| `windsurf` | Windsurf | `.windsurf/rules/<skill>.md` |
+| `windsurf` | Windsurf | `.windsurf/rules/rebase.md` + `.windsurf/rules/<skill>/SKILL.md` |
 | `gemini` | Gemini CLI / Antigravity | `.agents/skills/<skill>/SKILL.md` |
+| `codex` | Codex CLI | `.codex/skills/<skill>/SKILL.md` |
+| `kiro` | Kiro | `.kiro/steering/rebase.md` + `.kiro/steering/<skill>/SKILL.md` |
+| `copilot` | GitHub Copilot | `.github/instructions/rebase.instructions.md` + `<skill>/SKILL.md` |
+
+:::note[Cursor, Windsurf, Kiro y Copilot reciben un único archivo siempre activo]
+Esos cuatro cargan todo su directorio de reglas en cada petición. Un archivo de
+reglas por skill suponía unos **84.000 caracteres** de referencia de Rebase por
+delante de cada pregunta, tratara o no sobre Rebase — y una instrucción que un
+asistente hojea es una instrucción que no sigue.
+
+En su lugar reciben `rebase.mdc` (o `rebase.md`): un índice de unos 3 KB con
+`alwaysApply: true`, que enumera qué cubre cada skill y el archivo que hay que
+leer. Los cuerpos quedan en subdirectorios por skill y se abren bajo demanda.
+:::
 
 `gemini` cubre **tanto** Gemini CLI como Antigravity; ambos leen el mismo directorio `.agents/`, por lo que no existe un valor `antigravity` independiente.
 
@@ -88,7 +102,7 @@ Dos de ellas solicitan ser leídas sin indicación previa. `rebase-basics` indic
 ```text
   Found 21 Rebase skills
 
-  ✓ Claude Code — 21 skills installed (+ 1 reference file) to .claude/skills
+  ✓ Claude Code — 21 skills installed (+ 8 reference files) to .claude/skills
 ```
 
 Las habilidades se distribuyen desde el paquete `@rebasepro/agent-skills`, del cual depende la CLI, por lo que el conjunto obtenido coincide con la versión instalada de tu CLI.

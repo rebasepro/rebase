@@ -119,24 +119,86 @@ export type MongoProperties = {
 export type EngineProperties = PostgresProperties | FirebaseProperties | MongoProperties;
 
 /**
- * What a property key that no property type declares resolves to.
+ * What a key the surrounding shape does not declare resolves to.
  *
- * Nothing is assignable to it — it has a required brand nobody can spell — so
- * the key errors. It exists as a *named* type rather than `never` purely for the
- * message: TypeScript prints the target type, so the compiler names the offending
- * key back to the author instead of saying "not assignable to type 'never'".
+ * Nothing is assignable to it — it has required members nobody can spell — so
+ * the key errors. It is a *named* type rather than `never` purely for the
+ * message: TypeScript prints the target, so the compiler reads back the key that
+ * is wrong and the keys that would have been right, instead of saying "not
+ * assignable to type 'never'".
+ *
+ * ```
+ * Type '{ required: true }' is not assignable to type
+ *   '{ readonly required: true } & NoSuchKey<"validaton", "name" | "type" | "validation" | …>'.
+ *   Property 'didYouMean' is missing …
+ * ```
+ *
+ * `Known` is the set of keys that *were* available. TypeScript elides a long
+ * union after a few members, so this is a hint and not an exhaustive listing —
+ * which is the right trade: the near-miss is usually alphabetically adjacent to
+ * the key that was meant, and a wall of 25 names would be read by nobody.
  */
-export type UnknownPropertyKey<K extends PropertyKey> = {
-    readonly __rebaseUnknownPropertyKey: K;
+export type NoSuchKey<K extends PropertyKey, Known extends PropertyKey = never> = {
+    /** The key that was written, so the compiler reads it back verbatim. */
+    readonly noSuchKey: K;
+    /** The keys that were available. Required, so the type is unsatisfiable. */
+    readonly didYouMean: Known;
 };
+
+/**
+ * What a property whose `type` the engine does not have resolves to.
+ *
+ * Same trick as {@link NoSuchKey}, for a different mistake: a `relation` on a
+ * Firestore collection, a `vector` on MongoDB.
+ *
+ * Without it, `ExactProperty<V, never>` is `V & {}` — which is `V`, and
+ * therefore no check at all. The gate is normally caught one level up, by the
+ * builder's `P extends FirebaseProperties` constraint; this is what catches it
+ * when `StrictProperties` is applied to a property map that carries no such
+ * constraint, and it reports on the property rather than on the whole map.
+ */
+export type PropertyTypeNotOnThisEngine<T> = {
+    /** The `type` tag that has no home on this engine. Required, so nothing fits. */
+    readonly __rebasePropertyTypeNotOnThisEngine: T;
+};
+
+/**
+ * A relation checked against the concrete member of the union its own `kind`
+ * selects, rather than against the union as a whole.
+ *
+ * `Relation` is closed — `BelongsToRelation` has `localKey` and no
+ * `foreignKeyOnTarget`, `HasManyRelation` the reverse — but excess-property
+ * checking against a *union* passes any key that any member declares. So
+ * `{ kind: "belongsTo", foreignKeyOnTarget: "author_id" }` typechecked, and
+ * described a link that cannot exist: the generator reads `localKey`, defaults
+ * it to `<relationName>_id`, and the column the author actually named is never
+ * looked at. The relation resolves to a different link than the one written.
+ *
+ * The runtime already refuses this — `validate-config` rejects a link field that
+ * does not belong to the kind — so this is the same rule one stage earlier,
+ * where it costs a red squiggle instead of a failed boot.
+ */
+type StrictRelation<R> = R extends { kind: infer K }
+    ? R & {
+        [Key in Exclude<keyof R, keyof Extract<Relation, { kind: K }>>]:
+            NoSuchKey<Key, keyof Extract<Relation, { kind: K }>>;
+    }
+    : R;
 
 /**
  * `V`, plus every key it carries that `Shape` does not declare, typed so it
  * cannot be satisfied.
+ *
+ * The `relation` block is descended into, because it is the one nested shape
+ * that is a closed union rather than a single interface — see
+ * {@link StrictRelation}. The rest (`array.of`, `map.properties`, the `admin`
+ * options) are left to the weak-type check and the boot validator.
  */
-type ExactProperty<V, Shape> = V & {
-    [K in Exclude<keyof V, keyof Shape>]: UnknownPropertyKey<K>;
-};
+type ExactProperty<V, Shape> = [Shape] extends [never]
+    ? PropertyTypeNotOnThisEngine<V extends { type: infer T } ? T : never>
+    : V & {
+        [K in Exclude<keyof V, keyof Shape>]: NoSuchKey<K, keyof Shape>;
+    } & (V extends { relation: infer R } ? { relation: StrictRelation<R> } : unknown);
 
 /**
  * A property map in which each value is checked against the *concrete* member of
@@ -516,6 +578,15 @@ export interface VectorProperty extends BaseProperty {
      * Default value for new entities.
      */
     defaultValue?: Vector;
+    /**
+     * How many numbers each embedding has — 1536 for OpenAI's
+     * `text-embedding-3-small`, 768 for many sentence transformers.
+     *
+     * **Required, and effectively frozen.** It is the column's width
+     * (`vector(1536)`), so changing it is a rewrite of every row, and every
+     * stored embedding was produced by a model that no longer matches. Take the
+     * number from the model you are actually going to use.
+     */
     dimensions: number;
     /**
      * ANN index configuration for this column.
@@ -529,6 +600,11 @@ export interface VectorProperty extends BaseProperty {
      * embedding is left unindexed rather than failing the boot.
      */
     index?: VectorIndexConfig | false;
+    /**
+     * The rules every property has: `required`, `unique`. A vector has no
+     * length or range rules of its own — {@link dimensions} is the column's
+     * width, and the database enforces it.
+     */
     validation?: PropertyValidationSchema;
 }
 
@@ -541,6 +617,10 @@ export interface BinaryProperty extends BaseProperty {
      * Default value for new entities. Must be a base64-encoded string.
      */
     defaultValue?: string;
+    /**
+     * The rules every property has: `required`, `unique`. Size limits belong to
+     * the upload path, not here.
+     */
     validation?: PropertyValidationSchema;
 }
 
@@ -682,6 +762,12 @@ export interface RelationProperty extends BaseProperty {
      *     relation: { kind: "manyToMany", target: () => tagsCollection }
      * }
      * ```
+     *
+     * Optional because there is a second way to say the same thing: an entry in
+     * the collection's `relations` array whose `relationName` is this
+     * property's key. One of the two is required, and boot refuses a
+     * `type: "relation"` property that has neither — a field with no link is a
+     * relation in name only.
      */
     relation?: Relation;
 
@@ -801,15 +887,29 @@ export interface MapProperty extends BaseProperty {
 }
 
 /**
+ * What a `dynamicProps` builder is handed when it computes a property.
+ *
+ * Called on every render of the form, for one field, so it is a pure function of
+ * these arguments: the entity being edited, the value in this field, and who is
+ * editing. It runs **in the browser** and shapes what is offered — it is not a
+ * security boundary, and a rule that must hold has to be a security rule as well.
+ *
  * @group Entity properties
  */
 export type PropertyBuilderProps<M extends Record<string, unknown> = Record<string, unknown>> = {
+    /** The entity's values as they stand right now, including unsaved edits. */
     values: Partial<M>;
+    /** The values as last saved, or `undefined` for an entity being created. */
     previousValues?: Partial<M>;
+    /** The value in *this* field. `undefined` before anything is typed. */
     propertyValue?: unknown;
+    /** Position within the parent array, when this property is an array element. */
     index?: number;
+    /** The collection path this entity belongs to. */
     path: string;
+    /** The entity's id, or `undefined` while it is being created. */
     entityId?: string | number;
+    /** Who is editing — the signed-in user and their roles. */
     authController: AuthState;
 };
 
@@ -886,12 +986,19 @@ export interface PropertyValidationSchema {
  * @group Entity properties
  */
 export interface NumberPropertyValidationSchema extends PropertyValidationSchema {
+    /** Smallest accepted value, **inclusive**. `min: 0` accepts `0`. */
     min?: number;
+    /** Largest accepted value, **inclusive**. `max: 100` accepts `100`. */
     max?: number;
+    /** Must be strictly below this. The exclusive twin of {@link max}. */
     lessThan?: number;
+    /** Must be strictly above this. The exclusive twin of {@link min}. */
     moreThan?: number;
+    /** Must be greater than zero. `0` is rejected — use `min: 0` to allow it. */
     positive?: boolean;
+    /** Must be less than zero. `0` is rejected. */
     negative?: boolean;
+    /** No fractional part. Does not change the column type; see `columnType`. */
     integer?: boolean;
 }
 
@@ -900,16 +1007,42 @@ export interface NumberPropertyValidationSchema extends PropertyValidationSchema
  * @group Entity properties
  */
 export interface StringPropertyValidationSchema extends PropertyValidationSchema {
+    /** Exactly this many characters — a country code, a fixed-width reference. */
     length?: number;
+    /** Fewest characters accepted, inclusive. */
     min?: number;
+    /**
+     * Most characters accepted, inclusive.
+     *
+     * Also sizes the column: a `max` turns `TEXT` into `VARCHAR(max)`, so
+     * lowering it on a table that already has longer rows is a migration the
+     * database will refuse, not just a stricter form.
+     */
     max?: number;
+    /**
+     * A pattern the whole value must match.
+     *
+     * A `string` is compiled per request, so it must be a valid regular
+     * expression — one that will not compile is rejected at boot, because
+     * `toPattern` answers `undefined` for it and the caller reads
+     * `if (pattern && !pattern.test(value))`: the rule would silently become no
+     * rule. A `RegExp` literal has already been compiled by the engine.
+     */
     matches?: string | RegExp;
     /**
      * Message displayed when the input does not satisfy the regex in `matches`
      */
     matchesMessage?: string;
+    /**
+     * Strip leading and trailing whitespace **before** saving.
+     *
+     * A transform, not a check: it changes the value that is written, which is
+     * what makes it the fix for "the same tag twice, one with a trailing space".
+     */
     trim?: boolean;
+    /** Lowercase the value before saving. A transform, like {@link trim}. */
     lowercase?: boolean;
+    /** Uppercase the value before saving. A transform, like {@link trim}. */
     uppercase?: boolean;
 }
 
@@ -918,7 +1051,9 @@ export interface StringPropertyValidationSchema extends PropertyValidationSchema
  * @group Entity properties
  */
 export interface DatePropertyValidationSchema extends PropertyValidationSchema {
+    /** Earliest accepted date, inclusive. A fixed instant, not "today". */
     min?: Date;
+    /** Latest accepted date, inclusive. A fixed instant, not "today". */
     max?: Date;
 }
 
@@ -927,7 +1062,9 @@ export interface DatePropertyValidationSchema extends PropertyValidationSchema {
  * @group Entity properties
  */
 export interface ArrayPropertyValidationSchema extends PropertyValidationSchema {
+    /** Fewest elements accepted, inclusive. Counts elements, not characters. */
     min?: number;
+    /** Most elements accepted, inclusive. Counts elements, not characters. */
     max?: number;
 }
 

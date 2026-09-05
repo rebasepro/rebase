@@ -53,7 +53,7 @@ A `string` property can also act as a lightweight reference via its `reference` 
 
 ### Schema-as-Code
 
-Collections are defined as standalone TypeScript files under `config/collections/` relative to the project root. The visual Studio edits these files via AST manipulation — it never runs raw SQL. This preserves custom callbacks and complex configuration.
+Collections are defined as standalone TypeScript files under `config/collections/` relative to the project root, and each one is registered in the `collections` array exported by that directory's `index.ts` — a file that is not in the array does not exist as far as the CLI or the runtime is concerned. The visual Studio edits these files via AST manipulation — it never runs raw SQL. This preserves custom callbacks and complex configuration.
 
 ## Defining a Collection
 
@@ -1165,14 +1165,14 @@ The link goes under `relation`, and its `kind` decides which fields apply.
 | `joinPath` | `JoinStep[]` | — | `via` only; read-only |
 | `cardinality` | `"one" \| "many"` | — | `via` only — a join chain cannot imply it |
 | `relationName` | `string` | property key | The name it is addressed by: `include`, admin tab, nested path segment |
-| `onDelete` | `OnAction` | — | Cascade rule on delete |
-| `onUpdate` | `OnAction` | — | Cascade rule on update |
+| `onDelete` | `OnAction` | `"restrict"` if required, else `"set null"` | Cascade rule on delete |
+| `onUpdate` | `OnAction` | — (Postgres `NO ACTION`) | Cascade rule on update |
 | `overrides` | `Partial<CollectionConfig>` | — | Override target collection config when rendered as subcollection tab |
 | `admin.fixedFilter` | `FilterValues` | — | Filter applied when selecting related entities |
 | `admin.includeId` | `boolean` | `true` | Show entity ID in the reference preview |
 | `admin.includeEntityLink` | `boolean` | `true` | Show link to open the related entity |
 | `isId` | `boolean` | — | Mark as primary key |
-| `validation` | `{ required?: boolean }` | — | Relation-level validation |
+| `validation` | `{ required?: boolean }` | — | On the **property**, not inside `relation` — a relation carrying its own `validation` is a boot error |
 
 ### Relation UI Options
 
@@ -1190,6 +1190,12 @@ The link goes under `relation`, and its `kind` decides which fields apply.
 | `"set null"` | Set FK to NULL |
 | `"no action"` | Defer to constraint check |
 | `"set default"` | Set FK to default value |
+
+Unset, `onDelete` is `"restrict"` for a required `belongsTo` and `"set null"`
+for an optional one. `required` says the child cannot exist without a parent, not
+that deleting the parent should delete the child — ask for `"cascade"` when that
+is what you mean. A `manyToMany` junction row is the exception: it defaults to
+`"cascade"`, because what it deletes is the link and not the target.
 
 ### Multi-Hop Joins (joinPath)
 
@@ -1520,7 +1526,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
                 // Only show for pending submissions
                 isEnabled: ({ entity }) => entity?.values.status === "pending",
                 onClick: async ({ entity, context, onCollectionChange }) => {
-                    if (!entity) return;
+                    if (!entity || !context) return;
                     await context.data.collection<Record<string, unknown>>("job_submissions").update(entity.id, {
                         status: "approved"
                     });
@@ -1573,7 +1579,7 @@ The `onClick` and `isEnabled` handlers receive:
 | `selectionController` | `SelectionController \| undefined` | Multi-select state (collection view) |
 | `view` | `"collection" \| "form"` | Where the action was triggered |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the entity form is opened |
-| `highlightEntity` | `(entity) => void` | Highlight a entity row |
+| `highlightEntity` | `(entity) => void` | Highlight an entity row |
 | `unhighlightEntity` | `(entity) => void` | Remove highlight |
 | `navigateBack` | `() => void` | Navigate back (e.g., after deleting) |
 | `onCollectionChange` | `() => void` | Refresh the collection view |
@@ -1942,7 +1948,23 @@ internal_note: {
 
 ## Schema Migration Workflow
 
-After modifying collections, apply changes to the database:
+**A new collection file is invisible until it is in the barrel.** Add it to the
+`collections` array exported by `config/collections/index.ts`:
+
+```typescript title="config/collections/index.ts"
+import postsCollection from "./posts.js";
+import productsCollection from "./products.js";   // ← the new one
+
+export const collections = [postsCollection, productsCollection];
+```
+
+`rebase generate-sdk`, `rebase build` and the runtime all load that index and
+read `collections` from it — none of them scans the directory. A file left out
+of the array produces no error and no table; it simply is not there. (The
+directory scan in `generate_sdk.ts` is a *fallback* for projects with no index
+file at all, so a project that has one gets the array or nothing.)
+
+Then apply the changes to the database:
 
 ```bash
 # All commands run from the project root directory unless noted

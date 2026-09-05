@@ -1,6 +1,18 @@
 const React = require("react");
 
-module.exports = {
+/**
+ * The design system, stubbed. Entries below are here because a test asserts on
+ * something specific about them — an aria-label, a change handler, a value that
+ * is not a component at all.
+ *
+ * Everything else falls through the Proxy to a div that renders its children.
+ * It used to be absent instead: a pane that reached for one more component than
+ * this file listed failed to render at all, with React's "Element type is
+ * invalid" and no clue which import it meant. Growing the list by hand, once
+ * per test that touched a new pane, is what made this a maintenance surface
+ * rather than a fixture.
+ */
+const explicit = {
     Card: ({ children, ...props }) =>
         React.createElement("div", { "data-testid": "card",
 ...props }, children),
@@ -61,5 +73,25 @@ large: 32 },
         }),
     Label: ({ children, htmlFor, ...props }) =>
         React.createElement("label", { htmlFor,
-            ...props }, children)
+            ...props }, children),
+    CircularProgressCenter: () => React.createElement("div", { "data-testid": "loading" }),
+    // The real one adds retry and chunk-error handling around React.lazy. A test
+    // that renders a Studio view is not exercising any of that, and the loader
+    // is never called unless the route is visited.
+    lazyChunk: (loader) => React.lazy(loader)
 };
+
+module.exports = new Proxy(explicit, {
+    get: (target, key) => {
+        if (key in target) return target[key];
+        if (key === "__esModule") return true;
+        // A symbol reaches here when something introspects the module (jest's
+        // own equality checks, `util.inspect`). Answering with a component
+        // would be a lie.
+        if (typeof key !== "string") return undefined;
+        const Stub = ({ children }) => React.createElement("div", null, children);
+        Stub.displayName = key;
+        return Stub;
+    },
+    has: () => true
+});

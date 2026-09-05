@@ -266,10 +266,81 @@ schedule: "30 2 * * 1" })]);
         });
     });
 
+    // ── Rejected schedules ──────────────────────────────────────────
+
+    /**
+     * A job the scheduler refused is absent from `listJobs()`, so from the admin
+     * panel it is indistinguishable from a file nobody wrote. The commonest way
+     * to land here is a six-field expression copied out of a tool that supports
+     * seconds — a one-character fix that was previously visible only to whoever
+     * had the boot log.
+     */
+    describe("rejected schedules", () => {
+        it("keeps a six-field schedule with its reason instead of dropping it", () => {
+            scheduler.registerJobs([makeJob("nightly-report", { schedule: "0 0 3 * * *" })]);
+
+            expect(scheduler.listJobs()).toHaveLength(0);
+            expect(scheduler.listRejectedJobs()).toEqual([{
+                id: "nightly-report",
+                name: "Job nightly-report",
+                schedule: "0 0 3 * * *",
+                reason: "Expected 5 fields, got 6"
+            }]);
+        });
+
+        it("says nothing about a schedule it accepted", () => {
+            scheduler.registerJobs([makeJob("fine")]);
+
+            expect(scheduler.listRejectedJobs()).toEqual([]);
+        });
+
+        it("clears the complaint when the job is re-registered with a valid schedule", () => {
+            // `rebase dev` re-registers on every reload. A fixed schedule must
+            // stop being reported, or the panel accuses you of a bug you fixed.
+            scheduler.registerJobs([makeJob("nightly-report", { schedule: "0 0 3 * * *" })]);
+            scheduler.registerJobs([makeJob("nightly-report", { schedule: "0 3 * * *" })]);
+
+            expect(scheduler.listRejectedJobs()).toEqual([]);
+            expect(scheduler.listJobs().map(j => j.id)).toEqual(["nightly-report"]);
+        });
+    });
+
     // ── Concurrency guard ───────────────────────────────────────────
 
     describe("concurrency guard", () => {
         beforeEach(() => { jest.useRealTimers(); });
+
+        it("persists the skip, so an overlap is in the run history and not only the log", async () => {
+            // A run of these in a row is the signature of a job that has
+            // outgrown its schedule. That pattern is only visible if the skips
+            // are stored — a warning in the process log is gone by the time
+            // anyone asks.
+            const inserted: CronJobLogEntry[] = [];
+            scheduler.setStore({
+                ensureTable: async () => {},
+                insertLog: async (entry: CronJobLogEntry) => { inserted.push(entry); },
+                fetchLogs: async () => [],
+                fetchJobStats: async () => new Map()
+            } as never);
+
+            let resolve: () => void;
+            const blocker = new Promise<void>((r) => { resolve = r; });
+            scheduler.registerJobs([makeJob("slow-store", {
+                handler: async () => { await blocker; return { done: true }; }
+            })]);
+
+            const first = scheduler.triggerJob("slow-store");
+            await scheduler.triggerJob("slow-store");
+
+            const skip = inserted.find(entry => (entry.result as { skipped?: boolean })?.skipped);
+            expect(skip).toBeDefined();
+            expect(skip!.jobId).toBe("slow-store");
+            expect(skip!.success).toBe(true);
+            expect(skip!.result).toEqual({ skipped: true, reason: "already_executing" });
+
+            resolve!();
+            await first;
+        });
 
         it("prevents overlapping manual triggers", async () => {
             let resolve: () => void;
@@ -287,7 +358,7 @@ schedule: "30 2 * * 1" })]);
 
             expect(second!.result).toEqual({ skipped: true,
 reason: "already_executing" });
-            expect(second!.logs).toContain("Skipped: job is already running");
+            expect(second!.logs).toContain("Skipped: the previous run has not finished");
 
             // Let the first one finish
             resolve!();
@@ -337,6 +408,40 @@ reason: "already_executing" });
             const log = await scheduler.triggerJob("fast");
             expect(log!.success).toBe(true);
             // If timeout wasn't cleared, Jest would hang
+        });
+
+        it("aborts ctx.signal, so the handler's work stops with the run", async () => {
+            // The timeout stops the scheduler *waiting*. Without the abort it
+            // never stopped the handler: a `fetch` to an unresponsive host kept
+            // its socket, and a job whose timeout matches its interval leaked
+            // one abandoned request per tick — invisible, because the run was
+            // already recorded as failed.
+            jest.useRealTimers();
+            let aborted = false;
+            scheduler.registerJobs([makeJob("hangs", {
+                timeoutSeconds: 1,
+                handler: ({ signal }) => new Promise((resolve) => {
+                    signal.addEventListener("abort", () => { aborted = true; });
+                    setTimeout(() => resolve("late"), 3000);
+                })
+            })]);
+
+            await scheduler.triggerJob("hangs");
+
+            expect(aborted).toBe(true);
+        }, 10000);
+
+        it("leaves ctx.signal unaborted for a run that finished", async () => {
+            jest.useRealTimers();
+            let seen: AbortSignal | undefined;
+            scheduler.registerJobs([makeJob("quick", {
+                timeoutSeconds: 60,
+                handler: async ({ signal }) => { seen = signal; return "ok"; }
+            })]);
+
+            await scheduler.triggerJob("quick");
+
+            expect(seen!.aborted).toBe(false);
         });
     });
 

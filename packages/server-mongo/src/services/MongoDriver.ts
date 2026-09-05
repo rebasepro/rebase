@@ -27,7 +27,7 @@ import {
 import { MongoDataService } from "../db/MongoDataService";
 import { MongoRealtimeService } from "./MongoRealtimeService";
 import { MongoHistoryService } from "./MongoHistoryService";
-import { buildPropertyCallbacks, buildSdkData, checkOperation, PolicyClauses, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
+import { buildPropertyCallbacks, buildSdkData, callbackRefusal, checkOperation, PolicyClauses, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
 import { mergeDeep } from "@rebasepro/utils";
 import { Filter, Document } from "mongodb";
 import { ApiError } from "@rebasepro/server";
@@ -493,27 +493,23 @@ propertyCallbacks: undefined };
             return savedRow;
         } catch (error) {
             if (callbacks?.afterSaveError || propertyCallbacks?.afterSaveError) {
+                // `error` is the reason the hook exists; it was documented and
+                // never passed. Same fix as the Postgres driver.
+                const errorProps = {
+                    collection: resolvedCollection as CollectionConfig<M>,
+                    path,
+                    id,
+                    values: updatedValues,
+                    previousValues: undefined,
+                    status,
+                    error,
+                    context: contextForCallback
+                };
                 if (callbacks?.afterSaveError) {
-                    await callbacks.afterSaveError({
-                        collection: resolvedCollection as CollectionConfig<M>,
-                        path,
-                        id: id || "unknown",
-                        values: updatedValues,
-                        previousValues: undefined,
-                        status,
-                        context: contextForCallback
-                    });
+                    await callbacks.afterSaveError(errorProps);
                 }
                 if (propertyCallbacks?.afterSaveError) {
-                    await propertyCallbacks.afterSaveError({
-                        collection: resolvedCollection as CollectionConfig<M>,
-                        path,
-                        id: id || "unknown",
-                        values: updatedValues,
-                        previousValues: undefined,
-                        status,
-                        context: contextForCallback
-                    });
+                    await propertyCallbacks.afterSaveError(errorProps);
                 }
             }
             throw error;
@@ -582,7 +578,9 @@ propertyCallbacks: undefined };
                     }
                 }
                 if (preventDefault) {
-                    return;
+                    // Same as the Postgres driver: a veto that answered 204 told
+                    // the caller the row was gone when it was not.
+                    throw callbackRefusal("beforeDelete", row.path);
                 }
             }
         } catch (callbackError) {

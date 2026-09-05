@@ -101,6 +101,10 @@ export function checkRlsCheckCount(root) {
 
     const digits = new RegExp(`\\b(\\d{1,3})\\s+${CHECKS_WORD}\\b`, "gi");
     const words = new RegExp(`\\b([a-zà-ÿ-]+)\\s+${CHECKS_WORD}\\b`, "gi");
+    // A sample `--json` run states the same number as a field, where no word
+    // "checks" follows it — which is how `"checksRun": 14` sat in the README
+    // through the fifteenth check. A pasted sample is a claim like any other.
+    const jsonField = /\bchecksRun"?:\s*(\d{1,3})/g;
 
     let scanned = 0;
     for (const rel of proseFiles(root)) {
@@ -122,6 +126,12 @@ export function checkRlsCheckCount(root) {
                 if (stated !== undefined && stated !== packageCount) {
                     findings.push({ file: rel, line: index + 1,
                         message: `States "${match[0].trim()}" — rls-check ships ${packageCount}.` });
+                }
+            }
+            for (const match of line.matchAll(jsonField)) {
+                if (Number(match[1]) !== packageCount) {
+                    findings.push({ file: rel, line: index + 1,
+                        message: `A sample --json run states checksRun ${match[1]} — rls-check ships ${packageCount}.` });
                 }
             }
         });

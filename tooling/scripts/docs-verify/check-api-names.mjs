@@ -76,7 +76,7 @@ function buildExportMaps(root) {
 }
 
 export async function checkApiNames(root) {
-    const { byPackage, membersOf } = loadSdkExports(root);
+    const { byPackage, membersOf, missingEntries } = loadSdkExports(root);
     const { snippets, files } = extractSnippets(root, ALL_DOC_GLOBS);
     const exportMaps = buildExportMaps(root);
 
@@ -92,6 +92,19 @@ export async function checkApiNames(root) {
         if (!unknown.has(key)) unknown.set(key, { name, specifier, hint, locations: [] });
         unknown.get(key).locations.push(location);
     };
+
+    // A PACKAGE_ENTRIES entry whose file is gone contributes no export set, and
+    // a specifier with no export set is skipped below rather than flagged — so
+    // the stale entry buys silence for every fence importing that package.
+    for (const { specifier, entry } of missingEntries) {
+        record(
+            `entry:${specifier}`,
+            specifier,
+            "PACKAGE_ENTRIES",
+            `tooling/scripts/docs-verify/sdk-exports.mjs`,
+            `entry point ${entry} does not exist — every doc import of this package is unchecked`
+        );
+    }
 
     /** A wrong-package import is the common case; point at the right one. */
     const findOwner = (name) => {

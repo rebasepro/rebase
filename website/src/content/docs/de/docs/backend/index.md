@@ -49,11 +49,12 @@ Nach der Initialisierung werden diese Routen gemountet:
 | `/api/auth/*` | Authentifizierung (Registrierung, Anmeldung, Aktualisierung, OAuth, Magic Links, Einmalcodes, MFA) |
 | `/api/admin/*` | Benutzer- und Rollenverwaltung (nur für Administratoren) |
 | `/api/storage/*` | Datei-Upload, -Download und -Löschung |
-| `/api/data/collections` | Endpunkt für Sammlungsmetadaten |
 | `/api/data/:slug` | CRUD-Operationen pro Sammlung (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entitätsänderungshistorie (falls aktiviert) |
-| `/api/data/docs` | OpenAPI-Spezifikation (wenn `enableSwagger: true`) |
-| `/api/data/swagger` | Swagger UI (Entwicklungsmodus, wenn `enableSwagger: true`) |
+| `/api/docs` | OpenAPI-Spezifikation (wenn `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (Entwicklungsmodus, wenn `enableSwagger: true`) |
+| `/api/meta/contract` | Das Sammlungsschema des Projekts (nur Admin) |
+| `/api/meta/schema-version` | Eine Versionszeichenfolge für dieses Schema (nicht authentifiziert) |
 | `/api/functions/*` | Benutzerdefinierte Funktionsrouten (wenn `functionsDir` gesetzt ist) |
 | `/api/cron/*` | Cron-Job-Verwaltung (nur für Administratoren, wenn `cronsDir` gesetzt ist) |
 | WebSocket bei Upgrade | Echtzeit-Abonnements |
@@ -159,11 +160,21 @@ Das Backend enthält einen Fehler-Handler, der alle Ausnahmen abfängt und struk
 {
     "error": {
         "message": "Entity not found",
-        "code": "not-found",
-        "status": 404
+        "code": "NOT_FOUND",
+        "requestId": "9f1c0b8e-4d2a-4e1b-9d0f-2c7a5b3e6a11"
     }
 }
 ```
+
+| Feld | Immer vorhanden | Was es ist |
+|------|:---------------:|------------|
+| `message` | ja | Für einen Menschen geschrieben, der es in einer Konsole liest. Benennt das Hindernis, nicht die Regel. |
+| `code` | ja | `SCREAMING_SNAKE_CASE` und stabil. Auf dieses Feld verzweigt Client-Code. |
+| `details` | nein | Strukturierte Nutzlast, wenn die Ablehnung *über* etwas ist — eine Liste fehlgeschlagener Pfade, eine Menge unbekannter Felder. |
+| `requestId` | nein | Vorhanden, wenn die Anfrage eine trug oder eine zugewiesen bekam; spiegelt `X-Request-ID`. In einem Fehlerbericht angeben. |
+
+Der HTTP-Status steht in der Antwort, nicht im Body. Verzweigen Sie auf `code`,
+nicht auf `message` — Meldungen sind für Menschen geschrieben und dürfen sich ändern.
 
 Schlägt die Initialisierung fehl (z. B. Datenbankverbindungsfehler), startet der Server trotzdem, gibt aber für alle API-Anfragen 503 zurück, mit einer beschreibenden Fehlermeldung in den Logs.
 

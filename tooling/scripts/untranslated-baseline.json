@@ -111,7 +111,6 @@
   "packages/cms/src/components/EditViewBinding.tsx::entity_not_found": 1,
   "packages/cms/src/components/EntityViewBinding.tsx::settings_heading": 1,
   "packages/cms/src/components/RebaseNavigation.tsx::edit_collections": 1,
-  "packages/cms/src/components/RebaseNavigation.tsx::studio_sql_database": 1,
   "packages/cms/src/components/SelectableTable/filters/RelationFilterField.tsx::filter_for_null_values": 1,
   "packages/cms/src/data_import/components/DataNewPropertiesMapping.tsx::autogenerate_id": 3,
   "packages/cms/src/data_import/components/DataNewPropertiesMapping.tsx::default_values": 1,
@@ -174,5 +173,13 @@
   "packages/cms/src/preview/components/RelationPreview.tsx::entity_not_found": 2,
   "packages/cms/src/preview/components/RelationPreview.tsx::unexpected_value_click_to_edit": 1,
   "packages/cms/src/preview/PropertyPreview.tsx::unexpected_value": 1,
-  "packages/cms/src/routes/RebaseRoute.tsx::unsaved_changes_in_entity": 1
+  "packages/cms/src/routes/RebaseRoute.tsx::unsaved_changes_in_entity": 1,
+  "packages/studio/src/components/JSEditor/JSEditorSidebar.tsx::find_by_id": 1,
+  "packages/studio/src/components/JSEditor/JSEditorSidebar.tsx::studio_sql_sidebar_snippets": 2,
+  "packages/studio/src/components/SchemaVisualizer/TableNode.tsx::required": 1,
+  "packages/studio/src/components/SchemaVisualizer/TableNode.tsx::studio_schema_primary_key": 1,
+  "packages/studio/src/components/SQLEditor/MonacoEditor.tsx::studio_schema_delete_from": 1,
+  "packages/studio/src/components/SQLEditor/MonacoEditor.tsx::studio_schema_insert_into": 1,
+  "packages/studio/src/components/StorageView/StorageView.tsx::download": 1,
+  "packages/studio/src/components/StudioHomePage.tsx::studio_sql_database": 3
 }

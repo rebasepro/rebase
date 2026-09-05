@@ -16,7 +16,54 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, getProjectPort, resolveStartPort } from "./dev";
+import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, devWatchIncludes, getProjectPort, readEnvValue, resolveStartPort, SCAFFOLD_DEFAULT_PORT } from "./dev";
+
+/**
+ * `rebase dev` must notice a function or cron that did not exist when it
+ * started.
+ *
+ * tsx restarts on changes to what the entrypoint imports, and the runtime does
+ * not import these — it scans their directories at boot. So a brand-new
+ * `backend/functions/new.ts` was invisible until somebody restarted by hand,
+ * which is the opposite of what a watch mode is for. The `config/` case is
+ * older and worse: the flag meant to watch it, `--watch=<glob>`, is not a tsx
+ * flag at all, so tsx dropped it and the directory was never watched.
+ */
+describe("devWatchIncludes", () => {
+    const paths = {
+        REBASE_DEV_FUNCTIONS: "backend/functions",
+        REBASE_DEV_CRONS: "backend/crons"
+    };
+
+    it("watches the functions and crons directories, absolute", () => {
+        expect(devWatchIncludes("/srv/app", paths, false)).toEqual([
+            path.join("/srv/app", "backend", "functions"),
+            path.join("/srv/app", "backend", "crons")
+        ]);
+    });
+
+    it("adds config/ only when auto-generation is off", () => {
+        expect(devWatchIncludes("/srv/app", paths, true))
+            .toContain(path.join("/srv/app", "config"));
+        expect(devWatchIncludes("/srv/app", paths, false))
+            .not.toContain(path.join("/srv/app", "config"));
+    });
+
+    it("honours a manifest that moved the directories", () => {
+        expect(devWatchIncludes("/srv/app", {
+            REBASE_DEV_FUNCTIONS: "services/api/handlers",
+            REBASE_DEV_CRONS: "services/api/schedules"
+        }, false)).toEqual([
+            path.join("/srv/app", "services", "api", "handlers"),
+            path.join("/srv/app", "services", "api", "schedules")
+        ]);
+    });
+
+    it("drops an entry the manifest did not resolve", () => {
+        expect(devWatchIncludes("/srv/app", { REBASE_DEV_FUNCTIONS: "backend/functions" }, false))
+            .toEqual([path.join("/srv/app", "backend", "functions")]);
+    });
+});
 
 describe("getProjectPort", () => {
     it("returns a port in the range 3001–3999", () => {
@@ -166,6 +213,45 @@ force: true });
  * destructive: `rebase dev -p 4000`, typed straight off this page, started on
  * the project's default port and said nothing about the flag it ignored.
  */
+describe("readEnvValue", () => {
+    it("returns undefined for a variable that is set to nothing", () => {
+        // The scaffold ships `VITE_API_URL=` empty and a commented line right
+        // under it. The old `\\s*(.+?)\\s*$` let the leading `\\s*` eat the
+        // newline, so this returned "# VITE_GOOGLE_CLIENT_ID=" — and every
+        // first `rebase dev` warned that a variable nobody had set was being
+        // ignored.
+        const env = [
+            "VITE_API_URL=",
+            "# VITE_GOOGLE_CLIENT_ID=",
+            ""
+        ].join("\n");
+
+        expect(readEnvValue(env, "VITE_API_URL")).toBeUndefined();
+    });
+
+    it("reads a value on its own line", () => {
+        expect(readEnvValue("PORT=3001\nNODE_ENV=development\n", "PORT")).toBe("3001");
+    });
+
+    it("strips surrounding quotes", () => {
+        expect(readEnvValue('FRONTEND_URL="http://localhost:5173"\n', "FRONTEND_URL"))
+            .toBe("http://localhost:5173");
+    });
+
+    it("is undefined for a key that is not there", () => {
+        expect(readEnvValue("PORT=3001\n", "DATABASE_URL")).toBeUndefined();
+    });
+
+    it("does not read a commented-out line as a value", () => {
+        // `# DATABASE_URL=…` is how the scaffold says "not this one".
+        expect(readEnvValue("# DATABASE_URL=postgres://x\n", "DATABASE_URL")).toBeUndefined();
+    });
+
+    it("names the port the scaffold ships", () => {
+        expect(SCAFFOLD_DEFAULT_PORT).toBe(3001);
+    });
+});
+
 describe("the dev help and the dev flag spec", () => {
     it("advertises only short aliases the spec declares", async () => {
         const printed: string[] = [];
@@ -186,5 +272,70 @@ describe("the dev help and the dev flag spec", () => {
         for (const alias of advertised) {
             expect(Object.keys(DEV_FLAGS)).toContain(alias);
         }
+    });
+
+    it("documents every flag the spec accepts", async () => {
+        // The other direction, and the one that was broken: `--database-url`
+        // and `--docker` were both accepted and neither appeared in --help, so
+        // the only way to learn that `dev` can use your own Postgres was to
+        // read resolve.ts.
+        const printed: string[] = [];
+        const spy = vi.spyOn(console, "log").mockImplementation(message => {
+            printed.push(String(message));
+        });
+        try {
+            await devCommand(["node", "rebase", "dev", "--help"]);
+        } finally {
+            spy.mockRestore();
+        }
+
+        // eslint-disable-next-line no-control-regex
+        const help = printed.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+        const longFlags = Object.entries(DEV_FLAGS)
+            .filter(([name, spec]) => name.startsWith("--") && typeof spec !== "string")
+            .map(([name]) => name);
+
+        expect(longFlags).toEqual(expect.arrayContaining(["--docker", "--database-url"]));
+        for (const flag of longFlags) {
+            expect(help, `${flag} is accepted by the parser but missing from --help`).toContain(flag);
+        }
+    });
+
+    it("reads --no-db in exactly one place", () => {
+        // The flag used to be read twice: once to disable the preflight, once
+        // not at all for the managed database, which starts on the *other*
+        // branch. So `rebase dev --no-db` wrote .rebase/pglite/, booted a
+        // daemon and served against it — the one database a scaffolded project
+        // would otherwise get, started by the flag that asks for none. Two
+        // reads of the same flag are two things that have to agree; one is not.
+        const source = fs.readFileSync(
+            path.join(import.meta.dirname, "dev.ts"),
+            "utf8"
+        );
+
+        const reads = source.match(/args\["--no-db"\]/g) ?? [];
+        expect(reads).toHaveLength(1);
+        expect(source).toContain("const noDb =");
+    });
+
+    it("no longer claims a docker-compose db service is started first", async () => {
+        // It is started only for `--docker`, or for a DATABASE_URL that already
+        // points at this machine. A scaffolded project sets neither and runs on
+        // the managed database, so the old description described a path the
+        // documented first run never takes.
+        const printed: string[] = [];
+        const spy = vi.spyOn(console, "log").mockImplementation(message => {
+            printed.push(String(message));
+        });
+        try {
+            await devCommand(["node", "rebase", "dev", "--help"]);
+        } finally {
+            spy.mockRestore();
+        }
+
+        // eslint-disable-next-line no-control-regex
+        const help = printed.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+        expect(help).not.toContain("service is started first");
+        expect(help).toContain("the managed development database");
     });
 });

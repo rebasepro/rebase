@@ -159,6 +159,58 @@ limit: "10" });
     });
 });
 
+/**
+ * `page` and `offset` were parsed with a bare `parseInt` and never checked, so
+ * every malformed value produced a *different* wrong answer rather than one
+ * refusal:
+ *
+ * - `?offset=abc` → `NaN`, dropped by a `> 0` guard in the driver, so the read
+ *   silently ignored the parameter and served page one;
+ * - `?page=0` → `offset = -limit`, which Postgres refuses with a 500 about a
+ *   query the caller never wrote;
+ * - `?offset=1.5` → `1`, a window the caller did not ask for.
+ *
+ * `limit` had this settled already — rejected, not clamped, because a window
+ * quietly different from the one asked for cannot be told apart from having
+ * reached the end of the collection. These two now answer the same way.
+ */
+describe("parseQueryOptions — page and offset validation", () => {
+    it("refuses a non-numeric offset", () => {
+        expectBadRequest({ offset: "abc" }, "INVALID_OFFSET");
+    });
+
+    it("refuses a negative offset", () => {
+        expectBadRequest({ offset: "-5" }, "INVALID_OFFSET");
+    });
+
+    it("refuses a fractional offset rather than truncating it", () => {
+        expectBadRequest({ offset: "1.5" }, "INVALID_OFFSET");
+    });
+
+    it("refuses page 0 and below, which computed a negative offset", () => {
+        expectBadRequest({ page: "0" }, "INVALID_PAGE");
+        expectBadRequest({ page: "-3" }, "INVALID_PAGE");
+    });
+
+    it("refuses a non-numeric page", () => {
+        expectBadRequest({ page: "two" }, "INVALID_PAGE");
+    });
+
+    it("still accepts the values that were always valid", () => {
+        expect(parseQueryOptions({ offset: "0" }).offset).toBe(0);
+        expect(parseQueryOptions({ offset: "40" }).offset).toBe(40);
+        expect(parseQueryOptions({ page: "1" }).offset).toBe(0);
+        expect(parseQueryOptions({ page: "3", limit: "20" }).offset).toBe(40);
+    });
+
+    it("names the parameter in the message, not just the code", () => {
+        let caught: unknown;
+        try { parseQueryOptions({ offset: "abc" }); } catch (e) { caught = e; }
+        expect((caught as Error).message).toContain("`offset`");
+        expect((caught as Error).message).toContain("\"abc\"");
+    });
+});
+
 // ─────────────────────────────────────────────────────────────
 // parseQueryOptions — PostgREST Filters
 // ─────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import {
     provisionCollectionPolicies,
     provisionCollectionTables,
     provisionTargetFor,
+    verifyProvisioningConnection,
     type ProvisionTarget
 } from "./provision";
 import { logger } from "../utils/logger";
@@ -255,6 +256,48 @@ describe("provisionTargetFor", () => {
 
     it("falls back to the first bootstrapper when none is marked", async () => {
         expect(provisionTargetFor([{ type: "postgres" } as BackendBootstrapper]).engine).toBe("postgres");
+    });
+});
+
+/**
+ * The probe that runs before boot's first real query.
+ *
+ * Provisioning is the earliest thing in boot that touches the database —
+ * earlier than `initializeDriver`, which is where the Postgres adapter's
+ * connection diagnosis lives. So a developer whose database was not running got
+ * Drizzle's wrapper and nothing else. The diagnosis existed; nothing reached it.
+ */
+describe("verifyProvisioningConnection", () => {
+    it("asks the bootstrapper, passing the pre-init driver stand-in", async () => {
+        const verifyConnection = jest.fn(async () => {});
+        const driverResult = { internals: {} } as ProvisionTarget["driverResult"];
+        const t = target({
+            bootstrapper: { verifyConnection } as unknown as ProvisionTarget["bootstrapper"],
+            driverResult
+        });
+
+        await verifyProvisioningConnection(t);
+
+        expect(verifyConnection).toHaveBeenCalledWith(driverResult);
+    });
+
+    it("lets the driver's diagnosis through rather than wrapping it", async () => {
+        // The whole point is the message: re-wrapping it here would bury the
+        // host, the port and the hint one layer deeper than they already were.
+        const t = target({
+            bootstrapper: {
+                verifyConnection: jest.fn(async () => {
+                    throw new Error("Cannot connect to PostgreSQL at 127.0.0.1:5432: connection refused.");
+                })
+            } as unknown as ProvisionTarget["bootstrapper"]
+        });
+
+        await expect(verifyProvisioningConnection(t)).rejects.toThrow("127.0.0.1:5432");
+    });
+
+    it("is a no-op for a driver that cannot probe", async () => {
+        // A better first message, not a new requirement on every driver.
+        await expect(verifyProvisioningConnection(target())).resolves.toBeUndefined();
     });
 });
 

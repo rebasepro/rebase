@@ -23,7 +23,7 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/mydb` |
+| `DATABASE_URL` | PostgreSQL connection string. **Optional in development** — unset, `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. Required everywhere else. | `postgresql://user:pass@localhost:5432/mydb` |
 | `JWT_SECRET` | Secret key for signing JWT tokens. Use a strong random string (min 32 chars). **Required in production** (auto-generated in development). | `a1b2c3d4e5...` |
 
 > **`sslmode=no-verify` is a node-postgres spelling, not a libpq one.**
@@ -68,10 +68,30 @@ All configuration is done via environment variables in your `.env` file at the p
 | `PORT` | Port for the backend HTTP server. Read by `rebase start`; **`rebase dev` ignores it** and binds a port derived from the project path so several projects can run at once — use `rebase dev --port` to pin one. | `3001` |
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
-| `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. | — |
-| `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS. | — |
+| `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |
+| `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS, in both environments. | — |
 | `ADMIN_CONNECTION_STRING` | Admin-level database connection string (used for schema introspection and admin operations). | `DATABASE_URL` |
 | `DISABLE_DB_ROLE_SWITCHING` | Disable PostgreSQL role-switching in SQL Editor (useful for custom authentication where DB roles are not mapped). | `false` |
+
+#### CORS in development
+
+Development allows **localhost, plus whatever `CORS_ORIGINS` (or `FRONTEND_URL`)
+names** — the same list production uses, with localhost added rather than
+substituted. So the variable works the same way in both environments, and the
+cases that need it in development are the ordinary ones:
+
+```bash
+# A phone on the LAN, a colleague's machine, an ngrok tunnel,
+# a forwarded Codespaces port — all non-localhost origins.
+CORS_ORIGINS=http://192.168.1.5:5173
+```
+
+An origin that is neither localhost nor listed is refused, and the refusal is
+logged **once per origin** with the exact line that would allow it. Refusing is
+not caution for its own sake: the API sends credentials, so reflecting an
+arbitrary `Origin` would let any site the developer happens to visit make
+authenticated requests against the dev server with their session and read the
+answers.
 
 ### Authentication
 
@@ -83,9 +103,11 @@ All configuration is done via environment variables in your `.env` file at the p
 | `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime. Sliding — every rotation re-ups it, so this governs how long a session survives **inactivity**. | `400d` |
 | `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). Outside production the **first** user can always register, whatever this says — an empty user table has to admit somebody, and that somebody becomes the admin. In production (`NODE_ENV=production`) that window is closed: an empty table refuses the bootstrap registration with `SETUP_REQUIRED`, a first account created through open registration is an ordinary account, and the admin is named with `REBASE_ADMIN_EMAIL` below or assigned with the service key. The scaffold's `.env.example` sets it to `true`; the framework default is off. | `false` |
-| `DISABLE_SELF_REGISTRATION` | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open outside production, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
-| `REBASE_ADMIN_EMAIL` | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a production deployment gets its admin: the operator names the first account instead of racing the internet for it. Boot warns when the table is empty in production and this is unset. | — |
-| `REBASE_ADMIN_PASSWORD` | Password for that account. At least 12 characters, or it is refused and the account is not created. Change it after the first sign-in. | — |
+| `DISABLE_SELF_REGISTRATION` <span class="since-badge" data-since="0.18">Since 0.18</span> | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open outside production, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
+| `REBASE_ADMIN_EMAIL` <span class="since-badge" data-since="0.18">Since 0.18</span> | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a production deployment gets its admin: the operator names the first account instead of racing the internet for it. Boot warns when the table is empty in production and this is unset. | — |
+| `REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span> | Password for that account. At least 12 characters, or it is refused and the account is not created. Change it after the first sign-in. | — |
+| `MFA_ENCRYPTION_KEY` | Encrypts every stored TOTP secret. Without it, MFA enrolment is refused rather than storing secrets in the clear. | — |
+| `MFA_ENCRYPTION_KEY_PREVIOUS` | The key being rotated *away* from. Set both during a rotation: new secrets are written with `MFA_ENCRYPTION_KEY` and existing ones are still readable, so nobody is locked out of their own account mid-rotation. Remove it once every secret has been re-encrypted. | — |
 | `ALLOW_ANONYMOUS` | Enable anonymous sign-in (`POST /api/auth/anonymous`). Opt-in, and deliberately not gated by `ALLOW_REGISTRATION`. | `false` |
 | `AUTH_REQUIRE` | Require authentication for the data API. Set `false` for a fully public read surface — RLS still applies. | `true` |
 | `AUTH_DEFAULT_ROLE` | Role assigned to a newly registered user when none is given. | — |
@@ -156,6 +178,7 @@ ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `DB_POOL_CONNECT_TIMEOUT` | Milliseconds to wait for a connection | `10000` |
 | `DATABASE_DIRECT_URL` | Direct (non-pooled) connection. [Realtime](/docs/backend/realtime) needs one: `LISTEN`/`NOTIFY` does not survive a transaction pooler such as PgBouncer, and without it change notifications are disabled with a warning rather than silently lost. | — |
 | `DATABASE_READ_URL` | Read replica. Reads go there when it is set and differs from `DATABASE_URL`; if the connection fails, everything falls back to the primary with a warning. | — |
+| `REBASE_DB_POOL_MAX` | A ceiling on every pool in the process, applied whatever each one asked for. Plain digits only: a malformed value is ignored rather than silently serializing the server. | — |
 
 ### Runtime behaviour
 
@@ -178,6 +201,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (degrades to `trigger` today), `off`. See [Realtime](/docs/backend/realtime#database-level-change-capture-cdc). | `auto` |
 | `REALTIME_CHANNEL_BUS` | Cross-instance transport for broadcast channels and presence: `memory` or `postgres`. Ignored when `realtime.bus` was given a constructed transport. | `memory` |
 | `ALLOW_LOCALHOST_IN_PRODUCTION` | Permit `localhost`/loopback values under `NODE_ENV=production`. Off, so a production boot fails loudly rather than connecting to a database that is not there. | `false` |
+| `REBASE_STRICT_COLLECTION_CONFIG` | What boot does with a key in your collections that this version does not read: `warn`, `error` (refuse to boot — worth turning on in CI), or `off`. Only governs keys it does not *recognise*, which are usually a typo and occasionally deliberate metadata; a key it knows has moved is always fatal, because the feature it configured is silently absent otherwise. | `warn` |
 
 :::note[Boot provisioning is additive, and is not a migration tool]
 The boot pass runs unattended with nobody reading a diff, so it will never drop
@@ -191,14 +215,30 @@ generate` + `rebase db migrate`, or `rebase db push` from a checkout or CI,
 which dry-runs the change, refuses destructive ones without confirmation, and
 can take a backup first.
 :::
+| `REBASE_PROVISION_ONLY` | `1`/`true` runs the schema pass and exits without opening a socket — the shape a migration Job wants, from the same image and the same bundle as the server that follows it. An empty value is *unset*, so an unsubstituted `${SOMETHING}` in a compose file cannot turn an ordinary deployment into one that migrates and refuses to serve. | — |
+| `REBASE_STRICT_COLLECTION_CONFIG` | What an unrecognised key in a collection config does. `error`/`strict`/`1`/`true` refuses the boot, `off`/`0`/`false` is silent, anything else warns. | warn |
+| `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` lets a machine — an agent, a CI job — *apply* a schema change through `/api/admin/schema`, not only plan one. Off unless asked for: the credential that would make such a change is the one most likely to be sitting in a CI variable. | `false` |
+| `REBASE_FUNCTIONS_TIMEOUT_MS` | How long a custom function may run before its request is aborted. Same knob as the `functionsTimeoutMs` option. | — |
+| `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` makes an unhandled promise rejection terminate the process instead of logging it. On under an orchestrator that will restart you; off where a restart is worse than a leak. | `false` |
+| `REBASE_CRON_ALWAYS_ON` | Keeps the cron scheduler running on a platform the runtime otherwise detects as scale-to-zero, where a timer that fires in an idle instance fires in no instance. | — |
+| `TRUSTED_PROXY_HOPS` | How many proxies sit in front of this server, so the rate limiter can read the real client address out of `X-Forwarded-For`. Fail-safe default `0`: with no proxy, trusting the header would let any caller forge an identity. | `0` |
 
 ### Split deployments
 
 One image and one bundle can be booted several times over, each serving a
-different part of the project. `REBASE_ROLE`, `REBASE_CRON_SCHEDULER`,
-`REBASE_JOB_WORKERS`, `REBASE_FUNCTIONS_ONLY`, `REBASE_FUNCTIONS_EXCLUDE` and
-`REBASE_FUNCTIONS_UPSTREAM` are documented in full on
+different part of the project. One line each here, because this page claims to
+list every variable; what each combination *mounts and owns* — and which
+combinations refuse to boot — is on
 **[Split Processes](/docs/deployment/split-processes)**.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REBASE_ROLE` | Which part this process serves: `all`, `api`, `functions` or `worker`. | `all` |
+| `REBASE_CRON_SCHEDULER` | Override whether *this* process runs the cron timers. Unset follows the role. | — |
+| `REBASE_JOB_WORKERS` | Override whether this process runs job-queue workers. Unset follows the role. | — |
+| `REBASE_FUNCTIONS_ONLY` | Serve only the named custom functions in this process. | — |
+| `REBASE_FUNCTIONS_EXCLUDE` | Serve every custom function except the named ones. | — |
+| `REBASE_FUNCTIONS_UPSTREAM` | Where the API process forwards a function request it does not serve itself. | — |
 
 ### Backups
 
@@ -213,6 +253,56 @@ different part of the project. `REBASE_ROLE`, `REBASE_CRON_SCHEDULER`,
 
 Backups contain secrets and PII. Use a private destination with
 encryption-at-rest.
+| `PG_DUMPALL_PATH` | Where `pg_dumpall` lives, when it is not on `PATH`. Without it — and without the PostgreSQL client tools installed — a globals backup fails with an error naming this variable. | — |
+
+### Bundle delivery
+
+A managed deployment does not carry its code in the image: the runtime fetches a
+bundle at boot. These decide which one and how.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REBASE_BUNDLE` | Path to an already-extracted bundle directory. What `rebase start` sets locally. | — |
+| `REBASE_BUNDLE_URL` | Where to fetch the bundle archive from, when there is no local one. | — |
+| `REBASE_BUNDLE_TOKEN` | The bearer credential for that fetch. Treat it as a secret: it is what authorises a tenant to download its own code. | — |
+| `REBASE_BUNDLE_FETCH_DIR` | Where a fetched bundle is extracted. Must be writable and must survive between the fetch and the boot. | — |
+| `REBASE_RUNTIME_MODULES` | Extra modules the runtime image provides to the bundle, beyond the ones it declares itself. | — |
+
+### Resource bindings
+
+Every database, bucket and topic a project declares in `config/resources.ts` is
+bound by environment variables named after it. The base names are below; a
+non-default resource appends `__` and its key in upper case, so a bucket called
+`media` reads `S3_BUCKET__MEDIA`. `rebase status`
+<span class="since-badge" data-since="0.18">Since 0.18</span> prints, per resource,
+the exact variable it is reading and whether it is set.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REBASE_DRIVER` | The npm package implementing a data source's driver, when it is not the default Postgres one. Suffixed per source: `REBASE_DRIVER__ANALYTICS`. | — |
+| `REBASE_TOPIC_URL` | The connection string for a declared topic. Suffixed per topic. | — |
+
+### The CLI's own environment
+
+Read by `rebase`, not by the server. Nothing here affects a deployment.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REBASE_BASE_URL` | The backend `rebase auth` and `rebase api-keys` talk to, instead of deriving it from the project. | — |
+| `REBASE_PORT` | The port those commands assume when deriving that URL. | — |
+| `SERVICE_KEY` | The service key they authenticate with, instead of prompting. | — |
+| `REBASE_ENV_FILE_PATH` | Which `.env` the CLI reads and writes, when it is not the project's. | — |
+| `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
+| `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
+| `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |
+| `REBASE_DEBUG` | `1` prints the underlying error and request detail instead of the short message. The first thing to set when a `rebase cloud` command fails unhelpfully. | — |
+| `REBASE_DEV_NO_DB` | `rebase dev` starts no database and provisions nothing — you bring your own. Same as `--no-db`. | — |
+| `REBASE_FRONTEND_PORT` | Pins the frontend dev server's port, which `rebase dev` otherwise derives from the project's path. | — |
+| `REBASE_DEV_READY_TIMEOUT_MS` | How long `rebase dev` waits for the backend to announce itself before saying it has not started. `0` disables the report. | `30000` |
+| `DATABASE_PASSWORD` | The password `rebase dev --docker` puts into the connection string it derives from `docker-compose.yml`. | — |
+| `DO_NOT_TRACK` | The cross-tool convention. Set to anything but `0` and the CLI sends no telemetry. | — |
+| `REBASE_TELEMETRY_DISABLED` | The same, for Rebase specifically. Needs no file, which is why it is the one to use in CI and in an image. | — |
+| `REBASE_TELEMETRY_ENDPOINT` | Where telemetry is sent, for a self-hosted collector. | — |
 
 ## Secrets in development
 
@@ -225,7 +315,8 @@ were regenerated on every boot — so restarting the dev server logged you out o
 your own app and invalidated any API key you had just created.
 
 - Set either variable explicitly and yours is used; nothing is cached or read.
-- Point the cache somewhere else with `REBASE_DEV_SECRETS_FILE`.
+- Point the cache somewhere else with `REBASE_DEV_SECRETS_FILE` — a path, and the
+  only variable in this section you would ever set deliberately.
 - Delete the file to roll both secrets. The next boot writes a fresh one.
 - If the file cannot be written — a read-only container, say — the server starts
   anyway with an ephemeral secret, exactly as it used to.
@@ -302,7 +393,7 @@ await initializeRebaseBackend({
 
     history: true,           // Enable entity change history
 
-    enableSwagger: true,     // Enable OpenAPI docs at /api/data/docs
+    enableSwagger: true,     // Enable OpenAPI docs at /api/docs
 
     logging: {
         level: "info"

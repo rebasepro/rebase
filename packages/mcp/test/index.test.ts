@@ -15,11 +15,15 @@ import {
     READ_ONLY_TOOLS,
     LOCAL_ONLY_TOOLS,
     findBackendDir,
-    findDevDir
+    findDevDir,
+    envDeclaredProject,
+    explainToolError,
+    answerCliFlags,
+    lastLines
 } from "../src/index";
 import type { PackageManager } from "../src/index";
 import { spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -1052,5 +1056,293 @@ describe("the two project layouts", () => {
     it("runs dev in app/ when there is one", () => {
         mkdirSync(join(root, "app"), { recursive: true });
         expect(findDevDir(root)).toBe(resolve(root, "app"));
+    });
+});
+
+describe("the environment block outranks the persisted registry", () => {
+    // `homedir()` is mocked at the top of this file, so this is where the
+    // server's own REGISTRY_PATH resolves.
+    const home = join(tmpdir(), "rebase-mcp-test-home");
+    const registryPath = join(home, ".rebase", "projects.json");
+    let saved: string | null = null;
+
+    beforeEach(() => {
+        mkdirSync(join(home, ".rebase"), { recursive: true });
+        saved = existsSync(registryPath) ? readFileSync(registryPath, "utf8") : null;
+    });
+
+    afterEach(() => {
+        if (saved === null) rmSync(registryPath, { force: true });
+        else writeFileSync(registryPath, saved);
+        vi.unstubAllEnvs();
+        vi.resetModules();
+    });
+
+    /** Re-import the server with a written registry and a chosen environment. */
+    async function bootWith(
+        persisted: unknown,
+        env: Record<string, string>
+    ): Promise<typeof import("../src/index")> {
+        writeFileSync(registryPath, JSON.stringify(persisted));
+        for (const key of ["REBASE_PROJECT_DIR", "REBASE_BASE_URL", "REBASE_API_TOKEN", "REBASE_TOKEN"]) {
+            vi.stubEnv(key, env[key] ?? "");
+        }
+        vi.resetModules();
+        return await import("../src/index");
+    }
+
+    async function currentProject(mod: typeof import("../src/index")) {
+        const handler = (mod.server as any)._requestHandlers.get("tools/call");
+        const result = await handler({
+            method: "tools/call",
+            params: { name: "rebase_project_current", arguments: {} }
+        });
+        return JSON.parse(result.content[0].text);
+    }
+
+    const persistedDefault = (dir: string) => ({
+        activeProject: "default",
+        projects: {
+            default: {
+                name: "default",
+                projectDir: dir,
+                baseUrl: "https://persisted.example.com",
+                token: "persisted-token-that-is-long-enough",
+                addedAt: "2020-01-01T00:00:00.000Z"
+            }
+        }
+    });
+
+    it("rebuilds the default project from the environment on every start", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
+        const mod = await bootWith(persistedDefault(join(dir, "stale")), {
+            REBASE_PROJECT_DIR: dir,
+            REBASE_BASE_URL: "http://localhost:4321",
+            REBASE_API_TOKEN: "rk_env_00000000000000000000000000"
+        });
+
+        const current = await currentProject(mod);
+        expect(current.projectDir).toBe(dir);
+        expect(current.baseUrl).toBe("http://localhost:4321");
+        expect(current.tokenPrefix).toBe("rk_env_0...");
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("drops a token registered against the directory the environment replaced", async () => {
+        // The persisted token is a credential for the *old* projectDir. Carrying
+        // it into a directory it was never issued for is how an admin key ends
+        // up pointed at somebody else's backend.
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
+        const mod = await bootWith(persistedDefault(join(dir, "stale")), { REBASE_PROJECT_DIR: dir });
+
+        const current = await currentProject(mod);
+        expect(current.projectDir).toBe(dir);
+        expect(current.hasToken).toBe(false);
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("keeps the persisted default when the client declares none of the three", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
+        const mod = await bootWith(persistedDefault(join(dir, "kept")), {});
+
+        const current = await currentProject(mod);
+        expect(current.baseUrl).toBe("https://persisted.example.com");
+        expect(current.projectDir).toBe(join(dir, "kept"));
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("says on stderr that a sticky activeProject is what tools actually target", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
+        const warn = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        await bootWith(
+            {
+                activeProject: "prod",
+                projects: {
+                    default: { name: "default", projectDir: dir, baseUrl: "http://localhost:3001", token: "", addedAt: "2020-01-01T00:00:00.000Z" },
+                    prod: { name: "prod", projectDir: dir, baseUrl: "https://prod.example.com", token: "", addedAt: "2020-01-01T00:00:00.000Z" }
+                }
+            },
+            { REBASE_BASE_URL: "http://localhost:4321" }
+        );
+        const written = warn.mock.calls.map((c) => String(c[0])).join("");
+        expect(written).toContain("\"prod\" is the active one");
+        warn.mockRestore();
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("reports nothing when the environment is silent", () => {
+        expect(envDeclaredProject({} as NodeJS.ProcessEnv)).toBeNull();
+        expect(envDeclaredProject({ REBASE_TOKEN: "rk_x" } as NodeJS.ProcessEnv)).toEqual({
+            projectDir: undefined,
+            baseUrl: undefined,
+            token: "rk_x"
+        });
+    });
+});
+
+describe("showing a schema change before making it", () => {
+    const handler = () => (server as any)._requestHandlers.get("tools/call");
+
+    /** Drive the mocked `spawn` to a chosen exit code and output. */
+    function cliReturns(output: string, code: number) {
+        (mockSpawn.stdout.on as any).mockImplementation((event: string, cb: (b: Buffer) => void) => {
+            if (event === "data") cb(Buffer.from(output));
+            return mockSpawn.stdout;
+        });
+        (mockSpawn.stderr.on as any).mockImplementation(() => mockSpawn.stderr);
+        (mockSpawn.on as any).mockImplementation((event: string, cb: (c: number) => void) => {
+            if (event === "close") cb(code);
+            return mockSpawn;
+        });
+    }
+
+    /** `db push` is gated on DATABASE_URL being loopback; give it one. */
+    function targetIsLocal() {
+        vi.stubEnv("DATABASE_URL", "postgresql://u:p@localhost:5432/scratch");
+    }
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.clearAllMocks();
+    });
+
+    it("registers a plan tool that runs a dry push", () => {
+        expect(ALL_TOOLS.map((t) => t.name)).toContain("rebase_schema_plan");
+    });
+
+    it("plans without touching the environment, so the gate lets it through", () => {
+        expect(READ_ONLY_TOOLS.has("rebase_schema_plan")).toBe(true);
+        expect(gatedTargetFor("rebase_schema_plan")).toBeNull();
+        // The push it previews is still gated.
+        expect(gatedTargetFor("rebase_db_push")).toBe("db");
+    });
+
+    it("passes --dry-run, not a bare push", async () => {
+        cliReturns("Planned changes:\n  ALTER TABLE posts ADD COLUMN subtitle text", 0);
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "rebase_schema_plan", arguments: {} }
+        });
+        const argv = (spawn as any).mock.calls.at(-1)[1] as string[];
+        expect(argv).toEqual(expect.arrayContaining(["rebase", "db", "push", "--dry-run"]));
+        expect(result.content[0].text).toContain("ALTER TABLE posts ADD COLUMN subtitle");
+        expect(result.isError).toBeUndefined();
+    });
+
+    it("marks a non-zero CLI exit as an error rather than describing one", async () => {
+        cliReturns("something went wrong", 1);
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "rebase_doctor", arguments: {} }
+        });
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("Command exited with code 1");
+    });
+
+    it("hands a destructive refusal back as a human's decision, not a flag to find", async () => {
+        targetIsLocal();
+        cliReturns(
+            "  ✗ Aborting: destructive changes require confirmation.\n" +
+            "    Re-run interactively, or pass --allow-destructive to proceed.",
+            1
+        );
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "rebase_db_push", arguments: {} }
+        });
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("not yours to approve");
+        expect(result.content[0].text).toContain("rebase db push --allow-destructive");
+        expect(result.content[0].text).toContain("rebase db backup");
+    });
+
+    it("says nothing about --allow-destructive when the push succeeded", async () => {
+        targetIsLocal();
+        cliReturns("Schema applied.", 0);
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "rebase_db_push", arguments: {} }
+        });
+        expect(result.isError).toBeUndefined();
+        expect(result.content[0].text).not.toContain("not yours to approve");
+    });
+});
+
+describe("error ergonomics", () => {
+    const handler = () => (server as any)._requestHandlers.get("tools/call");
+
+    it("turns `fetch failed` into the URL it tried and the tool that fixes it", () => {
+        const explained = explainToolError(new Error("fetch failed"), "http://localhost:3001");
+        expect(explained).toContain("http://localhost:3001");
+        expect(explained).toContain("rebase dev");
+        expect(explained).toContain("rebase_dev_start");
+        expect(explained).toContain("rebase_project_current");
+    });
+
+    it("leaves an error that is not a connection failure alone", () => {
+        // A validation message is already the answer; wrapping it in advice
+        // about starting a dev server would bury it.
+        expect(explainToolError(new Error("Collection \"posts\" not found"), "http://x"))
+            .toBe("Collection \"posts\" not found");
+    });
+
+    it("tells project_add about its own input rather than a CLI flag", async () => {
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "rebase_project_add", arguments: { name: "staging" } }
+        });
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("`baseUrl`");
+        expect(result.content[0].text).toContain("projectDir");
+        // `--baseUrl` is a CLI flag; this tool has no flags at all.
+        expect(result.content[0].text).not.toContain("--baseUrl");
+    });
+
+    it("answers --version and --help without opening a transport", () => {
+        const written: string[] = [];
+        const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: any) => {
+            written.push(String(chunk));
+            return true;
+        });
+        expect(answerCliFlags(["--version"])).toBe(true);
+        expect(written.join("")).toMatch(/^\d+\.\d+\.\d+/);
+        written.length = 0;
+        expect(answerCliFlags(["--help"])).toBe(true);
+        expect(written.join("")).toContain("npx -y @rebasepro/mcp");
+        written.length = 0;
+        expect(answerCliFlags([])).toBe(false);
+        expect(written.join("")).toBe("");
+        spy.mockRestore();
+    });
+
+    it("names the storage tool after what it returns", async () => {
+        const names = ALL_TOOLS.map((t) => t.name);
+        expect(names).toContain("storage_get_download_url");
+        // No back-compat alias: the old name described metadata it never returned.
+        expect(names).not.toContain("storage_get_metadata");
+
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "storage_get_download_url", arguments: { key: "file.png" } }
+        });
+        expect(result.content[0].text).toContain("http://tempurl");
+    });
+
+    it("classifies schema introspection by where its effect lands", () => {
+        // It reads the database and writes collection files here. The write is
+        // the half that matters, and it is local.
+        expect(READ_ONLY_TOOLS.has("rebase_schema_introspect")).toBe(false);
+        expect(LOCAL_ONLY_TOOLS.has("rebase_schema_introspect")).toBe(true);
+        expect(gatedTargetFor("rebase_schema_introspect")).toBeNull();
+    });
+
+    it("counts dev-server log lines, not stdout chunks", () => {
+        // One `data` event can carry a hundred lines. Slicing the chunk array
+        // returned an amount of output unrelated to the number asked for.
+        const output = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join("\n");
+        expect(lastLines(output, 3).split("\n")).toEqual(["line 198", "line 199", "line 200"]);
+        expect(lastLines(output, 1000).split("\n")).toHaveLength(200);
+        expect(lastLines("", 50)).toBe("");
+        expect(lastLines("only\n", 50)).toBe("only");
     });
 });

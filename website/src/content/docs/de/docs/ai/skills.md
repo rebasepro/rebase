@@ -22,14 +22,29 @@ rebase skills install --agent claude,cursor
 rebase skills install --agent all
 ```
 
-Vier Ziele werden unterstützt:
+Sieben Ziele werden unterstützt – eines für jede Pointer-Datei, die `rebase init` schreibt:
 
 | `--agent` | Assistent | Geschrieben nach |
 |---|---|---|
-| `cursor` | Cursor | `.cursor/rules/<skill>.mdc` |
+| `cursor` | Cursor | `.cursor/rules/rebase.mdc` + `.cursor/rules/<skill>/SKILL.md` |
 | `claude` | Claude Code | `.claude/skills/<skill>/SKILL.md` |
-| `windsurf` | Windsurf | `.windsurf/rules/<skill>.md` |
+| `windsurf` | Windsurf | `.windsurf/rules/rebase.md` + `.windsurf/rules/<skill>/SKILL.md` |
 | `gemini` | Gemini CLI / Antigravity | `.agents/skills/<skill>/SKILL.md` |
+| `codex` | Codex CLI | `.codex/skills/<skill>/SKILL.md` |
+| `kiro` | Kiro | `.kiro/steering/rebase.md` + `.kiro/steering/<skill>/SKILL.md` |
+| `copilot` | GitHub Copilot | `.github/instructions/rebase.instructions.md` + `<skill>/SKILL.md` |
+
+:::note[Cursor, Windsurf, Kiro und Copilot bekommen eine einzige Dauerdatei]
+Diese vier laden ihr komplettes Rules-Verzeichnis in jede Anfrage. Eine
+Regeldatei pro Skill bedeutete rund **84.000 Zeichen** Rebase-Referenz vor jeder
+Frage, ob sie Rebase betraf oder nicht – und eine Anweisung, die ein Assistent
+überfliegt, ist eine, der er nicht folgt.
+
+Stattdessen bekommen sie `rebase.mdc` (bzw. `rebase.md`): ein rund 3 KB großer
+Index mit `alwaysApply: true`, der auflistet, was jeder Skill abdeckt und welche
+Datei zu lesen ist. Die Inhalte liegen in Unterverzeichnissen pro Skill und
+werden bei Bedarf geöffnet.
+:::
 
 `gemini` deckt **sowohl** Gemini CLI als auch Antigravity ab – beide lesen dasselbe `.agents/`-Verzeichnis, daher gibt es keinen separaten `antigravity`-Wert.
 
@@ -91,7 +106,7 @@ Zwei davon verlangen, unaufgefordert gelesen zu werden. `rebase-basics` besagt, 
 ```text
   Found 21 Rebase skills
 
-  ✓ Claude Code — 21 skills installed (+ 1 reference file) to .claude/skills
+  ✓ Claude Code — 21 skills installed (+ 8 reference files) to .claude/skills
 ```
 
 Skills werden über das `@rebasepro/agent-skills`-Paket bereitgestellt, von dem die CLI abhängt. Das bedeutet, dass der bereitgestellte Satz Ihrer installierten CLI-Version entspricht.

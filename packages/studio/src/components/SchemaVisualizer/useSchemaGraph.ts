@@ -371,7 +371,6 @@ export interface UseSchemaGraphResult {
     nodes: Node[];
     edges: Edge[];
     relayout: () => void;
-    isLoading: boolean;
     tableCount: number;
     relationCount: number;
 }
@@ -408,7 +407,6 @@ relationCount: 0 };
         nodes,
         edges,
         relayout,
-        isLoading: !collections,
         tableCount,
         relationCount
     };

@@ -31,7 +31,6 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "source": "src/index.ts",
   "engines": {
     "node": ">=22.22.0"
   },
@@ -41,6 +40,7 @@
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
     "test:lint": "eslint \"src/**\" --quiet",
     "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",
     "generateIcons": "ts-node --esm src/icons/generateIcons.ts"
   },
@@ -109,8 +109,8 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "react": ">=19.2.7",
-    "react-dom": ">=19.2.7",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "react-router": "^8.3.0"
   },
   "devDependencies": {
@@ -132,14 +132,7 @@
     "vite": "^8.1.5"
   },
   "files": [
-    "dist",
-    "src",
-    "!src/**/*.test.ts",
-    "!src/**/*.test.tsx",
-    "!src/**/*.spec.ts",
-    "!src/**/*.spec.tsx",
-    "!src/**/__tests__/**",
-    "!src/tests/**"
+    "dist"
   ],
   "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
   "publishConfig": {

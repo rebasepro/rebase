@@ -125,7 +125,7 @@ const { data } = await client.data.products
 | `.offset(n)` | Überspringt die ersten N Ergebnisse | `.offset(50)` |
 | `.search(text)` | Volltextsuche | `.search("laptop")` |
 | `.include(...relations)` | Bezieht verwandte Entitäten ein | `.include("author", "tags")` |
-| `.find()` | Führt die Abfrage aus | Gibt `FindResponse<M>` zurück |
+| `.find()` | Führt die Abfrage aus | Gibt `FindResult<M>` zurück |
 | `.listen(onUpdate)` | Abonniert Echtzeit-Updates | Gibt `unsubscribe()` zurück |
 
 ### Filteroperatoren

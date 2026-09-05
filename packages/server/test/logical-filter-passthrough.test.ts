@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import { serializeLogicalCondition } from "@rebasepro/common";
+import type { CollectionConfig, DataDriver, FilterCondition, WhereFilterOp } from "@rebasepro/types";
 
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 
@@ -96,5 +97,53 @@ describe("logical filter groups reach the driver", () => {
 
         expect((fetch as { filter?: unknown }).filter).toBeDefined();
         expect(logicalOf(fetch)).toMatchObject({ type: "or" });
+    });
+});
+
+/**
+ * The server parses exactly what the SDK emits.
+ *
+ * `serializeLogicalCondition` (in `@rebasepro/common`, used by
+ * `packages/client/src/transport.ts`) and `parseLogicalGroup` here are the two
+ * halves of one wire format, and only this test holds them against each other.
+ * The leaf encoder used to have two copies; the copy the SDK used wrote
+ * `deleted_at.eq.null`, `id.in.()` and, for any operator it did not recognise,
+ * `eq` — all of which this parser accepted and turned into a query that ran
+ * and answered something else.
+ */
+describe("the SDK's wire form parses back to the conditions it was built from", () => {
+    const wireFor = (conditions: FilterCondition[], type: "or" | "and" = "or") =>
+        `?${type}=${encodeURIComponent(`(${conditions.map(serializeLogicalCondition).join(",")})`)}`;
+
+    it("round-trips a null test, a relation path, a comparison and an empty list", async () => {
+        const conditions = [
+            { column: "deleted_at", operator: "==" as WhereFilterOp, value: null },
+            { column: "author.name", operator: "==" as WhereFilterOp, value: "bob" },
+            { column: "age", operator: ">=" as WhereFilterOp, value: 18 },
+            { column: "id", operator: "in" as WhereFilterOp, value: [] }
+        ];
+
+        const { fetch } = await listWith(wireFor(conditions));
+
+        expect(logicalOf(fetch)).toEqual({
+            type: "or",
+            conditions: [
+                { column: "deleted_at", operator: "is-null", value: null },
+                { column: "author.name", operator: "==", value: "bob" },
+                { column: "age", operator: ">=", value: "18" },
+                { column: "id", operator: "in", value: [] }
+            ]
+        });
+    });
+
+    it("keeps a comma inside a scalar out of the group split", async () => {
+        const { fetch } = await listWith(wireFor([
+            { column: "name", operator: "==" as WhereFilterOp, value: "Doe, John" }
+        ]));
+
+        expect(logicalOf(fetch)).toEqual({
+            type: "or",
+            conditions: [{ column: "name", operator: "==", value: "Doe, John" }]
+        });
     });
 });

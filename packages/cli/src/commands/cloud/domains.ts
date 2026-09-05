@@ -19,7 +19,7 @@ import {
     displayProjectRef,
     parseCloudArgs,
     emit,
-    emitHelp,
+    printGroupHelp,
     confirmDestructive,
     keyValues,
     success,
@@ -96,7 +96,7 @@ export async function domainsCommand(action: string | undefined, rawArgs: string
             printDomainsHelp();
             break;
         default:
-            fail(`Unknown domains command: ${action}`, "Try `rebase cloud domains --help`.");
+            fail(`Unknown domains command: ${action}`, "Run `rebase cloud domains --help`.", "unknown_command");
     }
 }
 
@@ -253,19 +253,23 @@ projectId }
 }
 
 export function printDomainsHelp(): void {
-    emitHelp("domains", ["list", "add", "verify", "remove"], () => {
-        console.log(`
-${chalk.bold("rebase cloud domains")} — Custom domain
-
-${chalk.green.bold("Commands")}
-  ${chalk.blue.bold("list")}                      Show the domain + DNS records
-  ${chalk.blue.bold("add")} ${chalk.gray("<domain>")}              Register a custom domain
-  ${chalk.blue.bold("verify")}                    Check DNS and go live
-  ${chalk.blue.bold("remove")} ${chalk.gray("[-y]")}               Detach the custom domain
-
-${chalk.green.bold("Options")}
-  ${chalk.blue("--json")}                    Machine-readable output
-  ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
-`);
+    printGroupHelp({
+        command: "cloud domains",
+        title: "Custom domain",
+        actions: [
+            { action: "list",
+description: "Show the domain and the DNS records it needs" },
+            { action: "add",
+args: "<domain>",
+description: "Register a custom domain" },
+            { action: "verify",
+description: "Check DNS and go live" },
+            { action: "remove",
+description: "Detach the custom domain" }
+        ],
+        notes: [
+            "A CNAME is invalid at a zone apex: use an A record there and a CNAME below it.",
+            "`list` prints the exact records to add — copy them rather than deriving them."
+        ]
     });
 }

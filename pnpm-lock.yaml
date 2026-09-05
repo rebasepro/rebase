@@ -464,10 +464,10 @@ importers:
         specifier: ^3.0.2
         version: 3.0.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react:
-        specifier: '>=19.2.7'
+        specifier: ^19.2.7
         version: 19.2.8
       react-dom:
-        specifier: '>=19.2.7'
+        specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)
       react-i18next:
         specifier: ^17.0.11
@@ -768,10 +768,10 @@ importers:
         specifier: ^1.42.2
         version: 1.42.2
       react:
-        specifier: '>=19.2.7'
+        specifier: ^19.2.7
         version: 19.2.8
       react-dom:
-        specifier: '>=19.2.7'
+        specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)
       react-dropzone:
         specifier: ^19.1.1
@@ -838,11 +838,11 @@ importers:
         specifier: workspace:*
         version: link:../types
       react:
-        specifier: ^19.0.0
-        version: 19.2.7
+        specifier: ^19.2.7
+        version: 19.2.8
       react-dom:
-        specifier: ^19.0.0
-        version: 19.2.7(react@19.2.7)
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
     devDependencies:
       '@types/jest':
         specifier: ^30.0.0
@@ -1003,10 +1003,10 @@ importers:
         specifier: ^7.5.0
         version: 7.5.0
       react:
-        specifier: '>=19.0.0'
+        specifier: ^19.2.7
         version: 19.2.8
       react-dom:
-        specifier: '>=19.0.0'
+        specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)
       react-router:
         specifier: '>=8.3.0 <9'
@@ -1073,11 +1073,11 @@ importers:
         specifier: 6.0.2
         version: 6.0.2
       react:
-        specifier: '>=19.0.0'
-        version: 19.2.7
+        specifier: ^19.2.7
+        version: 19.2.8
       react-dom:
-        specifier: '>=19.0.0'
-        version: 19.2.7(react@19.2.7)
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
     devDependencies:
       '@jest/globals':
         specifier: ^30.4.1
@@ -1187,10 +1187,10 @@ importers:
         specifier: workspace:*
         version: link:../utils
       react:
-        specifier: '>=19.2.7'
+        specifier: ^19.2.7
         version: 19.2.8
       react-dom:
-        specifier: '>=19.2.7'
+        specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)
       react-router:
         specifier: '>=8.3.0 <9'
@@ -1254,11 +1254,11 @@ importers:
         specifier: workspace:*
         version: link:../ui
       react:
-        specifier: '>=19.0.0'
-        version: 19.2.7
+        specifier: ^19.2.7
+        version: 19.2.8
       react-dom:
-        specifier: '>=19.0.0'
-        version: 19.2.7(react@19.2.7)
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ^7.0.0
@@ -1589,10 +1589,10 @@ importers:
         specifier: ^2.4.1
         version: 2.4.1(react@19.2.8)
       react:
-        specifier: '>=19.2.7'
+        specifier: ^19.2.7
         version: 19.2.8
       react-dom:
-        specifier: '>=19.2.7'
+        specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)
       react-dropzone:
         specifier: ^19.1.1
@@ -1746,10 +1746,10 @@ importers:
         specifier: ^14.3.0
         version: 14.3.0
       react:
-        specifier: '>=19.0.0'
+        specifier: ^19.2.7
         version: 19.2.8
       react-dom:
-        specifier: '>=19.0.0'
+        specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)
       react-dropzone:
         specifier: ^19.1.1
@@ -10267,11 +10267,6 @@ packages:
     peerDependencies:
       react: ^17.0.0 || ^18.0.0 || ^19.0.0 || ^0.0.0-experimental
 
-  react-dom@19.2.7:
-    resolution: {integrity: sha512-t0BRVXvbiE/o20Hfw669rLbMCDWtYZLvmJigy2f0MxsXF+71pxhR3xOkspmsO8h3ZlNzyibAmtCa3l4lYKk6gQ==}
-    peerDependencies:
-      react: ^19.2.7
-
   react-dom@19.2.8:
     resolution: {integrity: sha512-rVprimfGBG3DR+Tq0IQG2DT5PxKth1WIGDmj5yPmlzr4YBe7uyE+Du4oVqTDXZSHGGGXRtTJEGSSePyQCMBglQ==}
     peerDependencies:
@@ -10380,10 +10375,6 @@ packages:
     peerDependencies:
       react: ^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^15.0.0 || ^16.0.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-
-  react@19.2.7:
-    resolution: {integrity: sha512-HNe9WslTbXmFK8o8cmwgAeJFSBvt1bPdHCVKtaaV+WlAN36mpT4hcRpwbf3fY56ar2oIXzsBpOAiIRHAdY0OlQ==}
-    engines: {node: '>=0.10.0'}
 
   react@19.2.8:
     resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
@@ -21301,11 +21292,6 @@ snapshots:
     dependencies:
       react: 19.2.8
 
-  react-dom@19.2.7(react@19.2.7):
-    dependencies:
-      react: 19.2.7
-      scheduler: 0.27.0
-
   react-dom@19.2.8(react@19.2.8):
     dependencies:
       react: 19.2.8
@@ -21396,8 +21382,6 @@ snapshots:
       memoize-one: 5.2.1
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
-
-  react@19.2.7: {}
 
   react@19.2.8: {}
 

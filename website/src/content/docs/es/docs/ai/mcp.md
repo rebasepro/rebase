@@ -1,7 +1,7 @@
 ---
 title: Servidor MCP
 sidebar_label: Servidor MCP
-description: Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto Rebase — las 40 herramientas que expone, la credencial con la que se autentica y la compuerta loopback que se interpone entre un agente y producción.
+description: Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto Rebase — las 41 herramientas que expone, la credencial con la que se autentica y la compuerta loopback que se interpone entre un agente y producción.
 ---
 
 `@rebasepro/mcp` es un servidor del [Model Context Protocol](https://modelcontextprotocol.io)
@@ -15,45 +15,84 @@ ningún llamador remoto al que autenticar. Esa es la parte segura. Las preguntas
 interesantes giran en torno a lo que hace *una vez* que está en ejecución, y esta
 página las responde antes de mostrarte el bloque de configuración.
 
-## Conectar un cliente
+## Conexión de un cliente
 
-El servidor está publicado en npm y no necesita ningún paso de instalación; `npx` lo obtiene.
+El servidor está publicado en npm y no necesita instalación; `npx` lo descarga.
+Cada bloque de abajo es la integración completa.
 
-Para **Claude Code**, agrégalo a `.mcp.json` en la raíz de tu proyecto:
+**Claude Code** — `.mcp.json` en la raíz de tu proyecto. `rebase init` escribe este archivo por ti:
 
 ```json title=".mcp.json"
 {
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
-      "env": {
-        "REBASE_PROJECT_DIR": "/absolute/path/to/your/project"
-      }
+      "args": ["-y", "@rebasepro/mcp"]
     }
   }
 }
 ```
 
-**Cursor** utiliza la misma estructura en `.cursor/mcp.json`, y **Gemini CLI** en
-`.gemini/settings.json`. Cualquier cliente MCP que pueda generar un servidor stdio funciona;
-el bloque anterior es toda la integración.
+**Cursor** — la misma forma, en `.cursor/mcp.json`:
+
+```json title=".cursor/mcp.json"
+{
+  "mcpServers": {
+    "rebase": {
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"]
+    }
+  }
+}
+```
+
+**Gemini CLI** — `.gemini/settings.json`, bajo la misma clave:
+
+```json title=".gemini/settings.json"
+{
+  "mcpServers": {
+    "rebase": {
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"]
+    }
+  }
+}
+```
+
+**Codex CLI** — TOML en lugar de JSON, en `~/.codex/config.toml`. Es a nivel de usuario, no por proyecto, así que indica aquí el directorio del proyecto:
+
+```toml title="~/.codex/config.toml"
+[mcp_servers.rebase]
+command = "npx"
+args = ["-y", "@rebasepro/mcp"]
+env = { REBASE_PROJECT_DIR = "/absolute/path/to/your/project" }
+```
+
+**Kiro** — `.kiro/settings/mcp.json`:
+
+```json title=".kiro/settings/mcp.json"
+{
+  "mcpServers": {
+    "rebase": {
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"]
+    }
+  }
+}
+```
+
+Funciona cualquier cliente MCP capaz de lanzar un servidor stdio; la forma es la misma.
+
+### Sobre qué directorio actúa
 
 `REBASE_PROJECT_DIR` debe ser el directorio que contiene `rebase.json`. Si lo
-omites, el servidor utiliza su directorio de trabajo, que será en el que el cliente
-lo haya generado.
+omites, el servidor usa su directorio de trabajo, que para un archivo de
+configuración a nivel de proyecto es el propio proyecto — por eso solo lo define
+el bloque de Codex, que es a nivel de usuario.
 
-### Configuración
-
-| Variable | Por defecto | Descripción |
-|---|---|---|
-| `REBASE_PROJECT_DIR` | `process.cwd()` | Raíz del proyecto — utilizada para encontrar colecciones, `.env` y el estado del servidor de desarrollo |
-| `REBASE_BASE_URL` | `http://localhost:3001` | URL del backend |
-| `REBASE_API_TOKEN` / `REBASE_TOKEN` | *(vacío)* | El token utilizado para cada llamada a la API |
-| `REBASE_MCP_ALLOW_REMOTE_WRITES` | `false` | Eximir a las herramientas destructivas de la compuerta loopback |
-
-El servidor carga `.env` desde `$REBASE_PROJECT_DIR/.env` o
-`$REBASE_PROJECT_DIR/app/.env` al iniciar.
+Si lo defines, gana: el entorno reconstruye el proyecto `default` en cada
+arranque, así que una ruta absoluta en una configuración de usuario tiene
+prioridad sobre lo que recuerde `~/.rebase/projects.json`.
 
 ## A qué puede acceder el servidor
 
@@ -197,10 +236,10 @@ ese destino esté en la interfaz loopback.** La compuerta está diseñada como u
 lista de lo que *no* está bloqueado, por lo que una herramienta agregada más
 adelante estará protegida por defecto.
 
-- **No bloqueadas — lecturas:** `rebase_schema_introspect`, `rebase_doctor`,
+- **No bloqueadas — lecturas:** `rebase_schema_plan`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
-  `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
+  `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`.
 - **No bloqueadas — solo locales:** `rebase_schema_generate`, `rebase_db_generate`,
   `rebase_generate_sdk`, las herramientas del servidor de desarrollo y las herramientas
@@ -270,13 +309,17 @@ y remotos. Mientras `rebase dev` está en ejecución, el servidor lee el puerto 
 y la clave de servicio desde `.rebase/state.json` en el directorio del proyecto, que
 es lo que hace que el caso local funcione sin configuración previa.
 
-:::note[`REBASE_PROJECT_DIR` solo inicializa el registro una vez]
-La variable de entorno crea el proyecto `default` **solo si el registro aún no tiene
-una entrada `default`**. Una vez que `~/.rebase/projects.json` existe, cambiar
-`REBASE_PROJECT_DIR` no tiene efecto en un `default` ya registrado, y el `activeProject`
-del registro es a lo que las herramientas realmente apuntan. Si un asistente parece
-estar leyendo la base de datos equivocada, llama primero a `rebase_project_current`
-—casi siempre se debe a esto.
+:::note[El bloque de entorno tiene prioridad sobre el registro]
+`REBASE_PROJECT_DIR`, `REBASE_BASE_URL` y `REBASE_API_TOKEN` reconstruyen el
+proyecto `default` **en cada arranque**, no solo en el primero. La reconstrucción
+afecta a toda la entrada: un token registrado para el `projectDir` anterior se
+descarta en lugar de trasladarse a un directorio para el que nunca se emitió.
+
+El `default` persistido solo se usa cuando la configuración del cliente no define
+ninguna de las tres variables. `activeProject` sigue siendo persistente: si una
+sesión anterior llamó a `rebase_project_switch`, las herramientas apuntan a ese
+proyecto y el servidor lo indica por stderr. Si un asistente parece estar leyendo
+la base de datos equivocada, ejecuta primero `rebase_project_current`.
 :::
 
 Los tokens se almacenan en ese registro **en texto plano**. Es un archivo en tu directorio
@@ -285,15 +328,16 @@ registrado; trátalo como corresponde.
 
 ## Referencia de herramientas
 
-40 herramientas, en ocho grupos. Las herramientas marcadas con ⚠ son rechazadas contra
+41 herramientas, en ocho grupos. Las herramientas marcadas con ⚠ son rechazadas contra
 destinos no locales a menos que desactives esta protección.
 
-### Esquema y base de datos (11)
+### Esquema y base de datos (12)
 
 Ejecutan la CLI de Rebase en el directorio del proyecto activo.
 
 | Herramienta | Requerido | Descripción |
 |---|---|---|
+| `rebase_schema_plan` | — | Muestra el SQL que ejecutaría `rebase_db_push`, sin ejecutar nada |
 | `rebase_schema_generate` | — | Genera el esquema Drizzle a partir de las definiciones de colecciones |
 | `rebase_db_push` ⚠ | — | Aplica el esquema directamente a la base de datos (atajo para desarrollo) |
 | `rebase_schema_introspect` | — | Realiza introspección de la base de datos en vivo hacia definiciones de colecciones |
@@ -336,10 +380,10 @@ meramente "aditivas".
 | Herramienta | Requerido | Descripción |
 |---|---|---|
 | `storage_list_objects` | — | Lista objetos almacenados |
-| `storage_get_metadata` | `key` | Metadatos más una URL temporal firmada de descarga |
+| `storage_get_download_url` | `key` | Una URL de descarga firmada temporal y su caducidad — no metadatos del objeto |
 | `storage_delete_object` ⚠ | `key` | Elimina un objeto |
 
-`storage_get_metadata` está clasificada como lectura porque no cambia el entorno,
+`storage_get_download_url` se clasifica como lectura porque no cambia
 pero la URL firmada que genera es una capacidad al portador que sobrevive a la
 llamada de la herramienta.
 
@@ -403,11 +447,12 @@ Las colecciones se descubren desde `app/config/collections/`,
 `config/collections/` o `collections/` bajo el directorio del proyecto activo
 —la que exista.
 
-`rebase://schema` se lista **solo si** el esquema generado se encuentra exactamente
-en `app/backend/src/schema.generated.ts`. Esa es una única ruta fija sin alternativas,
-por lo que un proyecto organizado de manera diferente —o uno que aún no haya ejecutado
-`rebase schema generate`— simplemente no verá el recurso ofrecido. Si falta y lo
-esperabas, verifica la ruta antes de concluir que el servidor está roto.
+`rebase://schema` se lista **solo si** el esquema generado existe.
+`findBackendDir` busca `backend/` y luego `app/backend/` bajo el directorio del
+proyecto activo, y lee `src/schema.generated.ts` del que encuentre — así que
+funcionan tanto el layout del scaffold como el de este monorepo. Un proyecto
+organizado de una tercera forma, o que aún no ha ejecutado
+`rebase schema generate`, sencillamente no verá el recurso ofrecido.
 
 ## Configuración recomendada
 

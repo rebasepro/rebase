@@ -9,7 +9,7 @@ Rebase fournit quatre éléments distincts pour les assistants IA, et ils répon
 
 | | Ce que c'est | Qui le consomme |
 |---|---|---|
-| [**Serveur MCP**](/docs/ai/mcp) | Un serveur stdio Model Context Protocol avec 40 outils couvrant votre schéma, vos données, utilisateurs, stockage, cron et serveur de dev | Un assistant, au runtime |
+| [**Serveur MCP**](/docs/ai/mcp) | Un serveur stdio Model Context Protocol avec 41 outils couvrant votre schéma, vos données, utilisateurs, stockage, cron et serveur de dev | Un assistant, au runtime |
 | [**Compétences d'agent**](/docs/ai/skills) | 20 fichiers de compétences Markdown écrits dans votre dépôt par `rebase skills install` | Un assistant, en tant que documentation de référence |
 | [**Fichiers d'instructions**](/docs/ai/instruction-files) | `ai-instructions.md` ainsi que des fichiers pointeurs par assistant, générés par `rebase init` | Un assistant, en tant que règles permanentes |
 | [**Clés d'API**](/docs/backend/api#api-keys) | Identifiants machine délimités, par collection et par opération | Tout ce qui appelle l'API HTTP |
@@ -98,7 +98,7 @@ Il s'agit d'un mécanisme différent et les deux n'interagissent pas.
 ## Où aller ensuite
 
 - [Serveur MCP](/docs/ai/mcp) — connecter Claude Code, Cursor ou tout client MCP
-- [Compétences d'agent](/docs/ai/skills) — `rebase skills install` et les 20 compétences
+- [Compétences d'agent](/docs/ai/skills) — `rebase skills install` et les 21 compétences
 - [Fichiers d'instructions IA](/docs/ai/instruction-files) — le modèle de règles échafaudées
 
 ---

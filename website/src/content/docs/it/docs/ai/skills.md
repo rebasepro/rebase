@@ -22,14 +22,28 @@ rebase skills install --agent claude,cursor
 rebase skills install --agent all
 ```
 
-Sono supportate quattro destinazioni:
+Sono supportate sette destinazioni, una per ogni file puntatore scritto da `rebase init`:
 
 | `--agent` | Assistente | Scritto in |
 |---|---|---|
-| `cursor` | Cursor | `.cursor/rules/<skill>.mdc` |
+| `cursor` | Cursor | `.cursor/rules/rebase.mdc` + `.cursor/rules/<skill>/SKILL.md` |
 | `claude` | Claude Code | `.claude/skills/<skill>/SKILL.md` |
-| `windsurf` | Windsurf | `.windsurf/rules/<skill>.md` |
+| `windsurf` | Windsurf | `.windsurf/rules/rebase.md` + `.windsurf/rules/<skill>/SKILL.md` |
 | `gemini` | Gemini CLI / Antigravity | `.agents/skills/<skill>/SKILL.md` |
+| `codex` | Codex CLI | `.codex/skills/<skill>/SKILL.md` |
+| `kiro` | Kiro | `.kiro/steering/rebase.md` + `.kiro/steering/<skill>/SKILL.md` |
+| `copilot` | GitHub Copilot | `.github/instructions/rebase.instructions.md` + `<skill>/SKILL.md` |
+
+:::note[Cursor, Windsurf, Kiro e Copilot ricevono un solo file sempre attivo]
+Questi quattro caricano l'intera directory delle regole a ogni richiesta. Un
+file di regole per skill significava circa **84.000 caratteri** di riferimento
+Rebase davanti a ogni domanda, anche quando non riguardava Rebase — e
+un'istruzione che un assistente scorre è un'istruzione che non segue.
+
+Ricevono invece `rebase.mdc` (o `rebase.md`): un indice di circa 3 KB con
+`alwaysApply: true`, che elenca cosa copre ogni skill e il file da leggere. I
+corpi restano in sottodirectory per skill e vengono aperti su richiesta.
+:::
 
 `gemini` copre **sia** Gemini CLI che Antigravity — leggono la stessa directory `.agents/`, quindi non esiste un valore separato `antigravity`.
 
@@ -88,7 +102,7 @@ Due di queste richiedono di essere lette spontaneamente. `rebase-basics` specifi
 ```text
   Found 21 Rebase skills
 
-  ✓ Claude Code — 21 skills installed (+ 1 reference file) to .claude/skills
+  ✓ Claude Code — 21 skills installed (+ 8 reference files) to .claude/skills
 ```
 
 Le skill vengono distribuite tramite il pacchetto `@rebasepro/agent-skills`, dal quale dipende la CLI, quindi il set ottenuto corrisponde alla versione della CLI installata.

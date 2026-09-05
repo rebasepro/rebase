@@ -34,133 +34,113 @@ The failures that make a Postgres database leak in practice, rather than the one
 A scan of a Supabase project, `--no-color`:
 
 ```
-rls-check 0.10.0  ·  read-only Row-Level Security audit
-────────────────────────────────────────────────────────────────────────────
+rls-check 0.17.3  ·  read-only Row-Level Security audit
+────────────────────────────────────────────────────────────────────────────────────────
 
 Database  db.hjklqwertyuiop.supabase.co:5432/postgres
 Server    PostgreSQL 15.8 on aarch64-unknown-linux-gnu
 Platform  Supabase
-Scanned   1 schema · 23 tables · 31 policies · 15 checks
+Exposed   PUBLIC, anon, authenticated (add yours with --role)
+Scanned   1 schema · 3 tables · 2 policies · 15 checks
 
 Note  This scan connected as a role that row-level security cannot constrain — a
-      superuser, a table owner, or a role with BYPASSRLS. That is why it can read
-      the true catalog, and it is also why nothing below describes what this
-      connection experiences. The findings are about what OTHER roles get.
+      superuser, a table owner, or a role with BYPASSRLS. That is why it can read the
+      true catalog, and it is also why nothing below describes what this connection
+      experiences. The findings are about what OTHER roles get.
 
-CRITICAL  ·  2 findings
-────────────────────────────────────────────────────────────────────────────
+CRITICAL  ·  3 findings
+────────────────────────────────────────────────────────────────────────────────────────
+
+  [critical] policy-always-true  public.contact_messages · policy "anyone can write"
+      Policy "anyone can write" on public.contact_messages is WITH CHECK (true) for anon
+
+      This permissive INSERT policy's WITH CHECK expression is a constant truth, so it
+      matches every row for anon. Permissive policies are ORed together, so this one
+      alone satisfies the table's row filter no matter how strict the others are.
+      Impact  If this table is reachable over an API as anon, a caller can act on every
+              row — the policy applies no scoping whatsoever.
+      Fix
+          -- Replace the constant with the scoping you intended, e.g.:
+          ALTER POLICY "anyone can write" ON "public"."contact_messages"
+              WITH CHECK (user_id = auth.uid());
+          -- or, if unconditional access really is intended, drop the policy and say so
+          -- with an explicit grant instead:
+          -- DROP POLICY "anyone can write" ON "public"."contact_messages";
+      Docs    https://rebase.pro/docs/rls-check#policy-always-true
 
   [critical] rls-disabled  public.profiles
-      public.profiles is exposed to anon without row-level security
+      public.profiles has row-level security disabled and is granted to anon and
+      authenticated
 
-      Row-level security is disabled on this table, and anon holds SELECT, INSERT,
-      UPDATE and DELETE on it. With RLS off, policies are not consulted at all — a
-      policy defined on this table would have no effect.
-      Impact  Anyone with the project's anon key, which ships in your client bundle,
-              can read and modify every row.
+      Row-level security is not enabled on this table, so Postgres applies no per-row
+      filter at all — policies, if any exist, are never consulted. anon and
+      authenticated hold DELETE, INSERT, SELECT and UPDATE on it.
+      Impact  If this table is reachable over an API that connects as anon and
+              authenticated, a caller can read every row and delete, insert and update
+              any row, with no tenant or owner scoping.
       Fix
-          ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-          ALTER TABLE public.profiles FORCE ROW LEVEL SECURITY;
-
-          -- Then add at least one policy, or the table denies everything:
-          CREATE POLICY profiles_select_own ON public.profiles
-              FOR SELECT TO authenticated USING (id = auth.uid());
+          ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
+          -- Enabling RLS with no policies denies every row to everyone but the owner,
+          -- so add the policy you intend in the same migration, for example:
+          -- CREATE POLICY "profiles_owner_select" ON "public"."profiles"
+          --     FOR SELECT TO "anon" USING (user_id = auth.uid());
       Docs    https://rebase.pro/docs/rls-check#rls-disabled
 
   [critical] view-bypasses-rls  public.user_stats
-      public.user_stats reads past the row-level security on public.profiles
+      View public.user_stats reads public.orders without security_invoker and is
+      readable by anon
 
-      The view is granted to anon and does not set security_invoker, so it executes
-      with the privileges of its owner (postgres) rather than the caller's. The
-      policies on public.profiles never run.
-      Impact  An anon caller selecting from the view receives every row of
-              public.profiles, whatever its policies say.
+      The view is owned by postgres and `security_invoker` is not set, so its query
+      executes with postgres's privileges rather than the caller's. Row-level security
+      on public.orders is evaluated for postgres, not for the role that selected from
+      the view.
+      Impact  If this view is reachable over an API as anon, a caller reads rows from
+              public.orders that the policies on that table were written to withhold —
+              the view is an unfiltered path around them.
       Fix
-          ALTER VIEW public.user_stats SET (security_invoker = true);
+          ALTER VIEW "public"."user_stats" SET (security_invoker = true);
+          -- Callers then need their own SELECT privilege on public.orders, and the
+          -- policies there apply to them.
       Docs    https://rebase.pro/docs/rls-check#view-bypasses-rls
 
 HIGH  ·  1 finding
-────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────────────
 
   [high] anonymous-write-allowed  public.contact_messages · policy "anyone can write"
-      public.contact_messages accepts inserts from anon under policy "anyone can
+      public.contact_messages accepts unauthenticated insert via policy "anyone can
       write"
 
-      The policy is PERMISSIVE, applies to INSERT, names anon in its TO clause, and
-      its WITH CHECK expression is `true`, so every proposed row passes.
-      Impact  Anyone holding the anon key can insert unlimited rows. There is no
-              rate limit at the database layer.
+      Policy "anyone can write" is a permissive INSERT policy for anon, and its check
+      expression is a constant truth, so every row satisfies it. anon also holds INSERT
+      on the table, so both the privilege check and the row check pass for a request
+      that carries no credentials.
+      Impact  An unauthenticated caller reaching this database over an API can insert
+              rows in public.contact_messages at will — inserting records attributed to
+              other users, or modifying rows they do not own.
       Fix
-          ALTER POLICY "anyone can write" ON public.contact_messages
-              WITH CHECK (created_by = auth.uid() AND length(body) < 4000);
+          -- Scope the write to the caller, or take the privilege away entirely:
+          ALTER POLICY "anyone can write" ON "public"."contact_messages"
+              WITH CHECK (user_id = auth.uid());
+          -- and if anonymous writes are never intended:
+          REVOKE INSERT ON "public"."contact_messages" FROM "anon";
       Docs    https://rebase.pro/docs/rls-check#anonymous-write-allowed
 
-MEDIUM  ·  2 findings
-────────────────────────────────────────────────────────────────────────────
-
-  [medium] grant-to-public  public.feature_flags
-      public.feature_flags grants SELECT to PUBLIC
-
-      PUBLIC is every role in the cluster, including roles created after this grant.
-      The grant survives changes to anon and authenticated.
-      Impact  Any role that can connect can read this table, whether or not you
-              intended it to be reachable.
-      Fix
-          REVOKE SELECT ON public.feature_flags FROM PUBLIC;
-          GRANT SELECT ON public.feature_flags TO authenticated;
-      Docs    https://rebase.pro/docs/rls-check#grant-to-public
-
-  [medium] rls-enabled-not-forced  public.orders
-      public.orders does not force row-level security for its owner
-
-      RLS is enabled but not FORCEd, so the table's owner (postgres) is exempt from
-      its own policies. Any SECURITY DEFINER function owned by that role reads the
-      table unfiltered.
-      Impact  A trigger, a scheduled job, or an RPC running as the owner sees every
-              tenant's rows even though the policies say otherwise.
-      Fix
-          ALTER TABLE public.orders FORCE ROW LEVEL SECURITY;
-      Docs    https://rebase.pro/docs/rls-check#rls-enabled-not-forced
-
-WORTH CHECKING
-  These are heuristics, not proofs. They match a shape that is usually a mistake,
-  but each one may be deliberate in your schema — read them and decide. They are
-  listed separately so nothing above needs a second opinion.
-
-  [high] junction-table-unprotected  public.project_members
-      public.project_members looks like a join table between two protected tables
-      and has no RLS
-
-      The table is two foreign keys and a primary key over both, pointing at
-      public.projects and public.profiles — both of which have row-level security.
-      This one does not.
-      Impact  If this table is exposed over an API, the full membership graph is
-              readable: who belongs to which project, for every project.
-      Fix
-          ALTER TABLE public.project_members ENABLE ROW LEVEL SECURITY;
-          ALTER TABLE public.project_members FORCE ROW LEVEL SECURITY;
-
-          CREATE POLICY project_members_follows_project ON public.project_members
-              FOR SELECT TO authenticated USING (EXISTS (
-                  SELECT 1 FROM public.projects p
-                  WHERE p.id = project_members.project_id AND p.owner_id = auth.uid()
-              ));
-      Docs    https://rebase.pro/docs/rls-check#junction-table-unprotected
-
-────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────────────
 Summary
 
-  critical 2   high 2   medium 2   low 1   info 0
-  5 confirmed · 2 worth checking · 15 checks run against 23 tables in 1 schema
-  3 of 23 tables have row-level security disabled
+  critical 3   high 1   medium 0   low 0   info 0
+  4 confirmed · 0 worth checking · 15 checks run against 3 tables in 1 schema
+  1 of 3 tables have row-level security disabled
 
   Exit code 1 — at least one finding is "high" or worse (--fail-on high).
-  Scanned 2026-07-26T09:14:02.881Z · read-only, and nothing left this machine.
+  Scanned 2026-09-05T09:14:02.881Z · read-only, and nothing left this machine.
 
 rls-check is free and maintained by the team behind Rebase — https://rebase.pro
 ```
 
-Heuristic findings are always kept in their own section, after the confident ones. Mixing "this table is public" with "this might be a join table" is how a scanner teaches people to ignore it.
+That run found nothing heuristic. When it does, the heuristic findings go in a `WORTH CHECKING` section of their own, after the confident ones — mixing "this table is public" with "this might be a join table" is how a scanner teaches people to ignore it.
+
+The `Exposed` line is worth reading before the findings: every check reports a table only when one of those roles can reach it, so if the role your application connects as is not listed, name it with `--role` and run again.
 
 ## The checks
 
@@ -193,9 +173,12 @@ DATABASE_URL="postgresql://..." npx @rebasepro/rls-check [options]
 npx @rebasepro/rls-check [connection-string] [options]
 
   --json                 Machine-readable ScanResult on stdout, and nothing else.
+  --html <path>          Also write a self-contained HTML report to <path>. One file,
+                         no network requests, safe to attach to a ticket.
   --schema <name>        Restrict the scan to a schema. Repeatable or comma-separated.
   --role <name>          Treat this role as one an untrusted caller arrives as, in
                          addition to anon, authenticated, web_anon and rebase_user.
+                         A name that is not in pg_roles is an error, not a no-op.
                          Repeatable or comma-separated.
   --fail-on <severity>   Exit 1 at or above this severity: info, low, medium, high,
                          critical, or none to never fail. Default: high.
@@ -219,7 +202,9 @@ The connection string is taken from, in order:
 
 The connection string never appears in the output — not in the report, not in an error, not in a log line. Host, port and database name are shown; the user and password are replaced with `***`.
 
-If your password contains `@`, `:`, `/`, `?` or `#`, percent-encode it. An unencoded one makes the URL ambiguous, and `rls-check` refuses to guess rather than risk connecting somewhere unintended.
+If your password contains `/`, `?` or `#`, percent-encode it. Those three end the URL's authority section, so the split lands inside the credential — and rather than print fragments of a password, `rls-check` refuses the string and says so.
+
+`@` and `:` need no encoding here: the userinfo is split at the **last** `@` and the user at the **first** `:`, which is what `pg` does too, so `postgresql://user:pa@ss@host:5432/db` connects to `host` with the password `pa@ss`. Encoding them anyway is never wrong.
 
 ## Exit codes
 
@@ -265,35 +250,76 @@ To keep the machine-readable result as an artifact:
 
 ```json
 {
-  "scannedAt": "2026-07-26T09:14:02.881Z",
-  "database": { "host": "db.hjklqwertyuiop.supabase.co", "name": "postgres" },
+  "scannedAt": "2026-09-05T09:14:02.881Z",
+  "database": {
+    "host": "db.hjklqwertyuiop.supabase.co",
+    "name": "postgres"
+  },
   "serverVersion": "PostgreSQL 15.8 on aarch64-unknown-linux-gnu",
   "platform": "supabase",
   "scannerIsPrivileged": true,
+  "exposedRoles": [
+    "PUBLIC",
+    "anon",
+    "authenticated"
+  ],
   "stats": {
     "schemas": 1,
-    "tables": 23,
-    "policies": 31,
-    "tablesWithoutRls": 3,
-    "checksRun": 14
+    "tables": 1,
+    "policies": 0,
+    "tablesWithoutRls": 1,
+    "checksRun": 15
   },
   "findings": [
     {
       "id": "rls-disabled",
       "severity": "critical",
-      "title": "public.profiles is exposed to anon without row-level security",
-      "target": { "schema": "public", "table": "profiles" },
-      "detail": "…",
-      "impact": "…",
-      "fix": "ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;",
-      "docs": "https://rebase.pro/docs/rls-check#rls-disabled",
-      "confidence": "certain"
+      "confidence": "certain",
+      "title": "public.profiles has row-level security disabled and is granted to anon",
+      "target": {
+        "schema": "public",
+        "table": "profiles"
+      },
+      "detail": "Row-level security is not enabled on this table, so Postgres applies no per-row filter at all — policies, if any exist, are never consulted. anon holds DELETE, INSERT, SELECT and UPDATE on it.",
+      "impact": "If this table is reachable over an API that connects as anon, a caller can read every row and delete, insert and update any row, with no tenant or owner scoping.",
+      "fix": "ALTER TABLE \"public\".\"profiles\" ENABLE ROW LEVEL SECURITY;\n-- Enabling RLS with no policies denies every row to everyone but the owner,\n-- so add the policy you intend in the same migration, for example:\n-- CREATE POLICY \"profiles_owner_select\" ON \"public\".\"profiles\"\n--     FOR SELECT TO \"anon\" USING (user_id = auth.uid());",
+      "docs": "https://rebase.pro/docs/rls-check#rls-disabled"
     }
-  ]
+  ],
+  "diagnostics": {
+    "tlsVerificationDisabled": false,
+    "excludedSchemas": [
+      {
+        "schema": "auth",
+        "reason": "platform"
+      },
+      {
+        "schema": "information_schema",
+        "reason": "system"
+      },
+      {
+        "schema": "pg_catalog",
+        "reason": "system"
+      },
+      {
+        "schema": "pg_toast",
+        "reason": "system"
+      },
+      {
+        "schema": "storage",
+        "reason": "platform"
+      }
+    ],
+    "degraded": [],
+    "unrecognizedGrantees": [],
+    "scanningAsExposedRole": null
+  }
 }
 ```
 
 Findings are sorted worst-first and then by schema, object and id, so two scans of an unchanged database produce an identical file.
+
+`exposedRoles` and `diagnostics` are part of the contract, not decoration. Every check reports a table only when one of the exposed roles can reach it, and `diagnostics.degraded` is how a consumer tells "nothing was wrong" from "the scan could not look" — `findings: []` without both is half an answer.
 
 ## What this tool does not do
 

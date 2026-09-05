@@ -117,7 +117,7 @@ grep -n "AUTH_SCHEMA_VERSION =" packages/server-postgres/src/auth/schema-version
 | 2 | `BUNDLE_FORMAT_VERSION` | `packages/types/src/types/project_manifest.ts` | `packages/server/src/boot/bundle.ts` | **backward compatible** — new runtime reads old bundles |
 | 3 | `RUNTIME_CONTRACT_VERSION` | same file | same file | **exact match, both directions** |
 | 4 | `AUTH_SCHEMA_VERSION` | `packages/server-postgres/src/auth/schema-version.ts` | at boot, against `rebase.schema_meta` | **forward only** — new runtime migrates old databases |
-| 5 | `manifest.schemaVersion` | emitted by `rebase build` | sent by the SDK as `x-rebase-schema` | advisory — identifies which schema a client was built against |
+| 5 | `manifest.schemaVersion` | emitted by `rebase build` | sent by the SDK as `x-rebase-schema` when configured | advisory — identifies which schema a client was built against |
 | 6 | Derived database identifiers | `contracts/derived-names.txt` | `pnpm check:derived-names` | **frozen** — a name a release emitted is never re-derived |
 
 ### 1 — `rebase` in `rebase.json`
@@ -182,8 +182,34 @@ and echoed by a generated SDK in the `x-rebase-schema` header
 (`SCHEMA_VERSION_HEADER`). It exists so the platform can say "this app was built
 against an older schema" instead of failing mysteriously at the first request.
 
+`rebase generate-sdk` writes the value into `schema.meta.ts`; pass it to the
+client to send it:
+
+```typescript
+import { SCHEMA_VERSION } from "./generated/sdk/schema.meta";
+
+const rebase = createRebaseClient<Database>({
+    baseUrl: "http://localhost:3001",
+    collections: collectionsDictionary,
+    schemaVersion: SCHEMA_VERSION,
+});
+```
+
 It covers **collections only**. A hook or function edit does not change a
 client's contract and must not invalidate every generated SDK.
+
+### Who is calling
+
+Two more identifying signals, neither of which gates anything on its own:
+
+- **`GET /api/meta/schema-version`** is unauthenticated and answers with the
+  project's `schemaVersion` *and* its `runtime` (`version` and `contract`). A
+  CI job comparing its generated SDK against a live project needs no
+  credentials, and neither does a client asking which runtime it is talking to.
+- **`User-Agent: rebase-cli/<version>`** goes on every `rebase cloud` request.
+  The control plane's wire format runs ahead of what is published to npm, so it
+  needs to be able to answer an old client with `CLI_TOO_OLD` and the minimum
+  version — which it can only do for a caller that says who it is.
 
 ### 6 — Derived database identifiers
 
@@ -299,3 +325,9 @@ backfilled after the fact.
    no version to refuse on, because a column carries no version stamp. The step
    that replaces them is deciding not to make the change — see the section above
    for what the alternative looks like.
+
+## Related
+
+- [Upgrading](/docs/upgrading/) — what actually broke, release by release
+- [Changelog](/docs/changelog/) — every change, including the ones that broke nothing
+- [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) — contract 3 — the bundle format a deployed project is already built against

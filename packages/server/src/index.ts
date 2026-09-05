@@ -285,6 +285,16 @@ export type { Logger } from "./utils/logger";
 // =============================================================================
 export { loadEnv } from "./env";
 export type { RebaseEnv } from "./env";
+/**
+ * The runtime's own Zod instance.
+ *
+ * `loadEnv({ extend })` composes the caller's schema with the framework's, so
+ * the two schemas must come from the same copy of zod: a schema built against
+ * a second, duplicated zod fails the framework's `instanceof` checks and the
+ * extension is silently dropped. Importing `z` from here instead of from
+ * `"zod"` makes that impossible to get wrong, whatever the installer resolved.
+ */
+export { z } from "zod";
 
 // =============================================================================
 // Server-specific types (subscription types)

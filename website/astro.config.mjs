@@ -82,8 +82,37 @@ export default defineConfig({
                         { label: "Quickstart", slug: "docs/getting-started/quickstart" },
                         { label: "Project Structure", slug: "docs/getting-started/project-structure" },
                         { label: "Environment & Configuration", slug: "docs/getting-started/configuration" },
-                        { label: "Upgrading", slug: "docs/upgrading" },
-                        { label: "Compatibility", slug: "docs/compatibility" }
+                        { label: "Troubleshooting", slug: "docs/troubleshooting" },
+                        {
+                            label: "Upgrading",
+                            collapsed: true,
+                            items: [
+                                { label: "Which hop", slug: "docs/upgrading" },
+                                { label: "0.14 → 0.17", slug: "docs/upgrading/0-14-to-0-17" },
+                                { label: "0.13 → 0.14", slug: "docs/upgrading/0-13-to-0-14" },
+                                { label: "0.12 → 0.13", slug: "docs/upgrading/0-12-to-0-13" }
+                            ]
+                        },
+                        { label: "Compatibility", slug: "docs/compatibility" },
+                        // Published, mirrored from the repo root on every
+                        // `generate-all`, linked from the upgrade guide — and
+                        // reachable only by typing the URL until now.
+                        { label: "Changelog", slug: "docs/changelog" }
+                    ]
+                },
+                {
+                    // The BaaS path. Half of what Rebase is has no admin panel
+                    // in it, and until this group existed the only route from
+                    // the landing page to the SDK ran through Frontend pages —
+                    // so a reader who wanted an API over their database was
+                    // reading about React components to get there.
+                    label: "Backend only",
+                    collapsed: false,
+                    items: [
+                        { label: "Headless setup", slug: "docs/getting-started/headless" },
+                        { label: "REST API", slug: "docs/backend/api" },
+                        { label: "Client SDK", slug: "docs/sdk" },
+                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" }
                     ]
                 },
                 {
@@ -103,8 +132,12 @@ export default defineConfig({
                     items: [
                         { label: "Backend Setup", slug: "docs/backend" },
                         { label: "REST API", slug: "docs/backend/api" },
+                        { label: "Error codes", slug: "docs/backend/errors" },
+                        { label: "Endpoint index", slug: "docs/backend/endpoints" },
                         { label: "Live schema editing", slug: "docs/backend/live-schema-editing" },
                         { label: "Authentication", slug: "docs/backend/authentication" },
+                        { label: "Auth endpoints", slug: "docs/backend/auth-endpoints" },
+                        { label: "Custom auth adapters", slug: "docs/backend/auth-adapters" },
                         { label: "Storage Configuration", slug: "docs/backend/storage" },
                         { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },
                         { label: "MongoDB", slug: "docs/backend/mongodb" },
@@ -127,6 +160,7 @@ export default defineConfig({
                         { label: "Frontend Setup", slug: "docs/frontend" },
                         { label: "Extending Rebase", slug: "docs/frontend/extending" },
                         { label: "Styling Custom UI", slug: "docs/frontend/styling" },
+                        { label: "Translations", slug: "docs/frontend/i18n" },
                         { label: "Component Overrides (Swizzling)", slug: "docs/frontend/component-overrides" },
                         { label: "Authentication & Login", slug: "docs/frontend/authentication" },
                         { label: "Storage & File Uploads", slug: "docs/frontend/storage" },
@@ -141,6 +175,18 @@ export default defineConfig({
                         { label: "Data Import & Export", slug: "docs/frontend/data-import-export" },
                         { label: "Plugins", slug: "docs/plugins" },
                         { label: "Hooks Reference", slug: "docs/hooks" }
+                    ]
+                },
+                {
+                    // Studio is a whole half of the panel — schema editor, SQL
+                    // console, policy browser — and it was one entry inside a
+                    // collapsed "CLI & Tooling" group, filed next to the
+                    // commands. Nobody expanding a tooling group is looking for
+                    // the product's developer surface.
+                    label: "Studio",
+                    collapsed: false,
+                    items: [
+                        { label: "Studio Tools", slug: "docs/studio" }
                     ]
                 },
                 {
@@ -181,7 +227,6 @@ export default defineConfig({
                     items: [
                         { label: "CLI Commands", slug: "docs/cli" },
                         { label: "Schema Generation", slug: "docs/cli/schema" },
-                        { label: "Studio", slug: "docs/studio" },
                         { label: "rls-check (RLS audit)", slug: "docs/rls-check" }
                     ]
                 },
@@ -286,7 +331,47 @@ export default defineConfig({
             tailwindcss()
         ],
         resolve: {
-            dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "react-compiler-runtime"],
+            // `@rebasepro/*` is here for the same reason React is, and the symptom
+            // was worse. The aliases below point three packages at their `src`,
+            // so an import of `@rebasepro/types` from inside `packages/cms/src`
+            // and one from `packages/ui/src` reach the same file down two
+            // different symlink chains — and Vite kept them as two modules. The
+            // FieldWidgetPreview island shipped `@rebasepro/types` twice.
+            //
+            // Two copies is normally waste. Here it is a build failure, because
+            // `packages/types` registers resource kinds at module scope against a
+            // registry it hangs off `globalThis` with `Symbol.for`. Two copies
+            // both register `topic`; identical specs are idempotent, so the site
+            // built — until one copy was a stale `dist` whose `topic` had
+            // `envBases: []` and the other a fresh one with
+            // `["REBASE_TOPIC_URL"]`. Then `registerResourceKind` did what it is
+            // supposed to do and refused, and `astro build` died rendering
+            // /de/docs/collections/properties. The failure therefore depended on
+            // how stale someone's `dist` was, which is why it followed no one.
+            dedupe: [
+                "react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "react-compiler-runtime",
+                "@rebasepro/app",
+                "@rebasepro/cli",
+                "@rebasepro/client",
+                "@rebasepro/cms-types",
+                "@rebasepro/cms",
+                "@rebasepro/codegen",
+                "@rebasepro/common",
+                "@rebasepro/firebase",
+                "@rebasepro/forms",
+                "@rebasepro/inference",
+                "@rebasepro/mcp",
+                "@rebasepro/plugin-ai",
+                "@rebasepro/plugin-insights",
+                "@rebasepro/rls-check",
+                "@rebasepro/server-mongo",
+                "@rebasepro/server-postgres",
+                "@rebasepro/server",
+                "@rebasepro/studio",
+                "@rebasepro/types",
+                "@rebasepro/ui",
+                "@rebasepro/utils"
+            ],
             alias: {
                 "@rebasepro/ui": path.resolve(new URL(".", import.meta.url).pathname, "../packages/ui/src"),
                 "@rebasepro/editor": path.resolve(new URL(".", import.meta.url).pathname, "../packages/editor/src"),

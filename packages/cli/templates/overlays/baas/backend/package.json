@@ -15,12 +15,12 @@
         "@hono/node-server": "^2.0.12",
         "pg": "^8.11.3",
         "ws": "^8.16.0",
-        "dotenv": "^16.0.0",
+        "dotenv": "^17.4.2",
         "zod": "^4.4.3"
     },
     "devDependencies": {
         "@types/pg": "^8.6.5",
-        "@types/node": "^20.10.5",
+        "@types/node": "^22.19.4",
         "@types/ws": "^8.5.10",
         "tsx": "^4.20.6",
         "typescript": "^5.9.2"

@@ -125,7 +125,7 @@ const { data } = await client.data.products
 | `.offset(n)` | Salta i primi N risultati | `.offset(50)` |
 | `.search(text)` | Ricerca full-text | `.search("laptop")` |
 | `.include(...relations)` | Includi entità correlate | `.include("author", "tags")` |
-| `.find()` | Esegue la query | Restituisce `FindResponse<M>` |
+| `.find()` | Esegue la query | Restituisce `FindResult<M>` |
 | `.listen(onUpdate)` | Sottoscrivi agli aggiornamenti in tempo reale | Restituisce `unsubscribe()` |
 
 ### Operatori di Filtro

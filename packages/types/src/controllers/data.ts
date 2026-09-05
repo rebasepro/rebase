@@ -1,7 +1,7 @@
 import type { VectorSearchParams } from "./data_driver";
 import type { ComputedSortField, SearchMatch } from "../types/search";
 import { Entity, EntityValues } from "../types/entities";
-import { WhereFilterOp, FieldPath, FilterValues, OrderBySpec } from "../types/filter-operators";
+import { WhereFilterOp, FieldPath, NonColumnFieldPath, FilterValues, OrderBySpec, RelationAggregateSort } from "../types/filter-operators";
 
 /**
  * The element type of an array column, and the column's own type otherwise.
@@ -545,8 +545,27 @@ export type FindAllParams<M extends Record<string, unknown> = Record<string, unk
  */
 export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
+    /**
+     * Filter on a relation path (`author.name`) or a JSON path
+     * (`metadata->>tier`).
+     *
+     * A separate overload because the value cannot be typed: neither addresses
+     * a column of `M`, so there is nothing in a generated row type to check
+     * against — the driver resolves the path and refuses what it cannot. The
+     * key is still constrained to a *path*, so a mistyped column name does not
+     * fall through to here and lose its check.
+     *
+     * `find({ where })` has accepted both all along ({@link FieldPath}); the
+     * builder did not, so the documented relation-path filters were compile
+     * errors on a typed client.
+     */
+    where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): this;
     where(logicalCondition: LogicalCondition): this;
-    orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): this;
+    /**
+     * Sort by a column, a relation or JSON path, `_score`, or an aggregate over
+     * a to-many relation — the same key set {@link FindParams.orderBy} takes.
+     */
+    orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction?: "asc" | "desc"): this;
     limit(count: number): this;
     offset(count: number): this;
     search(searchString: string, options?: { explain?: boolean }): this;
@@ -567,6 +586,25 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
     ): this;
     include(...relations: string[]): this;
     find(): Promise<FindResult<M>>;
+
+    /**
+     * Page through everything this query matches, one row at a time.
+     *
+     * The same walker {@link SDKCollectionClient.iterate} uses, so the ceiling
+     * on `limit` is not a ceiling on what a query can read. `.limit()` set on
+     * the builder becomes the **page size** here, not a total.
+     */
+    iterate(options?: PageWalkOptions<M>): AsyncIterableIterator<M>;
+
+    /**
+     * Collect everything this query matches into one array.
+     *
+     * {@link SDKCollectionClient.findAll}'s `maxRows` guard applies: an
+     * unbounded collect is a memory hazard, so it stops and says so rather than
+     * growing until the process dies.
+     */
+    findAll(options?: PageWalkOptions<M> & { maxRows?: number }): Promise<M[]>;
+
     count(): Promise<number>;
     listen(onUpdate: (data: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
 }
@@ -635,6 +673,26 @@ export interface SDKCollectionClient<
 > {
     /**
      * Find multiple records with optional filtering, pagination, and sorting.
+     *
+     * ## What a list method returns
+     *
+     * Two shapes, and one rule that tells them apart: **a window is wrapped, a
+     * whole answer is not.**
+     *
+     * - `find()` and `listen()` return {@link FindResult} — `{ data, meta }` —
+     *   because they hand back *one page*. `meta.total` and `meta.hasMore` are
+     *   the caller's only way to know there is more, so a bare array would lose
+     *   the answer to the question the call raises.
+     * - `findAll()`, `createMany()` and `updateMany()` return a plain `M[]`,
+     *   because there is nothing left over to report: the walk finished, or the
+     *   batch is exactly the rows that were written. A `meta` there would be
+     *   `{ total: rows.length, hasMore: false }`, which says nothing.
+     * - `iterate()` yields rows one at a time and never materialises a list at
+     *   all.
+     *
+     * So `data` is not a wrapper the SDK sometimes adds and sometimes forgets —
+     * it is where the pagination metadata lives, and it is present exactly when
+     * there is some.
      */
     find(params?: FindParams<M>): Promise<FindResult<M>>;
 
@@ -786,10 +844,18 @@ export interface SDKCollectionClient<
     /**
      * Update an existing record by ID.
      * @param data The fields to update (the collection's `Update` shape).
+     * @param options Per-request write options — notably `idempotencyKey`.
      * @returns The updated row.
      * @throws {RebaseApiError} with status 404 when the record does not exist.
+     *
+     * `create`, `createMany`, `updateMany`, `delete` and `deleteMany` all took
+     * {@link WriteOptions}; this one did not, so the single-row update was the
+     * one write on the surface that could not be made idempotent. A client that
+     * never sees the response retries, and without a key the server cannot tell
+     * that retry from a second deliberate edit — which on a `PATCH` that
+     * increments or appends is a second edit applied.
      */
-    update(id: string | number, data: U): Promise<M>;
+    update(id: string | number, data: U, options?: WriteOptions): Promise<M>;
 
     /**
      * Update many records in a single request and a single transaction.
@@ -873,24 +939,37 @@ export interface SDKCollectionClient<
      * does not call back. `listen` does none of that; it forwards what the
      * socket sends.
      *
-     * Optional because it is only present when realtime is enabled. `observe()`
-     * is not — it degrades to a single fetch — which is the other reason to
-     * reach for it instead.
+     * Always present. A client that cannot subscribe — one built with
+     * `realtime: false`, or on a driver with no `listenCollection` — installs a
+     * stub that throws a `RebaseClientError` naming the configuration that
+     * would make it work. It used to be optional, which made every call site
+     * either write `listen!(…)` or a null check the type system could not tell
+     * apart from a real capability question; the answer to *that* question is
+     * {@link isUnsupported}, and the answer for ordinary code is to just call
+     * it.
+     *
+     * `observe()` degrades to a single fetch instead of throwing, which is the
+     * other reason to reach for it instead.
      */
-    listen?(params: FindParams<M> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
+    listen(params: FindParams<M> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
 
     /** {@link listen} for a single row. Prefer `observeById()`. */
-    listenById?(id: string | number, onUpdate: (row: M | undefined) => void, onError?: (error: Error) => void): () => void;
+    listenById(id: string | number, onUpdate: (row: M | undefined) => void, onError?: (error: Error) => void): () => void;
 
     /**
      * Count the number of records matching the given filter.
+     *
+     * Always present; see {@link listen} for what a transport that cannot serve
+     * it does instead.
      */
-    count?(params?: FindParams<M>): Promise<number>;
+    count(params?: FindParams<M>): Promise<number>;
 
     // Fluent Query Builder
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): SDKQueryBuilderInterface<M>;
+    /** A relation path (`author.name`) or a JSON path (`metadata->>tier`). */
+    where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): SDKQueryBuilderInterface<M>;
     where(logicalCondition: LogicalCondition): SDKQueryBuilderInterface<M>;
-    orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): SDKQueryBuilderInterface<M>;
+    orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction?: "asc" | "desc"): SDKQueryBuilderInterface<M>;
     limit(count: number): SDKQueryBuilderInterface<M>;
     offset(count: number): SDKQueryBuilderInterface<M>;
     search(searchString: string, options?: { explain?: boolean }): SDKQueryBuilderInterface<M>;

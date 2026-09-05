@@ -1,5 +1,8 @@
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
-import type { PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property } from "@rebasepro/types";
+import type { CollectionConfig, PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property } from "@rebasepro/types";
+
+import { getTableName } from "@rebasepro/common";
+import { suggestNearMiss } from "@rebasepro/utils";
 
 import { logger } from "../utils/logger";
 
@@ -65,6 +68,16 @@ export interface ValidateCollectionConfigOptions {
      * when that is unset.
      */
     unknownKeys?: UnknownKeyPolicy;
+    /**
+     * Where each collection came from, parallel to the array being checked.
+     *
+     * Used only in messages, and only by the checks that compare two
+     * collections: when two of them claim the same slug, "posts" names both, and
+     * the one thing the author needs is which two *files* to open. The loader
+     * has that and this module does not, so it is passed in rather than guessed
+     * at. Absent, the messages fall back to the collection's index.
+     */
+    sources?: readonly (string | undefined)[];
 }
 
 /**
@@ -256,7 +269,6 @@ const RELATION_KEYS = new Set<string>([
     "onUpdate",
     "onDelete",
     "overrides",
-    "validation",
     "localKey",
     "foreignKeyOnTarget",
     "sourceKey",
@@ -292,11 +304,21 @@ const RELATION_LINK_FIELDS = ["localKey", "foreignKeyOnTarget", "sourceKey", "th
 //   • 0.10 `33d096cd5` — `editable` removed; everything is editable by default.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * A key that moved or died, and what to do about it.
+ *
+ * There is no `codemod` field. Two of these messages used to end with "Run
+ * `node <this repo>/codemod/relations-tagged-union.mjs` to migrate the whole
+ * project" — a path inside the Rebase monorepo, which is the one place the
+ * reader of the message never is. A project installs `@rebasepro/server` from
+ * npm, and that directory is not in the package, so the single actionable
+ * instruction the message offered was the one thing nobody could do. Every
+ * `fix` below says what to write instead, per key, which is the part that
+ * survives being read by somebody else.
+ */
 interface Migration {
     /** What to do about it, in the imperative. */
     fix: string;
-    /** The codemod that does it, if one exists. */
-    codemod?: string;
 }
 
 /**
@@ -320,8 +342,7 @@ const COLLECTION_MIGRATIONS: Record<string, Migration> = {
 
 for (const key of ADMIN_COLLECTION_KEYS) {
     COLLECTION_MIGRATIONS[key] = {
-        fix: `\`${key}\` moved into the collection's \`admin\` block in 0.11 — write \`admin: { ${key}: … }\``,
-        codemod: "node tooling/scripts/codemod/collections-admin-block.mjs"
+        fix: `\`${key}\` moved into the collection's \`admin\` block in 0.11 — write \`admin: { ${key}: … }\``
     };
 }
 
@@ -364,12 +385,18 @@ const RELATION_PROPERTY_MIGRATIONS: Record<string, Migration> = {
     relationName: { fix: "move `relationName` inside `relation` — `relation: { kind: …, relationName: … }`" }
 };
 
-const RELATION_UNION_CODEMOD = "node tooling/scripts/codemod/relations-tagged-union.mjs";
-
 /** Fields the old flat `Relation` carried that the tagged union does not. */
 const RELATION_MIGRATIONS: Record<string, Migration> = {
-    direction: { fix: RELATION_PROPERTY_MIGRATIONS.direction.fix, codemod: RELATION_UNION_CODEMOD },
-    inverseRelationName: { fix: RELATION_PROPERTY_MIGRATIONS.inverseRelationName.fix, codemod: RELATION_UNION_CODEMOD }
+    direction: { fix: RELATION_PROPERTY_MIGRATIONS.direction.fix },
+    inverseRelationName: { fix: RELATION_PROPERTY_MIGRATIONS.inverseRelationName.fix },
+    // Not a rename: the key already existed one level up, and the two answers
+    // were read by different generators. Silence here would leave the surviving
+    // one — the property's — unset, and a required relation would quietly
+    // become optional in the generated types and nullable in the column.
+    validation: {
+        fix: "a relation no longer carries its own `validation` — `required` moved to the property's `validation.required`, " +
+            "beside every other field's. Write `{ type: \"relation\", validation: { required: true }, relation: { kind: … } }`"
+    }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -403,23 +430,32 @@ class ProblemCollector {
     migrated(path: string, key: string, migration: Migration): void {
         this.error(
             path,
-            `\`${key}\` is no longer read here. ${migration.fix}.` +
-            (migration.codemod ? ` Run \`${migration.codemod}\` to migrate the whole project.` : ""),
+            `\`${key}\` is no longer read here. ${migration.fix}.`,
             "key"
         );
     }
 
-    /** A key nobody recognises. Might be metadata, might be newer than us. */
-    unknown(path: string, key: string, context: string): void {
+    /**
+     * A key nobody recognises. Might be metadata, might be newer than us.
+     *
+     * `known` is the list this key was checked against, when there is one. The
+     * near-miss out of it is what turns "something is wrong somewhere in this
+     * file" into a one-line fix — `multilne` is not a key anybody will spot by
+     * re-reading the config, because it looks exactly like the key it is not.
+     */
+    unknown(path: string, key: string, context: string, known?: readonly string[]): void {
         if (this.unknownKeys === "off") return;
+        const suggestion = known ? suggestNearMiss(known, key) : undefined;
         this.problems.push({
             severity: this.unknownKeys === "error" ? "error" : "warning",
             kind: "key",
             path,
             message:
                 `\`${key}\` is not a known ${context} key and is being ignored. ` +
-                "If it is deliberate metadata this is safe; if it is a typo or a key from an older " +
-                "version, the feature it configures is silently absent."
+                (suggestion
+                    ? `Did you mean \`${suggestion}\`?`
+                    : "If it is deliberate metadata this is safe; if it is a typo or a key from an older " +
+                      "version, the feature it configures is silently absent.")
         });
     }
 }
@@ -436,7 +472,9 @@ function checkRelation(
         collect.error(
             path,
             "a relation has no `kind`. Relations became a tagged union in 0.11 — pick one of " +
-            `${RELATION_KINDS.join(", ")}. Run \`${RELATION_UNION_CODEMOD}\` to migrate the whole project.`
+            `${RELATION_KINDS.join(", ")}. Which one: the side that holds the foreign key is ` +
+            "`belongsTo`; the side that is pointed at is `hasOne` for one row and `hasMany` for " +
+            "many; a junction table is `manyToMany`; anything else is a read-only `via` with a `joinPath`."
         );
     } else if (!RELATION_KINDS.includes(kind)) {
         collect.error(path, `\`kind: "${kind}"\` is not a relation kind. Expected one of ${RELATION_KINDS.join(", ")}.`);
@@ -449,7 +487,7 @@ function checkRelation(
             continue;
         }
         if (!RELATION_KEYS.has(key)) {
-            collect.unknown(`${path}.${key}`, key, "relation");
+            collect.unknown(`${path}.${key}`, key, "relation", [...RELATION_KEYS]);
         }
     }
 
@@ -512,6 +550,129 @@ function checkValidationPattern(
     }
 }
 
+/**
+ * An enum's ids and labels, which become a Postgres type and a dropdown.
+ *
+ * The ids are the enum's SQL labels — `CREATE TYPE "posts_status" AS ENUM
+ * ('draft', 'published')` — so a duplicate id is a statement Postgres refuses:
+ * `23505` on `pg_enum_typid_label_index`. Boot read that as a lost race with a
+ * peer (every `pg_catalog` index violation was one), skipped it, and carried on;
+ * the type was never created and the column silently became `TEXT`. The config
+ * said "one of these three", the database said "any string", and nothing said
+ * anything.
+ *
+ * A blank id is the same statement with an empty label. A duplicate or blank
+ * *label* is not a database error at all — it is a dropdown with two identical
+ * options, or one with no text, which is a bug the author cannot see from the
+ * config. Both are reported here, where the property has a name.
+ *
+ * Both forms are checked: the array of `{ id, label }`, and the record whose
+ * keys are the ids. The record form cannot have duplicate keys, so only blanks
+ * apply to it.
+ */
+function checkEnumValues(
+    values: unknown,
+    path: string,
+    collect: ProblemCollector
+): void {
+    const blank = (value: unknown): boolean =>
+        typeof value === "string" ? value.trim() === "" : value === undefined || value === null;
+
+    const seenIds = new Map<string, number>();
+    const seenLabels = new Map<string, number>();
+
+    const check = (id: unknown, label: unknown, at: string, describe: string): void => {
+        if (blank(id)) {
+            collect.error(at, `${describe} has a blank \`id\`. The id is the value stored in the column and the label of the Postgres enum type; neither can be empty.`);
+        } else if (typeof id === "string" || typeof id === "number") {
+            const key = String(id);
+            const first = seenIds.get(key);
+            if (first !== undefined) {
+                collect.error(
+                    at,
+                    `${describe} repeats the id \`${key}\`, already used at index ${first}. ` +
+                    "The ids become the labels of one Postgres enum type, which cannot hold the same label twice — " +
+                    "so the `CREATE TYPE` fails and the column falls back to plain text with no enum behind it."
+                );
+            } else {
+                seenIds.set(key, seenIds.size);
+            }
+        } else {
+            collect.error(at, `${describe} has an \`id\` that is neither a string nor a number.`);
+        }
+
+        if (blank(label)) {
+            collect.error(at, `${describe} has a blank \`label\`, so it renders as an empty option nobody can read.`);
+        } else if (typeof label === "string") {
+            const first = seenLabels.get(label);
+            if (first !== undefined) {
+                collect.warn(at, `${describe} repeats the label "${label}", already used at index ${first}. Two options that read identically cannot be told apart in the panel.`);
+            } else {
+                seenLabels.set(label, seenLabels.size);
+            }
+        }
+    };
+
+    if (Array.isArray(values)) {
+        values.forEach((entry, index) => {
+            if (!isPlainObject(entry)) {
+                collect.error(`${path}[${index}]`, "an enum entry must be an object with `id` and `label`.");
+                return;
+            }
+            check(entry.id, entry.label, `${path}[${index}]`, `enum entry ${index}`);
+        });
+        return;
+    }
+
+    if (isPlainObject(values)) {
+        for (const [id, entry] of Object.entries(values)) {
+            const label = isPlainObject(entry) ? entry.label : entry;
+            check(id, label, `${path}.${id}`, `enum entry \`${id}\``);
+        }
+        return;
+    }
+
+    collect.error(path, "`enum` must be an array of `{ id, label }` or a record of id → label.");
+}
+
+/**
+ * The keys inside an `admin` block, against the list core owns.
+ *
+ * This block used to be checked for *removed* keys only, on the reasoning that
+ * it belongs to `@rebasepro/cms-types` and a completeness check here would
+ * reject options the panel had added. That reasoning had one flaw: the lists it
+ * would be checked against, `ADMIN_COLLECTION_KEYS` and `ADMIN_PROPERTY_KEYS`,
+ * live in core precisely so that core can read them, and `@rebasepro/cms-types`
+ * type-checks both against the option types in both directions. They cannot fall
+ * behind the panel.
+ *
+ * So the block was the one place in a collection where a typo cost nothing to
+ * make and produced no signal at all. `admin: { multilne: true }` booted clean
+ * and rendered a single-line input, and the config said otherwise.
+ *
+ * A warning, not an error, and it goes through {@link ProblemCollector.unknown}:
+ * the `REBASE_STRICT_COLLECTION_CONFIG` policy governs it like every other
+ * unrecognised key, so a project that wants these fatal can have them, and one
+ * running an older server against a newer panel is not blocked from booting.
+ */
+function checkAdminBlock(
+    block: Record<string, unknown>,
+    path: string,
+    known: readonly string[],
+    context: string,
+    collect: ProblemCollector
+): void {
+    const allowed = new Set<string>(known);
+    for (const key of Object.keys(block)) {
+        if (allowed.has(key)) continue;
+        // A key that moved *out* of the block has already been reported by its
+        // migration, which says where it went; saying "unknown" after that
+        // would be a second, worse message for the same key.
+        if (ADMIN_BLOCK_MIGRATIONS[key]) continue;
+        collect.unknown(`${path}.${key}`, key, context, known);
+    }
+}
+
 function checkProperty(
     property: unknown,
     path: string,
@@ -550,7 +711,7 @@ function checkProperty(
         // A relation's flat fields are checked first: `localKey` at the top of a
         // property is a 0.10 config, not an unknown key.
         if (type === "relation" && RELATION_PROPERTY_MIGRATIONS[key]) {
-            collect.migrated(`${path}.${key}`, key, { ...RELATION_PROPERTY_MIGRATIONS[key], codemod: RELATION_UNION_CODEMOD });
+            collect.migrated(`${path}.${key}`, key, RELATION_PROPERTY_MIGRATIONS[key]);
             continue;
         }
 
@@ -560,11 +721,23 @@ function checkProperty(
             continue;
         }
 
-        collect.unknown(`${path}.${key}`, key, `property (\`${String(type)}\`)`);
+        collect.unknown(`${path}.${key}`, key, `property (\`${String(type)}\`)`, [...allowed]);
+    }
+
+    // The property's own `admin` block. Checked against every key any property
+    // type's options declare, not the per-type subset: `ADMIN_PROPERTY_KEYS` is
+    // the union, and narrowing it here would reject a valid key on a type this
+    // file has no per-type list for.
+    if (isPlainObject(property.admin)) {
+        checkAdminBlock(property.admin, `${path}.admin`, ADMIN_PROPERTY_KEYS, "property `admin`", collect);
     }
 
     if (type === "relation" && property.relation !== undefined) {
         checkRelation(property.relation, `${path}.relation`, collect);
+    }
+
+    if (property.enum !== undefined) {
+        checkEnumValues(property.enum, `${path}.enum`, collect);
     }
 
     checkValidationPattern(property.validation, `${path}.validation`, collect);
@@ -676,6 +849,66 @@ function checkBoardConfig(
     }
 }
 
+/**
+ * A `type: "relation"` property has to name a link that exists.
+ *
+ * There are two legal ways to say which: the `relation` block on the property,
+ * or an entry in the collection's `relations` array whose `relationName` is the
+ * property's key. A property with neither names nothing.
+ *
+ * `CollectionRegistry.normalizeCollection` already noticed and answered with a
+ * `console.warn` — one line, on stdout, at the moment the panel builds its
+ * registry, which in a deployed backend nobody is reading. Everything downstream
+ * then behaved as if the field were not a relation: the form rendered no picker,
+ * the DDL generator emitted no foreign key, and `include()` answered nothing.
+ * The field existed everywhere and pointed nowhere.
+ *
+ * `relation` stays optional on the type, because the second form is real — the
+ * check is that *one* of the two is present, which is not a shape a single
+ * optional field can express.
+ */
+function checkRelationPropertiesResolve(
+    collection: Record<string, unknown>,
+    at: string,
+    collect: ProblemCollector
+): void {
+    const properties = collection.properties;
+    if (!isPlainObject(properties)) return;
+
+    const declaredNames = new Set<string>();
+    if (Array.isArray(collection.relations)) {
+        for (const relation of collection.relations) {
+            if (isPlainObject(relation) && typeof relation.relationName === "string") {
+                declaredNames.add(relation.relationName);
+            }
+        }
+    }
+
+    for (const [key, property] of Object.entries(properties)) {
+        // A builder function has nothing to inspect, as everywhere else here.
+        if (typeof property === "function") continue;
+        if (!isPlainObject(property) || property.type !== "relation") continue;
+        if (property.relation !== undefined) continue;
+        if (declaredNames.has(key)) continue;
+        // A pre-0.11 flat relation — `target` and `localKey` at the top of the
+        // property — names no `relation` block by construction, and every one of
+        // those keys already has its own message saying to move it inside one.
+        // Adding "this names no relation" on top would be a second, vaguer
+        // sentence about the same edit.
+        if (Object.keys(property).some(k => RELATION_PROPERTY_MIGRATIONS[k])) continue;
+
+        collect.error(
+            `${at}.properties.${key}`,
+            `\`${key}\` is a relation property that names no relation. Either give it a ` +
+            "`relation: { kind: …, target: … }` block, or add an entry to the collection's " +
+            `\`relations\` array with \`relationName: "${key}"\`. Without one the field is a ` +
+            "relation in name only: no picker in the form, no foreign key in the schema, and " +
+            "`include()` returns nothing for it.",
+            "incoherent"
+        );
+    }
+}
+
 function checkCollection(
     collection: unknown,
     index: number,
@@ -706,22 +939,19 @@ function checkCollection(
             continue;
         }
 
-        collect.unknown(`${at}.${key}`, key, "collection");
+        collect.unknown(`${at}.${key}`, key, "collection", [...COLLECTION_KEYS]);
     }
 
-    // Only the keys that were *removed* from the block, never the ones it does
-    // not recognise: the block belongs to `@rebasepro/cms-types` and the panel
-    // adds to it, so a completeness check here would reject valid config. A
-    // removal is different — nothing will read the key again, and a title that
-    // silently reverts to the derived one is the failure this prevents.
     if (isPlainObject(collection.admin)) {
         for (const [key, migration] of Object.entries(ADMIN_BLOCK_MIGRATIONS)) {
             if (key in collection.admin) collect.migrated(`${at}.admin.${key}`, key, migration);
         }
+        checkAdminBlock(collection.admin, `${at}.admin`, ADMIN_COLLECTION_KEYS, "collection `admin`", collect);
     }
 
     if (isPlainObject(collection.properties)) {
         checkProperties(collection.properties, `${at}.properties`, collect);
+        checkRelationPropertiesResolve(collection, at, collect);
     } else if (collection.properties !== undefined) {
         collect.error(`${at}.properties`, "`properties` must be an object keyed by property name.");
     }
@@ -750,7 +980,92 @@ export function findCollectionConfigProblems(
 ): ConfigProblem[] {
     const collect = new ProblemCollector(options.unknownKeys ?? unknownKeyPolicyFromEnv());
     collections.forEach((collection, index) => checkCollection(collection, index, collect));
+    checkCollectionsTogether(collections, options.sources, collect);
     return collect.problems;
+}
+
+/**
+ * The two questions no single collection can answer about itself.
+ *
+ * A `slug` is an identity — the URL, the API path, and the key every relation's
+ * `target()` resolves to. A table is where the rows are. Both were registered
+ * into a `Map`, and `CollectionRegistry._registerRecursively` returns early when
+ * the table name is already there, so the second collection to claim either one
+ * was **dropped without a word**: its routes did not exist, its relations
+ * resolved to the other collection's rows, and the config file sat in the
+ * directory looking loaded.
+ *
+ * Reported here rather than in the registry because this is where a config
+ * problem is *rendered* — with a path, alongside every other one, in a single
+ * pass — and because the registry has one collection at a time by then.
+ *
+ * The table is resolved through {@link getTableName}, the same function the
+ * registry and both generators use, so "duplicate" means the same thing here as
+ * it does to the database. A collection that declares no `table` still has one.
+ */
+function checkCollectionsTogether(
+    collections: readonly unknown[],
+    sources: readonly (string | undefined)[] | undefined,
+    collect: ProblemCollector
+): void {
+    /** How to name collection `i` to somebody who has to go and open it. */
+    const describe = (i: number): string => {
+        const source = sources?.[i];
+        if (source) return source;
+        const collection = collections[i];
+        const name = isPlainObject(collection) && typeof collection.name === "string" ? collection.name : undefined;
+        return name ? `collection[${i}] ("${name}")` : `collection[${i}]`;
+    };
+
+    const bySlug = new Map<string, number[]>();
+    const byTable = new Map<string, number[]>();
+
+    collections.forEach((collection, index) => {
+        if (!isPlainObject(collection)) return;
+
+        const slug = typeof collection.slug === "string" && collection.slug ? collection.slug : undefined;
+        if (slug) {
+            const seen = bySlug.get(slug);
+            if (seen) seen.push(index); else bySlug.set(slug, [index]);
+        }
+
+        const table = getTableName(collection as unknown as CollectionConfig);
+        if (!table) return;
+        const schema = typeof collection.schema === "string" && collection.schema ? collection.schema : "public";
+        const qualified = `${schema}.${table}`;
+        const seen = byTable.get(qualified);
+        if (seen) seen.push(index); else byTable.set(qualified, [index]);
+    });
+
+    for (const [slug, indexes] of bySlug) {
+        if (indexes.length < 2) continue;
+        collect.error(
+            slug,
+            `${indexes.length} collections declare \`slug: "${slug}"\`: ${indexes.map(describe).join(", ")}. ` +
+            "The slug is the collection's identity — its URL, its API path, and what every relation's " +
+            "`target()` resolves to — so only the first is registered and the rest are dropped silently. " +
+            "Give each one its own slug."
+        );
+    }
+
+    for (const [qualified, indexes] of byTable) {
+        if (indexes.length < 2) continue;
+        // A duplicate slug already produced a message for these; saying it twice
+        // about the table the slug derives adds nothing.
+        const slugs = new Set(indexes.map(i => {
+            const c = collections[i];
+            return isPlainObject(c) && typeof c.slug === "string" ? c.slug : undefined;
+        }));
+        if (slugs.size < indexes.length) continue;
+
+        collect.error(
+            qualified,
+            `${indexes.length} collections resolve to the table \`${qualified}\`: ${indexes.map(describe).join(", ")}. ` +
+            "A table has one owner: only the first is registered, and the others' routes, policies and " +
+            "generated columns never exist. Set `table` on each, or rename a slug — the table defaults to " +
+            "`toSnakeCase(slug)`."
+        );
+    }
 }
 
 function render(problems: ConfigProblem[]): string {

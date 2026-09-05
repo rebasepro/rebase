@@ -249,7 +249,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
     for (const handle of spawned) await stop(handle);
-    if (container) await stopPgContainer(container);
+    if (container) await stopPgContainer(container.containerName);
 }, 120_000);
 
 describe("refusals, from the real environment", () => {

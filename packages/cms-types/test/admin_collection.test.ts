@@ -89,7 +89,12 @@ describe("ADMIN_PROPERTY_KEYS", () => {
     it("covers the base options and every per-type extension", () => {
         // Same tripwire as above. Bump it deliberately, alongside the list.
         // 25: `span` joined and `widthPercentage`, which it replaced, is gone.
-        expect(ADMIN_PROPERTY_KEYS).toHaveLength(25);
+        // 27: `format` (AdminNumberOptions) and `renderInForm`
+        // (AdminRelationOptions) had never been listed. That is no longer
+        // something a count can be the first to notice — `property_options.ts`
+        // now asserts the reverse direction at compile time, and this pair is
+        // what the assertion found on its first run.
+        expect(ADMIN_PROPERTY_KEYS).toHaveLength(27);
     });
 
     it("names nothing that belongs to the property contract", () => {
@@ -473,6 +478,25 @@ describe("property keys are checked against the property's own type", () => {
         });
     });
 
+    // Where the error lands is the assertion. Under the three overloads it
+    // landed on `defineCollection(` — one TS2769 for the whole call, listing
+    // `FirebaseCollectionConfig` and `MongoDBCollectionConfig` at an author who
+    // had named neither engine. A directive on the key's own line only compiles
+    // if the error is reported *there*, which is what makes this a test.
+    it("reports an unknown key on the key, not on the call", () => {
+        defineCollection({
+            ...base,
+            properties: {
+                title: {
+                    name: "T",
+                    type: "string",
+                    // @ts-expect-error — `validaton`; the target names `keyof StringProperty`
+                    validaton: { required: true }
+                }
+            }
+        });
+    });
+
     it("rejects `multiline` written flat instead of under `admin`", () => {
         defineCollection({
             ...base,
@@ -515,6 +539,150 @@ describe("property keys are checked against the property's own type", () => {
             properties: { title: { name: "T", type: "string" } },
             // @ts-expect-error — "titel" is not a property of this collection
             admin: { display: { title: "titel" } }
+        });
+    });
+});
+
+/**
+ * A mistake in a property does not switch off the checks on everything else.
+ *
+ * `defineCollection` used to declare `const P extends PostgresProperties`, and a
+ * constraint TypeScript cannot satisfy is a constraint it silently falls back
+ * from: one property with a bad `defaultValue` made `P` become
+ * `PostgresProperties`, `M` become `Record<string, unknown>`, and every `admin`
+ * key — `display.title`, `listProperties`, `propertiesOrder` — widen to `string`
+ * and stop being checked. A collection with two mistakes reported one, and
+ * revealed the second only after the first was fixed.
+ *
+ * On top of that it was three overloads, so a failed call produced exactly one
+ * diagnostic naming `FirebaseCollectionConfig` and `MongoDBCollectionConfig` at
+ * an author who had mentioned neither.
+ *
+ * `P` is unconstrained now — exactness and the engine gate moved into
+ * `StrictProperties`, and the value check into a second, non-inferring
+ * intersection member — and there is one signature discriminated on `engine`.
+ * Both errors below are reported, in one pass, each where it is.
+ */
+describe("a bad property does not silence the admin block", () => {
+    it("reports the property and the admin key together", () => {
+        defineCollection({
+            name: "Posts",
+            slug: "posts",
+            table: "posts",
+            // @ts-expect-error — `defaultValue` on a string property is a string
+            properties: {
+                title: { name: "Title", type: "string", defaultValue: 3 }
+            },
+            // @ts-expect-error — "titel" is not a property of this collection, and
+            // this is the assertion: the line above did not switch this check off
+            admin: { display: { title: "titel" } }
+        });
+    });
+});
+
+/**
+ * A relation may not carry a link field its own `kind` does not have.
+ *
+ * `Relation` is a closed union — `belongsTo` owns `localKey`, `hasOne` and
+ * `hasMany` own `foreignKeyOnTarget`, `manyToMany` owns `through`, `via` owns
+ * `joinPath` — but excess-property checking against a *union* admits any key any
+ * member declares. So `{ kind: "belongsTo", foreignKeyOnTarget: … }` compiled,
+ * and meant something other than what it said: the generator reads `localKey`,
+ * defaults it to `<relationName>_id`, and the column the author named is never
+ * looked at.
+ *
+ * The boot validator has always refused these. This is the same rule one stage
+ * earlier, where it costs a squiggle instead of a failed deploy — and, like the
+ * block above, one bad key per call, or overload resolution collapses the two
+ * into a single error and leaves an `@ts-expect-error` unused.
+ */
+describe("a relation is checked against the member its `kind` selects", () => {
+    const authors = {
+        name: "Authors",
+        slug: "authors",
+        table: "authors",
+        properties: { name: { name: "Name", type: "string" } }
+    } as const;
+
+    const base = { name: "Posts", slug: "posts", table: "posts" } as const;
+
+    it("accepts each kind with its own link field", () => {
+        const ok = defineCollection({
+            ...base,
+            properties: {
+                author: {
+                    name: "Author",
+                    type: "relation",
+                    relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" }
+                },
+                editors: {
+                    name: "Editors",
+                    type: "relation",
+                    relation: { kind: "hasMany", target: () => authors, foreignKeyOnTarget: "post_id" }
+                },
+                reviewers: {
+                    name: "Reviewers",
+                    type: "relation",
+                    relation: { kind: "manyToMany", target: () => authors, through: { table: "post_reviewers" } }
+                }
+            }
+        });
+        expect(Object.keys(ok.properties)).toHaveLength(3);
+    });
+
+    it("rejects `foreignKeyOnTarget` on a `belongsTo`", () => {
+        defineCollection({
+            ...base,
+            properties: {
+                author: {
+                    name: "Author",
+                    type: "relation",
+                    // @ts-expect-error — a `belongsTo` holds the key itself; the field is `localKey`
+                    relation: { kind: "belongsTo", target: () => authors, foreignKeyOnTarget: "author_id" }
+                }
+            }
+        });
+    });
+
+    it("rejects `localKey` on a `hasMany`", () => {
+        defineCollection({
+            ...base,
+            properties: {
+                posts: {
+                    name: "Posts",
+                    type: "relation",
+                    // @ts-expect-error — the key is on the target; the field is `foreignKeyOnTarget`
+                    relation: { kind: "hasMany", target: () => authors, localKey: "author_id" }
+                }
+            }
+        });
+    });
+
+    it("rejects `through` on a `belongsTo`", () => {
+        defineCollection({
+            ...base,
+            properties: {
+                author: {
+                    name: "Author",
+                    type: "relation",
+                    // @ts-expect-error — `through` is a junction table, which only `manyToMany` has
+                    relation: { kind: "belongsTo", target: () => authors, through: { table: "x" } }
+                }
+            }
+        });
+    });
+
+    it("rejects a relation-level `validation`, which moved to the property", () => {
+        defineCollection({
+            ...base,
+            properties: {
+                author: {
+                    name: "Author",
+                    type: "relation",
+                    // @ts-expect-error — `required` is the property's `validation`, not the relation's
+                    relation: { kind: "belongsTo", target: () => authors, validation: { required: true } }
+                }
+            }
         });
     });
 });

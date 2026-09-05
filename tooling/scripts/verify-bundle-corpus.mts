@@ -195,9 +195,17 @@ function gte(a: string, b: string): boolean {
  * This is the axis the corpus could not see. `stage()` above lends the whole
  * donor `node_modules`, so both halves come from this checkout and every run
  * boots current-driver + current-server — a pairing that exists on no tenant
- * anywhere. Production is the opposite: `infra/docker/entrypoint.mjs` symlinks ONLY
- * `@rebasepro/server` from the image over the bundle's copy, so a project runs
- * today's server against whatever driver it was built with, possibly years old.
+ * anywhere. Production is the opposite: `infra/docker/entrypoint.mjs` collapses
+ * the packages in its `RUNTIME_PROVIDED` list — the framework and `zod`, never
+ * the driver — onto the image's copies, so a project runs today's runtime
+ * against whatever driver it was built with, possibly years old.
+ *
+ * The list is mirrored here as `RUNTIME_PROVIDED` and held to the entrypoint's
+ * by `tooling/scripts/test/runtime-provided.test.mjs`. It used to be
+ * hand-written as "only `@rebasepro/server`", which was true once and then
+ * silently wasn't: the driver's own `@rebasepro/types` stayed in place beside
+ * the checkout's, two resource-kind registries met, and the corpus failed a
+ * pairing production had stopped producing.
  *
  * That combination has already taken production down once — a driver too old to
  * have the `refresh_tokens` constraint the newer runtime assumed, which is why
@@ -226,17 +234,41 @@ function stageWithDriver(fixtureDir: string, name: string, driverVersion: string
         { cwd: dir, stdio: "pipe", encoding: "utf8" }
     );
 
-    // The entrypoint's RUNTIME_PROVIDED, reproduced: the image's server wins over
-    // the bundle's copy, and ONLY the server. Without this the bundle would run
-    // the old server too, which is a pairing production never produces either —
-    // and the whole point is that the two halves move independently.
-    const target = path.join(dir, "node_modules", "@rebasepro", "server");
-    fs.rmSync(target, { recursive: true, force: true });
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.symlinkSync(path.join(ROOT, "packages", "server"), target, "dir");
+    // The entrypoint's RUNTIME_PROVIDED, reproduced: the image's copy of each
+    // listed package wins over whatever the bundle installed, and nothing else
+    // is touched — the driver in particular stays the version npm resolved, which
+    // is the whole point of this axis. Framework packages come from this
+    // checkout's `packages/`; `zod` is whichever copy `@rebasepro/server` itself
+    // resolves, because that is the one the image ships beside it.
+    for (const pkg of RUNTIME_PROVIDED) {
+        const target = path.join(dir, "node_modules", pkg);
+        const source = pkg.startsWith("@rebasepro/")
+            ? path.join(ROOT, "packages", pkg.slice("@rebasepro/".length))
+            : path.dirname(createRequire(path.join(ROOT, "packages", "server", "package.json"))
+                .resolve(`${pkg}/package.json`));
+        if (!fs.existsSync(source)) {
+            throw new Error(`RUNTIME_PROVIDED names ${pkg}, but this checkout has nothing at ${source} to stitch in.`);
+        }
+        fs.rmSync(target, { recursive: true, force: true });
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.symlinkSync(source, target, "dir");
+    }
 
     return dir;
 }
+
+/**
+ * What the image supplies on top of a bundle — the entrypoint's list, verbatim.
+ * `runtime-provided.test.mjs` fails if this drifts from `infra/docker/entrypoint.mjs`.
+ */
+const RUNTIME_PROVIDED = [
+    "@rebasepro/server",
+    "@rebasepro/types",
+    "@rebasepro/client",
+    "@rebasepro/common",
+    "@rebasepro/utils",
+    "zod"
+];
 
 /**
  * An empty database for one skew run, dropped and recreated so a rerun starts

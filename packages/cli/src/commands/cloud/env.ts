@@ -22,7 +22,7 @@ import {
     displayProjectRef,
     parseCloudArgs,
     emit,
-    emitHelp,
+    printGroupHelp,
     confirmDestructive,
     keyValues,
     success,
@@ -94,7 +94,7 @@ export async function envCommand(action: string | undefined, rawArgs: string[]):
             printEnvHelp();
             break;
         default:
-            fail(`Unknown env command: ${action}`, "Try `rebase cloud env --help`.");
+            fail(`Unknown env command: ${action}`, "Run `rebase cloud env --help`.", "unknown_command");
     }
 }
 
@@ -461,26 +461,37 @@ skipped }
 }
 
 export function printEnvHelp(): void {
-    emitHelp("env", ["list", "set", "unset", "reveal", "pull"], () => {
-        console.log(`
-${chalk.bold("rebase cloud env")} — Environment variables
-
-${chalk.green.bold("Commands")}
-  ${chalk.blue.bold("list")}                      List keys ${chalk.gray("(values are never printed)")}
-  ${chalk.blue.bold("set")} ${chalk.gray("KEY=VALUE [--secret]")}  Create or replace a variable
-  ${chalk.blue.bold("unset")} ${chalk.gray("KEY")}                 Remove a variable
-  ${chalk.blue.bold("reveal")} ${chalk.gray("KEY")}                Print one non-secret value
-  ${chalk.blue.bold("pull")} ${chalk.gray("[--out .env] [-y]")}    Write revealable values to a dotenv file
-
-${chalk.green.bold("Options")}
-  ${chalk.blue("--secret")}                  Mark a variable write-only ${chalk.gray("(set)")}
-  ${chalk.blue("--force")}                   Set a build-time key anyway ${chalk.gray("(set)")}
-  ${chalk.blue("--json")}                    Machine-readable output
-  ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
-
-${chalk.gray("Values are encrypted at rest (AES-256-GCM) and only decrypted at deploy time.")}
-${chalk.gray("VITE_* / NEXT_PUBLIC_* / PUBLIC_* / REACT_APP_* are read by your bundler at BUILD time;")}
-${chalk.gray("these are applied at rollout, after the image is built, so they never reach the bundle.")}
-`);
+    printGroupHelp({
+        command: "cloud env",
+        title: "Environment variables",
+        actions: [
+            { action: "list",
+description: "List keys — values are never printed" },
+            {
+                action: "set",
+                args: "KEY=VALUE",
+                description: "Create or replace a variable",
+                flags: [
+                    ["--secret", "Mark it write-only: it can be set and used, never read back"],
+                    ["--force", "Set a build-time key anyway"]
+                ]
+            },
+            { action: "unset",
+args: "KEY",
+description: "Remove a variable" },
+            { action: "reveal",
+args: "KEY",
+description: "Print one non-secret value" },
+            {
+                action: "pull",
+                description: "Write revealable values to a dotenv file",
+                flags: [["--output, --out <file>", "Where to write it. Default: .env"]]
+            }
+        ],
+        notes: [
+            "Values are encrypted at rest (AES-256-GCM) and only decrypted at deploy time.",
+            "VITE_* / NEXT_PUBLIC_* / PUBLIC_* / REACT_APP_* are read by your bundler at BUILD time;",
+            "these are applied at rollout, after the image is built, so they never reach the bundle."
+        ]
     });
 }

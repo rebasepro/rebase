@@ -14,11 +14,26 @@ import {
     getActiveBackendPlugin,
     resolvePluginCliScript,
     resolveTsx,
-    findEnvFile
+    findEnvFile,
+    exitDependenciesNotInstalled
 } from "../utils/project";
+import { fileURLToPath } from "url";
 import { scanTextForLibpqUrls, type LibpqUrlFinding } from "../utils/libpq-url";
 import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
+import { reportSpawnFailure } from "../utils/spawn-error";
+import { argsFromCommand } from "../utils/command-words";
 import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
+import {
+    checkDuplicateSlugs,
+    checkEnvSanity,
+    checkNodeVersion,
+    checkPackageManager,
+    checkVersionSkew,
+    LOCKFILES,
+    parseEnvFile,
+    type DeclaredDependency,
+    type EnvironmentFinding
+} from "../doctor-environment";
 
 /**
  * Files that can hold a connection string the project actually runs on.
@@ -138,6 +153,140 @@ function reportFunctionPortability(projectRoot: string): void {
     console.log(chalk.gray("      See https://rebase.pro/docs/backend/custom-functions#runtime-portability"));
 }
 
+/**
+ * Read everything the environment checks need, then run them.
+ *
+ * The reading is here and the deciding is in `doctor-environment.ts`, so every
+ * check has a fixture that fails it without a project on disk.
+ */
+export function collectEnvironmentFindings(
+    projectRoot: string,
+    envFile: string | null | undefined
+): EnvironmentFinding[] {
+    const findings: EnvironmentFinding[] = [];
+
+    // Node, against the engines range the installed CLI declares.
+    findings.push(...checkNodeVersion(process.versions.node, readCliEngines()));
+
+    // Two package managers in one project.
+    const rootPackage = readJson(path.join(projectRoot, "package.json"));
+    findings.push(...checkPackageManager(
+        Object.keys(LOCKFILES).filter(file => fs.existsSync(path.join(projectRoot, file))),
+        typeof rootPackage?.packageManager === "string" ? rootPackage.packageManager : undefined
+    ));
+
+    // Two collections claiming one slug. Read as text rather than imported: a
+    // collection file can import anything, and doctor must not execute a
+    // project's code to tell it two slugs collide.
+    findings.push(...checkDuplicateSlugs(readDeclaredSlugs(projectRoot)));
+
+    // `.env`, values never echoed.
+    if (envFile && fs.existsSync(envFile)) {
+        try {
+            findings.push(...checkEnvSanity(parseEnvFile(fs.readFileSync(envFile, "utf-8"))));
+        } catch { /* unreadable is not a finding */ }
+    }
+
+    // One `@rebasepro/*` package, two versions.
+    findings.push(...checkVersionSkew(readDeclaredRebaseDeps(projectRoot)));
+
+    return findings;
+}
+
+/** The `engines.node` range of the CLI actually running. */
+function readCliEngines(): string | undefined {
+    try {
+        const here = path.dirname(fileURLToPath(import.meta.url));
+        for (let dir = here, i = 0; i < 5; i++) {
+            const candidate = path.join(dir, "package.json");
+            if (fs.existsSync(candidate)) {
+                const parsed = readJson(candidate);
+                if (parsed?.name === "@rebasepro/cli") {
+                    const engines = parsed.engines as { node?: string } | undefined;
+                    return engines?.node;
+                }
+            }
+            const parent = path.dirname(dir);
+            if (parent === dir) break;
+            dir = parent;
+        }
+    } catch { /* the check is advisory */ }
+    return undefined;
+}
+
+function readJson(file: string): Record<string, unknown> | undefined {
+    try {
+        return JSON.parse(fs.readFileSync(file, "utf-8")) as Record<string, unknown>;
+    } catch {
+        return undefined;
+    }
+}
+
+/** Where a project's package.json files live, relative to its root. */
+const PACKAGE_JSON_LOCATIONS = ["package.json", "backend/package.json", "frontend/package.json", "config/package.json"];
+
+function readDeclaredRebaseDeps(projectRoot: string): DeclaredDependency[] {
+    const declared: DeclaredDependency[] = [];
+    for (const relative of PACKAGE_JSON_LOCATIONS) {
+        const parsed = readJson(path.join(projectRoot, relative));
+        if (!parsed) continue;
+        for (const field of ["dependencies", "devDependencies", "peerDependencies"] as const) {
+            const block = parsed[field] as Record<string, string> | undefined;
+            if (!block) continue;
+            for (const [name, range] of Object.entries(block)) {
+                if (typeof range === "string") declared.push({ file: relative, name, range });
+            }
+        }
+    }
+    return declared;
+}
+
+/**
+ * Every `slug:` a collection file declares, read as text.
+ *
+ * Deliberately not by importing them: a collection file may import anything the
+ * project depends on, and doctor must not run a project's code to tell it two
+ * slugs collide. A regex over `slug: "..."` finds the literal in every shape
+ * the scaffold and the docs use; a computed slug is simply not seen, which is
+ * the right failure for a check that only ever reports.
+ */
+function readDeclaredSlugs(projectRoot: string): Array<{ slug: string }> {
+    const dir = path.join(projectRoot, "config", "collections");
+    if (!fs.existsSync(dir)) return [];
+    const slugs: Array<{ slug: string }> = [];
+    let entries: string[];
+    try {
+        entries = fs.readdirSync(dir);
+    } catch {
+        return [];
+    }
+    for (const entry of entries) {
+        if (!/\.(ts|js|mts|mjs)$/.test(entry) || entry.startsWith("index.")) continue;
+        try {
+            const text = fs.readFileSync(path.join(dir, entry), "utf-8");
+            for (const match of text.matchAll(/\bslug:\s*["'`]([^"'`]+)["'`]/g)) {
+                slugs.push({ slug: match[1] });
+            }
+        } catch { /* unreadable is not a finding */ }
+    }
+    return slugs;
+}
+
+/** Print what the environment checks found, grouped, or nothing at all. */
+function reportEnvironmentFindings(findings: EnvironmentFinding[]): boolean {
+    if (findings.length === 0) return false;
+
+    console.log("");
+    console.log(chalk.bold("  Environment"));
+    for (const finding of findings) {
+        const mark = finding.severity === "error" ? chalk.red("  ✗") : chalk.yellow("  ⚠");
+        console.log(`${mark} ${finding.message}`);
+        console.log(chalk.gray(`      ${finding.fix}`));
+    }
+    console.log("");
+    return findings.some(finding => finding.severity === "error");
+}
+
 function printDoctorHelp(): void {
     console.log(`
 ${chalk.bold("rebase doctor")} — Check a project for drift and misconfiguration
@@ -175,8 +324,7 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
 
     const pluginCli = resolvePluginCliScript(backendDir, activePlugin);
     if (!pluginCli) {
-        console.error(chalk.red(`✗ Could not find CLI entry point for ${activePlugin}.`));
-        process.exit(1);
+        exitDependenciesNotInstalled(projectRoot);
     }
 
     // Set up environment with DOTENV_CONFIG_PATH
@@ -196,29 +344,45 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     // today is a function quietly missing from `GET /api/functions`.
     reportFunctionPortability(projectRoot);
 
+    // Everything that breaks a first run happens before a table is compared:
+    // the wrong Node, two lockfiles disagreeing, two collections claiming one
+    // slug, a JWT_SECRET short enough to be refused in production, three
+    // versions of @rebasepro/server in one workspace. Doctor said nothing about
+    // any of it. Reported before the plugin runs, and non-blocking — a project
+    // with one of these still deserves its drift report.
+    const environmentFailed = reportEnvironmentFindings(collectEnvironmentFindings(projectRoot, envFile));
+
     try {
         const isTs = pluginCli.endsWith(".ts");
         if (isTs) {
             const tsxBin = resolveTsx(projectRoot);
             if (!tsxBin) {
-                console.error(chalk.red("✗ Could not find tsx binary."));
-                process.exit(1);
+                exitDependenciesNotInstalled(projectRoot);
             }
-            await execa(tsxBin, [pluginCli, ...rawArgs.slice(2)], {
+            await execa(tsxBin, [pluginCli, ...argsFromCommand(rawArgs, "doctor")], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env
             });
         } else {
-            await execa("node", [pluginCli, ...rawArgs.slice(2)], {
+            await execa("node", [pluginCli, ...argsFromCommand(rawArgs, "doctor")], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env
             });
         }
-    } catch {
-        // If the process exits with an error code, execa will throw,
-        // but inherit stdio means the user already saw the output.
+    } catch (error) {
+        // A child that ran and exited non-zero already printed its diagnostics
+        // through inherited stdio. A child that never started did not — and
+        // "the tsx symlink is broken" is exactly the state `doctor` exists to
+        // report, so exiting 1 in silence was the worst possible answer.
+        reportSpawnFailure(error);
         process.exit(1);
     }
+
+    // The plugin exited clean, so the schema agrees with itself. That is not
+    // the same as the project being able to run: an environment error is still
+    // an error, and a doctor that exits 0 over one is a doctor nobody can gate
+    // on.
+    if (environmentFailed) process.exit(1);
 }

@@ -16,7 +16,7 @@
  *      each fenced ts/js block against workspace source.
  *
  * Both stages also cover the repository's *own* agent instructions — `AGENT.md`,
- * `.agents/` and `.agent/workflows/` (see AGENT_INSTRUCTION_GLOBS in
+ * `.agent/workflows/` (see AGENT_INSTRUCTION_GLOBS in
  * docs-verify/extract.mjs). They were the one documentation surface no glob
  * reached, and they drifted the whole time everything else stayed clean: the
  * relation API they taught (`cardinality` + `direction`) had not existed since
@@ -43,8 +43,18 @@ import { checkAgentBundle } from "./docs-verify/check-agent-bundle.mjs";
 import { checkProseTypes } from "./docs-verify/check-prose-types.mjs";
 import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
+import { checkEnvReads } from "./docs-verify/check-env-reads.mjs";
+import { checkEndpointIndex } from "./docs-verify/check-endpoint-index.mjs";
 import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
+import { checkErrorCodes } from "./docs-verify/check-error-codes.mjs";
+import { checkMcpToolTables } from "./docs-verify/check-mcp-tool-tables.mjs";
+import { checkAiInstructions } from "./docs-verify/check-ai-instructions.mjs";
+import { checkSkillClaims } from "./docs-verify/check-skill-claims.mjs";
+import { checkRlsCheckFlags } from "./docs-verify/check-rls-check-flags.mjs";
+import { checkUnreleasedBadges } from "./docs-verify/check-unreleased-badges.mjs";
+import { checkDocsLinks } from "./docs-verify/check-docs-links.mjs";
+import { checkTranslationFreshness } from "./docs-verify/check-translation-freshness.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -75,12 +85,22 @@ if (asJson) {
         out.proseTypes = checkProseTypes(ROOT).findings;
         out.versionPins = checkVersionPins(ROOT).findings;
         out.envReference = checkEnvReference(ROOT).findings;
+        out.envReads = checkEnvReads(ROOT).findings;
+        out.endpointIndex = checkEndpointIndex(ROOT).findings;
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
+        out.errorCodes = checkErrorCodes(ROOT).findings;
+        out.mcpToolTables = checkMcpToolTables(ROOT).findings;
+        out.aiInstructions = checkAiInstructions(ROOT).findings;
+        out.skillClaims = checkSkillClaims(ROOT).findings;
+        out.unreleasedBadges = checkUnreleasedBadges(ROOT).findings;
+        out.docsLinks = checkDocsLinks(ROOT).findings;
+        out.translationFreshness = checkTranslationFreshness(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
         out.setupErrors = r.setupErrors;
         out.unresolvedImports = r.unresolved;
+        out.noVerify = { count: r.skipped, budget: r.budget, fences: r.skippedFences };
         out.snippets = r.failures.map((f) => ({
             file: f.snippet.file,
             fenceLine: f.snippet.line,
@@ -124,10 +144,10 @@ if (only === "both" || only === "names") {
     const { findings: bad, scanned } = checkDeployBuildContext(ROOT);
     console.log(`${DIM}Scanned ${scanned} deployment docs.${NC}`);
     if (!bad.length) {
-        console.log(`${GREEN}✓ No build instruction uses ./backend or ./frontend as its context.${NC}`);
+        console.log(`${GREEN}✓ No deploy guide builds a Dockerfile the scaffold does not ship, or names ./backend as a context.${NC}`);
     } else {
         findings += bad.length;
-        console.log(`${RED}✗ ${bad.length} bad build-context reference(s) — context must be the project root:${NC}`);
+        console.log(`${RED}✗ ${bad.length} bad build reference(s) — deploy guides build the bundle, not the source tree:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}:${b.line}${NC} ${DIM}[${b.rule}]${NC}`);
             console.log(`      ${DIM}${b.text}${NC}`);
@@ -179,6 +199,94 @@ if (only === "both" || only === "names") {
 }
 
 if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ rls-check flags ━━━${NC}`);
+    const { findings: bad, flags, scanned } = checkRlsCheckFlags(ROOT);
+    console.log(`${DIM}rls-check accepts ${flags.length} flag(s); checked --help and ${scanned} option table(s).${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every flag the CLI accepts is in --help and both option tables.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} flag documentation mismatch(es):${NC}`);
+        for (const b of bad) console.log(`  ${RED}${b.file}${NC}\n      ${DIM}${b.message}${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Translation freshness ━━━${NC}`);
+    const { findings: bad, missing, unstamped, fresh, sources, locales } =
+        checkTranslationFreshness(ROOT);
+    console.log(
+        `${DIM}${sources} translatable page(s) × ${locales} locales: ${fresh} fresh, ` +
+            `${unstamped.length} unstamped, ${missing.length} missing.${NC}`
+    );
+    if (!bad.length) {
+        console.log(`${GREEN}✓ No translation contradicts the English page it was made from.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} translation(s) made from an older English page:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+    if (missing.length || unstamped.length) {
+        console.log(
+            `      ${DIM}${unstamped.length} predate the stamp and ${missing.length} do not exist ` +
+                `(Starlight falls back to English). Neither fails this check; ` +
+                `\`node scripts/translate_docs.mjs --dry-run\` in website/ lists them.${NC}`
+        );
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Documentation link graph ━━━${NC}`);
+    const { findings: bad, scanned, links } = checkDocsLinks(ROOT);
+    console.log(`${DIM}Resolved ${links} internal link(s) across ${scanned} English docs page(s).${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every link resolves, and every page leads somewhere.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} broken or dead-end page(s):${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Error-code reference ━━━${NC}`);
+    const { findings: bad, scanned, total } = checkErrorCodes(ROOT);
+    console.log(`${DIM}Found ${total} error code(s) across ${scanned} source file(s).${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every code the server can raise is documented, and every documented code exists.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} error-code reference problem(s):${NC}`);
+        for (const b of bad) console.log(`  ${RED}${b.code}${NC}\n      ${DIM}${b.message}${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Unreleased-feature badges ━━━${NC}`);
+    const { findings: bad, tokens, scanned } = checkUnreleasedBadges(ROOT);
+    console.log(
+        `${DIM}${tokens.length} unreleased feature name(s) across ${scanned} English docs page(s)` +
+            (tokens.length ? `: ${tokens.join(", ")}` : "") + `.${NC}`
+    );
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every page describing an unreleased feature says so.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} section(s) a reader on the released version cannot use:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Environment reference ━━━${NC}`);
     const { findings: bad, scanned } = checkEnvReference(ROOT);
     console.log(`${DIM}Checked ${scanned} validated variable(s) against the configuration page.${NC}`);
@@ -189,6 +297,39 @@ if (only === "both" || only === "names") {
         console.log(`${RED}✗ ${bad.length} validated variable(s) missing from the reference:${NC}`);
         for (const key of bad) console.log(`  ${RED}${key}${NC}`);
         console.log(`      ${DIM}That page promises it lists every variable the schema validates.${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Endpoint index ━━━${NC}`);
+    const { findings: bad, routes, modules } = checkEndpointIndex(ROOT);
+    console.log(`${DIM}Extracted ${routes} route(s) from ${modules} router module(s).${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every mounted route is in the endpoint index.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} route(s) the index does not account for:${NC}`);
+        for (const b of bad) console.log(`  ${RED}${b.kind}${NC} ${DIM}${b.message}${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Environment variables the code reads ━━━${NC}`);
+    const { findings: bad, dead, scanned, files } = checkEnvReads(ROOT);
+    console.log(`${DIM}Found ${scanned} distinct variable(s) read across ${files} source file(s).${NC}`);
+    if (!bad.length && !dead.length) {
+        console.log(`${GREEN}✓ Every variable the code reads is on the configuration page.${NC}`);
+    } else {
+        findings += bad.length + dead.length;
+        if (bad.length) {
+            console.log(`${RED}✗ ${bad.length} variable(s) the code reads and the page does not name:${NC}`);
+            for (const b of bad) {
+                console.log(`  ${RED}${b.name}${NC} ${DIM}${b.files.slice(0, 3).join(", ")}${NC}`);
+            }
+        }
+        for (const name of dead) {
+            console.log(`  ${RED}${name}${NC} ${DIM}is exempted in NOT_OURS but nothing reads it — delete the entry.${NC}`);
+        }
     }
 }
 
@@ -225,14 +366,62 @@ if (only === "both" || only === "names") {
 }
 
 if (only === "both" || only === "names") {
-    console.log(`\n${YELLOW}━━━ Agent-bundle manifests ━━━${NC}`);
-    const { findings: bad, scanned } = checkAgentBundle(ROOT);
-    console.log(`${DIM}Scanned ${scanned} MCP manifest(s) in tooling/rebase-agent-skills/.${NC}`);
+    console.log(`\n${YELLOW}━━━ Always-on instruction files (all locales) ━━━${NC}`);
+    const { findings: bad, scanned } = checkAiInstructions(ROOT);
+    console.log(`${DIM}Scanned ${scanned} instruction file(s) against RebaseServerClient.${NC}`);
     if (!bad.length) {
-        console.log(`${GREEN}✓ Every MCP server manifest names something that exists.${NC}`);
+        console.log(`${GREEN}✓ Every accessor and specifier a scaffold teaches exists.${NC}`);
     } else {
         findings += bad.length;
-        console.log(`${RED}✗ ${bad.length} manifest(s) pointing at nothing:${NC}`);
+        console.log(`${RED}✗ ${bad.length} rule(s) naming something that does not exist:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Skill claims against source ━━━${NC}`);
+    const { findings: bad, scanned } = checkSkillClaims(ROOT);
+    console.log(`${DIM}Checked ${scanned} skill file(s) against the values the code declares.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every limit, path, signature and count a skill states matches source.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} claim(s) the code contradicts:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ MCP tool tables ━━━${NC}`);
+    const { findings: bad } = checkMcpToolTables(ROOT);
+    console.log(`${DIM}Compared packages/mcp/README.md against ALL_TOOLS.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ The npm README's tool tables are the ones the server registers.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} generated block(s) out of date:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Agent bundle: manifests, tool names, repository URLs ━━━${NC}`);
+    const { findings: bad, scanned } = checkAgentBundle(ROOT);
+    console.log(`${DIM}Scanned ${scanned} MCP manifest(s), plus every tool name and first-party URL in tooling/rebase-agent-skills/.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every launcher, tool name and repository URL in the bundle names something that exists.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} reference(s) pointing at nothing:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);
@@ -258,12 +447,28 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "snippets") {
     console.log(`\n${YELLOW}━━━ Docs snippet typecheck (en + skills) ━━━${NC}`);
-    const { failures, snippetCount, skipped, files, stubbed, setupErrors, unresolved, externalCount } =
-        await typecheckSnippets(ROOT);
+    const {
+        failures, snippetCount, skipped, files, stubbed, setupErrors, unresolved,
+        externalCount, overBudget, budget
+    } = await typecheckSnippets(ROOT);
     console.log(
         `${DIM}Compiled ${snippetCount} snippets from ${files} files ` +
-            `(${skipped} opted out via no-verify, ${externalCount} third-party module(s) stubbed).${NC}`
+            `(${skipped}/${budget} opted out via no-verify, ${externalCount} third-party module(s) stubbed).${NC}`
     );
+
+    // The opt-out ratchet, reported before the results: a fence nobody compiles
+    // cannot fail, so a rising count reads exactly like a passing suite.
+    if (overBudget) {
+        findings += 1;
+        console.log(
+            `${RED}✗ ${overBudget.count} no-verify fences, budget ${overBudget.budget} — ` +
+                `the opt-out may go down, never up.${NC}`
+        );
+        console.log(
+            `      ${DIM}Fix the fence, or say why it cannot be checked and raise ` +
+                `NO_VERIFY_BUDGET in tooling/scripts/docs-verify/extract.mjs with the reason.${NC}`
+        );
+    }
 
     // A misconfigured verifier reports "clean" for the snippets it can no longer
     // check, so surface it before the results it produced.

@@ -9,7 +9,7 @@ description: Wenden Sie mit CollectionCallbacks übergreifende Lifecycle-Callbac
 Rebase bietet zwei Ebenen von Entity-Lifecycle-Callbacks — beide verwenden denselben Typ `CollectionCallbacks` aus `@rebasepro/types`:
 
 - **[Callbacks pro Collection](/docs/collections/callbacks)**: Auf einzelnen Collection-Konfigurationen definiert. Sie laufen nur für diese Collection.
-- **Globale Callbacks**: Auf `initializeRebaseBackend({ callbacks })` definiert. Sie werden für **jede** Collection ausgelöst, auf jedem Datenpfad (REST-API, WebSocket / Echtzeit, serverseitiges `rebase.data`).
+- **Globale Callbacks**: Auf `initializeRebaseBackend({ callbacks })` definiert. Sie werden für **jede** Collection ausgelöst, auf jedem Datenpfad (REST-API, WebSocket / Echtzeit, serverseitiges `rebase.dataAsAdmin`).
 
 Verwenden Sie globale Callbacks für:
 - **PII-Maskierung** — sensible Felder für Nicht-Admin-Aufrufer über alle Collections hinweg schwärzen.

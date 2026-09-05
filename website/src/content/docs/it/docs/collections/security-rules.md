@@ -204,9 +204,9 @@ Un'esigenza comune è consentire agli **utenti non autenticati** di inviare dati
 ### Consigliato: `access: "public"` con `withCheck`
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const contactMessagesCollection: PostgresCollectionConfig = {
+const contactMessagesCollection = defineCollection({
     slug: "contact_messages",
     name: "Contact Messages",
     table: "contact_messages",
@@ -225,7 +225,7 @@ const contactMessagesCollection: PostgresCollectionConfig = {
     properties: {
         email: { name: "Email", type: "string" }
     }
-};
+});
 ```
 
 La scorciatoia `access: "public"` genera una policy che consente l'operazione senza richiedere autenticazione.
@@ -233,9 +233,9 @@ La scorciatoia `access: "public"` genera una policy che consente l'operazione se
 ### Per la Cattura di Lead / Iscrizioni
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const leadSignupsCollection: PostgresCollectionConfig = {
+const leadSignupsCollection = defineCollection({
     slug: "lead_magnet_signups",
     name: "Lead Magnet Signups",
     table: "lead_magnet_signups",
@@ -248,7 +248,7 @@ const leadSignupsCollection: PostgresCollectionConfig = {
     properties: {
         email: { name: "Email", type: "string" }
     }
-};
+});
 ```
 
 ### Come Funzionano le Richieste Anonime

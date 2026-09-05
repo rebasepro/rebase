@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 // number the client invented and no layer of the stack agreed with. Naming the
 // constant is what makes the assertion about the server's page size instead of
 // about the line above it.
-import { DEFAULT_LIST_LIMIT } from "@rebasepro/types";
+import { DEFAULT_LIST_LIMIT, isUnsupported } from "@rebasepro/types";
 import { createCollectionClient } from "../src/collection";
 import { Transport } from "../src/transport";
 import { RebaseWebSocketClient } from "../src/websocket";
@@ -301,6 +301,37 @@ title: "Updated" });
      * selector per visible cell, so a single `collection_update` fanned out
      * into one identical count request per row.
      */
+    /**
+     * `create`, `createMany`, `updateMany`, `delete` and `deleteMany` all took
+     * `WriteOptions`; the single-row `update` did not, so it was the one write
+     * on the surface that could not be made idempotent. A client that never
+     * sees the response retries, and without a key the server cannot tell that
+     * retry from a second deliberate edit — which on a `PATCH` that increments
+     * or appends is a second edit applied.
+     */
+    describe("update takes WriteOptions like every other write", () => {
+        it("sends the idempotency key", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockResolvedValue({ id: 1 } as never);
+
+            await client.update(1, { title: "x" }, { idempotencyKey: "attempt-1" });
+
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/1", expect.objectContaining({
+                method: "PATCH",
+                headers: { "Idempotency-Key": "attempt-1" }
+            }));
+        });
+
+        it("sends no header when no key was given", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockResolvedValue({ id: 1 } as never);
+
+            await client.update(1, { title: "x" });
+
+            expect(mockRequest.mock.calls[0][1]).not.toHaveProperty("headers");
+        });
+    });
+
     describe("count request de-duplication", () => {
         it("issues one request for concurrent identical counts", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
@@ -338,6 +369,36 @@ title: "Updated" });
             expect(mockRequest).toHaveBeenCalledTimes(2);
         });
 
+        /**
+         * A request key is a path and a query string. It says nothing about
+         * *who* is asking — and the map used to be module-level, shared by
+         * every client in the process. So an admin panel beside a signed-in
+         * user's client, or two per-request server clients, counting the same
+         * collection shared one request, and whichever arrived second was
+         * answered with the first one's total. Row-level security makes those
+         * genuinely different numbers.
+         */
+        it("does not share a count between two clients on different transports", async () => {
+            const a = createMockTransport();
+            const b = createMockTransport();
+            let resolveA: (v: { count: number }) => void = () => {};
+            a.mockRequest.mockReturnValue(new Promise<{ count: number }>(r => { resolveA = r; }) as never);
+            let resolveB: (v: { count: number }) => void = () => {};
+            b.mockRequest.mockReturnValue(new Promise<{ count: number }>(r => { resolveB = r; }) as never);
+
+            const clientA = createCollectionClient<PostModel>(a.transport, "posts");
+            const clientB = createCollectionClient<PostModel>(b.transport, "posts");
+
+            const both = Promise.all([clientA.count(), clientB.count()]);
+            resolveA({ count: 7 });
+            resolveB({ count: 2 });
+
+            // Two requests, and each client is told its own answer.
+            expect(await both).toEqual([7, 2]);
+            expect(a.mockRequest).toHaveBeenCalledTimes(1);
+            expect(b.mockRequest).toHaveBeenCalledTimes(1);
+        });
+
         it("propagates a failure to every sharing caller and clears the entry", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockRejectedValueOnce(new Error("boom") as never);
@@ -353,10 +414,15 @@ title: "Updated" });
     });
 
     describe("listen / listenById", () => {
-        it("does not expose listen/listenById when no websocket is provided", () => {
+        it("stubs listen/listenById with the reason when no websocket is provided", () => {
+            // They used to be absent, so the failure a caller saw depended on
+            // how deep they were: the query builder said "realtime: false" and
+            // `client.listen(...)` said `undefined is not a function`.
             const client = createCollectionClient<PostModel>(transport, "posts");
-            expect(client.listen).toBeUndefined();
-            expect(client.listenById).toBeUndefined();
+            expect(() => client.listen(undefined, jest.fn())).toThrow(/realtime: false/);
+            expect(() => client.listenById("p1", jest.fn())).toThrow(/realtime: false/);
+            expect(isUnsupported(client.listen)).toBe(true);
+            expect(isUnsupported(client.listenById)).toBe(true);
         });
 
         it("exposes listen/listenById when websocket is provided", () => {
@@ -381,7 +447,7 @@ title: "Updated" });
             const onUpdate = jest.fn();
             const onError = jest.fn();
 
-            const result = client.listen!({ limit: 10,
+            const result = client.listen({ limit: 10,
 orderBy: ["title", "desc"] }, onUpdate, onError);
 
             expect(mockWs.listenCollection).toHaveBeenCalledWith(
@@ -419,7 +485,7 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
             let resolveCount!: (n: number) => void;
             client.count = jest.fn().mockReturnValue(new Promise<number>(r => { resolveCount = r; }));
             const onUpdate = jest.fn();
-            client.listen!(undefined, onUpdate);
+            client.listen(undefined, onUpdate);
 
             const entities: Entity[] = [
                 { id: "1",
@@ -464,7 +530,7 @@ values: { title: "B" } }
             client.count = jest.fn().mockResolvedValue(100);
 
             const onUpdate = jest.fn();
-            client.listen!({ limit: 10, offset: 5 }, onUpdate);
+            client.listen({ limit: 10, offset: 5 }, onUpdate);
 
             const entities: Entity[] = [
                 { id: "1", path: "posts", values: { title: "A" } },
@@ -504,7 +570,7 @@ values: { title: "B" } }
             client.count = jest.fn().mockResolvedValue(2);
 
             const onUpdate = jest.fn();
-            client.listen!(undefined, onUpdate);
+            client.listen(undefined, onUpdate);
 
             const entities: Entity[] = [
                 { id: "1", path: "posts", values: { title: "A" } },
@@ -543,7 +609,7 @@ values: { title: "B" } }
             client.count = jest.fn().mockRejectedValue(new Error("Network error"));
 
             const onUpdate = jest.fn();
-            client.listen!(undefined, onUpdate);
+            client.listen(undefined, onUpdate);
 
             const entities: Entity[] = [
                 { id: "1", path: "posts", values: { title: "A" } }
@@ -577,7 +643,7 @@ values: { title: "B" } }
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
             const onUpdate = jest.fn();
 
-            client.listenById!("abc", onUpdate);
+            client.listenById("abc", onUpdate);
 
             expect(mockWs.listenOne).toHaveBeenCalledWith(
                 { path: "posts",
@@ -599,7 +665,7 @@ id: "abc" },
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
             const onUpdate = jest.fn();
-            client.listenById!("abc", onUpdate);
+            client.listenById("abc", onUpdate);
 
             // Entity exists
             const entity: Entity = { id: "abc",
@@ -621,7 +687,7 @@ values: { title: "Test" } };
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
-            client.listen!(
+            client.listen(
                 { where: { status: ["==", "published"] },
 searchString: "test" },
                 jest.fn()
@@ -812,77 +878,77 @@ mockWs };
 
     it("passes > operator tuple through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { count: [">", 5] } }, jest.fn());
+        client.listen({ where: { count: [">", 5] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.count).toEqual([">", 5]);
     });
 
     it("passes >= operator tuple through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { count: [">=", 10] } }, jest.fn());
+        client.listen({ where: { count: [">=", 10] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.count).toEqual([">=", 10]);
     });
 
     it("passes < operator tuple through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { count: ["<", 3] } }, jest.fn());
+        client.listen({ where: { count: ["<", 3] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.count).toEqual(["<", 3]);
     });
 
     it("passes != operator tuple through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { status: ["!=", "draft"] } }, jest.fn());
+        client.listen({ where: { status: ["!=", "draft"] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.status).toEqual(["!=", "draft"]);
     });
 
     it("passes in operator with array value through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { status: ["in", ["active", "pending"]] } }, jest.fn());
+        client.listen({ where: { status: ["in", ["active", "pending"]] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.status).toEqual(["in", ["active", "pending"]]);
     });
 
     it("passes not-in operator through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { type: ["not-in", ["a", "b"]] } }, jest.fn());
+        client.listen({ where: { type: ["not-in", ["a", "b"]] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.type).toEqual(["not-in", ["a", "b"]]);
     });
 
     it("passes array-contains operator through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { tags: ["array-contains", "featured"] } }, jest.fn());
+        client.listen({ where: { tags: ["array-contains", "featured"] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.tags).toEqual(["array-contains", "featured"]);
     });
 
     it("passes array-contains-any operator through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { tags: ["array-contains-any", ["a", "b", "c"]] } }, jest.fn());
+        client.listen({ where: { tags: ["array-contains-any", ["a", "b", "c"]] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.tags).toEqual(["array-contains-any", ["a", "b", "c"]]);
     });
 
     it("passes == with boolean true through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { active: ["==", true] } }, jest.fn());
+        client.listen({ where: { active: ["==", true] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.active).toEqual(["==", true]);
     });
 
     it("passes == with null through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { deletedAt: ["==", null] } }, jest.fn());
+        client.listen({ where: { deletedAt: ["==", null] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.deletedAt).toEqual(["==", null]);
     });
 
     it("passes == with string value through unchanged", () => {
         const { client, mockWs } = createClientWithWs();
-        client.listen!({ where: { status: ["==", "published"] } }, jest.fn());
+        client.listen({ where: { status: ["==", "published"] } }, jest.fn());
         const filter = (mockWs.listenCollection as jest.Mock).mock.calls[0][0].filter;
         expect(filter.status).toEqual(["==", "published"]);
     });

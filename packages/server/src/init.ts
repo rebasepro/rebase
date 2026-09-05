@@ -27,7 +27,8 @@ import {
     logForeignCollections,
     provisionCollectionPolicies,
     provisionCollectionTables,
-    provisionTargetFor
+    provisionTargetFor,
+    verifyProvisioningConnection
 } from "./boot/provision";
 import { enforceSchemaStamp, resolveSchemaMismatchPolicy } from "./boot/schema-stamp";
 import { DEFAULT_DRIVER_ID, DefaultDriverRegistry, DriverRegistry } from "./services/driver-registry";
@@ -40,11 +41,11 @@ import { createAdapterAuthMiddleware } from "./auth/adapter-middleware";
 import { scopeDataDriver, SERVICE_IDENTITY } from "./auth/rls-scope";
 import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
 import { errorHandler } from "./api/errors";
+import { installRootErrorHandler } from "./api/root-error-handler";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HonoEnv } from "./api/types";
-import { configureLogLevel } from "./utils/logging";
-import { logger } from "./utils/logger";
+import { logger, setLogLevel } from "./utils/logger";
 import { configureMiddlewares } from "./init/middlewares";
 import { initializeStorage, assertStorageAccessControlConfigured } from "./init/storage";
 import { resolveStorageAccessControl } from "./storage/policies";
@@ -124,7 +125,7 @@ import { createRebaseClient } from "@rebasepro/client";
 
 import { createHistoryRoutes } from "./history";
 import type { EmailService } from "./email";
-import { createEmailService, EmailConfig } from "./email";
+import { createEmailService, createUnconfiguredEmailService, EmailConfig } from "./email";
 import { activeDevEmailSink } from "./email/dev-sink";
 import type { OAuthProvider } from "./auth/interfaces";
 import type { AuthHooks } from "./auth/auth-hooks";
@@ -425,7 +426,8 @@ export interface RebaseBackendConfig {
      * such handle to give (it gave the connection to the adapter instead), so it
      * leaves this unset and the adapter falls back to its own connection.
      *
-     * Not part of the ordinary configuration surface: set by `bootFromBundle`.
+     * @internal Set by `bootFromBundle`; not part of the ordinary configuration
+     * surface.
      */
     provisioningDriverResult?: InitializedDriver;
 
@@ -437,6 +439,8 @@ export interface RebaseBackendConfig {
      * builds them from the declared graph. The list of *declared* sources is no
      * longer an option here: it is read from the resource graph, which is the
      * one place a project declares them.
+     *
+     * @internal Built by `initializeDataSources` from the declared resource graph. Pass `database` instead.
      */
     bootstrappers?: BackendBootstrapper[];
     /**
@@ -651,6 +655,8 @@ export interface RebaseBackendConfig {
      * EXISTS` reads the catalog and then writes to it, so N processes racing to
      * provision the same schema is a state nobody designed. `bootFromBundle`
      * derives it from `REBASE_ROLE`.
+     *
+     * @internal Derived from `REBASE_ROLE` by `bootFromBundle`.
      */
     provisionSchema?: boolean;
     surfaces?: RuntimeSurfaceOptions;
@@ -687,6 +693,8 @@ export interface RebaseBackendConfig {
      * `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE`.
      *
      * A name that is not in the bundle fails the boot — see `selectFunctions`.
+     *
+     * @internal Filled from `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE`.
      */
     functionsSelection?: import("./functions/selection").FunctionSelection;
     /**
@@ -695,6 +703,8 @@ export interface RebaseBackendConfig {
      * Only consulted when the `functions` surface is off — a process that serves
      * them has nothing to forward. `bootFromBundle` fills this from
      * `REBASE_FUNCTIONS_UPSTREAM` on the `api` role.
+     *
+     * @internal Filled from `REBASE_FUNCTIONS_UPSTREAM` on the `api` role.
      */
     functionsUpstream?: string;
     cronsDir?: string;
@@ -785,6 +795,8 @@ export interface RebaseBackendConfig {
      *
      * Suppresses the "no CORS configuration detected" warning, which exists for
      * hand-wired backends that genuinely have no origin policy.
+     *
+     * @internal Set by the boot path that installs CORS itself.
      */
     corsHandled?: boolean;
 
@@ -799,7 +811,11 @@ export interface RebaseBackendConfig {
      */
     schemaVersion?: string;
 
-    /** Runtime version reported by the contract endpoint. Informational. */
+    /**
+     * Runtime version reported by the contract endpoint. Informational.
+     *
+     * @internal Read from the bundle manifest by `bootFromBundle`.
+     */
     runtimeVersion?: string;
 
     /**
@@ -938,6 +954,9 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
         initializeAuth: dbAdapter.initializeAuth,
         initializeHistory: dbAdapter.initializeHistory,
         initializeWebsockets: dbAdapter.initializeWebsockets,
+        verifyConnection: dbAdapter.verifyConnection
+            ? (driverResult) => dbAdapter.verifyConnection!(driverResult)
+            : undefined,
         ensureCollectionSchema: dbAdapter.ensureCollectionSchema
             ? (collections, driverResult, log) =>
                 dbAdapter.ensureCollectionSchema!(collections, driverResult, log)
@@ -968,11 +987,12 @@ export async function initializeRebaseBackend(config: RebaseBackendConfig): Prom
 }
 
 async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<RebaseBackendInstance> {
-    if (config.logging?.level) {
-        configureLogLevel(config.logging.level);
-    } else {
-        configureLogLevel();
-    }
+    // One level system. This used to also call `configureLogLevel`, which
+    // replaced `console.debug`/`console.log`/`console.warn` with no-ops — so
+    // `LOG_LEVEL=warn` silenced not just this server's info lines but every
+    // `console.log` in the process: a dependency's, and the project's own
+    // debugging. Irreversibly, since the originals were discarded.
+    setLogLevel(config.logging?.level);
 
     // Before anything reads the config: a project still declaring resources the
     // old way is refused here rather than booted with them ignored. First
@@ -1016,6 +1036,15 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             notServing: offSurfaces
         });
     }
+
+    // The JSON envelope, on the root app, before any middleware is added — so
+    // that a throw *in* a middleware is caught too. It used to live on the data
+    // and functions routers alone, so everything else (auth, storage, admin, a
+    // project's own routes) answered Hono's default `500 Internal Server Error`
+    // as `text/plain`: no `code`, and a JSON parse failure for any client that
+    // reads one. An app that already has its own handler keeps it — see
+    // `installRootErrorHandler`.
+    installRootErrorHandler(config.app);
 
     // Configure Hono middlewares (Request ID, body limit, CSRF, CORS warning, logging)
     configureMiddlewares(config.app, basePath, isProduction, config);
@@ -1113,6 +1142,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         declaredDataSources.map(source => ({ key: source.key, engine: source.engine ?? provisionTarget.engine }))
     );
     logForeignCollections(activeCollections, provisionable, { engine: provisionTarget.engine });
+
+    // Before that first query: ask the database whether it is there at all. The
+    // adapter's connection diagnosis — the box that names the host, the port and
+    // `docker compose up -d db` — used to live only inside `initializeDriver`,
+    // which runs after this, so the one failure it was written for never reached
+    // it. See `verifyProvisioningConnection`.
+    await verifyProvisioningConnection(provisionTarget);
 
     const schemaOutcome = await provisionCollectionTables(provisionable, provisionTarget, {
         introspecting: introspectCollections,
@@ -1213,7 +1249,15 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     const defaultDriver = driverRegistry.getOrDefault(defaultDriverId);
     if (!defaultDriver || !defaultDriverResult) {
-        throw new Error("Default driver not initialized by bootstrappers");
+        // Named, because the reader's next question is "which one" and the
+        // answer is not obvious from a multi-source configuration: the default
+        // is whichever adapter is marked `isDefault`, or the first declared.
+        throw new Error(
+            `The "${defaultDriverId}" data source is the default, and its adapter's ` +
+            "`initializeDriver` returned nothing usable. Adapters that ran: " +
+            `${bootstrappers.map(b => b.id || b.type).join(", ") || "none"}. ` +
+            "Check that adapter's connection configuration."
+        );
     }
     const defaultBootstrapper = bootstrappers.find(b => b.id === defaultDriverId || b.type === defaultDriverId) || bootstrappers[0];
     const defaultRealtimeService = defaultDriverResult.realtimeProvider;
@@ -2480,13 +2524,16 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // declares — `data` is `Omit`ted from the type so the privilege has to be
     // named at the call site.
     //
-    // It is still assigned here on purpose. `createRebaseClient` above already
-    // put an HTTP-transport `data` on this object, so *not* overwriting it would
-    // leave `rebase.data` working in plain JS while quietly routing through the
-    // loop this native plane exists to skip — a silent performance and identity
-    // change instead of the compile error TypeScript now gives. Both names point
-    // at the same admin-scoped object — admin-scoped, not RLS-bypassing.
-    Object.assign(serverClient, { data: serverData, dataAsAdmin: serverData });
+    // `data` is deleted rather than re-pointed. `createRebaseClient` above put an
+    // HTTP-transport `data` on this object, and for a while the fix was to
+    // overwrite it with the native plane — so `rebase.data` kept working in plain
+    // JavaScript as a second name for the admin-scoped accessor. That is the
+    // thing the type change was for: one name for a privileged plane, visible at
+    // the call site. A hidden alias means untyped code can still reach it by the
+    // name that reads user-scoped everywhere else. Removed, so `rebase.data` is
+    // `undefined` in JavaScript as it is absent in TypeScript.
+    Object.assign(serverClient, { dataAsAdmin: serverData });
+    delete (serverClient as { data?: unknown }).data;
     logger.debug("Native data plane attached to singleton (bypasses HTTP loop)");
 
     // Same treatment for storage: server-side `rebase.storage` must talk to the
@@ -2510,10 +2557,20 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         emailService = createEmailService((config.auth as RebaseAuthConfig).email!);
     }
 
-    if (emailService) {
-        Object.assign(serverClient, { email: emailService });
-        logger.debug("Email service attached to singleton", { configured: emailService.isConfigured() });
+    // `RebaseServerClient` declares `email` as always present, so it has to be.
+    // Left absent, a cron or a custom function calling `rebase.email.send` on a
+    // backend without SMTP died on "Cannot read properties of undefined" — a
+    // stack trace about a language feature rather than about the thing nobody
+    // configured. The stand-in throws a sentence that names the fix, and reports
+    // `isConfigured() === false`, so the auth routes that already check that keep
+    // answering 503 rather than reaching it.
+    {
+        const attached = emailService ?? createUnconfiguredEmailService();
+        Object.assign(serverClient, { email: attached });
+        logger.debug("Email service attached to singleton", { configured: attached.isConfigured() });
+    }
 
+    if (emailService) {
         if (emailService.isConfigured() && typeof emailService.verifyConnection === "function") {
             emailService.verifyConnection().then((success) => {
                 if (!success) {
@@ -2766,11 +2823,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             cronScheduler.start();
             logger.info("Mounted cron jobs", {
                 count: loadedCronJobs.length,
-                path: `${basePath}/cron`
+                path: `${basePath}/admin/cron`
             });
         } else {
             logger.warn(
-                `Cron routes mounted at ${basePath}/cron, but no jobs loaded from ${config.cronsDir}. ` +
+                `Cron routes mounted at ${basePath}/admin/cron, but no jobs loaded from ${config.cronsDir}. ` +
                 (cronProblems.length > 0
                     ? `Nothing is scheduled — ${cronProblems.length} file(s) were skipped, see the messages above.`
                     : "The directory holds no .ts/.js cron files, so nothing is scheduled.")

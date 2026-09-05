@@ -165,17 +165,35 @@ Cloud Run y otras plataformas serverless son sin estado. Usa **almacenamiento S3
 
 ## Cambiar la URL Base
 
-Si quieres que Rebase se ejecute en una subruta (p. ej., `/admin`):
+Si quieres que el panel de administración se ejecute en una sub-ruta (p. ej. `/admin`), cambia una línea — el `path` de la app en `rebase.json`:
 
-**Frontend** — Actualiza el `basename` de `BrowserRouter`:
-
-```tsx title="frontend/src/main.tsx"
-<BrowserRouter basename="/admin">
-    <App />
-</BrowserRouter>
+```json title="rebase.json"
+"admin": {
+    "type": "static",
+    "root": "frontend",
+    "build": "npm run build --workspace frontend",
+    "output": "frontend/dist",
+    "path": "/admin"
+}
 ```
 
-**Backend** — Actualiza la ruta base:
+`rebase build` se lo pasa a Vite como `base` (mediante `REBASE_APP_BASE`), Vite lo devuelve como `import.meta.env.BASE_URL`, y el `main.tsx` del scaffold ya se lo entrega al router — así los assets, las rutas y el servidor coinciden sin escribir el prefijo en tres sitios:
+
+```tsx title="frontend/src/main.tsx"
+// At "/" this is "".
+const basename = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+const router = createBrowserRouter([
+    {
+        path: "/*",
+        element: <App/>
+    }
+], { basename });
+```
+
+El panel necesita un **data router** — `createBrowserRouter`, no el simple `BrowserRouter` — porque el bloqueo de cambios sin guardar usa `useBlocker`, que solo proporciona el data router.
+
+**Backend** — si también mueves la API, actualiza su ruta base:
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -210,16 +228,17 @@ de modo que cada app se carga de forma diferida y los visitantes del producto nu
 const isAdmin = window.location.pathname.startsWith("/admin");
 
 const ProductApp = lazy(() => import("./App"));
-const AdminApp = lazy(() => import("./AdminApp")); // renders <RebaseCMS basePath="/admin" />
+const AdminApp = lazy(() => import("./AdminApp"));
 
-if (isAdmin) {
-    // The admin uses useBlocker → needs a data router
-    const router = createBrowserRouter([{ path: "/admin/*", element: <AdminApp /> }]);
-    root.render(<RouterProvider router={router} />);
-} else {
-    root.render(<BrowserRouter><ProductApp /></BrowserRouter>);
-}
+const router = isAdmin
+    // The admin lives under /admin, and `basename` is how the router is told.
+    ? createBrowserRouter([{ path: "/*", element: <AdminApp/> }], { basename: "/admin" })
+    : createBrowserRouter([{ path: "/*", element: <ProductApp/> }]);
+
+root.render(<RouterProvider router={router}/>);
 ```
+
+Un único router para ambas mitades: el panel necesita el data router de todas formas, y no hay razón para que la app de producto esté en otro.
 
 El backend no necesita cambios para este patrón — la API permanece en `/api` y el catch-all de la SPA
 sirve `index.html` tanto para `/` como para `/admin/*`.

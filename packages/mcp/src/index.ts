@@ -325,18 +325,54 @@ const ENV_BASE_URL = process.env.REBASE_BASE_URL || "";
 const ENV_API_TOKEN = process.env.REBASE_API_TOKEN || process.env.REBASE_TOKEN || "";
 
 /**
+ * The env vars that describe a `default` project, or `null` when the client
+ * declared none of them.
+ *
+ * `ENV_PROJECT_DIR` cannot answer this on its own: it falls back to
+ * `process.cwd()`, so it is always truthy and "was it set?" has to be asked of
+ * `process.env` directly.
+ */
+export function envDeclaredProject(
+    env: NodeJS.ProcessEnv = process.env
+): { projectDir?: string; baseUrl?: string; token?: string } | null {
+    const projectDir = env.REBASE_PROJECT_DIR || undefined;
+    const baseUrl = env.REBASE_BASE_URL || undefined;
+    const token = env.REBASE_API_TOKEN || env.REBASE_TOKEN || undefined;
+    if (!projectDir && !baseUrl && !token) return null;
+    return { projectDir, baseUrl, token };
+}
+
+/**
  * Initialize the project registry.
  *
  * Priority:
- * 1. REBASE_PROJECT_DIR env → single-project mode (backward-compatible)
- * 2. Load ~/.rebase/projects.json
- * 3. Auto-discover from .rebase/state.json in the project dir
+ * 1. `REBASE_PROJECT_DIR` / `REBASE_BASE_URL` / `REBASE_API_TOKEN` — the block
+ *    in the client's own MCP config. If any of them is set, the `default`
+ *    project is rebuilt from them on **every** start.
+ * 2. The persisted `default` in `~/.rebase/projects.json`, when the client
+ *    declared none of the three.
+ * 3. Auto-discovery from `.rebase/state.json` in the project dir, which fills
+ *    the gaps in either case.
+ *
+ * Step 1 used to be `if (!registry.projects["default"])` — the env vars seeded
+ * the registry once and were dead ever after. That is the wrong way round:
+ * the env block is what the person editing `.mcp.json` just wrote, and
+ * `~/.rebase/projects.json` is a cache in their home directory they have
+ * probably forgotten exists. Pointing `REBASE_PROJECT_DIR` at a second project
+ * silently kept talking to the first one, which is the failure this file can
+ * least afford: every tool here acts on whatever `default` resolves to.
+ *
+ * The rebuild is whole-entry, not per-field, on purpose. A token registered
+ * for one `projectDir` is a credential for *that* backend; carrying it over
+ * because the new env block only named a directory would hand the wrong
+ * project an admin key.
  */
 function initializeRegistry(): void {
     registry = loadRegistry();
 
-    // Ensure a "default" project exists from env vars or CWD
-    if (!registry.projects["default"]) {
+    const fromEnv = envDeclaredProject();
+
+    if (fromEnv || !registry.projects["default"]) {
         const devState = readDevState(ENV_PROJECT_DIR);
         const envServiceKey = readServiceKeyFromEnv(ENV_PROJECT_DIR);
         registry.projects["default"] = {
@@ -355,6 +391,48 @@ function initializeRegistry(): void {
 
     if (!registry.activeProject || !registry.projects[registry.activeProject]) {
         registry.activeProject = "default";
+    }
+
+    warnIfEnvIgnored(fromEnv);
+}
+
+/**
+ * Say so on stderr if the environment asked for something the registry is not
+ * doing.
+ *
+ * Two cases, and only the second one is reachable now:
+ *
+ * - The `default` entry does not carry the env values. That is the bug fixed
+ *   above; the check stays as a canary, because the symptom of the old
+ *   behaviour was an assistant confidently reading the wrong database with no
+ *   output anywhere saying so.
+ * - The env block is set but a *different* project is active, because a
+ *   previous session called `rebase_project_switch` and the registry remembers
+ *   it. Tools target `activeProject`, so the env block really is inert — the
+ *   registry is not overruled here, since sticky project selection is the
+ *   point of having a registry, but silence is not an option either.
+ *
+ * stderr, not stdout: stdout is the MCP framing channel.
+ */
+function warnIfEnvIgnored(fromEnv: ReturnType<typeof envDeclaredProject>): void {
+    if (!fromEnv) return;
+    const def = registry.projects["default"];
+    const mismatched: string[] = [];
+    if (fromEnv.projectDir && def?.projectDir !== fromEnv.projectDir) mismatched.push("REBASE_PROJECT_DIR");
+    if (fromEnv.baseUrl && def?.baseUrl !== fromEnv.baseUrl) mismatched.push("REBASE_BASE_URL");
+    if (fromEnv.token && def?.token !== fromEnv.token) mismatched.push("REBASE_API_TOKEN");
+    if (mismatched.length) {
+        process.stderr.write(
+            `[rebase-mcp] ${mismatched.join(", ")} set but not reflected in the "default" project — ` +
+            `this is a bug in the server; report it.\n`
+        );
+    }
+    if (registry.activeProject && registry.activeProject !== "default") {
+        process.stderr.write(
+            `[rebase-mcp] the environment describes the "default" project, but "${registry.activeProject}" ` +
+            `is the active one, so tools target it instead. Call rebase_project_switch with "default" ` +
+            `to use the environment's values.\n`
+        );
     }
 }
 
@@ -460,8 +538,12 @@ function clearClientCache(): void {
  * auditable at a glance and a new tool now arrives protected.
  */
 export const READ_ONLY_TOOLS = new Set<string>([
-    // CLI tools that only inspect the database
-    "rebase_schema_introspect",
+    // CLI tools that only inspect the database. `rebase_schema_plan` is
+    // `db push --dry-run`: it reads the live schema, prints the diff, and
+    // applies nothing — including the auth-schema step, which is skipped
+    // precisely so that "show me what would happen" does not change anything
+    // on the way.
+    "rebase_schema_plan",
     "rebase_doctor",
     "rebase_db_branch_list",
     "rebase_db_branch_info",
@@ -471,11 +553,11 @@ export const READ_ONLY_TOOLS = new Set<string>([
     // Admin
     "list_users",
     "list_roles",
-    // Storage. `storage_get_metadata` mints a signed URL, which is a bearer
+    // Storage. `storage_get_download_url` mints a signed URL, which is a bearer
     // capability rather than a plain read — see L2 in the unit-67 audit — but
     // it does not change the environment, so it belongs here.
     "storage_list_objects",
-    "storage_get_metadata",
+    "storage_get_download_url",
     // Cron
     "cron_list_jobs",
     "cron_get_job",
@@ -495,6 +577,12 @@ export const READ_ONLY_TOOLS = new Set<string>([
  * open question 2).
  */
 export const LOCAL_ONLY_TOOLS = new Set<string>([
+    // `rebase_schema_introspect` reads the database and *writes collection
+    // definition files* into the project. It was classified as a read, which is
+    // half true and the wrong half: the half that matters lands on this machine,
+    // overwriting hand-written collection files with generated ones. Local-only
+    // is what it is.
+    "rebase_schema_introspect",
     "rebase_schema_generate",
     "rebase_db_generate",
     "rebase_generate_sdk",
@@ -756,8 +844,15 @@ properties: {} },
         cmd: ["schema", "generate"]
     },
     {
+        name: "rebase_schema_plan",
+        description: "Show the SQL that rebase_db_push would run, without running any of it. Read this before proposing a schema change: it names every statement, and marks the ones that destroy data.",
+        inputSchema: { type: "object",
+properties: {} },
+        cmd: ["db", "push", "--dry-run"]
+    },
+    {
         name: "rebase_db_push",
-        description: "Apply the current Drizzle schema directly to the database (development shortcut, skips migration files).",
+        description: "Apply the current Drizzle schema directly to the database (development shortcut, skips migration files). Refuses changes that destroy data — use rebase_schema_plan first, then ask the human to run `rebase db push --allow-destructive`.",
         inputSchema: { type: "object",
 properties: {} },
         cmd: ["db", "push"]
@@ -1054,8 +1149,8 @@ const STORAGE_TOOLS: ToolDef[] = [
         }
     },
     {
-        name: "storage_get_metadata",
-        description: "Get metadata and a temporary signed download URL for a file in Rebase storage.",
+        name: "storage_get_download_url",
+        description: "Mint a temporary signed download URL for a file in Rebase storage. It returns the URL and its expiry, not object metadata — the URL is a bearer capability that outlives the tool call.",
         inputSchema: {
             type: "object",
             properties: {
@@ -1209,8 +1304,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: ALL_TOOLS
 }));
 
-/** Spawn the rebase CLI using the project's detected package manager. */
-function runRebaseCmd(commandArgs: string[]): Promise<string> {
+/**
+ * Spawn the rebase CLI using the project's detected package manager.
+ *
+ * The exit code comes back with the output. It used to be folded into a string
+ * — `Command exited with code 1\n\n…` — and handed over as an ordinary result,
+ * so a failed migration and a successful one differed only in prose. MCP has
+ * `isError` for exactly this, and a model that has to parse a sentence to learn
+ * whether a command worked will eventually parse it wrong.
+ */
+function runRebaseCmd(commandArgs: string[]): Promise<{ output: string; code: number }> {
     const projectDir = getProjectDir();
     const pm = detectPackageManager(projectDir);
     const { command, args: execArgs } = getExecCommand(pm);
@@ -1228,18 +1331,50 @@ function runRebaseCmd(commandArgs: string[]): Promise<string> {
         const chunks: string[] = [];
         child.stdout?.on("data", (d: Buffer) => chunks.push(d.toString()));
         child.stderr?.on("data", (d: Buffer) => chunks.push(d.toString()));
-        child.on("error", (err) => resolve(`Error spawning command: ${err.message}`));
+        child.on("error", (err) => resolve({ output: `Error spawning command: ${err.message}`, code: -1 }));
         child.on("close", (code) => {
             const output = chunks.join("").trim();
-            resolve(code !== 0 ? `Command exited with code ${code}\n\n${output}` : output || "(no output)");
+            resolve({
+                output: code !== 0 ? `Command exited with code ${code}\n\n${output}` : output || "(no output)",
+                code: code ?? -1
+            });
         });
     });
+}
+
+/**
+ * The one refusal an agent cannot act on alone, spelled out.
+ *
+ * `db push` refuses a destructive change on a non-TTY, which every MCP call is,
+ * and prints the plan while exiting 1. Without this the model sees a failure
+ * with a flag buried in it and its next move is to find a way to pass the flag
+ * — which is the wrong move: dropping a column is a decision, and the person
+ * whose data it is has to make it. Naming the command *for the human* is what
+ * turns a dead end into a handoff.
+ */
+function destructiveRefusalHint(toolName: string, output: string): string | null {
+    if (toolName !== "rebase_db_push") return null;
+    if (!/destructive changes require confirmation|--allow-destructive/.test(output)) return null;
+    return (
+        "\n\nThis push was refused because it destroys data, and that is not yours to approve. " +
+        "Show the planned SQL above (rebase_schema_plan prints it without running anything), " +
+        "say which statements drop data, and ask the person you are working with to run:\n\n" +
+        "    rebase db backup\n" +
+        "    rebase db push --allow-destructive\n"
+    );
 }
 
 // Dev server management
 let devProcess: ChildProcess | null = null;
 const devLogs: string[] = [];
 const MAX_DEV_LOG_LINES = 500;
+
+/** The last `count` lines of a blob of output, without its trailing blank. */
+export function lastLines(text: string, count: number): string {
+    if (!text) return "";
+    const lines = text.replace(/\n$/, "").split("\n");
+    return lines.slice(-Math.max(1, count)).join("\n");
+}
 
 function appendDevLog(line: string) {
     devLogs.push(line);
@@ -1282,9 +1417,44 @@ function untrustedJsonResult(source: string, data: unknown) {
     return textResult(untrustedEnvelope(source, JSON.stringify(data, null, 2)));
 }
 
+/**
+ * A tool error with the two facts a caller needs to act on it.
+ *
+ * `fetch failed` is what Node says when nothing is listening, and on its own it
+ * is the least useful sentence in this file: it names no host, no port and no
+ * next step. The agent's actual situation — nine times out of ten — is that
+ * `rebase dev` is not running, and it holds the tool that starts it.
+ *
+ * The URL matters as much as the remedy. The active project is sticky and lives
+ * outside the repository, so "which backend did it even try?" is a real
+ * question, and answering it is how somebody notices they are pointed at the
+ * wrong project rather than at a stopped one.
+ */
+export function explainToolError(err: unknown, baseUrl?: string): string {
+    const msg = err instanceof Error ? err.message : String(err);
+    const url = baseUrl ?? safeActiveBaseUrl();
+    const networkish = /fetch failed|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network error/i;
+    if (!networkish.test(msg)) return msg;
+    const where = url ? ` while calling ${url}` : "";
+    return (
+        `${msg}${where}. Nothing answered there — is \`rebase dev\` running? ` +
+        "Start it with `rebase_dev_start`, or check `rebase_project_current`: " +
+        "the active project is sticky and lives outside your repository."
+    );
+}
+
+/** The active project's baseUrl, or undefined if even that cannot be resolved. */
+function safeActiveBaseUrl(): string | undefined {
+    try {
+        return getActiveProject().baseUrl;
+    } catch {
+        return undefined;
+    }
+}
+
 /** Raw text from the target environment (CLI stdout, dev-server logs), marked as untrusted. */
-function untrustedTextResult(source: string, text: string) {
-    return textResult(untrustedEnvelope(source, text));
+function untrustedTextResult(source: string, text: string, isError = false) {
+    return { ...textResult(untrustedEnvelope(source, text)), ...(isError ? { isError: true } : {}) };
 }
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -1318,8 +1488,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             cmdArgs.push(assertValidBranchName(argsObj.name, "name"));
         }
 
-        const result = await runRebaseCmd(cmdArgs);
-        return untrustedTextResult(`the "${name}" CLI command`, result);
+        const { output, code } = await runRebaseCmd(cmdArgs);
+        const hint = destructiveRefusalHint(name, output);
+        return untrustedTextResult(`the "${name}" CLI command`, output + (hint ?? ""), code !== 0);
     }
 
     // ── Project management tools ────────────────────────────────────────
@@ -1377,7 +1548,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
 
             if (!baseUrl) {
-                return textResult("Error: Could not determine baseUrl. Provide --baseUrl or ensure the dev server is running in the project directory.");
+                // `--baseUrl` is a CLI flag, and this is not a CLI. The
+                // model was being told to pass an option this tool has no
+                // notion of, in a message it could not act on.
+                return {
+                    ...textResult(
+                        `Cannot register "${projectName}": no baseUrl. Pass \`baseUrl\` ` +
+                        '(for example "http://localhost:3001"), or pass a `projectDir` ' +
+                        "where `rebase dev` is running so it can be discovered from " +
+                        "`.rebase/state.json`."
+                    ),
+                    isError: true
+                };
             }
 
             registry.projects[projectName] = {
@@ -1594,7 +1776,7 @@ roles });
             return textResult(`Deleted object "${key}" successfully.`);
         }
 
-        case "storage_get_metadata": {
+        case "storage_get_download_url": {
             const argsObj = args as { key: string; bucket?: string };
             const { key, bucket } = argsObj;
             const result = await client.storage.getSignedUrl(key, bucket);
@@ -1676,11 +1858,16 @@ roles });
         case "rebase_dev_logs": {
             const argsObj = args as { lines?: number } | undefined;
             const lineCount = argsObj?.lines ?? 50;
-            const recent = devLogs.slice(-lineCount);
-            if (recent.length === 0) {
+            // `devLogs` holds stdout *chunks*, not lines: one `data` event can
+            // carry a hundred lines or half of one. Slicing the chunk array by
+            // `lines` therefore returned an amount of output unrelated to the
+            // number asked for — usually far more — while the tool description
+            // and the docs both promised lines.
+            const recent = lastLines(devLogs.join(""), lineCount);
+            if (!recent) {
                 return textResult(devProcess ? "No output captured yet." : "Dev server is not running.");
             }
-            return untrustedTextResult("the dev server's output", recent.join(""));
+            return untrustedTextResult("the dev server's output", recent);
         }
 
         case "rebase_dev_stop": {
@@ -1695,11 +1882,10 @@ roles });
             throw new Error(`Unknown tool: ${name}`);
         }
     } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
         return {
             content: [{
                 type: "text" as const,
-                text: `Error: ${msg}`
+                text: `Error: ${explainToolError(err)}`
             }],
             isError: true
         };
@@ -1845,7 +2031,42 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 
 // ── Start ───────────────────────────────────────────────────────────────────
 
+/**
+ * `--help` and `--version`, answered before anything connects.
+ *
+ * A stdio MCP server run by hand is the normal way to check that a config block
+ * works, and this one answered `--version` by opening a transport and waiting
+ * for a client that was never coming — a hang with no output, which reads as a
+ * broken install rather than as a server doing exactly what it was told.
+ *
+ * @returns true when the process has answered and should exit.
+ */
+export function answerCliFlags(argv: string[] = process.argv.slice(2)): boolean {
+    if (argv.includes("--version") || argv.includes("-v")) {
+        process.stdout.write(`${MCP_SERVER_VERSION}\n`);
+        return true;
+    }
+    if (argv.includes("--help") || argv.includes("-h")) {
+        process.stdout.write(
+            "rebase-mcp — the Rebase MCP server\n\n" +
+            "It speaks MCP over stdio and has no other interface: an MCP client\n" +
+            "spawns it, and there is nothing to run interactively.\n\n" +
+            "  npx -y @rebasepro/mcp\n\n" +
+            "Environment\n" +
+            "  REBASE_PROJECT_DIR                the directory holding rebase.json\n" +
+            "  REBASE_BASE_URL                   backend URL (default http://localhost:3001)\n" +
+            "  REBASE_API_TOKEN                  a scoped rk_ API key, or a service key\n" +
+            "  REBASE_MCP_ALLOW_REMOTE_WRITES    allow write tools off the loopback interface\n\n" +
+            "Setup blocks for Claude Code, Cursor, Gemini CLI, Codex and Kiro:\n" +
+            "  https://rebase.pro/docs/ai/mcp\n"
+        );
+        return true;
+    }
+    return false;
+}
+
 async function main() {
+    if (answerCliFlags()) return;
     const transport = new StdioServerTransport();
     await server.connect(transport);
 }

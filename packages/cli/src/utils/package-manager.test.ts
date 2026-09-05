@@ -83,6 +83,40 @@ describe("detectPackageManager", () => {
         });
     });
 
+    describe("a lockfile this CLI cannot honour", () => {
+        // Yarn and bun users used to get an npm workspace in silence, with
+        // their own lockfile sitting in the same directory. The choice stands —
+        // the scaffold writes one workspace protocol, and yarn and bun disagree
+        // with pnpm about both that and where node_modules goes — but it is
+        // said out loud now, which is the whole of the fix.
+        for (const lock of ["yarn.lock", "bun.lockb", "bun.lock"]) {
+            it(`says so when it finds ${lock}`, () => {
+                const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+                fs.writeFileSync(path.join(tmpDir, lock), "");
+
+                const pm = detectPackageManager(tmpDir);
+
+                expect(["pnpm", "npm"]).toContain(pm);
+                expect(warn).toHaveBeenCalledTimes(1);
+                expect(warn.mock.calls[0][0]).toContain(lock);
+                expect(warn.mock.calls[0][0]).toContain("not supported yet");
+                warn.mockRestore();
+            });
+        }
+
+        it("stays quiet when a supported lockfile is also present", () => {
+            // A pnpm workspace that happens to carry a stale yarn.lock is not a
+            // yarn project, and a warning on every command would be noise.
+            const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+            fs.writeFileSync(path.join(tmpDir, "pnpm-lock.yaml"), "");
+            fs.writeFileSync(path.join(tmpDir, "yarn.lock"), "");
+
+            expect(detectPackageManager(tmpDir)).toBe("pnpm");
+            expect(warn).not.toHaveBeenCalled();
+            warn.mockRestore();
+        });
+    });
+
     describe("default behavior", () => {
         it("defaults to pnpm when installed and no lock file is present", () => {
             delete process.env.npm_config_user_agent;

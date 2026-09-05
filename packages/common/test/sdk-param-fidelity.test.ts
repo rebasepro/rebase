@@ -108,21 +108,21 @@ describe("in-process SDK: every FindParams field reaches the driver", () => {
 
     it("count() forwards a logical group", async () => {
         const { driver, calls } = recordingDriver();
-        await sdk(buildSdkData(driver), "posts").count!({ logical: GROUP });
+        await sdk(buildSdkData(driver), "posts").count({ logical: GROUP });
 
         expect(calls.count[0].logical).toEqual(GROUP);
     });
 
     it("count() forwards searchString, so it counts what find() returns", async () => {
         const { driver, calls } = recordingDriver();
-        await sdk(buildSdkData(driver), "posts").count!({ searchString: "widget" });
+        await sdk(buildSdkData(driver), "posts").count({ searchString: "widget" });
 
         expect(calls.count[0].searchString).toBe("widget");
     });
 
     it("listen() forwards a logical group", () => {
         const { driver, calls } = recordingDriver();
-        sdk(buildSdkData(driver), "posts").listen!({ logical: GROUP }, () => {});
+        sdk(buildSdkData(driver), "posts").listen({ logical: GROUP }, () => {});
 
         expect(calls.listen[0].logical).toEqual(GROUP);
     });

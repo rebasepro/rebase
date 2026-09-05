@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import type { DatabaseAdapter } from "@rebasepro/types";
 import { adapterToBootstrapper } from "../src/boot/driver";
 import { wrapDatabaseAdapter } from "../src/init";
@@ -33,6 +35,7 @@ const CAPABILITIES = [
     "initializeAuth",
     "initializeHistory",
     "initializeWebsockets",
+    "verifyConnection",
     "ensureCollectionSchema",
     "ensureCollectionPolicies",
     "finalizeSecurityPosture",
@@ -68,6 +71,44 @@ const WRAPPERS: Array<[string, (adapter: DatabaseAdapter) => Record<string, unkn
     ["adapterToBootstrapper (boot/driver.ts, multi-source path)",
         adapter => adapterToBootstrapper(adapter, "(default)", true) as unknown as Record<string, unknown>]
 ];
+
+/**
+ * The list above is only as good as somebody remembering to extend it — which
+ * is the failure mode this whole file was written about, one level up. So the
+ * list is checked against the protocol it claims to enumerate: every optional
+ * method on `DatabaseAdapter` must appear in `CAPABILITIES`.
+ *
+ * Read from the type's source rather than reflected, because an interface has
+ * no runtime existence to reflect on. A crude regex over the declaration is
+ * enough: the point is not to parse TypeScript, it is to fail the moment a
+ * method is added to the protocol and not to this list.
+ */
+/**
+ * Optional adapter methods the wrappers cannot forward, and why.
+ *
+ * `destroy` has no counterpart on `BackendBootstrapper`, so there is no field to
+ * assign it to — and nothing in the runtime calls it on an adapter either. It is
+ * a declared-but-unwired hook rather than a dropped one; listing it here is what
+ * keeps that distinction explicit instead of leaving the gate to be loosened.
+ */
+const NOT_FORWARDABLE = new Set(["destroy"]);
+
+describe("CAPABILITIES covers the adapter protocol", () => {
+    it("names every optional method on DatabaseAdapter", () => {
+        const require_ = createRequire(__filename);
+        const source = readFileSync(
+            require_.resolve("@rebasepro/types/package.json").replace(/package\.json$/, "src/types/database_adapter.ts"),
+            "utf8"
+        );
+        const declared = new Set<string>();
+        for (const match of source.matchAll(/^ {4}(\w+)\?\s*[(<]/gm)) declared.add(match[1]);
+
+        expect(declared.size).toBeGreaterThan(0);
+        expect(
+            [...declared].filter(name => !CAPABILITIES.includes(name as never) && !NOT_FORWARDABLE.has(name))
+        ).toEqual([]);
+    });
+});
 
 describe.each(WRAPPERS)("%s", (_name, wrap) => {
     it.each(CAPABILITIES)("forwards %s when the adapter implements it", capability => {

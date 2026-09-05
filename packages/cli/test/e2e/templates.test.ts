@@ -29,6 +29,7 @@ import {
     startBackend,
     stopBackend,
     registerAndLogin,
+    loginSeededAdmin,
     writeRow,
     readRows,
     type RunningBackend
@@ -65,8 +66,8 @@ interface CmsCase {
     expected: string;
     /**
      * Rows the API should report afterwards. The blank preset's only
-     * collection is the auth users table, which already holds the admin that
-     * registering created.
+     * collection is the auth users table, which already holds the admin
+     * `rebase init` named in `.env` and boot created.
      */
     expectedTotal: number;
 }
@@ -189,7 +190,13 @@ describe.each(CMS_CASES)("cms template: $preset", (testCase) => {
         projectDir = await scaffold(name, testCase.preset, "cms", databaseUrl);
 
         // cms declares its schema in files, so this is what creates the tables.
-        await execa("node", [cliBin, "db", "push", "--collections", "../config/collections", "--force"], {
+        // No `--force`: `db push` has never had one. It was accepted because
+        // every driver parser ran `arg(..., { permissive: true })`, which turns
+        // an undeclared flag into a positional — so this line asked for
+        // something and silently got nothing for as long as it existed. The
+        // fresh database it pushes into has nothing to destroy, so the
+        // destructive gate it was presumably reaching for never fires.
+        await execa("node", [cliBin, "db", "push", "--collections", "../config/collections"], {
             cwd: projectDir,
             env
         });
@@ -198,10 +205,16 @@ describe.each(CMS_CASES)("cms template: $preset", (testCase) => {
         await client.connect();
         backend = await startBackend(projectDir, env);
 
-        // Registered once, here, so that the admin-promotion assertion below is
-        // genuinely about the *first* user. Registering inside each test would
-        // also add rows to the blank preset, whose only collection is `users`.
-        admin = await registerAndLogin(backend.baseUrl, "admin@example.com", "StrongPass1!");
+        // The account `rebase init` seeded, signed in once here. This used to
+        // register `admin@example.com` and rely on the first user being
+        // promoted — a path the scaffold no longer has, because `init` now
+        // names that exact address in `.env` and boot creates it. Registering
+        // it answered `409 EMAIL_EXISTS`.
+        //
+        // Still once, in `beforeAll`, for the original reason: signing in
+        // inside each test would add rows to the blank preset, whose only
+        // collection is `users`.
+        admin = await loginSeededAdmin(projectDir, backend.baseUrl);
     }, 600_000);
 
     afterAll(async () => {
@@ -222,7 +235,7 @@ describe.each(CMS_CASES)("cms template: $preset", (testCase) => {
         }
     });
 
-    it("promotes the first registered user to admin", () => {
+    it("seeds the admin named in .env, with the admin role", () => {
         expect(admin.roles).toContain("admin");
     });
 
@@ -328,7 +341,11 @@ describe.each(BAAS_PRESETS)("baas template: %s", (preset) => {
     });
 
     it("bootstraps the auth schema without a db push", async () => {
-        const user = await registerAndLogin(backend!.baseUrl, "admin@example.com", "StrongPass1!");
+        // A round trip through register and login is what proves the tables are
+        // there. The address is deliberately NOT the seeded admin's: `init`
+        // writes that one into `.env` and boot creates it, so registering it
+        // proves nothing and answers 409.
+        const user = await registerAndLogin(backend!.baseUrl, "second@example.com", "StrongPass2!");
         expect(user.uid).toBeTruthy();
     }, 60_000);
 
@@ -368,23 +385,17 @@ describe.each(BAAS_PRESETS)("baas template: %s", (preset) => {
         await stopBackend(backend);
         backend = await startBackend(projectDir, env);
 
-        const login = async (email: string, password: string) => {
-            const res = await fetch(`${backend!.baseUrl}/api/auth/login`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password })
-            });
-            const body = await res.json() as any;
-            return { uid: body.user.uid, token: body.tokens.accessToken };
-        };
+        // The seeded admin owns the row, which is the same actor this asserted
+        // before — the first registered user, back when registering made you
+        // one. It is reached with the credentials in the scaffold's `.env`
+        // rather than the pair this test used to invent.
+        const owner = await loginSeededAdmin(projectDir, backend.baseUrl);
+        const other = await registerAndLogin(backend.baseUrl, "other@example.com", "StrongPass3!");
 
-        const owner = await login("admin@example.com", "StrongPass1!");
-        const other = await registerAndLogin(backend.baseUrl, "other@example.com", "StrongPass2!");
-
-        const written = await writeRow(backend.baseUrl, owner.token, "notes", { body: "owner's private note" });
+        const written = await writeRow(backend.baseUrl, owner.accessToken, "notes", { body: "owner's private note" });
         expect(written.status, JSON.stringify(written.body)).toBeLessThan(300);
 
-        const ownerView = await readRows(backend.baseUrl, owner.token, "notes");
+        const ownerView = await readRows(backend.baseUrl, owner.accessToken, "notes");
         expect(ownerView.rows).toHaveLength(1);
 
         // The whole point of the RLS gate: another authenticated user must not

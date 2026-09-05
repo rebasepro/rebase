@@ -252,7 +252,7 @@ Methods:
 
 | Method | Description |
 |--------|-------------|
-| `open({ path, entityId, collection })` | Open a entity in a side panel |
+| `open({ path, entityId, collection })` | Open an entity in a side panel |
 | `close()` | Close the current side panel |
 | `replace({ path, entityId, collection })` | Replace the current side panel content |
 
@@ -432,7 +432,7 @@ function CustomAction() {
     const client = useRebaseClient();
 
     const handleAction = async () => {
-        const result = await client.call("functions/send-invoice", { invoiceId: "123" });
+        const result = await client.functions.invoke("send-invoice", { invoiceId: "123" });
         console.log(result);
     };
 
@@ -503,7 +503,7 @@ Switch the admin layout view modes within the admin panel.
 import { useAdminModeController } from "@rebasepro/app";
 
 function ModeToggle() {
-    const { mode, setMode } = useAdminModeController(); // mode is "content" | "studio" | "settings"
+    const { mode, setMode } = useAdminModeController(); // mode is "cms" | "studio" | "settings"
 
     return <button onClick={() => setMode("studio")}>Switch to Studio View</button>;
 }

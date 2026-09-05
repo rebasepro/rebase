@@ -147,7 +147,6 @@ export interface AppView {
      * You can use any of the icons in the Lucide specs:
      * https://lucide.dev/icons/
      * e.g. 'ShoppingCart' or 'User'
-     * Find all the icons in https://rebase.pro/docs/icons
      */
     icon?: string | React.ReactNode;
 

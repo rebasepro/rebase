@@ -229,6 +229,14 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
     storageRegistry: StorageSourceRegistry;
     createStorageSource: (storageId: string) => StorageSource;
     fetchStorageSources: () => Promise<StorageSourceDefinition[]>;
+    /**
+     * POST to an arbitrary endpoint on this backend, returning its body
+     * verbatim.
+     *
+     * The shorthand for {@link FunctionsClient.invoke} — `call("functions/x",
+     * p)` is `functions.invoke("x", p)` — and it unwraps exactly as little.
+     * Neither reaches into the response for a `data` key.
+     */
     call: <T = unknown>(endpoint: string, payload?: unknown) => Promise<T>;
     collection: <M extends Record<string, unknown> = Record<string, unknown>>(slug: string) => CollectionClient<M>;
     data: TypedDataLayer<DB>;
@@ -624,11 +632,20 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         collection,
         call: async <T = unknown>(endpoint: string, payload?: unknown): Promise<T> => {
             const prefix = endpoint.startsWith("/") ? "" : "/";
-            const res = await transport.request<{ data: T }>(`${prefix}${endpoint}`, {
+            // The body, verbatim — the same thing `functions.invoke()` returns.
+            //
+            // This used to end `return res.data ?? (res as T)`, unwrapping a
+            // top-level `data` key when it saw one. The docs present `call()`
+            // as a shorthand for `invoke()`, which does not, so the two
+            // returned *different values* for the one function that happens to
+            // answer `{ data: … }` — and silently, since the unwrap only fires
+            // on the shape it fires on. A caller who wants `.data` can write
+            // it; a caller whose function legitimately returns a `data` field
+            // could not get it back at all.
+            return transport.request<T>(`${prefix}${endpoint}`, {
                 method: "POST",
                 body: payload ? JSON.stringify(payload) : undefined
             });
-            return res.data ?? (res as T);
         },
         data: dataProxy,
         ...(offlineManager ? { offline: offlineManager.api } : {}),

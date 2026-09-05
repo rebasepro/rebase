@@ -263,7 +263,6 @@ const job: CronJobDefinition = {
         ctx.log("Starting session cleanup...");
 
         // Usa il singleton rebase per l'accesso al database a livello di amministratore
-        // const { data: expired } = await rebase.data.findMany("sessions", { ... });
         const count = Math.floor(Math.random() * 50); // segnaposto
 
         ctx.log(`Cleaned up ${count} expired sessions`);

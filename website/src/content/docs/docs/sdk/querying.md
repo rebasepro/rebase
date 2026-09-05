@@ -228,13 +228,19 @@ const { data } = await client.data.products
 | Method | Description | Example |
 |--------|-------------|---------|
 | `.where(field, op, value)` | Add a filter condition | `.where("age", ">=", 18)` |
+| `.where(path, op, value)` | Filter on a [relation](#querying-through-a-relation) or [JSON](#filtering-inside-json) path | `.where("author.name", "==", "bob")` |
+| `.where(group)` | Add an [OR/AND group](#logical-conditions-or--and) | `.where(or(cond(…), cond(…)))` |
 | `.orderBy(field, dir)` | Sort results | `.orderBy("name", "asc")` |
+| `.orderBy(aggregate, dir)` | Sort by an [aggregate over a relation](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
 | `.limit(n)` | Limit result count | `.limit(25)` |
 | `.offset(n)` | Skip first N results | `.offset(50)` |
 | `.search(text)` | Text search — see [Search](/docs/backend/search) | `.search("laptop")` |
 | `.vectorSearch(prop, vector, opts?)` | Nearest-neighbour search over a `vector` property | `.vectorSearch("embedding", vec)` |
 | `.include(...relations)` | Include related entities | `.include("author", "tags")` |
-| `.find()` | Execute the query | Returns `FindResponse<M>` |
+| `.find()` | Execute the query | Returns `FindResult<M>` |
+| `.iterate(options?)` | [Stream every matching row](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
+| `.findAll(options?)` | [Collect every matching row](#reading-everything-iterate-and-findall) | Returns `M[]` |
+| `.count()` | Count the matching rows | Returns `number` |
 | `.listen(onUpdate, onError?)` | Subscribe to real-time updates | Returns `unsubscribe()` |
 
 ### Filter Operators
@@ -286,6 +292,77 @@ await client.data.products.find({
 
 > **Note:** Pre-serialized PostgREST strings (format 2) are an escape hatch for passing filter values that are already in wire format. Prefer tuple syntax for type safety and readability.
 
+## Logical Conditions (OR / AND)
+
+Every field in `where` is AND-ed. To OR conditions together, build a **logical
+condition** with the `or`, `and` and `cond` helpers the SDK exports:
+
+```typescript
+import { or, and, cond } from "@rebasepro/client";
+
+const { data } = await client.data.products.find({
+    logical: or(
+        cond("status", "==", "active"),
+        and(
+            cond("status", "==", "draft"),
+            cond("authorId", "==", currentUserId)
+        )
+    )
+});
+```
+
+The fluent builder takes the same tree:
+
+```typescript
+const { data } = await client.data.products
+    .where(or(cond("status", "==", "active"), cond("featured", "==", true)))
+    .orderBy("createdAt", "desc")
+    .find();
+```
+
+`cond` takes the canonical operator — the left column of the
+[Filter Operators](#filter-operators) table. An operator the dialect does not
+have is a `TypeError` when the query is serialized, not a silently different
+query.
+
+### How it composes with the rest of the query
+
+`where`, `logical` and `search` are three independent groups, AND-ed with each
+other:
+
+```
+(where fields, AND-ed)  AND  (logical group)  AND  (search)
+```
+
+There is no way to OR `where` against `logical`. Anything that is not a plain
+AND of the three has to be expressed inside one `logical` tree — move the
+fields you need OR-ed into it.
+
+### On the wire
+
+A logical group travels as a single `or=` or `and=` query parameter, in the
+same dot-syntax the field filters use:
+
+```
+GET /api/data/products?or=(status.eq.active,featured.eq.true)
+```
+
+Three encodings are worth knowing, because they are the ones a hand-written
+query string gets wrong:
+
+| Condition | Wire form | Note |
+|-----------|-----------|------|
+| `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` is a search for the four-character string `null` |
+| `cond("id", "in", [])` | `id.in.(\)` | `in.()` is a list holding one empty string, which is a different query |
+| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | a [relation path](#querying-through-a-relation) keeps its dot |
+
+Commas, parentheses and backslashes inside a value are backslash-escaped, so
+`cond("name", "==", "Doe, John")` travels as `name.eq.Doe\, John` and does not
+split the group.
+
+Groups may nest 32 levels deep. Past that the request is rejected with
+`INVALID_LOGICAL_GROUP` — flatten it, since `or(a,or(b,c))` is `or(a,b,c)`.
+
 ## Pagination
 
 ```typescript
@@ -306,6 +383,77 @@ const page = await client.data.products.find({ page: 2, limit: 20 });
 negative, or fractional one — is refused with a 400 `INVALID_LIMIT` rather than
 clamped, because a silently smaller page cannot be told apart from the last one.
 To read past that ceiling, walk the pages with `iterate()` or `findAll()`.
+
+### Which reads are wrapped, and which are not
+
+Two shapes, and one rule: **a window is wrapped, a whole answer is not.**
+
+| Method | Returns | Why |
+|--------|---------|-----|
+| `find()`, `listen()` | `{ data, meta }` | One page. `meta.total` / `meta.hasMore` are the only way to know there is more |
+| `findAll()`, `createMany()`, `updateMany()` | `M[]` | Nothing left over to report — the walk finished, or the batch *is* the rows |
+| `iterate()` | one row at a time | Nothing is materialised at all |
+| `findById()`, `get()`, `create()`, `update()` | one row | Not a list |
+
+`data` is not a wrapper the SDK sometimes adds and sometimes forgets. It is
+where the pagination metadata lives, and it is there exactly when there is some.
+
+### Reading everything: `iterate()` and `findAll()`
+
+`iterate()` streams every row a query matches, one at a time, fetching a page at
+a time behind the scenes. Nothing accumulates, so it is the one to use for a
+collection you cannot hold in memory:
+
+```typescript
+for await (const order of client.data.orders.iterate({
+    where: { status: ["==", "pending"] }
+})) {
+    await handleOrder(order);
+}
+```
+
+`findAll()` is the same walk collected into an array:
+
+```typescript
+const stale = await client.data.sessions.findAll({
+    where: { expiresAt: ["<", cutoff] }
+});
+```
+
+Both are on the fluent builder too, where `.limit()` becomes the **page size**
+rather than a total:
+
+```typescript
+const rows = await client.data.orders
+    .where("status", "==", "pending")
+    .orderBy("createdAt", "asc")
+    .limit(500)          // rows per request
+    .findAll();
+```
+
+Three options shape the walk:
+
+| Option | Default | What it does |
+|--------|---------|--------------|
+| `pageSize` | 200 | Rows per request. |
+| `cursor` | — | Seek on a column instead of paging by offset. See below. |
+| `maxPages` | 10 000 | Ceiling on requests, so a server that never stops saying `hasMore` cannot spin forever. |
+| `maxRows` | 10 000 | `findAll()` only. Exceeding it **throws** rather than returning a truncated array as if it were the whole answer. Pass `Infinity` to opt out, or use `iterate()`. |
+
+**Prefer `cursor` whenever the collection has a unique, sortable column.**
+Offset paging re-counts rows on every request, so a row inserted or deleted
+*while the walk runs* shifts the window and the walk silently skips or repeats
+rows. Seeking asks for rows strictly after the last one seen, which concurrent
+writes before the cursor cannot move:
+
+```typescript
+for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
+```
+
+The column must be unique — a repeated value at a page boundary either skips
+rows or stalls, and the iterator throws rather than looping — and the query is
+ordered by it, so a `cursor` alongside a conflicting `orderBy` is an error
+rather than a silent override.
 
 ## Sorting
 
@@ -416,7 +564,7 @@ told "no matches" when the truth is "not supported".
 A `json` or `jsonb` column can be filtered by path, using Postgres's own arrow
 syntax:
 
-```typescript no-verify
+```typescript
 // Orders whose metadata says the country is US
 const { data } = await client.data.orders
     .where("metadata->>country", "==", "US")
@@ -439,7 +587,7 @@ Path segments are always sent as bound parameters, never spliced into SQL.
 `->>` yields **text**, so comparisons are text comparisons — except that an
 ordering operator (`>`, `>=`, `<`, `<=`) given a **number** casts to numeric:
 
-```typescript no-verify
+```typescript
 await client.data.orders.where("metadata->>score", ">", 100).find();     // numeric: 9 < 100
 await client.data.orders.where("metadata->>version", ">", "1.2").find(); // text
 ```
@@ -705,6 +853,14 @@ const { data } = await client.data.talents.find({
 orderBy: [[{ relation: "orders", agg: "count" }, "desc"]]
 ```
 
+The fluent builder takes the same key:
+
+```typescript
+const { data } = await client.data.clients
+    .orderBy({ relation: "orders", agg: "count" }, "desc")
+    .find();
+```
+
 `min`, `max`, `count`, `sum` and `avg`. `field` is required by all of them
 except `count`, which counts the related rows when you leave it out and counts
 the rows with a non-null column when you don't.
@@ -784,6 +940,14 @@ const result = await client.call<{ summary: string }>(
     { articleId: 42 }
 );
 ```
+
+Both return **the function's response body, verbatim**. Neither reaches into it
+for a `data` key, so a function that answers `{ data: [...] }` gives you that
+object and you read `.data` yourself.
+
+`call()` takes a full path and always POSTs; `invoke()` takes a function name
+and can take a method, a sub-path and headers. Use `invoke()` unless you are
+calling something that is not a function.
 
 ## Next Steps
 

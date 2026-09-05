@@ -72,6 +72,7 @@ const mustAgree = names => names.filter(n => n.startsWith("@rebasepro/") || ALSO
 const fromBundler = runtimeProvided("packages/cli/src/bundle.ts");
 const fromEntrypoint = runtimeProvided("infra/docker/entrypoint.mjs");
 const fromFetchPath = runtimeProvided("packages/server/src/boot/fetch-bundle.ts");
+const fromCorpus = runtimeProvided("tooling/scripts/verify-bundle-corpus.mts");
 
 test("both files actually declare some @rebasepro packages", () => {
     // Guards the parser itself: a regex that silently matched nothing would make
@@ -166,5 +167,19 @@ test("the fetch path supplies exactly what the entrypoint does", () => {
         + "packages into a bundle, one for a baked-in bundle and one for a fetched one. They "
         + "disagree, so the same project would get different packages depending on how its "
         + "bundle arrived."
+    );
+});
+
+test("the bundle corpus stitches exactly what the entrypoint collapses", () => {
+    // verify-bundle-corpus.mts reproduces the entrypoint by hand so it can boot a
+    // bundle against a published driver without a container. A hand-written
+    // reproduction is a fourth copy of the same list, and it has drifted once:
+    // it stitched only @rebasepro/server, the driver kept its own
+    // @rebasepro/types, and two resource-kind registries met over a pairing no
+    // pod produces.
+    assert.deepEqual(
+        [...fromCorpus].sort(),
+        [...fromEntrypoint].sort(),
+        "verify-bundle-corpus.mts RUNTIME_PROVIDED must equal infra/docker/entrypoint.mjs RUNTIME_PROVIDED"
     );
 });

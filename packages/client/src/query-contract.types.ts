@@ -204,3 +204,64 @@ export const readUnknown = (result: FindResult<ContractRow>) =>
  */
 export const rowStaysIndexable = (result: FindResult<ContractRow>) =>
     result.data.map(row => row as Record<string, unknown>);
+
+// ── the builder accepts what find(params) accepts ──────────────────────────
+
+/**
+ * Four calls that `find(params)` took and the fluent builder refused.
+ *
+ * The two forms are one API with two spellings, and a caller who reaches for
+ * the chainable one should not discover it is a subset. Each of these is
+ * documented, works over HTTP, and was a compile error on a generated SDK —
+ * which is to say: on every project that took the trouble to be typed.
+ */
+
+/** 1. A relation path. `find({ where: { "author.name": … } })` always compiled. */
+export const fluentRelationPath = (qb: SDKQueryBuilderInterface<PostRow>) =>
+    qb.where("author.name", "==", "bob");
+
+/** 2. A JSON path into a `jsonb` column — `?metadata->>tier=eq.gold` on the wire. */
+export const fluentJsonPath = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    qb.where("metadata->>tier", "==", "gold");
+
+/** 3. An aggregate over a to-many relation, which `FindParams.orderBy` takes. */
+export const fluentRelationAggregateSort = (qb: SDKQueryBuilderInterface<PostRow>) =>
+    qb.orderBy({ relation: "tags", agg: "count" }, "desc");
+
+/** 4. Paging past the `limit` ceiling, which the client can do and the builder could not. */
+export const fluentIterate = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    qb.where("age", ">=", 18).iterate({ cursor: "id" });
+
+export const fluentFindAll = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    qb.where("age", ">=", 18).findAll({ maxRows: 50_000 });
+
+/**
+ * The loosening is bounded. A path overload keyed on "anything that is not a
+ * column" would have caught a mistyped column too and typed its value as
+ * `unknown` — turning every one of the assertions above into a silent pass.
+ * These are the same refusals as before.
+ */
+export const fluentPathTypo = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    // @ts-expect-error - "titel" has no dot and no `->>`: still just a typo
+    qb.where("titel", "==", "x");
+
+export const fluentPathDoesNotLoosenValues = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    // @ts-expect-error - a real column keeps its value type; `tags` is not one of its own elements
+    qb.where("tags", "array-contains", ["featured"]);
+
+export const fluentAggregateSortTypo = (qb: SDKQueryBuilderInterface<PostRow>) =>
+    // @ts-expect-error - `agg` is a closed set; "median" is not one of them
+    qb.orderBy({ relation: "tags", agg: "median" }, "desc");
+
+/** And the object form still takes all four, unchanged. */
+export const paramsRelationPath: FindParams<PostRow> = {
+    where: { "author.name": ["==", "bob"] }
+};
+
+export const paramsJsonPath: FindParams<ContractRow> = {
+    where: { "metadata->>tier": ["==", "gold"] }
+};
+
+export const paramsRelationAggregateSort: FindParams<PostRow> = {
+    orderBy: [[{ relation: "tags", agg: "count" }, "desc"]]
+};

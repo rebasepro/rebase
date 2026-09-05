@@ -85,6 +85,25 @@ export const escapeLikePattern = (value: string): string =>
  * `undefined` rather than a throw: each caller already has a message naming the
  * relation it was resolving, which is worth more than a generic one here.
  */
+/**
+ * The junction table a `manyToMany` relation names is not in the registry.
+ *
+ * Six sites raised `Junction table not found: <name>`, which is a fact and not
+ * a diagnosis. The name in the message is the one the relation *declares*, and
+ * the two things it can mean are opposite: the table exists in the database and
+ * the generated Drizzle schema predates it, or the table was never created and
+ * the relation's `through.table` is a typo. Both are one command away from
+ * being settled, and neither was named.
+ */
+function junctionTableMissing(junctionName: string): Error {
+    return new Error(
+        `The relation declares a junction table "${junctionName}", and no such table is registered. ` +
+        "Either the generated Drizzle schema predates it — run `rebase schema generate` — or the " +
+        "table does not exist yet: `rebase db push` creates the junctions a relation declares. " +
+        "If neither helps, check the `through.table` name on the relation."
+    );
+}
+
 const relationColumn = (
     table: PgTable<any>,
     collection: CollectionConfig | undefined,
@@ -392,7 +411,7 @@ export class DrizzleConditionBuilder {
                 const { table: junctionName, sourceColumn, targetColumn } = relation.through;
                 const junctionTable = registry.getTable(junctionName);
                 if (!junctionTable) {
-                    throw new Error(`Junction table not found: ${junctionName}`);
+                    throw junctionTableMissing(junctionName);
                 }
                 const sourceCol = junctionTable[sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
                 const targetCol = junctionTable[targetColumn as keyof typeof junctionTable] as AnyPgColumn;
@@ -1012,7 +1031,7 @@ export class DrizzleConditionBuilder {
             const { table: junctionName, sourceColumn, targetColumn } = relation.through;
             const junctionTable = registry.getTable(junctionName);
             if (!junctionTable) {
-                throw new Error(`Junction table not found: ${junctionName}`);
+                throw junctionTableMissing(junctionName);
             }
             const sourceCol = junctionTable[sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
             const targetCol = junctionTable[targetColumn as keyof typeof junctionTable] as AnyPgColumn;
@@ -1227,7 +1246,7 @@ export class DrizzleConditionBuilder {
             const { table: junctionName, sourceColumn, targetColumn: junctionTargetColumn } = relation.through;
             const junctionTable = target.registry.getTable(junctionName);
             if (!junctionTable) {
-                throw new Error(`Junction table not found: ${junctionName}`);
+                throw junctionTableMissing(junctionName);
             }
             const sourceCol = junctionTable[sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
             const targetCol = junctionTable[junctionTargetColumn as keyof typeof junctionTable] as AnyPgColumn;
@@ -1513,7 +1532,7 @@ export class DrizzleConditionBuilder {
             const { table: junctionName, sourceColumn, targetColumn } = relation.through;
             const junctionTable = registry.getTable(junctionName);
             if (!junctionTable) {
-                throw new Error(`Junction table not found: ${junctionName}`);
+                throw junctionTableMissing(junctionName);
             }
             const sourceCol = junctionTable[sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
             const targetCol = junctionTable[targetColumn as keyof typeof junctionTable] as AnyPgColumn;
@@ -1705,7 +1724,7 @@ export class DrizzleConditionBuilder {
                 //
                 // The wire layer rejects operator-shaped unknowns before they
                 // arrive (`UnknownFilterOperatorError`, 400). What reaches here
-                // came from in-process `rebase.data`, a stored filter preset or
+                // came from in-process `rebase.dataAsAdmin`, a stored filter preset or
                 // a config — none of them typechecked at the call site, all of
                 // them able to name an operator that no longer exists.
                 throw ApiError.badRequest(
@@ -2055,7 +2074,7 @@ whereConditions };
     ): { join: { table: PgTable<any>; condition: SQL }; condition: SQL } {
         const junctionTable = registry.getTable(through.table);
         if (!junctionTable) {
-            throw new Error(`Junction table not found: ${through.table}`);
+            throw junctionTableMissing(through.table);
         }
 
         const junctionSourceCol = junctionTable[through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
@@ -2576,7 +2595,7 @@ whereConditions };
     ): T {
         const junctionTable = registry.getTable(through.table);
         if (!junctionTable) {
-            throw new Error(`Junction table not found: ${through.table}`);
+            throw junctionTableMissing(through.table);
         }
 
         const junctionSourceCol = junctionTable[through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;

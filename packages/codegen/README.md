@@ -17,7 +17,7 @@ pnpm add @rebasepro/codegen
 
 `@rebasepro/codegen` takes an array of `CollectionConfig` definitions and produces TypeScript type files that provide full autocompletion when used with `@rebasepro/client`. It handles property types, enums, relations, maps, arrays, geopoints, vectors, and validation-based optionality.
 
-This is typically invoked via the CLI (`npx rebase generate-sdk`) rather than called directly.
+This is typically invoked via the CLI (`pnpm rebase generate-sdk`) rather than called directly.
 
 ## Key Exports
 

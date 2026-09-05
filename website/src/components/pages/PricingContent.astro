@@ -115,6 +115,11 @@ import ClosingCta from "../ClosingCta.astro";
                         ))}
                     </ul>
 
+                    <!-- The one fact a reader otherwise meets as a 402 after a
+                         bundle has finished uploading. It belongs on the page
+                         that sells the tier, not only in a deploy log. -->
+                    <p class="text-sm text-surface-500 mb-6">{t("pricing.cloud.billingNote")}</p>
+
                     <a href={translatePath("/contact")}
                        class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-0 min-h-(--control-large) text-base font-semibold text-white hover:bg-white/10 hover:border-white/20 transition-all duration-200">
                         {t("pricing.cloud.cta")}

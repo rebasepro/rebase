@@ -19,7 +19,9 @@
  *     that one fact, not the whole scan.
  */
 import { Client } from "pg";
+import type { ClientConfig } from "pg";
 
+import { parseKeywordConnectionString } from "./redact";
 import type {
     DbColumn,
     DbForeignKey,
@@ -85,11 +87,36 @@ export interface IntrospectDiagnostics {
      * imply that it looked.
      */
     unrecognizedGrantees: string[];
+    /**
+     * The connecting role, when it is not privileged and was therefore added to
+     * the exposed set. Disclosed rather than silent: it changes which findings
+     * appear, so a reader comparing two runs has to be able to see it.
+     */
+    scanningAsExposedRole?: string | null;
 }
 
 export interface IntrospectResult {
     snapshot: DbSnapshot;
     diagnostics: IntrospectDiagnostics;
+}
+
+/**
+ * A `--role` that is not in `pg_roles`.
+ *
+ * Same reasoning as an unknown `--skip` id: a typo here does not widen the scan
+ * and get noticed, it *narrows* it silently. `exposedRolesFor` drops the name,
+ * every check that gates on a grant to an exposed role stops matching, and the
+ * run prints "No findings" on a database nobody looked at properly. So it is an
+ * error, not a warning.
+ */
+export class UnknownRoleError extends Error {
+    readonly roles: string[];
+
+    constructor(roles: string[]) {
+        super(`Unknown role${roles.length === 1 ? "" : "s"}: ${roles.join(", ")}.`);
+        this.name = "UnknownRoleError";
+        this.roles = roles;
+    }
 }
 
 const SYSTEM_SCHEMAS = ["pg_catalog", "information_schema", "pg_toast"];
@@ -190,15 +217,89 @@ export async function introspectWithDiagnostics(opts: ConnectOptions): Promise<I
 type SslOption = false | { rejectUnauthorized: boolean };
 
 /**
+ * libpq keywords this tool can express as `pg` `Client` options.
+ *
+ * The list is an allowlist rather than a "map what we know and drop the rest",
+ * because every keyword left out changes where the connection goes or how it is
+ * verified: dropping `sslrootcert` would connect with weaker verification than
+ * was asked for, and dropping `hostaddr` would connect to a different machine.
+ * Silently doing either in a security scanner is worse than refusing.
+ */
+const SUPPORTED_KEYWORDS = new Set([
+    "host",
+    "port",
+    "dbname",
+    "user",
+    "password",
+    "sslmode",
+    "application_name",
+    "connect_timeout",
+    "options"
+]);
+
+/**
+ * The keywords in a libpq keyword string that this tool cannot honour, in the
+ * order they were written. Empty for a URL, and empty for a keyword string it
+ * can translate in full.
+ */
+export function unsupportedConnectionKeywords(connectionString: string): string[] {
+    const keywords = parseKeywordConnectionString(connectionString);
+    if (!keywords) return [];
+
+    return [...keywords.keys()].filter((keyword) => !SUPPORTED_KEYWORDS.has(keyword));
+}
+
+/**
+ * `Client` options for a libpq keyword string. Throws on a keyword it cannot
+ * honour. Exported for the test that pins the translation: getting `host` or
+ * `port` wrong here sends a production scan somewhere nobody asked for, and the
+ * failure would still be reported against the host the user typed.
+ */
+export function clientConfigFromKeywords(keywords: Map<string, string>): ClientConfig {
+    const unsupported = [...keywords.keys()].filter((keyword) => !SUPPORTED_KEYWORDS.has(keyword));
+    if (unsupported.length > 0) {
+        throw new Error(
+            `Unsupported connection keyword${unsupported.length === 1 ? "" : "s"}: ${unsupported.join(", ")}. Use a postgresql:// URL instead.`
+        );
+    }
+
+    const port = keywords.has("port") ? Number.parseInt(keywords.get("port")!, 10) : NaN;
+    const timeoutSeconds = keywords.has("connect_timeout")
+        ? Number.parseInt(keywords.get("connect_timeout")!, 10)
+        : NaN;
+
+    const config: ClientConfig = {
+        host: keywords.get("host") ?? "localhost",
+        database: keywords.get("dbname"),
+        user: keywords.get("user"),
+        password: keywords.get("password"),
+        application_name: keywords.get("application_name"),
+        options: keywords.get("options")
+    };
+    if (Number.isFinite(port)) config.port = port;
+    if (Number.isFinite(timeoutSeconds)) config.connectionTimeoutMillis = timeoutSeconds * 1000;
+
+    return config;
+}
+
+/**
  * Connect, negotiating TLS the way libpq would.
  *
  * `pg` lets the connection string override an explicit `ssl` option, so the
  * `sslmode` parameter is read and removed before the attempts are built —
  * otherwise the retry would silently reuse the setting that just failed.
+ *
+ * `pg` also cannot read the libpq keyword form (`host=… dbname=…`) at all — it
+ * would connect to the default host and then report the failure against the
+ * host the user *did* name, which is the worst of both. So that form is
+ * translated into explicit `Client` options here, or refused.
  */
 async function connect(connectionString: string): Promise<{ client: Client; tlsVerificationDisabled: boolean }> {
-    const sslmode = readParam(connectionString, "sslmode");
-    const cleaned = stripParam(connectionString, "sslmode");
+    const keywords = parseKeywordConnectionString(connectionString);
+    const sslmode = keywords ? keywords.get("sslmode")?.toLowerCase() : readParam(connectionString, "sslmode");
+    const base: ClientConfig = keywords
+        ? clientConfigFromKeywords(keywords)
+        : { connectionString: stripParam(connectionString, "sslmode") };
 
     // Each entry is (ssl option, did we give up verification to get here?).
     let attempts: { ssl: SslOption; downgraded: boolean }[];
@@ -227,7 +328,7 @@ async function connect(connectionString: string): Promise<{ client: Client; tlsV
 
     let lastError: unknown;
     for (const attempt of attempts) {
-        const client = new Client({ connectionString: cleaned, ssl: attempt.ssl });
+        const client = new Client({ ...base, ssl: attempt.ssl });
         try {
             await client.connect();
             return { client, tlsVerificationDisabled: attempt.downgraded };
@@ -344,6 +445,8 @@ async function readSnapshot(
     const schemas = selectSchemas(allSchemas, opts.schemas, diagnostics);
 
     const roles = await readRoles(db);
+    assertRolesExist(roles, opts.roles, diagnostics);
+
     const relations = await readRelations(db, schemas);
     const policies = await readPolicies(db, schemas);
     const grants = await readGrants(db, schemas);
@@ -351,7 +454,20 @@ async function readSnapshot(
     const foreignKeys = await readForeignKeys(db, schemas);
     const routines = await readRoutines(db, schemas);
 
-    const exposedRoles = exposedRolesFor(roles, opts.roles);
+    const scannerIsPrivileged = isPrivileged(currentRole, server, roles, relations);
+
+    // An unprivileged connecting role IS an exposed role for the purposes of
+    // this scan: RLS constrains it, it holds whatever the API role holds, and
+    // the overwhelmingly common way to run this tool without a superuser
+    // password is to run it as the application's own role. Leaving it out meant
+    // scanning as `app_user` on a table granted only to `app_user` reported
+    // nothing at all. `scannerIsPrivileged` already gates the other direction:
+    // a superuser or owner is not "exposed", it is the reason the caveat exists.
+    const connectingRole = !scannerIsPrivileged && currentRole !== "unknown" ? currentRole : undefined;
+    const exposedRoles = exposedRolesFor(roles, opts.roles, connectingRole);
+    diagnostics.scanningAsExposedRole = connectingRole && exposedRoles.includes(connectingRole)
+        ? connectingRole
+        : null;
     diagnostics.unrecognizedGrantees = unrecognizedGranteesFor(
         grants,
         roles,
@@ -364,7 +480,7 @@ async function readSnapshot(
         serverVersionNum,
         serverVersion,
         currentRole,
-        scannerIsPrivileged: isPrivileged(currentRole, server, roles, relations),
+        scannerIsPrivileged,
         schemas,
         exposedRoles,
         platform: detectPlatform(allSchemas, roles),
@@ -878,19 +994,40 @@ function detectPlatform(allSchemas: string[], roles: DbRole[]): DbSnapshot["plat
  * `service_role` is excluded on purpose. It exists, and it is in `roles`, but it
  * is the *trusted* bypass identity: treating it as exposed would flag every
  * table in every Supabase project as critical, which is both useless and wrong.
+ *
+ * `connecting` is the role the scan came in as, passed only when it is not
+ * privileged — see the call site.
  */
-function exposedRolesFor(roles: DbRole[], explicit?: string[]): string[] {
+function exposedRolesFor(roles: DbRole[], explicit?: string[], connecting?: string): string[] {
     const present = new Set(roles.map((r) => r.name));
-    const named = [...CANDIDATE_EXPOSED_ROLES, ...(explicit ?? [])];
-    // A role named with `--role` that does not exist is dropped here rather
-    // than carried: `effectivePrivileges` would find nothing for it anyway, and
-    // a phantom entry in `exposedRoles` reads like the scan covered something
-    // it did not. `unrecognizedGranteesFor` reports the mismatch instead.
+    const named = [...CANDIDATE_EXPOSED_ROLES, ...(explicit ?? []), ...(connecting ? [connecting] : [])];
+    // A role named with `--role` that does not exist never reaches here:
+    // `assertRolesExist` refuses the scan, because dropping it would narrow the
+    // run without saying so. The filter still stands for the built-in
+    // candidates, most of which are absent on any given database.
     return ["PUBLIC", ...new Set(named.filter((r) => present.has(r)))];
 }
 
 /**
- * Roles that hold DML on a scanned table and are neither exposed nor trusted.
+ * Refuse a `--role` that is not in `pg_roles`.
+ *
+ * Not a warning, for the reason spelled out on {@link UnknownRoleError}. The
+ * one exception is a degraded `roles` read: with no catalogue to check against,
+ * every name would look unknown, and turning a partial catalogue read into
+ * "your flag is wrong" would send the reader after the wrong problem.
+ */
+function assertRolesExist(roles: DbRole[], requested: string[] | undefined, diagnostics: IntrospectDiagnostics): void {
+    if (!requested || requested.length === 0) return;
+    if (diagnostics.degraded.some((entry) => entry.what === "roles")) return;
+
+    const present = new Set(roles.map((r) => r.name));
+    const unknown = [...new Set(requested.filter((role) => !present.has(role)))];
+    if (unknown.length > 0) throw new UnknownRoleError(unknown);
+}
+
+/**
+ * Roles that can read or write a scanned table and are neither exposed nor
+ * trusted.
  *
  * "Trusted" is deliberately generous — every role this can explain is one the
  * user does not have to think about. A grantee is explained when it is a
@@ -899,8 +1036,15 @@ function exposedRolesFor(roles: DbRole[], explicit?: string[]): string[] {
  * connected as, or is platform bookkeeping (`pg_*`, `cloudsql*`, Supabase's
  * `service_role`, which is the documented trusted bypass).
  *
- * What is left is the interesting set: a named role, holding write privileges,
- * that this tool has no opinion about. It may be a service account nothing can
+ * SELECT alone counts. It used to be filtered out as "a normal, deliberate
+ * grant on a reference table", which reads the risk backwards: the finding this
+ * whole tool exists for is `rls-disabled`, and what an RLS-disabled table
+ * hands a role holding nothing but SELECT is every row in it. A read-only
+ * reporting role reachable from the internet is the textbook leak, and the
+ * caveat that exists to stop a false negative was skipping exactly that shape.
+ *
+ * What is left is the interesting set: a named role with data access that this
+ * tool has no opinion about. It may be a service account nothing can
  * authenticate as — `rebase_user` is NOLOGIN by design — or it may be exactly
  * the role the API connects as. The scan cannot tell from the catalog, so it
  * names them and lets the reader decide.
@@ -915,7 +1059,9 @@ function unrecognizedGranteesFor(
     const exposedSet = new Set(exposed.map((r) => r.toLowerCase()));
     const byName = new Map(roles.map((r) => [r.name.toLowerCase(), r]));
     const owners = new Set(relations.map((r) => r.owner.toLowerCase()));
-    const writeable = new Set(["INSERT", "UPDATE", "DELETE"]);
+    // TRUNCATE, REFERENCES and TRIGGER are not data access, so a grant of only
+    // those does not make a role worth a sentence here.
+    const dataAccess = new Set(["SELECT", "INSERT", "UPDATE", "DELETE"]);
 
     const out = new Set<string>();
     for (const grant of grants) {
@@ -930,9 +1076,7 @@ function unrecognizedGranteesFor(
         const role = byName.get(key);
         if (role?.superuser || role?.bypassRls) continue;
 
-        // SELECT alone on a reference table is a normal, deliberate grant. It is
-        // the write privileges that make an unrecognised role worth a sentence.
-        if (!grant.privileges.some((p) => writeable.has(p))) continue;
+        if (!grant.privileges.some((p) => dataAccess.has(p))) continue;
 
         out.add(name);
     }

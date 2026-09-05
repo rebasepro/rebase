@@ -75,8 +75,7 @@ export interface BuildCollectionGenerationCallbackProps {
  *
  * @example
  * ```tsx
- * import { RebaseCMS } from "@rebasepro/cms";
- * import { buildCollectionGenerationCallback } from "@rebasepro/cms/collection_editor";
+ * import { RebaseCMS, buildCollectionGenerationCallback } from "@rebasepro/cms";
  * import { useFirebaseAuthController } from "@rebasepro/firebase";
  *
  * const authController = useFirebaseAuthController({ firebaseApp });

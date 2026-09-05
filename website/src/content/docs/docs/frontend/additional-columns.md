@@ -38,7 +38,7 @@ const ordersCollection = defineCollection({
                 name: "Total",
                 Builder: ({ entity }) => {
                     const total = entity.values.items?.reduce(
-                        (sum, item) => sum + (item.price * item.quantity), 0
+                        (sum, item) => sum + (item.price ?? 0) * (item.quantity ?? 0), 0
                     ) ?? 0;
                     return <span>${total.toFixed(2)}</span>;
                 }

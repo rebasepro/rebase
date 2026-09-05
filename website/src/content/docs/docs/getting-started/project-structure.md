@@ -4,6 +4,25 @@ sidebar_label: Project Structure
 description: Understand the structure of a Rebase project — frontend, backend, and collections configuration.
 ---
 
+:::note[Five words this page uses]
+Every one of them means something specific here, and four of them mean something
+else elsewhere in the industry.
+
+- **Collection** — one table, described in TypeScript. The schema, the API and
+  the admin screen all come from the same file.
+- **Studio** — the developer half of the admin panel: schema editor, SQL
+  console, policy browser. The same app your content team uses, behind a toggle.
+- **Managed runtime** — the published `rebasepro/server` image boots your
+  project. You write no server file, and you get runtime upgrades without a
+  rebuild. The alternative is `rebase eject`, below.
+- **Bundle** — what `rebase build` produces: your collections, functions and
+  crons, compiled, with a manifest saying where each one is. It is what the
+  managed runtime boots.
+- **Resource** — something the project needs from wherever it runs: a database,
+  a bucket, a topic. Declared in `config/resources.ts`, bound by environment
+  variables.
+:::
+
 A Rebase starter project has three interconnected packages:
 
 ```
@@ -52,26 +71,70 @@ file that builds them. See [Custom Server Integration](/docs/backend/custom-serv
 The frontend is a standard **Vite + React + TypeScript** application. The key file is `App.tsx`, which wires together all Rebase controllers:
 
 ```typescript title="frontend/src/App.tsx"
+import React from "react";
+
+import "@fontsource/jetbrains-mono";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/instrument-sans";
+
 import { Rebase, RebaseAuth, useRebaseAuthController } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import { ErrorBoundary } from "@rebasepro/ui";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
 
-// `rebase dev` injects VITE_API_URL with the port it actually bound, so this
-// needs no hardcoded localhost — and a deployed build serves the admin from the
-// same origin as the API, where an empty value is what you want.
-const rebaseClient = createRebaseClient({
-    baseUrl: import.meta.env.VITE_API_URL,
-    auth: { authFlowMode: "cookie" }
-});
+// `rebase dev` injects VITE_API_URL with the port it actually bound, and that
+// port is derived from this project's path rather than fixed — so a
+// `http://localhost:3001` fallback here names a port nothing is listening on.
+// A deployed build serves the admin from the same origin as the API, where an
+// empty value is exactly what you want.
+const API_URL = import.meta.env.VITE_API_URL;
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+export function App() {
+    const rebaseClient = React.useMemo(() => createRebaseClient({
+        baseUrl: API_URL,
+        // Store the refresh token in an httpOnly cookie (XSS-safe) rather than
+        // localStorage. The backend issues it via `auth.cookieAuth`.
+        auth: { authFlowMode: "cookie" }
+    }), []);
+
+    const authController = useRebaseAuthController({
+        client: rebaseClient,
+        googleClientId: GOOGLE_CLIENT_ID
+    });
+
+    return (
+        <ErrorBoundary fullPage>
+            <Rebase
+                client={rebaseClient}
+                authController={authController}
+            >
+                {/* The sign-in screen. On its own this changes nothing —
+                    it is where you pass `loginView` to replace it. */}
+                <RebaseAuth />
+                <RebaseCMS
+                    collections={collections}
+                />
+                <RebaseStudio/>
+                <RebaseShell title="Rebase"/>
+            </Rebase>
+        </ErrorBoundary>
+    );
+}
 ```
+
+`main.tsx` mounts it under a `react-router` `basename` taken from
+`import.meta.env.BASE_URL`, which `rebase build` sets from the `path` this app
+declares in `rebase.json` — so the assets, the router and the server agree on
+one value without it being written down three times.
 
 ### Key Concepts
 
 - **`createRebaseClient`** — Creates the SDK client that handles HTTP requests, WebSocket connections, and auth token management
 - **`virtual:rebase-collections`** — A Vite plugin that auto-imports your shared collections at build time
-- **Controllers** — `useBuildNavigationStateController`, `useBuildCollectionRegistryController`, etc. — these configure routing, collection resolution, and UI configuration
+- **`useRebaseAuthController`** — Holds the signed-in user and the token lifecycle, and is what `<Rebase>` distributes to everything below it
 
 ## Backend (`backend/`)
 
@@ -96,8 +159,19 @@ The runtime sets up:
 Configuration comes from `rebase.json`, the `config/` directory and environment
 variables. See [Environment & Configuration](/docs/getting-started/configuration).
 
+`rebase build` turns all of it into a **bundle** — the compiled collections,
+functions and crons plus a manifest — which the managed runtime boots. Nothing
+about the bundle is written by hand; if you want to see one,
+[Runtime & Bundles](/docs/architecture/runtime-and-bundles/) is what is in it.
+
+The panel the frontend serves has two halves. **Studio** is the developer one —
+the schema editor, the SQL console, the RLS policy browser — and it is behind
+the toggle in the drawer, not a separate deployment. See [Studio](/docs/studio/).
+
 To take ownership of the process instead — your own middleware, routes and auth
-wiring — run `rebase eject`. It writes an entry point that calls
+wiring — run `rebase eject`. **Everything below this paragraph is ejected-only**:
+a scaffolded project has none of those files, and nothing in it calls
+`initializeRebaseBackend`. It writes an entry point that calls
 `initializeRebaseBackend` directly, plus a Dockerfile and a compose file that
 builds it; from then on you maintain the server and platform runtime upgrades no
 longer reach the project. That surface is documented in
@@ -110,7 +184,7 @@ Collections are the **single source of truth** for your data model. They are def
 ```typescript title="config/collections/products.ts"
 import { defineCollection } from "@rebasepro/cms-types";
 
-export const productsCollection = defineCollection({
+const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     properties: {
@@ -118,6 +192,10 @@ export const productsCollection = defineCollection({
         price: { type: "number", name: "Price" }
     }
 });
+
+// The default export is what the registry picks up — every collection in the
+// scaffold is written this way.
+export default productsCollection;
 ```
 
 The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api/data/products`), and the PostgreSQL table name defaults to it. Add `table` only when they differ.
@@ -129,7 +207,10 @@ The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api
 3. **The frontend** reads them (via Vite plugin) to render tables, forms, and navigation
 4. **The CLI** reads them to generate migration files with `rebase schema generate`
 
-Changes to collections propagate everywhere automatically.
+While `rebase dev` is running, saving a file under `config/collections/`
+regenerates `backend/src/schema.generated.ts` and restarts the backend, and boot
+creates the tables and columns that are missing. Outside `rebase dev` the same
+step is `rebase schema generate`.
 
 ## Next Steps
 

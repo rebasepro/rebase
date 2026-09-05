@@ -4,7 +4,6 @@ import {
     useRebaseRegistry,
     RebaseRoutes,
     UserSettingsView,
-    UIReferenceView,
     NotFoundPage,
     useComponentOverride
 } from "@rebasepro/app";
@@ -87,8 +86,9 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
             <Route path={"/settings"} element={<SettingsView/>}/>
 
 
-            {/* Hidden debug route */}
-            <Route path={"/debug/ui"} element={<UIReferenceView/>}/>
+            {/* /debug/ui is not a framework route. It renders the design
+                reference, which lives in the dogfood app and registers itself
+                there as an ordinary custom view. */}
 
             {/* Custom Registered Views */}
             {combinedViews.map(view => {

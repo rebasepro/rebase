@@ -73,7 +73,19 @@ POSTGRES_PASSWORD=a_long_random_string
 JWT_SECRET=another_long_random_string_at_least_32_chars
 REBASE_SERVICE_KEY=a_third_long_random_string_at_least_32_chars
 CORS_ORIGINS=https://app.yourdomain.com
+REBASE_ADMIN_EMAIL=you@yourdomain.com
+REBASE_ADMIN_PASSWORD=at_least_twelve_characters
 ```
+
+All six are required — the Compose file declares them with `${VAR:?…}` and
+refuses to interpolate without them.
+
+The last two are the first administrator. A fresh database has no users, and
+outside production the first sign-up is promoted to admin — which is a race the
+moment this box answers on a hostname, because Caddy has TLS up before you have
+typed anything. So in production that window is shut and the account is named
+here instead; the runtime creates it once, while the user table is empty, and
+does nothing on every boot after that. Sign in and change the password.
 
 Then bring it up:
 

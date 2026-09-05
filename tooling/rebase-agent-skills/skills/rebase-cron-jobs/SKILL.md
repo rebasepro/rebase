@@ -226,6 +226,9 @@ interface CronJobContext {
     /** A simple logger scoped to this job run — output captured in the execution log. */
     log: (...args: unknown[]) => void;
 
+    /** Aborted when the run exceeds `timeoutSeconds`. Pass it to `fetch` and friends. */
+    signal: AbortSignal;
+
     /** The server-side Rebase singleton — data, email, storage, raw SQL. */
     rebase: RebaseServerClient;
 
@@ -237,6 +240,7 @@ interface CronJobContext {
 | `jobId` | `string` | Derived from the filename (e.g. `cleanup-sessions`). |
 | `scheduledAt` | `Date` | The timestamp when this execution was scheduled to start. |
 | `log` | `(...args: unknown[]) => void` | Logger whose output is captured in `CronJobLogEntry.logs`. Use like `console.log`. |
+| `signal` | `AbortSignal` | Aborted when the run exceeds `timeoutSeconds`. The timeout stops the scheduler waiting; only this stops the work. Pass it to `fetch`. |
 | `rebase` | `RebaseServerClient` | The server singleton. `rebase.dataAsAdmin` for CRUD, `rebase.email`, `rebase.storage`, `rebase.sql`. |
 
 > **IMPORTANT FOR AGENTS:** `ctx.rebase.dataAsAdmin` is scoped as the **service identity** (`uid: "service"`, `roles: ["admin"]`). Callbacks live in the driver, not in the route layer, so DataHooks and Collection Callbacks still run on this path even though the HTTP loop is skipped. This means:
@@ -384,7 +388,7 @@ On startup, the scheduler seeds `totalRuns`, `totalFailures`, and `lastRunAt` co
 
 ## REST API
 
-All routes are mounted at `/api/cron` and **require admin authentication** (`requireAuth` + `requireAdmin` middleware).
+All routes are mounted at `/api/admin/cron` and **require admin authentication** (`requireAuth` + `requireAdmin` middleware). `/api/cron` is kept alive as a legacy alias and answers with a `Deprecation` header; write the `/api/admin` path.
 
 > **IMPORTANT FOR AGENTS**: All cron REST endpoints require an admin JWT or service key in the `Authorization` header. Unauthenticated requests will receive 401/403.
 

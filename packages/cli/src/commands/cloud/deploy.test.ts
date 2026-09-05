@@ -19,6 +19,8 @@ import {
     warningPayload,
     ejectWarning,
     resolveDeployTimeout,
+    billingBlocksDeploy,
+    deployedUrl,
     EJECTS_MANAGED_RUNTIME
 } from "./deploy";
 import { warn, setJsonModeForTest } from "./context";
@@ -307,5 +309,91 @@ describe("resolveDeployTimeout", () => {
         }) as never);
         expect(() => resolveDeployTimeout(value)).toThrow("__exit__");
         exit.mockRestore();
+    });
+});
+
+/**
+ * The billing pre-check, which only ever refuses in one direction.
+ *
+ * The 402 used to land after a completed upload: the managed path builds, packs
+ * and uploads before it triggers anything, so "no card on file" arrived at the
+ * end of several minutes whose only product was a discarded tarball. Moving the
+ * question earlier is only safe if the client refuses exactly when it is sure —
+ * an internal billing account and `REBASE_BYO_FREE` are both server-side skips
+ * this client cannot see, so every unknown has to proceed and let the server
+ * decide.
+ */
+describe("billingBlocksDeploy", () => {
+    it("refuses when the control plane says there is no card", () => {
+        expect(billingBlocksDeploy({ plan: "standard",
+hasPaymentMethod: false,
+simulated: false })).toBe(true);
+    });
+
+    it("lets a card on file through", () => {
+        expect(billingBlocksDeploy({ plan: "standard",
+hasPaymentMethod: true,
+simulated: false })).toBe(false);
+    });
+
+    it("never refuses on an answer it could not get", () => {
+        expect(billingBlocksDeploy({ plan: null,
+hasPaymentMethod: null,
+simulated: false })).toBe(false);
+    });
+
+    it("exempts a control plane with no Stripe behind it", () => {
+        // `hasPaymentMethod: false` there is inferred from a simulated setup,
+        // not from a customer that has no card.
+        expect(billingBlocksDeploy({ plan: null,
+hasPaymentMethod: false,
+simulated: true })).toBe(false);
+    });
+
+    it("exempts an internal billing account, which the server skips entirely", () => {
+        expect(billingBlocksDeploy({ plan: "internal",
+hasPaymentMethod: false,
+simulated: false })).toBe(false);
+    });
+});
+
+/**
+ * "✓ Deployment succeeded" and then the address.
+ *
+ * A deploy that says only that it worked leaves the one thing the command was
+ * for — where the app now answers — to a second command, and the person who
+ * just watched the build finish has to go and ask `cloud status`. Resolved the
+ * same way `status` resolves it, so the two cannot disagree about the host.
+ */
+describe("deployedUrl", () => {
+    function client(project: unknown, baseDomain: unknown) {
+        return {
+            data: { collection: () => ({ findById: async () => project }) },
+            functions: { invoke: async () => ({ tenantBaseDomain: baseDomain }) }
+        } as never;
+    }
+
+    it("joins the subdomain to the base domain the control plane reports", async () => {
+        await expect(
+            deployedUrl(client({ subdomain: "shop" }, "rebase.website"), {
+                projectId: "p1",
+                url: "https://cp-deployedurl-1.example"
+            })
+        ).resolves.toBe("shop.rebase.website");
+    });
+
+    it("says nothing rather than guessing when the project cannot be read", async () => {
+        await expect(
+            deployedUrl(client(undefined, "rebase.website"), {
+                projectId: "p1",
+                url: "https://cp-deployedurl-2.example"
+            })
+        ).resolves.toBeUndefined();
+    });
+
+    it("says nothing when there is no project to resolve", async () => {
+        // `logs` without a follow, and any caller that did not pass one: a
+        // missing URL must never be a failed deploy.
+        await expect(deployedUrl(client({ subdomain: "shop" }, "rebase.website"), {})).resolves.toBeUndefined();
     });
 });

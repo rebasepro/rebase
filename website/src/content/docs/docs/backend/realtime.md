@@ -210,6 +210,13 @@ By default a broadcast reaches currently-connected members and is then gone. Tha
 
 For an operation stream — collaborative editing, anything where a silent gap causes divergence — a channel can be configured to **retain** its messages. Retained broadcasts are given a per-channel sequence number and stored, so a client that reconnects can ask for everything after the last one it saw.
 
+:::caution[Where this goes]
+**Managed runtime: nowhere.** Channel retention and `realtime.bus` are part of
+the database adapter the managed runtime constructs itself, and neither has an
+environment form. Eject to configure them.
+**Ejected:** `createPostgresAdapter({ realtime })` in `backend/src/index.ts`.
+:::
+
 Retention is opt-in and configured here, on the server:
 
 ```typescript
@@ -323,12 +330,14 @@ The client SDK automatically reconnects when the WebSocket connection drops:
 You can listen to connection lifecycle events:
 
 ```typescript
-const ws = client.ws; // Access the WebSocket client
-
-ws.on("connect", () => console.log("Connected"));
-ws.on("disconnect", () => console.log("Disconnected"));
-ws.on("reconnect", () => console.log("Reconnected"));
-ws.on("error", (error) => console.error("Error:", error));
+// `ws` is undefined on a client built without realtime, so narrow it once.
+const ws = client.ws;
+if (ws) {
+    ws.on("connect", () => console.log("Connected"));
+    ws.on("disconnect", () => console.log("Disconnected"));
+    ws.on("reconnect", () => console.log("Reconnected"));
+    ws.on("error", (error) => console.error("Error:", error));
+}
 ```
 
 ## Authentication & RLS
@@ -353,7 +362,7 @@ Because connection poolers like **pgBouncer** do not support the persistent conn
 
 ### Notification Mechanics & Payload Layout
 
-When a entity is modified on Instance A, it broadcasts a notification on the `rebase_entity_changes` channel. To minimize database overhead and network bandwidth, the notification payload is kept extremely compact:
+When a record is modified on Instance A, it broadcasts a notification on the `rebase_entity_changes` channel. To minimize database overhead and network bandwidth, the notification payload is kept extremely compact:
 
 ```json
 {
@@ -411,6 +420,8 @@ It can. Measured across two backend instances against a single Postgres containe
 The limit worth watching is not capacity, it is that every notification is a query against your primary database, competing with your application's real queries. The Postgres bus therefore **coalesces** outgoing frames (see below), which is what keeps that cost proportional to elapsed time rather than message count.
 
 Per client, the socket accepts up to **7,200 channel frames a minute** (120/s — 60 fps of cursor broadcasts plus the presence update each one carries), counted separately from the budget queries and subscriptions share. Frames past that are refused with a `RATE_LIMITED` error rather than queued.
+
+The refusal arrives on `channel.onError()`, not as a rejected `broadcast()` — see [When a channel frame is refused](#when-a-channel-frame-is-refused).
 
 If you are still pushing it after that, throttle cursor-grade events on the client (last-write-wins state does not need 60 updates a second), and consider routing a document's collaborators to the same instance — sticky routing drops cross-instance traffic to nearly nothing regardless of user count. Only past that is another transport worth it, and then the answer is a transport package, not a fork. See [Writing your own transport](#writing-your-own-transport).
 
@@ -487,7 +498,7 @@ Delivery to local clients is not your concern — the realtime service owns whic
 `pg_notify` refuses a payload of 8000 bytes or more. Cursors and presence fit with room to spare; a document snapshot does not. Rebase handles this the same way it handles large entity changes — by sending an address instead of a body:
 
 - **On a retained channel** (see [Channel Retention](#channel-retention)) the message is already stored with a sequence number, so the notification carries only `(channel, seq)` and each receiving instance reads the body back. There is no size limit at all.
-- **On an ephemeral channel** there is nothing to point at. The broadcast is delivered locally, the sender receives a `CHANNEL_BUS_PAYLOAD_TOO_LARGE` error, and a warning names the channel — rather than the message silently reaching half the cluster.
+- **On an ephemeral channel** there is nothing to point at. The broadcast is delivered locally, the sender receives a `CHANNEL_BUS_PAYLOAD_TOO_LARGE` error on `channel.onError()`, and a warning names the channel — rather than the message silently reaching half the cluster.
 
 If you broadcast large messages, give that channel a retention rule. That is the whole fix.
 
@@ -562,6 +573,37 @@ To prevent client requests from hanging indefinitely, all pending WebSocket oper
 If the server does not respond within this 30-second window, the client automatically deletes the pending request and rejects the promise with an `ApiError` with the message `"Request timed out"`.
 
 One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
+
+### When a channel frame is refused
+
+A channel frame is fire-and-forget: `await channel.broadcast(...)` resolves when
+the frame is written to the socket, **not** when the server has accepted it. That
+is deliberate — a collaborative app broadcasts a cursor position sixty times a
+second, and waiting for an acknowledgement on each would make every one a round
+trip.
+
+So a refusal cannot be a rejected promise. It arrives on `onError`:
+
+```typescript
+const channel = client.realtime.channel("doc:42");
+
+channel.onError((error) => {
+    if (error.code === "CHANNEL_FORBIDDEN") showReadOnlyBanner();
+    if (error.code === "RATE_LIMITED") throttleCursorUpdates();
+});
+```
+
+| Code | Means |
+|------|-------|
+| `CHANNEL_FORBIDDEN` | An authorizer refused the join, broadcast or history read |
+| `RATE_LIMITED` | Past the channel frame budget above |
+| `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
+| `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
+| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | The broadcast reached this instance only — see [The 8 KB limit on the Postgres bus](#the-8-kb-limit-on-the-postgres-bus) |
+
+With no handler attached, these are logged as a warning. They used to be
+discarded entirely: there was no promise to reject and no channel to deliver to,
+so a forbidden broadcast was indistinguishable from a delivered one.
 
 ## Next Steps
 

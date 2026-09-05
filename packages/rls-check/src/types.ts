@@ -217,6 +217,13 @@ export interface ScanResult {
     serverVersion: string;
     platform: DbSnapshot["platform"];
     scannerIsPrivileged: boolean;
+    /**
+     * The roles every check gated on. Reported because it is the single fact
+     * that decides whether a clean run means anything: a check only calls a
+     * table exposed when one of these can reach it, so a reader who does not
+     * see their own app role here knows the run did not cover their API.
+     */
+    exposedRoles: string[];
     stats: {
         schemas: number;
         tables: number;
@@ -246,11 +253,19 @@ export interface ScanResult {
         /** Schemas left out of the scan, and why. */
         excludedSchemas: { schema: string; reason: "system" | "platform" | "not-requested" }[];
         /**
-         * Roles holding write privileges that the scan neither recognises as
-         * exposed nor can explain as trusted. Non-empty means the exposed-role
-         * set may be incomplete, and every check gates on that set — so this is
-         * the difference between "clean" and "clean as far as I could tell".
+         * Roles holding read or write privileges on scanned tables that the scan
+         * neither recognises as exposed nor can explain as trusted. Non-empty
+         * means the exposed-role set may be incomplete, and every check gates on
+         * that set — so this is the difference between "clean" and "clean as far
+         * as I could tell".
          */
         unrecognizedGrantees: string[];
+        /**
+         * The role the scan connected as, when RLS constrains it and it was
+         * therefore treated as exposed. `null` or absent when the scan connected
+         * as a superuser, an owner or a BYPASSRLS role — the case
+         * `scannerIsPrivileged` already describes.
+         */
+        scanningAsExposedRole?: string | null;
     };
 }

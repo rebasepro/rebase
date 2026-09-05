@@ -3,8 +3,22 @@
   "version": "0.17.3",
   "private": false,
   "description": "Bundled AI agent skills for Rebase",
+  "keywords": [
+    "rebase",
+    "agent-skills",
+    "ai",
+    "agents",
+    "claude",
+    "postgres",
+    "backend-as-a-service"
+  ],
+  "license": "MIT",
+  "author": "rebase.pro",
   "type": "module",
   "homepage": "https://rebase.pro",
+  "bugs": {
+    "url": "https://github.com/rebasepro/rebase/issues"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/rebasepro/rebase.git",

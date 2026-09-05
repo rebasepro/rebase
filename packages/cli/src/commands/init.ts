@@ -9,6 +9,7 @@ import { cp } from "fs/promises";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
+import { cliVersion } from "../utils/version";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { resolveCloudUrl, writeLink } from "./cloud/context";
 import type { PackageManager, PMCommands } from "../utils/package-manager";
@@ -201,7 +202,7 @@ export function buildInitQuestions(params: BuildQuestionsParams): Record<string,
     questions.push({
         type: "input",
         name: "databaseUrl",
-        message: "Enter your PostgreSQL database connection string (leave blank to use a local default):",
+        message: "PostgreSQL connection string (blank = a managed database for this project, no setup):",
         default: "",
         validate: (input: string) => {
             if (input.trim() && /[\r\n]/.test(input)) {
@@ -247,8 +248,11 @@ ${chalk.bold("Usage")}
 ${chalk.bold("Options")}
   ${chalk.blue("-t, --template")} ${chalk.gray("<preset>")}   blog | ecommerce | blank ${chalk.gray("(default: blog)")}
   ${chalk.blue("--headless")}                Backend only — no admin panel, no collections
-  ${chalk.blue("-y, --yes")}                 Accept defaults, never prompt ${chalk.gray("(required for CI / non-TTY)")}
+  ${chalk.blue("-y, --yes")}                 Never prompt ${chalk.gray("(required for CI / non-TTY)")}
+                            ${chalk.gray("Skips git init and dependency install — the interactive")}
+                            ${chalk.gray("defaults say yes to both. Pass --git / --install for those.")}
   ${chalk.blue("-i, --install")}             Install dependencies after scaffolding
+  ${chalk.blue("--no-install")}              Scaffold only, install nothing ${chalk.gray("(the default)")}
   ${chalk.blue("-g, --git")}                 Initialize a git repository and make an initial commit
   ${chalk.blue("--database-url")} ${chalk.gray("<url>")}      Use an existing database instead of the generated one
   ${chalk.blue("--introspect")}              Generate collections from that database ${chalk.gray("(implies --template blank; needs --install)")}
@@ -286,6 +290,12 @@ ${chalk.bold("Rebase")} — Create a new project 🚀
 export const INIT_FLAGS = {
     "--git": Boolean,
     "--install": Boolean,
+    // The default, spelled out. `arg` has no negation, so without this entry a
+    // CI script that writes what reads naturally — `rebase init app --yes
+    // --no-install` — died on "Unknown or unexpected option", and both the
+    // README and the Quickstart documented a flag the parser rejected. When
+    // both are passed, the explicit "no" wins.
+    "--no-install": Boolean,
     "--database-url": String,
     "--introspect": Boolean,
     "--template": String,
@@ -336,6 +346,13 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
 
     const headlessArg = args["--headless"] === true ? true : undefined;
 
+    // `--no-install` is an explicit "no", not merely the absence of a "yes": it
+    // suppresses the interactive question too, so `rebase init app --no-install`
+    // asks one fewer thing rather than asking and ignoring the answer.
+    const noInstall = args["--no-install"] === true;
+    const installFlag = noInstall ? false : (args["--install"] ?? false);
+    const hasInstallFlag = noInstall || args["--install"] === true;
+
     if (isNonInteractive) {
         const projectName = nameArg || "my-rebase-app";
         const targetDirectory = path.resolve(process.cwd(), projectName);
@@ -345,7 +362,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         return {
             projectName: path.basename(targetDirectory),
             git: args["--git"] ?? false,
-            installDeps: args["--install"] ?? false,
+            installDeps: installFlag,
             targetDirectory,
             templateDirectory,
             databaseUrl: args["--database-url"] || undefined,
@@ -377,7 +394,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         templateArg,
         headlessArg,
         hasGitFlag: !!args["--git"],
-        hasInstallFlag: !!args["--install"],
+        hasInstallFlag,
         pm
     });
 
@@ -392,7 +409,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
     return {
         projectName,
         git: args["--git"] || answers.git || false,
-        installDeps: args["--install"] || answers.installDeps || false,
+        installDeps: noInstall ? false : (args["--install"] || answers.installDeps || false),
         targetDirectory,
         templateDirectory,
         databaseUrl: (answers.databaseUrl as string)?.trim() || undefined,
@@ -580,6 +597,12 @@ async function createProject(options: InitOptions) {
     // Rename .env.example to .env if it exists and randomize secrets
     await configureEnvFile(options.targetDirectory, options.databaseUrl);
 
+    // The manifest's build command is the project's package manager, not npm.
+    // The template has to spell one of them, and `npm run build --workspace
+    // frontend` in a pnpm project is a second package manager reading a
+    // lockfile it did not write.
+    await writeProjectPackageManagerIntoManifest(options.targetDirectory, options.pmCommands);
+
     // Create the repository now, but commit at the very end — see
     // commitScaffold below for why the two halves are separated.
     let gitInitialized = false;
@@ -705,11 +728,11 @@ async function createProject(options: InitOptions) {
         }
     } else if (isBaas) {
         // One step, then the thing that is actually this mode's job. `dev`
-        // starts the database container itself; a headless project has no
-        // collections, so there is no schema to push and the tables are the
-        // developer's to create.
+        // starts the database itself; a headless project has no collections, so
+        // there is no schema to push and the tables are the developer's to
+        // create.
         console.log(chalk.gray("  # A local database configuration has been generated in .env."));
-        console.log(chalk.gray("  # 1. Start everything — the database container comes up with it:"));
+        console.log(chalk.gray("  # 1. Start everything — the database comes up with it:"));
         console.log(`  ${chalk.cyan(runDev.join(" "))}`);
         console.log("");
         console.log(chalk.gray("  # 2. Create your tables (migrations, SQL, any tool you like)."));
@@ -718,14 +741,26 @@ async function createProject(options: InitOptions) {
         console.log(`  ${chalk.cyan("ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;")}`);
         console.log(chalk.gray("  #    The API logs any table it skips, and why."));
     } else {
-        // The whole first run, in one command: `dev` starts the database
-        // container and pushes the schema before it starts the servers. The two
-        // steps that used to be printed here are still available — and still
-        // documented under `rebase dev --help` — for anyone who wants to drive
-        // them separately.
+        // The whole first run, in one command.
+        //
+        // Deliberately does NOT say "container". This branch is the one a new
+        // project takes, and it is precisely the branch with no container in it:
+        // `.env` ships DATABASE_URL commented out, so `dev` starts the managed
+        // PGlite database rather than Docker. Saying otherwise sent a reader who
+        // had no Docker installed off to install it, to satisfy a step that was
+        // never going to run — and made the whole quickstart look like it
+        // required a daemon it does not.
+        //
+        // "schema" covers two things `dev` now does before serving: generating
+        // the Drizzle schema from the collections, and applying the collections
+        // to the database. The push-and-Docker steps that used to be printed
+        // here are still documented under `rebase dev --help`.
         console.log(chalk.gray("  # A local database configuration has been generated in .env."));
-        console.log(chalk.gray("  # Start everything — the database container and schema are set up for you:"));
+        console.log(chalk.gray("  # Start everything — the database and schema are set up for you,"));
+        console.log(chalk.gray("  # with no Docker and nothing else to install:"));
         console.log(`  ${chalk.cyan(runDev.join(" "))}`);
+        console.log("");
+        console.log(chalk.gray("  # To use a Postgres of your own instead, uncomment DATABASE_URL in .env."));
     }
 
     console.log("");
@@ -830,6 +865,43 @@ force: true });
     });
 }
 
+/**
+ * Rewrite `rebase.json`'s static-app build command for this project's package manager.
+ *
+ * The template must spell one of them, and it spells npm. In a pnpm project
+ * that is a second package manager invoked against a lockfile it did not
+ * write — `rebase build` then either installs a second tree or fails on a
+ * workspace flag npm and pnpm spell differently.
+ */
+async function writeProjectPackageManagerIntoManifest(
+    targetDirectory: string,
+    pmCommands: PMCommands
+): Promise<void> {
+    const manifestPath = path.join(targetDirectory, "rebase.json");
+    if (!fs.existsSync(manifestPath)) return;
+
+    try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
+            apps?: Record<string, { type?: string; root?: string; build?: string }>;
+        };
+        let changed = false;
+        for (const app of Object.values(manifest.apps ?? {})) {
+            if (app.type !== "static" || !app.root || !app.build) continue;
+            const rewritten = pmCommands.runWorkspace(app.root, "build").join(" ");
+            if (rewritten !== app.build) {
+                app.build = rewritten;
+                changed = true;
+            }
+        }
+        if (changed) {
+            fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 4)}\n`, "utf8");
+        }
+    } catch {
+        // A manifest that will not parse is `rebase build`'s problem to report,
+        // and scaffolding must not fail on a cosmetic rewrite.
+    }
+}
+
 async function applyPreset(targetDirectory: string, preset: TemplatePreset): Promise<void> {
     const collectionsDir = path.join(targetDirectory, "config", "collections");
     const presetsDir = path.join(collectionsDir, "presets");
@@ -872,68 +944,67 @@ force: true });
     }
 }
 
+/**
+ * The one registry call `init` makes, and what it is for.
+ *
+ * Every `@rebasepro/*` package in this repository carries the same version —
+ * `check:publishable-set` fails the build on the first PR after a bump if any
+ * of them drifts — so the version to pin is known before the network is
+ * touched: it is this CLI's own. Asking npm eleven times, once per package,
+ * bought nothing but eleven chances to hang. On a slow connection that was the
+ * slowest part of `init`; on no connection it was eleven timeouts before a
+ * fallback to `"latest"`, which is the one answer that produces a project
+ * mixing framework eras.
+ *
+ * One call remains, and it asks a different question. Lockstep is enforced in
+ * the repository, not on the registry: a release can still ship the CLI and
+ * leave a package behind, which is exactly what happened to
+ * `@rebasepro/agent-skills` across three releases. So this probes a single
+ * package — `@rebasepro/server`, the one a project cannot run without — to see
+ * whether this version really made it out. A gap is a refusal, because the
+ * alternative is scaffolding a project that cannot install.
+ *
+ * Unreachable is NOT a refusal. `init` offline is a legitimate thing to do,
+ * and the pin it would write is the same pin the probe would have confirmed.
+ * It says so and carries on.
+ */
+type ReleaseProbe =
+    | { kind: "published" }
+    | { kind: "gap"; found: string }
+    | { kind: "unreachable"; reason: string };
+
+/** The package the probe asks about. Not the CLI: the CLI is what is running. */
+const RELEASE_PROBE_PACKAGE = "@rebasepro/server";
+
+async function probeRelease(version: string): Promise<ReleaseProbe> {
+    try {
+        const { stdout } = await execa("npm", ["view", `${RELEASE_PROBE_PACKAGE}@${version}`, "version"]);
+        if (stdout.trim() === version) return { kind: "published" };
+        // npm answers an unpublished version with empty output rather than an
+        // error on some registries. Empty is a gap, not a success.
+        return { kind: "gap", found: stdout.trim() || "nothing" };
+    } catch (error) {
+        const text = `${(error as { stderr?: string }).stderr ?? ""}${(error as Error).message ?? ""}`;
+        if (/E404|404 Not Found|No match(ing)? version/i.test(text)) {
+            return { kind: "gap", found: "nothing" };
+        }
+        return { kind: "unreachable", reason: firstLine(text) || "the registry could not be reached" };
+    }
+}
+
+function firstLine(text: string): string {
+    return text.split("\n").map(l => l.trim()).filter(Boolean)[0] ?? "";
+}
+
 async function replacePlaceholders(options: InitOptions) {
     const filesToProcess = TEMPLATE_PLACEHOLDER_FILES;
 
-    const packageJsonPath = path.resolve(cliRoot!, "package.json");
-    let cliVersion = "latest";
-    if (fs.existsSync(packageJsonPath)) {
-        const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-        cliVersion = pkg.version || "latest";
-    }
+    // `unknown` only when the manifest could not be read at all, which is the
+    // same "nothing to pin, nothing to confirm" case `latest` used to stand for.
+    const version = cliVersion();
 
-    const versionCache = new Map<string, string>();
-    /** Packages with no release matching the CLI's own version. */
-    const unreleased = new Map<string, string>();
-
-    // Use npm view for registry queries — it's universal and works regardless of PM
-    const viewBin = "npm";
-
-    const getPackageVersion = async (pkgName: string) => {
-        if (versionCache.has(pkgName)) return versionCache.get(pkgName)!;
-        if (process.env.REBASE_E2E === "true") {
-            versionCache.set(pkgName, cliVersion);
-            return cliVersion;
-        }
-        let versionToUse = cliVersion;
-        try {
-            // First try to check if the specific cliVersion exists for this package
-            const { stdout } = await execa(viewBin, ["view", `${pkgName}@${cliVersion}`, "version"]);
-            if (!stdout.trim()) throw new Error("Not found");
-            versionToUse = stdout.trim();
-        } catch {
-            try {
-                // If specific version doesn't exist, try the matching tag (canary or latest)
-                const tag = cliVersion.includes("canary") ? "canary" : "latest";
-                const { stdout } = await execa(viewBin, ["view", `${pkgName}@${tag}`, "version"]);
-                if (!stdout.trim()) throw new Error("Not found");
-                versionToUse = stdout.trim();
-            } catch {
-                try {
-                    // Fallback to absolute latest
-                    const { stdout } = await execa(viewBin, ["view", pkgName, "version"]);
-                    versionToUse = stdout.trim() || "latest";
-                } catch {
-                    versionToUse = "latest";
-                }
-            }
-
-            // The fallbacks above answer "what can I install?", not "what matches
-            // this CLI?". When a package has no release at the CLI's own version,
-            // they quietly pin whatever the registry last tagged — which can be a
-            // prerelease from an entirely different era of the framework. Record
-            // it so we can refuse rather than scaffold a mixed-version app.
-            if (versionToUse !== cliVersion) {
-                unreleased.set(pkgName, versionToUse);
-            }
-        }
-        versionCache.set(pkgName, versionToUse);
-        return versionToUse;
-    };
-
-    // First, find all unique @rebasepro packages across all files to process in parallel
-    const allPackages = new Set<string>();
     const fileContents = new Map<string, string>();
+    const allPackages = new Set<string>();
 
     for (const file of filesToProcess) {
         const fullPath = path.resolve(options.targetDirectory, file);
@@ -942,52 +1013,46 @@ async function replacePlaceholders(options: InitOptions) {
         fileContents.set(fullPath, content);
 
         const matches = [...content.matchAll(/"(@rebasepro\/[^"]+)":\s*"workspace:\*"/g)];
-        for (const match of matches) {
-            allPackages.add(match[1]);
-        }
+        for (const match of matches) allPackages.add(match[1]);
     }
 
-    console.log(chalk.gray("  Resolving package versions..."));
+    // `latest` means this CLI could not read its own manifest — there is no
+    // version to confirm, and nothing to gain from asking.
+    const skipProbe = process.env.REBASE_E2E === "true" || version === "unknown";
+    const probe: ReleaseProbe = skipProbe ? { kind: "published" } : await probeRelease(version);
 
-    // Resolve all versions in parallel
-    await Promise.all(Array.from(allPackages).map(getPackageVersion));
-
-    // A stable CLI whose packages resolve only to a prerelease means those
-    // packages were never released at this version — the usual cause is a rename
-    // that left the new name published on the canary tag alone. Scaffolding
-    // anyway mixes eras (say @rebasepro/types@0.9.0 beside a 0.0.1 canary) and
-    // hands the user an app that fails at install or, worse, at runtime. Neither
-    // failure names this as the cause, so stop here and say it plainly.
-    const cliIsStable = cliVersion !== "latest" && !cliVersion.includes("-");
-    const prereleasePins = [...unreleased].filter(([, version]) => version === "latest" || version.includes("-"));
-
-    if (cliIsStable && prereleasePins.length > 0) {
-        const lines = prereleasePins.map(([name, version]) => `    ${name} → ${version}`).join("\n");
+    if (probe.kind === "gap") {
         throw new Error(
-            `Rebase ${cliVersion} is not fully published to npm.\n\n` +
-            `These packages have no ${cliVersion} release, so the newest thing on the\n` +
-            `registry is a prerelease:\n\n${lines}\n\n` +
-            `Scaffolding would pin those alongside the ${cliVersion} packages and produce\n` +
-            "an app that cannot install or run. That is a release gap in Rebase itself —\n" +
-            "not a problem with your machine, your network, or your package manager.\n\n" +
+            `Rebase ${version} is not fully published to npm.\n\n` +
+            `${RELEASE_PROBE_PACKAGE} has no ${version} release — the registry has ${probe.found}.\n` +
+            `Every @rebasepro package ships at one version, so scaffolding would pin ${allPackages.size}\n` +
+            `dependencies at a version that is not there, and the install would fail.\n\n` +
+            "That is a release gap in Rebase itself — not a problem with your machine,\n" +
+            "your network, or your package manager.\n\n" +
             "Stopped before writing dependency versions or installing anything. The\n" +
             `project directory ${path.basename(options.targetDirectory)}/ was created and is safe to delete.\n` +
-            "Please report this with the list above."
+            "Please report this."
         );
     }
 
-    // Perform replacements
+    if (probe.kind === "published") {
+        console.log(chalk.gray(`  Pinning ${allPackages.size} @rebasepro package(s) to ${version}...`));
+    }
+
+    if (probe.kind === "unreachable") {
+        console.log(chalk.gray(`  Pinning @rebasepro packages to ${version} (this CLI's version).`));
+        console.log(chalk.yellow(`  Could not reach npm to confirm the release: ${probe.reason}`));
+        console.log(chalk.gray("  The pin is right either way — install will say so if the version is missing."));
+    }
+
     for (const [fullPath, originalContent] of fileContents.entries()) {
         let content = originalContent.replace(/\{\{PROJECT_NAME\}\}/g, options.projectName);
-
-        // Replace workspace:* with the dynamically resolved version
-        const matches = [...content.matchAll(/"(@rebasepro\/[^"]+)":\s*"workspace:\*"/g)];
-        for (const match of matches) {
-            const pkgName = match[1];
-            const resolvedVersion = versionCache.get(pkgName) || "latest";
-            content = content.replace(new RegExp(`"${pkgName}":\\s*"workspace:\\*"`, "g"), `"${pkgName}": "${resolvedVersion}"`);
+        for (const pkgName of allPackages) {
+            content = content.replace(
+                new RegExp(`"${pkgName}":\\s*"workspace:\\*"`, "g"),
+                `"${pkgName}": "${version}"`
+            );
         }
-
         fs.writeFileSync(fullPath, content, "utf-8");
     }
 }
@@ -1062,16 +1127,8 @@ async function findAvailablePort(startPort: number): Promise<number> {
  * names a version that was never published.
  */
 function readCliVersion(): string {
-    try {
-        const manifest = path.resolve(cliRoot!, "package.json");
-        if (fs.existsSync(manifest)) {
-            const pkg = JSON.parse(fs.readFileSync(manifest, "utf-8"));
-            if (typeof pkg.version === "string" && pkg.version) return pkg.version;
-        }
-    } catch {
-        // Fall through — see the doc comment.
-    }
-    return "latest";
+    const version = cliVersion();
+    return version === "unknown" ? "latest" : version;
 }
 
 /**
@@ -1105,6 +1162,24 @@ export function resolveRuntimeImageTag(cliVersion: string): { tag: string; note?
     return { tag: cliVersion };
 }
 
+/**
+ * Set `KEY=value` in a .env body, whether the key ships set, commented out or
+ * missing entirely.
+ *
+ * The missing case is not hypothetical: `configureEnvFile` runs against
+ * whatever `.env.example` is in the target directory, which for a project
+ * scaffolded from an older template — or from one somebody edited — may not
+ * carry a key this version of `init` is expected to write. Silently skipping it
+ * produces a `.env` that satisfies no `${VAR:?…}` in the compose file, which
+ * surfaces as a stack that refuses to interpolate rather than as anything
+ * pointing back here.
+ */
+function setEnvValue(content: string, key: string, value: string, header?: string): string {
+    const line = new RegExp(`^#?\\s*${key}=.*$`, "m");
+    if (line.test(content)) return content.replace(line, `${key}=${value}`);
+    return `${content.trimEnd()}\n\n${header ? `${header}\n` : ""}${key}=${value}\n`;
+}
+
 export async function configureEnvFile(targetDirectory: string, databaseUrl?: string) {
     const envExamplePath = path.join(targetDirectory, ".env.example");
     const envPath = path.join(targetDirectory, ".env");
@@ -1125,6 +1200,13 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
         const jwtSecret = crypto.randomBytes(32).toString("hex");
         const dbPassword = crypto.randomBytes(16).toString("hex");
         const serviceKey = crypto.randomBytes(48).toString("base64");
+        // base64url rather than base64 or hex: 24 characters, comfortably past
+        // the runtime's 12-character floor, and every character it can produce
+        // is one dotenv and Compose interpolation read back unchanged. `+`, `/`
+        // and `=` are fine in a .env value but not obviously so to a reader
+        // about to paste one into a shell, and `#` — which hex cannot produce
+        // but a passphrase generator might — would truncate the line.
+        const adminPassword = crypto.randomBytes(18).toString("base64url");
 
         let envContent = fs.readFileSync(envPath, "utf-8");
 
@@ -1181,6 +1263,39 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             /^#\s*CORS_ORIGINS=.*$/m,
             `CORS_ORIGINS=http://localhost:${composeApiPort}`
         );
+
+        // The first admin, named rather than raced for.
+        //
+        // `docker-compose.yml` runs the api service with NODE_ENV=production,
+        // and in production the first-registration-becomes-admin window is
+        // shut — deliberately, because the compose stack is serving before its
+        // operator has typed anything and whoever found the sign-up form first
+        // would own it. A closed window needs a way in that is not a race, and
+        // this is it: the account is named in the same file that already holds
+        // the JWT secret and the database password.
+        //
+        // Written by `init` rather than left for the reader, because the
+        // compose file declares both with `${VAR:?…}`: unset, `docker compose
+        // up` does not produce a deployment without an admin, it produces a
+        // file that refuses to interpolate — and it refuses for `docker compose
+        // up -d db` too, which is step 1 of the "Next steps" printed below.
+        //
+        // The address is a placeholder the login route accepts. Not
+        // `admin@localhost`: `POST /auth/login` parses its body with
+        // `z.string().email()`, which rejects a domain with no dot, so that
+        // address seeds an account and then 400s on every attempt to use it.
+        // The runtime now refuses it at boot; this default is one it accepts.
+        envContent = setEnvValue(
+            envContent,
+            "REBASE_ADMIN_EMAIL",
+            "admin@example.com",
+            "# ── The first admin account ─────────────────────────────────────────\n" +
+            "# In production the first account to register is NOT promoted to admin,\n" +
+            "# so the operator names it here instead. Created once, while the user\n" +
+            "# table is empty. Change the email to yours, sign in, and change the\n" +
+            "# password below."
+        );
+        envContent = setEnvValue(envContent, "REBASE_ADMIN_PASSWORD", adminPassword);
 
         // Blank the build-time API URL rather than shipping `http://localhost:3001`.
         //
@@ -1282,16 +1397,15 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
                 // stays here, one `#` away, because the alternative — a project
                 // that mentions Docker nowhere — makes switching to it a
                 // documentation lookup instead of an edit.
+                // Deliberately short: the header copied from `.env.example`
+                // sits directly above and already says what unset means. Saying
+                // it twice, in the first section of the first file a new
+                // developer opens, is how a generated file starts reading like
+                // boilerplate nobody wrote on purpose.
                 [
-                    "# DATABASE_URL is commented out on purpose.",
-                    "#",
-                    "# `rebase dev` starts a managed PostgreSQL for this project — no Docker,",
-                    "# no setup, and the data lives in .rebase/. Set this variable to use a",
-                    "# database of your own instead; it always wins over the managed one.",
-                    "#",
-                    "# To use the docker-compose Postgres that ships with this project:",
-                    "#   docker compose up -d db",
-                    "# then uncomment the line below.",
+                    "# Commented out on purpose — that is what selects the managed database.",
+                    "# To use the docker-compose Postgres this project ships instead:",
+                    "#   docker compose up -d db, then uncomment the line below.",
                     `# DATABASE_URL=postgresql://rebase_app:${dbPassword}@127.0.0.1:${dbPort}/rebase?options=-c%20search_path%3Dpublic&sslmode=disable`,
                     `DATABASE_PASSWORD=${dbPassword}`
                 ].join("\n")

@@ -43,7 +43,7 @@ const backend = await initializeRebaseBackend({
 |----------|------|---------|-------------|
 | `from` | `string` | — | **Required.** Sender address. Format: `"noreply@example.com"` or `"MyApp <noreply@example.com>"` |
 | `smtp` | `SMTPConfig` | `undefined` | SMTP server configuration (see below) |
-| `sendEmail` | `(options: EmailSendOptions) => Promise<void>` | `undefined` | Custom send function — replaces SMTP entirely |
+| `sendEmail` | `(options: EmailSendOptions) => Promise<EmailSendResult>` | `undefined` | Custom send function — replaces SMTP entirely. Return what your provider reported; the message id is what makes a reply threadable |
 | `resetPasswordUrl` | `string` | `""` | Base URL for password reset links. The reset link becomes `{resetPasswordUrl}/reset-password?token={token}` |
 | `verifyEmailUrl` | `string` | `""` | Base URL for email verification links. The link becomes `{verifyEmailUrl}/verify-email?token={token}` |
 | `appName` | `string` | `"Rebase"` | Application name used in email subjects and body text |
@@ -79,7 +79,7 @@ The `EmailService` interface is exposed on the `rebase.email` singleton:
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `send` | `(options: EmailSendOptions) => Promise<void>` | Send a single email |
+| `send` | `(options: EmailSendOptions) => Promise<EmailSendResult>` | Send a single email. Resolves with what the provider reported — the message id among it — and throws on failure. It returned `void` before 0.17 |
 | `isConfigured` | `() => boolean` | Returns `true` when SMTP or a custom `sendEmail` function is configured |
 | `verifyConnection` | `() => Promise<boolean>` | *(Optional)* Test SMTP connectivity. Returns `true` on success, `false` on failure. For custom `sendEmail`, returns `true` if the function is set |
 
@@ -448,7 +448,7 @@ export default defineFunction((app, { rebase }) => {
         const { email, reportData } = await c.req.json();
 
         // `rebase.email` always exists server-side — when SMTP is not
-        // configured it is a no-op sender, so ask whether it can actually send.
+        // configured its `send()` throws, so ask whether it can actually send.
         if (!rebase.email.isConfigured()) {
             return c.json({ error: "Email not configured" }, 503);
         }
@@ -501,9 +501,9 @@ export default defineCron({
 import { rebase } from "@rebasepro/server";
 
 // `rebase.email` is ALWAYS present server-side — `RebaseServerClient` declares
-// it non-optional, and a no-op sender is wired when SMTP is not configured. So
-// `if (!rebase.email)` is dead code; the question worth asking is whether it can
-// send.
+// it non-optional, and when SMTP is not configured a stand-in is wired whose
+// `send()` throws a message naming what to set. So `if (!rebase.email)` is dead
+// code; the question worth asking is whether it can send.
 if (!rebase.email.isConfigured()) {
     console.log("Email service exists but has no SMTP or sendEmail function");
 }

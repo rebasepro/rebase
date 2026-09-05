@@ -37,6 +37,21 @@ Please refer to and follow the instructions defined in [ai-instructions.md](./ai
 This happens on every `rebase init`, for every preset including `--headless`.
 There is no flag and no prompt.
 
+`rebase init` also writes `.mcp.json`, which points Claude Code, Cursor and
+any other MCP client at the [Rebase MCP server](/docs/ai/mcp):
+
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "rebase": { "command": "npx", "args": ["-y", "@rebasepro/mcp"] }
+  }
+}
+```
+
+There is no `REBASE_PROJECT_DIR` in it on purpose: the client spawns the server
+at the project root, and an absolute path is the one line of that file that
+cannot be committed.
+
 ## Why a pointer rather than a copy
 
 The pointer files are deliberately content-free. Assistants follow relative
@@ -56,7 +71,7 @@ repos that are not Rebase projects at all.
 ## What `ai-instructions.md` starts with
 
 The scaffolded file is deliberately short — it points at
-[`rebase skills install`](/docs/ai/skills) for depth, then states four rules that
+[`rebase skills install`](/docs/ai/skills) for depth, then states the rules that
 assistants get wrong often enough to be worth repeating at the top of every
 session:
 
@@ -65,11 +80,13 @@ session:
    [Schema as Code](/docs/architecture/schema-as-code).
 2. **Migrations are two steps.** `rebase schema generate`, then `rebase db push`
    in development, or `rebase db generate && rebase db migrate` for production.
-3. **Use the SDK.** Go through `rebase.data.<slug>`; raw SQL and direct Drizzle
-   calls bypass validation, callbacks and RLS.
+3. **Use the SDK.** Go through `rebase.dataAsAdmin.<slug>` for work done as the
+   service identity, or `getDriver(c)` inside a function when the read should run
+   as the caller. The server client has no plain `data` accessor. Raw SQL and direct
+   Drizzle calls bypass validation, callbacks and RLS.
 4. **Guard every custom route.** Routes in `backend/functions/` are mounted
    *without* authentication. Use `requireAuth` / `requireAdmin` from
-   `@rebasepro/server` in the route's own middleware slot — reading
+   `@rebasepro/server/functions` in the route's own middleware slot — reading
    `c.get("user")` is not a guard, and neither is `app.use()` after the route.
 
 That last one is the one to keep. It is the difference between a middleware that

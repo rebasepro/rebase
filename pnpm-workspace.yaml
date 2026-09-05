@@ -7,6 +7,12 @@ packages:
   - website
   - tooling/videos
   - examples/*
+  # Rebase Cloud's control plane, which is a private repository checked out at
+  # `saas/` beside these packages. It is absent from a public clone, and pnpm
+  # treats a pattern that matches nothing as matching nothing — no warning, no
+  # error, `pnpm install` is unaffected. The entries stay because removing them
+  # would break the checkout that does have it, and the `saas` / `saas:prod`
+  # scripts in package.json are its entry points.
   - saas/config
   - saas/backend
   - saas/frontend

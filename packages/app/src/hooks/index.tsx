@@ -37,6 +37,7 @@ export * from "./usePermissions";
 export * from "./ApiConfigContext";
 
 export * from "./useTranslation";
+export * from "./useNavigationGroupLabel";
 export * from "./useRebaseClient";
 
 export * from "./useAnalyticsController";

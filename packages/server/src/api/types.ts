@@ -38,6 +38,36 @@ export type HonoEnv = {
         apiKey?: ApiKeyMasked;
         /** Unique request correlation ID (generated or propagated from X-Request-ID header). */
         requestId?: string;
+        /**
+         * The collection this request is about, when it is about one.
+         *
+         * Set by the REST generator from the first path segment, validated
+         * against the collections it actually serves — so it is a slug this
+         * backend knows, not whatever the caller typed. Read by the request
+         * logger: "a 403 on /api/data/orders" and "a 403" are different amounts
+         * of help at 3am, and the path alone does not survive being aggregated.
+         */
+        collection?: string;
+        /**
+         * What the error handler answered, for the request log line.
+         *
+         * The handler and the request logger both wrote a line for the same
+         * failed request, each holding half of it: the handler had the code and
+         * the message, the logger had the user and the latency. Neither was
+         * enough, and two lines per failure is its own cost. The handler now
+         * leaves what it knows here and stays quiet where the logger will
+         * speak. See `utils/request-logger.ts`.
+         */
+        errorSummary?: { code: string; message: string };
+        /**
+         * Set by `requestLogger` before the handler runs, so the error handler
+         * can tell whether one line per request is already guaranteed.
+         *
+         * A router mounted without the request logger — a project wiring routes
+         * onto its own Hono app — still gets the handler's own line, because
+         * there nothing else would report the failure at all.
+         */
+        requestLogged?: boolean;
     }
 };
 

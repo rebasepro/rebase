@@ -11,6 +11,105 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+### Breaking
+
+- **`defineCollection` is one signature, and its errors land on the field.** It
+  was three overloads — Postgres, Firestore, MongoDB — and when a call failed
+  TypeScript emitted exactly one diagnostic, on `defineCollection(`, listing each
+  overload's first failure. So a Postgres collection's typo reported
+  `FirebaseCollectionConfig` and `MongoDBCollectionConfig` at an author who had
+  named neither engine, and a collection with two mistakes reported one of them,
+  revealing the second only on the next compile.
+
+  There is now one signature discriminated on `engine` (Postgres when absent).
+  Errors are reported where they are, all of them at once: a misspelled key on
+  the key, a bad `admin.display.title` on the path, a link field that belongs to
+  another relation kind on that field.
+
+  Two type exports move with it: `UnknownPropertyKey` is now **`NoSuchKey`**,
+  which carries a `didYouMean` member naming the shape whose keys were valid, and
+  `PropertyTypeNotOnThisEngine` is new — it is what a `relation` on a Firestore
+  collection resolves to. Both are internal machinery of the builder; nothing
+  should be importing them, and neither has a runtime representation, so no
+  contract bump.
+
+- **`defineCollection` no longer stops checking the `admin` block when a property
+  is wrong.** The builder declared `const P extends PostgresProperties`, and a
+  constraint TypeScript cannot satisfy is one it silently falls back from: a
+  single property with a bad `defaultValue` made `P` collapse to
+  `PostgresProperties`, the inferred entity shape collapse to
+  `Record<string, unknown>`, and `display.title`, `listProperties`,
+  `propertiesOrder` and `previewProperties` all widen to `string`. Every check the
+  builder exists to provide switched itself off, quietly, at the first mistake.
+  `P` is unconstrained now; exactness and the engine gate are expressed inside
+  `StrictProperties`, where a violation is one error on one property.
+
+- **`defineCollection` now checks a relation against the member its `kind`
+  selects.** `Relation` has been a closed union since 0.11 — `belongsTo` owns
+  `localKey`, `hasOne`/`hasMany` own `foreignKeyOnTarget`, `manyToMany` owns
+  `through`, `via` owns `joinPath` — but TypeScript's excess-property check runs
+  against a *union* as a whole, so `{ kind: "belongsTo", foreignKeyOnTarget:
+  "author_id" }` compiled. It also meant something else: the generator reads
+  `localKey`, defaults it to `<relationName>_id`, and never looks at the column
+  the author named, so the relation resolved to a different link than the one
+  written. The boot validator already refused these; the type now refuses them
+  too, which moves the report from a failed deploy to a red squiggle. Code that
+  carried a link field belonging to another kind stops compiling — it was already
+  failing at boot.
+
+- **A relation no longer carries its own `validation`. `required` lives on the
+  property.** There were two places to write it and they were read by different
+  generators: the Postgres DDL asked the *property* (so the foreign-key column
+  came out `NOT NULL`) while the SDK type generator asked the *relation* (so the
+  generated `Insert` type made the field optional). A `create()` that omitted the
+  relation therefore typechecked and then failed at the database with a not-null
+  violation — and getting both right meant writing `required` twice, identically.
+
+  `RelationBase.validation` and `ResolvedRelationBase.validation` are deleted. Move
+  it up one level, beside every other field's:
+
+  ```ts
+  author: {
+      type: "relation",
+      validation: { required: true },        // ← here
+      relation: { kind: "belongsTo", target: () => authors }
+  }
+  ```
+
+  The boot validator refuses the old key by name rather than ignoring it: silence
+  would have left the surviving `required` unset, quietly turning a required
+  relation optional in the generated types and nullable in the column. New in
+  `@rebasepro/common`: `isRelationRequired(collection, relation)` and
+  `relationDeclaringProperty(collection, relation)`, which are how every reader
+  now asks.
+
+  The runtime contract major is **not** bumped. What was removed is an optional
+  member of a TypeScript interface — it has no runtime representation, so no
+  already-built bundle can fail to boot on it.
+
+- **A required `belongsTo` no longer defaults to `ON DELETE CASCADE`. It is
+  `RESTRICT`.** `validation: { required: true }` on a relation says the child
+  cannot exist without a parent. It does not say that deleting the parent should
+  delete the child — but that is what the generator inferred, so `onDelete`, a
+  field nobody has to write, quietly turned every `DELETE FROM authors` into a
+  cascade through posts, their comments, and anything hanging off those. The
+  default is now `RESTRICT`: the delete fails and names the constraint, and
+  `onDelete: "cascade"` is something an author asks for on purpose. Optional
+  relations are unchanged (`SET NULL`), and a `manyToMany` junction is unchanged
+  (`CASCADE` — the row it deletes is the link, not the target).
+
+  **This is a DDL change for existing projects.** The next `db push` will plan a
+  constraint rewrite (`DROP CONSTRAINT` / `ADD CONSTRAINT`) for every required
+  relation that never named an `onDelete`, and after it those parent deletes
+  start failing where they used to cascade. To keep the old behaviour, write it
+  down: `onDelete: "cascade"` on the relation. Review the plan before applying
+  it — `db push` prints the statements.
+
+  All three generators moved together (the `CREATE TABLE` DDL, the desired state
+  boot-ensure diffs the live database against, and the generated Drizzle schema),
+  so the default cannot differ between them and make every boot plan the same
+  rewrite forever.
+
 ### Added
 
 - **`rebase status` — what this project declares, and whether it is configured.**
@@ -49,6 +148,68 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   that is about to refuse to start.
 
 ### Fixed
+
+- **A second collection claiming the same `slug` or table was dropped without a
+  word.** `CollectionRegistry` registers by slug and by table name, and returns
+  early when the table is already taken — so the second file's routes never
+  existed, its relations resolved to the *other* collection's rows, and the file
+  sat in `config/collections` looking loaded. Boot now fails, naming both files:
+
+  ```
+    • posts
+        2 collections declare `slug: "posts"`: posts.ts, blog_posts.ts. …
+  ```
+
+  The file names come from the loader, which is the only thing that has them;
+  passed through `ValidateCollectionConfigOptions.sources`, and falling back to
+  the collection's index for callers that validate an array they built
+  themselves. The table is resolved with `getTableName` — the same function the
+  registry and both generators use — so two slugs that *derive* the same table
+  are caught as well as two that declare it, and a duplicate slug says it once
+  rather than twice.
+
+- **A typo inside an `admin` block was the one config mistake with no signal at
+  all.** The boot validator checked the collection's keys, each property's keys
+  and each relation's keys — and then stopped at the edge of `admin`, on the
+  reasoning that the block belongs to `@rebasepro/cms-types` and the panel adds
+  to it. But the lists to check against, `ADMIN_COLLECTION_KEYS` and
+  `ADMIN_PROPERTY_KEYS`, live in core *so that core can read them*, and
+  `@rebasepro/cms-types` type-checks both against the option types. So
+  `admin: { multilne: true }` booted clean, rendered a single-line input, and left
+  nothing to find.
+
+  Both blocks are checked now, as warnings under the existing
+  `REBASE_STRICT_COLLECTION_CONFIG` policy, and every unknown-key message — at any
+  level — carries the near-miss when there is one: *"`multilne` is not a known
+  property `admin` key and is being ignored. Did you mean `multiline`?"* The
+  suggester is the CLI's, moved into `@rebasepro/utils` as `isNearMiss` and
+  `suggestNearMiss`.
+
+  Both key lists now assert completeness against the option types in *both*
+  directions, at compile time. The reverse direction was believed to have no
+  type-level expression and had never been checked; on its first run it found two
+  real options that had never been listed — `format` on a number property and
+  `renderInForm` on a relation. Left unlisted, they would have made this new
+  warning fire on correct config, which is how a check earns its way into being
+  switched off.
+
+- **Two enum entries with the same `id` silently removed the enum.** The ids are
+  the labels of a Postgres enum type, so a duplicate makes `CREATE TYPE
+  "posts_status" AS ENUM ('draft', 'draft')` — which Postgres refuses with
+  `23505` on `pg_enum_typid_label_index`. Boot treated *every* unique violation on
+  a `pg_catalog` index as a lost race with a peer pod, skipped the statement, and
+  carried on: the type was never created and the column became plain `TEXT`. The
+  config said "one of these three" and the database accepted any string, with
+  nothing in the log.
+
+  The config validator now rejects a duplicate or blank enum `id`, and a blank
+  `label`, naming the property and the index of the entry; a repeated *label* is
+  a warning, since two options that read the same is a panel problem rather than
+  a database one. And `pg_enum_typid_label_index` is off the duplicate-object-race
+  allowlist, so a config that reaches the database with one fails loudly. The
+  concurrent-boot case that allowlist exists for is untouched: two pods adding the
+  same label race on `ALTER TYPE … ADD VALUE`, which raises `42710`, and the
+  generator writes `IF NOT EXISTS` anyway.
 
 - **`rebase resources --check` failed every project that declares nothing.** A
   backend has a default database and a default bucket whether or not anyone says

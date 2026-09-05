@@ -362,6 +362,41 @@ export function resolveListLimitParam(
 }
 
 /**
+ * A whole number at or above `minimum`, or a 400 naming the parameter.
+ *
+ * `parseInt` was the whole of the validation, and it answers `NaN` for
+ * `?offset=abc` and a negative for `?offset=-5`. Neither was checked:
+ *
+ * - `NaN` reached the driver, where `OFFSET NaN` is a 500 about a syntax error
+ *   in a query the caller never wrote;
+ * - `?page=0` computed `offset = -limit`, a negative offset, which Postgres
+ *   also refuses — and `?page=-3` refused deeper;
+ * - `?offset=1.5` truncated silently to `1`, so the caller paged a window they
+ *   had not asked for.
+ *
+ * Every one of those is the caller's parameter, so every one is a 400 named
+ * after the parameter — the shape `INVALID_LIMIT` already had, and the reason a
+ * limit is *rejected* rather than clamped: a window quietly different from the
+ * one asked for cannot be told apart from having reached the end.
+ *
+ * `expected: true` on the error (via {@link invalidParam}): a mistyped query
+ * parameter never reached the database and the response body already says what
+ * to fix, so it logs at debug rather than putting a warning in production logs
+ * on every request from a client holding a stale link.
+ */
+function parseWindowParam(raw: unknown, name: string, minimum: number, code: string): number {
+    const text = String(raw).trim();
+    const value = Number(text);
+    if (text === "" || !Number.isFinite(value) || !Number.isInteger(value) || value < minimum) {
+        throw invalidParam(
+            `Invalid \`${name}\` parameter: expected a whole number ${minimum === 0 ? "of 0 or more" : `of ${minimum} or more`}, got ${JSON.stringify(text)}.`,
+            code
+        );
+    }
+    return value;
+}
+
+/**
  * Parse query parameters into QueryOptions
  */
 export function parseQueryOptions(
@@ -372,11 +407,11 @@ export function parseQueryOptions(
     const rawLimit = getLastValue(query.limit) as number | string | null | undefined;
 
     const offsetVal = getLastValue(query.offset);
-    if (offsetVal) options.offset = parseInt(String(offsetVal));
+    if (offsetVal) options.offset = parseWindowParam(offsetVal, "offset", 0, "INVALID_OFFSET");
 
     const pageVal = getLastValue(query.page);
     if (pageVal) {
-        const page = parseInt(String(pageVal));
+        const page = parseWindowParam(pageVal, "page", 1, "INVALID_PAGE");
         // Page stride uses the same bounded page size the read will use, so
         // pages neither overlap nor gap. (Vector search never paginates by
         // page, so the plain/text default is correct here.)

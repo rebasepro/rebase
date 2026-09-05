@@ -740,12 +740,15 @@ The client SDK (`RebaseWebSocketClient`) automatically reconnects when the conne
 ### Connection Lifecycle Events
 
 ```typescript
-const ws = client.ws; // Access the RebaseWebSocketClient
-
-ws.on("connect", () => console.log("Connected"));
-ws.on("disconnect", () => console.log("Disconnected"));
-ws.on("reconnect", () => console.log("Reconnected"));
-ws.on("error", (error) => console.error("Error:", error));
+// The RebaseWebSocketClient. `undefined` on a client built without realtime,
+// so narrow it once rather than at every call.
+const ws = client.ws;
+if (ws) {
+    ws.on("connect", () => console.log("Connected"));
+    ws.on("disconnect", () => console.log("Disconnected"));
+    ws.on("reconnect", () => console.log("Reconnected"));
+    ws.on("error", (error) => console.error("Error:", error));
+}
 ```
 
 Each `on()` call returns an unsubscribe function:
@@ -899,7 +902,7 @@ If 10 entities change within 300ms, only **one** database query is executed for 
 
 ## Nested Relation Updates
 
-The realtime engine handles nested relation paths (e.g., `"posts/70/tags"`). When a entity changes at a nested path:
+The realtime engine handles nested relation paths (e.g., `"posts/70/tags"`). When a record changes at a nested path:
 
 1. The exact path is notified (`"posts/70/tags"`).
 2. All parent paths are also notified (`"posts"`, `"posts/70"`).

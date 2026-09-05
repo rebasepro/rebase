@@ -1097,4 +1097,70 @@ export interface RebaseTranslations {
     history_new_entity?: string;
     /** End of the paginated revision list */
     history_no_more?: string;
+
+    // ─── Studio: tools, groups and empty states ─────────────────
+    studio_group_database?: string;
+    studio_group_compute?: string;
+    studio_group_storage?: string;
+    studio_group_api?: string;
+    studio_group_access_control?: string;
+    studio_tool_sql?: string;
+    studio_tool_sql_description?: string;
+    studio_tool_js?: string;
+    studio_tool_js_description?: string;
+    studio_tool_rls?: string;
+    studio_tool_rls_description?: string;
+    studio_tool_storage?: string;
+    studio_tool_storage_description?: string;
+    studio_tool_cron?: string;
+    studio_tool_cron_description?: string;
+    studio_tool_schema_visualizer?: string;
+    studio_tool_schema_visualizer_description?: string;
+    studio_tool_branches?: string;
+    studio_tool_branches_description?: string;
+    studio_tool_backups?: string;
+    studio_tool_backups_description?: string;
+    studio_tool_api?: string;
+    studio_tool_api_description?: string;
+    studio_tool_logs?: string;
+    studio_tool_logs_description?: string;
+    studio_tool_api_keys?: string;
+    studio_tool_api_keys_description?: string;
+    studio_backups_denied_title?: string;
+    studio_backups_denied_hint?: string;
+    studio_backups_read_failed?: string;
+    studio_backups_downloading?: string;
+    studio_cron_denied_title?: string;
+    studio_cron_denied_hint?: string;
+    studio_cron_read_failed?: string;
+    studio_api_keys_denied_title?: string;
+    studio_api_keys_denied_hint?: string;
+    studio_api_keys_read_failed?: string;
+    studio_branches_denied_title?: string;
+    studio_branches_denied_hint?: string;
+    studio_branches_read_failed?: string;
+    studio_schema_no_collections?: string;
+    studio_schema_no_collections_body?: string;
+    studio_schema_introspect_hint?: string;
+
+
+    // ─── Studio: RLS editor confirmations ───────────────────────
+    studio_rls_enable_confirm_title?: string;
+    studio_rls_enable_confirm_body?: string;
+    studio_rls_disable_confirm_title?: string;
+    studio_rls_disable_confirm_body?: string;
+    studio_rls_drop_policy_title?: string;
+    studio_rls_drop_policy_body?: string;
+    studio_rls_unapplied?: string;
+    studio_rls_unapplied_tooltip?: string;
+
+
+    // ─── Studio: empty states that name a remedy ────────────────
+    studio_branches_unavailable_title?: string;
+    studio_branches_unavailable_body?: string;
+    studio_backups_not_configured_title?: string;
+    studio_backups_not_configured_body?: string;
+    studio_cron_empty_title?: string;
+    studio_cron_empty_body?: string;
+    studio_read_the_docs?: string;
 }

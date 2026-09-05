@@ -47,6 +47,35 @@ accessExpiresIn: "1h" });
             expect(body.error.code).toBe("UNAUTHORIZED");
         });
 
+        /**
+         * The refusal is formatted by `errorHandler`, not written by hand.
+         *
+         * Seven near-copies of `c.json({ error: { message, code } }, 401)` used
+         * to live in this file's subject, and they had all drifted from the
+         * envelope every other error on the server uses: no `requestId`, so a
+         * bug report about the error an app hits most could not quote the one
+         * string that finds the server-side line. The handler is *called*
+         * rather than thrown to, because these middlewares are mounted by
+         * callers this package does not control — `defineFunction` hands users
+         * a Hono app — and a throw with no `onError` at the mount point is a
+         * 500 where a 401 was meant.
+         */
+        it("answers the canonical envelope, requestId included", async () => {
+            const app = new Hono<HonoEnv>();
+            app.use("/*", async (c, next) => { c.set("requestId", "req-abc"); await next(); });
+            app.use("/protected/*", requireAuth);
+            app.get("/protected/resource", (c) => c.json({ ok: true }));
+
+            const res = await app.request("/protected/resource");
+            const body = await res.json() as any;
+
+            expect(res.status).toBe(401);
+            expect(Object.keys(body)).toEqual(["error"]);
+            expect(body.error.code).toBe("UNAUTHORIZED");
+            expect(body.error.requestId).toBe("req-abc");
+            expect(body.error).not.toHaveProperty("status");
+        });
+
         it("returns 401 for non-Bearer prefix", async () => {
             const app = createApp();
             const res = await app.request("/protected/resource", {

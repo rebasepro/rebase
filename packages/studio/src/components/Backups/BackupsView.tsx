@@ -13,8 +13,11 @@ import {
     RefreshCwIcon,
     Typography
 } from "@rebasepro/ui";
-import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
+import { useRebaseClient, useSnackbarController, useTranslation } from "@rebasepro/app";
 import type { BackupInfo, RebaseClient } from "@rebasepro/types";
+
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { LoadFailureView } from "../load-failure-view";
 
 function formatSize(bytes: number | undefined): string {
     if (bytes === undefined || bytes === null) return "—";
@@ -34,12 +37,15 @@ function formatDate(iso: string | undefined): string {
 export function BackupsView() {
     const client = useRebaseClient<RebaseClient>();
     const snackbar = useSnackbarController();
+    const { t } = useTranslation();
 
     const [backups, setBackups] = useState<BackupInfo[]>([]);
     const [destinationKind, setDestinationKind] = useState<string>("local");
     const [configured, setConfigured] = useState(true);
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState<string | null>(null);
+    /** Why the listing failed, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
 
     const clientRef = useRef(client);
     clientRef.current = client;
@@ -53,16 +59,18 @@ export function BackupsView() {
             setConfigured(false);
             return;
         }
+        setFailure(null);
         try {
             const res = await c.backups.list();
             setBackups(res.backups);
             setDestinationKind(res.destinationKind);
             setConfigured(res.configured);
         } catch (e: unknown) {
-            snackbarRef.current.open({
-                type: "error",
-                message: e instanceof Error ? e.message : String(e)
-            });
+            // The snackbar is gone in seconds, and the list underneath it is
+            // empty — which is how a refused listing came to read "No backups
+            // found yet" about a database that has backups. Keep the reason on
+            // screen instead.
+            setFailure(classifyLoadFailure(e));
         } finally {
             setLoading(false);
         }
@@ -123,7 +131,7 @@ export function BackupsView() {
             <div className={cls("flex items-center justify-between px-5 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
                 <div className="flex items-center gap-2">
                     <DatabaseIcon size={iconSize.small} className="text-primary"/>
-                    <Typography variant="subtitle2" className="font-semibold">Backups</Typography>
+                    <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_backups")}</Typography>
                     <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{backups.length}</Chip>
                     <Chip size="smallest" className="bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400 uppercase font-mono text-[10px]">{destinationKind}</Chip>
                 </div>
@@ -133,14 +141,27 @@ export function BackupsView() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-5">
-                {!configured ? (
+                {failure ? (
+                    <LoadFailureView
+                        failure={failure}
+                        title={t("studio_backups_read_failed")}
+                        deniedTitle={t("studio_backups_denied_title")}
+                        deniedHint={t("studio_backups_denied_hint")}
+                        onRetry={load}
+                    />
+                ) : !configured ? (
                     <Alert color="info">
                         <Typography variant="body2" className="text-[13px]">
-                            <strong>Backups are not configured.</strong> Set
-                            <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-950 font-mono text-[12px]">BACKUP_DESTINATION</code>
-                            (a local path or an <code className="font-mono text-[12px]">s3://</code> / <code className="font-mono text-[12px]">gs://</code> URL) and create backups with
-                            <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-950 font-mono text-[12px]">rebase db backup</code>
-                            or a scheduled cron. See docs/backups.md.
+                            <strong>{t("studio_backups_not_configured_title")}</strong>{" "}
+                            {t("studio_backups_not_configured_body")}{" "}
+                            <a
+                                href="https://rebase.pro/docs/backend/jobs"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary underline"
+                            >
+                                {t("studio_read_the_docs")}
+                            </a>
                         </Typography>
                     </Alert>
                 ) : backups.length === 0 ? (
@@ -173,7 +194,7 @@ export function BackupsView() {
                                         ? <CircularProgress size="smallest"/>
                                         : <DownloadIcon size={iconSize.smallest}/>}
                                 >
-                                    {downloading === backup.key ? "Downloading…" : "Download"}
+                                    {downloading === backup.key ? t("studio_backups_downloading") : t("download")}
                                 </Button>
                             </div>
                         ))}
