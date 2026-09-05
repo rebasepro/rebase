@@ -83,6 +83,37 @@ description: "First job" }),
             expect((body.jobs as unknown[])).toHaveLength(2);
         });
 
+        it("names a job whose schedule the scheduler refused, and the reason", async () => {
+            // The other way to be absent, and the one with a name attached: the
+            // file loaded, the schedule did not validate. Six fields, from an
+            // expression copied out of a tool that supports seconds, is the
+            // common case and a one-character fix — if you can see it.
+            scheduler.registerJobs([makeJob("nightly", { schedule: "0 0 3 * * *" })]);
+
+            const body = await jsonBody(await app.request("/cron"));
+
+            expect(body.skipped).toBe(1);
+            expect(body.rejected).toEqual([{
+                id: "nightly",
+                name: "Job nightly",
+                schedule: "0 0 3 * * *",
+                reason: "Expected 5 fields, got 6"
+            }]);
+            expect(body.note).toMatch(/invalid schedule/);
+            expect((body.jobs as unknown[])).toHaveLength(2);
+        });
+
+        it("counts unloadable files and refused schedules together", async () => {
+            scheduler.registerJobs([makeJob("nightly", { schedule: "0 0 3 * * *" })]);
+            const withBoth = new Hono();
+            withBoth.route("/cron", createCronRoutes(scheduler, 2));
+
+            const body = await jsonBody(await withBoth.request("/cron"));
+
+            expect(body.skipped).toBe(3);
+            expect((body.rejected as unknown[])).toHaveLength(1);
+        });
+
         it("each job has the expected shape", async () => {
             const res = await app.request("/cron");
             const body = await jsonBody(res);

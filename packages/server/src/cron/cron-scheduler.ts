@@ -249,8 +249,23 @@ interface RegisteredJob {
     executing: boolean;
 }
 
+/**
+ * A job the scheduler refused, and why.
+ *
+ * It is not a `CronJobStatus`: it has no state, no next run and no counters,
+ * because it was never registered. Reporting it as a job with `state: "error"`
+ * would be a lie in the other direction — nothing is going to run it.
+ */
+export interface RejectedCronJob {
+    id: string;
+    name: string;
+    schedule: string;
+    reason: string;
+}
+
 export class CronScheduler {
     private jobs = new Map<string, RegisteredJob>();
+    private rejected = new Map<string, RejectedCronJob>();
     private started = false;
     private store?: CronStore;
     private client?: RebaseServerClient;
@@ -291,8 +306,22 @@ export class CronScheduler {
             const validation = validateCronExpression(loaded.definition.schedule);
             if (!validation.valid) {
                 logger.error(`[cron] Rejecting job "${loaded.id}": invalid schedule "${loaded.definition.schedule}" — ${validation.reason}`);
+                // Kept, not just logged. A rejected job is absent from
+                // `listJobs()`, so from the Studio panel it is indistinguishable
+                // from a file that was never written — and the commonest reason
+                // to land here is a 6-field expression copied from a tool that
+                // supports seconds, which is a one-character fix nobody could
+                // see without boot-log access.
+                this.rejected.set(loaded.id, {
+                    id: loaded.id,
+                    name: loaded.definition.name ?? loaded.id,
+                    schedule: loaded.definition.schedule,
+                    reason: validation.reason
+                });
                 continue;
             }
+            // A re-register that now validates clears the earlier complaint.
+            this.rejected.delete(loaded.id);
 
             const existing = this.jobs.get(loaded.id);
             if (existing) {
@@ -384,6 +413,17 @@ export class CronScheduler {
     }
 
     /**
+     * Jobs that loaded but whose schedule the scheduler refused.
+     *
+     * Kept apart from {@link listJobs} because they are not jobs — nothing will
+     * run them — but they must be reachable, or "my cron is missing" and "my
+     * cron will never fire" look identical from the admin panel.
+     */
+    listRejectedJobs(): RejectedCronJob[] {
+        return [...this.rejected.values()];
+    }
+
+    /**
      * Get a single job status by ID.
      */
     getJob(id: string): CronJobStatus | undefined {
@@ -448,23 +488,47 @@ export class CronScheduler {
         // Concurrency guard — don't run two instances simultaneously
         if (job.executing) {
             logger.warn(`[cron] Skipping manual trigger of "${id}" — already executing`);
-            const logEntry: CronJobLogEntry = {
-                jobId: id,
-                startedAt: new Date().toISOString(),
-                finishedAt: new Date().toISOString(),
-                durationMs: 0,
-                success: true,
-                result: { skipped: true,
-reason: "already_executing" },
-                logs: ["Skipped: job is already running"],
-                manual: true
-            };
-            job.logs.push(logEntry);
-            if (job.logs.length > MAX_LOGS_PER_JOB) job.logs.shift();
-            return logEntry;
+            return this.recordSkip(job, "already_executing", true);
         }
 
         return this.executeJob(job, true);
+    }
+
+    /**
+     * Record a run that did not happen because the previous one had not
+     * finished.
+     *
+     * Written to `cron_logs`, not only to the in-memory ring. An overlap is the
+     * signature of a job that has outgrown its schedule — the one thing you want
+     * to see in the history rather than infer from a gap in it — and until now
+     * the scheduled path left no trace at all beyond a warning in the process
+     * log, which is gone by the time anyone asks. The manual path wrote a ring
+     * entry that vanished on restart.
+     *
+     * `success: true` is deliberate: nothing failed. The `result.skipped` flag
+     * and the reason are what distinguishes it, and the Studio panel reads them.
+     */
+    private recordSkip(job: RegisteredJob, reason: string, manual: boolean): CronJobLogEntry {
+        const now = new Date().toISOString();
+        const logEntry: CronJobLogEntry = {
+            jobId: job.id,
+            startedAt: now,
+            finishedAt: now,
+            durationMs: 0,
+            success: true,
+            result: { skipped: true, reason },
+            logs: [`Skipped: ${reason === "already_executing" ? "the previous run has not finished" : reason}`],
+            manual
+        };
+
+        job.logs.push(logEntry);
+        if (job.logs.length > MAX_LOGS_PER_JOB) job.logs.shift();
+
+        this.store?.insertLog(logEntry).catch((persistErr) => {
+            logger.error(`[cron] Failed to persist skip for "${job.id}"`, { error: persistErr });
+        });
+
+        return logEntry;
     }
 
     // ─── Internal ────────────────────────────────────────────────────
@@ -542,6 +606,10 @@ reason: "already_executing" },
                 // Concurrency guard: if somehow we're already executing, skip
                 if (job.executing) {
                     logger.warn(`[cron] Skipping scheduled run of "${id}" — still executing from previous run`);
+                    // Recorded as well as logged: a job that keeps overlapping
+                    // has outgrown its schedule, and that is visible in the run
+                    // history or nowhere.
+                    this.recordSkip(job, "already_executing", false);
                     // Re-schedule to try again later
                     this.scheduleNext(id);
                     return;
@@ -713,9 +781,16 @@ reason: "already_executing" },
         // Set executing flag — prevents concurrent runs
         job.executing = true;
 
+        // Aborted when the timeout below wins the race. Without it the timeout
+        // only stopped the scheduler waiting: the handler's `fetch` kept its
+        // socket, so a job whose timeout matches its interval leaked one
+        // abandoned request per tick while every run was already marked failed.
+        const abort = new AbortController();
+
         const ctx: CronJobContext = {
             jobId: job.id,
             scheduledAt: startedAt,
+            signal: abort.signal,
             log: (...args: unknown[]) => {
                 const line = args.map((a) =>
                     typeof a === "string" ? a : JSON.stringify(a)
@@ -744,7 +819,13 @@ reason: "already_executing" },
             let timeoutHandle: ReturnType<typeof setTimeout>;
             const timeoutPromise = new Promise<never>((_, reject) => {
                 timeoutHandle = setTimeout(
-                    () => reject(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`)),
+                    () => {
+                        // Abort first, so the handler's in-flight work is
+                        // cancelled rather than left running past the run it
+                        // belongs to.
+                        abort.abort(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`));
+                        reject(new Error(`Cron job "${job.id}" timed out after ${timeout}ms`));
+                    },
                     timeout
                 );
             });
