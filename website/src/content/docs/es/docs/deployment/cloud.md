@@ -109,9 +109,32 @@ rebase cloud deployments
 rebase cloud rollback
 ```
 
-A rollback re-points the project at a previous successful deployment's image. It
-needs one that recorded an image, so it is available for a project that has
-deployed successfully at least twice.
+A rollback re-points the project at what a previous successful deployment
+shipped, and never rebuilds — the value of a rollback is that it ships an
+artefact that has already run.
+
+Which deployments qualify depends on how the project deploys, and both kinds
+work:
+
+| How it deployed | What is restored |
+|---|---|
+| `rebase cloud deploy` (a source build) | The image that build published |
+| `rebase cloud deploy --bundle` (the platform runtime) | The bundle that deploy shipped, on the runtime version the project is running now |
+
+So a rollback needs a deployment that recorded one of the two, which means a
+project that has deployed successfully at least twice. `rebase cloud deployments`
+marks the ones that qualify, and `--json` reports `rollbackable` per row along
+with the `image` or `bundle` it would restore.
+
+Two deployments are refused, and the CLI says which: one that did not succeed,
+and one from before the platform recorded its artefact. There is nothing to guess
+at in either case — guessing would ship whatever was built or uploaded most
+recently while claiming to restore this one — so deploy the version you want
+instead.
+
+A rollback appends a new deployment rather than rewinding history, and waits for
+the restored version to serve before reporting success. Follow it with
+`rebase cloud logs -f`.
 
 ## Resources, and what they cost
 
