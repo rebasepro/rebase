@@ -85,7 +85,7 @@ the tables at boot.
 rather than fixed ones, so they differ between projects and between machines.
 The first account you register becomes the admin — on your machine. A
 production deployment names its admin instead, with `REBASE_ADMIN_EMAIL` and
-`REBASE_ADMIN_PASSWORD` (see [Configuration](/docs/getting-started/configuration/)).
+`REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span> (see [Configuration](/docs/getting-started/configuration/)).
 
 To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 `pnpm run dev` again.
@@ -535,9 +535,9 @@ All configuration is done via environment variables in your `.env` file at the p
 | `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime. Sliding — every rotation re-ups it, so this governs how long a session survives **inactivity**. | `400d` |
 | `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). Outside production the **first** user can always register, whatever this says — an empty user table has to admit somebody, and that somebody becomes the admin. In production (`NODE_ENV=production`) that window is closed: an empty table refuses the bootstrap registration with `SETUP_REQUIRED`, a first account created through open registration is an ordinary account, and the admin is named with `REBASE_ADMIN_EMAIL` below or assigned with the service key. The scaffold's `.env.example` sets it to `true`; the framework default is off. | `false` |
-| `DISABLE_SELF_REGISTRATION` | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open outside production, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
-| `REBASE_ADMIN_EMAIL` | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a production deployment gets its admin: the operator names the first account instead of racing the internet for it. Boot warns when the table is empty in production and this is unset. | — |
-| `REBASE_ADMIN_PASSWORD` | Password for that account. At least 12 characters, or it is refused and the account is not created. Change it after the first sign-in. | — |
+| `DISABLE_SELF_REGISTRATION` <span class="since-badge" data-since="0.18">Since 0.18</span> | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open outside production, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
+| `REBASE_ADMIN_EMAIL` <span class="since-badge" data-since="0.18">Since 0.18</span> | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a production deployment gets its admin: the operator names the first account instead of racing the internet for it. Boot warns when the table is empty in production and this is unset. | — |
+| `REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span> | Password for that account. At least 12 characters, or it is refused and the account is not created. Change it after the first sign-in. | — |
 | `ALLOW_ANONYMOUS` | Enable anonymous sign-in (`POST /api/auth/anonymous`). Opt-in, and deliberately not gated by `ALLOW_REGISTRATION`. | `false` |
 | `AUTH_REQUIRE` | Require authentication for the data API. Set `false` for a fully public read surface — RLS still applies. | `true` |
 | `AUTH_DEFAULT_ROLE` | Role assigned to a newly registered user when none is given. | — |
@@ -2087,7 +2087,7 @@ Three things resolve it, in the order worth checking:
 2. **The tables have no RLS policy**, so boot skipped them. The boot log names
    each one. Add a policy, as above.
 3. **`DATABASE_URL` points somewhere else** than you think. `rebase status`
-   prints the three files that decide what the backend reaches.
+   <span class="since-badge" data-since="0.18">Since 0.18</span> prints the three files that decide what the backend reaches.
 
 ### Adding an admin panel later
 
@@ -2804,7 +2804,7 @@ securityRules: [
 ```
 
 `policy.authenticated()` is true for anonymous *sign-in* too, which mints a real
-user row and a real session. Use `policy.registered()` where a guest should not
+user row and a real session. Use `policy.registered()` <span class="since-badge" data-since="0.18">Since 0.18</span> where a guest should not
 qualify — writing a review, joining an organization, spending money.
 
 #### Role-based Access
@@ -2864,7 +2864,7 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.rolesOverlap(roles)` | the caller has **any** of these app roles |
 | `policy.rolesContain(roles)` | the caller has **all** of these app roles |
 | `policy.authenticated()` | signed in — `rebase.uid()` is set **and is not an anonymous sentinel**. `IS NOT NULL` alone would be a tautology, since an anonymous request sets a sentinel rather than leaving it unset |
-| `policy.registered()` | signed in **with an account** — `authenticated()` and not a guest. See below |
+| `policy.registered()` <span class="since-badge" data-since="0.18">Since 0.18</span> | signed in **with an account** — `authenticated()` and not a guest. See below |
 | `policy.serverContext()` | `rebase.uid() IS NULL` — see the caution below |
 | `policy.existsIn({ collection, where })` | a correlated `EXISTS` subquery |
 | `policy.raw(sql)` | an escape hatch, inserted verbatim |
@@ -2877,7 +2877,7 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.authUid()` | `rebase.uid()` |
 | `policy.authRoles()` | `rebase.roles()` |
 
-#### `authenticated()` and `registered()`
+#### `authenticated()` and `registered()` <span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Two different things are called anonymous, and it is worth being precise about
 which one a rule means.
@@ -5267,7 +5267,7 @@ securityRules: [
 ```
 
 `policy.authenticated()` is true for anonymous *sign-in* too, which mints a real
-user row and a real session. Use `policy.registered()` where a guest should not
+user row and a real session. Use `policy.registered()` <span class="since-badge" data-since="0.18">Since 0.18</span> where a guest should not
 qualify — writing a review, joining an organization, spending money.
 
 #### Role-based Access
@@ -5327,7 +5327,7 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.rolesOverlap(roles)` | the caller has **any** of these app roles |
 | `policy.rolesContain(roles)` | the caller has **all** of these app roles |
 | `policy.authenticated()` | signed in — `rebase.uid()` is set **and is not an anonymous sentinel**. `IS NOT NULL` alone would be a tautology, since an anonymous request sets a sentinel rather than leaving it unset |
-| `policy.registered()` | signed in **with an account** — `authenticated()` and not a guest. See below |
+| `policy.registered()` <span class="since-badge" data-since="0.18">Since 0.18</span> | signed in **with an account** — `authenticated()` and not a guest. See below |
 | `policy.serverContext()` | `rebase.uid() IS NULL` — see the caution below |
 | `policy.existsIn({ collection, where })` | a correlated `EXISTS` subquery |
 | `policy.raw(sql)` | an escape hatch, inserted verbatim |
@@ -5340,7 +5340,7 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.authUid()` | `rebase.uid()` |
 | `policy.authRoles()` | `rebase.roles()` |
 
-#### `authenticated()` and `registered()`
+#### `authenticated()` and `registered()` <span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Two different things are called anonymous, and it is worth being precise about
 which one a rule means.
@@ -6695,7 +6695,7 @@ Rebase includes a complete backend authentication system:
 - **Auth hooks** — Lifecycle hooks for user creation and more
 - **Custom auth adapters** — Plug in Firebase Auth, Auth0, Clerk, or any external provider
 - **Service key** — Static key for server-to-server authentication
-- **Auto-bootstrapping** — Outside production, the first user automatically gets the admin role; a production deployment names its admin with `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`
+- **Auto-bootstrapping** — Outside production, the first user automatically gets the admin role; a production deployment names its admin with `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span>
 
 ### Configuration
 
@@ -6757,7 +6757,7 @@ const backend = await initializeRebaseBackend({
 | `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
 | `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
 | `requireAuth` | `boolean` | `true` | Require a session for the data API |
-| `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` |
+| `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` <span class="since-badge" data-since="0.18">Since 0.18</span> |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
 | `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts |
 | `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` for invite-by-email flows |
@@ -7324,7 +7324,7 @@ CREATE POLICY owner_access ON posts
     USING (author_id = rebase.uid() OR string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 ```
 
-### First User Bootstrap
+### First User Bootstrap <span class="since-badge" data-since="0.18">Since 0.18</span>
 
 When no users exist in the database and the server is **not** running with `NODE_ENV=production`, the first person to register automatically becomes an admin. After that, registration is controlled by the `allowRegistration` setting.
 
@@ -11265,7 +11265,7 @@ rebase db branch info dev_sandbox
 rebase db branch delete dev_sandbox
 ```
 
-`switch` is what makes a branch usable. It records the branch in
+<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` is what makes a branch usable. It records the branch in
 `.rebase/branch.json` — a name, never a connection string, so your credentials
 stay in `.env` alone — and every `rebase` command in that checkout then resolves
 the branch's database instead: `dev`, `db push`, `db migrate`, `db backup`.
@@ -11311,7 +11311,7 @@ Use branching against a real server — your own PostgreSQL via `DATABASE_URL`, 
 Because PostgreSQL duplicates the files on disk, each branch consumes space equal to the source database. If you have a 100GB production database, creating 5 branches will consume an additional 500GB of storage. 
 * *Recommendation*: Use subsetted databases or thin dev-templates as your clone sources instead of full production clones.
 
-`rebase db branch prune` is how you get the space back:
+<span class="since-badge" data-since="0.18">Since 0.18</span> `rebase db branch prune` is how you get the space back:
 
 ```bash
 rebase db branch prune                      # orphans only — always safe
@@ -17205,12 +17205,12 @@ PostgreSQL will not copy or drop a database anything else is connected to, and
 the usual "anything else" is your own `rebase dev`. `create` and `delete` name
 what is holding the database open; `--force` disconnects those sessions first.
 
-Every branch is a full copy on disk, so they need clearing out. `prune` removes
+<span class="since-badge" data-since="0.18">Since 0.18</span> Every branch is a full copy on disk, so they need clearing out. `prune` removes
 three things: an entry whose database was dropped outside Rebase, a branch
 database whose entry was never written, and — only with `--older-than` — branches
 past an age you name. It asks before removing anything unless you pass `--yes`.
 
-`switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
+<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
 takes precedence over `DATABASE_URL` in `.env` and loses to `--database-url` or a
 `DATABASE_URL` in the shell, so a flag on the command line always outranks a
 switch made earlier. Deleting the branch you are on returns you to the main
@@ -17238,7 +17238,7 @@ rebase apps init <name>      # register a new app in rebase.json
 rebase apps config <app>     # what one app resolves to
 ```
 
-#### `rebase status`
+#### `rebase status` <span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Everything this project declares, and whether the environment actually binds it:
 
@@ -18025,7 +18025,7 @@ The suggested SQL is printed with the caller-id function your database actually 
 spellings are recognised when reading policies, so a Rebase database mid-migration from
 the pre-1.0 `auth` schema is still checked.
 
-#### policy-authenticated-tautology
+#### policy-authenticated-tautology <span class="since-badge" data-since="0.18">Since 0.18</span>
 
 **Policy admits every signed-in caller to every row.** High.
 

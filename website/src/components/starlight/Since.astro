@@ -1,0 +1,31 @@
+---
+/**
+ * "Since <version>" — this feature is not in the release you have installed.
+ *
+ * The docs are published from `main`, not from the release tag, so a page
+ * describing something that landed yesterday goes live the same day. A reader
+ * on the current npm version then follows instructions for a command that does
+ * not exist, and has no way to tell which half of the page applies to them.
+ *
+ * Usage in MDX:
+ *
+ *     import Since from "../../../components/starlight/Since.astro";
+ *     <Since v="0.18" />
+ *
+ * Most documentation pages are plain `.md`, which cannot import a component.
+ * They write the same markup by hand, which Starlight renders as-is:
+ *
+ *     <span class="since-badge" data-since="0.18">Since 0.18</span>
+ *
+ * That is the *convention*, and it is what
+ * `tooling/scripts/docs-verify/check-unreleased-badges.mjs` reads. This
+ * component exists so the markup has one definition; keep the two in step.
+ */
+interface Props {
+    /** The release that first carries the feature, e.g. `"0.18"`. */
+    v: string;
+}
+const { v } = Astro.props;
+---
+
+<span class="since-badge" data-since={v}>Since {v}</span>

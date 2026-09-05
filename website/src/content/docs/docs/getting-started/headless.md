@@ -160,7 +160,7 @@ Three things resolve it, in the order worth checking:
 2. **The tables have no RLS policy**, so boot skipped them. The boot log names
    each one. Add a policy, as above.
 3. **`DATABASE_URL` points somewhere else** than you think. `rebase status`
-   prints the three files that decide what the backend reaches.
+   <span class="since-badge" data-since="0.18">Since 0.18</span> prints the three files that decide what the backend reaches.
 
 ## Adding an admin panel later
 

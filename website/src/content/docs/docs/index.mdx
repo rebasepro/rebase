@@ -82,7 +82,7 @@ the tables at boot.
 rather than fixed ones, so they differ between projects and between machines.
 The first account you register becomes the admin — on your machine. A
 production deployment names its admin instead, with `REBASE_ADMIN_EMAIL` and
-`REBASE_ADMIN_PASSWORD` (see [Configuration](/docs/getting-started/configuration/)).
+`REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span> (see [Configuration](/docs/getting-started/configuration/)).
 
 To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 `pnpm run dev` again.

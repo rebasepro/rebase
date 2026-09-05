@@ -220,12 +220,12 @@ PostgreSQL will not copy or drop a database anything else is connected to, and
 the usual "anything else" is your own `rebase dev`. `create` and `delete` name
 what is holding the database open; `--force` disconnects those sessions first.
 
-Every branch is a full copy on disk, so they need clearing out. `prune` removes
+<span class="since-badge" data-since="0.18">Since 0.18</span> Every branch is a full copy on disk, so they need clearing out. `prune` removes
 three things: an entry whose database was dropped outside Rebase, a branch
 database whose entry was never written, and — only with `--older-than` — branches
 past an age you name. It asks before removing anything unless you pass `--yes`.
 
-`switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
+<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
 takes precedence over `DATABASE_URL` in `.env` and loses to `--database-url` or a
 `DATABASE_URL` in the shell, so a flag on the command line always outranks a
 switch made earlier. Deleting the branch you are on returns you to the main
@@ -253,7 +253,7 @@ rebase apps init <name>      # register a new app in rebase.json
 rebase apps config <app>     # what one app resolves to
 ```
 
-### `rebase status`
+### `rebase status` <span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Everything this project declares, and whether the environment actually binds it:
 

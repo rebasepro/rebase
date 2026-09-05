@@ -242,7 +242,7 @@ The suggested SQL is printed with the caller-id function your database actually 
 spellings are recognised when reading policies, so a Rebase database mid-migration from
 the pre-1.0 `auth` schema is still checked.
 
-### policy-authenticated-tautology
+### policy-authenticated-tautology <span class="since-badge" data-since="0.18">Since 0.18</span>
 
 **Policy admits every signed-in caller to every row.** High.
 

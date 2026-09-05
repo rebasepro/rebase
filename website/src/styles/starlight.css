@@ -133,3 +133,20 @@ h1, h2, h3 {
 .sl-markdown-content li {
     @apply ml-6;
 }
+
+/* "Since 0.18" — see src/components/starlight/Since.astro. The docs publish
+   from main rather than from the release tag, so a page can describe something
+   no released version has; this is how a reader tells. */
+.sl-markdown-content .since-badge,
+.since-badge {
+    @apply inline-block align-middle ml-2 rounded-md border border-surface-600
+           px-1.5 py-0.5 text-[0.7rem] font-medium uppercase tracking-wide
+           text-surface-300 whitespace-nowrap;
+}
+
+.sl-markdown-content h1 .since-badge,
+.sl-markdown-content h2 .since-badge,
+.sl-markdown-content h3 .since-badge,
+.sl-markdown-content h4 .since-badge {
+    @apply align-[0.15em] text-[0.6em] font-medium normal-case tracking-normal;
+}

@@ -14,7 +14,7 @@ Rebase includes a complete backend authentication system:
 - **Auth hooks** — Lifecycle hooks for user creation and more
 - **Custom auth adapters** — Plug in Firebase Auth, Auth0, Clerk, or any external provider
 - **Service key** — Static key for server-to-server authentication
-- **Auto-bootstrapping** — Outside production, the first user automatically gets the admin role; a production deployment names its admin with `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`
+- **Auto-bootstrapping** — Outside production, the first user automatically gets the admin role; a production deployment names its admin with `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span>
 
 ## Configuration
 
@@ -76,7 +76,7 @@ const backend = await initializeRebaseBackend({
 | `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
 | `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
 | `requireAuth` | `boolean` | `true` | Require a session for the data API |
-| `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` |
+| `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` <span class="since-badge" data-since="0.18">Since 0.18</span> |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
 | `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts |
 | `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` for invite-by-email flows |
@@ -644,7 +644,7 @@ CREATE POLICY owner_access ON posts
     USING (author_id = rebase.uid() OR string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 ```
 
-## First User Bootstrap
+## First User Bootstrap <span class="since-badge" data-since="0.18">Since 0.18</span>
 
 When no users exist in the database and the server is **not** running with `NODE_ENV=production`, the first person to register automatically becomes an admin. After that, registration is controlled by the `allowRegistration` setting.
 

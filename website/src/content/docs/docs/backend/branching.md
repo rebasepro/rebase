@@ -180,7 +180,7 @@ rebase db branch info dev_sandbox
 rebase db branch delete dev_sandbox
 ```
 
-`switch` is what makes a branch usable. It records the branch in
+<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` is what makes a branch usable. It records the branch in
 `.rebase/branch.json` — a name, never a connection string, so your credentials
 stay in `.env` alone — and every `rebase` command in that checkout then resolves
 the branch's database instead: `dev`, `db push`, `db migrate`, `db backup`.
@@ -226,7 +226,7 @@ Use branching against a real server — your own PostgreSQL via `DATABASE_URL`, 
 Because PostgreSQL duplicates the files on disk, each branch consumes space equal to the source database. If you have a 100GB production database, creating 5 branches will consume an additional 500GB of storage. 
 * *Recommendation*: Use subsetted databases or thin dev-templates as your clone sources instead of full production clones.
 
-`rebase db branch prune` is how you get the space back:
+<span class="since-badge" data-since="0.18">Since 0.18</span> `rebase db branch prune` is how you get the space back:
 
 ```bash
 rebase db branch prune                      # orphans only — always safe
