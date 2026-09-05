@@ -14,6 +14,7 @@ import {
 } from "../utils/project";
 import { recordEvent } from "../telemetry";
 import { wantsHelp } from "../utils/args";
+import { reportSpawnFailure } from "../utils/spawn-error";
 
 export async function schemaCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
     // `--help` is answered here, before `requireProjectRoot` and before the
@@ -80,7 +81,12 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
                 env
             });
         }
-    } catch {
+    } catch (error) {
+        // A child that ran and exited non-zero already printed its diagnostics
+        // through inherited stdio; a child that never started (ENOENT on tsx,
+        // EACCES on the script) printed nothing at all, and this used to exit 1
+        // in silence.
+        reportSpawnFailure(error);
         process.exit(1);
     }
 }

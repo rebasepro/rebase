@@ -16,6 +16,7 @@ import {
     findEnvFile,
     dependenciesNotInstalled
 } from "../utils/project";
+import { reportSpawnFailure } from "../utils/spawn-error";
 import { recordEvent } from "../telemetry";
 
 /**
@@ -449,10 +450,7 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         // A child that exited non-zero already printed its diagnostics through
         // inherited stdio; only the errors raised above have a message worth
         // adding here.
-        const message = error instanceof Error ? error.message : "";
-        if (message && !/Command failed|exited with code/i.test(message)) {
-            console.error(chalk.red(`✗ ${message}`));
-        }
+        reportSpawnFailure(error);
         process.exit(1);
     }
 }

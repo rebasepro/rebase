@@ -19,6 +19,7 @@ import {
 } from "../utils/project";
 import { scanTextForLibpqUrls, type LibpqUrlFinding } from "../utils/libpq-url";
 import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
+import { reportSpawnFailure } from "../utils/spawn-error";
 import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
 
 /**
@@ -215,9 +216,12 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
                 env
             });
         }
-    } catch {
-        // If the process exits with an error code, execa will throw,
-        // but inherit stdio means the user already saw the output.
+    } catch (error) {
+        // A child that ran and exited non-zero already printed its diagnostics
+        // through inherited stdio. A child that never started did not — and
+        // "the tsx symlink is broken" is exactly the state `doctor` exists to
+        // report, so exiting 1 in silence was the worst possible answer.
+        reportSpawnFailure(error);
         process.exit(1);
     }
 }
