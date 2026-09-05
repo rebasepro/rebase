@@ -5,6 +5,7 @@
 # is moved onto a new image. Removing one breaks tenants at boot.
 
 ## @rebasepro/server
+SourceFile z
 class ApiError { badRequest, code, conflict, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
 class BlockedUrlError
 class BundleError { hint }

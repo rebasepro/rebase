@@ -24,7 +24,7 @@ dotenv.config({ path: "../../.env" });
 export const env = loadEnv();
 
 // Esteso — aggiungi le tue variabili tipizzate:
-import { z } from "zod";
+import { z } from "@rebasepro/server";
 export const env = loadEnv({
     extend: z.object({
         SMTP_HOST: z.string().optional(),

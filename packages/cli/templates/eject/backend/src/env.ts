@@ -2,8 +2,10 @@ import * as dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { loadEnv } from "@rebasepro/server";
-import { z } from "zod";
+// `z` comes from the runtime, not from "zod": `loadEnv({ extend })` composes
+// this schema with the framework's, and a schema built against a second copy
+// of zod fails the framework's instanceof checks and is silently dropped.
+import { loadEnv, z } from "@rebasepro/server";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
