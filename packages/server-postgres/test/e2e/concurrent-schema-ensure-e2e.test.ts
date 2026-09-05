@@ -79,7 +79,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
     await Promise.all(clients.map(client => client.end().catch(() => { /* already gone */ })));
-    if (container) await stopPgContainer(container);
+    if (container) await stopPgContainer(container.containerName);
 }, 120_000);
 
 describe("five instances booting into one empty database", () => {

@@ -149,6 +149,20 @@ export async function startPgContainer(
  * Stops and removes a PostgreSQL container.
  */
 export async function stopPgContainer(containerName: string): Promise<void> {
+    // The `PgContainer` this file hands out is one property away from the name,
+    // and two suites passed the whole object. `execa` then reported
+    // `Second argument must be an array of strings: rm,-f,[object Object]`,
+    // which the catch below turned into one grey line while the container stayed
+    // up for the rest of the run — a leaked Postgres per suite, and a port with
+    // it. `test/` is outside the typecheck (see tsconfig), so this is the only
+    // place the mistake can be caught; loud, because a swallowed cleanup failure
+    // is what hid it.
+    if (typeof containerName !== "string") {
+        throw new TypeError(
+            "stopPgContainer takes a container NAME, not the PgContainer object — "
+            + "pass `container.containerName`."
+        );
+    }
     console.log(`[pg-setup] Removing container: ${containerName}`);
     running.delete(containerName);
     try {
