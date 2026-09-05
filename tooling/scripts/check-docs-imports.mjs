@@ -59,9 +59,11 @@ if (!fs.existsSync(baseline)) {
     console.error(`${RED}✗ ${baseline} is missing — run \`pnpm write:api-surface\`.${NC}`);
     process.exit(1);
 }
+// `namespace`/`SourceFile` are how api-surface.mjs records a re-exported module
+// namespace such as `export { z } from "zod"` — an import target like any other.
 const known = new Set(
     [...fs.readFileSync(baseline, "utf8")
-        .matchAll(/^(?:function|const|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/gm)]
+        .matchAll(/^(?:function|const|class|interface|type|enum|namespace|SourceFile)\s+([A-Za-z_$][\w$]*)/gm)]
         .map(m => m[1])
 );
 if (known.size < 100) {
