@@ -35,34 +35,6 @@ const databaseAdmin = {
     switchBranch: jest.fn()
 };
 
-/**
- * The design system, stubbed wholesale. These panes reach for two dozen
- * components between them and this suite asserts on text, not on chrome; the
- * shared `__mocks__/rebasepro-ui.js` is a hand-written subset and adding
- * another twenty entries to it for one file is how that subset became a
- * maintenance surface. Anything not named below renders its children.
- */
-jest.mock("@rebasepro/ui", () => {
-    const R = jest.requireActual("react") as typeof import("react");
-    const values: Record<string, unknown> = {
-        cls: (...args: unknown[]) => args.filter(Boolean).join(" "),
-        iconSize: { smallest: 12, small: 16, medium: 24, large: 32 },
-        defaultBorderMixin: "border",
-        focusedMixin: "",
-        paperMixin: ""
-    };
-    return new Proxy({}, {
-        get: (_t, key: string) => {
-            if (key in values) return values[key];
-            if (key === "__esModule") return true;
-            const Stub = ({ children }: { children?: React.ReactNode }) =>
-                R.createElement("div", null, children);
-            Stub.displayName = key;
-            return Stub;
-        }
-    });
-});
-
 jest.mock("@rebasepro/app", () => ({
     useRebaseClient: () => client,
     useRebaseContext: () => ({ databaseAdmin }),
