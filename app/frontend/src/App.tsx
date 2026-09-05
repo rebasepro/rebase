@@ -9,7 +9,12 @@ declare function gtag(...args: unknown[]): void;
 
 import { useRebaseAuthController } from "@rebasepro/app";
 import { Rebase, RebaseAuth } from "@rebasepro/app";
-import { UIReferenceView } from "@rebasepro/app/debug";
+// The design reference renders every component in the kit. It is a hidden
+// dev route, so it must not sit in the eager set the login screen waits on —
+// the bundle budget refuses that. Lazy: the chunk downloads on first visit.
+const UIReferenceView = React.lazy(() =>
+    import("@rebasepro/app/debug").then((m) => ({ default: m.UIReferenceView }))
+);
 import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
 import type { RebasePlugin } from "@rebasepro/cms-types";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
@@ -90,7 +95,7 @@ export function App() {
             // this is the design reference, not something a demo visitor wants
             // sitting between the collections.
             hideFromNavigation: true,
-            view: <UIReferenceView />
+            view: <React.Suspense fallback={null}><UIReferenceView /></React.Suspense>
         }
     ], []);
 
