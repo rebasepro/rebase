@@ -61,5 +61,10 @@ large: 32 },
         }),
     Label: ({ children, htmlFor, ...props }) =>
         React.createElement("label", { htmlFor,
-            ...props }, children)
+            ...props }, children),
+    CircularProgressCenter: () => React.createElement("div", { "data-testid": "loading" }),
+    // The real one adds retry and chunk-error handling around React.lazy. A test
+    // that renders a Studio view is not exercising any of that, and the loader
+    // is never called unless the route is visited.
+    lazyChunk: (loader) => React.lazy(loader)
 };

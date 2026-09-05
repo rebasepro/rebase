@@ -16561,24 +16561,59 @@ above it needs the project's collection source at hand to write back to. That is
 difference in how it is mounted, not in what it is — it edits schema, and it belongs
 beside the SQL and RLS editors.
 
-### Adding Studio Views
+### Turning Studio on
 
-Studio tools are automatically available when you include the `RebaseStudio` component inside your app:
+One component, anywhere inside `<Rebase>`. It renders nothing — it registers
+the tools, and `<RebaseShell>` draws them:
 
 ```tsx
 
 export function App() {
     return (
         <Rebase client={client} authController={authController}>
-            {/* Custom views are injected and studio mode is managed automatically */}
-            <RebaseStudio />
-            {/* ... */}
+            <RebaseCMS collections={collections}/>
+            <RebaseStudio/>
+            <RebaseShell title="My App"/>
         </Rebase>
     );
 }
 ```
 
-These views appear in the sidebar navigation when Studio mode is active.
+The tools appear in the drawer while Studio mode is active. Leave
+`<RebaseStudio>` out entirely and you ship a content-only CMS: no Studio mode,
+no toggle, nothing lazy-loaded.
+
+### Adding your own tool
+
+`devViews` puts your own views beside the built-in ones. They are ordinary
+[`AppView`](/docs/frontend#custom-views)s — the only thing that makes one a
+Studio tool rather than a CMS view is which component it is registered on:
+
+```tsx
+
+const queues: AppView = {
+    slug: "queues",
+    name: "Queues",
+    group: "Compute",
+    icon: "ListOrdered",
+    description: "Depth and failures, per queue",
+    view: <QueuesView/>
+};
+
+<RebaseStudio devViews={[queues]}/>
+```
+
+| Registered on | Shows up in | For |
+|---|---|---|
+| `<RebaseCMS views>` | content mode | things the people editing content use |
+| `<RebaseStudio devViews>` | Studio mode | things you use to run the backend |
+
+A view goes in exactly one of them — the drawer sorts by which one registered
+it, so listing a slug in both hides it from content mode.
+
+Like `tools`, the list is read by its *contents*: writing it inline is safe, and
+a re-render of the host does not remount whichever tool is on screen. Renaming a
+view or changing its group does re-register it.
 
 #### Choosing which tools appear
 

@@ -32,7 +32,7 @@ import { StudioHomePage } from "./StudioHomePage";
  */
 const DEFAULT_HOME_PAGE = <StudioHomePage/>;
 
-export function RebaseStudio({ tools, homePage }: RebaseStudioConfig) {
+export function RebaseStudio({ tools, homePage, devViews: extraViews }: RebaseStudioConfig) {
     const dispatch = useRebaseRegistryDispatch();
 
     const resolvedHomePage = homePage ?? DEFAULT_HOME_PAGE;
@@ -153,6 +153,28 @@ view: suspense(<ApiKeysView/>) });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [toolsKey]);
 
+    /**
+     * Your own tools, keyed the same way `tools` is and for the same reason:
+     * callers write `devViews={[…]}` inline, so the array is new on every
+     * render. Re-registering would tear down and remount whichever Studio view
+     * was on screen — a half-typed SQL query, an open policy editor.
+     *
+     * The key is the identity of each view, not its element: a view's `view` is
+     * resolved by the router at render time, so a fresh element for the same
+     * slug is not a configuration change.
+     */
+    const extraViewsKey = (extraViews ?? [])
+        .map((v) => `${v.slug}|${v.name}|${v.group ?? ""}|${v.hideFromNavigation ?? false}`)
+        .join(",");
+    const extraViewsRef = React.useRef(extraViews);
+    extraViewsRef.current = extraViews;
+
+    const allDevViews: AppView[] = useMemo(
+        () => [...devViews, ...(extraViewsRef.current ?? [])],
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [devViews, extraViewsKey]
+    );
+
     // Use a ref for homePage so it never destabilizes the effect.
     // homePage is a React element — its identity doesn't matter for registration.
     const homePageRef = React.useRef(resolvedHomePage);
@@ -166,9 +188,9 @@ view: suspense(<ApiKeysView/>) });
     useLayoutEffect(() => {
         dispatch.registerStudio({ tools: toolsRef.current,
 homePage: homePageRef.current,
-devViews });
+devViews: allDevViews });
         return () => dispatch.unregisterStudio();
-    }, [dispatch, devViews]);
+    }, [dispatch, allDevViews]);
 
     return null;
 }
