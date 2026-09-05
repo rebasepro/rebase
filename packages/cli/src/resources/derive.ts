@@ -30,13 +30,26 @@ import path from "path";
 import { createRequire } from "module";
 import { pathToFileURL } from "url";
 import {
+    DEFAULT_RESOURCE_KEY,
     buildResourceGraph,
-    findEnvSuffixCollision,
+    declareFunction,
+    declaredQueueConsumers,
+    declaredResources,
     declaredSubscriptions,
+    findEnvSuffixCollision,
+    isResourceHandle,
+    resetDeclaredQueueConsumers,
     resetDeclaredResources,
     resetDeclaredSubscriptions,
+    resolveResourceRefs,
+    resourceId,
+    resourceKeyOf,
+    type CollectionConfig,
+    type RebaseBackendAppConfig,
     type ResourceGraph
 } from "@rebasepro/types";
+import { analyseFunctionsDirectory } from "../function-portability";
+import { resolveBackendPaths } from "../manifest";
 
 /** The committed, generated record of what a project needs. */
 export const RESOURCE_GRAPH_FILENAME = "rebase.resources.json";
@@ -132,8 +145,8 @@ async function registerProjectTsx(configDir: string): Promise<void> {
  * Plain `import()` so tsx's loader hooks resolve `.ts` and workspace
  * specifiers, exactly as the collection loader does.
  */
-async function evaluate(filePath: string): Promise<void> {
-    await import(pathToFileURL(filePath).href);
+async function evaluate(filePath: string): Promise<Record<string, unknown>> {
+    return await import(pathToFileURL(filePath).href) as Record<string, unknown>;
 }
 
 export interface DeriveOptions {
@@ -146,6 +159,73 @@ export interface DeriveOptions {
      * would under-report what the project needs.
      */
     includeCollections?: boolean;
+    /**
+     * Absolute path to the crons directory. Each file is evaluated through the
+     * same loader the runtime uses, which declares the cron under the same id
+     * the scheduler runs it as. Absent, or missing on disk: no crons.
+     */
+    cronsDir?: string;
+    /**
+     * Absolute path to the functions directory. Read statically — the
+     * bundler's portability analysis — never evaluated: a function's module
+     * scope belongs to a running backend, not a build.
+     */
+    functionsDir?: string;
+    /** The project root, for the paths a graph records. Defaults to the config directory's parent. */
+    projectRoot?: string;
+}
+
+/** The derive options for a backend app, from its manifest entry. */
+export function deriveOptionsFor(projectRoot: string, app: RebaseBackendAppConfig): DeriveOptions {
+    const paths = resolveBackendPaths(app, projectRoot);
+    return {
+        projectRoot,
+        configDir: path.join(projectRoot, paths.config),
+        cronsDir: path.join(projectRoot, paths.crons),
+        functionsDir: path.join(projectRoot, paths.functions)
+    };
+}
+
+/** Whether a module's default export looks like a collection. */
+function isCollectionLike(value: unknown): value is CollectionConfig {
+    return typeof value === "object" && value !== null
+        && typeof (value as { slug?: unknown }).slug === "string"
+        && typeof (value as { properties?: unknown }).properties === "object";
+}
+
+/**
+ * The resources a collection reaches: its database, and every bucket a
+ * storage property stores into. Only resources the graph declares get an
+ * edge — the implicit default database is not in the graph, so a collection
+ * that names no `dataSource` records nothing.
+ */
+function collectionEdges(collection: CollectionConfig, declared: Set<string>): Array<[string, string]> {
+    const edges: Array<[string, string]> = [];
+    const from = `collection:${collection.slug}`;
+    const databaseId = resourceId("database", collection.dataSource ?? DEFAULT_RESOURCE_KEY);
+    if (declared.has(databaseId)) edges.push([databaseId, from]);
+
+    const walk = (properties: Record<string, unknown> | undefined, prefix: string): void => {
+        for (const [name, raw] of Object.entries(properties ?? {})) {
+            const property = raw as {
+                storage?: { storageSource?: unknown };
+                of?: unknown;
+                properties?: Record<string, unknown>;
+            };
+            if (!property || typeof property !== "object") continue;
+            if (property.storage) {
+                const key = property.storage.storageSource === undefined
+                    ? DEFAULT_RESOURCE_KEY
+                    : resourceKeyOf(property.storage.storageSource as string);
+                const bucketId = resourceId("bucket", key);
+                if (declared.has(bucketId)) edges.push([bucketId, `property:${collection.slug}.${prefix}${name}`]);
+            }
+            if (property.properties) walk(property.properties, `${prefix}${name}.`);
+            if (property.of && typeof property.of === "object") walk({ [name]: property.of }, `${prefix}`);
+        }
+    };
+    walk(collection.properties as Record<string, unknown>, "");
+    return edges;
 }
 
 /**
@@ -156,42 +236,136 @@ export interface DeriveOptions {
  * of every project seen so far.
  */
 export async function deriveResourceGraph(options: DeriveOptions): Promise<{ graph: ResourceGraph; issues: ResourceIssue[] }> {
-    const { configDir, includeCollections = true } = options;
-    // Both, and the subscriptions are the easy one to forget: they live in a
-    // separate list, so resetting only the resources leaves one project's
-    // handlers attached while its topics are gone — every one of them then
-    // reads as orphaned against the *next* project. Caught by deriving twice
-    // in one process, which is what a watch mode does.
+    const { configDir, includeCollections = true, cronsDir, functionsDir } = options;
+    const projectRoot = options.projectRoot ?? path.dirname(configDir);
     // Before anything is evaluated: the loader has to be in place for the very
     // first import, and the first import is a collection file.
     await registerProjectTsx(configDir);
 
+    // All three registries, and the side lists are the easy ones to forget:
+    // resetting only the resources leaves one project's handlers attached
+    // while its topics are gone — every one of them then reads as orphaned
+    // against the *next* project. Caught by deriving twice in one process,
+    // which is what a watch mode does.
     resetDeclaredResources();
     resetDeclaredSubscriptions();
+    resetDeclaredQueueConsumers();
 
     const issues: ResourceIssue[] = [];
-    const entries: string[] = [];
+    const usedBy = new Map<string, string[]>();
+    const use = (resource: string, by: string): void => {
+        const list = usedBy.get(resource) ?? [];
+        if (!list.includes(by)) list.push(by);
+        usedBy.set(resource, list);
+    };
 
+    // ── Declarations ─────────────────────────────────────────────────────
+    // Which export name is which resource, so a function's `import { media }`
+    // can be recorded as reaching `bucket:media` without evaluating the
+    // function. The export name and the key are usually the same word and
+    // nothing requires them to be.
+    const handleExports = new Map<string, string>();
     for (const name of RESOURCE_ENTRY_NAMES) {
         const candidate = path.join(configDir, name);
-        if (fs.existsSync(candidate)) { entries.push(candidate); break; }
-    }
-    if (includeCollections) entries.push(...collectionFiles(configDir));
-
-    for (const entry of entries) {
+        if (!fs.existsSync(candidate)) continue;
         try {
-            await evaluate(entry);
+            const mod = await evaluate(candidate);
+            for (const [exportName, value] of Object.entries(mod)) {
+                if (isResourceHandle(value)) handleExports.set(exportName, resourceId(value.kind, value.key));
+            }
         } catch (err) {
-            // Named individually: "could not derive the graph" with no file in
-            // it sends somebody reading every module in the directory.
-            issues.push({
-                path: path.relative(configDir, entry),
-                message: err instanceof Error ? err.message : String(err)
-            });
+            issues.push({ path: path.relative(configDir, candidate), message: err instanceof Error ? err.message : String(err) });
+        }
+        break;
+    }
+
+    // ── Collections ──────────────────────────────────────────────────────
+    const collections: CollectionConfig[] = [];
+    if (includeCollections) {
+        for (const entry of collectionFiles(configDir)) {
+            try {
+                const mod = await evaluate(entry);
+                // As the loader sees it at boot: a handle written where a key
+                // belongs is its key here too.
+                if (isCollectionLike(mod.default)) collections.push(resolveResourceRefs(mod.default));
+            } catch (err) {
+                // Named individually: "could not derive the graph" with no file in
+                // it sends somebody reading every module in the directory.
+                issues.push({
+                    path: path.relative(configDir, entry),
+                    message: err instanceof Error ? err.message : String(err)
+                });
+            }
         }
     }
 
-    const graph = buildResourceGraph();
+    // ── Crons ────────────────────────────────────────────────────────────
+    // Through the runtime's own loader, so the id the graph records is the id
+    // the scheduler runs — the filename — and a cron that would not load at
+    // boot does not load here either.
+    if (cronsDir && fs.existsSync(cronsDir)) {
+        // The runtime's loader logs each job as it loads, to stdout, as JSON
+        // — which is also where `rebase resources --json` writes the graph.
+        // Its problems come back as a list, so the log adds nothing here.
+        const previousLevel = process.env.LOG_LEVEL;
+        process.env.LOG_LEVEL = "error";
+        try {
+            const { loadCronJobsWithDiagnostics } = await import("@rebasepro/server");
+            // This process's own `import()`, not the loader's `new Function`
+            // one: tsx's hooks are registered here, and a test runner's module
+            // sandbox answers the other with "a dynamic import callback was
+            // not specified" — the same trap the split-roles e2e records.
+            const { problems } = await loadCronJobsWithDiagnostics(cronsDir, url => import(url));
+            for (const problem of problems) {
+                issues.push({ path: path.relative(projectRoot, cronsDir), message: problem });
+            }
+        } catch (err) {
+            issues.push({ path: path.relative(projectRoot, cronsDir), message: err instanceof Error ? err.message : String(err) });
+        } finally {
+            if (previousLevel === undefined) delete process.env.LOG_LEVEL;
+            else process.env.LOG_LEVEL = previousLevel;
+        }
+    }
+
+    // ── Functions ────────────────────────────────────────────────────────
+    if (functionsDir && fs.existsSync(functionsDir)) {
+        for (const report of analyseFunctionsDirectory(functionsDir, projectRoot)) {
+            const requires = [...new Set(
+                report.issues
+                    .filter(issue => issue.kind === "node-builtin" || issue.kind === "node-only-package")
+                    .map(issue => issue.message)
+            )];
+            try {
+                declareFunction(report.name, {
+                    file: report.file,
+                    portable: report.portable,
+                    ...(requires.length > 0 ? { requires } : {})
+                });
+            } catch (err) {
+                issues.push({ path: report.file, message: err instanceof Error ? err.message : String(err) });
+            }
+            for (const imported of report.resourceImports) {
+                const resource = handleExports.get(imported);
+                if (resource) use(resource, `function:${report.name}`);
+            }
+        }
+    }
+
+    // ── Edges ────────────────────────────────────────────────────────────
+    const declared = new Set(declaredResources().map(r => resourceId(r.kind, r.key)));
+    for (const collection of collections) {
+        for (const [resource, by] of collectionEdges(collection, declared)) use(resource, by);
+    }
+    for (const sub of declaredSubscriptions()) {
+        const id = resourceId("topic", sub.topic);
+        if (declared.has(id)) use(id, `subscription:${sub.topic}.${sub.name}`);
+    }
+    for (const consumer of declaredQueueConsumers()) {
+        const id = resourceId("queue", consumer.queue);
+        if (declared.has(id)) use(id, `handler:${consumer.queue}`);
+    }
+
+    const graph = buildResourceGraph(usedBy);
 
     // Two resources of a kind whose env suffixes collide would silently read
     // each other's configuration, which is indistinguishable from a
@@ -226,6 +400,31 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
         }
     }
 
+    // A collection routed to a database nothing declares boots into a
+    // refusal, and a property stored in a bucket nothing declares answers 501
+    // on its first upload. Both are cheaper to hear about here.
+    const databases = new Set(graph.resources.filter(r => r.kind === "database").map(r => r.key));
+    const buckets = new Set(graph.resources.filter(r => r.kind === "bucket").map(r => r.key));
+    for (const collection of collections) {
+        if (collection.dataSource && collection.dataSource !== DEFAULT_RESOURCE_KEY && !databases.has(collection.dataSource)) {
+            issues.push({
+                path: `collection.${collection.slug}`,
+                message:
+                    `routes to dataSource "${collection.dataSource}", which nothing declares. ` +
+                    `Add database("${collection.dataSource}") to resources.ts, or import the handle and use it here.`
+            });
+        }
+        for (const [name, raw] of Object.entries(collection.properties ?? {})) {
+            const key = (raw as { storage?: { storageSource?: unknown } })?.storage?.storageSource;
+            if (typeof key === "string" && key !== DEFAULT_RESOURCE_KEY && buckets.size > 0 && !buckets.has(key)) {
+                issues.push({
+                    path: `collection.${collection.slug}.${name}`,
+                    message: `stores into bucket "${key}", which nothing declares. Add bucket("${key}") to resources.ts.`
+                });
+            }
+        }
+    }
+
     return { graph, issues };
 }
 
@@ -237,7 +436,8 @@ export function serializeResourceGraph(graph: ResourceGraph): string {
         engine: r.engine,
         transport: r.transport,
         ...(r.label !== undefined ? { label: r.label } : {}),
-        ...(Object.keys(r.options).length > 0 ? { options: r.options } : {})
+        ...(Object.keys(r.options).length > 0 ? { options: r.options } : {}),
+        ...(r.usedBy && r.usedBy.length > 0 ? { usedBy: r.usedBy } : {})
     }));
     return JSON.stringify({
         $generated: `Generated from config by \`rebase resources\`. Edit the declarations, not this file.`,
@@ -277,5 +477,8 @@ export function parseResourceGraph(contents: string): ResourceGraph {
             "This project was generated by a newer Rebase; upgrade rather than provisioning half of it."
         );
     }
-    return { version: 1, resources: (raw.resources ?? []) as ResourceGraph["resources"] };
+    const entries = Array.isArray(raw.resources) ? raw.resources as Record<string, unknown>[] : [];
+    // `options` is omitted from the file when empty; a reader of the graph
+    // expects it present, so it is restored here.
+    return { version: 1, resources: entries.map(r => ({ options: {}, ...r })) as ResourceGraph["resources"] };
 }

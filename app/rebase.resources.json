@@ -1,0 +1,39 @@
+{
+    "$generated": "Generated from config by `rebase resources`. Edit the declarations, not this file.",
+    "version": 1,
+    "resources": [
+        {
+            "kind": "cron",
+            "key": "refresh-product-stats",
+            "engine": "scheduler",
+            "transport": "server",
+            "label": "Refresh product stats",
+            "options": {
+                "schedule": "*/30 * * * *",
+                "description": "Counts active products and logs the total — demo/dogfood job."
+            }
+        },
+        {
+            "kind": "cron",
+            "key": "reset-demo",
+            "engine": "scheduler",
+            "transport": "server",
+            "label": "Reset demo data",
+            "options": {
+                "schedule": "0 * * * *",
+                "description": "Truncates and reseeds all demo collections back to their pristine seed.",
+                "timeoutSeconds": 600
+            }
+        },
+        {
+            "kind": "function",
+            "key": "insights",
+            "engine": "http",
+            "transport": "server",
+            "options": {
+                "portable": true,
+                "file": "backend/functions/insights.ts"
+            }
+        }
+    ]
+}

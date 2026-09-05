@@ -38,6 +38,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     clusters: null,
     "projects create": CREATE_PROJECT_FLAGS,
     "projects delete": {},
+    "resources prune": { "--yes": Boolean },
     "db create": CREATE_DATABASE_FLAGS,
     "db backup": {},
     "db pitr": { "--target": String },

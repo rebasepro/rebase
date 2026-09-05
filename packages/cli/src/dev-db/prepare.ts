@@ -24,6 +24,7 @@ import path from "path";
 
 import { composeDatabaseUrl } from "../utils/dev-preflight";
 import { readEnvFile } from "../utils/project";
+import { resourceEnvSuffix } from "@rebasepro/types";
 import { branchUrl, readActiveBranch } from "./branch-pointer";
 import { MANAGED_LIMITATIONS, MANAGED_POOL_MAX } from "./constraints";
 import { ensureManagedDatabase } from "./daemon";
@@ -38,6 +39,15 @@ export interface PrepareOptions {
     quiet?: boolean;
     /** Where human-facing lines go. Defaults to stdout via the caller. */
     onProgress?: (message: string) => void;
+    /**
+     * Keys of the additional databases the project declares —
+     * `database("analytics")` → `analytics`. On the managed path each gets
+     * its own PGlite instance and a `DATABASE_URL__<KEY>` in the child's
+     * environment, unless the developer set that variable themselves. On an
+     * external database nothing is added: whoever chose the database binds
+     * the rest of them.
+     */
+    additionalKeys?: readonly string[];
 }
 
 export interface PreparedDatabase {
@@ -56,6 +66,8 @@ export interface PreparedDatabase {
     dataDir?: string;
     /** True when this call started the managed database rather than finding it. */
     startedDaemon?: boolean;
+    /** The additional managed databases, by declared key, when any were asked for. */
+    additional?: Record<string, string>;
 }
 
 /**
@@ -165,22 +177,38 @@ export async function prepareDatabaseEnv(
         return { database, env: {}, description };
     }
 
+    // Only the keys nobody bound by hand. A developer who set
+    // DATABASE_URL__ANALYTICS to a warehouse of their own has said which
+    // database that is, and the managed one fills a vacuum, never a choice.
+    const unbound = (options.additionalKeys ?? []).filter((key) => {
+        const name = `DATABASE_URL${resourceEnvSuffix(key)}`;
+        return !process.env[name] && !envFile[name];
+    });
+
     const managed = await ensureManagedDatabase(projectRoot, {
         quiet: options.quiet,
-        onProgress: options.onProgress
+        onProgress: options.onProgress,
+        additionalKeys: unbound
     });
+
+    const additionalEnv: Record<string, string> = {};
+    for (const [key, url] of Object.entries(managed.additional)) {
+        additionalEnv[`DATABASE_URL${resourceEnvSuffix(key)}`] = url;
+    }
 
     return {
         database,
         description,
         dataDir: managed.dataDir,
         startedDaemon: managed.started,
+        additional: managed.additional,
         env: {
             DATABASE_URL: managed.url,
             // PGlite is one session behind a multiplexer: two pooled clients in
             // overlapping transactions deadlock there. This is the ceiling that
             // turns that into ordinary queueing — see `constraints.ts`.
-            REBASE_DB_POOL_MAX: String(MANAGED_POOL_MAX)
+            REBASE_DB_POOL_MAX: String(MANAGED_POOL_MAX),
+            ...additionalEnv
         }
     };
 }
@@ -197,6 +225,9 @@ export function managedNotices(prepared: PreparedDatabase): string[] {
 
     const lines = [`Using ${prepared.description}.`];
     if (prepared.dataDir) lines.push(`Data: ${prepared.dataDir}`);
+    for (const key of Object.keys(prepared.additional ?? {})) {
+        lines.push(`Also serving database "${key}" as DATABASE_URL${resourceEnvSuffix(key)}`);
+    }
 
     // Stated every time rather than discovered. A developer who does not know
     // requests are serialized here will read a concurrency difference as a bug

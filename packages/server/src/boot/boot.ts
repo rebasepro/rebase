@@ -13,6 +13,7 @@ import {
 } from "@rebasepro/types";
 import { createDataSourceRegistry, resolveDataSource } from "@rebasepro/common";
 import { loadBundleResourceGraph } from "./resource-loading.js";
+import { assertEveryKindBindable } from "./resource-resolvers.js";
 import {
     assertNoReplacedResourceConfig,
     graphToDataSources,
@@ -252,6 +253,9 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // is built from the declarations in the project's own code, and the
     // committed rebase.resources.json is for readers that do not run it.
     const resourceGraph = await loadBundleResourceGraph(bundle);
+    // Before any kind is picked out of it: a kind this runtime has no resolver
+    // for is refused here by name, not filtered out by the adapters below.
+    assertEveryKindBindable(resourceGraph);
     const graphDataSources = graphToDataSources(resourceGraph);
     const graphStorageSources = graphToStorageSources(resourceGraph);
     const dataSourceDefs: DataSourceDefinition[] | undefined =
@@ -313,7 +317,10 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     const storage = resolveStorageSources(
         process.env,
         storageSourceDefs,
-        path.join(bundle.dir, "uploads")
+        path.join(bundle.dir, "uploads"),
+        // Said explicitly: an unbound object store may stand in as a local
+        // directory only in a process that has declared itself development.
+        { production: isProduction }
     );
 
     // ── Schema ───────────────────────────────────────────────────────────────

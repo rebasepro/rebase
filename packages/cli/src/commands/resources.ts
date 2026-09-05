@@ -12,16 +12,16 @@
 import chalk from "chalk";
 import path from "path";
 import { requireProjectRoot } from "../utils/project";
-import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
+import { findBackendApp, loadManifest, ManifestError } from "../manifest";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import {
     RESOURCE_GRAPH_FILENAME,
-    deriveResourceGraph,
+    deriveOptionsFor, deriveResourceGraph,
     readResourceGraphFile,
     serializeResourceGraph,
     writeResourceGraphFile
 } from "../resources/derive";
-import { declaredSubscriptions, type ResourceGraph } from "@rebasepro/types";
+import { declaredSubscriptions, type RebaseBackendAppConfig, type ResourceGraph } from "@rebasepro/types";
 
 function usage(): void {
     console.log(`
@@ -44,18 +44,34 @@ function print(graph: ResourceGraph): void {
         console.log(chalk.gray("\n  No resources declared. A backend still has its default database.\n"));
         return;
     }
-    const kinds = [...new Set(graph.resources.map(r => r.kind))];
+    // Infrastructure first, then code: what needs binding is what a reader
+    // is here to check.
+    const order = ["database", "bucket", "topic", "queue", "cron", "function"];
+    const kinds = [...new Set(graph.resources.map(r => r.kind))]
+        .sort((a, b) => (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b)));
     for (const kind of kinds) {
         console.log(`\n  ${chalk.bold(kind)}`);
         for (const r of graph.resources.filter(x => x.kind === kind)) {
-            const bits = [chalk.gray(r.engine)];
-            if (r.transport !== "server") bits.push(chalk.yellow(r.transport));
-            for (const [k, v] of Object.entries(r.options)) bits.push(chalk.gray(`${k}=${String(v)}`));
+            const bits: string[] = [];
+            if (kind === "cron") {
+                bits.push(chalk.cyan(String(r.options.schedule)));
+                bits.push(chalk.gray(r.options.timezone ? String(r.options.timezone) : "local time"));
+            } else if (kind === "function") {
+                bits.push(chalk.gray(String(r.options.file ?? "")));
+                if (r.options.portable === false) bits.push(chalk.yellow("node-only"));
+            } else {
+                bits.push(chalk.gray(r.engine));
+                if (r.transport !== "server") bits.push(chalk.yellow(r.transport));
+                for (const [k, v] of Object.entries(r.options)) bits.push(chalk.gray(`${k}=${String(v)}`));
+            }
             console.log(`    ${r.key.padEnd(24)} ${bits.join(" · ")}`);
             if (kind === "topic") {
                 for (const sub of declaredSubscriptions(r.key)) {
                     console.log(`      ${chalk.gray("→")} ${sub.name}`);
                 }
+            }
+            if (r.usedBy && r.usedBy.length > 0) {
+                console.log(`      ${chalk.gray("used by")} ${chalk.gray(r.usedBy.join(", "))}`);
             }
         }
     }
@@ -79,7 +95,7 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
 
     const projectRoot = requireProjectRoot();
 
-    let configDir: string;
+    let backendApp: RebaseBackendAppConfig;
     try {
         const loaded = loadManifest(projectRoot);
         const backend = findBackendApp(loaded.manifest);
@@ -88,7 +104,7 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
             process.exitCode = 1;
             return;
         }
-        configDir = path.join(projectRoot, resolveBackendPaths(backend.app, projectRoot).config);
+        backendApp = backend.app;
     } catch (err) {
         if (err instanceof ManifestError) {
             console.error(chalk.red(err.message));
@@ -99,7 +115,7 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
         throw err;
     }
 
-    const { graph, issues } = await deriveResourceGraph({ configDir });
+    const { graph, issues } = await deriveResourceGraph(deriveOptionsFor(projectRoot, backendApp));
 
     if (issues.length > 0) {
         console.error(chalk.red(`\n✗ ${issues.length} problem(s) in the declared resources:\n`));

@@ -19,17 +19,18 @@ import type { Ground } from "../theme";
  * Layout, by cell (each cell is one 1920 x 1080 frame of world):
  *
  *     (0,0) the hook       (1,0) the rule       (2,0) the agent
- *     (0,½) push + rescan  (1,1) two people     (2,1) the panel
+ *     (0,½) the terminal   (1,1) two people     (2,1) the panel
  *     (0,2) studio         (1,2) the schema     (2,2) every view
  *
- * The push view sits half a cell down from the hook on purpose: it shares
- * the scan window with it. The scan re-running in the SAME window, next to
- * the agent's own terminal, is the payoff of the opening, and a copy of that
- * window somewhere else would not be the same scan.
+ * The terminal view sits half a cell down from the hook on purpose: it
+ * shares the scan window with it. The scan re-running in the SAME window,
+ * next to the agent's own terminal, is the payoff of the opening, and a copy
+ * of that window somewhere else would not be the same scan.
  *
- * The camera path is a snake — right, back and down, right and down, right
- * and up, down, down, left, left, up, out — so no two consecutive moves are
- * the same direction and no move crosses the whole desk except the last.
+ * The camera path: down to the terminal, right and up to the rule, back to
+ * the terminal, right and down, right and up, down, down, left, left, out.
+ * No two consecutive moves share a direction and no move crosses the whole
+ * desk except the last.
  */
 
 export const CELL = { w: 1920, h: 1080 } as const;
@@ -57,8 +58,24 @@ export interface Beat {
 
 const cell = (col: number, row: number): View => ({ x: col * CELL.w, y: row * CELL.h, zoom: 1 });
 
+/**
+ * THE TEMPO. Every beat below was first timed at a 180-words-a-minute read
+ * and the film came in at 78 seconds; it played a shade fast. Rather than
+ * re-time eleven beats and eleven lines by hand, the sheet keeps its
+ * original numbers and everything after the cold open is stretched by
+ * this factor — beats, moves and the narration's frames alike, so no
+ * relationship between them changes. 1.1 is 86 seconds and a 164-word
+ * read. What is NOT stretched is anything inside a window: typing speed,
+ * a report streaming, a spring — those are how fast the product is, and
+ * the product did not get slower.
+ */
+export const TEMPO = 1.1;
+const COLD_OPEN = 66;
+/** A frame from the original sheet, on the stretched timeline. */
+export const tempo = (raw: number): number => COLD_OPEN + Math.round((raw - COLD_OPEN) * TEMPO);
+
 /** The whole desk, framed on its content rather than its edges: the windows
- *  span roughly 240..5680 by 180..3160, and a 0.34 zoom from (150, 120) puts
+ *  span roughly 200..5680 by 180..3160, and a 0.34 zoom from (150, 120) puts
  *  that box on the frame. */
 const ALL: View = { x: 150, y: 120, zoom: 0.34 };
 
@@ -68,24 +85,46 @@ const ALL: View = { x: 150, y: 120, zoom: 0.34 };
  *  going rather than as a backdrop that happens to be dim. */
 const FINAL: View = { x: -226, y: -92, zoom: 0.3 };
 
+/** The view that holds the terminal: half a cell below the hook, so the
+ *  agent's own window and the scan stay in frame above it. Visited twice —
+ *  once to point Rebase at the database, once to push and re-run the scan —
+ *  and the return is the story: back to the terminal, next command. */
+const TERMINAL: View = { x: 0, y: 420, zoom: 1 };
+
+/**
+ * THE ORDER IS CAUSAL. Each beat is what the previous one made happen:
+ *
+ *   hook    an agent's backend, three ways in
+ *   init    so point Rebase at the same database — it writes a file per table
+ *   rule    the rule goes in that file, and compiles to a policy
+ *   push    push it; the same scan runs again and finds nothing; run it
+ *   users   the API on :3001 answers two people differently
+ *   agent   and answers an agent the same way
+ *   panel   the panel on :5173 — then every view, the schema, Studio
+ *   all     pull back; three commands; the address
+ *
+ * A first cut showed the rule BEFORE init (a file that did not exist yet),
+ * and returned to "Init. Push. Run." as its own beat forty seconds after
+ * both had already run. It was a tour with a story stapled to the front.
+ */
 export const BEATS: Beat[] = [
-    { id: "hook", start: 66, view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.3 },
-    { id: "rule", start: 340, view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
-    { id: "push", start: 600, view: { x: 0, y: 420, zoom: 1 }, roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "users", start: 860, view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
-    { id: "agent", start: 1096, view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
-    { id: "panel", start: 1290, view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "views", start: 1550, view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
-    { id: "schema", start: 1650, view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
-    { id: "studio", start: 1770, view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
-    { id: "commands", start: 1870, view: { x: 0, y: 900, zoom: 1 }, roll: 0.7, ground: "base", reveal: 0.3 },
-    { id: "all", start: 2050, view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "hook", start: tempo(66), view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.3 },
+    { id: "init", start: tempo(340), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "rule", start: tempo(560), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
+    { id: "push", start: tempo(800), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.3 },
+    { id: "users", start: tempo(1040), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
+    { id: "agent", start: tempo(1280), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
+    { id: "panel", start: tempo(1480), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "views", start: tempo(1740), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "schema", start: tempo(1850), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
+    { id: "studio", start: tempo(1970), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
+    { id: "all", start: tempo(2080), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
 ];
 
 /** The cold open holds the camera on the hook before anything is on it. */
 export const OPENING: View = cell(0, 0);
 
-export const DESK_DURATION = 2350;
+export const DESK_DURATION = tempo(2400);
 
 export const beat = (id: string): Beat => {
     const b = BEATS.find((x) => x.id === id);
@@ -102,9 +141,59 @@ export const MOVE_LEAD = 8;
  *  frames is a whip, and the one move that crosses the whole desk (the pull
  *  back at the end) gets its own, slower, number. */
 export function moveFrames(from: View, to: View): number {
-    if (to.zoom !== from.zoom) return 64;
+    if (to.zoom !== from.zoom) return Math.round(64 * TEMPO);
     const d = Math.hypot(to.x - from.x, to.y - from.y);
-    return Math.round(24 + d / 240);
+    return Math.round((30 + d / 300) * TEMPO);
+}
+
+/**
+ * WHAT A MOVE LOOKS LIKE, and why the windows fade.
+ *
+ * A pan to the next cell is a full frame of travel, and there is no way to
+ * make it less: whatever the pitch of the grid, bringing the neighbour fully
+ * into view displaces the screen by exactly one frame. The first cut let the
+ * outgoing windows ride that whole sweep at full strength, and every
+ * transition read as a whip — the complaint was "too much displacement".
+ *
+ * So the windows a beat is leaving behind fade over the first half of the
+ * move, and are gone before the camera reaches speed; what crosses the
+ * middle of the move is the ground and the ribbon turning, neither of which
+ * travels. Windows the next beat shares with this one (the scan, the shell)
+ * stay; windows it brings back (the hook's, on the way into push) fade in
+ * over the second half. Measured on the eased curve, a window now travels
+ * about a fifth of the distance before it is gone — the displacement a slide
+ * used to have, not a pan's.
+ *
+ * The pull-back at the end is the one move that fades everything IN: the
+ * desk reveals itself as the camera lifts off it.
+ */
+const FADE_OUT_BY = 0.55;
+const FADE_IN_FROM = 0.45;
+
+/** Which beat the camera is in or moving into, and how far along the move. */
+export function deskPhase(frame: number): { beat: number; moving: boolean; t: number } {
+    for (let i = 0; i < BEATS.length; i++) {
+        const a = KEY_AT[2 * i + 1];
+        const z = KEY_AT[2 * i + 2];
+        if (frame < a) return { beat: i - 1, moving: false, t: 0 };
+        if (frame < z) return { beat: i, moving: true, t: (frame - a) / (z - a) };
+    }
+    return { beat: BEATS.length - 1, moving: false, t: 0 };
+}
+
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+/** Opacity of a window that is on camera during `shown` beats. */
+export function windowOpacity(frame: number, shown: readonly string[]): number {
+    const { beat, moving, t } = deskPhase(frame);
+    const has = (i: number) => i >= 0 && shown.includes(BEATS[i].id);
+    if (!moving) return has(beat) ? 1 : 0;
+    const from = has(beat - 1);
+    const to = has(beat);
+    if (from && to) return 1;
+    if (!from && !to) return 0;
+    if (from) return 1 - clamp01(t / FADE_OUT_BY);
+    return clamp01((t - FADE_IN_FROM) / (1 - FADE_IN_FROM));
 }
 
 /* Piecewise: hold at a view, ease to the next across its move window. Built

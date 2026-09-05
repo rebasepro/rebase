@@ -118,6 +118,12 @@ interface CronJobDefinition {
     // Cron schedule expression (5-field format)
     schedule: string;
 
+    // IANA zone the schedule is read in, e.g. "Europe/Madrid". Without it the
+    // schedule is read in the host's own zone — UTC in nearly every container,
+    // yours on a laptop — so name it. An unknown zone is refused when the job
+    // loads rather than read as local time.
+    timezone?: string;
+
     // Human-readable name shown in Studio
     name: string;
 
@@ -532,3 +538,11 @@ export default job;
 - **[Backend Overview](/docs/backend)** — Full backend configuration reference
 - **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
 - **[Webhook Integration](/docs/recipes/webhooks)** — Send notifications on events
+
+## Crons in the resource graph
+
+Every cron file is also a declaration. `rebase resources` lists it under the
+name of the file — the same id the scheduler runs it as and the Studio shows —
+with its schedule and zone, so a host reads a project's schedules before it
+runs anything. A cron binds from no environment variable; `rebase status`
+shows it green with nothing to configure.

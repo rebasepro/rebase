@@ -21,9 +21,10 @@
  * first time it disagreed it would be reassuring a developer about a deployment
  * that is about to refuse to start.
  *
- * The variable *names* come from each kind's `envBases` and
- * `ACCOUNT_SCOPED_STORAGE_BASES`, both of which are held to those same
- * resolvers by `resource-env-bases.test.ts`.
+ * The variable *names* come from each kind's `envBases`, and the verdicts from
+ * the resolver `@rebasepro/server` registers per kind — one object per kind,
+ * held to `envBases` by `resource-env-bases.test.ts`. A kind this view has
+ * never heard of is judged by whatever resolver its package registered.
  */
 import {
     DEFAULT_RESOURCE_KEY,
@@ -71,6 +72,10 @@ export interface ResourceStatus {
     state: ResourceState;
     /** What this means, in the terms the developer will meet it in. */
     detail: string;
+    /** Set when a local directory stands in for this engine, in development. */
+    standsIn?: string;
+    /** What in the project reaches this resource, from the graph. */
+    usedBy?: readonly string[];
 }
 
 export type EnvBag = Record<string, string | undefined>;
@@ -163,36 +168,53 @@ export function withImplicitDefaults(graph: ResourceGraph): {
 }
 
 /**
+ * The resolver-side of status, as `@rebasepro/server` registers it per kind.
+ *
+ * Passed in rather than imported so this module stays testable without a
+ * server, and so a kind registered by a plugin is judged by the resolver the
+ * plugin brought with it rather than by a switch here.
+ */
+export interface StatusResolvers {
+    /** `resourceResolver(kind)` from `@rebasepro/server`. */
+    resolverFor: (kind: string) => {
+        accountScoped?: readonly string[];
+        resolve: (
+            declaration: ResourceDeclaration,
+            env: EnvBag,
+            context: { production: boolean; defaultBasePath: string }
+        ) => { state: "ready" | "unbound" | "blocked" | "code"; detail?: string; standsIn?: string };
+    } | undefined;
+    /** `resolveDataSources` from `@rebasepro/server`, for the whole-set check. */
+    resolveDataSources: (env: EnvBag, definitions: unknown) => unknown;
+    /** Whether the process being judged is production. Status judges for development by default. */
+    production?: boolean;
+}
+
+/**
  * Resolve every declared resource against an environment.
  *
- * `resolveStorageBackend` is called per bucket because it already answers per
- * bucket, and its three outcomes are exactly the three states worth showing:
- * a config (ready), `undefined` (nothing set — legal, and the reason an upload
- * answers 501), or a throw (set and set wrongly — the deployment refuses).
+ * Each kind's verdict comes from the resolver `@rebasepro/server` registered
+ * for it — the same one boot calls — so this view cannot say "ready" about a
+ * binding boot would refuse. A kind with no resolver is reported as such
+ * rather than skipped: a resource nobody shows is one nobody remembers to
+ * configure, and a kind this runtime cannot bind is exactly what boot will
+ * refuse by name.
  *
- * Databases are simpler and stricter: a declared one with no connection string
- * is fatal at boot, because collections routed to it would otherwise fall back
- * to the default database and land their rows somewhere nobody named. The
- * connection string is the whole rule, so it is read off the binding — and
- * `resolveDataSources` is then run once over the whole set, so anything else it
- * would refuse (a driver package it cannot resolve for a custom engine) is
- * reported rather than missed by a view that only looked for URLs.
+ * `resolveDataSources` is then run once over the whole set, so anything it
+ * would refuse across sources (a driver package it cannot resolve for a custom
+ * engine) is reported rather than missed by a view that only looked per row.
  */
 export function computeStatus(
     graph: ResourceGraph,
     env: EnvBag,
-    resolvers: {
-        accountScopedBases: readonly string[];
-        resolveStorageBackend: (
-            env: EnvBag, key: string, engine: string | undefined, basePath: string, account?: string
-        ) => unknown;
-        resolveDataSources: (env: EnvBag, definitions: unknown) => unknown;
-    }
+    resolvers: StatusResolvers
 ): { resources: ResourceStatus[]; blocked?: string } {
     const resources: ResourceStatus[] = [];
+    const production = resolvers.production ?? false;
 
     for (const { declaration, implicit } of withImplicitDefaults(graph)) {
-        const bindings = bindingsFor(declaration, env, resolvers.accountScopedBases);
+        const resolver = resolvers.resolverFor(declaration.kind);
+        const bindings = bindingsFor(declaration, env, resolver?.accountScoped ?? []);
         const base: Omit<ResourceStatus, "state" | "detail"> = {
             kind: declaration.kind,
             key: declaration.key,
@@ -202,78 +224,47 @@ export function computeStatus(
                 ? { account: declaration.options.account }
                 : {}),
             implicit,
-            bindings
+            bindings,
+            ...(declaration.usedBy && declaration.usedBy.length > 0 ? { usedBy: declaration.usedBy } : {})
         };
 
-        if (declaration.transport !== "server") {
+        if (!resolver) {
             resources.push({
                 ...base,
-                state: "ready",
-                detail: "reached by a provider SDK in the browser; the backend binds nothing"
+                state: "broken",
+                detail: `this runtime has no resolver for a "${declaration.kind}" — boot refuses it by name. ` +
+                    "Upgrade @rebasepro/server, or remove the declaration."
             });
             continue;
         }
 
-        if (declaration.kind === "bucket") {
-            try {
-                const config = resolvers.resolveStorageBackend(
-                    env, declaration.key, declaration.engine, "uploads",
-                    typeof declaration.options.account === "string" ? declaration.options.account : undefined
-                );
-                const resolvedType = (config as { type?: string } | undefined)?.type;
-                resources.push(config
-                    ? {
-                        ...base,
-                        state: "ready",
-                        // A green tick on a local bucket would be the exact
-                        // false reassurance this view exists to remove:
-                        // production DROPS a local backend, because a
-                        // container's filesystem is erased on every restart, so
-                        // uploads that succeed here fail there — and the
-                        // deployment still looks healthy.
-                        detail: resolvedType === "local"
-                            ? "local disk — fine for development, dropped in production unless a durable "
-                              + "volume is mounted and FORCE_LOCAL_STORAGE=true"
-                            : ""
-                    }
-                    : {
-                        ...base,
-                        state: "unconfigured",
-                        detail: "declared, not configured — uploads here answer 501 STORAGE_SOURCE_NOT_CONFIGURED"
-                    });
-            } catch (err) {
+        const verdict = resolver.resolve(declaration, env, { production, defaultBasePath: "uploads" });
+        switch (verdict.state) {
+            case "ready":
                 resources.push({
                     ...base,
-                    state: "broken",
-                    detail: err instanceof Error ? err.message : String(err)
+                    state: "ready",
+                    ...(verdict.standsIn ? { standsIn: verdict.standsIn } : {}),
+                    detail: verdict.detail ?? ""
                 });
-            }
-            continue;
-        }
-
-        if (declaration.kind === "database") {
-            const url = bindings.find(b => b.name.startsWith("DATABASE_URL"));
-            resources.push(url?.set
-                ? { ...base, state: "ready", detail: "" }
-                : {
+                break;
+            case "code":
+                resources.push({ ...base, state: "ready", detail: verdict.detail ?? "needs no environment configuration" });
+                break;
+            case "unbound":
+                resources.push({ ...base, state: "unconfigured", detail: verdict.detail ?? "declared, not configured" });
+                break;
+            case "blocked":
+                resources.push({
                     ...base,
-                    state: "unconfigured",
-                    detail: implicit
-                        ? "no connection string — the backend cannot start without one"
-                        : "declared with no connection string — boot refuses, because collections "
-                          + "routed here would otherwise use the default database"
+                    // A database the environment names nothing for is the
+                    // ordinary first-run state, and reads as unconfigured; a
+                    // binding that is set and set wrongly is broken.
+                    state: implicit || bindings.every(b => !b.set && !b.fallback?.set) ? "unconfigured" : "broken",
+                    detail: verdict.detail ?? "boot refuses this binding"
                 });
-            continue;
+                break;
         }
-
-        // A kind this build does not model the binding of — a topic today, a
-        // cache tomorrow. Listed rather than hidden: a resource nobody shows is
-        // one nobody remembers to configure.
-        resources.push({
-            ...base,
-            state: "ready",
-            detail: bindings.length === 0 ? "needs no environment configuration" : ""
-        });
     }
 
     // Only asked when every row already looks fine. Its failures overlap with

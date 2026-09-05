@@ -308,8 +308,8 @@ which refuses the boot rather than degrading.
 
 ### `rebase resources`
 
-What this project declares it needs — the databases, buckets and topics its
-config code asks for:
+What this project declares it needs — the databases, buckets, topics and
+queues its config code asks for, and the crons and functions its files define:
 
 ```bash
 rebase resources            # list them
@@ -319,9 +319,15 @@ rebase resources --json     # machine-readable
 ```
 
 A resource is declared in config code — `database("analytics")`,
-`bucket("media")`, `topic("signups")` — and never by hand in
+`bucket("media")`, `topic("signups")`, `queue("thumbnails")` — or is a file
+under `backend/crons` or `backend/functions`, and never written by hand in
 `rebase.resources.json`, which is generated from those declarations so a host can
-read what a project needs without building it.
+read what a project needs without building it. Each entry records who uses it
+(`collection:events`, `property:posts.cover`, `function:report`).
+
+To see what the platform holds for a project against what its code declares,
+and to remove a provisioned database the code no longer names, see
+`rebase cloud resources` below.
 
 ### `rebase cloud`
 
@@ -404,14 +410,27 @@ rebase cloud db pitr status | restore | cutover | discard
 
 #### Resources
 
+What the platform holds for the project, against what its code declares.
+
+```bash
+rebase cloud resources                       # each database and bucket: declared? provisioned?
+rebase cloud resources prune database <key>  # remove one the code no longer declares
+```
+
+A deploy never removes a provisioned database when its declaration goes — that
+would be data deleted by a push. It keeps, binds and bills it until somebody
+prunes it by name.
+
+#### Compute
+
 What the project reserves, and what that costs.
 
 ```bash
-rebase cloud resources          # the current reservation and its monthly cost
-rebase cloud resources set      # change it
+rebase cloud compute            # the current reservation and its monthly cost
+rebase cloud compute set        # change it
 ```
 
-`resources set` takes `--cpu`, `--memory`, `--replicas`, `--spot`,
+`compute set` takes `--cpu`, `--memory`, `--replicas`, `--spot`,
 `--scale-to-zero`, `--db-mode`, `--db-instances`, `--db-cpu`, `--db-memory`,
 `--storage`, `--autoscale-max`, `--autoscale-cpu-target` and `--no-autoscale`.
 There are no plan tiers: everything is priced per resource. See

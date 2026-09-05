@@ -1,4 +1,5 @@
 import type { ComponentRef } from "./component_ref";
+import type { ResourceRef } from "./resources";
 
 import type { Entity, EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "./entities";
 import type { JoinStep, OnAction, Relation, ResolvedRelation } from "./relations";
@@ -1079,8 +1080,11 @@ export type StorageConfig = {
      * in `initializeRebaseBackend({ storage: { ... } })`.
      *
      * When omitted, the default storage source is used.
+     *
+     * A string key, or the handle `bucket("media")` returned — the handle is
+     * the same name spelled once, and `defineCollection` records its key.
      */
-    storageSource?: string;
+    storageSource?: ResourceRef;
 
     /**
      * Store files for this property as **public**: they are placed under the

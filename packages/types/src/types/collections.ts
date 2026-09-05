@@ -88,6 +88,15 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
      *
      * // A direct-transport Firestore data source registered as "analytics"
      * { slug: "events", dataSource: "analytics" }
+     *
+     * // The same, spelled once — `defineCollection` accepts the handle
+     * // `database("analytics")` returned and records its key here.
+     * import { analytics } from "../resources";
+     * defineCollection({ slug: "events", dataSource: analytics, … })
+     *
+     * A string on the recorded collection, because a collection is data past
+     * `defineCollection`: it serialises, it compares with `===`, and it reaches
+     * the admin UI over the wire, none of which a handle survives.
      */
     dataSource?: string;
 

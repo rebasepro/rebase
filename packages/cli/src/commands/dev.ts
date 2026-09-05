@@ -15,6 +15,7 @@
  * root path, so multiple Rebase instances never collide.
  */
 import chalk from "chalk";
+import { DEFAULT_RESOURCE_KEY } from "@rebasepro/types";
 import { execa, execaCommandSync, type ResultPromise } from "execa";
 
 import { managedNotices, prepareDatabaseEnv, resolveComposeUrl } from "../dev-db/prepare";
@@ -171,6 +172,30 @@ export function devWatchIncludes(
         .map(entry => path.resolve(projectRoot, entry));
     if (includeConfig) dirs.push(path.join(projectRoot, "config"));
     return dirs;
+}
+
+/**
+ * The databases the project declares beyond the default, by key.
+ *
+ * Read from the graph, so `database("analytics")` in `config/resources.ts`
+ * is enough for `rebase dev` to serve a second database — the declaration is
+ * the request. A config that does not evaluate is the backend's problem to
+ * report, in the terms it already uses; here it means "no additional
+ * databases", not a refusal to start.
+ */
+async function declaredAdditionalDatabases(projectRoot: string): Promise<string[]> {
+    try {
+        const loaded = loadManifest(projectRoot);
+        const backend = findBackendApp(loaded.manifest);
+        if (!backend) return [];
+        const { deriveResourceGraph, deriveOptionsFor } = await import("../resources/derive");
+        const { graph } = await deriveResourceGraph({ ...deriveOptionsFor(projectRoot, backend.app), cronsDir: undefined, functionsDir: undefined });
+        return graph.resources
+            .filter(r => r.kind === "database" && r.transport === "server" && r.key !== DEFAULT_RESOURCE_KEY)
+            .map(r => r.key);
+    } catch {
+        return [];
+    }
 }
 
 /** Well-known filename the backend writes its actual port to. */
@@ -806,7 +831,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         const prepared = noDb ? null : await prepareDatabaseEnv(projectRoot, {
             flagUrl: typeof args["--database-url"] === "string" ? args["--database-url"] : null,
             flagDocker: Boolean(args["--docker"]),
-            onProgress: (message) => console.log(chalk.gray(`  ${message}`))
+            onProgress: (message) => console.log(chalk.gray(`  ${message}`)),
+            additionalKeys: await declaredAdditionalDatabases(projectRoot)
         });
         if (prepared) Object.assign(env, prepared.env);
         /**

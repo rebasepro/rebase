@@ -972,6 +972,63 @@ export function findUnusedServerEntry(projectRoot: string, functionsDir: string)
 /**
  * Compile and assemble a bundle.
  */
+/** What `composeBundleManifest` needs: every input, already resolved. */
+export interface ComposeManifestInput {
+    runtimeRange: string;
+    builtAgainst: string;
+    schemaVersion: string;
+    appName: string;
+    entry: RebaseBundleManifest["entry"];
+    collectionSlugs: string[];
+    functions: RebaseBundleFunction[];
+    nativeModules: NativeDependency[];
+    declaresStorageAuthorize: boolean;
+    resources: ResourceGraph | undefined;
+    declaredDeps: Record<string, string>;
+    build: RebaseBundleManifest["build"];
+}
+
+/**
+ * The bundle manifest, as a pure function of its inputs.
+ *
+ * Separated from `buildBundle` so the SHAPE a host reads can be pinned by a
+ * test without compiling a project: `tooling/contracts/bundle-manifest.json`
+ * is written from this with fixed inputs, and the control plane's own tests
+ * read that file to prove they consume what the CLI emits. That contract is
+ * what was missing when buckets moved from `storage.sources` into `resources`
+ * and the control plane went on reading the old field for two weeks — every
+ * declared bucket arriving as nothing, with both suites green.
+ */
+export function composeBundleManifest(input: ComposeManifestInput): RebaseBundleManifest {
+    return {
+        bundleFormat: BUNDLE_FORMAT_VERSION,
+        runtime: {
+            range: input.runtimeRange,
+            builtAgainst: input.builtAgainst,
+            contract: RUNTIME_CONTRACT_VERSION
+        },
+        schemaVersion: input.schemaVersion,
+        app: input.appName,
+        kind: "backend",
+        entry: input.entry,
+        collections: [...input.collectionSlugs].sort(),
+        ...(input.functions.length > 0 ? { functions: input.functions } : {}),
+        hooks: {
+            native: input.nativeModules.length > 0,
+            nativeModules: input.nativeModules.length > 0 ? input.nativeModules : undefined
+        },
+        storage: {
+            // The hook, not the buckets. Those live in `resources` now, with
+            // every other kind, so a host reads one list instead of one per
+            // kind — which is what let databases and buckets drift apart.
+            authorize: input.declaresStorageAuthorize
+        },
+        resources: input.resources,
+        deps: { declared: input.declaredDeps },
+        build: input.build
+    };
+}
+
 export async function buildBundle(options: BuildBundleOptions): Promise<BuildBundleResult> {
     const { projectRoot, app, appName } = options;
     const paths = resolveBackendPaths(app, projectRoot);
@@ -1142,21 +1199,16 @@ stdio: "inherit" });
         console.log(line.trimStart().startsWith("⚠") ? chalk.yellow(line) : chalk.dim(line));
     }
 
-    const manifest: RebaseBundleManifest = {
-        bundleFormat: BUNDLE_FORMAT_VERSION,
-        runtime: {
-            range: options.runtimeRange,
-            builtAgainst: resolveServerVersion(projectRoot),
-            contract: RUNTIME_CONTRACT_VERSION
-        },
+    const manifest = composeBundleManifest({
+        runtimeRange: options.runtimeRange,
+        builtAgainst: resolveServerVersion(projectRoot),
         // A build with no config directory genuinely does not know the schema —
         // collections are introspected from the live database at boot. Recording
         // a version here would stamp the hash of an empty list, and the runtime
         // would then serve that as the identity of whatever it actually found.
         // Empty means "ask the runtime", which is the honest answer.
         schemaVersion: paths.hasCollections ? computeSchemaVersion(collections) : "",
-        app: appName,
-        kind: "backend",
+        appName,
         entry: {
             config: paths.hasConfig ? relative(paths.config) : undefined,
             collections: paths.hasCollections ? relative(path.join(paths.config, "collections")) : undefined,
@@ -1167,29 +1219,20 @@ stdio: "inherit" });
                 ? relative(path.join(paths.config, `${paths.usersCollection}.js`))
                 : undefined
         },
-        collections: collections
+        collectionSlugs: collections
             .map(collection => collection.slug)
-            .filter((slug): slug is string => Boolean(slug))
-            .sort(),
-        ...(bundledFunctions.length > 0 ? { functions: bundledFunctions } : {}),
-        hooks: {
-            native: nativeModules.length > 0,
-            nativeModules: nativeModules.length > 0 ? nativeModules : undefined
-        },
-        storage: {
-            // The hook, not the buckets. Those live in `resources` now, with
-            // every other kind, so a host reads one list instead of one per
-            // kind — which is what let databases and buckets drift apart.
-            authorize: declaresStorageAuthorize
-        },
+            .filter((slug): slug is string => Boolean(slug)),
+        functions: bundledFunctions,
+        nativeModules,
+        declaresStorageAuthorize,
         resources: resourceGraph,
-        deps: { declared },
+        declaredDeps: declared,
         build: {
             cli: cliVersion(),
             node: process.versions.node.split(".")[0],
             createdAt: new Date().toISOString()
         }
-    };
+    });
 
     fs.writeFileSync(
         path.join(outDir, "manifest.json"),

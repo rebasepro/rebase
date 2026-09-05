@@ -7,9 +7,10 @@ description: Route collections to different databases and properties to differen
 ## Overview
 
 A project is not limited to one database and one bucket. Every named thing a
-project needs — a database, a bucket, a topic — is **declared with a
+project needs — a database, a bucket, a topic, a queue — is **declared with a
 constructor in your config**, and configured from the environment by a variable
-derived from its key.
+derived from its key. Crons and functions are files, and they enter the same
+graph under the name of the file.
 
 One rule, whatever the kind: there is no second place to look, and nothing that
 has to be kept in sync by hand.
@@ -21,7 +22,7 @@ you something to import — but the declaration is what registers them.
 
 ```ts
 // config/resources.ts
-import { bucket, database, topic } from "@rebasepro/types";
+import { bucket, database, queue, topic } from "@rebasepro/types";
 
 /** The project's database. Reads DATABASE_URL, as it always did. */
 export const main = database();
@@ -40,15 +41,17 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-Then point a collection at one:
+Then point a collection at one, by handle — the same name, spelled once:
 
 ```ts
 import { defineCollection } from "@rebasepro/cms-types";
+import { analytics } from "../resources";
+
 const pageViewsCollection = defineCollection({
     name: "Page Views",
     slug: "page_views",
     table: "page_views",
-    dataSource: "analytics",
+    dataSource: analytics,
     properties: { /* … */ }
 });
 ```
@@ -56,11 +59,27 @@ const pageViewsCollection = defineCollection({
 ...or a file property:
 
 ```ts
+import { media } from "../resources";
+
 coverImage: {
     name: "Cover image",
     type: "string",
-    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
+    storage: { storageSource: media, acceptedFiles: ["image/*"] }
 }
+```
+
+`defineCollection` records the handle's key, so past that point a collection is
+plain data — it serialises, it compares, it reaches the admin UI. The string
+form (`dataSource: "analytics"`) still works; the handle is the one a rename
+follows and jump-to-definition lands on.
+
+In a function, the same handles reach the resource:
+
+```ts
+import { analytics, media } from "../../config/resources";
+
+const rows = await rebase.sql("select count(*) from page_views", { database: analytics });
+await rebase.bucket(media).putObject({ key, file });
 ```
 
 ### Seeing what you declared
@@ -76,6 +95,15 @@ to decide what to provision *before* it runs anything — which is how a console
 can say "this project wants a `media` bucket and has none" on a first deploy.
 Edit the declarations, never the file; `--check` fails a build if the two
 disagree.
+
+Each entry also records **who uses it** — `collection:page_views` on a
+database, `property:posts.cover` on a bucket, `function:report` on whatever
+the function imports from `resources.ts`. That is the map a console needs to
+answer "what breaks if I remove this".
+
+`rebase status` goes one step further: for every declaration it says whether
+the environment binds it, using the same resolvers boot uses, so it cannot
+reassure you about a deployment that is about to refuse to start.
 
 ### An engine the build has never heard of
 
@@ -133,18 +161,29 @@ DATABASE_URL=postgres://localhost/app
 DATABASE_URL__ANALYTICS=postgres://warehouse.internal/analytics
 
 # Optional, per source:
-REBASE_DB_POOL_MAX__ANALYTICS=5
+DB_POOL_MAX__ANALYTICS=5
 REBASE_DRIVER__ANALYTICS=@rebasepro/server-postgres
 ```
 
 The driver is chosen from the declared `engine` (`postgres` and `mongodb` are
 known), and `REBASE_DRIVER__<KEY>` overrides it for anything else.
+`REBASE_DB_POOL_MAX` is a process-wide ceiling, not a per-source binding, so it
+takes no suffix.
+
+In development you set none of this: `rebase dev` serves every declared
+database from its managed Postgres — a second instance for `analytics`, started
+on demand — and exports `DATABASE_URL__ANALYTICS` itself. A variable you set by
+hand is never overridden.
+
+Tables and row-level-security policies are provisioned **per source**: a
+collection routed to `analytics` gets its table, and its policies, in the
+analytics database.
 
 ### Storage
 
 ```bash
 S3_BUCKET__MEDIA=my-media-bucket
-STORAGE_REGION__MEDIA=eu-central-1
+S3_REGION__MEDIA=eu-central-1
 S3_ACCESS_KEY_ID__MEDIA=…
 S3_SECRET_ACCESS_KEY__MEDIA=…
 ```
@@ -183,7 +222,7 @@ is deliberately no fallback to the unsuffixed variable: that one belongs to the
 default source, and letting a named bucket inherit it would mean a mistyped key
 signs with another source's credentials.
 
-## Topics
+## Topics and queues
 
 A topic is delivered through the durable job queue: publishing writes **one row
 per subscription**, so each subscriber retries on its own schedule and a broken
@@ -193,13 +232,47 @@ one neither blocks the others nor makes them run again.
 await signups.publish({ userId });
 ```
 
-Delivery is **at-least-once**. A worker that dies holding a job releases it and
-the next one starts the handler from the top, so a handler must tolerate seeing
-an event twice. Publishing inside a transaction that rolls back never happened —
-the enqueue is a row insert.
+A queue is the other shape of background work: a work list with **one
+handler**, where the caller holds the job's id.
 
-Declaring a topic turns the job queue on by itself. Publishing to a topic
-nothing declares throws rather than writing rows no worker handles.
+```ts
+export const thumbnails = queue<{ key: string }>("thumbnails");
+thumbnails.handler(async ({ key }, { attempt }) => { /* … */ });
+
+const { id } = await thumbnails.enqueue({ key }, { runAt: new Date(Date.now() + 60_000) });
+```
+
+Both are **at-least-once**. A worker that dies holding a job releases it and
+the next one starts the handler from the top, so a handler must tolerate seeing
+an event twice. Publishing or enqueueing inside a transaction that rolls back
+never happened — it is a row insert.
+
+Declaring either turns the job queue on by itself, on every boot path — a
+project on the managed runtime, which has no entrypoint to pass `jobs.tasks`
+through, gets its handlers this way. Publishing to a topic nothing declares, or
+enqueueing on a queue with no handler, throws rather than writing rows no
+worker handles.
+
+## Crons and functions
+
+Both are files — `backend/crons/<name>.ts`, `backend/functions/<name>.ts` —
+and both enter the graph under the name of the file, which is also the id the
+scheduler runs a cron as and the path a function mounts at. Neither binds from
+the environment; they are in the graph so a host knows a project's schedules
+before it runs anything.
+
+```ts
+export default defineCron({
+    name: "Nightly cleanup",
+    schedule: "0 3 * * *",
+    timezone: "Europe/Madrid",
+    async handler({ rebase }) { /* … */ }
+});
+```
+
+Without `timezone` the schedule is read in the host's own zone — UTC in nearly
+every container, yours on a laptop — so `0 3 * * *` means a different hour
+either side of a deploy. An unknown zone is refused when the job loads.
 
 ## Failure behaviour
 
@@ -260,11 +333,14 @@ default bucket, and a property that does not name one has nowhere to go —
 deliberately, and identically in development and production. Add `bucket()` too
 if you want one.
 
-In development, a declared bucket that nothing else configured becomes a real
-local directory, so `bucket("media")` plus `rebase dev` is enough to upload a
-file. That never happens in production, or on the managed runtime: a bucket
-invented there would write uploads to a container filesystem that vanishes on
-the next rollout.
+In development, a declared bucket nothing binds is a local directory —
+`uploads__media` beside the default `uploads` — whatever engine it declares, so
+`bucket("media", { engine: "s3" })` plus `rebase dev` is enough to upload a
+file. Boot says which engine the directory is standing in for, and `rebase
+status` shows it in yellow beside the tick. That never happens in production,
+or on the managed runtime: a bucket invented there would write uploads to a
+container filesystem that vanishes on the next rollout, so an unbound bucket
+stays unbound and answers 501.
 
 ## Related
 

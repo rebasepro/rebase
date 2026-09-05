@@ -2,6 +2,7 @@ import type { ArrayProperty, MapProperty, NumberProperty, Property, StringProper
 import React, { createElement, Suspense } from "react";
 import { deepEqual as equal } from "fast-equals"
 
+import { resourceKeyOf } from "@rebasepro/types";
 import { EntityReference, EntityRelation } from "@rebasepro/types";
 import type { PropertyPreviewProps } from "../types/components/PropertyPreviewProps";
 import { resolveProperty, normalizeToEntityRelation, getRelationTargetPath } from "@rebasepro/common";
@@ -93,7 +94,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                 content = <StorageThumbnail
                     interactive={interactive}
                     storeUrl={property.storage?.storeUrl ?? false}
-                    storageSourceKey={stringProperty.storage.storageSource}
+                    storageSourceKey={stringProperty.storage.storageSource === undefined ? undefined : resourceKeyOf(stringProperty.storage.storageSource)}
                     size={props.size}
                     fill={fill}
                     storagePathOrDownloadUrl={filePath}/>;

@@ -1,4 +1,5 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { resourceKeyOf } from "@rebasepro/types";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 import { useAuthController, useStorageSource } from "@rebasepro/app";
@@ -96,7 +97,7 @@ export function MarkdownEditorFieldBinding({
     // Resolve the correct storage source for this property.
     // Mirrors the resolution in useStorageUploadController.
     const storageSource = useMemo(() => resolveStorageSource({
-        sourceKey: storage?.storageSource,
+        sourceKey: storage?.storageSource === undefined ? undefined : resourceKeyOf(storage.storageSource),
         sources: storageSources.sources,
         defaultSource: defaultStorageSource
     }), [storage?.storageSource, storageSources.sources, defaultStorageSource]);

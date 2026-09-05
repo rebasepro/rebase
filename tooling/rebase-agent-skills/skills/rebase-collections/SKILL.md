@@ -160,7 +160,7 @@ export default productsCollection;
 | `description` | `string` | — | Description shown in the UI (supports Markdown) |
 | `admin.icon` | `string \| ReactNode` | — | Lucide icon name or React element |
 | `admin.group` | `string` | `"Views"` | Sidebar group heading |
-| `dataSource` | `string` | `"(default)"` | Data-source key — routes the collection to a database declared with `database("<key>")` in `config/resources.ts`. See **Data sources & multiple backends** below. |
+| `dataSource` | `string \| DatabaseHandle` | `"(default)"` | Routes the collection to a database declared with `database("<key>")` in `config/resources.ts`. Pass the handle (`import { analytics } from "../resources"`, `dataSource: analytics`) — `defineCollection` records its key — or the key as a string. See **Data sources & multiple backends** below. |
 | `driver` | `string` | `undefined` | **Deprecated** — engine hint (`"postgres"`/`"firestore"`/`"mongodb"`). Prefer `dataSource`. When `dataSource` is omitted, `driver` doubles as the routing key. |
 | `databaseId` | `string` | — | Physical DB/schema/Firestore-database within the engine |
 | `history` | `boolean` | `false` | Enable entity audit trail (requires history plugin) |

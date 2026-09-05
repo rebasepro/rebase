@@ -26,11 +26,12 @@ import {
     metricsCommand,
     webhooksCommand,
     storageCommand,
-    resourcesCommand,
+    computeCommand,
     clustersCommand,
     billingCommand,
     printStorageHelp
 } from "./resources";
+import { declaredResourcesCommand } from "./declared-resources";
 import {
     requireProjectRef,
     initOutputMode,
@@ -276,8 +277,22 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "storage":
             await storageCommand(action, rawArgs);
             break;
+        case "compute":
+            await computeCommand(action, rawArgs);
+            break;
         case "resources":
-            await resourcesCommand(action, rawArgs);
+            // The word means the graph now, on both sides of the wire: what the
+            // code declares against what the platform holds. What it used to
+            // show — CPU, memory, cost — is `compute`, and a dial flag arriving
+            // here is the one thing worth a pointed refusal.
+            if (action === "set") {
+                fail(
+                    "`rebase cloud resources set` is now `rebase cloud compute set` — CPU, memory, replicas and cost.",
+                    "`rebase cloud resources` lists what this project declares against what the platform provisioned.",
+                    "renamed"
+                );
+            }
+            await declaredResourcesCommand(action, rawArgs);
             break;
         case "clusters":
             await clustersCommand(action, rawArgs);
@@ -393,10 +408,12 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "storage", section: "Data", description: "The project's object storage" },
 
     { action: "webhooks", section: "Other resources", description: "Outbound webhooks on a table's row changes" },
-    // `resources` dispatches, has a page, and was absent from this list — so the
-    // one command that names what a project costs was undiscoverable from
-    // `rebase cloud --help`, which is where an agent finds the family.
-    { action: "resources", section: "Other resources", description: "What this project reserves, what it costs, and how to change it" },
+    // Both of these dispatch and have a page, and both were absent from this
+    // list — so the command that names what a project costs, and the one that
+    // names what it declares, were undiscoverable from `rebase cloud --help`,
+    // which is where an agent finds the family.
+    { action: "resources", section: "Other resources", description: "What the code declares against what the platform provisioned" },
+    { action: "compute", section: "Other resources", description: "What this project reserves, what it costs, and how to change it" },
     { action: "clusters", section: "Other resources", description: "The clusters tenants run on. Platform-admin only" },
     { action: "billing", section: "Other resources", description: "The organization's billing account and card on file" }
 ];

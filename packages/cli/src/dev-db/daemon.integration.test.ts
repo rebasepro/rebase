@@ -237,6 +237,48 @@ describe("the managed database", () => {
     });
 });
 
+describe("a second declared database", () => {
+    it("is served by the same daemon, as its own database, without a restart", { timeout: BOOT_TIMEOUT }, async () => {
+        // `database("analytics")` in config/resources.ts is the request. The
+        // daemon was started before anybody asked for it — `rebase studio` in
+        // another terminal is on the first one — and must serve the second
+        // from the process that is already running.
+        const first = await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true });
+        const withAnalytics = await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true, additionalKeys: ["analytics"] });
+
+        expect(withAnalytics.pid).toBe(first.pid);
+        expect(withAnalytics.started).toBe(false);
+        const analyticsUrl = withAnalytics.additional.analytics;
+        expect(analyticsUrl).toMatch(/^postgresql:\/\/postgres@127\.0\.0\.1:\d+\/postgres\?sslmode=disable$/);
+        expect(analyticsUrl).not.toBe(withAnalytics.url);
+
+        // Two databases, not one with two doors: a table in one is absent
+        // from the other.
+        await connect(analyticsUrl).query("create table facts (id int)");
+        const { rows } = await connect(first.url).query<{ n: string }>(
+            "select count(*)::text as n from pg_tables where tablename = 'facts'"
+        );
+        expect(rows[0].n).toBe("0");
+
+        // Recorded, so `rebase status` and a reset can see it; and asked for
+        // again, it is the same instance rather than a second one.
+        expect(readState(root)?.databases?.analytics?.port).toBe(Number(new URL(analyticsUrl).port));
+        const again = await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true, additionalKeys: ["analytics"] });
+        expect(again.additional.analytics).toBe(analyticsUrl);
+    });
+
+    it("is removed by a reset along with the default", { timeout: BOOT_TIMEOUT }, async () => {
+        const database = await ensureManagedDatabase(root, { entry: CLI_ENTRY, quiet: true, additionalKeys: ["analytics"] });
+        const analyticsDir = readState(root)?.databases?.analytics?.dataDir;
+        expect(analyticsDir && fs.existsSync(analyticsDir)).toBe(true);
+        void database;
+
+        await resetManagedDatabase(root);
+        expect(fs.existsSync(analyticsDir!)).toBe(false);
+        expect(fs.existsSync(dataDir(root))).toBe(false);
+    });
+});
+
 describe("one daemon per project", () => {
     it("adopts a running daemon instead of starting a second", { timeout: BOOT_TIMEOUT }, async () => {
         // Two processes opening one PGlite data directory would corrupt it.

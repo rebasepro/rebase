@@ -5,7 +5,7 @@
  * and the route 404s. Both CLI call sites had the slash in the name and both
  * swallowed the failure in a bare `catch {}` whose comment blamed "a control
  * plane without the quote endpoint" — so `rebase cloud billing` and
- * `rebase cloud resources` never printed a price, and the absence looked
+ * `rebase cloud compute` never printed a price, and the absence looked
  * deliberate. The saas console makes the same call correctly, with a comment
  * explaining exactly this.
  *
@@ -27,7 +27,7 @@ const SOURCE = RAW
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/\/\/[^\n]*/g, " ");
 
-describe("cloud resources pricing calls", () => {
+describe("cloud compute pricing calls", () => {
     it("finds the invoke calls at all", () => {
         // Guards the two assertions below from passing vacuously if these
         // calls move or are renamed.

@@ -38,24 +38,33 @@ describe("collectionsStoredBy", () => {
         expect(collectionsStoredBy(collections, postgres, [postgres]).map(c => c.slug)).toEqual(["users"]);
     });
 
-    it("keeps a second source on the same engine", () => {
-        // Two Postgres databases is one engine: filtering by data-source key
-        // instead would stop creating the analytics tables anywhere.
+    it("hands a second source on the same engine its own collections, and nothing else", () => {
+        // Two Postgres databases are two stores. Filtering by engine used to
+        // hand `events` to the default, which created its table in the
+        // default database and left the analytics one empty — every query
+        // routed there then failed on a missing relation.
         const analytics = source("analytics", "postgres");
         const collections = [collection("users"), collection("events", { dataSource: "analytics" })];
 
         expect(collectionsStoredBy(collections, postgres, [postgres, analytics]).map(c => c.slug))
-            .toEqual(["users", "events"]);
+            .toEqual(["users"]);
+        expect(collectionsStoredBy(collections, analytics, [postgres, analytics]).map(c => c.slug))
+            .toEqual(["events"]);
     });
 
-    it("resolves the engine through the declared sources", () => {
-        // `dataSource: "warehouse"` says nothing about the engine on its own;
-        // the initialized source does.
+    it("a source of another engine never takes a collection that names a different one", () => {
+        // `dataSource: "warehouse"` routes to the warehouse source; a
+        // collection there that also declares `engine: "mongodb"` is not a
+        // warehouse table whatever key it names.
         const warehouse = source("warehouse", "postgres");
-        const collections = [collection("facts", { dataSource: "warehouse" })];
+        const collections = [
+            collection("facts", { dataSource: "warehouse" }),
+            collection("docs", { dataSource: "warehouse", engine: "mongodb" })
+        ];
 
-        expect(collectionsStoredBy(collections, postgres, [postgres, warehouse]).map(c => c.slug))
+        expect(collectionsStoredBy(collections, warehouse, [postgres, warehouse]).map(c => c.slug))
             .toEqual(["facts"]);
+        expect(collectionsStoredBy(collections, postgres, [postgres, warehouse])).toEqual([]);
     });
 
     it("hands a Mongo primary its own collections", () => {

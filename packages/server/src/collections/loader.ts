@@ -1,4 +1,4 @@
-import { CollectionConfig, SecurityRule, isPostgresCollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, SecurityRule, isPostgresCollectionConfig, resolveResourceRefs } from "@rebasepro/types";
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
@@ -107,7 +107,12 @@ export async function loadCollectionsFromDirectory(
     // The file each collection came from, in the order they were pushed. Only
     // the checks that compare two collections use it — "two collections declare
     // `slug: "posts"`" is unactionable without saying which two files.
-    const validate = (collections: CollectionConfig[], sources?: string[]): CollectionConfig[] => {
+    const validate = (loaded: CollectionConfig[], sources?: string[]): CollectionConfig[] => {
+        // A resource handle written where a key belongs — `dataSource:
+        // analytics` — becomes its key here, for a collection authored as a
+        // plain object rather than through `defineCollection`, which already
+        // did this. Past this point a collection is data.
+        const collections = loaded.map(c => resolveResourceRefs(c));
         if (options.validate !== false) {
             assertCollectionConfigs(collections, { ...(options.validate ?? {}), sources });
         }

@@ -1,5 +1,5 @@
 /**
- * Flag handling for `rebase cloud resources set`.
+ * Flag handling for `rebase cloud compute set`.
  *
  * Its own file rather than an addition to cloud-commands.test.ts, which mocks
  * `./resources` wholesale — weakening that mock to reach one export would have

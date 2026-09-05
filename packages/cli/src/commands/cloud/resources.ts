@@ -1431,13 +1431,13 @@ status: acct.status ?? null }
     }
 }
 
-/* ─── resources: what this project is given ─────────────────────── */
+/* ─── compute: what this project reserves ───────────────────────── */
 
 /**
- * The action words `rebase cloud resources` dispatches. No word, or `show`,
+ * The action words `rebase cloud compute` dispatches. No word, or `show`,
  * prints the dials and the quote.
  */
-export const RESOURCES_ACTIONS = ["show", "set"] as const;
+export const COMPUTE_ACTIONS = ["show", "set"] as const;
 
 /** The dials, and the flag that sets each. */
 const DIAL_FLAGS = {
@@ -1490,7 +1490,12 @@ const NUMERIC_DIALS = new Set([
 const BOOLEAN_DIALS = new Set(["preemptible", "scaleToZero"]);
 
 /**
- * `rebase cloud resources` — show what a project is given, and change it.
+ * `rebase cloud compute` — show what a project reserves, and change it.
+ *
+ * Named for what it shows — CPU, memory, replicas, the database's shape, and
+ * what those cost — because `rebase resources` already means the graph a
+ * project declares, and two commands called "resources" that show different
+ * things is a support ticket.
  *
  * ## Why nothing is validated here
  *
@@ -1504,10 +1509,10 @@ const BOOLEAN_DIALS = new Set(["preemptible", "scaleToZero"]);
  * boundary refuses a raw PATCH and a console save, which is the property worth
  * having — a check in a client only covers the clients that run it.
  */
-export async function resourcesCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
-    // `resources et --cpu 500m` used to SHOW the dials and exit 0, so a caller
+export async function computeCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
+    // `compute et --cpu 500m` used to SHOW the dials and exit 0, so a caller
     // that meant to change one was told what it currently is and nothing else.
-    requireKnownAction("resources", action, RESOURCES_ACTIONS);
+    requireKnownAction("compute", action, COMPUTE_ACTIONS);
 
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
@@ -1567,7 +1572,7 @@ export async function resourcesCommand(action: string | undefined, rawArgs: stri
                 console.log("");
                 noteBlank();
                 note("Empty means the platform default. Change one with:");
-                note(chalk.cyan("  rebase cloud resources set --cpu 500m --memory 2Gi"));
+                note(chalk.cyan("  rebase cloud compute set --cpu 500m --memory 2Gi"));
                 console.log("");
             },
             {
@@ -1649,7 +1654,7 @@ export function buildDialPatch(
     /**
      * `requireOne: false` for `projects create`, where naming no dial is the
      * ordinary case — a new project takes the platform default. On
-     * `resources set` a patch with nothing in it is a typo, and saying so beats
+     * `compute set` a patch with nothing in it is a typo, and saying so beats
      * a success message for a change nobody made.
      */
     opts?: { requireOne?: boolean }

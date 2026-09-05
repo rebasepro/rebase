@@ -23,7 +23,7 @@ import path from "path";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { readEnvFile, requireProjectRoot } from "../utils/project";
 import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
-import { deriveResourceGraph, RESOURCE_GRAPH_FILENAME, readResourceGraphFile, serializeResourceGraph } from "../resources/derive";
+import { deriveOptionsFor, deriveResourceGraph, RESOURCE_GRAPH_FILENAME, readResourceGraphFile, serializeResourceGraph } from "../resources/derive";
 import { computeStatus, type ResourceStatus } from "../resources/status";
 import type { RebaseBackendAppConfig } from "@rebasepro/types";
 
@@ -37,7 +37,8 @@ ${chalk.bold("Usage")}
 
 ${chalk.bold("Reads")}
   rebase.json                  which apps exist, and who owns the server process
-  <config>/resources.ts        the databases, buckets and topics declared
+  <config>/resources.ts        the databases, buckets, topics and queues declared
+  backend/crons, backend/functions   the crons and functions, by filename
   .env                         whether each one's variables are set
 `);
 }
@@ -54,8 +55,15 @@ function printResource(status: ResourceStatus): void {
     if (status.transport !== "server") tags.push(chalk.yellow(status.transport));
     if (status.account) tags.push(chalk.gray(`account:${status.account}`));
     if (status.implicit) tags.push(chalk.gray("implicit"));
+    // A stand-in is not a binding. It is shown in yellow beside a green tick:
+    // uploads work here, and the same declaration answers 501 in production
+    // until the variable is set.
+    if (status.standsIn) tags.push(chalk.yellow(`local stand-in for ${status.standsIn}`));
 
     console.log(`  ${MARK[status.state]} ${name}  ${tags.join(" · ")}`);
+    if (status.usedBy && status.usedBy.length > 0) {
+        console.log(`      ${chalk.gray("used by")} ${chalk.gray(status.usedBy.join(", "))}`);
+    }
 
     let hiddenOptional = 0;
     for (const binding of status.bindings) {
@@ -125,7 +133,7 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
     const paths = resolveBackendPaths(backendApp, projectRoot);
     const configDir = path.join(projectRoot, paths.config);
 
-    const { graph, issues } = await deriveResourceGraph({ configDir });
+    const { graph, issues } = await deriveResourceGraph(deriveOptionsFor(projectRoot, backendApp));
     if (issues.length > 0) {
         console.error(chalk.red(`\n✗ ${issues.length} problem(s) in the declared resources:\n`));
         for (const issue of issues) console.error(`  ${chalk.bold(issue.path)}  ${issue.message}`);
@@ -141,9 +149,11 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
 
     const server = await import("@rebasepro/server");
     const { resources, blocked } = computeStatus(graph, env, {
-        accountScopedBases: server.ACCOUNT_SCOPED_STORAGE_BASES,
-        resolveStorageBackend: server.resolveStorageBackend as never,
-        resolveDataSources: server.resolveDataSources as never
+        resolverFor: server.resourceResolver as never,
+        resolveDataSources: server.resolveDataSources as never,
+        // Judged as production when the .env says so; a stand-in local
+        // directory for an unbound bucket is only ever offered to development.
+        production: env.NODE_ENV === "production"
     });
 
     if (flags["--json"]) {

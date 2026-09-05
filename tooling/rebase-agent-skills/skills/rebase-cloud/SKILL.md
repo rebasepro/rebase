@@ -155,7 +155,7 @@ Two escape hatches, in increasing order of ownership:
 
 ```bash
 # A CloudNativePG cluster of this project's own, still managed by the platform
-rebase cloud resources set --db-mode dedicated
+rebase cloud compute set --db-mode dedicated
 
 # Your own PostgreSQL, anywhere
 rebase cloud db create --type byodb --connection-string "$DATABASE_URL" --wait
@@ -407,14 +407,21 @@ There are no plan tiers. A project is priced by the resources it reserves, and
 each one is a dial:
 
 ```bash
-rebase cloud resources                       # what this project reserves, and €/month
-rebase cloud resources set --cpu 500m --memory 1Gi
-rebase cloud resources set --db-mode dedicated --db-instances 2
-rebase cloud resources set --autoscale-max 5 --autoscale-cpu-target 70
+rebase cloud compute                       # what this project reserves, and €/month
+rebase cloud compute set --cpu 500m --memory 1Gi
+rebase cloud compute set --db-mode dedicated --db-instances 2
+rebase cloud compute set --autoscale-max 5 --autoscale-cpu-target 70
 ```
 
-`resources` itemises the monthly quote line by line. Empty means the platform
+`compute` itemises the monthly quote line by line. Empty means the platform
 default.
+
+`rebase cloud resources` is a different question: what the platform holds for
+the project against what its code declares — each database and bucket, whether
+the last deploy still declares it, whether the platform made it. A deploy never
+removes a provisioned database when its declaration goes; it keeps, binds and
+bills it until `rebase cloud resources prune database <key>` (asks; `--yes`
+off a terminal). Do not prune unasked.
 
 ---
 
@@ -482,7 +489,7 @@ a command it has not used before.
 | `rebase cloud domains list` / `add` / `verify` / `remove` | Custom domains |
 | `rebase cloud extensions list` / `enable` / `disable` | Postgres extensions |
 | `rebase cloud settings show` / `set` | Name, branch, repo, subdomain |
-| `rebase cloud resources` / `resources set` | What it reserves, and what it costs |
+| `rebase cloud compute` / `compute set` | What it reserves, and what it costs |
 | `rebase cloud storage` / `storage create` / `storage attach` | Object storage |
 | `rebase cloud orgs list` / `create` / `members` | Organizations |
 | `rebase cloud billing` / `billing setup` | Card on file |
@@ -498,7 +505,7 @@ Global flags on every one of them: `--project, -p <slug>`, `--json`,
 **Never run a command that changes the hosted platform unless the user asked in
 the current conversation.** That includes `deploy`, `projects create`,
 `projects delete`, `db create`, `env set`, `domains add`, `rollback`, `stop`,
-`restart`, `resources set` and `extensions enable`.
+`restart`, `compute set` and `extensions enable`.
 
 **Never pass these to get past an error:**
 
@@ -512,7 +519,7 @@ the current conversation.** That includes `deploy`, `projects create`,
 **Never retry or "fix" a `platform_permission_denied`.** Report it.
 
 **Safe to run unasked:** `status`, `logs`, `deployments list`, `env list`,
-`resources`, `metrics`, `debug`, `db info`, `domains list`, `extensions list`,
+`resources`, `compute`, `metrics`, `debug`, `db info`, `domains list`, `extensions list`,
 and any `--help`.
 
 ---

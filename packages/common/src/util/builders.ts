@@ -11,7 +11,9 @@ import {
     PostgresProperties,
     PostgresProperty,
     StrictProperties,
-    User
+    User,
+    resolveResourceRefs,
+    type ResourceRef
 } from "@rebasepro/types";
 
 
@@ -49,7 +51,8 @@ export function defineCollection<
     const P extends PostgresProperties,
     USER extends User = User
 >(
-    collection: Omit<PostgresCollectionConfig<InferEntityType<P>, USER>, "properties"> & { properties: StrictProperties<P, PostgresProperty> }
+    collection: Omit<PostgresCollectionConfig<InferEntityType<P>, USER>, "properties" | "dataSource">
+        & { properties: StrictProperties<P, PostgresProperty>; dataSource?: ResourceRef }
 ): PostgresCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /**
@@ -60,7 +63,8 @@ export function defineCollection<
     const P extends FirebaseProperties,
     USER extends User = User
 >(
-    collection: Omit<FirebaseCollectionConfig<InferEntityType<P>, USER>, "properties"> & { properties: StrictProperties<P, FirebaseProperty> }
+    collection: Omit<FirebaseCollectionConfig<InferEntityType<P>, USER>, "properties" | "dataSource">
+        & { properties: StrictProperties<P, FirebaseProperty>; dataSource?: ResourceRef }
 ): FirebaseCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /**
@@ -71,7 +75,8 @@ export function defineCollection<
     const P extends MongoProperties,
     USER extends User = User
 >(
-    collection: Omit<MongoDBCollectionConfig<InferEntityType<P>, USER>, "properties"> & { properties: StrictProperties<P, MongoProperty> }
+    collection: Omit<MongoDBCollectionConfig<InferEntityType<P>, USER>, "properties" | "dataSource">
+        & { properties: StrictProperties<P, MongoProperty>; dataSource?: ResourceRef }
 ): MongoDBCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /**
@@ -79,8 +84,10 @@ export function defineCollection<
  * At runtime this is a plain identity function.
  */
 export function defineCollection(
-    collection: CollectionConfig
+    collection: Omit<CollectionConfig, "dataSource"> & { dataSource?: ResourceRef }
 ): CollectionConfig {
-    return collection;
+    // A resource handle written where a key belongs — `dataSource: analytics`
+    // — becomes its key here, so past this point a collection is plain data.
+    return resolveResourceRefs(collection) as CollectionConfig;
 }
 

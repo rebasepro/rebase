@@ -38,6 +38,7 @@ import type {
     User
 } from "@rebasepro/types";
 // A value, not a type: the runtime list core owns.
+import { resolveResourceRefs, type ResourceRef } from "@rebasepro/types";
 import { ADMIN_COLLECTION_KEYS as CORE_ADMIN_COLLECTION_KEYS, nestAdminCollectionKeys } from "@rebasepro/types";
 
 import type {
@@ -768,16 +769,25 @@ export function defineCollection<
     const KEYS = Properties,
     USER extends User = User
 >(
-    collection: Omit<CollectionConfigForEngine<E, KEYS, USER>, "properties" | "engine">
+    collection: Omit<CollectionConfigForEngine<E, KEYS, USER>, "properties" | "engine" | "dataSource">
         & {
             engine?: E;
             properties: StrictProperties<P, PropertyForEngine<E>> & KEYS;
+            dataSource?: ResourceRef;
         }
 ): CollectionConfigForEngine<E, KEYS, USER> & { properties: KEYS };
 
-/** Identity at runtime; the signature above is the whole point. @group Builder */
-export function defineCollection(collection: CollectionConfig): CollectionConfig {
-    return collection;
+/**
+ * At runtime this records the collection as data: a resource handle written
+ * where a key belongs — `dataSource: analytics`, `storageSource: media` — is
+ * replaced by its key, so what leaves here serialises and compares like the
+ * string it always was. The signature above is the rest of the point.
+ * @group Builder
+ */
+export function defineCollection(
+    collection: Omit<CollectionConfig, "dataSource"> & { dataSource?: ResourceRef }
+): CollectionConfig {
+    return resolveResourceRefs(collection) as CollectionConfig;
 }
 
 /**

@@ -30,7 +30,7 @@ import {
     VENDOR_SIZE_WARN_BYTES
 } from "../bundle";
 import { assertBuiltForPath, foldFrontendIntoBundle, staticBuildEnv } from "../fold-static";
-import { deriveResourceGraph, writeResourceGraphFile } from "../resources/derive";
+import { deriveOptionsFor, deriveResourceGraph, writeResourceGraphFile } from "../resources/derive";
 
 function printHelp(): void {
     console.log(`
@@ -169,9 +169,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
             // whose manifest is missing a bucket the code declares would deploy
             // into a tenant with nothing provisioned for it, and the first sign
             // would be uploads failing in production.
-            const { graph: resourceGraph, issues } = await deriveResourceGraph({
-                configDir: path.join(projectRoot, resolveBackendPaths(app, projectRoot).config)
-            });
+            const { graph: resourceGraph, issues } = await deriveResourceGraph(deriveOptionsFor(projectRoot, app));
             if (issues.length > 0) {
                 console.error(chalk.red(`\n  ✗ ${issues.length} problem(s) in the declared resources:\n`));
                 for (const issue of issues) console.error(`    ${chalk.bold(issue.path)}  ${issue.message}`);

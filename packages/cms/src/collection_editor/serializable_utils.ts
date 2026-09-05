@@ -8,6 +8,7 @@
  * @module
  */
 
+import { resourceKeyOf } from "@rebasepro/types";
 import { isRelationalCollectionConfig, type Relation, type ArrayProperty, type BinaryProperty, type BooleanProperty, type DateProperty, type GeopointProperty, type MapProperty, type NumberProperty, type Properties, type Property, type ReferenceProperty, type RelationProperty, type StorageConfig, type StringProperty, type VectorProperty } from "@rebasepro/types";
 import type { AdminPropertyOptions } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
@@ -129,7 +130,7 @@ function toSerializableStorageConfig(storage: StorageConfig | undefined): Serial
     if (storage.includeBucketUrl !== undefined) result.includeBucketUrl = storage.includeBucketUrl;
     if (storage.storeUrl !== undefined) result.storeUrl = storage.storeUrl;
     if (storage.maxSize !== undefined) result.maxSize = storage.maxSize;
-    if (storage.storageSource !== undefined) result.storageSource = storage.storageSource;
+    if (storage.storageSource !== undefined) result.storageSource = resourceKeyOf(storage.storageSource);
     // processFile, postProcess, previewUrl are intentionally dropped (functions)
 
     return result;
