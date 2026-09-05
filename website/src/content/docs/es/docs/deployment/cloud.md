@@ -72,13 +72,23 @@ rebase cloud link --project my-app
 ## Deploy
 
 ```bash
-rebase build
-rebase cloud deploy --bundle
+rebase cloud deploy
 ```
 
-`--bundle` uploads the built bundle and runs it on the platform image. That is
-the path to use: a bare `rebase cloud deploy` builds from **source** instead,
-which is a different and slower mechanism.
+One command, and no flag to remember. A scaffold's `rebase.json` declares
+`runtime: "managed"` for its backend, and `deploy` reads that declaration — it
+says so on the way past (`rebase.json declares runtime: managed — deploying a
+bundle`), builds the app into `dist-bundle`, uploads the bundle, runs it on the
+published runtime image, and follows the deployment to a terminal state. The exit
+code is the verdict, so the same line works unattended in CI.
+
+To ship an artefact that was built earlier — a CI job that builds once and
+deploys twice, say — point at the directory instead of rebuilding:
+
+```bash
+rebase build
+rebase cloud deploy --bundle-dir dist-bundle
+```
 
 Watch it:
 
