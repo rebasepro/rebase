@@ -374,34 +374,43 @@ function readTuple(field: string, raw: unknown): [WhereFilterOp, unknown] | unde
 // ---------------------------------------------------------------------------
 
 /**
- * Serialize a single canonical condition tuple to a PostgREST dot-string.
+ * Encode the `<op>.<value>` half of a wire condition.
  *
- * Throws `TypeError` if the input is not a valid `[WhereFilterOp, unknown]` tuple.
+ * This is the single leaf encoder. Both wire positions that carry a condition
+ * — a top-level query parameter (`?status=eq.active`) and a leaf inside an
+ * `and(...)`/`or(...)` group (`or(status.eq.active,…)`) — go through it, so a
+ * rule expressed here holds in both. The group serializer used to carry its
+ * own copy, and the copy had drifted on every rule that matters: `null` went
+ * out as the four-character string, the empty list as `()`, and an operator
+ * this dialect does not have was silently rewritten to `eq` — a filter that
+ * ran, returned rows, and answered a different question than the one asked.
  *
- * @example
- * serializeTuple(["==", "active"])           // "eq.active"
- * serializeTuple(["in", ["admin","editor"]]) // "in.(admin,editor)"
- * serializeTuple([">=", 18])                 // "gte.18"
+ * `escapeScalar` is the one thing the two positions legitimately disagree
+ * about. A scalar in a query parameter owns the whole value and needs no
+ * escaping; a scalar inside a group sits between the same commas a list item
+ * does, so a comma in it would end the condition early.
  */
-function serializeTuple(tuple: [WhereFilterOp, unknown]): string {
-    if (!Array.isArray(tuple) || tuple.length !== 2) {
-        throw new TypeError(
-            `serializeTuple: expected a [WhereFilterOp, value] tuple, got ${JSON.stringify(tuple)}`
-        );
-    }
-
-    const [op, value] = tuple;
-
+function serializeOperatorAndValue(
+    op: WhereFilterOp,
+    value: unknown,
+    { escapeScalar, where }: { escapeScalar: boolean; where: string }
+): string {
     if (typeof op !== "string") {
         throw new TypeError(
-            `serializeTuple: operator must be a string, got ${typeof op}`
+            `${where}: operator must be a string, got ${typeof op}`
         );
     }
 
-    const restOp = CANONICAL_OP_LOOKUP.get(op);
+    // REST short-codes resolve too. `deserializeFilter` has accepted both
+    // spellings since `readTuple` was fixed; serializing only the canonical
+    // half left `{ operator: "gte" }` — the spelling the wire itself uses, and
+    // the one a hand-built condition object most often carries — falling
+    // through to a fallback of `eq`.
+    const canonical = toCanonicalOp(op);
+    const restOp = canonical && CANONICAL_OP_LOOKUP.get(canonical);
     if (!restOp) {
         throw new TypeError(
-            `serializeTuple: unknown operator "${op}". Valid operators: ${Object.keys(CANONICAL_TO_REST).join(", ")}`
+            `${where}: unknown operator "${op}". Valid operators: ${Object.keys(CANONICAL_TO_REST).join(", ")}`
         );
     }
 
@@ -416,9 +425,15 @@ function serializeTuple(tuple: [WhereFilterOp, unknown]): string {
     // These are the same query: SQL `= NULL` is never true, so `== null` can
     // only mean IS NULL. Emitting it as such is unambiguous in both directions
     // and leaves `eq.null` free to mean the literal string, which it now does.
-    if (value === null && (op === "==" || op === "!=")) {
-        return op === "==" ? "isnull.null" : "notnull.null";
+    if (value === null && (canonical === "==" || canonical === "!=")) {
+        return canonical === "==" ? "isnull.null" : "notnull.null";
     }
+
+    // A null test has no operand. Whatever was parked in `value` is dropped
+    // here rather than on the way back, so the encoding is stable: both
+    // deserializers normalize `isnull.<anything>` to `null`, and re-encoding
+    // that must land on the same string it came from.
+    if (NULL_OPS.has(canonical)) return `${restOp}.null`;
 
     if (Array.isArray(value)) {
         // The empty list needs a spelling of its own.
@@ -439,7 +454,32 @@ function serializeTuple(tuple: [WhereFilterOp, unknown]): string {
         return `${restOp}.(${items})`;
     }
 
-    return `${restOp}.${stringifyValue(value)}`;
+    const scalar = stringifyValue(value);
+    return `${restOp}.${escapeScalar ? escapeWireValue(scalar) : scalar}`;
+}
+
+/**
+ * Serialize a single canonical condition tuple to a PostgREST dot-string.
+ *
+ * Throws `TypeError` if the input is not a valid `[WhereFilterOp, unknown]` tuple.
+ *
+ * @example
+ * serializeTuple(["==", "active"])           // "eq.active"
+ * serializeTuple(["in", ["admin","editor"]]) // "in.(admin,editor)"
+ * serializeTuple([">=", 18])                 // "gte.18"
+ */
+function serializeTuple(tuple: [WhereFilterOp, unknown]): string {
+    if (!Array.isArray(tuple) || tuple.length !== 2) {
+        throw new TypeError(
+            `serializeTuple: expected a [WhereFilterOp, value] tuple, got ${JSON.stringify(tuple)}`
+        );
+    }
+
+    const [op, value] = tuple;
+    return serializeOperatorAndValue(op, value, {
+        escapeScalar: false,
+        where: "serializeTuple"
+    });
 }
 
 /**
@@ -625,9 +665,20 @@ export function deserializeFilter(
 /**
  * Serialize a `LogicalCondition` or `FilterCondition` to its wire-format string.
  *
+ * Leaf encoding is {@link serializeOperatorAndValue}, the same function
+ * `serializeTuple` uses, so `null`, the empty list and an unknown operator
+ * behave identically inside a group and in a query parameter.
+ *
+ * @throws {TypeError} when a leaf names an operator this dialect does not have.
+ * It used to fall back to `eq`, which turned `age >= 18` into `age = 18` with
+ * no diagnostic anywhere.
+ *
  * @example
  * serializeLogicalCondition({ column: "status", operator: "==", value: "active" })
  * // → "status.eq.active"
+ *
+ * serializeLogicalCondition({ column: "deleted_at", operator: "==", value: null })
+ * // → "deleted_at.isnull.null"
  *
  * serializeLogicalCondition({ type: "or", conditions: [...] })
  * // → "or(status.eq.active,status.eq.pending)"
@@ -643,16 +694,69 @@ export function serializeLogicalCondition(
         return `${cond.type}(${inner})`;
     }
 
-    // FilterCondition
-    const restOp = CANONICAL_OP_LOOKUP.get(cond.operator) ?? "eq";
-    if (Array.isArray(cond.value)) {
-        const items = cond.value.map(v => escapeWireValue(stringifyValue(v))).join(",");
-        return `${cond.column}.${restOp}.(${items})`;
+    // FilterCondition. The leaf goes through the shared encoder, so a group
+    // condition and a query parameter agree on nulls, empty lists and unknown
+    // operators — see `serializeOperatorAndValue`.
+    //
+    // The column is escaped like a value: it is not one, but it shares the
+    // delimiters, and a comma or paren in it would move where the group parser
+    // thinks the condition ends. Dots are deliberately *not* escaped — a
+    // relation path is `author.name` on the wire, and the parser below finds
+    // the operator rather than assuming it is the second segment.
+    return `${escapeWireValue(cond.column)}.${serializeOperatorAndValue(cond.operator, cond.value, {
+        escapeScalar: true,
+        where: "serializeLogicalCondition"
+    })}`;
+}
+
+/**
+ * Split a leaf condition into `column`, operator token and value.
+ *
+ * The naive reading — column is everything before the first dot, operator is
+ * everything up to the second — cannot express a relation path. A filter on
+ * `author.name` serializes to `author.name.eq.bob` and came back as the column
+ * `author` with the operator `name`, which resolves to nothing, so the
+ * fallback made it `author == "eq.bob"`: a condition that runs and matches
+ * nothing, on a column the caller never named.
+ *
+ * So the operator is found rather than assumed: it is the first dot-separated
+ * segment after the column that resolves to a real operator. Everything before
+ * it is the column, everything after is the value. `version.eq.1.2.3` still
+ * reads as `version >= "1.2.3"` because the scan stops at the first match, and
+ * `metadata->>x.eq.5` never had dots in the column to begin with.
+ *
+ * Returns `undefined` when no segment resolves — `status.active`, an equality
+ * written without an operator, which the caller handles.
+ */
+function splitLeafCondition(str: string): { column: string; operator: WhereFilterOp; value: string } | undefined {
+    // Dots inside a list value (`in.(1.5,2.5)`) are not separators. The value
+    // always follows the operator, so the search only needs the region before
+    // the first unescaped paren.
+    let limit = str.length;
+    for (let i = 0; i < str.length; i++) {
+        if (str[i] === "\\") { i++; continue; }
+        if (str[i] === "(") { limit = i; break; }
     }
-    // Escaped, like a list item. A scalar inside a group sits between the same
-    // delimiters a list item does, so leaving it raw let a comma in the value
-    // end the condition early — see `splitGroupItems`.
-    return `${cond.column}.${restOp}.${escapeWireValue(stringifyValue(cond.value))}`;
+
+    const dots: number[] = [];
+    for (let i = 0; i < limit; i++) {
+        if (str[i] === "\\") { i++; continue; }
+        if (str[i] === ".") dots.push(i);
+    }
+
+    // Segment 0 is always the column, and an operator needs a value after it,
+    // so a candidate is bounded on both sides by a dot.
+    for (let i = 1; i < dots.length; i++) {
+        const operator = toCanonicalOp(str.substring(dots[i - 1] + 1, dots[i]));
+        if (!operator) continue;
+        return {
+            column: unescapeWireValue(str.substring(0, dots[i - 1])),
+            operator,
+            value: str.substring(dots[i] + 1)
+        };
+    }
+
+    return undefined;
 }
 
 /**
@@ -707,29 +811,39 @@ export function deserializeLogicalCondition(
     }
 
     // FilterCondition: "column.op.value"
-    const firstDot = str.indexOf(".");
-    if (firstDot === -1) {
-        return { column: str, operator: "==", value: true };
+    const leaf = splitLeafCondition(str);
+    if (!leaf) {
+        const firstDot = str.indexOf(".");
+        if (firstDot === -1) {
+            return { column: unescapeWireValue(str), operator: "==", value: true };
+        }
+        // "column.value" — no segment resolved as an operator, so this is an
+        // equality written without one. The value keeps its dots.
+        return {
+            column: unescapeWireValue(str.substring(0, firstDot)),
+            operator: "==",
+            value: unescapeWireValue(str.substring(firstDot + 1))
+        };
     }
 
-    const column = str.substring(0, firstDot);
-    const rest = str.substring(firstDot + 1);
+    const { column, operator, value: valueStr } = leaf;
 
-    const secondDot = rest.indexOf(".");
-    if (secondDot === -1) {
-        // "column.value" — treat as equality (value kept as string)
-        return { column, operator: "==", value: unescapeWireValue(rest) };
+    // A null test has no operand: `isnull.null` is what the serializer writes,
+    // but a hand-written `isnull.true` means the same thing. Normalizing here
+    // is what makes the tuple stable through a re-encode, and it matches
+    // `deserializeSingle`, which has done it for query parameters all along.
+    if (NULL_OPS.has(operator)) {
+        return { column, operator, value: null };
     }
-
-    const opStr = rest.substring(0, secondDot);
-    const valueStr = rest.substring(secondDot + 1);
-    const operator = toCanonicalOp(opStr) ?? "==";
 
     // Parse list values with escape-aware splitting. The wrapping parens are
     // written by the serializer *after* the items are escaped, so an escaped
     // paren inside an item can never be mistaken for them.
     if (valueStr.startsWith("(") && valueStr.endsWith(")")) {
-        const items = splitListItems(valueStr.slice(1, -1));
+        const inner = valueStr.slice(1, -1);
+        // See EMPTY_LIST_TOKEN: `(\)` is the empty list, which is not the same
+        // query as a search for the empty string.
+        const items = inner === EMPTY_LIST_TOKEN ? [] : splitListItems(inner);
         return { column, operator, value: items };
     }
 

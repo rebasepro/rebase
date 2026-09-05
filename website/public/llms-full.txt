@@ -13411,6 +13411,76 @@ await client.data.products.find({
 
 > **Note:** Pre-serialized PostgREST strings (format 2) are an escape hatch for passing filter values that are already in wire format. Prefer tuple syntax for type safety and readability.
 
+### Logical Conditions (OR / AND)
+
+Every field in `where` is AND-ed. To OR conditions together, build a **logical
+condition** with the `or`, `and` and `cond` helpers the SDK exports:
+
+```typescript
+
+const { data } = await client.data.products.find({
+    logical: or(
+        cond("status", "==", "active"),
+        and(
+            cond("status", "==", "draft"),
+            cond("authorId", "==", currentUserId)
+        )
+    )
+});
+```
+
+The fluent builder takes the same tree:
+
+```typescript
+const { data } = await client.data.products
+    .where(or(cond("status", "==", "active"), cond("featured", "==", true)))
+    .orderBy("createdAt", "desc")
+    .find();
+```
+
+`cond` takes the canonical operator — the left column of the
+[Filter Operators](#filter-operators) table. An operator the dialect does not
+have is a `TypeError` when the query is serialized, not a silently different
+query.
+
+#### How it composes with the rest of the query
+
+`where`, `logical` and `search` are three independent groups, AND-ed with each
+other:
+
+```
+(where fields, AND-ed)  AND  (logical group)  AND  (search)
+```
+
+There is no way to OR `where` against `logical`. Anything that is not a plain
+AND of the three has to be expressed inside one `logical` tree — move the
+fields you need OR-ed into it.
+
+#### On the wire
+
+A logical group travels as a single `or=` or `and=` query parameter, in the
+same dot-syntax the field filters use:
+
+```
+GET /api/data/products?or=(status.eq.active,featured.eq.true)
+```
+
+Three encodings are worth knowing, because they are the ones a hand-written
+query string gets wrong:
+
+| Condition | Wire form | Note |
+|-----------|-----------|------|
+| `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` is a search for the four-character string `null` |
+| `cond("id", "in", [])` | `id.in.(\)` | `in.()` is a list holding one empty string, which is a different query |
+| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | a [relation path](#querying-through-a-relation) keeps its dot |
+
+Commas, parentheses and backslashes inside a value are backslash-escaped, so
+`cond("name", "==", "Doe, John")` travels as `name.eq.Doe\, John` and does not
+split the group.
+
+Groups may nest 32 levels deep. Past that the request is rejected with
+`INVALID_LOGICAL_GROUP` — flatten it, since `or(a,or(b,c))` is `or(a,b,c)`.
+
 ### Pagination
 
 ```typescript
