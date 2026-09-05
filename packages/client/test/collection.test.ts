@@ -338,6 +338,36 @@ title: "Updated" });
             expect(mockRequest).toHaveBeenCalledTimes(2);
         });
 
+        /**
+         * A request key is a path and a query string. It says nothing about
+         * *who* is asking — and the map used to be module-level, shared by
+         * every client in the process. So an admin panel beside a signed-in
+         * user's client, or two per-request server clients, counting the same
+         * collection shared one request, and whichever arrived second was
+         * answered with the first one's total. Row-level security makes those
+         * genuinely different numbers.
+         */
+        it("does not share a count between two clients on different transports", async () => {
+            const a = createMockTransport();
+            const b = createMockTransport();
+            let resolveA: (v: { count: number }) => void = () => {};
+            a.mockRequest.mockReturnValue(new Promise<{ count: number }>(r => { resolveA = r; }) as never);
+            let resolveB: (v: { count: number }) => void = () => {};
+            b.mockRequest.mockReturnValue(new Promise<{ count: number }>(r => { resolveB = r; }) as never);
+
+            const clientA = createCollectionClient<PostModel>(a.transport, "posts");
+            const clientB = createCollectionClient<PostModel>(b.transport, "posts");
+
+            const both = Promise.all([clientA.count(), clientB.count()]);
+            resolveA({ count: 7 });
+            resolveB({ count: 2 });
+
+            // Two requests, and each client is told its own answer.
+            expect(await both).toEqual([7, 2]);
+            expect(a.mockRequest).toHaveBeenCalledTimes(1);
+            expect(b.mockRequest).toHaveBeenCalledTimes(1);
+        });
+
         it("propagates a failure to every sharing caller and clears the entry", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");
             mockRequest.mockRejectedValueOnce(new Error("boom") as never);

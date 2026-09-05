@@ -32,10 +32,32 @@ const NO_SOCKET =
     + "and not when it was created with realtime: false.";
 
 /**
- * Counts currently in flight, keyed by the exact request they issue. Entries
- * live only for the duration of the request — see `count()` for why.
+ * Counts currently in flight, **per client**, keyed by the exact request they
+ * issue. Entries live only for the duration of the request — see `count()` for
+ * why they exist at all.
+ *
+ * The map used to be module-level, shared by every client in the process. A
+ * request key is a path and a query string: it says nothing about *who* is
+ * asking. So two clients holding different credentials — an admin panel beside
+ * a signed-in user's client, a per-request server client in a Node process, a
+ * test asserting one client's calls — counting the same collection would share
+ * one request, and whichever arrived second was answered with the first one's
+ * total. Row-level security makes those genuinely different numbers.
+ *
+ * Keyed on the transport instead, which is the object a credential lives on.
+ * A `WeakMap`, so a closed client's entry goes with it.
  */
-const inflightCounts = new Map<string, Promise<number>>();
+const inflightCounts = new WeakMap<Transport, Map<string, Promise<number>>>();
+
+/** The in-flight map for one transport, created on first use. */
+function inflightCountsFor(transport: Transport): Map<string, Promise<number>> {
+    let map = inflightCounts.get(transport);
+    if (!map) {
+        map = new Map<string, Promise<number>>();
+        inflightCounts.set(transport, map);
+    }
+    return map;
+}
 
 /**
  * A live query result: a normal {@link FindResult} plus what an interface
@@ -304,17 +326,18 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             // The entry is dropped as soon as it settles, so this merges
             // concurrent calls only and never serves a cached total.
             const key = basePath + "/count" + qs;
-            const inflight = inflightCounts.get(key);
-            if (inflight) return inflight;
+            const inflight = inflightCountsFor(transport);
+            const existing = inflight.get(key);
+            if (existing) return existing;
 
             const request = transport
                 .request<{ count: number }>(key, { method: "GET" })
                 .then((raw) => raw.count ?? 0);
-            inflightCounts.set(key, request);
+            inflight.set(key, request);
             try {
                 return await request;
             } finally {
-                inflightCounts.delete(key);
+                inflight.delete(key);
             }
         },
 
