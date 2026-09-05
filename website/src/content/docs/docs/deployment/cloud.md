@@ -39,19 +39,30 @@ From a project directory:
 
 ```bash
 rebase cloud login
-rebase cloud projects create my-app
-rebase cloud link
+rebase cloud billing setup
+rebase cloud projects create --name "My app" --subdomain my-app --link
 ```
 
-`link` writes `.rebase/cloud.json`, which records the project id and slug. It is
-not a secret and it is not your credentials — those live in
-`~/.rebase/credentials.json`, written by `login`.
+`projects create` takes no positional argument. The name and the subdomain are
+flags, and both are required — on a terminal they are prompted for, and a
+headless run that omits either exits with `input_required` rather than inventing
+one. **The subdomain is not editable afterwards:** it is the
+`<slug>.rebase.website` host the project answers on, so pick it deliberately.
 
-An existing project links to an existing Cloud project without creating one:
+`--link` binds this directory to the project in the same call, so there is no
+separate `link` step. It writes `.rebase/cloud.json`, which records the project id
+and slug. That file is not a secret and it is not your credentials — those live
+in `~/.rebase/credentials.json`, written by `login`.
+
+`billing setup` attaches a card to the organization, once. It is first in the
+sequence on purpose: the first deploy of a project is refused without one, and
+finding that out after a bundle has finished uploading is the worse order.
+
+An existing project links without creating one:
 
 ```bash
 rebase cloud projects list
-rebase cloud link
+rebase cloud link --project my-app
 ```
 
 ## Deploy
