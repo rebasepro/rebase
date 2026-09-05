@@ -463,6 +463,13 @@ export class PostgresBackendDriver implements DataDriver {
             const contextForCallback = this.buildCallContext();
             return Promise.all(rows.map(async (row) => {
                 let fetched = row;
+                // `?? fetched` on every tier. An `afterRead` that mutates the row
+                // and returns nothing is a reasonable thing to write — the guide's
+                // own signature says the return is a transform, not a requirement
+                // — and on the tiers that lacked the fallback it replaced the row
+                // with `undefined`. The collection tier tolerated it, so the same
+                // callback worked or emptied the response depending on which
+                // block it was registered in.
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterRead) {
                     fetched = await globalCallbacks.afterRead({
@@ -470,7 +477,7 @@ export class PostgresBackendDriver implements DataDriver {
                         path,
                         row: fetched,
                         context: contextForCallback
-                    });
+                    }) ?? fetched;
                 }
                 // 2. Collection callbacks second
                 if (callbacks?.afterRead) {
@@ -488,7 +495,7 @@ export class PostgresBackendDriver implements DataDriver {
                         path,
                         row: fetched,
                         context: contextForCallback
-                    });
+                    }) ?? fetched;
                 }
                 return fetched;
             }));
@@ -582,6 +589,7 @@ export class PostgresBackendDriver implements DataDriver {
 
         if (row && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
             const contextForCallback = this.buildCallContext();
+            // `?? row` on every tier — see the note in `fetchCollection`.
             // 1. Global callbacks first
             if (globalCallbacks?.afterRead) {
                 row = await globalCallbacks.afterRead({
@@ -589,7 +597,7 @@ export class PostgresBackendDriver implements DataDriver {
                     path,
                     row,
                     context: contextForCallback
-                });
+                }) ?? row;
             }
             // 2. Collection callbacks second
             if (callbacks?.afterRead) {
@@ -607,7 +615,7 @@ export class PostgresBackendDriver implements DataDriver {
                     path,
                     row,
                     context: contextForCallback
-                });
+                }) ?? row;
             }
         }
 
@@ -774,6 +782,8 @@ export class PostgresBackendDriver implements DataDriver {
             );
 
             if (savedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+                // `?? savedRow` on every tier — see the note in `fetchCollection`.
+                // Here it decided what the write's own response body contained.
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterRead) {
                     savedRow = await globalCallbacks.afterRead({
@@ -781,7 +791,7 @@ export class PostgresBackendDriver implements DataDriver {
                         path,
                         row: savedRow,
                         context: contextForCallback
-                    });
+                    }) ?? savedRow;
                 }
                 // 2. Collection callbacks second
                 if (callbacks?.afterRead) {
@@ -799,7 +809,7 @@ export class PostgresBackendDriver implements DataDriver {
                         path,
                         row: savedRow,
                         context: contextForCallback
-                    });
+                    }) ?? savedRow;
                 }
             }
 

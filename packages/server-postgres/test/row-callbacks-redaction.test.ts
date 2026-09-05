@@ -173,3 +173,72 @@ describe("CollectionCallbacks.afterRead PII redaction on the rebase.data path", 
         expect(rows[0].trail).toBe("global>collection");
     });
 });
+
+/**
+ * An `afterRead` that returns nothing must not erase the row.
+ *
+ * Mutating `row` and returning nothing is a reasonable thing to write — the
+ * hook's own signature calls the return a transform, not a requirement — and the
+ * collection tier has always tolerated it via `?? fetched`. The global and
+ * property tiers did not, so the *same callback* worked or emptied the response
+ * depending on which block it was registered in. On the write path it decided
+ * what the response body of a create contained.
+ */
+describe("an afterRead that returns nothing", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    const plain = {
+        slug: "customers",
+        name: "Customers",
+        table: "customers",
+        properties: {}
+    } as unknown as CollectionConfig;
+
+    const voidGlobal = {
+        afterRead: ({ row }: { row: Record<string, unknown> }) => {
+            (row as { seen?: boolean }).seen = true;
+            // no return
+        }
+    } as unknown as CollectionCallbacks<Record<string, unknown>>;
+
+    it("still returns the rows from fetchCollection", async () => {
+        const driver = buildDriver(plain, [{ ...RAW_CUSTOMER }], voidGlobal);
+
+        const rows = await driver.fetchCollection({ path: "customers" } as any);
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toBeDefined();
+        expect(rows[0].id).toBe("c1");
+        expect(rows[0].seen).toBe(true);
+    });
+
+    it("still returns the row from fetchOne", async () => {
+        const driver = buildDriver(plain, [{ ...RAW_CUSTOMER }], voidGlobal);
+
+        const row = await driver.fetchOne({ path: "customers", id: "c1" } as any);
+
+        expect(row).toBeDefined();
+        expect(row!.id).toBe("c1");
+    });
+
+    it("still returns the saved row from a write", async () => {
+        // The same pipeline runs on the way out of `save`, where the result is
+        // the response body of a create. A void global afterRead turned a
+        // successful write into `undefined`.
+        const driver = buildDriver(plain, [{ ...RAW_CUSTOMER }], voidGlobal);
+        jest.spyOn((driver as any).dataService, "save").mockResolvedValue({ ...RAW_CUSTOMER } as never);
+
+        const saved = await driver.save({
+            path: "customers",
+            id: "c1",
+            values: { first_name: "Jane" },
+            collection: plain,
+            status: "new"
+        } as any);
+
+        expect(saved).toBeDefined();
+        expect(saved.id).toBe("c1");
+    });
+});
