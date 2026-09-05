@@ -579,10 +579,10 @@ await initializeRebaseBackend({
 Then, from the client:
 
 ```typescript
-const profile = await rebase.auth.findUserByEmail("teammate@example.com");
+const profile = await client.auth.findUserByEmail("teammate@example.com");
 // → { uid, displayName, photoURL } | null   (never email/roles/metadata)
 if (profile) {
-    await rebase.data.team_members.create({ team_id, user_id: profile.uid });
+    await client.data.team_members.create({ team_id, user_id: profile.uid });
 }
 ```
 

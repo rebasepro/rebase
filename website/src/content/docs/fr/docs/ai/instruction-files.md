@@ -70,7 +70,7 @@ utile de les répéter au début de chaque session :
 2. **Les migrations se font en deux étapes.** `rebase schema generate`, puis
    `rebase db push` en développement, ou `rebase db generate && rebase db migrate`
    pour la production.
-3. **Utilisez le SDK.** Passez par `rebase.data.<slug>` ; le SQL brut et les
+3. **Utilisez le SDK.** Passez par `client.data.<slug>` (browser) / `rebase.dataAsAdmin.<slug>` (server) ; le SQL brut et les
    appels Drizzle directs contournent la validation, les callbacks et le RLS.
 4. **Protégez chaque route personnalisée.** Les routes dans `backend/functions/`
    sont montées *sans* authentification. Utilisez `requireAuth` / `requireAdmin`

@@ -9,7 +9,7 @@ description: Apply cross-cutting lifecycle callbacks to every collection at the 
 Rebase provides two levels of entity lifecycle callbacks — both use the same `CollectionCallbacks` type from `@rebasepro/types`:
 
 - **[Per-collection callbacks](/docs/collections/callbacks)**: Defined on individual collection configurations. They run only for that collection.
-- **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.data`).
+- **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.dataAsAdmin`).
 
 Use global callbacks for:
 - **PII masking** — redact sensitive fields for non-admin callers across all collections.

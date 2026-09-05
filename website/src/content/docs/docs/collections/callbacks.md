@@ -582,14 +582,34 @@ Other cross-collection patterns:
 
 Every callback receives a `context` object of type `RebaseCallContext`:
 
-```typescript
+```typescript no-verify
 interface RebaseCallContext {
-    /** The authenticated user, if any */
+    /** The authenticated user, if any. Absent for a public request. */
     user?: User;
-    /** The underlying data driver (PostgresBackendDriver) */
-    driver: DataDriver;
-    /** Unified data access — context.data.<slug>.create/update/find/delete */
-    data: RebaseData;
+
+    /**
+     * Unified data access — context.data.<slug>.create/update/find/delete.
+     * Inherits the privilege of whatever triggered the callback: user-scoped on
+     * a user request, admin-scoped under `dataAsAdmin` or a cron.
+     */
+    data: RebaseSdkData;
+
+    /**
+     * The app singleton. Server-side this is always the *admin* plane, so
+     * `client.dataAsAdmin` escalates a user-scoped operation — deliberate, when
+     * you mean it. Come here for functions, storage and email; use `data` for
+     * queries.
+     */
+    client: RebaseClient;
+
+    /** The storage source the app is configured with — uploads, signed URLs. */
+    storageSource: StorageSource;
+
+    /**
+     * The driver executing this operation. Server-side only, hence optional.
+     * `data` is already scoped correctly on a user request, so you rarely need it.
+     */
+    driver?: DataDriver;
 }
 ```
 

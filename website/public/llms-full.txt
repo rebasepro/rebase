@@ -4022,14 +4022,34 @@ Other cross-collection patterns:
 
 Every callback receives a `context` object of type `RebaseCallContext`:
 
-```typescript
+```typescript no-verify
 interface RebaseCallContext {
-    /** The authenticated user, if any */
+    /** The authenticated user, if any. Absent for a public request. */
     user?: User;
-    /** The underlying data driver (PostgresBackendDriver) */
-    driver: DataDriver;
-    /** Unified data access — context.data.<slug>.create/update/find/delete */
-    data: RebaseData;
+
+    /**
+     * Unified data access — context.data.<slug>.create/update/find/delete.
+     * Inherits the privilege of whatever triggered the callback: user-scoped on
+     * a user request, admin-scoped under `dataAsAdmin` or a cron.
+     */
+    data: RebaseSdkData;
+
+    /**
+     * The app singleton. Server-side this is always the *admin* plane, so
+     * `client.dataAsAdmin` escalates a user-scoped operation — deliberate, when
+     * you mean it. Come here for functions, storage and email; use `data` for
+     * queries.
+     */
+    client: RebaseClient;
+
+    /** The storage source the app is configured with — uploads, signed URLs. */
+    storageSource: StorageSource;
+
+    /**
+     * The driver executing this operation. Server-side only, hence optional.
+     * `data` is already scoped correctly on a user request, so you rarely need it.
+     */
+    driver?: DataDriver;
 }
 ```
 
@@ -6072,10 +6092,10 @@ await initializeRebaseBackend({
 Then, from the client:
 
 ```typescript
-const profile = await rebase.auth.findUserByEmail("teammate@example.com");
+const profile = await client.auth.findUserByEmail("teammate@example.com");
 // → { uid, displayName, photoURL } | null   (never email/roles/metadata)
 if (profile) {
-    await rebase.data.team_members.create({ team_id, user_id: profile.uid });
+    await client.data.team_members.create({ team_id, user_id: profile.uid });
 }
 ```
 
@@ -8990,13 +9010,18 @@ const job: CronJobDefinition = {
     async handler(ctx) {
         ctx.log("Starting session cleanup...");
 
-        // Use the rebase singleton for admin-level database access
-        // const { data: expired } = await rebase.data.findMany("sessions", { ... });
-        const count = Math.floor(Math.random() * 50); // placeholder
+        // Admin-scoped data access — see `ctx.rebase` above.
+        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const expired = await ctx.rebase.dataAsAdmin.sessions.findAll({
+            where: { last_seen_at: ["<", cutoff] }
+        });
+        for (const session of expired) {
+            await ctx.rebase.dataAsAdmin.sessions.delete(session.id as string);
+        }
 
-        ctx.log(`Cleaned up ${count} expired sessions`);
+        ctx.log(`Cleaned up ${expired.length} expired sessions`);
 
-        return { deletedSessions: count };
+        return { deletedSessions: expired.length };
     },
 };
 
@@ -9723,7 +9748,7 @@ Unhandled promise rejections are logged rather than fatal: a fire-and-forget cal
 Rebase provides two levels of entity lifecycle callbacks — both use the same `CollectionCallbacks` type from `@rebasepro/types`:
 
 - **[Per-collection callbacks](/docs/collections/callbacks)**: Defined on individual collection configurations. They run only for that collection.
-- **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.data`).
+- **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.dataAsAdmin`).
 
 Use global callbacks for:
 - **PII masking** — redact sensitive fields for non-admin callers across all collections.
@@ -15970,8 +15995,9 @@ session:
    [Schema as Code](/docs/architecture/schema-as-code).
 2. **Migrations are two steps.** `rebase schema generate`, then `rebase db push`
    in development, or `rebase db generate && rebase db migrate` for production.
-3. **Use the SDK.** Go through `rebase.data.<slug>`; raw SQL and direct Drizzle
-   calls bypass validation, callbacks and RLS.
+3. **Use the SDK.** Go through `client.data.<slug>` in the browser and
+   `rebase.dataAsAdmin.<slug>` on the server; raw SQL and direct Drizzle calls
+   bypass validation, callbacks and RLS.
 4. **Guard every custom route.** Routes in `backend/functions/` are mounted
    *without* authentication. Use `requireAuth` / `requireAdmin` from
    `@rebasepro/server` in the route's own middleware slot — reading

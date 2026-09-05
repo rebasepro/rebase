@@ -961,7 +961,7 @@ The auth middleware assigns these reserved identities automatically. They are vi
 | Anonymous | `"anon"` | `["anon"]` | Unauthenticated when `requireAuth: false` |
 | No token + `requireAuth: true` | — | — | **Rejected (401)** |
 
-> **IMPORTANT FOR AGENTS:** the server singleton's data plane is `rebase.dataAsAdmin` (used in cron jobs, custom functions and webhooks). It is backed by the **native DataDriver** — no JSON round trip through the REST API — and is scoped once, at boot, as `{ uid: "service", roles: ["admin"] }`. Callbacks live in the driver rather than the route layer, so global and collection callbacks still fire, seeing `uid: "service"` and `roles: ["admin"]`. That is how a callback distinguishes a server-internal read from an end-user one. `rebase.data` still resolves at runtime as an alias, but `RebaseServerClient` omits it from the type so the privileged plane has exactly one name.
+> **IMPORTANT FOR AGENTS:** the server singleton's data plane is `rebase.dataAsAdmin` (used in cron jobs, custom functions and webhooks). It is backed by the **native DataDriver** — no JSON round trip through the REST API — and is scoped once, at boot, as `{ uid: "service", roles: ["admin"] }`. Callbacks live in the driver rather than the route layer, so global and collection callbacks still fire, seeing `uid: "service"` and `roles: ["admin"]`. That is how a callback distinguishes a server-internal read from an end-user one. `rebase.data` does not exist — not on the type and not at runtime — so the privileged plane has exactly one name.
 
 ---
 

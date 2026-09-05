@@ -745,10 +745,9 @@ The singleton has **two planes**, and they do not work the same way:
 ### What It Exposes
 
 The `rebase` singleton implements `RebaseServerClient` — `RebaseClient` narrowed
-to the guarantees that always hold on a server, and with `data` **omitted from
-the type** so the privileged plane has exactly one name. (`rebase.data` still
-resolves at runtime as an alias of `dataAsAdmin`, so untyped JavaScript keeps
-working, but do not write it.)
+to the guarantees that always hold on a server, and with `data` **gone** so the
+privileged plane has exactly one name. It is not there at runtime either:
+`rebase.data` is `undefined`, in TypeScript and in plain JavaScript alike.
 
 | Property | Type | Description |
 |----------|------|-------------|

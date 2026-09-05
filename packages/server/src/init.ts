@@ -2480,13 +2480,16 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // declares — `data` is `Omit`ted from the type so the privilege has to be
     // named at the call site.
     //
-    // It is still assigned here on purpose. `createRebaseClient` above already
-    // put an HTTP-transport `data` on this object, so *not* overwriting it would
-    // leave `rebase.data` working in plain JS while quietly routing through the
-    // loop this native plane exists to skip — a silent performance and identity
-    // change instead of the compile error TypeScript now gives. Both names point
-    // at the same admin-scoped object — admin-scoped, not RLS-bypassing.
-    Object.assign(serverClient, { data: serverData, dataAsAdmin: serverData });
+    // `data` is deleted rather than re-pointed. `createRebaseClient` above put an
+    // HTTP-transport `data` on this object, and for a while the fix was to
+    // overwrite it with the native plane — so `rebase.data` kept working in plain
+    // JavaScript as a second name for the admin-scoped accessor. That is the
+    // thing the type change was for: one name for a privileged plane, visible at
+    // the call site. A hidden alias means untyped code can still reach it by the
+    // name that reads user-scoped everywhere else. Removed, so `rebase.data` is
+    // `undefined` in JavaScript as it is absent in TypeScript.
+    Object.assign(serverClient, { dataAsAdmin: serverData });
+    delete (serverClient as { data?: unknown }).data;
     logger.debug("Native data plane attached to singleton (bypasses HTTP loop)");
 
     // Same treatment for storage: server-side `rebase.storage` must talk to the

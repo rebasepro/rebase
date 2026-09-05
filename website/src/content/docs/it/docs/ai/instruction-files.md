@@ -64,7 +64,7 @@ sessione:
    [Schema as Code](/docs/architecture/schema-as-code).
 2. **Le migrazioni sono in due passaggi.** `rebase schema generate`, poi `rebase db push`
    in fase di sviluppo, oppure `rebase db generate && rebase db migrate` per la produzione.
-3. **Usa l'SDK.** Passa attraverso `rebase.data.<slug>`; l'SQL grezzo e le chiamate dirette a Drizzle
+3. **Usa l'SDK.** Passa attraverso `client.data.<slug>` (browser) / `rebase.dataAsAdmin.<slug>` (server); l'SQL grezzo e le chiamate dirette a Drizzle
    bypassan la validazione, le callback e la RLS.
 4. **Proteggi ogni route personalizzata.** Le route in `backend/functions/` sono montate
    *senza* autenticazione. Usa `requireAuth` / `requireAdmin` da

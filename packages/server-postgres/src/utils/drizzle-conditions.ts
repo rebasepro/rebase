@@ -1705,7 +1705,7 @@ export class DrizzleConditionBuilder {
                 //
                 // The wire layer rejects operator-shaped unknowns before they
                 // arrive (`UnknownFilterOperatorError`, 400). What reaches here
-                // came from in-process `rebase.data`, a stored filter preset or
+                // came from in-process `rebase.dataAsAdmin`, a stored filter preset or
                 // a config — none of them typechecked at the call site, all of
                 // them able to name an operator that no longer exists.
                 throw ApiError.badRequest(

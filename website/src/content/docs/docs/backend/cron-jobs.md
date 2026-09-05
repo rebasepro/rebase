@@ -503,13 +503,18 @@ const job: CronJobDefinition = {
     async handler(ctx) {
         ctx.log("Starting session cleanup...");
 
-        // Use the rebase singleton for admin-level database access
-        // const { data: expired } = await rebase.data.findMany("sessions", { ... });
-        const count = Math.floor(Math.random() * 50); // placeholder
+        // Admin-scoped data access — see `ctx.rebase` above.
+        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const expired = await ctx.rebase.dataAsAdmin.sessions.findAll({
+            where: { last_seen_at: ["<", cutoff] }
+        });
+        for (const session of expired) {
+            await ctx.rebase.dataAsAdmin.sessions.delete(session.id as string);
+        }
 
-        ctx.log(`Cleaned up ${count} expired sessions`);
+        ctx.log(`Cleaned up ${expired.length} expired sessions`);
 
-        return { deletedSessions: count };
+        return { deletedSessions: expired.length };
     },
 };
 

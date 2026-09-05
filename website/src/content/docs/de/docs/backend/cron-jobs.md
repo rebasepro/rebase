@@ -263,7 +263,6 @@ const job: CronJobDefinition = {
         ctx.log("Starte Sitzungsbereinigung...");
 
         // Verwenden Sie den Rebase-Singleton für den Datenbankzugriff auf Admin-Ebene
-        // const { data: expired } = await rebase.data.findMany("sessions", { ... });
         const count = Math.floor(Math.random() * 50); // Platzhalter
 
         ctx.log(`${count} abgelaufene Sitzungen bereinigt`);
