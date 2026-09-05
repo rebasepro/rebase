@@ -45,6 +45,7 @@ import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
 import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
+import { checkMcpToolTables } from "./docs-verify/check-mcp-tool-tables.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -76,6 +77,7 @@ if (asJson) {
         out.versionPins = checkVersionPins(ROOT).findings;
         out.envReference = checkEnvReference(ROOT).findings;
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
+        out.mcpToolTables = checkMcpToolTables(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -219,6 +221,22 @@ if (only === "both" || only === "names") {
         console.log(`${RED}✗ ${bad.length} command(s) a reader cannot run:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ MCP tool tables ━━━${NC}`);
+    const { findings: bad } = checkMcpToolTables(ROOT);
+    console.log(`${DIM}Compared packages/mcp/README.md against ALL_TOOLS.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ The npm README's tool tables are the ones the server registers.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} generated block(s) out of date:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);
         }
     }

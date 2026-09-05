@@ -11,7 +11,7 @@ pnpm add @rebasepro/mcp
 Or run directly:
 
 ```bash
-npx rebase-mcp
+npx -y @rebasepro/mcp
 ```
 
 ## What This Package Does
@@ -68,69 +68,96 @@ Rows, user records, storage listings, cron jobs, function responses and CLI outp
 
 ## Tools
 
-### Project Management Tools (6) [NEW]
+<!-- generated: mcp tool tables — pnpm generate:mcp-readme -->
 
-Manage multiple local projects or remote environments.
+40 tools, in 8 groups. Tools marked ⚠ are refused against a non-local
+target unless `REBASE_MCP_ALLOW_REMOTE_WRITES=true` — see the gate above.
 
-| Tool | Required Args | Description |
+### Schema & database (11)
+
+Spawn the Rebase CLI in the active project directory.
+
+| Tool | Required | Description |
 |---|---|---|
-| `rebase_project_list` | (none) | List all registered projects and show which one is currently active |
-| `rebase_project_switch` | `name` | Switch the active project to another registered project |
-| `rebase_project_add` | `name` | Register a new project (requires `baseUrl` and optional `projectDir`, `token`/`serviceKey`) |
-| `rebase_project_remove` | `name` | Remove a project from the registry (cannot remove the default project) |
-| `rebase_project_current` | (none) | Show details of the active project (name, directory, base URL, auth token status) |
-| `rebase_project_status` | (none) | Perform a health check on the active project's backend URL |
+| `rebase_schema_generate` | — | Generate Drizzle schema from Rebase TypeScript collection definitions |
+| `rebase_db_push` ⚠ | — | Apply the current Drizzle schema directly to the database (development shortcut, skips migration files) |
+| `rebase_schema_introspect` | — | Introspect the live database and generate Rebase collection definitions from existing tables |
+| `rebase_db_generate` | — | Generate SQL migration files from schema changes (compares current Drizzle schema against the last entity) |
+| `rebase_db_migrate` ⚠ | — | Run all pending SQL migrations against the database |
+| `rebase_generate_sdk` | — | Generate a fully-typed JavaScript/TypeScript SDK from collection definitions |
+| `rebase_doctor` | — | Detect schema drift between collection definitions, generated Drizzle schema, and the live PostgreSQL database |
+| `rebase_db_branch_create` ⚠ | `name` | Create a new database branch (Admins only) |
+| `rebase_db_branch_list` | — | List all database branches (Admins only) |
+| `rebase_db_branch_delete` ⚠ | `name` | Delete an existing database branch (Admins only) |
+| `rebase_db_branch_info` | `name` | Show information and status for a database branch (Admins only) |
 
-### CLI Tools (6)
+### Documents (5)
 
-Spawn `npx rebase <command>` in the active project directory.
+CRUD over a collection through `@rebasepro/client`.
 
-| Tool | Description |
-|---|---|
-| `rebase_schema_generate` | Generate Drizzle schema from collection definitions |
-| `rebase_db_push` | Apply schema directly to DB (dev shortcut) |
-| `rebase_schema_introspect` | Introspect live DB → collection definitions |
-| `rebase_db_generate` | Generate SQL migration files from schema diff |
-| `rebase_db_migrate` | Run pending SQL migrations |
-| `rebase_generate_sdk` | Generate typed TypeScript SDK |
-
-### Data Tools (5)
-
-CRUD operations via `@rebasepro/client` on the active project.
-
-| Tool | Required Args | Description |
+| Tool | Required | Description |
 |---|---|---|
-| `list_documents` | `collection` | List with optional `limit`, `offset`, `orderBy`, `where` |
-| `get_document` | `collection`, `id` | Get single document by ID |
-| `create_document` | `collection`, `data` | Create a new document |
-| `update_document` | `collection`, `id`, `data` | Update existing document |
-| `delete_document` | `collection`, `id` | Delete a document |
+| `list_documents` | `collection` | List documents from a Rebase collection with optional filtering, sorting, and pagination |
+| `get_document` | `collection`, `id` | Get a single document by ID from a Rebase collection |
+| `create_document` ⚠ | `collection`, `data` | Create a new document in a Rebase collection |
+| `update_document` ⚠ | `collection`, `id`, `data` | Update an existing document in a Rebase collection |
+| `delete_document` ⚠ | `collection`, `id` | Delete a document from a Rebase collection |
 
-### Admin Tools (6)
+### Users & roles (6)
 
-User and role management.
-
-| Tool | Required Args | Description |
+| Tool | Required | Description |
 |---|---|---|
-| `list_users` | (none) | List all users with roles |
-| `create_user` | `email` | Create user (optional: `displayName`, `password`, `roles`) |
-| `update_user` | `userId` | Update user (optional: `email`, `displayName`, `roles`) |
-| `delete_user` | `userId` | Delete a user |
-| `list_roles` | (none) | List all defined roles |
-| `rebase_auth_reset_password` | `email` | Reset a user's password using the admin API (optional: `password`) |
+| `list_users` | — | List all users registered in the Rebase backend, including their roles |
+| `create_user` ⚠ | `email` | Create a new user in the Rebase backend |
+| `update_user` ⚠ | `uid` | Update an existing user (email, display name, roles) |
+| `delete_user` ⚠ | `uid` | Delete a user from the Rebase backend |
+| `list_roles` | — | List all roles defined in the Rebase backend |
+| `rebase_auth_reset_password` ⚠ | `email` | Reset a user's password via the admin API |
 
-> [!NOTE]
-> `rebase_auth_reset_password` now calls the running admin endpoint instead of performing direct database queries. This makes it compatible with both local development and remote servers.
+### Dev server (3)
 
-### Dev Server Tools (3)
+| Tool | Required | Description |
+|---|---|---|
+| `rebase_dev_start` | — | Start the Rebase development server (frontend + backend) |
+| `rebase_dev_logs` | — | Read recent output from the running Rebase dev server |
+| `rebase_dev_stop` | — | Stop the running Rebase development server |
 
-Manage the local development server.
+### Storage (3)
 
-| Tool | Description |
-|---|---|
-| `rebase_dev_start` | Start `pnpm run dev` in the `app/` directory |
-| `rebase_dev_logs` | Read recent output (default: 50 lines, max buffer: 500) |
-| `rebase_dev_stop` | Send SIGTERM to the dev server process |
+| Tool | Required | Description |
+|---|---|---|
+| `storage_list_objects` | — | List files/objects stored in Rebase storage |
+| `storage_delete_object` ⚠ | `key` | Delete an object/file from Rebase storage |
+| `storage_get_metadata` | `key` | Get metadata and a temporary signed download URL for a file in Rebase storage |
+
+### Cron (5)
+
+| Tool | Required | Description |
+|---|---|---|
+| `cron_list_jobs` | — | List all scheduled cron jobs and their configuration status |
+| `cron_get_job` | `jobId` | Get status and details of a specific scheduled cron job |
+| `cron_trigger_job` ⚠ | `jobId` | Manually trigger a cron job run immediately |
+| `cron_get_job_logs` | `jobId` | Read execution logs for a specific cron job |
+| `cron_toggle_job` ⚠ | `jobId`, `enabled` | Enable or disable a scheduled cron job |
+
+### Functions (1)
+
+| Tool | Required | Description |
+|---|---|---|
+| `invoke_function` ⚠ | `name` | Invoke a custom backend Hono function (located in api/functions/:name) |
+
+### Project registry (6)
+
+| Tool | Required | Description |
+|---|---|---|
+| `rebase_project_list` | — | List all registered Rebase projects and show which one is active |
+| `rebase_project_switch` | `name` | Switch the active Rebase project by name |
+| `rebase_project_add` | `name` | Register a new Rebase project |
+| `rebase_project_remove` | `name` | Remove a registered project from the project registry |
+| `rebase_project_current` | — | Show details about the currently active Rebase project, including resolved URL and auth status |
+| `rebase_project_status` | — | Health-check the active project's backend by calling GET /health |
+
+<!-- /generated: mcp tool tables -->
 
 ---
 
@@ -154,7 +181,7 @@ Add to your AI assistant's MCP config (e.g. `.gemini/settings.json`):
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["rebase-mcp"],
+      "args": ["-y", "@rebasepro/mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "/path/to/your/project"
       }
