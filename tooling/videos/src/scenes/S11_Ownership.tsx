@@ -20,9 +20,9 @@ import { useTone } from "../Plane";
  */
 
 const FACTS: [string, string][] = [
-    ["MIT", "Fork it, change it, ship it. No clause takes that back."],
-    ["Self-hosted", "Your laptop, your server, your cloud. Same artifact."],
-    ["Your credentials", "No second party operates it and no one else holds the keys."],
+    ["MIT licence", "Fork it, change it, ship it. No clause takes that back."],
+    ["Runs anywhere", "Your laptop, your server, your cloud. The same build on all three."],
+    ["Your keys", "Nobody else operates it, and nobody else holds them."],
 ];
 
 export const S11_Ownership: React.FC = () => {
@@ -34,8 +34,12 @@ export const S11_Ownership: React.FC = () => {
             <Stage>
                 <Chapter n="10" label="Yours" delay={2} />
                 <div style={{ marginTop: 24 }}>
-                    <DisplayLine size={DISPLAY.statement} delay={8}>Nothing here can be</DisplayLine>
-                    <DisplayLine size={DISPLAY.statement} delay={14}>taken away from you.</DisplayLine>
+                    {/* It said "Nothing here can be taken away from you", which
+                        is true and sounds like a threat someone else made. The
+                        line under the eyebrow YOURS should sound like the
+                        eyebrow. */}
+                    <DisplayLine size={DISPLAY.statement} delay={8}>Yours to run, anywhere.</DisplayLine>
+                    <DisplayLine size={DISPLAY.statement} delay={14}>Yours to keep.</DisplayLine>
                 </div>
 
                 <div style={{ display: "flex", gap: 30, marginTop: 62 }}>

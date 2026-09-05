@@ -98,3 +98,69 @@ export const Terminal: React.FC<{
         </div>
     );
 };
+
+export interface Step {
+    command: string;
+    output?: OutputLine[];
+    /** Frames of nothing after the last output line, before the next prompt.
+     *  A person reads what a command printed before typing the next one. */
+    pause?: number;
+    /** Pin this step to a frame instead of chaining it after the previous
+     *  one. The desk film types two commands in one beat and the third in a
+     *  later one, in the same window, with a minute of story in between. */
+    at?: number;
+}
+
+/**
+ * Several commands, one after another, in one window.
+ *
+ * Each step's prompt appears the moment the previous step's output has
+ * finished, plus its pause — so the session is one continuous take rather
+ * than three terminals stacked. The timing is a fold over the steps, which
+ * is what lets a step's length be a property of the step: change one
+ * command's output and everything after it moves.
+ */
+export const Session: React.FC<{
+    steps: Step[];
+    delay?: number;
+    rate?: number;
+    size?: number;
+    prompt?: string;
+}> = ({ steps, delay = 0, rate = 1.15, size = 24, prompt = "$" }) => {
+    const frame = useCurrentFrame();
+
+    const starts: number[] = [];
+    let at = delay;
+    for (const step of steps) {
+        if (step.at !== undefined) at = step.at;
+        starts.push(at);
+        const typed = step.command.length * rate;
+        const last = step.output?.length ? Math.max(...step.output.map((l) => l.at)) : 0;
+        at += typed + last + 9 + (step.pause ?? 18);
+    }
+
+    return (
+        <div style={{ fontFamily: FONT.mono, fontSize: size, lineHeight: 1.75 }}>
+            {steps.map((step, i) => {
+                const start = starts[i];
+                if (frame < start) return null;
+                const isLast = i === steps.length - 1;
+                return (
+                    <div key={i} style={{ marginTop: i === 0 ? 0 : size * 0.9 }}>
+                        <Terminal
+                            command={step.command}
+                            output={step.output}
+                            delay={start}
+                            rate={rate}
+                            size={size}
+                            prompt={prompt}
+                            /* Only the live prompt has a caret. Three blinking
+                               carets is three shells, not one session. */
+                            caret={isLast || frame < (starts[i + 1] ?? Infinity)}
+                        />
+                    </div>
+                );
+            })}
+        </div>
+    );
+};

@@ -4,7 +4,7 @@ import { Stage } from "../components/Scene";
 import { DisplayLine, DISPLAY } from "../components/Type";
 import { Frame } from "../components/Frame";
 import { ramp } from "../components/motion";
-import { CHROMA, FONT, INK, TRACKING } from "../theme";
+import { CHROMA, FONT, INK } from "../theme";
 
 /**
  * CANDIDATE — a different opening for the film.
@@ -62,7 +62,11 @@ export const Plausible: React.FC = () => {
 
     return (
         <AbsoluteFill>
-            <Stage style={{ justifyContent: "flex-start", paddingTop: 92 }}>
+            {/* The block sits lower than a statement headline usually does.
+                At 92 the two frames ended at y=665 and the bottom forty percent
+                of the frame was bare ground — fine under the prompter in the
+                timing render, and a hole in the film. */}
+            <Stage style={{ justifyContent: "flex-start", paddingTop: 152 }}>
                 <DisplayLine size={DISPLAY.statement} delay={6}>
                     Anyone can have a backend by lunch.
                 </DisplayLine>
@@ -72,7 +76,7 @@ export const Plausible: React.FC = () => {
             </Stage>
 
             <AbsoluteFill>
-                <div style={{ position: "absolute", left: 200, top: 348, width: 700 }}>
+                <div style={{ position: "absolute", left: 200, top: 446, width: 720 }}>
                     <Frame title="agent · session summary" delay={30} bodyStyle={{ padding: "26px 30px 30px" }}>
                         {SHIPPED.map((line, i) => (
                             <div
@@ -83,7 +87,7 @@ export const Plausible: React.FC = () => {
                                     alignItems: "center",
                                     padding: "9px 0",
                                     fontFamily: FONT.mono,
-                                    fontSize: 19,
+                                    fontSize: 20,
                                     color: INK.copy,
                                     opacity: ramp(frame, 40 + i * 9, 14),
                                 }}
@@ -96,7 +100,7 @@ export const Plausible: React.FC = () => {
                             style={{
                                 marginTop: 18,
                                 fontFamily: FONT.mono,
-                                fontSize: 19,
+                                fontSize: 20,
                                 color: INK.high,
                                 opacity: ramp(frame, 82, 16),
                             }}
@@ -106,7 +110,7 @@ export const Plausible: React.FC = () => {
                     </Frame>
                 </div>
 
-                <div style={{ position: "absolute", left: 980, top: 348, width: 740 }}>
+                <div style={{ position: "absolute", left: 980, top: 446, width: 740 }}>
                     <Frame
                         title="rls-check · the same database"
                         delay={112}
@@ -119,7 +123,7 @@ export const Plausible: React.FC = () => {
                                     padding: "7px 0",
                                     paddingLeft: l.tone === "body" ? 26 : 0,
                                     fontFamily: FONT.mono,
-                                    fontSize: l.tone === "body" ? 16 : 18,
+                                    fontSize: l.tone === "body" ? 17 : 19,
                                     color: l.tone === "crit" ? CHROMA.coral : INK.muted,
                                     opacity: ramp(frame, 124 + i * 11, 14),
                                     whiteSpace: "pre",
@@ -132,9 +136,9 @@ export const Plausible: React.FC = () => {
                             style={{
                                 marginTop: 18,
                                 fontFamily: FONT.mono,
-                                fontSize: 18,
+                                fontSize: 19,
                                 color: CHROMA.coral,
-                                letterSpacing: TRACKING.eyebrow,
+                                letterSpacing: "0.04em",
                                 opacity: ramp(frame, 186, 16),
                             }}
                         >

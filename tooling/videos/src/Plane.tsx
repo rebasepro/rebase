@@ -2,8 +2,8 @@ import React, { createContext, useContext } from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { NeatCanvas, NeatTravel } from "./gradient/NeatCanvas";
 import { GLIDE, SCENES, STARTS } from "./film";
-import { slideMotion, TRANSITION_FRAMES } from "./transitions";
-import { GROUND, TONE } from "./theme";
+import { OVERLAP, slideMotion } from "./transitions";
+import { GROUND, TONE, type Tone } from "./theme";
 
 /**
  * The plane, the route through it, and the ground painted over it.
@@ -53,15 +53,18 @@ const PATH = {
 /**
  * The ground's schedule, and it is NOT the camera's.
  *
- * A scene brings its own world WITH it: the blend runs from the cut to
- * TRANSITION_FRAMES after it, never before. Centring it on the cut instead —
- * which is what this did first — means the next scene's ground starts arriving
- * while the previous slide is still on screen. Mostly that is invisible, and
- * on the film's first cut it was not: the cold open is specified to have no
- * plane at all, and a symmetric blend had the ribbon fading up behind the mark
- * twenty-two frames before the mark had left.
+ * A scene brings its own world WITH it: the blend runs over the OVERLAP
+ * frames before the cut — the same window in which the incoming slide is
+ * arriving and the outgoing one leaving (Intro.tsx). When scenes were
+ * mounted one at a time this ran from the cut to TRANSITION_FRAMES after it,
+ * which was right then: a symmetric blend put the ribbon behind the cold
+ * open's mark before the mark had left. Now the mark leaves during that same
+ * window, on top of a headline arriving, and a ribbon fading up under both
+ * is the cross-fade, not an intrusion on it. What would be wrong now is the
+ * old schedule — the claim's blue field arriving twelve frames AFTER the
+ * white type it exists to sit under.
  *
- * Still a cross-fade, so a colour change never snaps — it just belongs to the
+ * Still a cross-fade, so a colour change never snaps — it belongs to the
  * scene arriving rather than to the one leaving.
  */
 const GROUND_AT: number[] = [];
@@ -73,7 +76,7 @@ SCENES.forEach((scene, i) => {
         GROUND_KEY.push(scene);
         return;
     }
-    GROUND_AT.push(start, start + TRANSITION_FRAMES);
+    GROUND_AT.push(start - OVERLAP, start);
     GROUND_KEY.push(SCENES[i - 1], scene);
 });
 
@@ -171,24 +174,34 @@ export function groundAt(frame: number) {
  * A scene inside a <Series.Sequence> only knows its own frame counter, and the
  * plane is addressed in absolute frames — so the offset has to be handed down.
  */
-export const StationContext = createContext<{ index: number; start: number }>({
+export const StationContext = createContext<{ index: number; start: number; lead: number }>({
     index: 0,
     start: 0,
+    lead: 0,
 });
 
+/** A window on the desk (src/desk) sits on no scene, so it names the ground
+ *  it was composed for here instead. Null everywhere else. */
+export const ToneOverride = createContext<Tone | null>(null);
+
 /** The ink set for whatever ground the current scene sits on. */
-export function useTone() {
+export function useTone(): Tone {
+    const override = useContext(ToneOverride);
     const { index } = useContext(StationContext);
-    return TONE[SCENES[index].ground];
+    return override ?? TONE[SCENES[index].ground];
 }
 
 /** The slide's own motion: authored per cut, not inherited from the camera. */
 export function useSlideMotion() {
     const local = useCurrentFrame();
-    const { index } = useContext(StationContext);
+    const { index, lead } = useContext(StationContext);
     const scene = SCENES[index];
     const next = SCENES[index + 1];
-    return slideMotion(local, scene.durationInFrames, scene.enter, next?.enter ?? null);
+    // `lead` is the head start the film gives a scene so it can arrive while
+    // the previous one leaves (see Intro.tsx). The exit still sits on the
+    // last TRANSITION_FRAMES before the NEXT cut, which is why it is measured
+    // from the extended duration and not the nominal one.
+    return slideMotion(local, scene.durationInFrames + lead, scene.enter, next?.enter ?? null);
 }
 
 /**

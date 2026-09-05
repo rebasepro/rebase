@@ -1,16 +1,21 @@
 import React from "react";
 import { Scene, Stage } from "../components/Scene";
-import { Chapter, DisplayLine, Lead, DISPLAY } from "../components/Type";
+import { Chapter, DisplayLine, DISPLAY } from "../components/Type";
 import { Frame } from "../components/Frame";
-import { Terminal } from "../components/Terminal";
+import { Session } from "../components/Terminal";
 
 /**
- * 02 · ONE COMMAND — 175 frames.
+ * 14 · THREE COMMANDS — 205 frames.
  *
- * Act I of the three-act shape the whole site reuses: point it at Postgres,
- * and the APIs appear. The output lines are the real ones the CLI prints and
- * the ports are the real ports — a demo terminal that invents its own output
- * is the fastest way to lose a developer watching this.
+ * The site's "first five minutes" is three commands, and the headline has
+ * always said so: Init. Push. Run. The terminal beside it, until now, showed
+ * ONE — `init` printing the output of all three, including a server it had
+ * not started. The voiceover says "three commands" over that picture. Every
+ * line here is now the CLI page's own session, verbatim (CliContent.astro):
+ * scaffold, move the schema onto the database, start both halves. A demo
+ * terminal that invents its own output is the fastest way to lose a
+ * developer watching this, and one that contradicts its own headline is
+ * faster still.
  */
 export const S02_OneCommand: React.FC = () => (
     <Scene>
@@ -36,18 +41,35 @@ export const S02_OneCommand: React.FC = () => (
                     title="zsh · ~/work"
                     delay={12}
                     style={{ flex: 1 }}
-                    bodyStyle={{ padding: "34px 38px 40px" }}
+                    bodyStyle={{ padding: "30px 38px 34px" }}
                 >
-                    <Terminal
+                    <Session
                         delay={22}
-                        size={26}
-                        command="pnpm dlx @rebasepro/cli init"
-                        output={[
-                            { text: "Initialized Rebase in current directory.", tone: "ok", at: 16 },
-                            { text: "Schema pushed to database. Tables created.", tone: "ok", at: 30 },
-                            { text: "Admin panel, API, and WebSocket server running.", tone: "ok", at: 44 },
-                            { text: "", at: 52 },
-                            { text: "API on :3001 · panel on :5173", tone: "muted", at: 56 },
+                        size={23}
+                        rate={0.9}
+                        steps={[
+                            {
+                                command: "pnpm dlx @rebasepro/cli init",
+                                output: [
+                                    { text: "Initialized Rebase in current directory.", tone: "ok", at: 12 },
+                                    { text: "\u00a0\u00a0backend/  frontend/  .env  rebase.config.ts", tone: "muted", at: 18 },
+                                ],
+                                pause: 14,
+                            },
+                            {
+                                command: "rebase db push",
+                                output: [
+                                    { text: "Schema pushed to database. Tables created.", tone: "ok", at: 14 },
+                                    { text: "Row-level security enabled on every collection.", tone: "ok", at: 24 },
+                                ],
+                                pause: 14,
+                            },
+                            {
+                                command: "rebase dev",
+                                output: [
+                                    { text: "API and realtime on :3001, panel on :5173.", tone: "ok", at: 14 },
+                                ],
+                            },
                         ]}
                     />
                 </Frame>

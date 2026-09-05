@@ -4,6 +4,7 @@ import { Scene, Stage } from "../components/Scene";
 import { Chapter, DisplayLine, DISPLAY } from "../components/Type";
 import { ramp, ENTER } from "../components/motion";
 import { FONT, FRAME, INK } from "../theme";
+import { OVERLAP } from "../transitions";
 
 /**
  * 06 · THE PANEL — 260 frames.
@@ -98,13 +99,22 @@ export const S06_Panel: React.FC = () => {
                         </div>
 
                         {/* The shot label. One line that swaps rather than four
-                            that stack: the montage is one idea, not four. */}
+                            that stack: the montage is one idea, not four.
+
+                            The swap is SEQUENTIAL — the old label is gone before
+                            the new one starts. They used to cross-fade on the
+                            same frames, and two words of tracked uppercase at
+                            half strength on top of each other are not two
+                            words, they are one: the render showed "EVERYAVIEWORD"
+                            under the headline for ten frames at every shot
+                            change. The window between them is short enough to
+                            read as a blink rather than a gap. */}
                         <div style={{ marginTop: 30, height: 26, position: "relative" }}>
                             {SHOTS.map((shot, i) => {
                                 const at = SHOT_AT[i];
                                 const o =
-                                    ramp(frame, at, 10) *
-                                    (1 - ramp(frame, at + shot.frames, 10));
+                                    ramp(frame, at + 4, 8) *
+                                    (1 - ramp(frame, at + shot.frames - 8, 8));
                                 return (
                                     <div
                                         key={shot.label}
@@ -161,7 +171,12 @@ export const S06_Panel: React.FC = () => {
                                         made this montage look static. */}
                                     <Sequence
                                         from={at}
-                                        durationInFrames={shot.frames + DISSOLVE + 6}
+                                        /* The last shot runs on through the
+                                           exit window, which the scene is
+                                           mounted OVERLAP frames longer for. */
+                                        durationInFrames={
+                                            shot.frames + DISSOLVE + 6 + (i === SHOTS.length - 1 ? OVERLAP : 0)
+                                        }
                                         layout="none"
                                     >
                                     <OffthreadVideo

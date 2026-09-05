@@ -116,7 +116,11 @@ export const SCENES: SceneEntry[] = [
     {
         id: "Headline", title: "04 · Headline", component: S01_Headline,
         durationInFrames: 180, ground: "base",
-        station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.3 },
+        /* Lit. The type sits in the bottom third and the ribbon holds the
+           top, which is the site's own hero framing — at 0.3 the top two
+           thirds were six seconds of near-black, and the one scene whose
+           whole job is to feel like the hero was the darkest in the film. */
+        station: { x: 0, y: -12, zoom: 2.05, roll: 0.16, reveal: 0.52 },
         enter: "descend",
     },
     {

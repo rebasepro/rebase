@@ -43,11 +43,14 @@ export const S01_Headline: React.FC = () => {
                         transform: `translateY(${(1 - badge) * 10}px)`,
                     }}
                 >
-                    Open-source · Deploy anywhere · Postgres-native
+                    Open source · Postgres-native · Deploy anywhere
                 </div>
 
-                <DisplayLine size={DISPLAY.bookend} delay={16}>The backend you always wanted.</DisplayLine>
-                <DisplayLine size={DISPLAY.bookend} delay={26}>On the Postgres you choose.</DisplayLine>
+                {/* 8 and 14, not 16 and 26. The scene arrives on its own
+                    transition now; a headline that then waited most of a second
+                    to start rising was the longest empty hold in the film. */}
+                <DisplayLine size={DISPLAY.bookend} delay={8}>The backend you always wanted.</DisplayLine>
+                <DisplayLine size={DISPLAY.bookend} delay={14}>On the Postgres you choose.</DisplayLine>
             </Stage>
         </Scene>
     );

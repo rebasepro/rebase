@@ -24,11 +24,11 @@ const READ_AHEAD = 36;
 const HOLD = 16;
 const FADE = 10;
 
-export const Narration: React.FC = () => {
+export const Narration: React.FC<{ script?: typeof NARRATION }> = ({ script = NARRATION }) => {
     const frame = useCurrentFrame();
 
     let line: (typeof NARRATION)[number] | undefined;
-    for (const l of NARRATION) {
+    for (const l of script) {
         if (frame >= l.at - READ_AHEAD) line = l;
         else break;
     }
