@@ -23,7 +23,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { CHECKS, runChecks } from "./checks";
-import { introspectWithDiagnostics } from "./introspect";
+import { introspectWithDiagnostics, UnknownRoleError, unsupportedConnectionKeywords } from "./introspect";
 import { formatEndpoint, isLoopbackEndpoint, parseConnectionString, redactSecrets } from "./redact";
 import { exceedsThreshold, renderCheckCatalog, renderJson, renderReport } from "./report";
 import { renderHtml } from "./report-html";
@@ -152,6 +152,7 @@ function buildScanResult(
         serverVersion: snapshot.serverVersion,
         platform: snapshot.platform,
         scannerIsPrivileged: snapshot.scannerIsPrivileged,
+        exposedRoles: snapshot.exposedRoles,
         stats: {
             schemas: snapshot.schemas.length,
             tables: tables.length,
@@ -856,7 +857,25 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
                 formatFriendlyError(
                     {
                         headline: "That does not look like a PostgreSQL connection string.",
-                        hint: "Expected postgresql://user:password@host:5432/database, or a libpq keyword string such as host=… dbname=…. If the password contains @ : / ? or #, percent-encode it — otherwise the URL is ambiguous and neither this tool nor libpq can tell where the credential ends."
+                        hint: "Expected postgresql://user:password@host:5432/database, or a libpq keyword string carrying at least one of host= dbname= user= (port, password, sslmode, application_name, connect_timeout and options are honoured too). A password containing / ? or # is the usual cause: those end the authority, so the split lands inside the credential and neither this tool nor libpq can tell where it ends — percent-encode them. An @ or a : inside a password is fine, and needs no encoding."
+                    },
+                    color
+                )
+            );
+
+            return EXIT_ERROR;
+        }
+
+        // A keyword string this tool cannot translate in full is refused rather
+        // than connected with the missing keyword dropped: every one of them
+        // changes where the connection goes or how it is verified.
+        const unsupported = unsupportedConnectionKeywords(connectionString);
+        if (unsupported.length > 0) {
+            io.stderr(
+                formatFriendlyError(
+                    {
+                        headline: `This connection string uses ${unsupported.length === 1 ? "a keyword" : "keywords"} the scan cannot honour: ${unsupported.join(", ")}.`,
+                        hint: "Rewrite it as a URL — postgresql://user:password@host:5432/database?sslmode=require. Connecting with those keywords dropped would send the scan somewhere you did not ask for, or verify TLS less strictly than you asked for."
                     },
                     color
                 )
@@ -885,6 +904,22 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
                 statementTimeoutMs: options.timeoutMs
             });
         } catch (error) {
+            // A typo in `--role` is the user's mistake, not the database's, and
+            // `explainError` would bury it under "the scan failed".
+            if (error instanceof UnknownRoleError) {
+                io.stderr(
+                    formatFriendlyError(
+                        {
+                            headline: `No such role on this database: ${error.roles.join(", ")}.`,
+                            hint: "Check the spelling against `SELECT rolname FROM pg_roles`. This is an error rather than a warning for the same reason an unknown --skip id is: a name that matches nothing silently narrows the scan, and the run then prints a clean report of a database nobody looked at."
+                        },
+                        color
+                    )
+                );
+
+                return EXIT_ERROR;
+            }
+
             io.stderr(
                 formatFriendlyError(explainError(error, { endpoint, timeoutMs: options.timeoutMs, connectionString }), color)
             );

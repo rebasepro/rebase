@@ -50,7 +50,9 @@ dejarte adivinar.
 | Opción | Significado |
 | --- | --- |
 | `--json` | Salida en formato legible por máquinas en stdout, y nada más en stdout |
+| `--html <ruta>` | Escribe además un informe HTML autocontenido ahí. Un solo archivo, sin peticiones de red |
 | `--schema <nombre>` | Restringe el escaneo a un esquema. Repetible o separado por comas |
+| `--role <nombre>` | Trata este rol como uno con el que llega un llamante no confiable, además de `anon`, `authenticated`, `web_anon` y `rebase_user`. Repetible o separado por comas |
 | `--fail-on <severidad>` | Sale con código 1 en o por encima de esta severidad. Valor por defecto `high`; `none` nunca falla |
 | `--only <id>` | Ejecuta solo estas comprobaciones. Repetible o separado por comas |
 | `--skip <id>` | Omite estas comprobaciones. Repetible o separado por comas |
@@ -60,7 +62,20 @@ dejarte adivinar.
 | `--no-color` | Desactiva el color ANSI (también respeta `NO_COLOR` y un stdout que no sea TTY) |
 
 Un id desconocido pasado a `--only` o `--skip` genera un error en lugar de ignorarse silenciosamente, ya que
-un error tipográfico allí debilitaría el escaneo sin que te des cuenta.
+un error tipográfico allí debilitaría el escaneo sin que te des cuenta. Un `--role` que no esté en `pg_roles`
+es un error por la misma razón: toda comprobación depende de un permiso concedido a un rol expuesto, así que
+un nombre que no coincide con nada elimina cobertura sin decirlo.
+
+El encabezado del informe nombra los roles que la ejecución trató como expuestos, para que veas de un vistazo
+si `No findings` cubrió el rol con el que se conecta tu aplicación:
+
+```
+Exposed   PUBLIC, anon, authenticated (add yours with --role)
+```
+
+Cuando el escaneo se conecta con un rol que la seguridad a nivel de fila *sí* puede restringir —ni superusuario,
+ni propietario, sin `BYPASSRLS`— ese rol se añade al conjunto y el informe lo indica. Escanear con el rol de tu
+propia aplicación es lo más parecido a preguntarle a la base de datos qué ve tu API.
 
 ### Códigos de salida
 
@@ -85,9 +100,13 @@ de datos limpia.
 ### Salida JSON
 
 `--json` emite un objeto estable: `scannedAt`, `database` (solo host y nombre, nunca
-credenciales), `serverVersion`, `platform`, `scannerIsPrivileged`, `stats` y `findings`.
-Cada hallazgo incluye `id`, `severity`, `title`, `target`, `detail`, `impact`, `fix`,
-`docs` y `confidence`.
+credenciales), `serverVersion`, `platform`, `scannerIsPrivileged`, `exposedRoles`, `stats`,
+`findings` y `diagnostics`. Cada hallazgo incluye `id`, `severity`, `title`, `target`,
+`detail`, `impact`, `fix`, `docs` y `confidence`.
+
+`exposedRoles` y `diagnostics` forman parte del contrato, no son extras: toda comprobación
+depende del conjunto de roles expuestos, y `diagnostics.degraded` es lo que permite a un
+consumidor distinguir «no había nada mal» de «el escaneo no pudo mirar».
 
 ## Cómo leer el informe
 

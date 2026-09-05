@@ -18,7 +18,11 @@ const lang = langProp ?? getLangFromUrl(Astro.url);
 const t = tProp ?? useTranslations(lang);
 const translatePath = useTranslatedPath(lang);
 
-const RLS_CHECK_COMMAND = "npx @rebasepro/rls-check $DATABASE_URL";
+// No argument: the tool reads DATABASE_URL (or POSTGRES_URL, or .env) itself.
+// A connection string on the command line is readable in `ps` by every other
+// user on the box, and lands in shell history — this is the form we can put in
+// front of someone about to paste a production credential.
+const RLS_CHECK_COMMAND = "npx @rebasepro/rls-check";
 
 // One source for the command the hero shows and the copy button writes, so
 // the two can never drift apart.

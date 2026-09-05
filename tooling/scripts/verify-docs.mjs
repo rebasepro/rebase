@@ -49,6 +49,7 @@ import { checkErrorCodes } from "./docs-verify/check-error-codes.mjs";
 import { checkMcpToolTables } from "./docs-verify/check-mcp-tool-tables.mjs";
 import { checkAiInstructions } from "./docs-verify/check-ai-instructions.mjs";
 import { checkSkillClaims } from "./docs-verify/check-skill-claims.mjs";
+import { checkRlsCheckFlags } from "./docs-verify/check-rls-check-flags.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -183,6 +184,19 @@ if (only === "both" || only === "names") {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} stated count(s) disagree with the tool:${NC}`);
         for (const b of bad) console.log(`  ${RED}${b.file}:${b.line}${NC}\n      ${DIM}${b.message}${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ rls-check flags ━━━${NC}`);
+    const { findings: bad, flags, scanned } = checkRlsCheckFlags(ROOT);
+    console.log(`${DIM}rls-check accepts ${flags.length} flag(s); checked --help and ${scanned} option table(s).${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every flag the CLI accepts is in --help and both option tables.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} flag documentation mismatch(es):${NC}`);
+        for (const b of bad) console.log(`  ${RED}${b.file}${NC}\n      ${DIM}${b.message}${NC}`);
     }
 }
 

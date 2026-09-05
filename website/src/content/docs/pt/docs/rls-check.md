@@ -50,7 +50,9 @@ deixar você adivinhar.
 | Opção | Significado |
 | --- | --- |
 | `--json` | Saída legível por máquina no stdout, e nada mais no stdout |
+| `--html <caminho>` | Também escreve um relatório HTML autocontido nesse caminho. Um arquivo, sem requisições de rede |
 | `--schema <name>` | Restringe a verificação a um schema. Repetível ou separado por vírgulas |
+| `--role <name>` | Trata esta role como uma pela qual um chamador não confiável chega, além de `anon`, `authenticated`, `web_anon` e `rebase_user`. Repetível ou separado por vírgulas |
 | `--fail-on <severity>` | Encerra com código 1 nesta severidade ou acima dela. Padrão `high`; `none` nunca falha |
 | `--only <id>` | Executa apenas estas verificações. Repetível ou separado por vírgulas |
 | `--skip <id>` | Ignora estas verificações. Repetível ou separado por vírgulas |
@@ -60,7 +62,20 @@ deixar você adivinhar.
 | `--no-color` | Desativa cores ANSI (também respeita `NO_COLOR` e stdout sem TTY) |
 
 Um ID desconhecido passado para `--only` ou `--skip` é um erro em vez de uma operação nula silenciosa, pois
-um erro de digitação ali enfraquece silenciosamente a verificação.
+um erro de digitação ali enfraquece silenciosamente a verificação. Uma `--role` que não está em `pg_roles` é
+um erro pelo mesmo motivo: toda verificação depende de um privilégio concedido a uma role exposta, portanto um
+nome que não corresponde a nada remove cobertura sem avisar.
+
+O cabeçalho do relatório nomeia as roles que a execução tratou como expostas, para que você veja de relance se
+`No findings` cobriu a role com a qual sua aplicação se conecta:
+
+```
+Exposed   PUBLIC, anon, authenticated (add yours with --role)
+```
+
+Quando a verificação se conecta com uma role que a row-level security *consegue* restringir — nem superusuário,
+nem proprietário, sem `BYPASSRLS` — essa role é adicionada ao conjunto e o relatório diz isso. Verificar com a
+role da sua própria aplicação é o mais próximo de perguntar ao banco de dados o que a sua API enxerga.
 
 ### Códigos de saída
 
@@ -85,9 +100,13 @@ dados limpo.
 ### Saída JSON
 
 `--json` emite um objeto estável: `scannedAt`, `database` (apenas host e nome — nunca
-credenciais), `serverVersion`, `platform`, `scannerIsPrivileged`, `stats` e `findings`.
-Cada achado contém `id`, `severity`, `title`, `target`, `detail`, `impact`, `fix`,
-`docs` e `confidence`.
+credenciais), `serverVersion`, `platform`, `scannerIsPrivileged`, `exposedRoles`, `stats`,
+`findings` e `diagnostics`. Cada achado contém `id`, `severity`, `title`, `target`, `detail`,
+`impact`, `fix`, `docs` e `confidence`.
+
+`exposedRoles` e `diagnostics` fazem parte do contrato, não são extras: toda verificação depende
+do conjunto de roles expostas, e `diagnostics.degraded` é o que permite distinguir "nada estava
+errado" de "a verificação não conseguiu olhar".
 
 ## Como ler o relatório
 
