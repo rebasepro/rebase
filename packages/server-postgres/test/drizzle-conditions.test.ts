@@ -446,7 +446,10 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                     mockPostsTable.id,
                     mockRegistry
                 );
-            }).toThrow("Junction table not found: nonexistent_table");
+                // The name AND the way out of it: the same absence means either
+                // a stale generated schema or a table that was never created,
+                // and the message names the command for each.
+            }).toThrow(/"nonexistent_table".*rebase schema generate.*rebase db push/s);
         });
 
         it("should throw error when source column is not found in junction table", () => {

@@ -57,12 +57,35 @@ open costs nothing.
 | Schema Visualizer | `schema-visualizer` | Database | Interactive ERD of tables and relations |
 | Branches | `branches` | Database | Create and manage [database branches](/docs/backend/branching) |
 | Backups | `backups` | Database | Browse and download database backups |
-| Logs Explorer | `logs` | Database | Real-time system and query logs |
+| Logs Explorer | `logs` | Database | Live request log, plus everything the server reports at warn or error — see below |
 | JS Console | `js` | Compute | Write and execute JavaScript through the Rebase SDK |
 | Cron Jobs | `cron` | Compute | Inspect and manage [scheduled tasks](/docs/backend/cron-jobs) |
 | Storage | `storage` | Storage | Browse, upload and manage files across your storage backends |
 | API Explorer | `api` | API | Interactive API documentation, with a request runner |
 | API Keys | `api-keys` | Access Control | Create and manage scoped service API keys |
+
+### What the Logs Explorer shows
+
+Two streams into one in-memory ring, held on the server process:
+
+- **Every request** — method, path, status, duration, the `X-Request-ID`, the
+  collection when the request was about one, and, when the request failed, the
+  error `code` and message the client received. A failed request is recorded at
+  `warn` (4xx) or `error` (5xx), so the level filter finds it.
+- **Everything the server reports at warn or error** — a schema warning, an
+  auth refusal, a driver diagnosis, a boot failure. `source` comes from the
+  message's own prefix (`[API]`, `[Auth]`, `[storage]`, `[realtime]`), and
+  anything unrecognised is `system`.
+
+Routine `info` chatter is deliberately left out. The ring holds 10,000 entries
+and a wall of `200`s evicts what you opened the panel to find.
+
+A custom function that throws therefore shows its own message here, against the
+request that called it — the case this exists for.
+
+The ring is per process and per boot: it is not durable, it is not shared
+between replicas, and a restart empties it. For anything you need to keep, read
+the process's stdout, which carries the same lines and more.
 
 The **Collection Editor** is a Studio tool too, but it is not in this list because
 it is registered differently: `RebaseStudio` does not lazy-load it. The panel injects

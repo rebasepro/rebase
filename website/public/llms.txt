@@ -37,6 +37,7 @@
 - [Quickstart](https://rebase.pro/docs/getting-started/quickstart): Create a new Rebase project and get it running locally in under 2 minutes.
 - [Project Structure](https://rebase.pro/docs/getting-started/project-structure): Understand the structure of a Rebase project — frontend, backend, and collections configuration.
 - [Environment & Configuration](https://rebase.pro/docs/getting-started/configuration): All environment variables and configuration options for Rebase projects.
+- [Troubleshooting](https://rebase.pro/docs/troubleshooting): The failures that stop a Rebase backend from starting or serving — an unreachable database, wrong credentials, a missing extension, an RLS refusal, schema drift, a busy port, a function that will not load — and what each one looks like.
 - [Upgrading](https://rebase.pro/docs/upgrading): What breaks when you move an existing app to the current release, and what to do about each one.
 - [Compatibility](https://rebase.pro/docs/compatibility): What Rebase promises across versions and what it does not — the six versioned contracts, how each one fails, and what may still change in a minor.
 - [Collections](https://rebase.pro/docs/collections): Collections are the core building block of Rebase — each collection maps to a database table and defines its schema, relations, security, and UI behavior.
@@ -46,6 +47,7 @@
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Backend Overview](https://rebase.pro/docs/backend): The Rebase backend provides a complete server with REST API, authentication, storage, WebSocket real-time, and entity history — all initialized with a single function call.
 - [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
+- [Error codes](https://rebase.pro/docs/backend/errors): Every error code a Rebase backend can return, with its HTTP status, what it means and what to do about it — plus the response envelope, X-Request-ID and the details rules.
 - [Live schema editing](https://rebase.pro/docs/backend/live-schema-editing): Create and alter collections against a running backend — committed to your repository first, then applied.
 - [Authentication](https://rebase.pro/docs/backend/authentication): Configure JWT authentication, OAuth providers, SMTP email, auth hooks, and custom auth adapters on the backend.
 - [Storage Configuration](https://rebase.pro/docs/backend/storage): Configure local filesystem, S3-compatible, or GCS/Firebase Storage backends for file uploads, images, and media.

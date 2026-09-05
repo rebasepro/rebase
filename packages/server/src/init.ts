@@ -27,7 +27,8 @@ import {
     logForeignCollections,
     provisionCollectionPolicies,
     provisionCollectionTables,
-    provisionTargetFor
+    provisionTargetFor,
+    verifyProvisioningConnection
 } from "./boot/provision";
 import { enforceSchemaStamp, resolveSchemaMismatchPolicy } from "./boot/schema-stamp";
 import { DEFAULT_DRIVER_ID, DefaultDriverRegistry, DriverRegistry } from "./services/driver-registry";
@@ -40,11 +41,11 @@ import { createAdapterAuthMiddleware } from "./auth/adapter-middleware";
 import { scopeDataDriver, SERVICE_IDENTITY } from "./auth/rls-scope";
 import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
 import { errorHandler } from "./api/errors";
+import { installRootErrorHandler } from "./api/root-error-handler";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HonoEnv } from "./api/types";
-import { configureLogLevel } from "./utils/logging";
-import { logger } from "./utils/logger";
+import { logger, setLogLevel } from "./utils/logger";
 import { configureMiddlewares } from "./init/middlewares";
 import { initializeStorage, assertStorageAccessControlConfigured } from "./init/storage";
 import { resolveStorageAccessControl } from "./storage/policies";
@@ -953,6 +954,9 @@ export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstra
         initializeAuth: dbAdapter.initializeAuth,
         initializeHistory: dbAdapter.initializeHistory,
         initializeWebsockets: dbAdapter.initializeWebsockets,
+        verifyConnection: dbAdapter.verifyConnection
+            ? (driverResult) => dbAdapter.verifyConnection!(driverResult)
+            : undefined,
         ensureCollectionSchema: dbAdapter.ensureCollectionSchema
             ? (collections, driverResult, log) =>
                 dbAdapter.ensureCollectionSchema!(collections, driverResult, log)
@@ -983,11 +987,12 @@ export async function initializeRebaseBackend(config: RebaseBackendConfig): Prom
 }
 
 async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<RebaseBackendInstance> {
-    if (config.logging?.level) {
-        configureLogLevel(config.logging.level);
-    } else {
-        configureLogLevel();
-    }
+    // One level system. This used to also call `configureLogLevel`, which
+    // replaced `console.debug`/`console.log`/`console.warn` with no-ops — so
+    // `LOG_LEVEL=warn` silenced not just this server's info lines but every
+    // `console.log` in the process: a dependency's, and the project's own
+    // debugging. Irreversibly, since the originals were discarded.
+    setLogLevel(config.logging?.level);
 
     // Before anything reads the config: a project still declaring resources the
     // old way is refused here rather than booted with them ignored. First
@@ -1031,6 +1036,15 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             notServing: offSurfaces
         });
     }
+
+    // The JSON envelope, on the root app, before any middleware is added — so
+    // that a throw *in* a middleware is caught too. It used to live on the data
+    // and functions routers alone, so everything else (auth, storage, admin, a
+    // project's own routes) answered Hono's default `500 Internal Server Error`
+    // as `text/plain`: no `code`, and a JSON parse failure for any client that
+    // reads one. An app that already has its own handler keeps it — see
+    // `installRootErrorHandler`.
+    installRootErrorHandler(config.app);
 
     // Configure Hono middlewares (Request ID, body limit, CSRF, CORS warning, logging)
     configureMiddlewares(config.app, basePath, isProduction, config);
@@ -1128,6 +1142,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         declaredDataSources.map(source => ({ key: source.key, engine: source.engine ?? provisionTarget.engine }))
     );
     logForeignCollections(activeCollections, provisionable, { engine: provisionTarget.engine });
+
+    // Before that first query: ask the database whether it is there at all. The
+    // adapter's connection diagnosis — the box that names the host, the port and
+    // `docker compose up -d db` — used to live only inside `initializeDriver`,
+    // which runs after this, so the one failure it was written for never reached
+    // it. See `verifyProvisioningConnection`.
+    await verifyProvisioningConnection(provisionTarget);
 
     const schemaOutcome = await provisionCollectionTables(provisionable, provisionTarget, {
         introspecting: introspectCollections,
@@ -1228,7 +1249,15 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     const defaultDriver = driverRegistry.getOrDefault(defaultDriverId);
     if (!defaultDriver || !defaultDriverResult) {
-        throw new Error("Default driver not initialized by bootstrappers");
+        // Named, because the reader's next question is "which one" and the
+        // answer is not obvious from a multi-source configuration: the default
+        // is whichever adapter is marked `isDefault`, or the first declared.
+        throw new Error(
+            `The "${defaultDriverId}" data source is the default, and its adapter's ` +
+            "`initializeDriver` returned nothing usable. Adapters that ran: " +
+            `${bootstrappers.map(b => b.id || b.type).join(", ") || "none"}. ` +
+            "Check that adapter's connection configuration."
+        );
     }
     const defaultBootstrapper = bootstrappers.find(b => b.id === defaultDriverId || b.type === defaultDriverId) || bootstrappers[0];
     const defaultRealtimeService = defaultDriverResult.realtimeProvider;

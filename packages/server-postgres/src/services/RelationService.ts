@@ -84,6 +84,26 @@ function applyDynamicRelationQuery<T>(
 }
 
 /**
+ * The registry has no table for a collection a relation just asked about.
+ *
+ * "Parent table not found" was the whole message, four times over, and it names
+ * neither the collection nor the table nor anything to do next. The state it
+ * reports is a real one with two distinct causes worth telling apart, so the
+ * message names both: the collection was never registered (its file is not
+ * exported from `config/collections/index.ts`, so the driver never saw it), or
+ * the generated schema has no such table (the collection is declared and
+ * `schema.generated.ts` predates it).
+ */
+function unregisteredTable(collectionSlug: string, table: string, role: string): Error {
+    return new Error(
+        `No registered table "${table}" for the ${role} collection "${collectionSlug}". ` +
+        "Either the collection is not exported from config/collections/index.ts, so this driver " +
+        "never registered it, or the generated Drizzle schema predates it — run " +
+        "`rebase schema generate` and restart."
+    );
+}
+
+/**
  * Service for handling all relation-related operations.
  * Handles fetching, updating, and managing row relations.
  */
@@ -362,8 +382,9 @@ export class RelationService {
         const parentIdInfo = parentPks[0];
         const parsedParentIdObj = parseIdValues(parentId, parentPks);
         const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
-        const parentTable = this.registry.getTable(getTableName(parentCollection));
-        if (!parentTable) throw new Error("Parent table not found");
+        const parentTableName = getTableName(parentCollection);
+        const parentTable = this.registry.getTable(parentTableName);
+        if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
         const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
 
         // Handle join path relations
@@ -538,8 +559,9 @@ export class RelationService {
         const parentIdInfo = parentPks[0];
         const parsedParentIdObj = parseIdValues(parentId, parentPks);
         const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
-        const parentTable = this.registry.getTable(getTableName(parentCollection));
-        if (!parentTable) throw new Error("Parent table not found");
+        const parentTableName = getTableName(parentCollection);
+        const parentTable = this.registry.getTable(parentTableName);
+        if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
         const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
 
         // Same translation the listing does, and it has to be: `isRelated`
@@ -616,8 +638,9 @@ export class RelationService {
 
         const parentPks = requirePrimaryKeys(parentCollection, this.registry);
         const parentIdInfo = parentPks[0];
-        const parentTable = this.registry.getTable(getTableName(parentCollection));
-        if (!parentTable) throw new Error("Parent table not found");
+        const parentTableName = getTableName(parentCollection);
+        const parentTable = this.registry.getTable(parentTableName);
+        if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
         const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
 
         // Parse all parent IDs once
@@ -834,8 +857,9 @@ export class RelationService {
 
         const parentPks = requirePrimaryKeys(parentCollection, this.registry);
         const parentIdInfo = parentPks[0];
-        const parentTable = this.registry.getTable(getTableName(parentCollection));
-        if (!parentTable) throw new Error("Parent table not found");
+        const parentTableName = getTableName(parentCollection);
+        const parentTable = this.registry.getTable(parentTableName);
+        if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
         const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
 
         const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentIdInfo.fieldName]);

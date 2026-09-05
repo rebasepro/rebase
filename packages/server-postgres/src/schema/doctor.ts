@@ -12,7 +12,7 @@ import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
-import { CollectionConfig, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
+import { computeSchemaVersion, CollectionConfig, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { generateTypedefs } from "@rebasepro/codegen";
 import { getTableName, resolveCollectionRelations, findRelation, relationalCollections } from "@rebasepro/common";
@@ -20,6 +20,7 @@ import { toSnakeCase } from "@rebasepro/utils";
 import { loadCollectionsFromDirectory } from "@rebasepro/server";
 // The report is CLI output, not application logging — see cli-output.ts.
 import { out, outError } from "../cli-output";
+import { deepestErrorMessage, diagnoseDbError, parseHostInfo } from "../cli-errors";
 
 /**
  * Resolve the SQL column name for a property.
@@ -79,6 +80,17 @@ export interface DoctorPhase {
      * a comparison, and no comparison happened.
      */
     notApplicable?: string;
+    /**
+     * The phase was skipped by a fault rather than by a choice.
+     *
+     * `skipped` covers both: "no DATABASE_URL, so nothing to compare against"
+     * is a local situation a developer may be perfectly happy with, and "the
+     * DATABASE_URL you set refuses connections" is not. The report renders them
+     * the same way — a check that did not run is a check that did not run — but
+     * the exit code must not, or `rebase doctor` in CI goes green against a
+     * database it never reached.
+     */
+    blocked?: boolean;
 }
 
 export interface DoctorReport {
@@ -330,6 +342,85 @@ interface DbEnumValue {
     enum_value: string;
 }
 
+/**
+ * Extensions the collections need, that the database does not have installed.
+ *
+ * Only `vector` today, and only because a `{ type: "vector" }` property plans a
+ * column of a type that will not exist. Rebase installs it only where a project
+ * has said it may (`database({ extensions: ["vector"] })`), so the absence is
+ * often correct configuration and a wrong deployment — which is exactly why the
+ * report has to name it rather than the first failing INSERT.
+ *
+ * Exported for its test.
+ */
+export function missingExtensionIssues(
+    collections: CollectionConfig[],
+    installed: ReadonlySet<string>
+): DoctorIssue[] {
+    const usesVector = collections.some(collection =>
+        Object.values(collection.properties ?? {})
+            .some(property => (property as { type?: string } | null)?.type === "vector"));
+
+    if (!usesVector || installed.has("vector")) return [];
+
+    return [{
+        severity: "error",
+        category: "missing_table",
+        message: 'A collection declares a `{ type: "vector" }` property and the pgvector extension is not installed on this database.',
+        fix: 'Declare it — `database({ extensions: ["vector"] })` in config/resources.ts — and use an image that ships the library '
+            + "(the scaffold's pgvector/pgvector:pg18; a stock postgres:18 does not). Or install it once by hand: CREATE EXTENSION vector;"
+    }];
+}
+
+/**
+ * The stamp the runtime wrote, against the collections on disk.
+ *
+ * A stamp that disagrees means this database was provisioned from a different
+ * set of collections than the ones in this checkout — a colleague's branch, an
+ * older deploy, a tenant somebody else migrated. Everything else in this report
+ * is then describing a schema somebody else created, which is worth knowing
+ * before acting on any of it.
+ *
+ * A warning, not an error, and never a direction: the stamp is a hash, so it
+ * can say the two disagree and never which is ahead. `null` — never stamped —
+ * is not a finding: every database provisioned before the stamp existed reads
+ * that way, and so does every fresh one.
+ */
+export async function schemaStampIssues(
+    pool: { query<T>(text: string): Promise<{ rows: T[] }> },
+    collections: CollectionConfig[]
+): Promise<DoctorIssue[]> {
+    let stamped: string | null = null;
+    try {
+        // `to_regclass` so a missing schema or table is a null rather than a
+        // thrown 42P01 — the commonest state on a fresh database is neither.
+        const present = await pool.query<{ present: boolean }>(
+            `SELECT to_regclass('"rebase"."schema_meta"') IS NOT NULL AS present`
+        );
+        if (!present.rows[0]?.present) return [];
+        const row = await pool.query<{ value: string }>(
+            `SELECT value FROM "rebase"."schema_meta" WHERE key = 'collections_schema_version' LIMIT 1`
+        );
+        stamped = row.rows[0]?.value ?? null;
+    } catch {
+        // The stamp is a diagnostic, not a gate. A database that will not
+        // answer this question has bigger problems, and they are reported by
+        // the checks around this one.
+        return [];
+    }
+
+    if (!stamped) return [];
+    const expected = computeSchemaVersion(collections);
+    if (stamped === expected) return [];
+
+    return [{
+        severity: "warning",
+        category: "schema_stale",
+        message: `This database was provisioned from a different set of collections (stamp ${stamped.slice(0, 12)}…, this checkout computes ${expected.slice(0, 12)}…).`,
+        fix: "A hash says the two disagree, never which is ahead. Check you are pointed at the database you think you are; then `rebase db push` to bring it to these collections."
+    }];
+}
+
 export async function checkCollectionsVsDatabase(
     collections: CollectionConfig[],
     databaseUrl: string
@@ -362,6 +453,26 @@ export async function checkCollectionsVsDatabase(
         const existingTables = new Set(tablesResult.rows.map((r) =>
             r.table_schema === "public" ? r.table_name : `${r.table_schema}.${r.table_name}`
         ));
+
+        // An extension the collections need and the database does not have.
+        //
+        // The symptom without this is `type "vector" does not exist` on the
+        // first write to a table that looks perfectly well-formed in the
+        // report: the column is planned, the extension is not, and the two
+        // facts live in different places. Extensions are opt-in by design —
+        // installing one needs an image that ships the library and a role
+        // allowed to install it — so this reports, it does not install.
+        const extensionsResult = await pool.query<{ extname: string }>("SELECT extname FROM pg_extension");
+        const installedExtensions = new Set(extensionsResult.rows.map(r => r.extname));
+        issues.push(...missingExtensionIssues(collections, installedExtensions));
+
+        // A database provisioned from a different set of collections than the
+        // ones on disk.
+        //
+        // The runtime stamps what it applied; nothing compared it outside boot,
+        // and a stamp that disagrees is exactly the state where the rest of
+        // this report is describing a schema somebody else's deploy created.
+        issues.push(...await schemaStampIssues(pool, collections));
 
         // Fetch all columns in the defined schemas
         const columnsResult = await pool.query<DbColumn>(
@@ -800,7 +911,26 @@ export async function runDoctor(options: {
     let schemaToDatabase: DoctorPhase;
     if (options.databaseUrl) {
         out(chalk.gray("  Checking Collections → Database..."));
-        schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl);
+        try {
+            schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl);
+        } catch (err: unknown) {
+            // A database that cannot be reached used to end the whole run: the
+            // error escaped `runDoctor` and the CLI's last-resort catch printed
+            // a stack. So the two phases that need no database — the generated
+            // schema and the SDK types, both of which are read off disk — never
+            // ran, and the one command whose job is to say what is wrong said
+            // only "Doctor failed" over a drizzle stack trace.
+            const banner = diagnoseDbError(err, options.databaseUrl);
+            if (banner) outError(banner);
+            const reason = deepestErrorMessage(err)
+                ?? (err instanceof Error ? err.message : String(err));
+            schemaToDatabase = {
+                passed: false,
+                issues: [],
+                skipped: `could not reach ${parseHostInfo(options.databaseUrl)} — ${reason}`,
+                blocked: true
+            };
+        }
     } else {
         // Not `{ passed: true }`: see DoctorPhase.skipped.
         schemaToDatabase = { passed: false,

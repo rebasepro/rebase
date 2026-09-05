@@ -101,7 +101,7 @@ export interface PostgresDriverInternals {
 }
 
 // Re-export from shared CLI error utilities
-import { isEconnrefused } from "./cli-errors";
+import { deepestErrorMessage, diagnoseDbError, isEconnrefused, parseHostInfo } from "./cli-errors";
 import { classifyConnectFailure } from "./utils/pg-error-utils";
 
 /**
@@ -285,6 +285,67 @@ function describeEnsureFailure(failure: { kind: string; target: string; error: s
     }
 }
 
+/**
+ * Say what a failed `SELECT 1` actually means, and whether boot can go on.
+ *
+ * Returns the error to throw, or `undefined` when the failure could be
+ * transient and the pool may still recover.
+ *
+ * Two problems this exists to keep fixed. First, the logged error is Drizzle's
+ * wrapper — `Failed query: SELECT 1` and a stack through drizzle internals —
+ * while the sentence that actually says what is wrong ("connect ECONNREFUSED
+ * 127.0.0.1:5432", "password authentication failed for user …", "database …
+ * does not exist") sits in `.cause`, or inside the `AggregateError` a
+ * dual-stack host produces. A developer with a stopped database, or a typo in
+ * their `DATABASE_URL`, got two walls of stack trace and no cause.
+ *
+ * Second, "continuing… the pool may recover" is only true for a transient
+ * fault. A wrong password or a missing database is settled: the next query
+ * fails the same way, so the process died seconds later anyway — after printing
+ * a reassurance.
+ *
+ * The banners come from `diagnoseDbError`, the same ones the CLI prints, so a
+ * developer sees one diagnosis whether the database was unreachable during
+ * `rebase db push` or during boot.
+ */
+function diagnoseConnectFailure(err: unknown, connectionString: string | undefined): Error | undefined {
+    const url = connectionString ?? "";
+    const hostInfo = parseHostInfo(url);
+
+    if (isEconnrefused(err)) {
+        logger.error(diagnoseDbError(err, url) ?? `❌ Cannot connect to PostgreSQL at ${hostInfo}`);
+        const reason = deepestErrorMessage(err) ?? "connection refused";
+        return new Error(
+            `Cannot connect to PostgreSQL at ${hostInfo}: ${reason}. Is the database running?`,
+            { cause: err }
+        );
+    }
+
+    const { fatal, reason, code } = classifyConnectFailure(err);
+    const detail = code ? ` [${code}]` : "";
+
+    if (fatal) {
+        logger.error(
+            diagnoseDbError(err, url) ??
+            `\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `  ❌  PostgreSQL at ${hostInfo} refused the connection\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `\n` +
+            `  ${reason}${detail}\n` +
+            `\n` +
+            `  The server is reachable, so this is the credentials or the\n` +
+            `  database name in DATABASE_URL — check them in your .env.\n` +
+            `\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+        );
+        return new Error(`PostgreSQL at ${hostInfo} refused the connection: ${reason}${detail}`, { cause: err });
+    }
+
+    logger.error(`❌ Failed to connect to PostgreSQL at ${hostInfo}: ${reason}${detail}`, { error: err });
+    return undefined;
+}
+
 export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): BackendBootstrapper {
     // Applied at construction rather than threaded through every read: the
     // condition builder's static methods are reached from call sites that
@@ -460,72 +521,8 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             try {
                 await schemaAwareDb.execute(sql`SELECT 1`);
             } catch (err: unknown) {
-                const isConnectionRefused = isEconnrefused(err);
-                if (isConnectionRefused) {
-                    // Parse host/port from connection string for a helpful message
-                    let hostInfo = pgConfig.connectionString || "unknown";
-                    try {
-                        const parsed = new URL(pgConfig.connectionString || "");
-                        hostInfo = `${parsed.hostname}:${parsed.port || 5432}`;
-                    } catch { /* use raw string */ }
-
-                    const message =
-                        `\n` +
-                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                        `  ❌  Cannot connect to PostgreSQL at ${hostInfo}\n` +
-                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                        `\n` +
-                        `  The database server is not running or is not accepting\n` +
-                        `  connections. Common fixes:\n` +
-                        `\n` +
-                        `    • docker compose up -d db          (the service a Rebase scaffold ships)\n` +
-                        `    • brew services start postgresql@18\n` +
-                        `    • Verify DATABASE_URL in your .env file\n` +
-                        `\n` +
-                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-                    logger.error(message);
-                    throw new Error(`Cannot connect to PostgreSQL at ${hostInfo}: connection refused. Is the database running?`);
-                }
-
-                /*
-                 * Everything else.
-                 *
-                 * Two problems with what used to happen here. First, the logged
-                 * error was Drizzle's wrapper — `Failed query: SELECT 1` and a
-                 * stack through drizzle internals — while the sentence that
-                 * actually says what is wrong ("password authentication failed
-                 * for user …", "database … does not exist") sits in `.cause`
-                 * and was never printed. A developer with a typo in their
-                 * DATABASE_URL got two walls of stack trace and no cause.
-                 *
-                 * Second, "continuing… the pool may recover" is only true for
-                 * a transient fault. A wrong password or a missing database is
-                 * settled: the next query fails the same way, so the process
-                 * died seconds later anyway — after printing a reassurance.
-                 * Those now fail here, where the message can be about the
-                 * cause rather than about whichever query ran next.
-                 */
-                const { fatal, reason, code } = classifyConnectFailure(err);
-                const detail = code ? ` [${code}]` : "";
-
-                if (fatal) {
-                    logger.error(
-                        `\n` +
-                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                        `  ❌  PostgreSQL refused the connection\n` +
-                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                        `\n` +
-                        `  ${reason}${detail}\n` +
-                        `\n` +
-                        `  The server is reachable, so this is the credentials or the\n` +
-                        `  database name in DATABASE_URL — check them in your .env.\n` +
-                        `\n` +
-                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
-                    );
-                    throw new Error(`PostgreSQL refused the connection: ${reason}${detail}`);
-                }
-
-                logger.error(`❌ Failed to connect to PostgreSQL: ${reason}${detail}`, { error: err });
+                const fatal = diagnoseConnectFailure(err, pgConfig.connectionString);
+                if (fatal) throw fatal;
                 logger.warn("⚠️ Continuing without initial database verification. Drizzle/PG will attempt to connect on subsequent queries.");
             }
 
@@ -1051,6 +1048,38 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
         async initializeRealtime(_config: unknown, driverResult: InitializedDriver): Promise<RealtimeProvider | undefined> {
             const internals = driverResult.internals as PostgresDriverInternals;
             return internals.realtimeService;
+        },
+
+        /**
+         * The cheapest round trip there is, run before boot's first real query.
+         *
+         * Boot provisions the collection schema *before* `initializeDriver`, so
+         * the connection diagnosis above — the box naming the host, the port and
+         * `docker compose up -d db` — never ran for the one failure it was
+         * written for. A developer whose database was not running saw Drizzle's
+         * `Failed query: [redacted]` and a stack through drizzle internals.
+         *
+         * Same diagnosis, one step earlier. Anything short of "the database
+         * answered" is fatal here: provisioning is the next thing to happen and
+         * it needs the connection, so continuing only moves the failure to a
+         * frame with less to say about it.
+         */
+        async verifyConnection(driverResult?: InitializedDriver): Promise<void> {
+            const db = provisioningDb(driverResult);
+            // No handle to probe through is not a failure to report: an adapter
+            // constructed without a `connection` is the case
+            // `provisioningQueryable` already refuses, with a message about the
+            // adapter rather than about the network.
+            if (!db) return;
+            try {
+                await db.execute(sql`SELECT 1`);
+            } catch (err: unknown) {
+                throw diagnoseConnectFailure(err, pgConfig.connectionString)
+                    ?? new Error(
+                        `Cannot reach PostgreSQL at ${parseHostInfo(pgConfig.connectionString ?? "")} to provision the collection schema.`,
+                        { cause: err }
+                    );
+            }
         },
 
         /**

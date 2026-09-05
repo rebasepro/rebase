@@ -826,6 +826,28 @@ export interface BackendBootstrapper {
     getAdmin?(driverResult: InitializedDriver): DatabaseAdmin | undefined;
 
     /**
+     * Ask the database whether it is there, before anything else touches it.
+     *
+     * Boot's first database call is not `initializeDriver` — it is the schema
+     * provisioning that runs ahead of it, and a driver's connection diagnosis
+     * therefore never got the chance to run. A stopped database produced
+     * `Failed query: [redacted]` and a stack through drizzle internals: no host,
+     * no port, no `ECONNREFUSED`, and no hint about starting the thing.
+     *
+     * Implementations MUST issue the cheapest round trip they have (`SELECT 1`),
+     * MUST throw an error whose message names the host, the port and the
+     * driver's own reason, and MAY log a fuller diagnosis first. They MUST NOT
+     * throw for a reachable database that merely answered something unexpected —
+     * the caller treats a throw as fatal.
+     *
+     * `driverResult` is optional for the same reason as
+     * {@link ensureCollectionSchema}: this runs before `initializeDriver`, so an
+     * adapter that was constructed with its own connection has to fall back to
+     * it.
+     */
+    verifyConnection?(driverResult?: InitializedDriver): Promise<void>;
+
+    /**
      * Bring the database's collection tables up to date, additively.
      *
      * Optional because it is only meaningful for schema-ful drivers. A managed

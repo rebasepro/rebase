@@ -62,6 +62,7 @@ export interface ProvisionTarget {
     runtimeVersion?: string;
     bootstrapper: Pick<
         BackendBootstrapper,
+        | "verifyConnection"
         | "ensureCollectionSchema"
         | "ensureCollectionPolicies"
         | "readCollectionsSchemaVersion"
@@ -112,6 +113,26 @@ export interface ProvisionRunOptions {
 
 export function provisioningDisabled(env: { REBASE_MIGRATE_ON_BOOT?: string } = process.env): boolean {
     return (env.REBASE_MIGRATE_ON_BOOT || "ensure") === "none";
+}
+
+/**
+ * Ask the database whether it is there, before boot's first real query.
+ *
+ * Ordering is the whole point. Provisioning is the first thing in boot that
+ * talks to the database — earlier than `initializeDriver`, which is where the
+ * Postgres adapter's connection diagnosis lives — so a developer whose database
+ * was not running got Drizzle's wrapper and nothing else: `Failed query:
+ * [redacted]`, a stack through drizzle internals, no host, no port, no
+ * `ECONNREFUSED`, and no suggestion to start the database. The diagnosis existed
+ * the whole time; nothing reached it.
+ *
+ * A driver that cannot probe (no `verifyConnection`) is not an error: this is a
+ * better first message, not a new requirement. And a probe that throws is fatal
+ * for the same reason provisioning is — every path after this needs the database.
+ */
+export async function verifyProvisioningConnection(target: ProvisionTarget): Promise<void> {
+    if (!target.bootstrapper.verifyConnection) return;
+    await target.bootstrapper.verifyConnection(target.driverResult);
 }
 
 /**

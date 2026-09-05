@@ -12,6 +12,7 @@
  * ```
  */
 import type { MiddlewareHandler } from "hono";
+import type { HonoEnv } from "../api/types";
 import { logger as log } from "./logger";
 
 export interface RequestLoggerOptions {
@@ -19,7 +20,7 @@ export interface RequestLoggerOptions {
     skip?: string[];
 }
 
-export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler {
+export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler<HonoEnv> {
     const skipPaths = new Set(options?.skip ?? ["/health", "/favicon.ico"]);
 
     return async (c, next) => {
@@ -31,6 +32,11 @@ export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler
         if (skipPaths.has(path)) {
             return next();
         }
+
+        // Claimed before the handler runs, because the error handler runs
+        // *during* it and needs to know whether a request line is coming. See
+        // `HonoEnv.Variables.requestLogged`.
+        c.set("requestLogged", true);
 
         await next();
 
@@ -63,6 +69,24 @@ export function requestLogger(options?: RequestLoggerOptions): MiddlewareHandler
         const uid = (c.get("user") as { uid?: string } | undefined)?.uid;
         if (uid) {
             data.uid = uid;
+        }
+
+        // Which collection, when the request was about one. "A 403 on
+        // /api/data/orders" and "a 403" are different amounts of help at 3am,
+        // and the path does not survive being aggregated by route.
+        const collection = c.get("collection");
+        if (collection) {
+            data.collection = collection;
+        }
+
+        // What the error handler answered, so the failure is described once
+        // rather than in two half-lines. The handler holds the code and the
+        // message; this line holds the user, the collection and the latency,
+        // and neither was any use without the other.
+        const errorSummary = c.get("errorSummary");
+        if (errorSummary) {
+            data.errorCode = errorSummary.code;
+            data.errorMessage = errorSummary.message;
         }
 
         if (status >= 500) {

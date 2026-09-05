@@ -16,6 +16,8 @@ import type { AddressInfo } from "net";
 import path from "path";
 import fs from "fs";
 
+import { logger } from "./logger";
+
 const MAX_PORT_ATTEMPTS = 20;
 
 /** Filename written next to the project `.env` so the CLI can read it. */
@@ -181,6 +183,19 @@ export function listenWithPortRetry(
             const onError = (err: NodeJS.ErrnoException) => {
                 cleanup();
                 if (err.code === "EADDRINUSE") {
+                    // Say which port was refused and which one is next.
+                    //
+                    // The retry is silent otherwise, and silence here is how a
+                    // developer ends up staring at a server on 3002 while their
+                    // frontend, their bookmark and their curl all point at 3001
+                    // — with nothing anywhere saying a port was ever skipped.
+                    // The most common cause is the previous run still holding
+                    // the socket, and that is worth knowing before the next
+                    // twenty minutes go into a phantom bug.
+                    const next = portsToTry[index + 1];
+                    logger.warn(next !== undefined
+                        ? `Port ${port} is in use — trying ${next}.`
+                        : `Port ${port} is in use, and it was the last one to try.`);
                     tryNext(index + 1);
                 } else {
                     reject(err);

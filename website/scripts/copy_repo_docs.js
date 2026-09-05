@@ -85,6 +85,20 @@ description: What Rebase promises across versions and what it does not — the s
 ---
 
 `
+    },
+    {
+        // Authored at the repo root because that is where a developer with a
+        // broken checkout looks first — beside the code, with no site to build.
+        source: "../../docs/troubleshooting.md",
+        dest: "../src/content/docs/docs/troubleshooting.md",
+        stripH1: true,
+        frontmatter: `---
+slug: docs/troubleshooting
+title: Troubleshooting
+description: The failures that stop a Rebase backend from starting or serving — an unreachable database, wrong credentials, a missing extension, an RLS refusal, schema drift, a busy port, a function that will not load — and what each one looks like.
+---
+
+`
     }
 ];
 

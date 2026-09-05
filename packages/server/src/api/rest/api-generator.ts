@@ -1,7 +1,8 @@
-import { Hono, type Context } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
+import { hostEnv } from "../../utils/host";
 import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { assertKnownWriteFields, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
@@ -111,6 +112,8 @@ export class RestApiGenerator {
      * Generate REST routes using existing DataDriver
      */
     generateRoutes(): Hono<HonoEnv> {
+        this.nameTheCollection();
+
         this.collections.forEach(collection => {
             this.createCollectionRoutes(collection);
         });
@@ -124,6 +127,62 @@ export class RestApiGenerator {
         this.createUnmatchedRoute();
 
         return this.router;
+    }
+
+    /**
+     * A 404 that says which row was not found, and names the other reason.
+     *
+     * "Entity not found" was the entire message on five routes. It does not say
+     * which collection, which id, or — the part that costs the most time — that
+     * a row can be perfectly present and invisible: authenticated requests run
+     * as a restricted role, so a `SELECT` policy that excludes this caller
+     * produces exactly this 404. Somebody checking whether the row exists finds
+     * it in psql, concludes the API is broken, and goes looking in the wrong
+     * place.
+     *
+     * The collection and the id are both in the URL the caller just sent, so
+     * naming them back reveals nothing. `details` is withheld in production
+     * anyway, on the same principle as the database diagnostics one layer up:
+     * structured fields are for the people building against this, and a
+     * deployed API answers strangers.
+     */
+    private entityNotFound(collection: string, id: string): ApiError {
+        return new ApiError(
+            404,
+            "NOT_FOUND",
+            `No row with id '${id}' in '${collection}'. It may not exist, ` +
+            "or it may be hidden from this caller by row-level security.",
+            hostEnv().NODE_ENV === "production" ? undefined : { collection, id }
+        );
+    }
+
+    /**
+     * Record which collection a request is about, before anything can fail.
+     *
+     * One middleware rather than a `c.set` in each of the fifteen handlers,
+     * because the value has to be there for the ones that throw *before*
+     * reaching a handler body — an API-key permission check, a query parser
+     * refusing an operator — which is exactly the set of requests whose log
+     * line is worth reading.
+     *
+     * The slug is validated against the collections this backend serves, so the
+     * field is always a real collection and never whatever a caller typed. An
+     * unknown slug leaves it unset; the path is still logged, and the
+     * unmatched-route handler already says the collection does not exist.
+     */
+    private nameTheCollection(): void {
+        const known = new Set(this.collections.map(collection => collection.slug));
+        // A route param, not `c.req.path`: inside a mounted sub-app the latter
+        // is still the FULL request path (`/api/data/posts`), so splitting it
+        // yields `api`. `:maybeSlug` is matched relative to where this router
+        // was mounted, which is the thing being asked for.
+        const remember: MiddlewareHandler<HonoEnv> = async (c, next) => {
+            const slug = c.req.param("maybeSlug");
+            if (slug && known.has(slug)) c.set("collection", slug);
+            await next();
+        };
+        this.router.use("/:maybeSlug", remember);
+        this.router.use("/:maybeSlug/*", remember);
     }
 
     /**
@@ -390,7 +449,7 @@ export class RestApiGenerator {
                 : await this.fetchRawEntity(driver, resolvedCollection, String(id));
 
             if (!entity) {
-                throw ApiError.notFound("Entity not found");
+                throw this.entityNotFound(collection.slug, String(id));
             }
 
             return c.json(projectResponseFields(
@@ -806,7 +865,7 @@ values: entity as Record<string, unknown> },
             });
 
             if (!existingEntity) {
-                throw ApiError.notFound("Entity not found");
+                throw this.entityNotFound(collection.slug, String(id));
             }
 
             const body = await parseJsonBody(c);
@@ -883,7 +942,7 @@ values: entity as Record<string, unknown> },
             });
 
             if (!existingEntity) {
-                throw ApiError.notFound("Entity not found");
+                throw this.entityNotFound(collection.slug, String(id));
             }
 
             await driver.delete({
@@ -1003,7 +1062,7 @@ id };
                     ? await fetchService.fetchOneForRest(parsed.collectionPath, parsed.id, queryOptions.include)
                     : await driver.fetchOne({ path: parsed.collectionPath,
 id: parsed.id });
-                if (!entity) throw ApiError.notFound("Entity not found");
+                if (!entity) throw this.entityNotFound(parsed.collectionPath, parsed.id);
 
                 // `?fields=` is advertised on this endpoint too. It reached
                 // `queryOptions` and was read by nothing here, so a
@@ -1178,7 +1237,7 @@ id: parsed.id });
                 id: parsed.id
             });
 
-            if (!existingEntity) throw ApiError.notFound("Entity not found");
+            if (!existingEntity) throw this.entityNotFound(parsed.collectionPath, parsed.id);
 
             await driver.delete({
                 row: {

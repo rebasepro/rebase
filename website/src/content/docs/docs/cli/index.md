@@ -340,11 +340,48 @@ Creates TypeScript types and a type-safe client for all your collections.
 
 ### `rebase doctor`
 
-Run diagnostics to detect drift between your collections, the generated schema, and the current database state:
-
 ```bash
 rebase doctor
 ```
+
+The command to run when something is wrong and you do not yet know what. It
+reports and never changes anything, so it is safe against any database you can
+reach.
+
+**Without a database.** These run first, because everything that stops a project
+from working at all happens before a table can be compared:
+
+| Check | Why |
+| --- | --- |
+| Node version | Against the range the CLI declares. Too old is not reported as "unsupported Node" — it is a syntax error inside a dependency. |
+| Package managers | Two lockfiles in one project. `npm install` in a pnpm workspace rewrites `node_modules` into a layout pnpm disagrees with, and the symptom is `Cannot find module` hours later. |
+| Duplicate slugs | The registry keeps the last collection registered, so the other one is not reported missing — it is served as the winner, under its own name. |
+| `.env` sanity | A `JWT_SECRET` shorter than 32 characters (which production refuses to boot on), and `NODE_ENV=production` with neither `CORS_ORIGINS` nor `FRONTEND_URL`. Values are never printed. |
+| `@rebasepro/*` version skew | The same package pinned to different versions across the project's `package.json` files. Two copies break `instanceof` between them, which fails as a type guard rejecting its own type. |
+| Connection strings | An unencoded `=` in a URL parameter, which PostgreSQL's own tools refuse to parse — so backups and `psql` break while the app keeps working. |
+| Custom functions | What each function needs from its host, and which of them would not run on an edge runtime. |
+
+**Against the database**, when `DATABASE_URL` is set:
+
+| Check | Why |
+| --- | --- |
+| Collections → generated schema | Whether `schema.generated.ts` is stale. |
+| Collections → database | Missing tables, columns, enums, foreign keys and junctions. |
+| Required extensions | A `{ type: "vector" }` property needs pgvector, which Rebase installs only where a project declared it. |
+| Schema stamp | Whether this database was provisioned from these collections. A hash, so it can say the two disagree and never which is ahead. |
+| Collections → SDK types | Whether the generated typed SDK is stale. |
+| RLS policies | Whether the database's policies match the `securityRules` you declared, and whether any policy names a role this server cannot use. |
+
+If the database is unreachable, its phases are reported as skipped with the
+reason and the rest still runs — see [Troubleshooting](/docs/troubleshooting/).
+
+Exits non-zero when a check finds an error, or when a phase could not run
+because the database it was given refuses connections. A phase skipped because
+you set no `DATABASE_URL` is not a failure.
+
+`rebase doctor --policies` runs only the RLS checks — no schema diff, no SDK
+types — and fails closed, which makes it the form to use as a CI gate against a
+deployed database.
 
 ### `rebase auth`
 
