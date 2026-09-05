@@ -76,27 +76,32 @@ const ColdOpen: React.FC = () => {
 
 const ALL = beat("all");
 
-/** The address, over the whole desk pulled back behind a scrim: every
- *  window the film visited, small, and the one thing to take away in front
- *  of them. */
+/** The address, over the whole desk pulled back: every window the film
+ *  visited, small, for as long as the pull-back takes — then they go, and
+ *  the one thing to take away is what is left.
+ *
+ *  The mark starts assembling while the camera is still pulling out, and the
+ *  desk is most of the way to black by the time the wordmark is up. A first
+ *  cut held the mosaic at 38% under the whole address, and with nine windows
+ *  and three headlines behind it the close had more on screen than any
+ *  other shot in the film — the one shot that should have the least. */
 const Close: React.FC = () => {
     const frame = useCurrentFrame();
-    const at = ALL.start + 40;
-    const scrim = ramp(frame, at, 30);
-    if (scrim <= 0) return null;
-    const url = ramp(frame, at + 30, 26);
-    const cmd = ramp(frame, at + 52, 24);
-    const foot = ramp(frame, at + 70, 22);
-    /* The desk goes, the address stays: the scrim closes to black under the
-       wordmark over the last two seconds, so the final frame is the mark, the
-       address and the command on ground — not the mosaic coming back as the
-       overlay fades. */
-    const dark = ramp(frame, DESK_DURATION - 64, 54, SHIFT);
+    const at = ALL.start + 24;
+    const mark = ramp(frame, at, 1);
+    if (mark <= 0) return null;
+    const scrim = ramp(frame, at + 10, 44);
+    const url = ramp(frame, at + 26, 26);
+    const cmd = ramp(frame, at + 48, 24);
+    const foot = ramp(frame, at + 66, 22);
+    /* And to black entirely under the last line, so the final frame is the
+       mark, the address and the command on ground. */
+    const dark = ramp(frame, DESK_DURATION - 70, 56, SHIFT);
     return (
         <AbsoluteFill>
-            <AbsoluteFill style={{ background: "#000", opacity: 0.62 * scrim + 0.38 * dark }} />
+            <AbsoluteFill style={{ background: "#000", opacity: 0.86 * scrim + 0.14 * dark }} />
             <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
-                <Mark size={116} delay={at + 12} spread={20} />
+                <Mark size={116} delay={at} spread={18} />
                 <div style={{ overflow: "hidden", marginTop: 38, paddingBottom: "0.1em" }}>
                     <div
                         style={{

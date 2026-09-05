@@ -62,6 +62,12 @@ const cell = (col: number, row: number): View => ({ x: col * CELL.w, y: row * CE
  *  that box on the frame. */
 const ALL: View = { x: 150, y: 120, zoom: 0.34 };
 
+/** Where the camera is on the last frame: the same centre as ALL, a little
+ *  further away. It never quite stops — the desk keeps receding under the
+ *  address for the whole close, which is what makes the windows read as
+ *  going rather than as a backdrop that happens to be dim. */
+const FINAL: View = { x: -226, y: -92, zoom: 0.3 };
+
 export const BEATS: Beat[] = [
     { id: "hook", start: 66, view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.3 },
     { id: "rule", start: 340, view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
@@ -114,6 +120,8 @@ BEATS.forEach((b, i) => {
     KEY_AT.push(a, z);
     KEY_VIEW.push(from, b.view);
 });
+KEY_AT.push(DESK_DURATION);
+KEY_VIEW.push(FINAL);
 
 const EASE = Easing.inOut(Easing.cubic);
 const OPTS = { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: EASE } as const;
