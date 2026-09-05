@@ -13,20 +13,20 @@ import { RebaseApiError } from "./transport";
  * the wifi drops and one that does not.
  */
 
-/** The request never reached the server, so nothing was decided by it. */
+/**
+ * The request never reached the server, so nothing was decided by it.
+ *
+ * One question, one answer: `status === 0` is how a transport spells "there
+ * was no response at all", and the transport now wraps every `fetch` rejection
+ * into a `RebaseApiError` carrying it. This used to also sniff for the shapes
+ * a raw `fetch` rejects with — a `TypeError` in a browser, an `AbortError`, a
+ * `TimeoutError` — which is a list that has to be kept in step with three
+ * runtimes and was wrong in both directions: it missed anything they add, and
+ * it claimed a `TypeError` thrown by application code inside a callback was a
+ * network failure, which quietly served a cached answer in its place.
+ */
 export function isNetworkError(error: unknown): boolean {
-    if (error instanceof RebaseApiError) {
-        // A 0 status is what a transport reports when it has no response at all.
-        return error.status === 0;
-    }
-    // fetch rejects with TypeError on network failure in every runtime we
-    // support (browsers: "Failed to fetch"/"Load failed"; undici: "fetch
-    // failed").
-    if (error instanceof TypeError) return true;
-    const name = (error as { name?: string } | undefined)?.name;
-    // AbortError covers both an explicit abort and a fetch timeout; the others
-    // are what Node and Safari surface for a dropped connection.
-    return name === "AbortError" || name === "TimeoutError" || name === "NetworkError";
+    return error instanceof RebaseApiError && error.status === 0;
 }
 
 /**

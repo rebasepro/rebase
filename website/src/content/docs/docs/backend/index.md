@@ -227,7 +227,11 @@ The HTTP status is on the response, not in the body. Branch on `code`, not on
 `message` — messages are written for humans and are free to change.
 
 The client SDK turns every one of these into a `RebaseApiError` carrying
-`status`, `code` and `details`, so application code catches one class:
+`status`, `code` and `details` — including the failures that never reached a
+server at all. A refused connection, a DNS failure, CORS or an abort arrives as
+`status: 0`, `code: "NETWORK_ERROR"`, with the runtime's own error on `cause`,
+rather than as whatever `fetch` felt like rejecting with. So application code
+catches one class:
 
 ```typescript
 async function setPrice(id: string, price: number) {

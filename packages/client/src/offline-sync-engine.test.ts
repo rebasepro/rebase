@@ -41,7 +41,7 @@ function createFakeServer() {
 
     function guard(slug: string, op: string, id?: unknown) {
         calls.push({ collection: slug, op, id });
-        if (!state.online) throw new TypeError("fetch failed");
+        if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
         const rejection = rejections.get(`${op}:${String(id)}`) ?? rejections.get(`${op}:*`);
         if (rejection) throw rejection;
     }
@@ -496,7 +496,7 @@ describe("replay", () => {
 
         // Replay the create only, by making the update fail on the network.
         server.state.online = true;
-        server.rejections.set("update:p1", new TypeError("fetch failed"));
+        server.rejections.set("update:p1", new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" }));
         await manager.sync();
 
         // The create landed; the update has not — and the row must still show

@@ -1,4 +1,5 @@
 import { RebaseApiError, Transport } from "./transport";
+import { RebaseClientError } from "@rebasepro/types";
 import type { AuthAdapterCapabilities, AuthChangeEvent, RebaseSession, AuthTokens, DeviceSession, User } from "@rebasepro/types";
 
 // Re-export canonical types so `import { RebaseSession } from "@rebasepro/client"` keeps working
@@ -560,7 +561,13 @@ redirectUri });
 
     async function doRefreshSession(): Promise<RebaseSession> {
         if (authFlowMode !== "cookie" && !currentSession?.refreshToken) {
-            throw new Error("No active session to refresh");
+            // A `RebaseClientError`, not a bare `Error`: the SDK documents one
+            // class a `catch` block has to check for, and this is raised before
+            // any request is made, which is exactly what that class is.
+            throw new RebaseClientError(
+                "No active session to refresh. Sign in first, or set `authFlowMode: \"cookie\"` " +
+                "if the refresh token is held in an HttpOnly cookie."
+            );
         }
         const fetchFn = getFetch();
         const res = await fetchFn(authUrl("/refresh"), {

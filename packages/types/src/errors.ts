@@ -31,6 +31,8 @@ export type RebaseErrorCode =
     | "CONFLICT"
     | "INTERNAL_ERROR"
     | "SERVICE_UNAVAILABLE"
+    | "NETWORK_ERROR"
+    | "OFFLINE"
     | "DB_PERMISSION_DENIED"
     | "SCHEMA_DRIFT"
     // `string & {}` keeps the union open while preserving completion on the
@@ -45,8 +47,16 @@ export type RebaseErrorCode =
 export interface RebaseErrorInit {
     /**
      * HTTP status code, when the error originated from an HTTP response.
-     * Left `undefined` for realtime/WebSocket, network, and client-side
-     * logic errors that have no HTTP status.
+     *
+     * Three states, and they mean different things:
+     *
+     * - a real status — the server answered, and this is what it said;
+     * - **`0`** — the request never reached a server: DNS, a refused
+     *   connection, CORS, an abort. `XMLHttpRequest` has always spelled that
+     *   `0`, and a fabricated 5xx would be indistinguishable from one the
+     *   server actually sent. The original failure is on `cause`;
+     * - `undefined` — nothing was sent at all: a realtime/WebSocket failure,
+     *   or a client-side logic error raised before any request.
      */
     status?: number;
     /** Stable, machine-readable error code. See {@link RebaseErrorCode}. */

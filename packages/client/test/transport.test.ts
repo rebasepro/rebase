@@ -126,10 +126,32 @@ apiPath: "/v2" });
         expect(transport.baseUrl).toBe("https://api.example.com");
     });
 
-    it("exposes fetchFn", () => {
+    /**
+     * `auth.ts` and `storage.ts` read `transport.fetchFn` and make their own
+     * requests with it, so what is exposed here is the *wrapped* fetch, not the
+     * one that was configured. That is the point: those paths get the same
+     * `NETWORK_ERROR` treatment as `request()`, rather than rejecting with a
+     * bare `TypeError` from whichever runtime they happen to run in.
+     */
+    it("exposes a fetchFn that calls through to the configured one", async () => {
         const transport = createTransport({ baseUrl: "http://localhost",
 fetch: fetchMock as typeof globalThis.fetch });
-        expect(transport.fetchFn).toBe(fetchMock);
+
+        fetchMock.mockResolvedValueOnce({ ok: true, status: 204 });
+        await transport.fetchFn("http://localhost/x");
+        expect(fetchMock).toHaveBeenCalledWith("http://localhost/x", undefined);
+    });
+
+    it("turns a transport failure from that fetchFn into a RebaseApiError", async () => {
+        const transport = createTransport({ baseUrl: "http://localhost",
+fetch: fetchMock as typeof globalThis.fetch });
+
+        fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+
+        const error = await transport.fetchFn("http://localhost/x").catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(RebaseApiError);
+        expect((error as RebaseApiError).code).toBe("NETWORK_ERROR");
+        expect((error as RebaseApiError).status).toBe(0);
     });
 
     /**
