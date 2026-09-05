@@ -20,6 +20,7 @@ import { toSnakeCase } from "@rebasepro/utils";
 import { loadCollectionsFromDirectory } from "@rebasepro/server";
 // The report is CLI output, not application logging — see cli-output.ts.
 import { out, outError } from "../cli-output";
+import { deepestErrorMessage, diagnoseDbError, parseHostInfo } from "../cli-errors";
 
 /**
  * Resolve the SQL column name for a property.
@@ -79,6 +80,17 @@ export interface DoctorPhase {
      * a comparison, and no comparison happened.
      */
     notApplicable?: string;
+    /**
+     * The phase was skipped by a fault rather than by a choice.
+     *
+     * `skipped` covers both: "no DATABASE_URL, so nothing to compare against"
+     * is a local situation a developer may be perfectly happy with, and "the
+     * DATABASE_URL you set refuses connections" is not. The report renders them
+     * the same way — a check that did not run is a check that did not run — but
+     * the exit code must not, or `rebase doctor` in CI goes green against a
+     * database it never reached.
+     */
+    blocked?: boolean;
 }
 
 export interface DoctorReport {
@@ -800,7 +812,26 @@ export async function runDoctor(options: {
     let schemaToDatabase: DoctorPhase;
     if (options.databaseUrl) {
         out(chalk.gray("  Checking Collections → Database..."));
-        schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl);
+        try {
+            schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl);
+        } catch (err: unknown) {
+            // A database that cannot be reached used to end the whole run: the
+            // error escaped `runDoctor` and the CLI's last-resort catch printed
+            // a stack. So the two phases that need no database — the generated
+            // schema and the SDK types, both of which are read off disk — never
+            // ran, and the one command whose job is to say what is wrong said
+            // only "Doctor failed" over a drizzle stack trace.
+            const banner = diagnoseDbError(err, options.databaseUrl);
+            if (banner) outError(banner);
+            const reason = deepestErrorMessage(err)
+                ?? (err instanceof Error ? err.message : String(err));
+            schemaToDatabase = {
+                passed: false,
+                issues: [],
+                skipped: `could not reach ${parseHostInfo(options.databaseUrl)} — ${reason}`,
+                blocked: true
+            };
+        }
     } else {
         // Not `{ passed: true }`: see DoctorPhase.skipped.
         schemaToDatabase = { passed: false,

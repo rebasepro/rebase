@@ -7,6 +7,7 @@ import path from "path";
 import chalk from "chalk";
 import { runDoctor } from "./doctor";
 import { exitCodeForPolicyGate, runPolicyChecks } from "./doctor-policy-checks";
+import { diagnoseDbError } from "../cli-errors";
 
 async function main() {
     const collectionsArg = process.argv.find((a) => a.startsWith("--collections="));
@@ -53,14 +54,31 @@ async function main() {
 
     // Exit non-zero if there are errors. A policy run that could not happen is
     // reported loudly above but does not fail the interactive command — the
-    // same treatment the skipped database phase gets. `--policies` is the gate,
-    // and that one fails closed.
-    if (report.summary.errors > 0 || policyStatus === "problems") {
+    // same treatment the *chosen* skip of the database phase gets. `--policies`
+    // is the gate, and that one fails closed.
+    //
+    // A phase that was skipped by a fault is different, and `blocked` is what
+    // separates the two: "no DATABASE_URL" is a local situation somebody may be
+    // content with, while "the DATABASE_URL you set refuses connections" would
+    // otherwise let `rebase doctor` go green in CI against a database it never
+    // reached.
+    const blocked = [report.collectionsToSchema, report.schemaToDatabase, report.collectionsToSdk]
+        .some(phase => phase.blocked);
+    if (report.summary.errors > 0 || policyStatus === "problems" || blocked) {
         process.exit(1);
     }
 }
 
 main().catch((err) => {
-    console.error(chalk.red("  ✗ Doctor failed"), err instanceof Error ? (err.stack ?? err.message) : String(err));
+    // A known database failure has a diagnosis; a stack trace through pg and
+    // drizzle internals is not it. This is the last resort — `runDoctor`
+    // already catches the connection failure it can name — so it exists for
+    // everything reached after the report, the policy checks in particular.
+    const banner = diagnoseDbError(err, process.env.DATABASE_URL || process.env.ADMIN_CONNECTION_STRING);
+    if (banner) {
+        console.error(banner);
+    } else {
+        console.error(chalk.red("  ✗ Doctor failed"), err instanceof Error ? (err.stack ?? err.message) : String(err));
+    }
     process.exit(1);
 });
