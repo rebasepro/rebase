@@ -69,20 +69,27 @@ export function generateSDK(
 
 ## Field names are the ones the API serves
 
-The generated \`Row\` uses each column's real name, unchanged — a \`created_at\`
-column is \`row.created_at\`, not \`row.createdAt\`. \`where\` and \`orderBy\` are keyed
-off the same type, so what compiles is what the backend answers to.
+The generated \`Row\` uses each field's **wire** name — the key it arrives under in
+JSON — and nothing here renames anything.
 
-Only the *collection accessor* is turned into a property name
-(\`my-notes\` → \`rebase.data.myNotes\`), which is what \`collectionsDictionary\` maps
-back.
+- **A declared property is its key in the collection.** A property keyed
+  \`createdAt\` is \`row.createdAt\`, whatever \`columnName\` says. A column name is
+  the name of a different thing: where the value lives, not what the API calls it.
+- **A foreign key derived from a relation is camelCase**, because that is what
+  the wire carries. A \`belongsTo\` named \`author\` gives you \`row.authorId\`, not
+  the column spelling.
+- **A collection accessor is camelCase too** (\`my-notes\` → \`rebase.data.myNotes\`),
+  which is what \`collectionsDictionary\` maps back to the slug.
+
+\`where\` and \`orderBy\` are keyed off the same type, so what compiles is what the
+backend answers to.
 
 ## \`Row\` vs \`Insert\` vs \`Update\`
 
 | Type | What it describes |
 |---|---|
 | \`Row\` | What a read serves. Nullable columns are \`T \\| null\`; relations appear only when \`include\` names them. |
-| \`Insert\` | What \`create()\` accepts. Server-assigned ids are optional; a \`belongsTo\` target may be named either way (\`{ author: 5 }\` or \`{ author_id: 5 }\`). |
+| \`Insert\` | What \`create()\` accepts. Server-assigned ids are optional; a \`belongsTo\` target may be named either way (\`{ author: 5 }\` or \`{ authorId: 5 }\`). |
 | \`Update\` | What \`update()\` accepts. Everything optional, and the primary key is not settable. |
 
 A property marked \`excludeFromApi\` is absent from all three: the API surface

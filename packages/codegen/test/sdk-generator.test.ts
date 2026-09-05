@@ -636,6 +636,36 @@ describe("generateSDK configurations", () => {
         expect(types.content).toContain("export interface Database");
         expect(types.content).toContain("authors:");
     });
+
+    /**
+     * The README is the first thing a developer reads after generating, and it
+     * taught the naming rule from before 0.14: that a field keeps its *column*
+     * name, so `created_at` is `row.created_at`. It has not been true since —
+     * a declared property is its key in the collection, and a foreign key
+     * derived from a relation arrives camelCased (`author_id` → `authorId`).
+     *
+     * A reader who believed it wrote `row.created_at` and `{ author_id: 5 }`,
+     * both of which are compile errors against the types generated in the same
+     * directory. Two snake_case examples were the whole of the damage, so the
+     * check is that neither spelling comes back.
+     */
+    it("teaches the wire names, not the column names", () => {
+        const readme = generateSDK([authorsCollection])
+            .find(f => f.path === "README.md")!.content;
+
+        // The old paragraph's own two examples, banned outright.
+        expect(readme).not.toContain("created_at");
+        expect(readme).not.toContain("author_id");
+
+        // And the rule behind them, so a different snake_case field cannot
+        // reintroduce the same advice under another name.
+        expect(readme).not.toMatch(/\brow\.[a-z0-9]+_/);
+        expect(readme).not.toMatch(/\{\s*[a-z0-9]+_[a-z0-9_]*:/);
+
+        // What replaced it.
+        expect(readme).toContain("row.authorId");
+        expect(readme).toContain("row.createdAt");
+    });
 });
 
 /**
