@@ -183,9 +183,39 @@ outlives the container:
 ```yaml
       STORAGE_TYPE: local
       STORAGE_PATH: /data/uploads
+      FORCE_LOCAL_STORAGE: "true"
     volumes:
       - uploads:/data/uploads
 ```
+
+`FORCE_LOCAL_STORAGE` is not optional there: in production a `local` backend is
+dropped rather than registered, because the alternative is uploads that succeed
+into a filesystem about to be destroyed. The variable is how you say the mount
+is durable.
+
+### Storage needs an access-control model
+
+Once a bucket **is** configured, the runtime **refuses to boot in production**
+until the deployment states how objects are protected. Storage is not under
+row-level security and its keys share one flat namespace, so with no rule the
+only thing separating two users' files is key unguessability — which
+`GET /storage/list?prefix=` defeats. Any one of these satisfies it:
+
+- a **`storageAuthorize` hook** (or `storagePolicies`) in your project's config,
+  which is the real answer and what the scaffold ships in `config/storage.ts` —
+  no environment variable can express "this user may read this key";
+- **`STORAGE_PUBLIC_READ=true`**, for a bucket that genuinely is a public
+  read-only CDN;
+- **`STORAGE_ALLOW_ANY_AUTHENTICATED=true`**, for a single-tenant app where
+  every signed-in account is trusted with every file.
+
+Outside production the same condition is a loud warning rather than a refusal,
+so this is a boot failure you meet on the deploy rather than on the laptop. It
+is deliberate: the failure it replaces is silent.
+
+Set `MFA_ENCRYPTION_KEY` too if you use TOTP. Left unset, stored authenticator
+secrets are encrypted with `JWT_SECRET` — so rotating that signs everybody out
+*and* makes every enrolled device undecryptable.
 
 ## Other platforms
 
