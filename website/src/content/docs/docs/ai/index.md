@@ -10,7 +10,7 @@ problems. It is worth knowing which one you are reaching for:
 | | What it is | Who consumes it |
 |---|---|---|
 | [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 41 tools over your schema, data, users, storage, cron and dev server | An assistant, at runtime |
-| [**Agent skills**](/docs/ai/skills) | 20 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
+| [**Agent skills**](/docs/ai/skills) | 21 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
 | [**API keys**](/docs/backend/api#api-keys) | Scoped machine credentials, per collection and per operation | Anything calling the HTTP API |
 
@@ -92,5 +92,5 @@ mechanism and the two do not interact.
 ## Where to go next
 
 - [MCP Server](/docs/ai/mcp) — connect Claude Code, Cursor or any MCP client
-- [Agent Skills](/docs/ai/skills) — `rebase skills install` and the 20 skills
+- [Agent Skills](/docs/ai/skills) — `rebase skills install` and the 21 skills
 - [AI Instruction Files](/docs/ai/instruction-files) — the scaffolded rules pattern

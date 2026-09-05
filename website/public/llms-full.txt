@@ -14949,7 +14949,7 @@ problems. It is worth knowing which one you are reaching for:
 | | What it is | Who consumes it |
 |---|---|---|
 | [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 41 tools over your schema, data, users, storage, cron and dev server | An assistant, at runtime |
-| [**Agent skills**](/docs/ai/skills) | 20 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
+| [**Agent skills**](/docs/ai/skills) | 21 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
 | [**API keys**](/docs/backend/api#api-keys) | Scoped machine credentials, per collection and per operation | Anything calling the HTTP API |
 
@@ -15031,7 +15031,7 @@ mechanism and the two do not interact.
 ### Where to go next
 
 - [MCP Server](/docs/ai/mcp) — connect Claude Code, Cursor or any MCP client
-- [Agent Skills](/docs/ai/skills) — `rebase skills install` and the 20 skills
+- [Agent Skills](/docs/ai/skills) — `rebase skills install` and the 21 skills
 - [AI Instruction Files](/docs/ai/instruction-files) — the scaffolded rules pattern
 
 ## MCP Server
@@ -15470,12 +15470,12 @@ Collections are discovered from `app/config/collections/`,
 `config/collections/` or `collections/` under the active project directory —
 whichever exists.
 
-`rebase://schema` is listed **only if** the generated schema is at exactly
-`app/backend/src/schema.generated.ts`. That is a single hardcoded path with no
-fallbacks, so a project laid out differently — or one that has not run
-`rebase schema generate` yet — simply will not see the resource offered. If it
-is missing and you expected it, check the path before concluding the server is
-broken.
+`rebase://schema` is listed **only if** the generated schema exists.
+`findBackendDir` looks for `backend/` and then `app/backend/` under the active
+project directory, and reads `src/schema.generated.ts` from whichever it finds —
+so both the scaffolded layout and this monorepo's work, and a project laid out a
+third way, or one that has not run `rebase schema generate` yet, simply will not
+see the resource offered.
 
 ### Recommended setup
 

@@ -47,6 +47,7 @@ import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
 import { checkMcpToolTables } from "./docs-verify/check-mcp-tool-tables.mjs";
 import { checkAiInstructions } from "./docs-verify/check-ai-instructions.mjs";
+import { checkSkillClaims } from "./docs-verify/check-skill-claims.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -80,6 +81,7 @@ if (asJson) {
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
         out.mcpToolTables = checkMcpToolTables(ROOT).findings;
         out.aiInstructions = checkAiInstructions(ROOT).findings;
+        out.skillClaims = checkSkillClaims(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -239,6 +241,22 @@ if (only === "both" || only === "names") {
         console.log(`${RED}✗ ${bad.length} rule(s) naming something that does not exist:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Skill claims against source ━━━${NC}`);
+    const { findings: bad, scanned } = checkSkillClaims(ROOT);
+    console.log(`${DIM}Checked ${scanned} skill file(s) against the values the code declares.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every limit, path, signature and count a skill states matches source.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} claim(s) the code contradicts:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);
         }
     }

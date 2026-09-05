@@ -92,7 +92,7 @@ mecanismo diferente y ambos no interactúan entre sí.
 ## Próximos pasos
 
 - [Servidor MCP](/docs/ai/mcp) — conecta Claude Code, Cursor o cualquier cliente MCP
-- [Skills de agentes](/docs/ai/skills) — `rebase skills install` y las 20 skills
+- [Skills de agentes](/docs/ai/skills) — `rebase skills install` y las 21 skills
 - [Archivos de instrucciones de IA](/docs/ai/instruction-files) — el patrón de reglas estructuradas
 
 ---

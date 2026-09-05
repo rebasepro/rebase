@@ -8,7 +8,8 @@ description: Core principles, workflow, and maintenance for using Rebase. Use th
 Please complete these setup steps before proceeding, and remember your progress to avoid repeating them in future interactions.
 
 1. **Local Environment Setup:** Verify the environment is properly set up:
-   - Run `node --version` to check Node.js is installed (v20+ required).
+   - Run `node --version`. A scaffolded project declares `node >= 22.22.0`, which is
+     what `.nvmrc` pins; an older runtime fails at install, not at run time.
    - Run `pnpm --version` to check pnpm is installed. If not, install it: `npm install -g pnpm`.
    - Verify PostgreSQL is available: `psql --version` or confirm Docker is running with a Postgres container.
    - If any of these checks fail, use the `rebase-local-env-setup` skill to get the environment ready.
@@ -211,7 +212,7 @@ Read these when you need them, not before.
 ### CLI & Tooling
 
 - **pnpm not found:** Install with `npm install -g pnpm`.
-- **Node.js version mismatch:** Rebase requires Node.js v20+. Use `nvm install 20 && nvm use 20`.
+- **Node.js version mismatch:** a scaffolded project declares `node >= 22.22.0`, which is what `.nvmrc` pins. Use `nvm install 22.22.0 && nvm use 22.22.0`.
 - **`Could not find tsx binary`:** Install tsx in your project: `pnpm add -D tsx`.
 - **`Could not detect an active database plugin`:** Ensure `@rebasepro/server-postgres` (or another driver) is listed in `backend/package.json` dependencies.
 - **`No bootstrappers or database adapter provided`:** The `initializeRebaseBackend()` call is missing the `database` (or `bootstrappers`) property. See the backend configuration section above.

@@ -439,12 +439,12 @@ Collections are discovered from `app/config/collections/`,
 `config/collections/` or `collections/` under the active project directory —
 whichever exists.
 
-`rebase://schema` is listed **only if** the generated schema is at exactly
-`app/backend/src/schema.generated.ts`. That is a single hardcoded path with no
-fallbacks, so a project laid out differently — or one that has not run
-`rebase schema generate` yet — simply will not see the resource offered. If it
-is missing and you expected it, check the path before concluding the server is
-broken.
+`rebase://schema` is listed **only if** the generated schema exists.
+`findBackendDir` looks for `backend/` and then `app/backend/` under the active
+project directory, and reads `src/schema.generated.ts` from whichever it finds —
+so both the scaffolded layout and this monorepo's work, and a project laid out a
+third way, or one that has not run `rebase schema generate` yet, simply will not
+see the resource offered.
 
 ## Recommended setup
 

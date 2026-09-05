@@ -456,12 +456,12 @@ récupérer le contexte du projet sans consommer d'appel d'outil :
 Les collections sont détectées depuis `app/config/collections/`, `config/collections/`
 ou `collections/` sous le répertoire du projet actif — selon le premier trouvé.
 
-`rebase://schema` n'est listé **que si** le schéma généré se trouve exactement à
-l'emplacement `app/backend/src/schema.generated.ts`. Il s'agit d'un chemin unique codé
-en dur sans solution de secours, de sorte qu'un projet structuré différemment — ou qui
-n'a pas encore exécuté `rebase schema generate` — ne verra tout simplement pas la
-ressource proposée. Si elle est manquante alors que vous vous y attendiez, vérifiez le
-chemin avant de conclure à un dysfonctionnement du serveur.
+`rebase://schema` n'est listée **que si** le schéma généré existe.
+`findBackendDir` cherche `backend/` puis `app/backend/` sous le répertoire du
+projet actif et lit `src/schema.generated.ts` depuis celui qu'il trouve — la
+disposition du scaffold comme celle de ce monorepo fonctionnent donc. Un projet
+organisé d'une troisième manière, ou dans lequel `rebase schema generate` n'a pas
+encore été lancé, ne verra tout simplement pas la ressource proposée.
 
 ## Configuration recommandée
 

@@ -38,7 +38,8 @@ rebase/
 ## 1. Verify Node.js
 
 - **Action**: Run `node --version`.
-- **Required**: Node.js **22 LTS** (the version used in the production Dockerfile). Node >= 20 works but 22 is recommended.
+- **Required**: Node.js **>= 22.22.0** — what a scaffolded project's `engines` declares and
+  what `.nvmrc` pins. Not a recommendation: an older runtime fails at install.
 - **Handling**: If Node.js is missing or < v22:
 
   **Recommended: Use a Node Version Manager**
@@ -90,8 +91,13 @@ docker run --name rebase-postgres \
   -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_DB=rebase \
   -p 5432:5432 \
-  -d postgres:17
+  -d pgvector/pgvector:pg18
 ```
+
+> The image is `pgvector/pgvector:pg18`, not stock `postgres`. It is the official
+> Postgres image with the `vector` extension built in, and a `{ type: "vector" }`
+> property compiles to `VECTOR(n)`, which stock Postgres answers with
+> `type "vector" does not exist` — a boot failure whose cause is an image.
 
 ### Option B: Local Installation
 

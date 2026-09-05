@@ -463,13 +463,13 @@ Collections werden aus `app/config/collections/`, `config/collections/` oder
 `collections/` unterhalb des aktiven Projektverzeichnisses ermittelt – je
 nachdem, welches Verzeichnis existiert.
 
-`rebase://schema` wird **nur dann** aufgeführt, wenn sich das generierte Schema
-exakt unter `app/backend/src/schema.generated.ts` befindet. Das ist ein
-einzelner, fest codierter Pfad ohne Fallbacks; ein Projekt mit abweichender
-Struktur – oder eines, auf dem `rebase schema generate` noch nicht ausgeführt
-wurde – bekommt die Ressource einfach nicht angeboten. Wenn sie fehlt und Sie sie
-erwartet haben, überprüfen Sie den Pfad, bevor Sie den Schluss ziehen, dass der
-Server fehlerhaft ist.
+`rebase://schema` wird **nur dann** aufgeführt, wenn das generierte Schema
+existiert. `findBackendDir` sucht unter dem aktiven Projektverzeichnis erst
+`backend/` und dann `app/backend/` und liest `src/schema.generated.ts` aus dem,
+was es findet — es funktionieren also sowohl das Scaffold-Layout als auch das
+dieses Monorepos. Ein drittens angelegtes Projekt, oder eines, in dem
+`rebase schema generate` noch nicht gelaufen ist, sieht die Ressource schlicht
+nicht angeboten.
 
 ## Empfohlenes Setup
 

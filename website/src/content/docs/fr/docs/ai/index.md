@@ -98,7 +98,7 @@ Il s'agit d'un mécanisme différent et les deux n'interagissent pas.
 ## Où aller ensuite
 
 - [Serveur MCP](/docs/ai/mcp) — connecter Claude Code, Cursor ou tout client MCP
-- [Compétences d'agent](/docs/ai/skills) — `rebase skills install` et les 20 compétences
+- [Compétences d'agent](/docs/ai/skills) — `rebase skills install` et les 21 compétences
 - [Fichiers d'instructions IA](/docs/ai/instruction-files) — le modèle de règles échafaudées
 
 ---

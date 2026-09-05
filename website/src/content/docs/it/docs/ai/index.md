@@ -58,7 +58,7 @@ Per la ricerca lessicale — ricerca full-text con ranking sui campi specificati
 ## Dove proseguire
 
 - [Server MCP](/docs/ai/mcp) — connetti Claude Code, Cursor o qualsiasi client MCP
-- [Agent Skill](/docs/ai/skills) — `rebase skills install` e le 20 skill disponibili
+- [Agent Skill](/docs/ai/skills) — `rebase skills install` e le 21 skill disponibili
 - [File di istruzioni IA](/docs/ai/instruction-files) — il pattern per le regole generate automaticamente
 
 ---

@@ -92,7 +92,7 @@ diferente e os dois não interagem.
 ## Próximos passos
 
 - [Servidor MCP](/docs/ai/mcp) — conecte o Claude Code, Cursor ou qualquer cliente MCP
-- [Agent Skills](/docs/ai/skills) — `rebase skills install` e as 20 skills
+- [Agent Skills](/docs/ai/skills) — `rebase skills install` e as 21 skills
 - [Arquivos de Instrução de IA](/docs/ai/instruction-files) — o padrão de regras geradas por scaffolding
 
 ---

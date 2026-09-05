@@ -465,8 +465,8 @@ carries markup and user-typed text: split on `<mark>` and render the parts
 rather than injecting it as HTML.
 
 To make a collection searchable, edit its config — see the `rebase-collections`
-skill. Do not try to work around the default with `where` + `like`: there is no
-`like` operator.
+skill. `where` + `like` is not the workaround it looks like: the operator does
+exist, but a pattern beginning with `%` cannot use an index and scans the table.
 
 ### Vector search
 

@@ -438,11 +438,12 @@ As coleções são descobertas a partir de `app/config/collections/`,
 `config/collections/` ou `collections/` no diretório do projeto ativo —
 o que existir.
 
-`rebase://schema` é listado **apenas se** o schema gerado estiver exatamente em
-`app/backend/src/schema.generated.ts`. Esse é um caminho único pré-definido (*hardcoded*) sem
-alternativas (*fallbacks*), portanto, um projeto estruturado de forma diferente — ou que ainda não executou
-`rebase schema generate` — simplesmente não verá o recurso oferecido. Se ele estiver
-ausente e você o esperava, verifique o caminho antes de concluir que o servidor está quebrado.
+`rebase://schema` é listado **apenas se** o schema gerado existir.
+O `findBackendDir` procura `backend/` e depois `app/backend/` sob o diretório do
+projeto ativo e lê `src/schema.generated.ts` daquele que encontrar — então tanto
+o layout do scaffold quanto o deste monorepo funcionam. Um projeto organizado de
+uma terceira maneira, ou que ainda não rodou `rebase schema generate`,
+simplesmente não verá o recurso oferecido.
 
 ## Configuração recomendada
 
