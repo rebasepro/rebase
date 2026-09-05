@@ -222,6 +222,14 @@ export interface ViaRelation extends RelationBase {
     kind: "via";
     /** Whether the chain yields one row or many. Cannot be derived from a join chain. */
     cardinality: "one" | "many";
+    /**
+     * The joins, in order, from this collection's table to the target's.
+     *
+     * Each step names a table and the columns to join it on; the last step's
+     * table is the target. Read-only, because Rebase will not work out how to
+     * write through an arbitrary chain, and guessing is what this kind exists to
+     * stop.
+     */
     joinPath: JoinStep[];
 }
 
@@ -268,11 +276,26 @@ export type ResolvedRelation =
 export interface ResolvedRelationBase {
     /** Always set: defaulted during resolution if the author omitted it. */
     relationName: string;
+    /**
+     * The collection on the other end.
+     *
+     * Still a thunk — a relation between two collections that import each other
+     * has to be — but normalised: resolution unwraps the module namespace the
+     * author's `() => import(…)` may hand back, so every consumer gets the
+     * config and not a `{ default: … }` wrapper.
+     */
     target: () => AnyCollectionConfig;
     /** The target's slug, resolved once so consumers need not call `target()`. */
     targetSlug: string;
+    /** As authored — see {@link RelationBase.onUpdate}. Defaults are not filled in. */
     onUpdate?: OnAction;
+    /**
+     * As authored — see {@link RelationBase.onDelete}. `undefined` here means
+     * the author said nothing, and the DDL generator picks the default; it does
+     * **not** mean "no action".
+     */
     onDelete?: OnAction;
+    /** Presentation overrides applied when this relation is rendered as a tab. */
     overrides?: Partial<AnyCollectionConfig>;
     /**
      * Whether one row or many come back. Derived from `kind` — kept because it
@@ -347,6 +370,11 @@ export interface ResolvedManyToMany extends ResolvedRelationBase {
     cardinality: "many";
     writable: true;
     shared: true;
+    /**
+     * The junction table and its two key columns, with every default filled in:
+     * the table from both table names sorted and joined, the columns from each
+     * endpoint's slug.
+     */
     through: {
         table: string;
         sourceColumn: string;
@@ -358,6 +386,7 @@ export interface ResolvedManyToMany extends ResolvedRelationBase {
 export interface ResolvedVia extends ResolvedRelationBase {
     kind: "via";
     writable: false;
+    /** The chain as authored — see {@link ViaRelation.joinPath}. Nothing to default. */
     joinPath: JoinStep[];
 }
 
