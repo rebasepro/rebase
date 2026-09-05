@@ -5,8 +5,11 @@ you would say it to one person across a desk. Short sentences. "You".
 
 **It opens on you, with a question.** "You can build a backend in an
 afternoon now. But can you trust it?" — to camera, before any evidence. Then
-the evidence: this one, built by an agent, three ways in. The close answers
-the question in the same words.
+the evidence: this one, built by an agent, three ways in.
+
+**No slogans.** You are explaining what just happened, not selling it. The
+facts stay; the flourishes go. The last thing said is a practical offer —
+the scan is free, run it on your own database — not a tagline.
 
 **One story, one desk, in the order it happens.** There are no cuts. Every
 line is caused by the one before: the scan finds three ways in, so you point
@@ -15,7 +18,7 @@ that file; you push it, so the same scan comes back clean; you run it, so the
 API answers Robert, Dana and an agent, and your team gets the panel. "Three
 commands" at the end is a count of what you watched.
 
-Total: **2831 frames = 94.4 seconds** at 30fps · 210 words · speech is
+Total: **2831 frames = 94.4 seconds** at 30fps · 209 words · speech is
 82% of the running time. The climax is the quietest part: two short
 lines with the terminal doing the talking between them.
 
@@ -25,18 +28,18 @@ lines with the terminal doing the talking between them.
 |---|------|--------|-------|------|------|
 | 00 | Cold open | 0.0s | — | *(silent — the mark assembles)* | — |
 | 01 | You, to camera | 3.2s | 14 | You can build a backend in an afternoon now. But can you trust it? | 0.5s beat |
-| 02 | The evidence | 8.8s | 17 | This one was built by an agent. It works. A free ten-second scan found three ways in. | 1.5s **pause** |
+| 02 | The evidence | 8.8s | 16 | This one was built by an agent. It works. A ten-second scan found three ways in. | 1.5s **pause** |
 | 03 | Point Rebase at it | 16.5s | 18 | So you point Rebase at that same database. It reads the tables, and writes one file per table. | 1.3s beat |
 | 04 | The rule | 24.4s | 22 | Who can see what goes in that file. Here, customers only see their own orders. And Postgres enforces it, not your code. | 0.9s beat |
 | 05 | Push, and the same scan | 33.4s | 10 | Push it, and run the same scan again. Nothing found. | 1.2s beat |
 | 06 | Run it | 38.3s | 3 | Then run it. | 2.8s **pause** — the terminal prints the ports |
 | 07 | Two people | 42.2s | 23 | The same request, from two different people, gets two different answers. Robert sees his own orders. Dana, on support, sees all of them. | 0.4s flow |
-| 08 | The agent | 51.0s | 17 | An agent gets your permissions, and it can't get around them. Same rules, same database, same answer. | 1.1s beat |
-| 09 | The panel | 58.3s | 18 | And your team gets an admin panel. Same data, same rules. Nobody built any of this by hand. | 3.0s **pause** — the montage plays |
-| 10 | Every view | 67.9s | 10 | Boards, tables, cards, forms. It all comes from your data. | 0.4s flow |
-| 11 | The schema | 71.9s | 12 | The schema, straight from the database, so it's never out of date. | 0.1s flow |
+| 08 | The agent | 51.0s | 18 | An agent works the same way. It gets a key with permissions, and it can't get around them. | 1.1s beat |
+| 09 | The panel | 58.3s | 19 | And there's an admin panel for your team, generated from the same files. The same rules apply there too. | 3.0s **pause** — the montage plays |
+| 10 | Every view | 67.9s | 9 | Boards, tables, cards and forms, depending on the collection. | 0.4s flow |
+| 11 | The schema | 71.9s | 12 | The schema, read from the database, so it matches what's actually there. | 0.1s flow |
 | 12 | Studio | 76.4s | 10 | And you can work on the database itself, right there. | 0.2s flow |
-| 13 | The whole desk | 80.3s | 36 | That was three commands. It's open source, and it runs anywhere. Your laptop, your servers, any cloud. Nobody else holds your data. So go build it by lunch. This time, you'll know you can trust it. | — |
+| 13 | The whole desk | 80.3s | 35 | That was three commands. It's open source, and you run it wherever you want — your laptop, your servers, any cloud. If you want to know where your own database stands, the scan is free. | — |
 
 ## The presenter
 

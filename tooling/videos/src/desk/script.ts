@@ -14,8 +14,14 @@ import { tempo, TEMPO } from "./beats";
  * IT OPENS ON YOU, WITH A QUESTION. "You can build a backend in an
  * afternoon now. But can you trust it?" — said to camera, before any
  * evidence. Then the evidence: this one, built by an agent, three ways in.
- * The close answers the question in the same words: this time, you'll know
- * you can trust it.
+ *
+ * NO SLOGANS. The close used to be three of them in a row — "Nobody else
+ * holds your data. So go build it by lunch. This time, you'll know you can
+ * trust it." — and "Same rules, same database, same answer" was a fourth.
+ * A person explaining what just happened does not talk like that. The
+ * facts stay (open source, runs where you want, three commands); the
+ * flourishes go; and the last thing said is a practical offer, not a
+ * tagline: the scan is free, run it on your own database.
  *
  * EVERY LINE IS CAUSED BY THE ONE BEFORE. "So you point Rebase at that same
  * database" answers the scan; "that file" is the file init just wrote;
@@ -35,7 +41,7 @@ export const DESK_NARRATION: { at: number; words: string[] }[] = [
     // the question, to camera
     { at: tempo(92), words: ["You", "can", "build", "a", "backend", "in", "an", "afternoon", "now.", "But", "can", "you", "trust", "it?"] },
     // the evidence
-    { at: tempo(245), words: ["This", "one", "was", "built", "by", "an", "agent.", "It", "works.", "A", "free", "ten-second", "scan", "found", "three", "ways", "in."] },
+    { at: tempo(245), words: ["This", "one", "was", "built", "by", "an", "agent.", "It", "works.", "A", "ten-second", "scan", "found", "three", "ways", "in."] },
     // init
     { at: tempo(456), words: ["So", "you", "point", "Rebase", "at", "that", "same", "database.", "It", "reads", "the", "tables,", "and", "writes", "one", "file", "per", "table."] },
     // rule
@@ -47,15 +53,15 @@ export const DESK_NARRATION: { at: number; words: string[] }[] = [
     // users
     { at: tempo(1156), words: ["The", "same", "request,", "from", "two", "different", "people,", "gets", "two", "different", "answers.", "Robert", "sees", "his", "own", "orders.", "Dana,", "on", "support,", "sees", "all", "of", "them."] },
     // agent
-    { at: tempo(1396), words: ["An", "agent", "gets", "your", "permissions,", "and", "it", "can't", "get", "around", "them.", "Same", "rules,", "same", "database,", "same", "answer."] },
+    { at: tempo(1396), words: ["An", "agent", "works", "the", "same", "way.", "It", "gets", "a", "key", "with", "permissions,", "and", "it", "can't", "get", "around", "them."] },
     // panel
-    { at: tempo(1596), words: ["And", "your", "team", "gets", "an", "admin", "panel.", "Same", "data,", "same", "rules.", "Nobody", "built", "any", "of", "this", "by", "hand."] },
+    { at: tempo(1596), words: ["And", "there's", "an", "admin", "panel", "for", "your", "team,", "generated", "from", "the", "same", "files.", "The", "same", "rules", "apply", "there", "too."] },
     // views
-    { at: tempo(1858), words: ["Boards,", "tables,", "cards,", "forms.", "It", "all", "comes", "from", "your", "data."] },
+    { at: tempo(1858), words: ["Boards,", "tables,", "cards", "and", "forms,", "depending", "on", "the", "collection."] },
     // schema
-    { at: tempo(1968), words: ["The", "schema,", "straight", "from", "the", "database,", "so", "it's", "never", "out", "of", "date."] },
+    { at: tempo(1968), words: ["The", "schema,", "read", "from", "the", "database,", "so", "it", "matches", "what's", "actually", "there."] },
     // studio
     { at: tempo(2090), words: ["And", "you", "can", "work", "on", "the", "database", "itself,", "right", "there."] },
     // all
-    { at: tempo(2196), words: ["That", "was", "three", "commands.", "It's", "open", "source,", "and", "it", "runs", "anywhere.", "Your", "laptop,", "your", "servers,", "any", "cloud.", "Nobody", "else", "holds", "your", "data.", "So", "go", "build", "it", "by", "lunch.", "This", "time,", "you'll", "know", "you", "can", "trust", "it."] },
+    { at: tempo(2196), words: ["That", "was", "three", "commands.", "It's", "open", "source,", "and", "you", "run", "it", "wherever", "you", "want", "—", "your", "laptop,", "your", "servers,", "any", "cloud.", "If", "you", "want", "to", "know", "where", "your", "own", "database", "stands,", "the", "scan", "is", "free."] },
 ];
