@@ -49,7 +49,14 @@ App Runner is the simplest way to run containers on AWS without managing orchest
 | `NODE_ENV` | `production` |
 | `CORS_ORIGINS` | Your frontend domain (e.g., `https://yourdomain.com`) |
 | `FRONTEND_URL` | Your frontend URL (used for email links and CORS fallback) |
-| `ALLOW_REGISTRATION` | `false` (set to `true` only during initial setup) |
+| `DISABLE_SELF_REGISTRATION` | `true` |
+| `REBASE_ADMIN_EMAIL` | The first administrator's address, set **before the first boot** |
+| `REBASE_ADMIN_PASSWORD` | At least 12 characters |
+
+The last three are how this deployment gets an administrator at all: in
+production the first account to register is not promoted, so nothing else
+produces the first signed-in caller. See [Your first
+admin](/docs/getting-started/deployment/#your-first-admin).
 
 6. (Optional) If your RDS instance is strictly private, configure **Custom VPC** networking in App Runner so the container can securely talk to the database.
 7. Click **Create & deploy**.

@@ -20,7 +20,7 @@ There is no separate admin URL: the admin panel is part of your frontend, so whe
 | Backend-only project | Nothing (API only) | Not deployed |
 
 :::note[First visit]
-On the first visit to a fresh deployment's admin, Rebase shows a bootstrap screen to **create your admin account**. The first registered account receives admin privileges — claim it right after deploying.
+A fresh **production** deployment does not offer a bootstrap screen, and its first registration is an ordinary account. Name the administrator before the first boot instead — see [Your first admin](#your-first-admin).
 :::
 
 ## Docker Compose (Recommended)
@@ -100,19 +100,72 @@ For a **versioned, team workflow**, commit migration files with
 Either way it runs from a project checkout, not inside the running container —
 the runtime image ships without the CLI.
 
+## Your first admin
+
+**Set `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` before the first boot.**
+Every platform guide on this site points here, because this is the one step that
+has no recovery from the outside.
+
+A fresh database has no users, and outside production the registration policy
+admits the first sign-up and promotes it to admin. It has to: bootstrapping an
+admin needs a caller who is already signed in, so an empty database with no such
+rule is a dead end. On a laptop the person at the keyboard is the operator and
+that is exactly right.
+
+It is exactly wrong on a host with a public name. The shipped artifacts bring
+DNS and TLS up before the operator has typed anything, so the window is open to
+the internet from the first second — and whoever reaches the sign-up form first
+owns the deployment.
+
+So under `NODE_ENV=production` that window is closed. An empty user table
+refuses the bootstrap registration with `SETUP_REQUIRED`, an account created
+through open registration is an ordinary account, `GET /api/auth/config` never
+advertises `needsSetup`, and `POST /api/admin/bootstrap` refuses. In 0.17.3 and
+earlier the window was open in production too, so upgrade before you expose a
+fresh deployment.
+
+That leaves two ways in, neither of which is a race:
+
+```bash
+REBASE_ADMIN_EMAIL=you@example.com
+REBASE_ADMIN_PASSWORD=<at least 12 characters>
+DISABLE_SELF_REGISTRATION=true
+```
+
+The runtime creates that account once, while the user table is empty, and does
+nothing on every boot after that. Or assign the role to an existing user with
+the service key, if you provision accounts out of band.
+
+Two rules the runtime enforces at boot, both of which produce an account nobody
+can use if you get them wrong:
+
+- The password must be **at least 12 characters**, or it is refused and no
+  account is created.
+- The address must be one `POST /api/auth/login` accepts — it parses its body
+  with `z.string().email()`, so a domain with no dot (`admin@localhost`) seeds
+  fine and then answers 400 on every sign-in. Boot refuses that address too.
+
+Set both or neither: half a credential is a typo, and the deployment it produces
+— self-registration off, no admin — needs a `psql` prompt to recover. Boot warns
+when the table is empty in production and no admin is named.
+
+Sign in and change the password. It is sitting in plain text wherever you put
+your environment.
+
 ## Production Checklist
 
 Before deploying to production, ensure:
 
 | Item | Details |
 |------|---------|
+| **First admin** | Set `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` **before the first boot**, and `DISABLE_SELF_REGISTRATION=true`. In production the first account to register is not promoted — see [Your first admin](#your-first-admin). |
+| **NODE_ENV** | `NODE_ENV=production`. It is what closes the bootstrap window, refuses local file storage, requires `CORS_ORIGINS`, and turns the OpenAPI docs off. A deployment left at the default is running in development mode. |
 | **Database schema** | Boot creates your collection tables additively. Run `pnpm run db:push` (or `pnpm run db:migrate`) for junction-table RLS and for anything not purely additive. |
 | **JWT_SECRET** | Use a cryptographically strong random string (≥ 32 chars). Never reuse across environments. |
 | **DATABASE_URL** | Use a managed Postgres instance (Neon, Supabase, RDS) with TLS enabled |
-| **CORS** | Configure allowed origins on your backend if frontend and backend are on different domains |
+| **CORS_ORIGINS** | Always, not only when the frontend is on another domain. The runtime refuses to start in production with neither `CORS_ORIGINS` nor `FRONTEND_URL`, because an API that guesses its allowed origins eventually allows the wrong one. |
 | **Storage volumes** | Mount persistent volumes for file uploads. Or switch to S3 for production. |
 | **HTTPS** | Terminate TLS at your reverse proxy (nginx, Cloudflare, load balancer) |
-| **Registration** | Set `ALLOW_REGISTRATION=false` after creating your admin account |
 | **Public reads still need a caller** | `access: "public"` widens which *rows* a caller sees, not who may call: an anonymous request to `/api/data/*` answers 401 while `AUTH_REQUIRE` is on. Set `AUTH_REQUIRE=false` for a public site that reads its own backend, and let RLS alone decide. It is an environment variable, so a local `.env` that sets it does **not** travel with your deploy. |
 
 ## Native Modules on the Managed Runtime

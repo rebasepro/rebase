@@ -45,9 +45,17 @@ gcloud run deploy rebase-backend \
   --image europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest \
   --region europe-west3 \
   --port 3001 \
-  --set-env-vars DATABASE_URL="postgresql://...",JWT_SECRET="YOUR_SECURE_RANDOM_STRING",REBASE_SERVICE_KEY="YOUR_SERVICE_KEY",NODE_ENV="production",CORS_ORIGINS="https://yourdomain.com",FRONTEND_URL="https://yourdomain.com",ALLOW_REGISTRATION="false" \
+  --set-env-vars DATABASE_URL="postgresql://...",JWT_SECRET="YOUR_SECURE_RANDOM_STRING",REBASE_SERVICE_KEY="YOUR_SERVICE_KEY",NODE_ENV="production",CORS_ORIGINS="https://yourdomain.com",FRONTEND_URL="https://yourdomain.com",DISABLE_SELF_REGISTRATION="true",REBASE_ADMIN_EMAIL="you@yourdomain.com",REBASE_ADMIN_PASSWORD="AT_LEAST_TWELVE_CHARS" \
   --allow-unauthenticated
 ```
+
+`REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` are how this service gets an
+administrator at all: in production the first account to register is not
+promoted, so nothing else produces the first signed-in caller. Set them before
+the first revision serves traffic — see [Your first
+admin](/docs/getting-started/deployment/#your-first-admin). Put the password in
+Secret Manager rather than on the command line for a real deployment;
+`--set-secrets` mounts it the same way.
 
 ## 3. Handle File Storage
 Since Cloud Run instances are strictly stateless and ephemeral, you cannot use local disk storage for Rebase File Uploads.

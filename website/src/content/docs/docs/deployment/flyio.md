@@ -33,9 +33,18 @@ fly secrets set \
   REBASE_SERVICE_KEY=another_super_long_randomly_generated_secure_string \
   CORS_ORIGINS=https://my-rebase-app.fly.dev \
   FRONTEND_URL=https://my-rebase-app.fly.dev \
-  ALLOW_REGISTRATION=false \
+  DISABLE_SELF_REGISTRATION=true \
+  REBASE_ADMIN_EMAIL=you@example.com \
+  REBASE_ADMIN_PASSWORD=$(openssl rand -hex 12) \
   -a my-rebase-app
 ```
+
+The last three are how this app gets an administrator at all: in production the
+first account to register is not promoted, so nothing else produces the first
+signed-in caller. Set them before the first deploy serves traffic — see [Your
+first admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets
+list` shows only digests, so keep the generated password from this command —
+there is no way to read it back.
 
 ## 3. Validate Internal Configuration
 Fly will have generated a `fly.toml` file at the root of your project. Verify that the internal port explicitly aligns with the Rebase default configuration (`3001`):

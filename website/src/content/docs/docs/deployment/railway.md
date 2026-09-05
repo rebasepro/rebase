@@ -38,7 +38,15 @@ The initial build might fail because it is entirely missing configuration. Let's
    - `NODE_ENV`: Set to `production`
    - `CORS_ORIGINS`: Your frontend domain (e.g., `https://your-app.up.railway.app`)
    - `FRONTEND_URL`: Same as CORS_ORIGINS
-   - `ALLOW_REGISTRATION`: Set to `false` after creating your admin account
+   - `DISABLE_SELF_REGISTRATION`: `true`
+   - `REBASE_ADMIN_EMAIL`: the first administrator's address
+   - `REBASE_ADMIN_PASSWORD`: at least 12 characters
+
+   The last three are how this service gets an administrator at all: in
+   production the first account to register is not promoted, so nothing else
+   produces the first signed-in caller. Set them before the service first
+   serves traffic — see [Your first
+   admin](/docs/getting-started/deployment/#your-first-admin).
 4. Click **Reference Variable** and select `DATABASE_URL` from the PostgreSQL service you provisioned. Railway will securely inject the internal Postgres URL at runtime.
 
 ## 5. Expose the Domain
