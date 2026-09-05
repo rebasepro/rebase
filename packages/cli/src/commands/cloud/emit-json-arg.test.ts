@@ -6,8 +6,8 @@ import { describe, it, expect } from "vitest";
  * The human argument beside it IS a thunk, so mirroring it reads natural — and
  * four call sites in `resources.ts` did exactly that. `json: unknown` accepted a
  * function without complaint, `printJson` stringified it, and
- * `JSON.stringify(fn)` is `undefined`. So `rebase cloud resources`,
- * `resources set`, `clusters verify` and `clusters add` printed the single word
+ * `JSON.stringify(fn)` is `undefined`. So `rebase cloud compute`,
+ * `compute set`, `clusters verify` and `clusters add` printed the single word
  * `undefined` on every piped or `--json` run — and this command family forces
  * JSON mode off a TTY, so that was every scripted use.
  *

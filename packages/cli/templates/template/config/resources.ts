@@ -11,7 +11,7 @@
  * The runtime reads this file at boot and reports, for every declaration,
  * whether it is bound. Nothing here is silent.
  */
-import { bucket, database } from "@rebasepro/types";
+import { bucket, database, queue, topic } from "@rebasepro/types";
 
 /**
  * The project's database, bound from `DATABASE_URL`.
@@ -35,11 +35,18 @@ export const main = database();
  * Object storage.
  *
  * Uncomment to give this project a bucket. The default-keyed one binds from the
- * plain `S3_BUCKET` / `GCS_BUCKET` / `STORAGE_BUCKET`; a named one appends its
- * key, so `bucket("media")` reads `S3_BUCKET__MEDIA`.
+ * plain `S3_BUCKET` / `GCS_BUCKET`; a named one appends its key, so
+ * `bucket("media")` reads `S3_BUCKET__MEDIA`. In development an unbound bucket
+ * is a local directory until you bind it; in production it is off, and
+ * `rebase status` tells you which variable it is waiting on.
  *
  * export const files = bucket({ engine: "s3" });
  * export const media = bucket("media", { engine: "s3" });
+ *
+ * Point a property at it by handle — the same name, spelled once:
+ *
+ * import { media } from "../resources";
+ * cover: { type: "string", storage: { storageSource: media } }
  *
  * ## When you have several on one provider
  *
@@ -55,3 +62,24 @@ export const main = database();
  * one, so a single source can be moved to another provider without breaking the
  * rest off their shared account.
  */
+
+/**
+ * Background work.
+ *
+ * A topic fans out: every subscription gets each event, and each retries on
+ * its own. A queue is a work list with one handler. Both ride on the durable
+ * job queue in this project's database, so declaring either turns it on, and
+ * neither needs any environment configuration.
+ *
+ * export const signups = topic<{ userId: string }>("signups");
+ * signups.subscription("send-welcome", async ({ userId }) => { … });
+ *
+ * export const thumbnails = queue<{ key: string }>("thumbnails");
+ * thumbnails.handler(async ({ key }) => { … });
+ *
+ * Crons and functions are files: `backend/crons/<name>.ts` and
+ * `backend/functions/<name>.ts`. They appear in `rebase resources` under the
+ * name of the file.
+ */
+void topic;
+void queue;

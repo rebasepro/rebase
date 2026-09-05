@@ -15,7 +15,8 @@ import {
     MountableRouter,
     RealtimeProvider,
     SecurityRule,
-    buildResourceGraph
+    buildResourceGraph,
+    resourceKeyOf
 } from "@rebasepro/types";
 import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, getEffectiveSecurityRules } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
@@ -24,10 +25,12 @@ import { loadCollectionsFromDirectory } from "./collections/loader";
 import { assertCollectionConfigs } from "./collections/validate-config";
 import {
     collectionsStoredBy,
-    logForeignCollections,
+    logUnprovisionedCollections,
+    provisionTargetsFor,
+    provisioningDisabled,
+    type ProvisionTarget,
     provisionCollectionPolicies,
-    provisionCollectionTables,
-    provisionTargetFor
+    provisionCollectionTables
 } from "./boot/provision";
 import { enforceSchemaStamp, resolveSchemaMismatchPolicy } from "./boot/schema-stamp";
 import { DEFAULT_DRIVER_ID, DefaultDriverRegistry, DriverRegistry } from "./services/driver-registry";
@@ -105,6 +108,7 @@ import type { JobQueueOptions } from "./jobs/types";
 import {
     BackendStorageConfig,
     createStorageRoutes,
+    DEFAULT_STORAGE_ID,
     StorageController,
     StorageRegistry
 } from "./storage";
@@ -828,9 +832,12 @@ import {
     assertNoReplacedResourceConfig,
     graphToDataSources,
     graphToStorageSources,
-    graphTopics
+    graphTopics,
+    graphQueues
 } from "./boot/resource-adapters.js";
+import { assertEveryKindBindable } from "./boot/resource-resolvers.js";
 import { installTopicRuntime, topicJobHandlers } from "./topics/runtime.js";
+import { queueJobHandlers, installQueueRuntime } from "./queues/runtime.js";
 export { isAuthAdapter } from "./auth/require-auth";
 
 /**
@@ -985,6 +992,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // declarations, which have already been evaluated by the time a backend is
     // being initialised with them.
     const resourceGraph = buildResourceGraph();
+    assertEveryKindBindable(resourceGraph);
     const declaredDataSources = graphToDataSources(resourceGraph);
     const declaredStorageSources = graphToStorageSources(resourceGraph);
 
@@ -1106,18 +1114,47 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // ever ran for managed tenants. An app shipping its own image called
     // `initializeRebaseBackend` directly, got no tables, and served sign-in
     // while 500ing every data route. See ./boot/provision.
-    const provisionTarget = provisionTargetFor(bootstrappers, config.database, config.provisioningDriverResult);
-    const provisionable = collectionsStoredBy(
-        activeCollections,
-        { engine: provisionTarget.engine },
-        declaredDataSources.map(source => ({ key: source.key, engine: source.engine ?? provisionTarget.engine }))
-    );
-    logForeignCollections(activeCollections, provisionable, { engine: provisionTarget.engine });
+    // One target per data source, the default first. Each source gets exactly
+    // the collections routed to it: this used to hand every same-engine
+    // collection to the default, so a table for `database("analytics")` was
+    // created in the default database and the analytics one stayed empty.
+    const provisionTargets = provisionTargetsFor(bootstrappers, config.database, config.provisioningDriverResult);
+    const provisionTarget = provisionTargets[0];
+    const sourceShapes = provisionTargets.map(t => ({ key: t.key ?? DEFAULT_DRIVER_ID, engine: t.engine }));
+    const declaredShapes = declaredDataSources.map(source => ({
+        key: source.key,
+        engine: source.engine ?? provisionTarget.engine
+    }));
+    const provisionableBy = new Map<ProvisionTarget, CollectionConfig[]>();
+    const storedBySome = new Set<CollectionConfig>();
+    for (const target of provisionTargets) {
+        const mine = collectionsStoredBy(
+            activeCollections,
+            { key: target.key ?? DEFAULT_DRIVER_ID, engine: target.engine },
+            declaredShapes.length > 0 ? declaredShapes : sourceShapes
+        );
+        provisionableBy.set(target, mine);
+        for (const c of mine) storedBySome.add(c);
+    }
+    logUnprovisionedCollections(activeCollections, storedBySome, sourceShapes);
+    const provisionable = provisionableBy.get(provisionTarget) ?? [];
 
-    const schemaOutcome = await provisionCollectionTables(provisionable, provisionTarget, {
+    let schemaOutcome = await provisionCollectionTables(provisionable, provisionTarget, {
         introspecting: introspectCollections,
         provision: config.provisionSchema ?? true
     });
+    for (const target of provisionTargets.slice(1)) {
+        const mine = provisionableBy.get(target) ?? [];
+        if (mine.length === 0) continue;
+        logger.info(`Provisioning ${mine.length} collection table(s) on data source "${target.key}"`);
+        const outcome = await provisionCollectionTables(mine, target, {
+            introspecting: introspectCollections,
+            provision: config.provisionSchema ?? true
+        });
+        if (outcome.status === "applied" && schemaOutcome.status === "applied") {
+            schemaOutcome = { status: "applied", applied: schemaOutcome.applied + outcome.applied };
+        }
+    }
 
     // 1. Initialize all drivers
     for (const bootstrapper of bootstrappers) {
@@ -1131,6 +1168,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             collections: activeCollections,
             collectionRegistry,
             introspectCollections,
+            dataSourceKey: b.id || DEFAULT_DRIVER_ID,
             baas: config.baas,
             // So the driver's drift check can say something true about WHY a
             // table is missing. Its warning used to assert that "this runtime
@@ -1379,6 +1417,21 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         introspecting: introspectCollections,
         provision: config.provisionSchema ?? true
     });
+    for (const target of provisionTargets.slice(1)) {
+        const mine = provisionableBy.get(target) ?? [];
+        if (mine.length === 0) continue;
+        // The helper functions the policies call arrive with the auth tables
+        // on the default source only. A second database needs them created on
+        // its own, or every CREATE POLICY below fails and the source denies
+        // every user read while reporting itself healthy.
+        if ((config.provisionSchema ?? true) && !provisioningDisabled() && target.bootstrapper.ensureRlsRuntime) {
+            await target.bootstrapper.ensureRlsRuntime(target.driverResult);
+        }
+        await provisionCollectionPolicies(mine, target, {
+            introspecting: introspectCollections,
+            provision: config.provisionSchema ?? true
+        });
+    }
 
     // ── Is the database's authorization actually in force? ───────────────────
     //
@@ -2500,6 +2553,28 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         Object.assign(serverClient, { storage: storageController });
         logger.debug("Native storage attached to singleton (bypasses HTTP loop)");
     }
+    // `rebase.bucket(media)`: the source a declared bucket names, by handle or
+    // by key, straight to its controller. Refuses an unknown source by name
+    // rather than handing back the default — a write that lands in the wrong
+    // bucket is the failure that looks like success.
+    if (storageRegistry || storageController) {
+        Object.assign(serverClient, {
+            bucket: (source: import("@rebasepro/types").ResourceRef) => {
+                const key = resourceKeyOf(source);
+                if (storageRegistry) {
+                    const found = storageRegistry.get(key);
+                    if (found) return found;
+                    throw new Error(
+                        `No storage source "${key}" is configured on this backend. ` +
+                        `Configured: ${storageRegistry.list().map(k => `"${k}"`).join(", ") || "(none)"}. ` +
+                        "Declare it in config/resources.ts and bind it — `rebase status` shows which variable."
+                    );
+                }
+                if (key === DEFAULT_STORAGE_ID) return storageController;
+                throw new Error(`No storage source "${key}" is configured on this backend; only the default is.`);
+            }
+        });
+    }
 
     // Attach email service to the server client when configured.
     // The email service may come from the auth bootstrapper or from the auth config directly.
@@ -2532,8 +2607,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const driverAdmin = defaultBootstrapper.getAdmin?.(defaultDriverResult);
     if (isSQLAdmin(driverAdmin)) {
         Object.assign(serverClient, {
-            sql: (query: string, options?: { database?: string; role?: string; params?: unknown[] }) =>
-                driverAdmin.executeSql(query, options)
+            sql: (query: string, options?: { database?: import("@rebasepro/types").ResourceRef; role?: string; params?: unknown[] }) =>
+                driverAdmin.executeSql(query, options && {
+                    role: options.role,
+                    params: options.params,
+                    ...(options.database !== undefined ? { database: resourceKeyOf(options.database) } : {})
+                })
         });
         logger.debug("SQL capability attached to singleton");
     }
@@ -2789,18 +2868,21 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // somebody to turn on a subsystem they never named, to make a feature they
     // did name work, is the kind of second step this model exists to remove.
     const declaredTopics = graphTopics(buildResourceGraph());
+    const declaredQueues = graphQueues(buildResourceGraph());
     const topicTasks = declaredTopics.length > 0 ? topicJobHandlers() : {};
-    if (declaredTopics.length > 0) {
+    const queueTasks = declaredQueues.length > 0 ? queueJobHandlers() : {};
+    if (declaredTopics.length > 0 || declaredQueues.length > 0) {
         config = {
             ...config,
             jobs: {
                 ...config.jobs,
                 enabled: true,
-                tasks: { ...(config.jobs?.tasks ?? {}), ...topicTasks }
+                tasks: { ...(config.jobs?.tasks ?? {}), ...topicTasks, ...queueTasks }
             }
         };
         logger.debug(
-            `[topics] ${declaredTopics.length} topic(s), ${Object.keys(topicTasks).length} subscription(s) ` +
+            `[topics] ${declaredTopics.length} topic(s), ${Object.keys(topicTasks).length} subscription(s); ` +
+            `[queues] ${declaredQueues.length} queue(s), ${Object.keys(queueTasks).length} handler(s) ` +
             "wired onto the job queue"
         );
     }
@@ -2844,6 +2926,9 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             if (declaredTopics.length > 0) {
                 installTopicRuntime({ queue: jobQueue, topics: declaredTopics });
             }
+            if (declaredQueues.length > 0) {
+                installQueueRuntime({ queue: jobQueue, queues: declaredQueues });
+            }
             // Constructed either way, started only where this process owns the
             // workers: `rebase.jobs.enqueue` must keep working in a process that
             // runs none of them. Enqueueing is a write to a table; running is a
@@ -2856,17 +2941,20 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                     tasks: Object.keys(config.jobs.tasks ?? {}).length
                 });
             }
-        } else if (declaredTopics.length > 0) {
+        } else if (declaredTopics.length > 0 || declaredQueues.length > 0) {
             // A warning would be wrong here. Webhooks have an in-memory
-            // fallback; topics have none, so every publish would throw at the
-            // first event — in production, at whatever hour the first one
-            // arrives. A driver that cannot carry the queue cannot carry
-            // topics, and the honest place to say so is boot.
+            // fallback; topics and queues have none, so every publish would
+            // throw at the first event — in production, at whatever hour the
+            // first one arrives. A driver that cannot carry the job queue
+            // cannot carry either, and the honest place to say so is boot.
+            const named = [
+                ...declaredTopics.map(t => `topic ${t.key}`),
+                ...declaredQueues.map(q => `queue ${q.key}`)
+            ].join(", ");
             throw new Error(
-                `This project declares ${declaredTopics.length} topic(s) — ` +
-                `${declaredTopics.map(t => t.key).join(", ")} — but the durable job queue is not ` +
-                "available on this database driver, and topics are delivered as job rows.\n\n" +
-                "Use a driver that supports the job queue, or remove the topic declarations. " +
+                `This project declares ${named}, but the durable job queue is not ` +
+                "available on this database driver, and topics and queues are delivered as job rows.\n\n" +
+                "Use a driver that supports the job queue, or remove the declarations. " +
                 "Refusing to boot rather than starting a backend where every publish throws."
             );
         } else {

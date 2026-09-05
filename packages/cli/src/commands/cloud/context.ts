@@ -641,7 +641,7 @@ export function emit<T>(human: () => void, json: JsonArg<T>): void {
  * `json: unknown` accepted a function without complaint, and four call sites in
  * `resources.ts` passed `() => ({ … })` — mirroring the human argument beside
  * it, which *is* a thunk. In JSON mode `printJson` then stringified a function,
- * which is `undefined`. So `rebase cloud resources`, `resources set` and two
+ * which is `undefined`. So `rebase cloud compute`, `compute set` and two
  * cluster commands printed the single word `undefined` on every piped or
  * `--json` run — and since this family forces JSON mode off a TTY, that is
  * every scripted use of them.

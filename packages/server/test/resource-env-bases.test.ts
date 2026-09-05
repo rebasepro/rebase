@@ -1,8 +1,9 @@
 import { describe, it, expect } from "@jest/globals";
 import fs from "fs";
 import path from "path";
-import { resourceKind } from "@rebasepro/types";
+import { resourceKind, resourceKinds } from "@rebasepro/types";
 import { ACCOUNT_SCOPED_STORAGE_BASES } from "../src/boot/sources";
+import { resourceResolver, unbindableKinds } from "../src/boot/resource-resolvers";
 
 /**
  * A kind's `envBases` list against the resolver that actually reads them.
@@ -87,6 +88,31 @@ describe("envBases matches the resolver", () => {
         for (const name of ["S3_BUCKET", "GCS_BUCKET", "STORAGE_TYPE", "STORAGE_PATH"]) {
             expect({ name, scoped: scoped.has(name), plain: plain.has(name) })
                 .toEqual({ name, scoped: false, plain: true });
+        }
+    });
+
+    it("every registered kind has a resolver, and it reads exactly the kind's bases", () => {
+        // The generic half of the gate. The two source-text checks above see
+        // inside the resolvers for database and bucket; this one holds EVERY
+        // kind — topic, queue, cron, function and whatever comes next — to the
+        // same rule from the outside: the runtime must know how to bind it,
+        // and the bases it says it reads must be the bases the kind declares.
+        // The topic kind escaped the old per-kind tests with `REBASE_TOPIC_URL`,
+        // a name nothing read, which is why this iterates the registry rather
+        // than naming kinds.
+        expect(unbindableKinds()).toEqual([]);
+        expect(resourceKinds().length).toBeGreaterThanOrEqual(6);
+        for (const spec of resourceKinds()) {
+            const resolver = resourceResolver(spec.kind);
+            expect({ kind: spec.kind, resolver: Boolean(resolver) }).toEqual({ kind: spec.kind, resolver: true });
+            expect({ kind: spec.kind, reads: [...resolver!.reads].sort() })
+                .toEqual({ kind: spec.kind, reads: [...spec.envBases].sort() });
+            if (resolver!.accountScoped) {
+                for (const base of resolver!.accountScoped) {
+                    expect({ kind: spec.kind, base, declared: spec.envBases.includes(base) })
+                        .toEqual({ kind: spec.kind, base, declared: true });
+                }
+            }
         }
     });
 

@@ -43,6 +43,11 @@ export function graphTopics(graph: ResourceGraph): ResourceGraph["resources"] {
     return graph.resources.filter(r => r.kind === "topic");
 }
 
+/** Queues in the graph, for the runtime to enqueue on and the worker to wire. */
+export function graphQueues(graph: ResourceGraph): ResourceGraph["resources"] {
+    return graph.resources.filter(r => r.kind === "queue");
+}
+
 /**
  * Configuration keys the resource graph replaced.
  *

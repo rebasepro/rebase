@@ -65,6 +65,90 @@ describe("deriving", () => {
         expect(graph.resources.map(r => r.key)).toContain(`attachments_${process.pid}`);
     });
 
+    it("records a cron under the id the scheduler runs it as, and a function by its filename", async () => {
+        // Both by filename: the same identity the routes, the Studio and
+        // `REBASE_FUNCTIONS_ONLY` use. A host reading the graph now knows the
+        // schedule and the zone before it runs anything.
+        const cronsDir = path.join(root, "backend", "crons");
+        const functionsDir = path.join(root, "backend", "functions");
+        fs.mkdirSync(cronsDir, { recursive: true });
+        fs.mkdirSync(functionsDir, { recursive: true });
+        fs.writeFileSync(path.join(cronsDir, `nightly_${process.pid}.ts`), `
+            import { defineCron } from "@rebasepro/server";
+            export default defineCron({
+                name: "Nightly",
+                schedule: "0 3 * * *",
+                timezone: "Europe/Madrid",
+                async handler() {}
+            });
+        `);
+        fs.writeFileSync(path.join(functionsDir, `hello_${process.pid}.ts`), `
+            import { defineFunction } from "@rebasepro/server/functions";
+            import fs from "fs";
+            export default defineFunction((app) => { app.get("/", c => c.json({ ok: fs.existsSync("/") })); });
+        `);
+        writeResources(`export const nothing = 1;`);
+
+        const { graph, issues } = await deriveResourceGraph({ configDir, cronsDir, functionsDir, projectRoot: root });
+        expect(issues).toEqual([]);
+        const cron = graph.resources.find(r => r.kind === "cron");
+        expect(cron?.key).toBe(`nightly_${process.pid}`);
+        expect(cron?.options).toMatchObject({ schedule: "0 3 * * *", timezone: "Europe/Madrid" });
+        const fn = graph.resources.find(r => r.kind === "function");
+        expect(fn?.key).toBe(`hello_${process.pid}`);
+        expect(fn?.options).toMatchObject({ portable: false });
+        expect(fn?.options.requires).toEqual(["imports the Node built-in \"fs\""]);
+    });
+
+    it("records who uses what: collections by dataSource, properties by bucket, functions by import", async () => {
+        // The map a split needs and a console needs for "what breaks if I
+        // remove this". Recorded from the evaluated collections and the
+        // functions' imports, never from the constructors, which only know
+        // that a resource exists.
+        const k = process.pid;
+        fs.mkdirSync(path.join(configDir, "collections"), { recursive: true });
+        writeResources(`
+            import { database, bucket } from "@rebasepro/types";
+            export const analytics = database("analytics_${k}");
+            export const media = bucket("media_${k}", { engine: "s3" });
+        `);
+        fs.writeFileSync(path.join(configDir, "collections", "events.ts"), `
+            import { analytics, media } from "../resources";
+            export default {
+                slug: "events", name: "Events", dataSource: analytics,
+                properties: { cover: { type: "string", storage: { storageSource: media } } }
+            };
+        `);
+        const functionsDir = path.join(root, "backend", "functions");
+        fs.mkdirSync(functionsDir, { recursive: true });
+        fs.writeFileSync(path.join(functionsDir, `report_${k}.ts`), `
+            import { media as photos } from "../../config/resources";
+            export default (app: unknown) => app;
+        `);
+
+        const { graph, issues } = await deriveResourceGraph({ configDir, functionsDir, projectRoot: root });
+        expect(issues).toEqual([]);
+        expect(graph.resources.find(r => r.key === `analytics_${k}`)?.usedBy).toEqual(["collection:events"]);
+        expect(graph.resources.find(r => r.key === `media_${k}`)?.usedBy)
+            .toEqual([`function:report_${k}`, "property:events.cover"]);
+        // A handle written where a key belongs is recorded as the key: the
+        // collection is data past this point, and the edge came from it.
+        expect(serializeResourceGraph(graph)).toContain('"usedBy"');
+    });
+
+    it("names a collection routed to a database nothing declares", async () => {
+        // Boot refuses this with the variable name; the derive step says it
+        // earlier, with the declaration to add.
+        fs.mkdirSync(path.join(configDir, "collections"), { recursive: true });
+        writeResources(`export const nothing = 1;`);
+        fs.writeFileSync(path.join(configDir, "collections", "facts.ts"), `
+            export default { slug: "facts", name: "Facts", dataSource: "warehouse", properties: {} };
+        `);
+        const { issues } = await deriveResourceGraph({ configDir });
+        expect(issues.map(i => i.path)).toEqual(["collection.facts"]);
+        expect(issues[0].message).toMatch(/database\("warehouse"\)/);
+    });
+
     it("reports the file a broken declaration is in, not just that it failed", async () => {
         writeResources(`
             import { bucket } from "@rebasepro/types";

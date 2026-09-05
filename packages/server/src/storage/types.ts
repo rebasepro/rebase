@@ -17,6 +17,14 @@ export interface LocalStorageConfig {
     allowedMimeTypes?: string[];
     /** Base URL for generating download URLs (default: auto-detected from request) */
     baseUrl?: string;
+    /**
+     * Set when this local backend stands in for an object store the source
+     * declared and nothing bound — `bucket("media", { engine: "s3" })` with no
+     * `S3_BUCKET__MEDIA` in a development process. Names the engine it stands
+     * in for, so boot can say so and `rebase status` can show it. Never set in
+     * production, where an unbound object store stays unbound.
+     */
+    standsInFor?: string;
 }
 
 /**

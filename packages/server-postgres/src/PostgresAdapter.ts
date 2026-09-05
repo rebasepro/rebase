@@ -56,6 +56,15 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
                 bootstrapper.ensureCollectionSchema!(collections, driverResult, log)
             : undefined,
 
+        // Same rule, and it bit at once: the method existed on the bootstrapper,
+        // this wrapper did not forward it, and a second database booted with
+        // tables and no helper functions — every policy on it silently failed
+        // to create. The adapter type is where a forgotten forward should fail
+        // to compile; `adapter-forwarding.test.ts` sweeps for exactly this.
+        ensureRlsRuntime: bootstrapper.ensureRlsRuntime
+            ? (driverResult) => bootstrapper.ensureRlsRuntime!(driverResult)
+            : undefined,
+
         ensureCollectionPolicies: bootstrapper.ensureCollectionPolicies
             ? (collections, driverResult, log) =>
                 bootstrapper.ensureCollectionPolicies!(collections, driverResult, log)

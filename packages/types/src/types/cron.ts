@@ -20,6 +20,17 @@ export interface CronJobDefinition {
     // Cron schedule expression, e.g. "0 3 * * *" for daily at 3 AM.
     schedule: string;
 
+    /**
+     * IANA time zone the schedule is read in, e.g. `"Europe/Madrid"`.
+     *
+     * Without it the expression is read in the process's own zone — UTC in
+     * nearly every container, the developer's own on a laptop — so `0 3 * * *`
+     * fires at a different wall-clock hour either side of a deploy. Name the
+     * zone and the schedule means one thing everywhere it runs. An unknown zone
+     * is refused when the job loads rather than silently read as local time.
+     */
+    timezone?: string;
+
     /** Human-readable name shown in the Studio UI. */
     name: string;
 

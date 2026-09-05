@@ -875,6 +875,13 @@ export interface BackendBootstrapper {
     ): Promise<{ applied: number }>;
 
     /**
+     * Create the RLS helper functions on this source's database. See
+     * `DatabaseAdapter.ensureRlsRuntime`; needed on every source that is not
+     * the default, whose helpers arrive with the auth tables.
+     */
+    ensureRlsRuntime?(driverResult?: InitializedDriver): Promise<void>;
+
+    /**
      * Re-check, after the schema exists, that requests will actually be
      * constrained by the database's own authorization.
      *

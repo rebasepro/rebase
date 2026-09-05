@@ -1,4 +1,4 @@
-import { CollectionConfig, SecurityRule, isPostgresCollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, SecurityRule, isPostgresCollectionConfig, resolveResourceRefs } from "@rebasepro/types";
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
@@ -104,7 +104,12 @@ export async function loadCollectionsFromDirectory(
     options: { validate?: false | ValidateCollectionConfigOptions } = {}
 ): Promise<CollectionConfig[]> {
     const resolved = path.resolve(source);
-    const validate = (collections: CollectionConfig[]): CollectionConfig[] => {
+    const validate = (loaded: CollectionConfig[]): CollectionConfig[] => {
+        // A resource handle written where a key belongs — `dataSource:
+        // analytics` — becomes its key here, for a collection authored as a
+        // plain object rather than through `defineCollection`, which already
+        // did this. Past this point a collection is data.
+        const collections = loaded.map(c => resolveResourceRefs(c));
         if (options.validate !== false) assertCollectionConfigs(collections, options.validate ?? {});
         return collections;
     };

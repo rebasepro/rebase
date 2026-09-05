@@ -1,4 +1,5 @@
 import type { User } from "../users";
+import type { ResourceRef } from "../types/resources";
 import type { RebaseSdkData } from "./data";
 import type { EmailService } from "./email";
 import type { StorageSource } from "./storage";
@@ -312,7 +313,24 @@ export interface RebaseClient<DB = unknown> {
      * routed to the matching `StorageController`. Used to lazily wire
      * `transport: "server"` sources on the frontend.
      */
-    createStorageSource?(storageId: string): StorageSource;
+    createStorageSource?(storageId: ResourceRef): StorageSource;
+
+    /**
+     * The storage source a bucket handle names, ready to use.
+     *
+     * ```ts
+     * import { media } from "../../config/resources";
+     * await rebase.bucket(media).upload(key, file);
+     * ```
+     *
+     * Named after the constructor: `bucket("media")` declares it, and
+     * `rebase.bucket(media)` reaches it — the same name, spelled once. A string
+     * key is accepted for callers that only have one. Throws on a source the
+     * backend did not register, naming the ones it did, rather than silently
+     * serving the default — the failure that used to look like an upload that
+     * worked.
+     */
+    bucket?(source: ResourceRef): StorageSource;
 
     /**
      * Discover the storage sources declared on the backend via
@@ -451,7 +469,7 @@ export interface RebaseServerClient<DB = unknown> extends Omit<RebaseClient<DB>,
      * that genuinely needs raw SQL can ask `runtimeKey()` and degrade, rather
      * than discovering it at the call.
      */
-    sql(query: string, options?: { database?: string; role?: string; params?: unknown[] }): Promise<Record<string, unknown>[]>;
+    sql(query: string, options?: { database?: ResourceRef; role?: string; params?: unknown[] }): Promise<Record<string, unknown>[]>;
 }
 
 /**

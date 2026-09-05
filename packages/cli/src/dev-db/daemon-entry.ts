@@ -27,7 +27,7 @@ import {
     PGLITE_EXTENSIONS
 } from "./constraints";
 import { NotificationProxy } from "./notification-proxy";
-import { clearState, dataDir, findFreePort, writeState } from "./state";
+import { additionalDataDir, clearState, dataDir, findFreePort, writeState } from "./state";
 
 /** Shut down after this long with nothing connected. */
 const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60_000;
@@ -123,11 +123,43 @@ async function loadExtensions(): Promise<Record<string, unknown>> {
  * Rebase send a migration to a stranger. So the daemon publishes a token on a
  * second loopback port and the answer is only yes when the token matches.
  */
-function startIdentityServer(token: string, onConnection: () => void): Promise<net.Server> {
+/**
+ * How long a client has to send a command after the identity line, before
+ * the daemon closes the socket. The liveness check never sends one and
+ * closes on its own; this is for a client that connected and hung.
+ */
+const COMMAND_TIMEOUT_MS = 2_000;
+
+/**
+ * One command a client may send after reading the identity line.
+ *
+ * `ensure <key>` answers `ok <port>` once a PGlite instance for that declared
+ * database is serving, starting it if it is not. A daemon started before a
+ * second database was declared serves it without a restart, which matters
+ * because `rebase studio` in another terminal is connected to the first.
+ */
+type CommandHandler = (command: string) => Promise<string>;
+
+function startIdentityServer(token: string, onConnection: () => void, onCommand: CommandHandler): Promise<net.Server> {
     return new Promise((resolve, reject) => {
         const server = net.createServer((socket) => {
             onConnection();
-            socket.end(`rebase-dev-db ${token}\n`);
+            socket.write(`rebase-dev-db ${token}\n`);
+            let buffered = "";
+            const timer = setTimeout(() => socket.end(), COMMAND_TIMEOUT_MS);
+            socket.on("data", (chunk) => {
+                buffered += chunk.toString("utf8");
+                const newline = buffered.indexOf("\n");
+                if (newline === -1) return;
+                clearTimeout(timer);
+                const command = buffered.slice(0, newline).trim();
+                buffered = "";
+                onCommand(command)
+                    .then((reply) => socket.end(`${reply}\n`))
+                    .catch((err) => socket.end(`error ${err instanceof Error ? err.message : String(err)}\n`));
+            });
+            socket.on("error", () => clearTimeout(timer));
+            socket.on("close", () => clearTimeout(timer));
         });
         server.once("error", reject);
         server.listen(0, "127.0.0.1", () => resolve(server));
@@ -150,54 +182,111 @@ export async function runDaemon(args: DaemonArgs): Promise<void> {
     };
 
     const extensions = await loadExtensions();
-    const db = (await PGlite.create({ dataDir: directory, extensions })) as { close(): Promise<void> };
+
+    /** One PGlite instance, its socket server and the proxy clients reach it through. */
+    interface Instance {
+        db: { close(): Promise<void> };
+        server: { stop(): Promise<void>; getStats(): { activeConnections: number; queuedQueries: number } };
+        proxy: NotificationProxy;
+        port: number;
+        dataDir: string;
+    }
 
     // The socket server listens privately; clients reach it through the
-    // notification proxy on `args.port`. Realtime does not work otherwise —
-    // PGlite is one session, so a NotificationResponse is handed to whichever
-    // socket is reading rather than to the one that issued LISTEN. See
-    // `notification-proxy.ts` for the measurements.
-    const upstreamPort = await findFreePort();
-    const server = new PGLiteSocketServer({
-        db,
-        port: upstreamPort,
-        host: "127.0.0.1",
-        // Above the client pool limit so a second *non-transactional* client is
-        // refused with a connection error rather than deadlocking the
-        // multiplexer. See `constraints.ts` — the pool limit is what actually
-        // prevents overlapping transactions.
-        maxConnections: MANAGED_SERVER_MAX_CONNECTIONS
-    });
-    await server.start();
+    // notification proxy on the public port. Realtime does not work
+    // otherwise — PGlite is one session, so a NotificationResponse is handed
+    // to whichever socket is reading rather than to the one that issued
+    // LISTEN. See `notification-proxy.ts` for the measurements.
+    const startInstance = async (instanceDir: string, listenPort: number, label: string): Promise<Instance> => {
+        fs.mkdirSync(instanceDir, { recursive: true });
+        const db = (await PGlite.create({ dataDir: instanceDir, extensions })) as { close(): Promise<void> };
+        const upstreamPort = await findFreePort();
+        const server = new PGLiteSocketServer({
+            db,
+            port: upstreamPort,
+            host: "127.0.0.1",
+            // Above the client pool limit so a second *non-transactional* client is
+            // refused with a connection error rather than deadlocking the
+            // multiplexer. See `constraints.ts` — the pool limit is what actually
+            // prevents overlapping transactions.
+            maxConnections: MANAGED_SERVER_MAX_CONNECTIONS
+        });
+        await server.start();
+        const proxy = new NotificationProxy({
+            listenPort,
+            upstreamPort,
+            onNotification: (channel, _payload, copies) => {
+                if (copies > 0) process.stdout.write(`dev-db${label}: relayed notification on ${channel} to ${copies} client(s)\n`);
+            }
+        });
+        await proxy.start();
+        return { db, server, proxy, port: listenPort, dataDir: instanceDir };
+    };
 
-    const proxy = new NotificationProxy({
-        listenPort: args.port,
-        upstreamPort,
-        onNotification: (channel, _payload, copies) => {
-            if (copies > 0) process.stdout.write(`dev-db: relayed notification on ${channel} to ${copies} client(s)\n`);
-        }
-    });
-    await proxy.start();
+    const primary = await startInstance(directory, args.port, "");
+    /** Additional declared databases, by key. Started on demand. */
+    const additional = new Map<string, Instance>();
+    /** In-flight starts, so two commands asking for one key start one instance. */
+    const starting = new Map<string, Promise<Instance>>();
 
     // "Idle" means nothing is connected to the *database*. An earlier version
     // tracked identity pings instead, which meant a daemon serving queries
     // steadily for an hour would decide it was idle and shut down under a
     // running dev server.
     let idleSince: number | null = Date.now();
+
+    const publishState = (identityPort: number) => {
+        const databases: Record<string, { port: number; dataDir: string }> = {};
+        for (const [key, instance] of additional) databases[key] = { port: instance.port, dataDir: instance.dataDir };
+        writeState(args.projectRoot, {
+            port: args.port,
+            pid: process.pid,
+            dataDir: directory,
+            startedAt: new Date().toISOString(),
+            token: args.token,
+            identityPort,
+            ...(additional.size > 0 ? { databases } : {})
+        });
+    };
+
+    let identityPort = 0;
+    const ensureAdditional = async (key: string): Promise<Instance> => {
+        const existing = additional.get(key);
+        if (existing) return existing;
+        const inFlight = starting.get(key);
+        if (inFlight) return inFlight;
+        const promise = (async () => {
+            const instance = await startInstance(additionalDataDir(args.projectRoot, key), await findFreePort(), ` [${key}]`);
+            additional.set(key, instance);
+            publishState(identityPort);
+            process.stdout.write(`dev-db [${key}]: ready on 127.0.0.1:${instance.port}\n`);
+            return instance;
+        })();
+        starting.set(key, promise);
+        try {
+            return await promise;
+        } finally {
+            starting.delete(key);
+        }
+    };
+
     const identity = await startIdentityServer(args.token, () => {
         idleSince = null;
+    }, async (command) => {
+        const match = /^ensure\s+(\S+)$/.exec(command);
+        if (!match) return `error unknown command "${command}"`;
+        const key = match[1];
+        // The key becomes a directory name and a variable suffix; the same
+        // rule the declaration passed applies here, so nothing a declaration
+        // could not say reaches the filesystem.
+        if (!/[a-z0-9]/i.test(key) || key.includes("/") || key.includes("..")) return `error invalid key "${key}"`;
+        const instance = await ensureAdditional(key);
+        return `ok ${instance.port}`;
     });
     const identityAddress = identity.address();
-    const identityPort = identityAddress !== null && typeof identityAddress !== "string" ? identityAddress.port : 0;
+    identityPort = identityAddress !== null && typeof identityAddress !== "string" ? identityAddress.port : 0;
 
-    writeState(args.projectRoot, {
-        port: args.port,
-        pid: process.pid,
-        dataDir: directory,
-        startedAt: new Date().toISOString(),
-        token: args.token,
-        identityPort
-    });
+    publishState(identityPort);
 
     let shuttingDown = false;
     const shutdown = async (reason: string) => {
@@ -208,16 +297,18 @@ export async function runDaemon(args: DaemonArgs): Promise<void> {
         // should conclude "not running" and start a fresh daemon, rather than
         // connect to a socket that is closing under it.
         clearState(args.projectRoot);
-        try {
-            await proxy.stop();
-        } catch { /* already down */ }
-        try {
-            await server.stop();
-        } catch { /* already down */ }
         identity.close();
-        try {
-            await db.close();
-        } catch { /* already closed */ }
+        for (const instance of [primary, ...additional.values()]) {
+            try {
+                await instance.proxy.stop();
+            } catch { /* already down */ }
+            try {
+                await instance.server.stop();
+            } catch { /* already down */ }
+            try {
+                await instance.db.close();
+            } catch { /* already closed */ }
+        }
         process.exit(0);
     };
 
@@ -230,8 +321,10 @@ export async function runDaemon(args: DaemonArgs): Promise<void> {
 
     if (args.idleTimeoutMs > 0) {
         const timer = setInterval(() => {
-            const stats = server.getStats();
-            const busy = stats.activeConnections > 0 || stats.queuedQueries > 0;
+            const busy = [primary, ...additional.values()].some((instance) => {
+                const stats = instance.server.getStats();
+                return stats.activeConnections > 0 || stats.queuedQueries > 0;
+            });
             if (busy) {
                 idleSince = null;
 

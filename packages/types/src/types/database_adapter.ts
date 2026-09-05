@@ -140,6 +140,19 @@ export interface DatabaseAdapter {
     ): Promise<{ applied: number }>;
 
     /**
+     * Create the helper functions the generated policies call (`rebase.uid()`,
+     * `rebase.roles()` and their siblings) on THIS source's database.
+     *
+     * On the default source these arrive with the auth tables, because auth
+     * lives there. A second database gets no auth tables and had no helpers
+     * either, so every policy on it failed to create and every user read was
+     * denied — a collection declared on `database("analytics")` answered 401 on
+     * a healthy-looking backend. Idempotent; runs before
+     * `ensureCollectionPolicies` on every non-default source.
+     */
+    ensureRlsRuntime?(driverResult?: InitializedDriver): Promise<void>;
+
+    /**
      * Re-check, once the schema exists, that requests will really be constrained
      * by the database's own authorization. See
      * `BackendBootstrapper.finalizeSecurityPosture`.
@@ -204,6 +217,13 @@ export interface DatabaseAdapter {
 export interface DatabaseAdapterInitConfig {
     /** Registered collection definitions. */
     collections: CollectionConfig[];
+    /**
+     * The data-source key this driver serves — `(default)`, or a declared
+     * one such as `analytics`. A driver given every collection needs it to
+     * know which are its own: the ones whose `dataSource` names this key, or
+     * name none when this is the default.
+     */
+    dataSourceKey?: string;
     /** The shared collection registry to register into. */
     collectionRegistry: CollectionRegistryInterface;
     /**

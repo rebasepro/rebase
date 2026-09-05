@@ -87,8 +87,10 @@ describe("refusals", () => {
     });
 
     it("refuses an unknown kind and lists the ones registered", () => {
-        expect(() => declareResource("queue", "work"))
-            .toThrow(/Unknown resource kind "queue".*Registered kinds: bucket, database, topic/s);
+        // `queue` was the example here until it became a real kind. A kind
+        // that will never exist keeps this test about refusal.
+        expect(() => declareResource("teleporter", "work"))
+            .toThrow(/Unknown resource kind "teleporter".*Registered kinds: bucket, cron, database, function, queue, topic/s);
     });
 
     it("refuses two different declarations of one resource instead of merging", () => {

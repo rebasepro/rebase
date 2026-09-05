@@ -1,0 +1,118 @@
+{
+  "bundleFormat": 2,
+  "runtime": {
+    "range": "^1",
+    "builtAgainst": "1.0.0",
+    "contract": 1
+  },
+  "schemaVersion": "v1:example",
+  "app": "backend",
+  "kind": "backend",
+  "entry": {
+    "config": "config",
+    "collections": "config/collections",
+    "functions": "backend/functions",
+    "crons": "backend/crons",
+    "schema": "backend/src/schema.generated.js",
+    "usersCollection": "config/collections/users.js"
+  },
+  "collections": [
+    "events",
+    "posts"
+  ],
+  "functions": [
+    {
+      "name": "hello",
+      "file": "backend/functions/hello.js",
+      "portable": true
+    }
+  ],
+  "hooks": {
+    "native": false
+  },
+  "storage": {
+    "authorize": true
+  },
+  "resources": {
+    "version": 1,
+    "resources": [
+      {
+        "kind": "bucket",
+        "key": "media",
+        "engine": "s3",
+        "transport": "server",
+        "options": {
+          "account": "minio"
+        },
+        "usedBy": [
+          "property:posts.cover"
+        ]
+      },
+      {
+        "kind": "cron",
+        "key": "nightly",
+        "engine": "scheduler",
+        "transport": "server",
+        "options": {
+          "schedule": "0 3 * * *",
+          "timezone": "Europe/Madrid"
+        }
+      },
+      {
+        "kind": "database",
+        "key": "(default)",
+        "engine": "postgres",
+        "transport": "server",
+        "options": {
+          "extensions": [
+            "vector"
+          ]
+        }
+      },
+      {
+        "kind": "database",
+        "key": "analytics",
+        "engine": "postgres",
+        "transport": "server",
+        "options": {},
+        "usedBy": [
+          "collection:events"
+        ]
+      },
+      {
+        "kind": "function",
+        "key": "hello",
+        "engine": "http",
+        "transport": "server",
+        "options": {
+          "file": "backend/functions/hello.ts",
+          "portable": true
+        }
+      },
+      {
+        "kind": "queue",
+        "key": "thumbnails",
+        "engine": "jobs",
+        "transport": "server",
+        "options": {}
+      },
+      {
+        "kind": "topic",
+        "key": "signups",
+        "engine": "jobs",
+        "transport": "server",
+        "options": {}
+      }
+    ]
+  },
+  "deps": {
+    "declared": {
+      "@rebasepro/server": "^1.0.0"
+    }
+  },
+  "build": {
+    "cli": "0.0.0-contract",
+    "node": "22",
+    "createdAt": "2026-01-01T00:00:00.000Z"
+  }
+}

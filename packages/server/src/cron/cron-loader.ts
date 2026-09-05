@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
-import type { CronJobDefinition } from "@rebasepro/types";
+import { declareCron, type CronJobDefinition, type CronResourceOptions } from "@rebasepro/types";
 import { logger } from "../utils/logger.js";
 import { nativeDynamicImport, type ModuleImporter } from "../utils/dynamic-import.js";
 
@@ -120,9 +120,23 @@ export async function loadCronJobsWithDiagnostics(
                     handler: def.handler as CronJobDefinition["handler"]
                 };
 
+                // The declaration, keyed by the same id the scheduler, the
+                // routes and the Studio use — the filename. `defineCron` cannot
+                // do this: it never sees the filename, and `name` is a label.
+                // The derive step runs this same loader, so the graph a host
+                // reads and the schedule this process runs come from one place.
+                // From the raw export, not the normalised definition: the
+                // defaults filled in above (`enabled: true`, `timeoutSeconds:
+                // 300`) are this process's, and a graph that records them for
+                // every cron would say something the author never wrote.
+                declareCron(id, cronResourceOptions(def as unknown as CronJobDefinition));
+
                 jobs.push({ id,
 definition });
-                logger.info(`⏰ Loaded cron job: ${id} (${definition.schedule})`);
+                logger.info(
+                    `⏰ Loaded cron job: ${id} (${definition.schedule}` +
+                    `${definition.timezone ? ` ${definition.timezone}` : " in the process's local time"})`
+                );
             } catch (err: unknown) {
                 const message =
                     err instanceof Error ? err.message : String(err);
@@ -141,4 +155,21 @@ definition });
     }
 
     return { jobs, problems };
+}
+
+/**
+ * The declaration a definition makes: every field a host can read without the
+ * handler. Spelled once here so the graph and the scheduler cannot disagree
+ * about what a cron is.
+ */
+export function cronResourceOptions(definition: CronJobDefinition): CronResourceOptions {
+    return {
+        schedule: definition.schedule,
+        ...(definition.timezone !== undefined ? { timezone: definition.timezone } : {}),
+        ...(definition.description !== undefined ? { description: definition.description } : {}),
+        ...(definition.enabled !== undefined ? { enabled: definition.enabled } : {}),
+        ...(definition.timeoutSeconds !== undefined ? { timeoutSeconds: definition.timeoutSeconds } : {}),
+        ...(definition.catchUpWindowSeconds !== undefined ? { catchUpWindowSeconds: definition.catchUpWindowSeconds } : {}),
+        ...(definition.name ? { label: definition.name } : {})
+    };
 }

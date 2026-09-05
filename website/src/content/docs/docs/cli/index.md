@@ -289,8 +289,8 @@ which refuses the boot rather than degrading.
 
 ### `rebase resources`
 
-What this project declares it needs — the databases, buckets and topics its
-config code asks for:
+What this project declares it needs — the databases, buckets, topics and
+queues its config code asks for, and the crons and functions its files define:
 
 ```bash
 rebase resources            # list them
@@ -300,9 +300,15 @@ rebase resources --json     # machine-readable
 ```
 
 A resource is declared in config code — `database("analytics")`,
-`bucket("media")`, `topic("signups")` — and never by hand in
+`bucket("media")`, `topic("signups")`, `queue("thumbnails")` — or is a file
+under `backend/crons` or `backend/functions`, and never written by hand in
 `rebase.resources.json`, which is generated from those declarations so a host can
-read what a project needs without building it.
+read what a project needs without building it. Each entry records who uses it
+(`collection:events`, `property:posts.cover`, `function:report`).
+
+To see what the platform holds for a project against what its code declares,
+and to remove a provisioned database the code no longer names, see
+`rebase cloud resources` below.
 
 ### `rebase cloud`
 
@@ -323,8 +329,18 @@ rebase cloud env list | set | unset | reveal | pull
 rebase cloud domains list | add | verify | remove
 rebase cloud db list | create | info | test | backup | pitr
 rebase cloud extensions list | enable | disable
+rebase cloud resources | resources prune database <key>
+rebase cloud compute | compute set
 rebase cloud storage | settings | orgs | webhooks | billing | clusters
 ```
+
+`rebase cloud resources` is what the platform holds for a project against what
+its code declares — each database and bucket, whether the last deploy's code
+still declares it, whether the platform made it. A deploy never removes a
+provisioned database when its declaration goes: it keeps, binds and bills it
+until `rebase cloud resources prune database <key>`. `rebase cloud compute` is
+what the project reserves — CPU, memory, replicas, the database's shape — and
+what it costs per month.
 
 Every group answers `--help`, and `--help` never runs the command.
 

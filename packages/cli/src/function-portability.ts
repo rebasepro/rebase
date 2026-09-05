@@ -95,6 +95,13 @@ export interface FunctionPortability {
     issues: PortabilityIssue[];
     /** True when `issues` contains nothing that pins it to Node. */
     portable: boolean;
+    /**
+     * Names imported from the project's resources module — `import { media }
+     * from "../../config/resources"` — so the graph can record that this
+     * function reaches `media` without evaluating it. Export names, not keys:
+     * the derive step maps them through the evaluated module.
+     */
+    resourceImports: string[];
 }
 
 /** Files the functions loader would serve. Mirrors `function-loader.ts`. */
@@ -157,6 +164,33 @@ function imports(source: string): Array<{ specifier: string; line: number; typeO
     });
 
     return found;
+}
+
+/**
+ * The names a file imports from the project's resources module.
+ *
+ * Matched on the specifier's last path segment — `../config/resources`,
+ * `../../config/resources.js`, `@app/config/resources` — because that is the
+ * one convention `rebase resources` reads declarations from, and a function
+ * importing a handle from anywhere else has put its declaration somewhere
+ * the graph does not look. Type-only imports are skipped: they reach nothing
+ * at runtime.
+ */
+function resourceImports(source: string): string[] {
+    const names = new Set<string>();
+    for (const line of source.split("\n")) {
+        const match = /(?:^|[\s;}])import\s+(?!type\b)\{([^}]*)\}\s*from\s*["']([^"']+)["']/.exec(line);
+        if (!match) continue;
+        const specifier = match[2].replace(/\.[cm]?[jt]s$/, "");
+        if (!/(?:^|\/)resources(?:\/index)?$/.test(specifier)) continue;
+        for (const part of match[1].split(",")) {
+            const name = part.trim().replace(/^type\s+/, "");
+            if (!name || part.trim().startsWith("type ")) continue;
+            // `media as photos` imports `media`; the local alias is not the export.
+            names.add(name.split(/\s+as\s+/)[0].trim());
+        }
+    }
+    return [...names].sort();
 }
 
 /**
@@ -251,7 +285,8 @@ export function analyseFunctionSource(source: string, name: string, file: string
         issues,
         // The advisory import-path finding does not make a function unportable —
         // it is the same code either way, reachable through a heavier door.
-        portable: issues.every(issue => issue.kind === "root-barrel-import")
+        portable: issues.every(issue => issue.kind === "root-barrel-import"),
+        resourceImports: resourceImports(withStrings)
     };
 }
 

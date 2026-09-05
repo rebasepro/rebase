@@ -319,6 +319,9 @@ export function adapterToBootstrapper(
             ? (collections, driverResult, log) =>
                 adapter.ensureCollectionPolicies!(collections, driverResult, log)
             : undefined,
+        ensureRlsRuntime: adapter.ensureRlsRuntime
+            ? (driverResult) => adapter.ensureRlsRuntime!(driverResult)
+            : undefined,
         finalizeSecurityPosture: adapter.finalizeSecurityPosture
             ? (driverResult) => adapter.finalizeSecurityPosture!(driverResult)
             : undefined,

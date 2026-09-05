@@ -227,6 +227,21 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
      * page for every command that names itself to `parseCloudArgs`.
      */
 
+    "resources prune": {
+        command: "cloud resources prune",
+        usage: "cloud resources prune database <key> [--yes]",
+        summary:
+            "Drop a platform-provisioned database that this project's code no longer declares. "
+            + "A deploy never removes one — it keeps, binds and bills it — so this is where it goes. "
+            + "Only a database: a bucket and its files are removed in the project's storage settings.",
+        flags: [["--yes", "Skip the confirmation. Off a terminal it refuses rather than assuming."]],
+        examples: ["rebase cloud resources prune database analytics --yes"],
+        notes: [
+            "Refused while the code still declares the database, and for one the platform never made.",
+            "Its connection string leaves the running backend at the next deploy."
+        ]
+    },
+
     "projects delete": {
         command: "cloud projects delete",
         usage: "cloud projects delete <slug|id> [--yes]",

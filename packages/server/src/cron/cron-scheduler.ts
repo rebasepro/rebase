@@ -125,13 +125,82 @@ function parseCronFields(expression: string): CronFields {
     };
 }
 
-/** Whether a minute-precision instant matches every field of the expression. */
-function matchesCronFields(candidate: Date, fields: CronFields): boolean {
-    return fields.months.includes(candidate.getMonth() + 1) // getMonth is 0-11
-        && fields.doms.includes(candidate.getDate())
-        && fields.dows.includes(candidate.getDay())
-        && fields.hours.includes(candidate.getHours())
-        && fields.minutes.includes(candidate.getMinutes());
+/**
+ * Whether an IANA zone name is one this runtime can read a schedule in.
+ *
+ * `Intl` is the authority: it throws a RangeError on a name it does not know,
+ * which is the only check that tracks the tz database the process actually
+ * ships. A misspelled zone must fail when the job loads, not silently read
+ * the schedule as local time.
+ */
+export function isValidTimeZone(zone: string): boolean {
+    try {
+        new Intl.DateTimeFormat("en-US", { timeZone: zone });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/** Wall-clock parts of an instant, in a zone, as the cron fields see them. */
+interface WallClock {
+    minute: number;
+    hour: number;
+    dom: number;
+    month: number;
+    dow: number;
+}
+
+const formatters = new Map<string, Intl.DateTimeFormat>();
+const DOW: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+function wallClockIn(candidate: Date, zone: string): WallClock {
+    let formatter = formatters.get(zone);
+    if (!formatter) {
+        formatter = new Intl.DateTimeFormat("en-US", {
+            timeZone: zone,
+            hourCycle: "h23",
+            weekday: "short",
+            month: "numeric",
+            day: "numeric",
+            hour: "numeric",
+            minute: "numeric"
+        });
+        formatters.set(zone, formatter);
+    }
+    const parts: Record<string, string> = {};
+    for (const part of formatter.formatToParts(candidate)) parts[part.type] = part.value;
+    return {
+        minute: Number(parts.minute),
+        hour: Number(parts.hour),
+        dom: Number(parts.day),
+        month: Number(parts.month),
+        dow: DOW[parts.weekday] ?? candidate.getDay()
+    };
+}
+
+/**
+ * Whether a minute-precision instant matches every field of the expression.
+ *
+ * Read in `zone` when one is named, else in the process's own zone — which is
+ * whatever the host is set to, UTC in nearly every container. A schedule that
+ * names its zone means the same wall-clock hour on every host it runs on.
+ */
+function matchesCronFields(candidate: Date, fields: CronFields, zone?: string): boolean {
+    const wall: WallClock = zone
+        ? wallClockIn(candidate, zone)
+        : {
+            minute: candidate.getMinutes(),
+            hour: candidate.getHours(),
+            dom: candidate.getDate(),
+            month: candidate.getMonth() + 1, // getMonth is 0-11
+            dow: candidate.getDay()
+        };
+    return fields.months.includes(wall.month)
+        && fields.doms.includes(wall.dom)
+        && fields.dows.includes(wall.dow)
+        && fields.hours.includes(wall.hour)
+        && fields.minutes.includes(wall.minute);
 }
 
 /** ~1 year in minutes — the walk bound for both search directions. */
@@ -148,7 +217,7 @@ const MAX_SLOT_SEARCH_MINUTES = 4 * 525960 + 1440;
  * Calculate the next Date after `after` that matches the cron expression.
  * Throws on invalid expressions.
  */
-export function parseCronExpression(expression: string, after: Date): Date {
+export function parseCronExpression(expression: string, after: Date, timezone?: string): Date {
     const fields = parseCronFields(expression);
 
     // Forward-search from `after + 1 minute`
@@ -157,7 +226,7 @@ export function parseCronExpression(expression: string, after: Date): Date {
     candidate.setMinutes(candidate.getMinutes() + 1);
 
     for (let i = 0; i < MAX_SLOT_SEARCH_MINUTES; i++) {
-        if (matchesCronFields(candidate, fields)) {
+        if (matchesCronFields(candidate, fields, timezone)) {
             return candidate;
         }
         candidate.setMinutes(candidate.getMinutes() + 1);
@@ -197,14 +266,14 @@ export function parseCronExpression(expression: string, after: Date): Date {
  * builds a slot, so the same wall-clock slot serialises to a byte-identical
  * ISO string down either path. The claim key depends on that.
  */
-export function findMostRecentSlot(expression: string, from: Date, to: Date): Date | undefined {
+export function findMostRecentSlot(expression: string, from: Date, to: Date, timezone?: string): Date | undefined {
     const fields = parseCronFields(expression);
 
     const candidate = new Date(to);
     candidate.setSeconds(0, 0);
 
     for (let i = 0; i < MAX_SLOT_SEARCH_MINUTES && candidate.getTime() >= from.getTime(); i++) {
-        if (matchesCronFields(candidate, fields)) {
+        if (matchesCronFields(candidate, fields, timezone)) {
             return candidate;
         }
         candidate.setMinutes(candidate.getMinutes() - 1);
@@ -291,6 +360,16 @@ export class CronScheduler {
             const validation = validateCronExpression(loaded.definition.schedule);
             if (!validation.valid) {
                 logger.error(`[cron] Rejecting job "${loaded.id}": invalid schedule "${loaded.definition.schedule}" — ${validation.reason}`);
+                continue;
+            }
+            // Rejected, not read as local time: a misspelled zone that fell
+            // back silently would fire at the wrong hour on every host and
+            // look like a scheduler bug.
+            if (loaded.definition.timezone !== undefined && !isValidTimeZone(loaded.definition.timezone)) {
+                logger.error(
+                    `[cron] Rejecting job "${loaded.id}": unknown timezone "${loaded.definition.timezone}". ` +
+                    'Use an IANA name such as "Europe/Madrid" or "UTC".'
+                );
                 continue;
             }
 
@@ -509,7 +588,7 @@ reason: "already_executing" },
 
         try {
             const now = new Date();
-            const nextRun = parseCronExpression(job.definition.schedule, now);
+            const nextRun = parseCronExpression(job.definition.schedule, now, job.definition.timezone);
             job.nextRunAt = nextRun;
 
             const rawDelay = nextRun.getTime() - now.getTime();
@@ -646,7 +725,7 @@ reason: "already_executing" },
 
                 const windowSeconds = job.definition.catchUpWindowSeconds!;
                 const from = new Date(now.getTime() - windowSeconds * 1000);
-                const slot = findMostRecentSlot(job.definition.schedule, from, now);
+                const slot = findMostRecentSlot(job.definition.schedule, from, now, job.definition.timezone);
                 if (!slot) continue;
 
                 const slotIso = slot.toISOString();

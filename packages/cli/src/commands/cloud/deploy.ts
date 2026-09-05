@@ -38,7 +38,7 @@ import { buildAssetApp } from "../build";
 import { foldFrontendIntoBundle } from "../../fold-static";
 import { loadManifest, findBackendApp, resolveBackendPaths, selectDeployApp } from "../../manifest";
 import { findProjectRoot, requireProjectRoot } from "../../utils/project";
-import { deriveResourceGraph } from "../../resources/derive";
+import { deriveOptionsFor, deriveResourceGraph } from "../../resources/derive";
 import type { RebaseAppConfig, RebaseBackendAppConfig } from "@rebasepro/types";
 
 interface Deployment {
@@ -272,9 +272,9 @@ app: target.app as RebaseBackendAppConfig };
         // bundle whose manifest is missing a bucket the code declares deploys
         // into a tenant with nothing provisioned for it. After `backend` on
         // purpose — the config directory it reads comes from that app.
-        const { graph: resourceGraph, issues: resourceIssues } = await deriveResourceGraph({
-            configDir: path.join(projectRoot, resolveBackendPaths(backend.app, projectRoot).config)
-        });
+        const { graph: resourceGraph, issues: resourceIssues } = await deriveResourceGraph(
+            deriveOptionsFor(projectRoot, backend.app)
+        );
         if (resourceIssues.length > 0) {
             throw new Error(
                 `${resourceIssues.length} problem(s) in the declared resources:\n` +
@@ -1086,7 +1086,7 @@ deduplicated: true };
     if (err?.status === 400 && err.details?.intakeCode) {
         fail(
             err.message || "This bundle was refused.",
-            err.details.hint ?? "Run `rebase cloud resources` to see what this project is given.",
+            err.details.hint ?? "Run `rebase cloud compute` to see what this project reserves.",
             err.details.intakeCode
         );
     }

@@ -270,7 +270,13 @@ registerResourceKind({
     // a failure is a row somebody can look at rather than a lost message.
     engines: ["jobs"],
     defaultEngine: "jobs",
-    envBases: ["REBASE_TOPIC_URL"],
+    // Nothing. A topic on the `jobs` engine is rows in the project's own
+    // database and binds from no variable of its own. This list said
+    // `REBASE_TOPIC_URL` once — a name nothing in either repository read, which
+    // `rebase status` then printed as a variable somebody could set. The gate
+    // in `resource-env-bases.test.ts` now covers every registered kind, so a
+    // phantom name here fails a build rather than reaching a developer.
+    envBases: [],
     optionKeys: ["delivery", "maxAttempts"],
     implicitDefault: false
 });
@@ -410,6 +416,228 @@ export function topic<T = unknown>(key: string, options: TopicOptions = {}): Top
             });
         }
     } as TopicHandle<T>;
+}
+
+// ── cron ─────────────────────────────────────────────────────────────────────
+
+registerResourceKind({
+    kind: "cron",
+    // The in-process scheduler, claiming each slot in `rebase.cron_claims` so
+    // several instances of one deployment run a slot once. It is the only
+    // engine because it is the only one that exists; an external scheduler
+    // (a platform's cron, a Kubernetes CronJob) would be a second engine that
+    // triggers the same handler over HTTP, and it can register itself.
+    engines: ["scheduler"],
+    defaultEngine: "scheduler",
+    // Code, not configuration: a cron binds from no variable. It is in the
+    // graph so a host knows a project's schedules BEFORE running it, which is
+    // what lets a console show them and a placement decision read them.
+    envBases: [],
+    optionKeys: ["schedule", "timezone", "description", "enabled", "timeoutSeconds", "catchUpWindowSeconds"],
+    implicitDefault: false
+});
+
+/** What a cron declaration records, beyond its handler. */
+export interface CronResourceOptions extends DeclareOptions {
+    /** Five-field cron expression, e.g. `0 3 * * *`. */
+    schedule: string;
+    /**
+     * IANA zone the schedule is read in, e.g. `Europe/Madrid`.
+     *
+     * Without it the schedule is read in the process's own zone, which is
+     * whatever the host happens to be set to — UTC in nearly every container,
+     * the developer's own on a laptop. "3 AM" then means two different hours
+     * either side of a deploy. Naming the zone makes the declaration mean one
+     * thing everywhere.
+     */
+    timezone?: string;
+    description?: string;
+    enabled?: boolean;
+    timeoutSeconds?: number;
+    catchUpWindowSeconds?: number;
+}
+
+/**
+ * Declare a cron, as the scheduler's `defineCron` does on its way through.
+ *
+ * Projects do not call this: `defineCron` in `@rebasepro/server` does, so a
+ * cron file is both the handler and the declaration — one file, one name, and
+ * the graph derived from it says what a host needs to know without evaluating
+ * the handler. Exported so the derive step and the scheduler spell the
+ * declaration identically.
+ */
+export function declareCron(name: string, options: CronResourceOptions): ResourceHandle {
+    if (typeof options.schedule !== "string" || options.schedule.trim() === "") {
+        throw new Error(`Cron "${name}" needs a schedule — a five-field cron expression such as "0 3 * * *".`);
+    }
+    return declareResource("cron", name, options);
+}
+
+// ── function ─────────────────────────────────────────────────────────────────
+
+registerResourceKind({
+    kind: "function",
+    // Mounted by this runtime at `/api/functions/<name>`. A host that runs a
+    // function elsewhere — an edge runtime, say — is a second engine, and the
+    // bundle's `portable` analysis already says which ones could move.
+    engines: ["http"],
+    defaultEngine: "http",
+    envBases: [],
+    optionKeys: ["portable", "requires", "file"],
+    implicitDefault: false
+});
+
+/**
+ * What a function declaration records.
+ *
+ * Recorded by the derive step from the bundler's static analysis rather than
+ * by evaluating the function module: a function's handler is a Hono app that
+ * only needs to exist at request time, and evaluating it at build time would
+ * run its module-scope code in a process with none of its environment.
+ */
+export interface FunctionResourceOptions extends DeclareOptions {
+    /** Path inside the project, so a host can point at the file. */
+    file?: string;
+    /** `false` when the source imports a Node built-in or a package that needs one. */
+    portable?: boolean;
+    /** Why it is not portable — one short phrase per reason. */
+    requires?: string[];
+}
+
+/** Declare a function. Called by the derive step, not by projects. */
+export function declareFunction(name: string, options: FunctionResourceOptions = {}): ResourceHandle {
+    return declareResource("function", name, options);
+}
+
+// ── queue ────────────────────────────────────────────────────────────────────
+
+registerResourceKind({
+    kind: "queue",
+    // Same durable queue topics ride on: a row per job, claimed with
+    // `FOR UPDATE SKIP LOCKED`, retried on a backoff, kept when it gives up.
+    engines: ["jobs"],
+    defaultEngine: "jobs",
+    envBases: [],
+    optionKeys: ["maxAttempts"],
+    implicitDefault: false
+});
+
+/** Options a queue accepts beyond the common ones. */
+export interface QueueOptions extends DeclareOptions {
+    /** Attempts before a job is left failed. Default 5. */
+    maxAttempts?: number;
+}
+
+/** What a queue's handler receives. `attempt` counts from 1. */
+export type QueueHandler<T> = (
+    payload: T,
+    context: { attempt: number; queue: string; jobId: string }
+) => Promise<void> | void;
+
+/** Per-job options at enqueue time. */
+export interface QueueEnqueueOptions {
+    /** Earliest time the job may run. Defaults to now. */
+    runAt?: Date;
+    /** Attempts for this job, overriding the queue's. */
+    maxAttempts?: number;
+}
+
+/**
+ * What a queue enqueues through.
+ *
+ * Installed by `@rebasepro/server` at boot, alongside the topic runtime.
+ * Absent — config evaluated by the CLI, a unit test — enqueueing throws with
+ * the cause named, rather than resolving and dropping the job.
+ */
+export interface QueueRuntime {
+    enqueue(queue: string, payload: unknown, options?: QueueEnqueueOptions): Promise<{ id: string }>;
+}
+
+const queueRuntimeHolder: { current: QueueRuntime | null } = { current: null };
+
+/** Install the transport queues enqueue through. Called by the server at boot. */
+export function setQueueRuntime(runtime: QueueRuntime | null): void {
+    queueRuntimeHolder.current = runtime;
+}
+
+/** A queue's handler, as recorded for the worker to wire. */
+export interface QueueConsumer<T = unknown> {
+    queue: string;
+    handler: QueueHandler<T>;
+}
+
+const queueConsumers = new Map<string, QueueConsumer>();
+
+/** Every declared queue handler, for the worker to wire. */
+export function declaredQueueConsumers(): QueueConsumer[] {
+    return [...queueConsumers.values()];
+}
+
+/** Forget declared queue handlers. For tests, alongside `resetDeclaredResources`. */
+export function resetDeclaredQueueConsumers(): void {
+    queueConsumers.clear();
+}
+
+/** A queue handle, carrying its payload type. */
+export interface QueueHandle<T> extends ResourceHandle {
+    /**
+     * Put a job on the queue.
+     *
+     * Resolves once the job is durably recorded, not once it has run. A row
+     * insert, so enqueued inside a transaction that rolls back it was never
+     * enqueued.
+     */
+    enqueue(payload: T, options?: QueueEnqueueOptions): Promise<{ id: string }>;
+    /**
+     * Declare the handler.
+     *
+     * One per queue: a queue is a work list with one consumer, which is what
+     * separates it from a topic. Work that several things must react to is a
+     * topic with several subscriptions.
+     */
+    handler(fn: QueueHandler<T>): void;
+}
+
+/**
+ * Declare a queue.
+ *
+ * ```ts
+ * export const thumbnails = queue<{ key: string }>("thumbnails");
+ * thumbnails.handler(async ({ key }) => { … });
+ * await thumbnails.enqueue({ key }, { runAt: new Date(Date.now() + 60_000) });
+ * ```
+ *
+ * The difference from a topic is the number of consumers: a queue has one, a
+ * topic fans out to every subscription. Both ride on the durable job queue, so
+ * declaring either turns it on.
+ */
+export function queue<T = unknown>(key: string, options: QueueOptions = {}): QueueHandle<T> {
+    const handle = declareResource("queue", key, options);
+
+    return {
+        ...handle,
+        toString() { return key; },
+        async enqueue(payload: T, enqueueOptions?: QueueEnqueueOptions): Promise<{ id: string }> {
+            const runtime = queueRuntimeHolder.current;
+            if (!runtime) {
+                throw new Error(
+                    `Cannot enqueue on queue "${key}": no queue runtime is installed. ` +
+                    "Enqueueing works inside a running Rebase backend; this looks like config " +
+                    "being evaluated outside one (a build, a script, or a test without a harness)."
+                );
+            }
+            return runtime.enqueue(key, payload, enqueueOptions);
+        },
+        handler(fn: QueueHandler<T>): void {
+            if (queueConsumers.has(key)) {
+                throw new Error(
+                    `Queue "${key}" already has a handler. A queue has exactly one consumer; ` +
+                    "work that several things react to is a topic with several subscriptions."
+                );
+            }
+            queueConsumers.set(key, { queue: key, handler: fn as QueueHandler<unknown> });
+        }
+    } as QueueHandle<T>;
 }
 
 // ── Handing declarations to the readers ──────────────────────────────────────

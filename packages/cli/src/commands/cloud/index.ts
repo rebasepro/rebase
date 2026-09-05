@@ -26,11 +26,12 @@ import {
     metricsCommand,
     webhooksCommand,
     storageCommand,
-    resourcesCommand,
+    computeCommand,
     clustersCommand,
     billingCommand,
     printStorageHelp
 } from "./resources";
+import { declaredResourcesCommand } from "./declared-resources";
 import { requireProjectRef, initOutputMode, emitHelp, fail, GLOBAL_CLOUD_FLAGS } from "./context";
 import { ACTION_HELP, printActionHelp } from "./action-help";
 
@@ -269,8 +270,22 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "storage":
             await storageCommand(action, rawArgs);
             break;
+        case "compute":
+            await computeCommand(action, rawArgs);
+            break;
         case "resources":
-            await resourcesCommand(action, rawArgs);
+            // The word means the graph now, on both sides of the wire: what the
+            // code declares against what the platform holds. What it used to
+            // show — CPU, memory, cost — is `compute`, and a dial flag arriving
+            // here is the one thing worth a pointed refusal.
+            if (action === "set") {
+                fail(
+                    "`rebase cloud resources set` is now `rebase cloud compute set` — CPU, memory, replicas and cost.",
+                    "`rebase cloud resources` lists what this project declares against what the platform provisioned.",
+                    "renamed"
+                );
+            }
+            await declaredResourcesCommand(action, rawArgs);
             break;
         case "clusters":
             await clustersCommand(action, rawArgs);
@@ -411,8 +426,10 @@ ${chalk.green.bold("Other resources")}
   ${chalk.blue.bold("clusters")}                List the clusters tenants run on
   ${chalk.blue.bold("clusters add")}            Register a cluster from a kubeconfig
   ${chalk.blue.bold("clusters verify")}         Ask a cluster whether it can host tenants
-  ${chalk.blue.bold("resources")}               Show what this project reserves, and what it costs per month
-  ${chalk.blue.bold("resources set")}           Change it (--cpu, --memory, --replicas, --spot, --scale-to-zero,
+  ${chalk.blue.bold("resources")}               What the code declares against what the platform provisioned
+  ${chalk.blue.bold("resources prune")}         Remove a provisioned database the code no longer declares
+  ${chalk.blue.bold("compute")}                 Show what this project reserves, and what it costs per month
+  ${chalk.blue.bold("compute set")}             Change it (--cpu, --memory, --replicas, --spot, --scale-to-zero,
                           --db-mode, --db-instances, --db-cpu, --db-memory, --storage,
                           --autoscale-max, --autoscale-cpu-target, --no-autoscale)
   ${chalk.blue.bold("storage")}                 List storage buckets

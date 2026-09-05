@@ -36,6 +36,7 @@ import type {
     User
 } from "@rebasepro/types";
 // A value, not a type: the runtime list core owns.
+import { resolveResourceRefs, type ResourceRef } from "@rebasepro/types";
 import { ADMIN_COLLECTION_KEYS as CORE_ADMIN_COLLECTION_KEYS, nestAdminCollectionKeys } from "@rebasepro/types";
 
 import type {
@@ -678,8 +679,8 @@ export function defineCollection<
     const P extends PostgresProperties,
     USER extends User = User
 >(
-    collection: Omit<PostgresCollectionConfig<InferEntityType<P>, USER>, "properties">
-        & { properties: StrictProperties<P, PostgresProperty> }
+    collection: Omit<PostgresCollectionConfig<InferEntityType<P>, USER>, "properties" | "dataSource">
+        & { properties: StrictProperties<P, PostgresProperty>; dataSource?: ResourceRef }
 ): PostgresCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /** Define a Firestore-backed collection with the admin block checked. @group Builder */
@@ -687,8 +688,8 @@ export function defineCollection<
     const P extends FirebaseProperties,
     USER extends User = User
 >(
-    collection: Omit<FirebaseCollectionConfig<InferEntityType<P>, USER>, "properties">
-        & { properties: StrictProperties<P, FirebaseProperty> }
+    collection: Omit<FirebaseCollectionConfig<InferEntityType<P>, USER>, "properties" | "dataSource">
+        & { properties: StrictProperties<P, FirebaseProperty>; dataSource?: ResourceRef }
 ): FirebaseCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /** Define a MongoDB-backed collection with the admin block checked. @group Builder */
@@ -696,13 +697,21 @@ export function defineCollection<
     const P extends MongoProperties,
     USER extends User = User
 >(
-    collection: Omit<MongoDBCollectionConfig<InferEntityType<P>, USER>, "properties">
-        & { properties: StrictProperties<P, MongoProperty> }
+    collection: Omit<MongoDBCollectionConfig<InferEntityType<P>, USER>, "properties" | "dataSource">
+        & { properties: StrictProperties<P, MongoProperty>; dataSource?: ResourceRef }
 ): MongoDBCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
-/** Identity at runtime; the overloads above are the whole point. @group Builder */
-export function defineCollection(collection: CollectionConfig): CollectionConfig {
-    return collection;
+/**
+ * At runtime this records the collection as data: a resource handle written
+ * where a key belongs — `dataSource: analytics`, `storageSource: media` — is
+ * replaced by its key, so what leaves here serialises and compares like the
+ * string it always was. The overloads above are the rest of the point.
+ * @group Builder
+ */
+export function defineCollection(
+    collection: Omit<CollectionConfig, "dataSource"> & { dataSource?: ResourceRef }
+): CollectionConfig {
+    return resolveResourceRefs(collection) as CollectionConfig;
 }
 
 /**

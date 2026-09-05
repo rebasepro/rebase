@@ -13,6 +13,91 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ### Added
 
+- **Every kind in one graph: crons, functions and queues join databases, buckets
+  and topics.** A cron file is now also a declaration — the loader records it
+  under the id the scheduler runs it as, with its schedule and zone — and a
+  function is recorded from the bundler's analysis by filename. `rebase
+  resources` lists them; a host reads a project's schedules before running it.
+  `queue<T>("thumbnails")` is the work-list shape of background work, one handler
+  per queue, on the same durable job queue topics ride on — and unlike
+  `jobs.tasks`, which needed an entrypoint a managed project does not have, a
+  declared queue is picked up by every boot path.
+
+- **Handles are the API.** `defineCollection({ dataSource: analytics })` and
+  `storage: { storageSource: media }` take the handle a constructor returned —
+  the same name, spelled once — and record its key. `rebase.bucket(media)` reaches
+  a declared bucket's storage source; `rebase.sql(q, { database: analytics })`
+  takes the handle too. The derive step records who uses what (`usedBy` on each
+  graph entry: `collection:events`, `property:posts.cover`, `function:report`),
+  which is the map a console needs for "what breaks if I remove this" and a
+  future split needs to be derived from.
+
+- **`rebase dev` serves every declared database.** `database("analytics")` in
+  `config/resources.ts` is the request: the development daemon starts a second
+  PGlite instance for it on demand — without a restart, so `rebase studio` in
+  another terminal keeps its connection — and exports `DATABASE_URL__ANALYTICS`.
+  A variable you set by hand is never overridden. `--reset` removes them all.
+
+- **A declared object store nothing binds is a local directory in development.**
+  `bucket("media", { engine: "s3" })` with no `S3_BUCKET__MEDIA` used to answer
+  501 on the first upload, which made MinIO a prerequisite for uploading one
+  file. In a development process it now stands in as `uploads__media`, boot says
+  which engine it stands in for, and `rebase status` shows it in yellow beside
+  the tick. Production never does this: an unbound bucket stays unbound.
+
+- **Kinds own their binding.** `@rebasepro/server` registers a resolver per kind
+  (`registerResourceResolver`), and boot, `rebase status` and the gate that holds
+  a kind's `envBases` to what the runtime reads all consult the registry rather
+  than a switch. A kind this runtime has no resolver for is refused at boot by
+  name instead of dropped. Adding a `cache` is a spec, a resolver and a driver.
+
+- **Cron `timezone`.** `defineCron({ schedule: "0 3 * * *", timezone:
+  "Europe/Madrid" })` reads the schedule in that zone; without it the schedule is
+  the host's own zone, which is UTC in nearly every container and yours on a
+  laptop. An unknown zone is refused when the job loads.
+
+- **`rebase cloud resources`** — what the code declares against what the platform
+  holds, per database and bucket — and **`rebase cloud resources prune database
+  <key>`**, the one removal a deploy is not allowed to make. What used to be
+  `rebase cloud resources` (CPU, memory, replicas, cost) is **`rebase cloud
+  compute`**: two commands named "resources" that showed different things was a
+  support ticket.
+
+- **The bundle-manifest contract.** `tooling/contracts/bundle-manifest.json` is
+  written from the CLI's manifest composer with fixed inputs, and the control
+  plane's tests read that same file to prove intake accepts it and the deploy
+  finds every resource in it. Both suites were green for two weeks while every
+  bucket a current CLI declared reached the platform as nothing; this is the test
+  across that seam.
+
+### Fixed
+
+- **A collection routed to a second database got its table in the first.**
+  Provisioning filtered collections by *engine*, so `dataSource: "analytics"` on
+  a Postgres collection handed it to the default Postgres database: the table was
+  created where nothing read it, the analytics database never got one, and every
+  query there failed on a missing relation behind a boot that reported the schema
+  up to date. Tables and RLS policies are now provisioned per source, and the
+  helper functions the policies call — which arrive with the auth tables on the
+  default only — are created on every other source first.
+
+- **Two local buckets shared one directory.** Every local source without its own
+  `STORAGE_PATH__<KEY>` resolved to the same base path, so a file uploaded to
+  `media` was readable through the default source. A named source now gets
+  `uploads__<key>`; the default keeps the plain path, so nothing an existing
+  deployment wrote moves.
+
+- **`REBASE_TOPIC_URL` was a variable nothing read.** The topic kind advertised
+  it as a binding and `rebase status` listed it. The gate now covers every
+  registered kind, so a phantom name fails a build.
+
+- **Blank variables are unset.** A value of three spaces was a bucket name.
+
+- **The scaffold and the docs named variables nothing reads** — `STORAGE_BUCKET`
+  in both `resources.ts` templates, `STORAGE_REGION__MEDIA` and
+  `REBASE_DB_POOL_MAX__ANALYTICS` in the multiple-sources page. Fixed to the names
+  the resolver reads (`S3_REGION`, `DB_POOL_MAX`).
+
 - **`rebase status` — what this project declares, and whether it is configured.**
   The model a developer has to hold is three files: `rebase.json` says where the
   code is and who runs the server, `config/resources.ts` says what the project

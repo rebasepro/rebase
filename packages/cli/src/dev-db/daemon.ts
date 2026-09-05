@@ -51,6 +51,12 @@ export interface ManagedDatabase {
     pid: number;
     /** True when this call started the daemon rather than finding it. */
     started: boolean;
+    /**
+     * Connection strings for the additional databases the caller asked for,
+     * by declared key — `database("analytics")` → `analytics`. Each is its
+     * own PGlite instance behind the same daemon.
+     */
+    additional: Record<string, string>;
 }
 
 /**
@@ -179,6 +185,70 @@ export interface EnsureOptions {
      * — spawning vitest with `__dev-db-daemon` rather than the CLI.
      */
     entry?: string;
+    /**
+     * Keys of the additional databases the project declares, beyond the
+     * default. Each is served by the daemon on request, so a project that
+     * adds `database("analytics")` while the daemon is running gets it
+     * without a restart.
+     */
+    additionalKeys?: readonly string[];
+}
+
+/**
+ * Ask the running daemon for one additional database, and get its port.
+ *
+ * The identity socket doubles as the command channel: the daemon answers
+ * with its token first, which is how the caller knows it is talking to the
+ * daemon the state file describes and not to a stranger on a recycled port.
+ */
+function ensureAdditionalDatabase(state: DaemonState, key: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+        const socket = new net.Socket();
+        let answer = "";
+        let identified = false;
+        const fail = (message: string) => {
+            socket.removeAllListeners();
+            socket.destroy();
+            reject(new Error(message));
+        };
+        socket.setTimeout(START_TIMEOUT_MS);
+        socket.once("timeout", () => fail(`The development database did not answer for "${key}" within ${Math.round(START_TIMEOUT_MS / 1000)}s.`));
+        socket.once("error", (err) => fail(`Could not reach the development database for "${key}": ${err.message}`));
+        socket.on("data", (chunk) => {
+            answer += chunk.toString("utf8");
+            let newline = answer.indexOf("\n");
+            while (newline !== -1) {
+                const line = answer.slice(0, newline).trim();
+                answer = answer.slice(newline + 1);
+                if (!identified) {
+                    if (line !== `rebase-dev-db ${state.token}`) return fail("The process on the development database's port is not the daemon.");
+                    identified = true;
+                    socket.write(`ensure ${key}\n`);
+                } else if (line.startsWith("ok ")) {
+                    const port = Number(line.slice(3));
+                    socket.removeAllListeners();
+                    socket.destroy();
+                    if (!Number.isInteger(port) || port <= 0) return reject(new Error(`The development database answered with an invalid port for "${key}": ${line}`));
+                    return resolve(port);
+                } else {
+                    return fail(`The development database could not serve "${key}": ${line.replace(/^error\s*/, "")}`);
+                }
+                newline = answer.indexOf("\n");
+            }
+        });
+        socket.connect(state.identityPort, "127.0.0.1");
+    });
+}
+
+/** Every additional database the caller asked for, as connection strings. */
+async function adoptWithAdditional(state: DaemonState, started: boolean, keys: readonly string[]): Promise<ManagedDatabase> {
+    const additional: Record<string, string> = {};
+    for (const key of keys) {
+        const known = state.databases?.[key];
+        const port = known ? known.port : await ensureAdditionalDatabase(state, key);
+        additional[key] = managedUrl(port);
+    }
+    return { ...adopt(state, started), additional };
 }
 
 /**
@@ -192,8 +262,9 @@ export async function ensureManagedDatabase(
     projectRoot: string,
     options: EnsureOptions = {}
 ): Promise<ManagedDatabase> {
+    const keys = options.additionalKeys ?? [];
     const existing = await findRunningDaemon(projectRoot);
-    if (existing) return adopt(existing, false);
+    if (existing) return adoptWithAdditional(existing, false, keys);
 
     fs.mkdirSync(devDbDir(projectRoot), { recursive: true });
     ensureGitignore(projectRoot);
@@ -204,7 +275,7 @@ export async function ensureManagedDatabase(
     // the single-daemon design exists to prevent.
     if (!acquireStartLock(projectRoot, START_TIMEOUT_MS)) {
         const adopted = await waitForDaemon(projectRoot, START_TIMEOUT_MS);
-        if (adopted) return adopt(adopted, false);
+        if (adopted) return adoptWithAdditional(adopted, false, keys);
 
         // The holder gave up or died without publishing. Falling through to
         // start one ourselves is better than failing: the lock is stale by now,
@@ -249,7 +320,7 @@ export async function ensureManagedDatabase(
         let announced = false;
         while (Date.now() < deadline) {
             const state = readState(projectRoot);
-            if (state && (await isDaemonAlive(state))) return adopt(state, true);
+            if (state && (await isDaemonAlive(state))) return adoptWithAdditional(state, true, keys);
 
             if (!announced && !options.quiet) {
                 announced = true;
@@ -289,7 +360,8 @@ function adopt(state: DaemonState, started: boolean): ManagedDatabase {
         dataDir: state.dataDir,
         port: state.port,
         pid: state.pid,
-        started
+        started,
+        additional: {}
     };
 }
 
@@ -341,6 +413,15 @@ export async function stopManagedDatabase(projectRoot: string): Promise<boolean>
 export async function resetManagedDatabase(projectRoot: string): Promise<void> {
     await stopManagedDatabase(projectRoot);
     fs.rmSync(dataDir(projectRoot), { recursive: true, force: true });
+    // Every additional database too: `pgdata__<key>` beside `pgdata`. "Give
+    // me an empty database" means all of them — a reset that emptied the
+    // default and kept the analytics rows would be a surprise on first read.
+    const dir = devDbDir(projectRoot);
+    if (fs.existsSync(dir)) {
+        for (const entry of fs.readdirSync(dir)) {
+            if (entry.startsWith("pgdata__")) fs.rmSync(path.join(dir, entry), { recursive: true, force: true });
+        }
+    }
     clearState(projectRoot);
 }
 

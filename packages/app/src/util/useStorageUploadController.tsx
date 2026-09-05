@@ -3,6 +3,7 @@ import type { ArrayProperty, Property, StringProperty } from "@rebasepro/types";
 import Compressor from "compressorjs";
 import { deepEqual as equal } from "fast-equals";
 
+import { resourceKeyOf } from "@rebasepro/types";
 import { EntityValues, StorageConfig, StorageSource, StorageSourceRegistry } from "@rebasepro/types";import { useCallback, useEffect, useMemo, useState } from "react";
 import { resolveStorageFilenameString, resolveStoragePathString, resolveStorageSource } from "@rebasepro/common";
 import { useAuthController } from "../hooks";
@@ -65,7 +66,7 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
     // Resolve the correct storage source for this property.
     // Priority: explicit registry prop → StorageSourcesContext → default.
     const resolvedStorageSource = useMemo(() => resolveStorageSource({
-        sourceKey: storage?.storageSource,
+        sourceKey: storage?.storageSource === undefined ? undefined : resourceKeyOf(storage.storageSource),
         registry: storageSourceRegistry,
         sources: storageSources.sources,
         defaultSource: storageSource

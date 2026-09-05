@@ -6,6 +6,7 @@ import {
     StorageController,
     StorageRegistry
 } from "../storage";
+import { resourceEnvSuffix } from "@rebasepro/types";
 import { logger } from "../utils/logger";
 
 export async function initializeStorage(
@@ -44,6 +45,18 @@ export async function initializeStorage(
                 "FORCE_LOCAL_STORAGE=true."
             );
             return undefined;
+        }
+        if (conf.type === "local" && conf.standsInFor) {
+            // Once, at info, naming the variable that ends it. This is a
+            // development convenience standing in for a declared object store,
+            // and the developer should never discover at deploy time that
+            // production has no such fallback.
+            logger.info(
+                `Storage source "${label}" is declared as ${conf.standsInFor} and nothing binds it — ` +
+                `using ${conf.basePath} in development. Production does not do this: set ` +
+                `${conf.standsInFor.toUpperCase()}_BUCKET${resourceEnvSuffix(label)} ` +
+                "there, or uploads to it answer 501."
+            );
         }
         return await createStorageController(conf);
     };

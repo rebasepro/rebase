@@ -36,6 +36,17 @@ import { BundleError } from "./bundle";
 /** Environment lookup, injectable so tests need not mutate `process.env`. */
 export type EnvBag = Record<string, string | undefined>;
 
+/** What the resolver needs to know about the process it resolves for. */
+export interface ResolveStorageOptions {
+    /**
+     * Whether this is a production process. `false` lets a declared object
+     * store nothing bound stand in as a local directory; `true` or unknown
+     * leaves it unbound. Unknown is treated as production on purpose — a
+     * process that has not said it is development must not be handed a disk.
+     */
+    production?: boolean;
+}
+
 /**
  * Convert a source key into the suffix used in environment variable names.
  *
@@ -57,10 +68,18 @@ export function envSuffixForKey(key: string, defaultKey: string): string {
     }
 }
 
-/** Read `<base>` for the default source, `<base>__<KEY>` for a named one. */
+/**
+ * Read `<base>` for the default source, `<base>__<KEY>` for a named one.
+ *
+ * Blank — empty or whitespace only — is unset. An emptied variable is how a
+ * console "removes" one, and a value of three spaces is not a bucket name;
+ * treating it as one reports storage as configured for a project that has
+ * none. Values with content are returned as they are: a secret's trailing
+ * space is the secret's business.
+ */
 function readVar(env: EnvBag, base: string, suffix: string): string | undefined {
     const value = env[`${base}${suffix}`];
-    return value === "" ? undefined : value;
+    return value === undefined || value.trim() === "" ? undefined : value;
 }
 
 /**
@@ -307,9 +326,29 @@ export function resolveStorageBackend(
      * account-scoped bindings — the ones describing the provider rather than the
      * bucket — consult it. See `StorageSourceDefinition.account`.
      */
-    accountHint?: string
+    accountHint?: string,
+    options: ResolveStorageOptions = {}
 ): BackendStorageConfig | undefined {
     const suffix = envSuffixForKey(key, DEFAULT_STORAGE_SOURCE_KEY);
+    // Every local source gets a directory of its own. Two sources sharing
+    // `defaultBasePath` shared one namespace — a file uploaded to `media` was
+    // readable through the default source, and the only sign was that it
+    // worked. The default keeps the plain path, so nothing an existing
+    // deployment wrote moves; a named source appends its key the way its
+    // variables do: `uploads__media`.
+    const localBasePath = readVar(env, "STORAGE_PATH", suffix)
+        || (suffix ? `${defaultBasePath}${suffix.toLowerCase()}` : defaultBasePath);
+    // An object store the project declared and the environment did not bind.
+    // In production that is "not configured" and stays so — the console's
+    // "declared, not configured" state, and a 501 rather than a file written
+    // to a disk about to be erased. In development it is the first five
+    // minutes of a project, and demanding MinIO to upload one file is the
+    // second step this model exists to remove: the source resolves to a local
+    // directory and says which engine it is standing in for.
+    const standIn = (engine: string): BackendStorageConfig | undefined =>
+        options.production === false
+            ? { type: "local", basePath: localBasePath, standsInFor: engine }
+            : undefined;
     // The account's own suffix, derived by the same rule as a source key's, so
     // `account: "minio"` reads `S3_ACCESS_KEY_ID__MINIO`. Undefined when the
     // source named no account, which switches the fallback off entirely.
@@ -317,7 +356,7 @@ export function resolveStorageBackend(
         ? envSuffixForKey(accountHint, DEFAULT_STORAGE_SOURCE_KEY)
         : undefined;
     const declaredType = readVar(env, "STORAGE_TYPE", suffix);
-    const type = (declaredType || engineHint || "").toLowerCase();
+    const type = (declaredType || engineHint || "").trim().toLowerCase();
     // Whether the *environment* named this backend, as opposed to inheriting it
     // from a declaration. It decides what a missing bucket means:
     //
@@ -338,7 +377,7 @@ export function resolveStorageBackend(
     if (type === "s3") {
         const bucket = readVar(env, "S3_BUCKET", suffix);
         if (!bucket) {
-            if (!explicit) return undefined;
+            if (!explicit) return standIn("s3");
             throw new BundleError(
                 `Storage source "${key}" is set to s3 but has no bucket — ` +
                 `set ${`S3_BUCKET${suffix}`}.`
@@ -361,7 +400,7 @@ export function resolveStorageBackend(
         // environment for the build log, so the log and the runtime agree on
         // what this configuration is.
         if (!accessKeyId || !secretAccessKey) {
-            if (!explicit) return undefined;
+            if (!explicit) return standIn("s3");
             // Names the account form too when the source declared one, because
             // that is the variable the reader would actually have accepted — an
             // error naming only the per-key name would send someone to set the
@@ -392,7 +431,7 @@ export function resolveStorageBackend(
     if (type === "gcs") {
         const bucket = readVar(env, "GCS_BUCKET", suffix);
         if (!bucket) {
-            if (!explicit) return undefined;
+            if (!explicit) return standIn("gcs");
             throw new BundleError(
                 `Storage source "${key}" is set to gcs but has no bucket — ` +
                 `set ${`GCS_BUCKET${suffix}`}.`
@@ -411,10 +450,7 @@ export function resolveStorageBackend(
     }
 
     if (type === "local" || type === "") {
-        return {
-            type: "local",
-            basePath: readVar(env, "STORAGE_PATH", suffix) || defaultBasePath
-        };
+        return { type: "local", basePath: localBasePath };
     }
 
     throw new BundleError(
@@ -433,7 +469,8 @@ export function resolveStorageBackend(
 export function resolveStorageSources(
     env: EnvBag,
     definitions: StorageSourceDefinition[] | undefined,
-    defaultBasePath: string
+    defaultBasePath: string,
+    options: ResolveStorageOptions = {}
 ): Record<string, BackendStorageConfig> | undefined {
     const declared = definitions ?? [];
     assertDistinctSuffixes(declared, DEFAULT_STORAGE_SOURCE_KEY, "Storage source");
@@ -461,7 +498,8 @@ export function resolveStorageSources(
             definition.key,
             definition.engine,
             defaultBasePath,
-            definition.account
+            definition.account,
+            options
         );
         if (config) result[definition.key] = config;
     }

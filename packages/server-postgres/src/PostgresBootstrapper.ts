@@ -428,9 +428,48 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 );
             }
 
+            // ── Declared collections, no generated schema: read the tables back ──
+            // Only the default source is handed the bundle's Drizzle schema; a
+            // second database (`database("analytics")`) has collections routed
+            // to it and no schema at all. Its tables were just provisioned from
+            // those collections, so they are read back from the catalogue —
+            // restricted to the collections that are this source's, because
+            // the driver is handed every collection the project declares and
+            // must not go looking for the default's tables in the analytics
+            // database. Without this the registry held no table for `events`,
+            // and every routed write failed with "table not found" on a
+            // database that had the table.
+            let ownTables: Record<string, PgTable> | undefined;
+            let ownRelations: Record<string, Relations> | undefined;
+            const sourceKey = (config as { dataSourceKey?: string }).dataSourceKey ?? "(default)";
+            if (!introspectedCollections && !pgConfig.schema?.tables && collections && collections.length > 0) {
+                const own = collections.filter(c =>
+                    c.dataSource === sourceKey || (!c.dataSource && sourceKey === "(default)")
+                );
+                if (own.length > 0) {
+                    const pgSchemaName = pgConfig.introspectionSchema ?? "public";
+                    const live = await introspectSchema(rawClient, pgSchemaName);
+                    const wanted = new Set(own.map(c => getCollectionTableName(c)));
+                    for (const table of [...live.tablesMap.keys()]) {
+                        if (!wanted.has(table) && !live.joinTables.has(table)) live.tablesMap.delete(table);
+                    }
+                    ownTables = buildDrizzleTablesFromSchema(live.tablesMap, pgSchemaName);
+                    ownRelations = buildDrizzleRelationsFromSchema(live.tablesMap, ownTables);
+                    const missing = [...wanted].filter(t => !live.tablesMap.has(t));
+                    if (missing.length > 0) {
+                        logger.warn(
+                            `[PostgresRegistry] Data source "${sourceKey}" has no table yet for: ${missing.join(", ")}. ` +
+                            "Their collections will answer \"table not found\" until the schema is provisioned."
+                        );
+                    }
+                }
+            }
+
             const activeCollections = introspectedCollections ?? collections;
-            const schemaTables = introspectedTables ?? pgConfig.schema?.tables;
-            const schemaRelations = introspectedRelations ?? (pgConfig.schema?.relations as Record<string, Relations> | undefined);
+            const schemaTables = introspectedTables ?? pgConfig.schema?.tables ?? ownTables;
+            const schemaRelations = introspectedRelations
+                ?? (pgConfig.schema?.relations as Record<string, Relations> | undefined)
+                ?? ownRelations;
 
             // Create a fresh registry for this driver. Registration order is
             // load-bearing, so it lives in one place — see `buildCollectionRegistry`.
@@ -1104,6 +1143,33 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
          * strings). Failures are per-table and non-fatal: a table left un-policed
          * stays RLS-enabled, so it denies rather than leaks.
          */
+        /**
+         * The helper functions every generated policy calls — `rebase.uid()`,
+         * `rebase.roles()` and their siblings — on THIS database.
+         *
+         * On the default source they arrive with the auth tables, because auth
+         * lives there. A second database (`database("analytics")`) has no auth
+         * tables and used to have no helpers either, so every `CREATE POLICY`
+         * on it failed and every user-context read was denied. Same statements
+         * as the auth path and the migration preamble, from the same constant.
+         */
+        async ensureRlsRuntime(driverResult?: InitializedDriver): Promise<void> {
+            const { RLS_BOOTSTRAP_STATEMENTS } = await import("./schema/rls-bootstrap-sql");
+            const queryable = provisioningQueryable(driverResult);
+            // One statement per call — this handle speaks the extended query
+            // protocol, which rejects multi-command strings. Advisory-locked
+            // for the same reason the auth path is: two instances booting
+            // against one fresh database must not race on CREATE OR REPLACE.
+            await queryable.query("SELECT pg_advisory_lock(hashtext('rebase_auth_functions_init'))");
+            try {
+                for (const statement of RLS_BOOTSTRAP_STATEMENTS) {
+                    await queryable.query(statement);
+                }
+            } finally {
+                await queryable.query("SELECT pg_advisory_unlock(hashtext('rebase_auth_functions_init'))");
+            }
+        },
+
         async ensureCollectionPolicies(
             collections: unknown[],
             driverResult?: InitializedDriver,

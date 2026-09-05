@@ -14,6 +14,7 @@
  */
 
 import fs from "fs";
+import { resourceEnvSuffix } from "@rebasepro/types";
 import net from "net";
 import path from "path";
 
@@ -55,6 +56,16 @@ export interface DaemonState {
     token: string;
     /** Loopback port that answers the identity check. */
     identityPort: number;
+    /**
+     * The additional databases this daemon serves, by declared key.
+     *
+     * One PGlite instance each — PGlite is one database per instance, so
+     * `database("analytics")` is a second data directory and a second port,
+     * not a `CREATE DATABASE`. Started on demand when a command asks for the
+     * key over the identity socket, and recorded here so `rebase status` and
+     * a reset can see them. The default database is the fields above.
+     */
+    databases?: Record<string, { port: number; dataDir: string }>;
 }
 
 export function devDbDir(projectRoot: string): string {
@@ -63,6 +74,17 @@ export function devDbDir(projectRoot: string): string {
 
 export function dataDir(projectRoot: string): string {
     return path.join(devDbDir(projectRoot), DATA_DIR_NAME);
+}
+
+/**
+ * The data directory for an additional declared database.
+ *
+ * `pgdata__analytics`: the key spelled the way its variable is, so the
+ * directory beside `pgdata` and `DATABASE_URL__ANALYTICS` are visibly the
+ * same thing.
+ */
+export function additionalDataDir(projectRoot: string, key: string): string {
+    return path.join(devDbDir(projectRoot), `${DATA_DIR_NAME}${resourceEnvSuffix(key).toLowerCase()}`);
 }
 
 export function stateFile(projectRoot: string): string {
@@ -163,13 +185,28 @@ export function readState(projectRoot: string): DaemonState | null {
             return null;
         }
 
+        // Only well-formed entries survive: a malformed one is treated as
+        // absent, and the next ensure asks the daemon for it again.
+        const databases: Record<string, { port: number; dataDir: string }> = {};
+        if (parsed.databases && typeof parsed.databases === "object") {
+            for (const [key, entry] of Object.entries(parsed.databases)) {
+                if (
+                    entry && typeof entry.port === "number" && Number.isInteger(entry.port)
+                    && entry.port > 0 && entry.port <= 65535 && typeof entry.dataDir === "string"
+                ) {
+                    databases[key] = { port: entry.port, dataDir: entry.dataDir };
+                }
+            }
+        }
+
         return {
             port: parsed.port,
             pid: parsed.pid,
             dataDir: parsed.dataDir,
             startedAt: typeof parsed.startedAt === "string" ? parsed.startedAt : "",
             token: parsed.token,
-            identityPort: parsed.identityPort
+            identityPort: parsed.identityPort,
+            ...(Object.keys(databases).length > 0 ? { databases } : {})
         };
     } catch {
         return null;

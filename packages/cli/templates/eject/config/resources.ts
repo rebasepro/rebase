@@ -16,7 +16,7 @@ export const main = database();
 
 /**
  * The default bucket, bound from the plain unsuffixed storage variables
- * (`S3_BUCKET`, `GCS_BUCKET`, `STORAGE_BUCKET`).
+ * (`S3_BUCKET`, `GCS_BUCKET`).
  *
  * Name more of them to get more — `bucket("media")` reads `S3_BUCKET__MEDIA`,
  * and so on for every variable that kind uses.

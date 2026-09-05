@@ -220,7 +220,7 @@ export const CREATE_PROJECT_FLAGS = {
     /** For `--db byodb`. Same spelling as `rebase cloud db create` uses. */
     "--connection-string": String,
     "-n": "--name",
-    // The resource dials, same spelling as `rebase cloud resources set`. Every
+    // The resource dials, same spelling as `rebase cloud compute set`. Every
     // one is optional: a project that names none takes the platform default.
     // `--vm-size` used to sit here and named a machine on a price list this
     // platform does not buy from; the column it wrote was dropped on 2026-08-20.
@@ -291,7 +291,7 @@ message: "Subdomain:" });
     const defaults = providerDefaults(provider);
     const region = (args["--region"] || target.region || defaults.region).trim();
 
-    // Resources, if the caller named any. The same flags `resources set` takes,
+    // Compute, if the caller named any. The same flags `compute set` takes,
     // parsed by the same function — a second parser here would be the place the
     // two spellings of a dial drift apart. Nothing is required: a project that
     // names no dial takes the platform default and can change it afterwards.

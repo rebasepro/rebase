@@ -384,7 +384,16 @@ export {
     resolveStorageSources,
     resolveStorageBackend
 } from "./boot/sources";
-export type { ResolvedDataSourceConfig, EnvBag } from "./boot/sources";
+export type { ResolvedDataSourceConfig, EnvBag, ResolveStorageOptions } from "./boot/sources";
+export {
+    registerResourceResolver,
+    resourceResolver,
+    resourceResolvers,
+    assertEveryKindBindable,
+    unbindableKinds,
+    implicitDeclaration
+} from "./boot/resource-resolvers";
+export type { ResourceResolver, ResourceResolution, ResolveContext } from "./boot/resource-resolvers";
 export { initializeDataSource, initializeDataSources } from "./boot/driver";
 export type { InitializedDataSource, DriverConnection, BundleSchema } from "./boot/driver";
 

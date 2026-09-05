@@ -1,4 +1,5 @@
 import { createDataSourceRegistry, resolveDataSource } from "@rebasepro/common";
+import { DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
 
 import { loadCollectionsFromDirectory } from "../collections/loader";
@@ -64,9 +65,14 @@ export interface ProvisionTarget {
         BackendBootstrapper,
         | "ensureCollectionSchema"
         | "ensureCollectionPolicies"
+        | "ensureRlsRuntime"
         | "readCollectionsSchemaVersion"
         | "stampCollectionsSchemaVersion"
     >;
+    /** The data-source key this target provisions for. `(default)` for the primary. */
+    key?: string;
+    /** Whether this is the default source — the one auth lives on. */
+    isDefault?: boolean;
     /**
      * The handle the hooks read (`internals.db`), or `undefined` to let the
      * adapter fall back to the connection it was constructed with.
@@ -266,21 +272,22 @@ applied };
 }
 
 /**
- * The collections a data source's engine is the store for.
+ * The collections one data source is the store for.
  *
  * A project's collections directory holds *every* collection it declares,
- * whatever engine serves it — that is the point of `dataSource` routing. What it
- * is not is a list of tables to create: handing the whole directory to the
- * primary source's bootstrapper made a Firestore collection declared alongside
- * the Postgres ones arrive as an empty Postgres table, with RLS policies, while
- * the app went on reading its documents from Firestore.
+ * whatever source serves it — that is the point of `dataSource` routing. What
+ * it is not is a list of tables for the primary to create. This used to
+ * filter by *engine*, so a collection routed to a second Postgres database
+ * was handed to the default one: its table was created where nothing would
+ * ever read it, and the database it was routed to never got one. Every query
+ * against `database("analytics")` then failed on a missing relation behind a
+ * boot that had reported the schema up to date.
  *
- * Excluding is deliberately conservative. A collection that names neither an
- * `engine` nor a `dataSource` belongs to whichever source is primary — the
- * "postgres" that `resolveDataSource` falls back to there is a default, not a
- * declaration, and must not exclude anything on its own. Only a collection that
- * explicitly routes to a *different* engine is dropped, so a project running two
- * sources on the same engine is unaffected.
+ * So: a collection belongs to the source its `dataSource` names, or to the
+ * default when it names none. The engine check stays as a guard — a
+ * collection that declares an `engine` other than this source's is never its
+ * table, whatever key it names — and a source of a different engine still
+ * gets nothing that is not explicitly its own.
  *
  * Takes the shapes it actually reads rather than an `InitializedDataSource`, so
  * the path that has data sources and the path that has only an adapter can share
@@ -288,13 +295,15 @@ applied };
  */
 export function collectionsStoredBy(
     collections: CollectionConfig[],
-    primary: { engine: string },
+    source: { key: string; engine: string },
     dataSources: Array<{ key: string; engine: string }>
 ): CollectionConfig[] {
     const registry = createDataSourceRegistry(
-        dataSources.map(source => ({ key: source.key, engine: source.engine }))
+        dataSources.map(s => ({ key: s.key, engine: s.engine }))
     );
     return collections.filter(collection => {
+        const routedTo = collection.dataSource ?? DEFAULT_DATA_SOURCE_KEY;
+        if (routedTo !== source.key) return false;
         // The collection's own `engine` is read first, and `resolveDataSource`
         // is not asked to settle it: that function lets a registered definition
         // override the collection's engine, which is the right precedence for
@@ -304,21 +313,30 @@ export function collectionsStoredBy(
         const declared = collection.engine
             ?? (collection.dataSource ? resolveDataSource(collection, registry).engine : undefined);
         if (!declared) return true;
-        return declared === primary.engine;
+        return declared === source.engine;
     });
 }
 
-/** Say what was routed elsewhere, so a missing table is never a silent one. */
-export function logForeignCollections(
+/**
+ * Say what no source provisions, so a missing table is never a silent one.
+ *
+ * Every collection should be stored by exactly one of the sources handed in.
+ * One that none claims — routed to a key no source has, or declaring an
+ * engine none of them runs — is logged here by name rather than left to fail
+ * on its first request.
+ */
+export function logUnprovisionedCollections(
     all: CollectionConfig[],
-    stored: CollectionConfig[],
-    primary: { engine: string }
+    storedBySome: Set<CollectionConfig>,
+    sources: Array<{ key: string; engine: string }>
 ): void {
-    if (stored.length === all.length) return;
-    const foreign = all.filter(c => !stored.includes(c)).map(c => c.slug);
-    logger.info(
-        `Skipping ${foreign.length} collection(s) served by another engine, not "${primary.engine}": ${foreign.join(", ")}. ` +
-            "Their storage is not managed by this data source."
+    const orphans = all.filter(c => !storedBySome.has(c));
+    if (orphans.length === 0) return;
+    logger.warn(
+        `${orphans.length} collection(s) are stored by none of the data sources this process opened ` +
+            `(${sources.map(s => `${s.key}: ${s.engine}`).join(", ")}): ` +
+            `${orphans.map(c => `${c.slug}${c.dataSource ? ` → ${c.dataSource}` : ""}`).join(", ")}. ` +
+            "No table is created for them here; a source reached by a provider SDK manages its own."
     );
 }
 
@@ -351,8 +369,36 @@ export function provisionTargetFor(
         driverPackage: undefined,
         engine,
         bootstrapper: primary ?? {},
-        driverResult
+        driverResult,
+        key: primary?.id ?? DEFAULT_DATA_SOURCE_KEY,
+        isDefault: true
     };
+}
+
+/**
+ * One provisioning target per data source, the default first.
+ *
+ * The default keeps the pre-init handle the bundle path supplies; every other
+ * source is provisioned through its own adapter's connection, which is the
+ * contract `ensureCollectionSchema` already honours when handed no result.
+ */
+export function provisionTargetsFor(
+    bootstrappers: BackendBootstrapper[],
+    adapter?: { type: string },
+    driverResult?: InitializedDriver
+): ProvisionTarget[] {
+    const primary = provisionTargetFor(bootstrappers, adapter, driverResult);
+    const others = bootstrappers
+        .filter(b => b !== primary.bootstrapper)
+        .map((b): ProvisionTarget => ({
+            driverPackage: undefined,
+            engine: b.type,
+            bootstrapper: b,
+            driverResult: undefined,
+            key: b.id ?? b.type,
+            isDefault: false
+        }));
+    return [primary, ...others];
 }
 
 /** Load collections for provisioning when only a directory is known. */

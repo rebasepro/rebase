@@ -19,9 +19,9 @@
  * A declaration says a resource *exists* and what shape it has. It never says
  * how to reach it — that is a property of the environment, not of the project,
  * and it differs between a laptop, a self-hosted box and a tenant in the cloud.
- * Binding lives in `@rebasepro/server`'s boot path, reading environment
- * variables or an infrastructure config file, and it keys off the logical name
- * declared here.
+ * Binding lives in `@rebasepro/server`'s boot path, where each kind registers
+ * the resolver that reads its environment variables, keyed off the logical
+ * name declared here.
  *
  * This split is the whole point. Before it, storage topology was hand-written
  * into `rebase.json` while database topology lived in TypeScript, and the
@@ -104,6 +104,19 @@ export interface ResourceDeclaration {
     label?: string;
     /** Kind-specific options, validated against the kind's `optionKeys`. */
     options: Readonly<Record<string, unknown>>;
+    /**
+     * What in the project reaches this resource, as `<what>:<name>` — a
+     * `collection:posts` routed to a database, a `property:posts.cover` stored
+     * in a bucket, a `function:report` importing a handle.
+     *
+     * Recorded by the derive step, never by a constructor: a declaration says
+     * a resource exists, and only a reader that has evaluated the rest of the
+     * project can say who uses it. It is the map a host needs to split a
+     * monolith into units later, and the map a console needs to answer "what
+     * breaks if I remove this". Absent when nothing was recorded, which is
+     * different from an empty list.
+     */
+    usedBy?: readonly string[];
 }
 
 /**
@@ -126,9 +139,64 @@ export function isResourceHandle(value: unknown): value is ResourceHandle {
     return typeof value === "object" && value !== null && BRAND in value;
 }
 
+/**
+ * A reference to a resource where a key is expected: the handle a constructor
+ * returned, or the key spelled as a string.
+ *
+ * The handle is the point. `dataSource: analytics` is the same name spelled
+ * once — rename the export and every use follows, jump-to-definition lands on
+ * the declaration, and the derive step can record who uses what. The string
+ * form stays because a key has to survive serialisation: the runtime and the
+ * admin UI read collections as plain data, where a handle cannot travel.
+ */
+export type ResourceRef = string | ResourceHandle;
+
 /** The key a resource reference names, whether it is a handle or already a key. */
-export function resourceKeyOf(ref: string | ResourceHandle): string {
+export function resourceKeyOf(ref: ResourceRef): string {
     return isResourceHandle(ref) ? ref.key : ref;
+}
+
+/**
+ * Replace every resource handle inside a value with its key, deeply.
+ *
+ * Applied where authored config becomes data: `defineCollection`, the
+ * collection loaders, the derive step. Past that point a collection is plain
+ * data that serialises, compares with `===` and reaches the admin UI over the
+ * wire, so a handle must not survive into it. Plain objects and arrays are
+ * walked; anything else — a function, a Date, a class instance — is a leaf and
+ * is returned as it is, which is what keeps callbacks and validators intact.
+ */
+export function resolveResourceRefs<T>(value: T): T {
+    if (isResourceHandle(value)) return value.key as unknown as T;
+    // Identity-preserving: a value with no handle inside comes back as the
+    // same object, not a copy. Collections point at each other through
+    // `target: () => authors`, and a loader that cloned every collection would
+    // leave those closures returning the originals while everything else
+    // held the copies. A collection that `defineCollection` already
+    // normalised passes through here untouched.
+    if (Array.isArray(value)) {
+        let changed = false;
+        const out = value.map(item => {
+            const next = resolveResourceRefs(item);
+            if (next !== item) changed = true;
+            return next;
+        });
+        return (changed ? out : value) as T;
+    }
+    if (value !== null && typeof value === "object") {
+        const proto = Object.getPrototypeOf(value);
+        if (proto === Object.prototype || proto === null) {
+            let changed = false;
+            const out: Record<string, unknown> = {};
+            for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+                const next = resolveResourceRefs(v);
+                if (next !== v) changed = true;
+                out[k] = next;
+            }
+            return (changed ? out : value) as T;
+        }
+    }
+    return value;
 }
 
 /**
@@ -346,12 +414,26 @@ export interface ResourceGraph {
 /** The current graph format version. */
 export const RESOURCE_GRAPH_VERSION = 1 as const;
 
-/** Build a graph from the current declarations, sorted for a stable diff. */
-export function buildResourceGraph(): ResourceGraph {
+/**
+ * Build a graph from the current declarations, sorted for a stable diff.
+ *
+ * `usedBy` maps a `kind:key` id to the things that reach it. The derive step
+ * supplies it after evaluating collections; a runtime building the graph at
+ * boot passes nothing and gets declarations alone, which is all it binds from.
+ */
+export function buildResourceGraph(usedBy?: ReadonlyMap<string, readonly string[]>): ResourceGraph {
     const resources = declaredResources().slice().sort(
         (a, b) => a.kind.localeCompare(b.kind) || a.key.localeCompare(b.key)
-    );
+    ).map(r => {
+        const users = usedBy?.get(declarationId(r.kind, r.key));
+        return users && users.length > 0 ? { ...r, usedBy: [...users].sort() } : r;
+    });
     return { version: RESOURCE_GRAPH_VERSION, resources };
+}
+
+/** `kind:key`, the id `usedBy` maps are keyed by. Exported for the derive step. */
+export function resourceId(kind: string, key: string): string {
+    return declarationId(kind, key);
 }
 
 /**
