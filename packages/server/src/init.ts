@@ -1186,6 +1186,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const mine = provisionableBy.get(target) ?? [];
         if (mine.length === 0) continue;
         logger.info(`Provisioning ${mine.length} collection table(s) on data source "${target.key}"`);
+        // The same question for every database that gets tables, not only the
+        // first: a second source that is down would otherwise fail inside the
+        // DDL with the redacted "Failed query" this probe exists to pre-empt.
+        await verifyProvisioningConnection(target);
         const outcome = await provisionCollectionTables(mine, target, {
             introspecting: introspectCollections,
             provision: config.provisionSchema ?? true

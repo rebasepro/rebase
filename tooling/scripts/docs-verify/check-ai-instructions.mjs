@@ -129,7 +129,10 @@ export function checkAiInstructions(root) {
         };
 
         for (const span of codeSpans(text)) {
-            for (const m of span.text.matchAll(/\brebase\.([A-Za-z_$][\w$]*)/g)) {
+            // `rebase.resources.json` is a file the scaffold commits, not an
+            // accessor; the trailing word boundary stops a shorter backtracked
+            // match from slipping past the lookahead.
+            for (const m of span.text.matchAll(/\brebase\.([A-Za-z_$][\w$]*)\b(?!\.json\b)/g)) {
                 const name = m[1];
                 if (NOT_ACCESSORS.has(name) || members.has(name)) continue;
                 report(

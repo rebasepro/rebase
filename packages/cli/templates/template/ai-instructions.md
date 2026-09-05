@@ -15,6 +15,7 @@
 | `pnpm skills:install` | Install the Rebase skills for your assistant |
 | `pnpm example` | Run `scripts/example.ts` against the running backend — the SDK, end to end |
 | `rebase doctor` | What disagrees between collections, generated schema and the live database — run this before guessing |
+| `rebase resources --write` | After declaring a database, bucket or topic in `config/resources.ts`: regenerate `rebase.resources.json` and commit it (`pnpm build` does this too) |
 | `pnpm deploy` | Deploys this project. Never run it; see below |
 
 ## Never
@@ -22,6 +23,7 @@
 - **Never deploy.** `pnpm deploy`, `rebase cloud deploy`, `firebase deploy`, `gcloud run deploy` — print the command and let the human run it, even when the task list ends in "deploy" and the tests are green.
 - **Never edit `.env`.** It holds generated secrets and the connection string. Add a variable by asking, and document it in `.env.example`.
 - **Never edit `backend/src/schema.generated.ts`.** It is overwritten by `pnpm schema:generate`; the collection file is the source.
+- **Never edit `rebase.resources.json`.** It is generated from `config/resources.ts` — declare there, then `rebase resources --write`.
 - **Never pass `--allow-destructive`** to anything pointed at a database that is not the local development one. It drops columns and tables.
 - **Never write raw SQL or Drizzle queries against application tables.** That path skips validation, hooks and row-level security.
 

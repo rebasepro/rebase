@@ -132,14 +132,16 @@ A rollback appends a new deployment rather than rewinding history, and waits for
 the restored version to serve before reporting success. Follow it with
 `rebase cloud logs -f`.
 
-## Resources, and what they cost
+## Compute, and what it costs
 
-A project is priced from what it reserves, not from a tier. `resources` prints
-every dial and the control plane's own itemised quote for them:
+A project is priced from what it reserves, not from a tier. `compute` prints
+every dial and the control plane's own itemised quote for them. (`rebase cloud
+resources` is a different thing: the databases and buckets the code declares,
+and whether each is provisioned — see the [CLI reference](/docs/cli/#rebase-cloud).)
 
 ```bash
-rebase cloud resources
-rebase cloud resources set --cpu 500m --memory 2Gi
+rebase cloud compute
+rebase cloud compute set --cpu 500m --memory 2Gi
 ```
 
 | Dial | Unit, and what it means |
@@ -159,7 +161,7 @@ follows the platform default and moves when it moves.
 
 Nothing is validated by the CLI, on purpose — the limits belong to the cluster a
 project runs on, and they differ between providers. The control plane refuses a
-value it cannot honour and names the field. Run `rebase cloud resources` to see
+value it cannot honour and names the field. Run `rebase cloud compute` to see
 the €/month before and after; a change applies immediately, prorated from today,
 except one that restarts the database, which waits for a maintenance window.
 
