@@ -55,7 +55,7 @@ anche in repository che non sono affatto progetti Rebase.
 ## Con cosa inizia `ai-instructions.md`
 
 Il file scaffoldato è deliberatamente breve — rimanda a
-[`rebase skills install`](/docs/ai/skills) per approfondire, poi definisce quattro regole che
+[`rebase skills install`](/docs/ai/skills) per approfondire, poi definisce le regole che
 gli assistenti sbagliano abbastanza spesso da meritare di essere ripetute all'inizio di ogni
 sessione:
 
@@ -64,11 +64,14 @@ sessione:
    [Schema as Code](/docs/architecture/schema-as-code).
 2. **Le migrazioni sono in due passaggi.** `rebase schema generate`, poi `rebase db push`
    in fase di sviluppo, oppure `rebase db generate && rebase db migrate` per la produzione.
-3. **Usa l'SDK.** Passa attraverso `rebase.data.<slug>`; l'SQL grezzo e le chiamate dirette a Drizzle
+3. **Usa l'SDK.** Passa attraverso `rebase.dataAsAdmin.<slug>` per il lavoro svolto
+   con l'identità del servizio, oppure `getDriver(c)` dentro una function quando la
+   lettura deve avvenire come chiamante. Sul server il client non espone un accessore `data` semplice.
+   L'SDK va sempre usato: l'SQL grezzo e le chiamate dirette a Drizzle
    bypassan la validazione, le callback e la RLS.
 4. **Proteggi ogni route personalizzata.** Le route in `backend/functions/` sono montate
    *senza* autenticazione. Usa `requireAuth` / `requireAdmin` da
-   `@rebasepro/server` nello slot middleware dedicato della route — leggere
+   `@rebasepro/server/functions` nello slot middleware dedicato della route — leggere
    `c.get("user")` non costituisce una protezione, e non lo è nemmeno `app.use()` dopo la route.
 
 Quest'ultima è quella fondamentale da ricordare. Fa la differenza tra un middleware che

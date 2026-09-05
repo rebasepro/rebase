@@ -60,7 +60,7 @@ Rebase-Projekte sind.
 ## Womit `ai-instructions.md` beginnt
 
 Die generierte Datei ist bewusst kurz gehalten – sie verweist für Details auf
-[`rebase skills install`](/docs/ai/skills) und formuliert dann vier Regeln, die
+[`rebase skills install`](/docs/ai/skills) und formuliert dann die Regeln, die
 Assistenten oft genug falsch machen, sodass es sich lohnt, sie zu Beginn jeder
 Sitzung zu wiederholen:
 
@@ -70,11 +70,14 @@ Sitzung zu wiederholen:
 2. **Migrationen bestehen aus zwei Schritten.** `rebase schema generate`, dann
    `rebase db push` in der Entwicklung oder `rebase db generate && rebase db migrate`
    für die Produktion.
-3. **Nutzen Sie das SDK.** Gehen Sie über `rebase.data.<slug>`; natives SQL und
+3. **Nutzen Sie das SDK.** Gehen Sie über `rebase.dataAsAdmin.<slug>` für Arbeit
+   unter der Dienstidentität oder über `getDriver(c)` innerhalb einer Function,
+   wenn der Lesezugriff als Aufrufer laufen soll. Auf dem Server hat der Client keinen
+   einfachen `data`-Accessor. natives SQL und
    direkte Drizzle-Aufrufe umgehen Validierung, Callbacks und RLS.
 4. **Schützen Sie jede benutzerdefinierte Route.** Routen in `backend/functions/`
    werden *ohne* Authentifizierung eingebunden. Verwenden Sie `requireAuth` /
-   `requireAdmin` aus `@rebasepro/server` im route-eigenen Middleware-Slot – das
+   `requireAdmin` aus `@rebasepro/server/functions` im route-eigenen Middleware-Slot – das
    Auslesen von `c.get("user")` ist kein Schutz, und `app.use()` nach der Route
    ebenfalls nicht.
 
