@@ -1,8 +1,9 @@
 import React from "react";
-import { AbsoluteFill, Series } from "remotion";
+import { AbsoluteFill, Sequence } from "remotion";
 import { Plane, StationContext } from "./Plane";
 import { Narration } from "./Narration";
 import { SCENES, STARTS } from "./film";
+import { OVERLAP } from "./transitions";
 
 /**
  * The film.
@@ -12,19 +13,39 @@ import { SCENES, STARTS } from "./film";
  * mid-move across every one of them, carrying the outgoing slide out and the
  * incoming one in. That is the difference between a shared plane and nine
  * backdrops that happen to match.
+ *
+ * THE SCENES OVERLAP. This was a `Series`, which mounts exactly one scene at
+ * a time — so the outgoing slide had finished fading on the last frame before
+ * the cut and the incoming one had not started on the first frame after it.
+ * Measured on the render: 9 to 25 frames of bare ground at every one of the
+ * sixteen cuts, and the film read as pausing to breathe at each edit no
+ * matter how fast the slides themselves moved. A push in which nothing is
+ * ever pushed past anything is a dip to black with extra steps.
+ *
+ * So every scene after the first is mounted OVERLAP frames before its own
+ * cut, which is exactly the window the previous scene spends leaving. The two
+ * slides cross; the incoming one is on top. The cut itself — where the camera
+ * turns, where the ground changes, where the narration is timed from — is
+ * still STARTS[i]. A scene simply starts arriving a little before it.
  */
 export const RebaseIntro: React.FC = () => (
     <AbsoluteFill style={{ background: "#000" }}>
         <Plane />
-        <Series>
-            {SCENES.map((scene, i) => (
-                <Series.Sequence key={scene.id} durationInFrames={scene.durationInFrames}>
-                    <StationContext.Provider value={{ index: i, start: STARTS[i] }}>
+        {SCENES.map((scene, i) => {
+            const lead = i === 0 ? 0 : OVERLAP;
+            return (
+                <Sequence
+                    key={scene.id}
+                    from={STARTS[i] - lead}
+                    durationInFrames={scene.durationInFrames + lead}
+                    layout="none"
+                >
+                    <StationContext.Provider value={{ index: i, start: STARTS[i], lead }}>
                         <scene.component />
                     </StationContext.Provider>
-                </Series.Sequence>
-            ))}
-        </Series>
+                </Sequence>
+            );
+        })}
     </AbsoluteFill>
 );
 
@@ -34,10 +55,11 @@ export const RebaseIntro: React.FC = () => (
  * different background than it will ship with is worse than not previewing it.
  */
 export const STANDALONE = SCENES.map((scene, i) => {
+    const lead = i === 0 ? 0 : OVERLAP;
     const Component: React.FC = () => (
         <AbsoluteFill style={{ background: "#000" }}>
-            <Plane offset={STARTS[i]} />
-            <StationContext.Provider value={{ index: i, start: STARTS[i] }}>
+            <Plane offset={STARTS[i] - lead} />
+            <StationContext.Provider value={{ index: i, start: STARTS[i], lead }}>
                 <scene.component />
             </StationContext.Provider>
         </AbsoluteFill>

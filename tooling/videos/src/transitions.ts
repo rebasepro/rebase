@@ -28,13 +28,20 @@ export type TransitionKind = "hold" | "push" | "descend" | "rise" | "scale";
 const H = 420;
 const V = 300;
 
-/** Frames on each side of a cut. Both halves finish exactly at the cut, so
- *  every transition takes the same time.
+/** Frames a slide spends leaving, and frames the next one spends arriving.
  *
- *  22, not 16: at 16 the whole move is 0.53s, and a slide that has to be read
- *  as a DIRECTION rather than a flicker needs closer to three quarters of a
- *  second. */
+ *  These two windows are THE SAME FRAMES. The film mounts each scene
+ *  `OVERLAP` frames before its cut (Intro.tsx), so an exit and the entrance
+ *  that answers it run concurrently and the whole transition takes 12 frames
+ *  — not 12 out, a gap, then 12 in. It was 22 when the halves ran back to
+ *  back; a slide that has to read as a direction rather than a flicker needed
+ *  the time. Crossing, it does not: the direction is carried by two slides
+ *  moving the same way at once, which is legible in far fewer frames. */
 export const TRANSITION_FRAMES = 12;
+
+/** How early the next scene is mounted. Equal to TRANSITION_FRAMES so the
+ *  entrance starts on the exit's first frame and both end on the cut. */
+export const OVERLAP = TRANSITION_FRAMES;
 
 interface Move {
     /** Where the incoming slide starts, relative to rest. */
@@ -74,6 +81,19 @@ const MOVES: Record<TransitionKind, Move> = {
 const EXIT = Easing.bezier(0.35, 0, 0.75, 0.45);
 const ARRIVE = Easing.out(Easing.cubic);
 
+/* The two fades are a DISSOLVE now, because the two slides share the frame.
+   When they ran back to back, opacity led the position on the way in and
+   trailed it on the way out, so each slide was seen travelling on its own.
+   Overlapping, that pairing put both slides at full strength on the same
+   frames — a headline sliding through another headline. So the outgoing
+   slide loses opacity across the whole window and the incoming one gains it
+   across the whole window, offset by a couple of frames in the newcomer's
+   favour so the slide you are about to read is the one that reads first.
+   Linear, on purpose: over twelve frames an eased dissolve just reads as
+   one slide holding longer than it should. */
+const FADE_IN_UNTIL = 0.8;
+const FADE_OUT_FROM = 0.2;
+
 export interface SlideMotion {
     px: number;
     py: number;
@@ -110,9 +130,7 @@ export function slideMotion(
         px += from.x * (1 - t);
         py += from.y * (1 - t);
         scale *= from.scale + (1 - from.scale) * t;
-        // Opacity LEADS the position: full by a third of the way in, so the
-        // slide is legible while it is still visibly travelling.
-        opacity *= interpolate(local, [0, TRANSITION_FRAMES * 0.35], [0, 1], {
+        opacity *= interpolate(local, [0, TRANSITION_FRAMES * FADE_IN_UNTIL], [0, 1], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
         });
@@ -129,9 +147,7 @@ export function slideMotion(
         px += to.x * t;
         py += to.y * t;
         scale *= 1 + (to.scale - 1) * t;
-        // Opacity TRAILS the position on the way out: the slide holds full
-        // strength for the first half of its journey, so you see where it went.
-        opacity *= 1 - interpolate(local, [start + TRANSITION_FRAMES * 0.45, duration], [0, 1], {
+        opacity *= 1 - interpolate(local, [start + TRANSITION_FRAMES * FADE_OUT_FROM, duration], [0, 1], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
         });

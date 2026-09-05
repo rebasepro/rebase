@@ -148,7 +148,10 @@ export const TwoUsers: React.FC = () => {
     return (
         <AbsoluteFill>
             <Stage style={{ justifyContent: "flex-start", paddingTop: 96 }}>
-                <Chapter n="06" label="The same query, twice" delay={2} />
+                {/* Not "The same query, twice" — that is the headline, and an
+                    eyebrow that repeats its headline is two lines saying one
+                    thing. This names what the scene is evidence OF. */}
+                <Chapter n="06" label="Row-level security, running" delay={2} />
                 <div style={{ marginTop: 20 }}>
                     <DisplayLine size={DISPLAY.statement} delay={8}>
                         The same query, twice.

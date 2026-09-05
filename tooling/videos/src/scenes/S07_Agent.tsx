@@ -23,9 +23,11 @@ import { useTone } from "../Plane";
  * said before the address.
  */
 
+/* Plain, and each one says what the agent gets. "A wildcard is not a scope"
+   was a good line for a security engineer and a riddle for everyone else. */
 const MECHANISMS: [string, string][] = [
-    ["MCP server", "The backend, as tools an agent can call."],
-    ["Scoped API keys", "Per-collection, per-operation. A wildcard is not a scope."],
+    ["MCP server", "Your backend, as tools an agent can call."],
+    ["Scoped API keys", "One collection, one operation, one key. Nothing broader."],
     ["Installable skills", "The agent learns your schema, not a generic API."],
 ];
 
@@ -38,10 +40,13 @@ export const S07_Agent: React.FC = () => {
             <Stage>
                 <Chapter n="08" label="Agent-native" delay={4} />
                 <div style={{ marginTop: 24 }}>
+                    {/* "Not a way around it" was a clipped negative with nothing
+                        for "it" to point at. This says whose permissions, and
+                        what an agent cannot do with them. */}
                     <DisplayLine size={DISPLAY.statement} delay={10}>
-                        An agent gets the same permissions
+                        An agent gets your permissions.
                     </DisplayLine>
-                    <DisplayLine size={DISPLAY.statement} delay={17}>you do. Not a way around it.</DisplayLine>
+                    <DisplayLine size={DISPLAY.statement} delay={17}>No way around them.</DisplayLine>
                 </div>
 
                 <div style={{ display: "flex", gap: 28, marginTop: 62 }}>

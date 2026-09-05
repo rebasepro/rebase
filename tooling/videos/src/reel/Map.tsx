@@ -1,6 +1,8 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 import { pop, ramp, SPRING } from "../components/motion";
+import { STAGE_INSET } from "../components/Scene";
+import { DisplayLine, DISPLAY } from "../components/Type";
 import { CHROMA, FONT, INK, TRACKING } from "../theme";
 
 /**
@@ -35,19 +37,19 @@ const W = 268;
 const H = 92;
 
 const NODES: Node[] = [
-    { id: "products", label: "products", fields: "14 fields", x: 214, y: 286, hue: CHROMA.cyan },
-    { id: "orders", label: "orders", fields: "12 fields", x: 686, y: 214, hue: CHROMA.cyan },
-    { id: "order_items", label: "order_items", fields: "6 fields", x: 686, y: 438, hue: CHROMA.cyan },
-    { id: "customers", label: "customers", fields: "9 fields", x: 1158, y: 286, hue: CHROMA.coral },
-    { id: "users", label: "users", fields: "7 fields", x: 1478, y: 148, hue: CHROMA.coral },
-    { id: "tickets", label: "tickets", fields: "10 fields", x: 1420, y: 452, hue: CHROMA.yellow },
+    { id: "products", label: "products", fields: "14 fields", x: 200, y: 286, hue: CHROMA.cyan },
+    { id: "orders", label: "orders", fields: "12 fields", x: 672, y: 214, hue: CHROMA.cyan },
+    { id: "order_items", label: "order_items", fields: "6 fields", x: 672, y: 438, hue: CHROMA.cyan },
+    { id: "customers", label: "customers", fields: "9 fields", x: 1144, y: 286, hue: CHROMA.coral },
+    { id: "users", label: "users", fields: "7 fields", x: 1464, y: 148, hue: CHROMA.coral },
+    { id: "tickets", label: "tickets", fields: "10 fields", x: 1406, y: 452, hue: CHROMA.yellow },
     /* The content cluster is laid out around its EDGES, not on a grid. With
        posts, authors and tags on one row the posts→tags relation ran straight
        through the authors card — a line crossing a node reads as a connection
        to it. tags sits high and authors low so the long edge passes above. */
-    { id: "posts", label: "posts", fields: "11 fields", x: 250, y: 620, hue: CHROMA.violet },
-    { id: "authors", label: "authors", fields: "6 fields", x: 700, y: 690, hue: CHROMA.violet },
-    { id: "tags", label: "tags", fields: "3 fields", x: 1150, y: 560, hue: CHROMA.violet },
+    { id: "posts", label: "posts", fields: "11 fields", x: 236, y: 620, hue: CHROMA.violet },
+    { id: "authors", label: "authors", fields: "6 fields", x: 686, y: 690, hue: CHROMA.violet },
+    { id: "tags", label: "tags", fields: "3 fields", x: 1136, y: 560, hue: CHROMA.violet },
 ];
 
 const byId = (id: string) => NODES.find((n) => n.id === id)!;
@@ -174,7 +176,7 @@ export const Map: React.FC = () => {
             <div
                 style={{
                     position: "absolute",
-                    left: 214,
+                    left: STAGE_INSET,
                     top: 100,
                     display: "flex",
                     alignItems: "center",
@@ -199,21 +201,13 @@ export const Map: React.FC = () => {
                 </span>
             </div>
 
-            <div
-                style={{
-                    position: "absolute",
-                    left: 214,
-                    top: 848,
-                    width: 1500,
-                    fontFamily: FONT.display,
-                    fontSize: 46,
-                    fontWeight: 600,
-                    letterSpacing: "-0.02em",
-                    color: INK.high,
-                    opacity: ramp(frame, 178, 26),
-                }}
-            >
-                Your schema, as it actually is.
+            {/* The line lands after the last relation is drawn. Split tier, on
+                the film's measure — this and the wire both ran a 46px one-off
+                fourteen pixels off the inset every other scene uses. */}
+            <div style={{ position: "absolute", left: STAGE_INSET, top: 846, width: 1500 }}>
+                <DisplayLine size={DISPLAY.split} delay={178}>
+                    Your schema, as it actually is.
+                </DisplayLine>
             </div>
         </AbsoluteFill>
     );

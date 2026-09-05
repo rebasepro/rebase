@@ -21,10 +21,10 @@ import { useTone } from "../Plane";
  */
 
 const SURFACES = [
-    ["SQL editor", "Query production, with the schema in reach"],
+    ["SQL editor", "Query your data, with the schema beside it"],
     ["Schema visualizer", "Tables and relations, as they really are"],
-    ["RLS editor", "Read and write policies in place"],
-    ["Logs & API explorer", "What the backend answered, and why"],
+    ["RLS editor", "Read and write the policies where they live"],
+    ["Logs & API explorer", "Every request, and what it was answered with"],
 ];
 
 export const S07_Studio: React.FC = () => {

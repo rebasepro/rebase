@@ -2,6 +2,7 @@ import React from "react";
 import { AbsoluteFill } from "remotion";
 import { Scene } from "../components/Scene";
 import { BentoTiles } from "../bento/Bento";
+import { OVERLAP } from "../transitions";
 
 /**
  * EVERY VIEW — 240 frames. The only scene with no chapter and no headline.
@@ -25,7 +26,12 @@ import { BentoTiles } from "../bento/Bento";
 export const S07b_Everything: React.FC = () => (
     <Scene>
         <AbsoluteFill>
-            <BentoTiles duration={240} travel={110} lift={30} />
+            {/* The scene is mounted OVERLAP frames longer than its nominal 240
+                so it can cross with the panel before it (Intro.tsx). The tiles'
+                own Sequences have to cover that too, or seven clips unmount
+                on the first frame of the exit and the grid slides out as
+                seven empty boxes. */}
+            <BentoTiles duration={240 + OVERLAP} travel={110} lift={30} />
         </AbsoluteFill>
     </Scene>
 );

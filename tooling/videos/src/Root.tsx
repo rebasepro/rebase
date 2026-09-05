@@ -4,6 +4,7 @@ import { Composition, Series } from "remotion";
 import { loadFonts } from "./fonts";
 import { RebaseIntro, RebaseIntroVO, STANDALONE } from "./Intro";
 import { INTRO_DURATION, SCENES } from "./film";
+import { OVERLAP } from "./transitions";
 import { HeroIntro } from "./components/HeroIntro";
 import { HowItWorks } from "./components/HowItWorks";
 import { FeatureShowcase } from "./components/FeatureShowcase";
@@ -233,7 +234,7 @@ export const RemotionRoot: React.FC = () => (
                 key={scene.id}
                 id={`Scene-${scene.id}`}
                 component={STANDALONE[i]}
-                durationInFrames={scene.durationInFrames}
+                durationInFrames={scene.durationInFrames + (i === 0 ? 0 : OVERLAP)}
                 fps={FPS}
                 width={WIDTH}
                 height={HEIGHT}
