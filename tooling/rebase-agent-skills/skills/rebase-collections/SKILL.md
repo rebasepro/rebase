@@ -1520,7 +1520,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
                 // Only show for pending submissions
                 isEnabled: ({ entity }) => entity?.values.status === "pending",
                 onClick: async ({ entity, context, onCollectionChange }) => {
-                    if (!entity) return;
+                    if (!entity || !context) return;
                     await context.data.collection<Record<string, unknown>>("job_submissions").update(entity.id, {
                         status: "approved"
                     });

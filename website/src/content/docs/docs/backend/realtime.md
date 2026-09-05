@@ -43,7 +43,8 @@ Both methods return an **unsubscribe function** you call to stop receiving updat
 
 Use `listen()` to receive updates whenever records in a collection change:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listen(
   undefined, // FindParams — pass undefined for all records
   (response) => {
@@ -64,7 +65,8 @@ The callback receives a `FindResponse<M>` containing:
 
 Pass `FindParams` as the first argument to filter the subscription:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listen(
   {
     where: { status: ["==", "published"] },
@@ -83,7 +85,8 @@ The server respects these filters — only matching records are included in upda
 
 Use `listenById()` to watch a specific record:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listenById` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listenById(
   "product-123",
   (entity) => {
@@ -105,7 +108,8 @@ The callback receives `Entity<M> | undefined`. A value of `undefined` means the 
 
 Both `listen()` and `listenById()` return an unsubscribe function. Call it to stop receiving updates and clean up server-side resources:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listen(undefined, (response) => {
   // handle updates
 });
@@ -322,7 +326,8 @@ The client SDK automatically reconnects when the WebSocket connection drops:
 
 You can listen to connection lifecycle events:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `client.ws` is optional on the client, same class as `listen`. -->
+```typescript no-verify
 const ws = client.ws; // Access the WebSocket client
 
 ws.on("connect", () => console.log("Connected"));

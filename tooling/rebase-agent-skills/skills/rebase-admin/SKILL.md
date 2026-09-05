@@ -372,7 +372,7 @@ function MyComponent() {
     const { open, close } = useSelectionDialog<Product>({
         path: "products",
         onSingleEntitySelected: (entity) => {
-            console.log("Selected:", entity.id);
+            console.log("Selected:", entity?.id);
             close();
         }
     });

@@ -38,7 +38,8 @@ The `@rebasepro/client` SDK provides high-level methods with automatic authentic
 
 ### Subscribing to a Collection — `listen()`
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 import { createRebaseClient } from "@rebasepro/client";
 
 const client = createRebaseClient({
@@ -67,7 +68,8 @@ unsubscribe();
 
 Pass `FindParams` as the first argument to filter the subscription:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listen(
     {
         where: { status: ["==", "published"] },
@@ -116,7 +118,8 @@ The `FindResponse<M>` contains:
 
 ### Subscribing to a Single Entity — `listenById()`
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listenById` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listenById(
     "product-123",
     (entity) => {
@@ -148,7 +151,8 @@ The callback receives `undefined` when the entity is deleted.
 
 Both `listen()` and `listenById()` return an unsubscribe function. Call it to stop receiving updates and clean up server-side resources:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listen(undefined, (response) => {
     // handle updates
 });
@@ -159,7 +163,8 @@ unsubscribe();
 
 In React, use `useEffect` cleanup:
 
-```tsx
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```tsx no-verify
 useEffect(() => {
     const unsubscribe = client.data.products.listen(
         { where: { active: ["==", true] } },
@@ -739,7 +744,8 @@ The client SDK (`RebaseWebSocketClient`) automatically reconnects when the conne
 
 ### Connection Lifecycle Events
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `client.ws` is optional on the client, same class as `listen`. -->
+```typescript no-verify
 const ws = client.ws; // Access the RebaseWebSocketClient
 
 ws.on("connect", () => console.log("Connected"));
@@ -921,7 +927,8 @@ class ApiError extends Error {
 
 ### Subscription Error Callbacks
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listen(
     undefined,
     (response) => { /* success */ },

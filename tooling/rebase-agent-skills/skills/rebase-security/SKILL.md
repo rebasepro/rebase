@@ -332,7 +332,7 @@ const ordersCollection: PostgresCollectionConfig<Order> = {
         beforeSave: async ({ values, context }) => {
             // Enforce business rule: only admins can set high-value orders
             const user = context.user;
-            if (values.total > 10000 && !user?.roles?.includes("admin")) {
+            if ((values.total ?? 0) > 10000 && !user?.roles?.includes("admin")) {
                 throw new Error("High-value orders require admin approval");
             }
             return values;

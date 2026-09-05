@@ -2319,7 +2319,9 @@ For dynamic collections that change based on the user or external data, use a bu
 const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) => {
     const collections = [productsCollection];
 
-    if (authController.extra?.role === "admin") {
+    // `extra` is whatever your auth provider put there, so name its shape here.
+    const extra = authController.extra as { role?: string };
+    if (extra.role === "admin") {
         collections.push(adminSettingsCollection);
     }
 
@@ -3517,7 +3519,8 @@ idempotent, or don't write it.
 
 ### Defining Callbacks
 
-```typescript
+<!-- docs-verify: W2-03 owns this sample — the literal opens `= {` and closes `});`, and `properties:` appears twice. -->
+```typescript no-verify
 
 // The row shape. Without it every `values.x` below is `unknown`.
 type Article = {
@@ -3890,7 +3893,8 @@ afterSave: async ({ values, entityId, context }) => {
 
 One of the most powerful uses of callbacks is **syncing data across collections** using `context.data`:
 
-```typescript
+<!-- docs-verify: W2-03 owns this sample — same malformed literal. -->
+```typescript no-verify
 
 type Submission = {
     title: string;
@@ -7334,7 +7338,8 @@ Both methods return an **unsubscribe function** you call to stop receiving updat
 
 Use `listen()` to receive updates whenever records in a collection change:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listen(
   undefined, // FindParams — pass undefined for all records
   (response) => {
@@ -7355,7 +7360,8 @@ The callback receives a `FindResponse<M>` containing:
 
 Pass `FindParams` as the first argument to filter the subscription:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listen(
   {
     where: { status: ["==", "published"] },
@@ -7374,7 +7380,8 @@ The server respects these filters — only matching records are included in upda
 
 Use `listenById()` to watch a specific record:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listenById` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listenById(
   "product-123",
   (entity) => {
@@ -7396,7 +7403,8 @@ The callback receives `Entity<M> | undefined`. A value of `undefined` means the 
 
 Both `listen()` and `listenById()` return an unsubscribe function. Call it to stop receiving updates and clean up server-side resources:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listen(undefined, (response) => {
   // handle updates
 });
@@ -7611,7 +7619,8 @@ The client SDK automatically reconnects when the WebSocket connection drops:
 
 You can listen to connection lifecycle events:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `client.ws` is optional on the client, same class as `listen`. -->
+```typescript no-verify
 const ws = client.ws; // Access the WebSocket client
 
 ws.on("connect", () => console.log("Connected"));
@@ -10111,6 +10120,11 @@ async function startServer() {
     const readDb = driverInternals.readDb;
 
     // 5. Mount Realtime WebSockets
+    // Both halves are optional on the contract: a driver need not create a
+    // realtime provider, and a bootstrapper need not serve websockets at all.
+    if (!realtimeProvider || !bootstrapper.initializeWebsockets) {
+        throw new Error("This driver does not support realtime websockets.");
+    }
     await bootstrapper.initializeWebsockets(server, realtimeProvider, driver, {
         requireAuth: true // Enforces authentication token checks
     });
@@ -10382,7 +10396,8 @@ const adminModeController = useBuildAdminModeController();
 
 Add top-level navigation views for dashboards, tools, or custom pages:
 
-```tsx
+<!-- docs-verify: W10-02 owns this sample — the comma is inside the comment, and `admin` is not a key of `AppView`. -->
+```tsx no-verify
 const views: AppView[] = [
     {
         slug: "dashboard",
@@ -11873,9 +11888,10 @@ const articlesCollection = defineCollection({
                 name: "Publish",
                 icon: <Upload size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
+                    if (!entity || !context) return;
                     await context.data.collection<Record<string, unknown>>(entity.path)
                             .update(entity.id, { status: "published", publishedAt: new Date() });
-                    context.snackbarController.open({
+                    context.snackbarController?.open({
                         type: "success",
                         message: "Article published!"
                     });
@@ -11885,6 +11901,7 @@ const articlesCollection = defineCollection({
                 name: "Clone",
                 icon: <Copy size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
+                    if (!entity || !context) return;
                     const { id, ...values } = entity.values;
                     await context.data.collection<Record<string, unknown>>(entity.path)
                             .create({ ...values, name: values.name + " (Copy)" });
@@ -11906,12 +11923,8 @@ function PublishSelectedAction({ selectionController, context }: CollectionActio
     const handlePublish = async () => {
         const selected = selectionController.selectedEntities;
         for (const entity of selected) {
-            await context.data.save({
-                path: entity.path,
-                entityId: entity.id,
-                values: { status: "published" },
-                collection: context.collection
-            });
+            await context.data.collection<Record<string, unknown>>(entity.path)
+                    .update(entity.id, { status: "published" });
         }
     };
 
@@ -11977,7 +11990,7 @@ const ordersCollection = defineCollection({
                 name: "Total",
                 Builder: ({ entity }) => {
                     const total = entity.values.items?.reduce(
-                        (sum, item) => sum + (item.price * item.quantity), 0
+                        (sum, item) => sum + (item.price ?? 0) * (item.quantity ?? 0), 0
                     ) ?? 0;
                     return <span>${total.toFixed(2)}</span>;
                 }
@@ -13078,7 +13091,8 @@ A property key *you* wrote is your key, whatever its shape — nothing renames a
 
 ### Quick Example
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 // Create
 const product = await client.data.products.create({
     name: "Camera",
@@ -14203,7 +14217,8 @@ The WebSocket connection is established automatically when a `websocketUrl` is a
 
 Use `listen()` to subscribe to a collection query. The callback fires whenever the matching data set changes:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`, so the sample cannot compile under strictNullChecks until it is not. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
     (response) => {
@@ -14218,7 +14233,8 @@ unsubscribe();
 
 The `listen()` method accepts the same `FindParams` as `find()` — you can filter, sort, and paginate your subscription:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.orders.listen(
     {
         where: { status: ["==", "pending"] },
@@ -14254,7 +14270,8 @@ When `listen()` fires, it emits updates in up to two phases:
 
 If the count query **fails**, no second emission occurs. The first emission's `estimated: true` flag remains as the signal that the metadata is heuristic. This is not treated as a subscription error.
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
     (response) => {
@@ -14336,7 +14353,8 @@ so a subscriber has no way to notice.
 
 Every subscription returns an `unsubscribe` function. Call it to stop receiving updates and clean up the WebSocket listener:
 
-```typescript
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```typescript no-verify
 const unsubscribe = client.data.products.listen(
     undefined,
     (response) => { /* ... */ }
@@ -14348,7 +14366,8 @@ unsubscribe();
 
 In React, use `useEffect` cleanup:
 
-```tsx
+<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
+```tsx no-verify
 useEffect(() => {
     const unsubscribe = client.data.products.listen(
         { where: { active: ["==", true] } },
@@ -19359,9 +19378,16 @@ Build a custom dashboard view that displays analytics alongside your admin panel
 
 ```tsx
 
+type OrderRow = { id: string; total: number };
+
 function DashboardView() {
     const context = useRebaseContext();
-    const [stats, setStats] = useState({
+    const [stats, setStats] = useState<{
+        totalOrders: number;
+        totalRevenue: number;
+        activeProducts: number;
+        recentOrders: OrderRow[];
+    }>({
         totalOrders: 0,
         totalRevenue: 0,
         activeProducts: 0,
@@ -19374,7 +19400,7 @@ function DashboardView() {
             // `find` resolves to { data, meta } — the rows are on `data`, and they are
             // flat, so it is `o.total` rather than `o.values.total`.
             const { data: orders } = await context.data
-                .collection<{ total: number }>("orders")
+                .collection<OrderRow>("orders")
                 .find({ limit: 1000 });
 
             const { data: products } = await context.data
@@ -19403,7 +19429,7 @@ function DashboardView() {
             <ul>
                 {stats.recentOrders.map(order => (
                     <li key={order.id}>
-                        Order #{order.id} — ${order.values.total}
+                        Order #{order.id} — ${order.total}
                     </li>
                 ))}
             </ul>
@@ -19423,7 +19449,8 @@ function StatCard({ title, value }: { title: string; value: string | number }) {
 
 ### Register as a Custom View
 
-```tsx
+<!-- docs-verify: W10-02 owns this sample — `admin` is not a key of `AppView`. -->
+```tsx no-verify
 const views: AppView[] = [
     {
         slug: "dashboard",

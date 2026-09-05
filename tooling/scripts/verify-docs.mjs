@@ -81,6 +81,7 @@ if (asJson) {
         const r = await typecheckSnippets(ROOT);
         out.setupErrors = r.setupErrors;
         out.unresolvedImports = r.unresolved;
+        out.noVerify = { count: r.skipped, budget: r.budget, fences: r.skippedFences };
         out.snippets = r.failures.map((f) => ({
             file: f.snippet.file,
             fenceLine: f.snippet.line,
@@ -258,12 +259,28 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "snippets") {
     console.log(`\n${YELLOW}━━━ Docs snippet typecheck (en + skills) ━━━${NC}`);
-    const { failures, snippetCount, skipped, files, stubbed, setupErrors, unresolved, externalCount } =
-        await typecheckSnippets(ROOT);
+    const {
+        failures, snippetCount, skipped, files, stubbed, setupErrors, unresolved,
+        externalCount, overBudget, budget
+    } = await typecheckSnippets(ROOT);
     console.log(
         `${DIM}Compiled ${snippetCount} snippets from ${files} files ` +
-            `(${skipped} opted out via no-verify, ${externalCount} third-party module(s) stubbed).${NC}`
+            `(${skipped}/${budget} opted out via no-verify, ${externalCount} third-party module(s) stubbed).${NC}`
     );
+
+    // The opt-out ratchet, reported before the results: a fence nobody compiles
+    // cannot fail, so a rising count reads exactly like a passing suite.
+    if (overBudget) {
+        findings += 1;
+        console.log(
+            `${RED}✗ ${overBudget.count} no-verify fences, budget ${overBudget.budget} — ` +
+                `the opt-out may go down, never up.${NC}`
+        );
+        console.log(
+            `      ${DIM}Fix the fence, or say why it cannot be checked and raise ` +
+                `NO_VERIFY_BUDGET in tooling/scripts/docs-verify/extract.mjs with the reason.${NC}`
+        );
+    }
 
     // A misconfigured verifier reports "clean" for the snippets it can no longer
     // check, so surface it before the results it produced.

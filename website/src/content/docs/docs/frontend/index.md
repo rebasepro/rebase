@@ -169,7 +169,8 @@ const adminModeController = useBuildAdminModeController();
 
 Add top-level navigation views for dashboards, tools, or custom pages:
 
-```tsx
+<!-- docs-verify: W10-02 owns this sample — the comma is inside the comment, and `admin` is not a key of `AppView`. -->
+```tsx no-verify
 const views: AppView[] = [
     {
         slug: "dashboard",

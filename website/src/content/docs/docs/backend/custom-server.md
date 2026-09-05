@@ -108,6 +108,11 @@ async function startServer() {
     const readDb = driverInternals.readDb;
 
     // 5. Mount Realtime WebSockets
+    // Both halves are optional on the contract: a driver need not create a
+    // realtime provider, and a bootstrapper need not serve websockets at all.
+    if (!realtimeProvider || !bootstrapper.initializeWebsockets) {
+        throw new Error("This driver does not support realtime websockets.");
+    }
     await bootstrapper.initializeWebsockets(server, realtimeProvider, driver, {
         requireAuth: true // Enforces authentication token checks
     });

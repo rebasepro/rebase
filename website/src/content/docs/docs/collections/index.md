@@ -410,7 +410,9 @@ For dynamic collections that change based on the user or external data, use a bu
 const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) => {
     const collections = [productsCollection];
 
-    if (authController.extra?.role === "admin") {
+    // `extra` is whatever your auth provider put there, so name its shape here.
+    const extra = authController.extra as { role?: string };
+    if (extra.role === "admin") {
         collections.push(adminSettingsCollection);
     }
 

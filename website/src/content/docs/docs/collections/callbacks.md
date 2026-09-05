@@ -74,7 +74,8 @@ idempotent, or don't write it.
 
 ## Defining Callbacks
 
-```typescript
+<!-- docs-verify: W2-03 owns this sample — the literal opens `= {` and closes `});`, and `properties:` appears twice. -->
+```typescript no-verify
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 
 // The row shape. Without it every `values.x` below is `unknown`.
@@ -449,7 +450,8 @@ afterSave: async ({ values, entityId, context }) => {
 
 One of the most powerful uses of callbacks is **syncing data across collections** using `context.data`:
 
-```typescript
+<!-- docs-verify: W2-03 owns this sample — same malformed literal. -->
+```typescript no-verify
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 
 type Submission = {
