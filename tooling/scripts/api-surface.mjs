@@ -220,6 +220,11 @@ function kindOf(decl) {
     if (ts.isEnumDeclaration(decl)) return "enum";
     if (ts.isVariableDeclaration(decl)) return "const";
     if (ts.isModuleDeclaration(decl)) return "namespace";
+    // `export { z } from "zod"` — the export resolves into another package, so
+    // its declaration IS that package's module file. A namespace by any other
+    // name; without this the raw syntax kind ("SourceFile z") leaked into a
+    // contract people read.
+    if (ts.isSourceFile(decl)) return "module";
     return ts.SyntaxKind[decl.kind];
 }
 
