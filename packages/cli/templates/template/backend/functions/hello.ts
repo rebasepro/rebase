@@ -15,7 +15,11 @@ import {
  *   GET  /api/functions/hello/stats    (admins only)
  *
  * Call from the client SDK:
- *   const result = await client.call("functions/hello", { name: "World" });
+ *   const result = await client.functions.invoke("hello", { name: "World" });
+ *
+ * `invoke` sends POST by default, which is why the POST route below is the one
+ * that takes a body. For the public GET above, pass the method:
+ *   await client.functions.invoke("hello", undefined, { method: "GET" });
  *
  * Authored with `defineFunction`, which hands you a pre-typed Hono app (so
  * `c.get("user")` / `c.get("driver")` are typed) and the `rebase` singleton via

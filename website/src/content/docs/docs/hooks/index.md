@@ -432,7 +432,7 @@ function CustomAction() {
     const client = useRebaseClient();
 
     const handleAction = async () => {
-        const result = await client.call("functions/send-invoice", { invoiceId: "123" });
+        const result = await client.functions.invoke("send-invoice", { invoiceId: "123" });
         console.log(result);
     };
 

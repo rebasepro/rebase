@@ -118,7 +118,9 @@ export default defineFunction((app) => {
 });
 ```
 
-Call from the client SDK: `client.call("functions/hello", { name: "World" })`
+Call from the client SDK: `client.functions.invoke("hello", { name: "World" })`.
+It sends POST by default — for the GET route above, pass
+`{ method: "GET" }` as the third argument.
 
 **Functions are not authenticated for you.** The functions router parses the
 caller's token into the request context but does not reject anonymous requests —

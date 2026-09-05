@@ -20,9 +20,14 @@ export interface FunctionsClient {
     /**
      * Invoke a custom backend function by name.
      *
+     * **The method is `POST` unless you say otherwise.** A function whose only
+     * route is `app.get("/")` therefore answers 404 to a bare `invoke(name)` —
+     * pass `{ method: "GET" }`, or write the route as `app.post`.
+     *
      * @typeParam T - Expected shape of the response payload.
      * @param name    - Function name (the filename without extension, e.g. `"extract-job"`).
-     * @param payload - Optional JSON-serialisable body sent as `POST`.
+     *                  One path segment: a sub-path goes in `options.path`.
+     * @param payload - Optional JSON-serialisable body. Dropped for `GET`.
      * @param options - Optional overrides (HTTP method, sub-path, extra headers).
      * @returns The parsed JSON response from the function.
      */
