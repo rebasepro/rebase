@@ -37,7 +37,7 @@ export async function settingsCommand(action: string | undefined, rawArgs: strin
             printSettingsHelp();
             break;
         default:
-            fail(`Unknown settings command: ${action}`, "Try `rebase cloud settings --help`.");
+            fail(`Unknown settings command: ${action}`, "Run `rebase cloud settings --help`.", "unknown_command");
     }
 }
 

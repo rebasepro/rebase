@@ -1012,11 +1012,12 @@ title: "📄 Logs" });
             printDebugHelp();
             break;
         default:
-            if (isJsonMode()) fail(`Unknown debug command: ${action}`, undefined, "unknown_command");
-            console.error(chalk.red(`Unknown debug command: ${action}`));
-            console.log("");
-            printDebugHelp();
-            process.exit(1);
+            // Through `fail` in both modes, like every other refusal in the
+            // family. The terminal branch used to print the whole help page to
+            // STDOUT — the results stream — after a command that produced no
+            // result, which is the same shape the index dispatcher was fixed
+            // out of. The hint names the page instead.
+            fail(`Unknown debug command: ${action}`, "Run `rebase cloud debug --help`.", "unknown_command");
     }
 }
 

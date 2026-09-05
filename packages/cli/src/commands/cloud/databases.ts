@@ -730,7 +730,11 @@ acknowledgeNoCutover: true },
             return;
         }
 
-        fail(`Unknown pitr command: ${action}`, "Try status | restore | cutover | discard.", "usage");
+        fail(
+            `Unknown pitr command: ${action}`,
+            "Run `rebase cloud db pitr --help`. Actions: status, restore, cutover, discard.",
+            "unknown_command"
+        );
     } catch (e) {
         reportError(e, "PITR operation failed");
     }

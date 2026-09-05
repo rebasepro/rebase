@@ -98,7 +98,7 @@ export async function extensionsCommand(action: string | undefined, rawArgs: str
             printExtensionsHelp();
             break;
         default:
-            fail(`Unknown extensions command: ${action}`, "Try `rebase cloud extensions --help`.");
+            fail(`Unknown extensions command: ${action}`, "Run `rebase cloud extensions --help`.", "unknown_command");
     }
 }
 

@@ -96,7 +96,7 @@ export async function domainsCommand(action: string | undefined, rawArgs: string
             printDomainsHelp();
             break;
         default:
-            fail(`Unknown domains command: ${action}`, "Try `rebase cloud domains --help`.");
+            fail(`Unknown domains command: ${action}`, "Run `rebase cloud domains --help`.", "unknown_command");
     }
 }
 

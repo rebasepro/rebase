@@ -208,6 +208,47 @@ flag });
     return found;
 }
 
+/**
+ * Every "I do not know that word" refusal carries `unknown_command`.
+ *
+ * `fail`'s code defaults to the string `"error"`, and four groups took it:
+ * `env`, `domains`, `extensions` and `settings` answered a mistyped action with
+ * `{"error":{"code":"error"}}`. An envelope whose only machine-readable field is
+ * the word "error" is not machine-readable — it forces the substring-matching on
+ * `message` that the envelope exists to remove — and it made a typo
+ * indistinguishable from a server failure to anything reading the code.
+ *
+ * Read from the source rather than driven per command, because the point is the
+ * class: a new group written in the same shape fails here on the commit that
+ * adds it, not the day an agent branches on the code.
+ */
+describe("unknown-action refusals", () => {
+    /** `fail("Unknown … command: …", hint, code)` occurrences, with their code. */
+    function unknownActionRefusals(): Array<{ text: string; code: string | null }> {
+        const found: Array<{ text: string; code: string | null }> = [];
+        for (const source of cloudSources()) {
+            for (const match of source.matchAll(/fail\(\s*`Unknown [^`]*`,([\s\S]{0,200}?)\);/g)) {
+                const code = /,\s*"([a-z_]+)"\s*$/.exec(match[1].trim());
+                found.push({ text: match[0].split("\n")[0],
+code: code ? code[1] : null });
+            }
+        }
+        return found;
+    }
+
+    it("finds the refusals it is checking, so an empty sweep cannot pass", () => {
+        expect(unknownActionRefusals().length).toBeGreaterThan(6);
+    });
+
+    it("all carry unknown_command, never `fail`'s default", () => {
+        const wrong = unknownActionRefusals().filter(r => r.code !== "unknown_command");
+        expect(
+            wrong.map(r => `${r.text} → ${r.code ?? "(default: \"error\")"}`),
+            "a mistyped action and a server failure must not answer with the same code"
+        ).toEqual([]);
+    });
+});
+
 describe("no command's spec redeclares a global flag", () => {
     /**
      * `parseCloudArgs` merges `GLOBAL_CLOUD_FLAGS` UNDER the command's own spec,

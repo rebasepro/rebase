@@ -94,7 +94,7 @@ export async function envCommand(action: string | undefined, rawArgs: string[]):
             printEnvHelp();
             break;
         default:
-            fail(`Unknown env command: ${action}`, "Try `rebase cloud env --help`.");
+            fail(`Unknown env command: ${action}`, "Run `rebase cloud env --help`.", "unknown_command");
     }
 }
 
