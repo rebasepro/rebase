@@ -32,6 +32,7 @@ import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { acceptsExcludeFlag, buildAtlasArgs } from "./schema/atlas-argv";
 import { unexpectedBranchArgs } from "./branch-argv";
 import { assertKnownFlags } from "./cli-flags";
+import { backupActionOf } from "./backup-argv";
 
 import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
 
@@ -209,7 +210,12 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
 
     if (subcommand === "backup" || subcommand === "restore" || subcommand === "backups") {
         const { backupCommand, restoreCommand, backupsCommand } = await import("./backup/backup-cli");
-        if (subcommand === "backup") await backupCommand(rawArgs);
+        // `rebase cloud db backup list` is how the cloud family spells this, and
+        // locally the same words *created a backup*: "list" was a positional
+        // `backupCommand` ignored. One CLI, two spellings, and the wrong guess
+        // wrote a dump instead of reading one. Both spellings list now.
+        if (subcommand === "backup" && backupActionOf(rawArgs) === "list") await backupsCommand(rawArgs);
+        else if (subcommand === "backup") await backupCommand(rawArgs);
         else if (subcommand === "restore") await restoreCommand(rawArgs);
         else await backupsCommand(rawArgs);
         return;

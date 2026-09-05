@@ -158,6 +158,7 @@ ${chalk.bold("Usage")}
 ${chalk.bold("Options")}
   -c, --collections-dir <dir>  Local collections directory (default: ./config/collections)
   -o, --output <dir>           Where to write the SDK (default: ./generated/sdk)
+                               (--out is accepted too, as on 'rebase build')
       --from <link|url>        Fetch the schema from a running project instead of
                                local source. "link" uses this checkout's linked project.
       --token <token>          Bearer token for the contract endpoint

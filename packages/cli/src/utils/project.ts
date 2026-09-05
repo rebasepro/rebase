@@ -327,11 +327,51 @@ export function exitDependenciesNotInstalled(projectRoot: string): never {
 }
 
 /**
+ * The refusal envelope, for a caller that asked for JSON.
+ *
+ * Same shape as the cloud family's `fail()` — `{ error: { message, code, hint } }`
+ * — because there is one CLI and a caller should not have to know which half of
+ * it answered. `code` is what a caller branches on and is never absent; the
+ * cloud family's reasoning about that applies here unchanged.
+ *
+ * On **stdout**, like every other `--json` result: the contract those commands
+ * make is that stdout holds one JSON value, and a caller that pipes stdout to a
+ * parser must get a parseable refusal rather than an empty stream and a
+ * human sentence it never sees.
+ *
+ * The flag is read off `process.argv` because the failure happens inside a
+ * helper the command calls before it has parsed anything. Coarse — a literal
+ * `--json` as some other flag's value would count — and worth it: the failure
+ * mode of being coarse is a JSON error where a human one was wanted, and the
+ * failure mode of not doing it is an unparseable stream.
+ */
+function failAsJson(message: string, code: string, hint: string): never {
+    console.log(JSON.stringify({ error: { message, code, hint } }, null, 2));
+    process.exit(1);
+}
+
+/** Did the command line ask for machine-readable output? */
+export function wantsJsonOutput(argv: readonly string[] = process.argv): boolean {
+    return argv.includes("--json");
+}
+
+/**
  * Require the project root or exit with a helpful error.
  */
 export function requireProjectRoot(): string {
     const root = findProjectRoot();
     if (!root) {
+        if (wantsJsonOutput()) {
+            // `rebase status --json` outside a project wrote four grey lines to
+            // stderr and nothing at all to stdout, so the agent or CI step that
+            // asked for JSON got an empty parse and no reason.
+            failAsJson(
+                "Could not find a Rebase project root.",
+                "no_project_root",
+                `Looked in this directory and every parent for a ${MANIFEST_FILENAME}, `
+                + "a package.json with a \"backend\" workspace, or a backend/ next to a config/."
+            );
+        }
         // Name what is actually looked for, in the order `findProjectRoot`
         // looks for it. The old wording ("backend/, frontend/, and config/")
         // described neither the manifest — which is the primary marker and the
@@ -353,6 +393,13 @@ export function requireProjectRoot(): string {
 export function requireBackendDir(projectRoot: string): string {
     const backendDir = findBackendDir(projectRoot);
     if (!backendDir) {
+        if (wantsJsonOutput()) {
+            failAsJson(
+                "Could not find a backend/ directory.",
+                "no_backend_dir",
+                `Expected at: ${path.join(projectRoot, "backend")}`
+            );
+        }
         console.error(chalk.red("✗ Could not find a backend/ directory."));
         console.error(chalk.gray(`  Expected at: ${path.join(projectRoot, "backend")}`));
         process.exit(1);

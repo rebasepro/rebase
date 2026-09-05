@@ -97,3 +97,42 @@ describe("bin/rebase.js writes plain text to a pipe", () => {
         expect(stderr).not.toMatch(ESCAPES);
     });
 });
+
+/**
+ * A caller that asked for JSON gets JSON, including for the refusal.
+ *
+ * `rebase status --json` outside a project wrote four grey lines to stderr and
+ * **nothing at all** to stdout, so the agent or CI step that piped stdout to a
+ * parser got an empty stream and no reason. Being outside a project is the most
+ * ordinary way for that command to fail — it is the first thing anyone runs in
+ * the wrong directory.
+ */
+describe("--json refusals are JSON", () => {
+    it("puts a parseable envelope on stdout when there is no project", async () => {
+        const empty = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-nojson-"));
+        try {
+            const { code, stdout } = await runCli(["status", "--json"], {}, empty);
+
+            expect(code).toBe(1);
+            const parsed = JSON.parse(stdout);
+            // The cloud family's `fail()` shape, because there is one CLI and a
+            // caller should not have to know which half of it answered.
+            expect(parsed.error.code).toBe("no_project_root");
+            expect(parsed.error.message).toBeTruthy();
+            expect(parsed.error.hint).toBeTruthy();
+        } finally {
+            fs.rmSync(empty, { recursive: true, force: true });
+        }
+    });
+
+    it("keeps the human sentence when JSON was not asked for", async () => {
+        const empty = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-nojson-"));
+        try {
+            const { stdout, stderr } = await runCli(["status"], {}, empty);
+            expect(stdout).toBe("");
+            expect(stderr).toContain("Could not find a Rebase project root.");
+        } finally {
+            fs.rmSync(empty, { recursive: true, force: true });
+        }
+    });
+});

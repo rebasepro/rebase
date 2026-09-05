@@ -895,9 +895,17 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
     },
     backup: {
         usage: "rebase db backup [--out <path|s3://…>]",
-        summary: "Create a pg_dump backup. --out is resolved against the directory you are standing in."
+        summary: "Create a pg_dump backup. --out is resolved against the directory you are standing in.",
+        notes: [
+            "--output is accepted as an alias, as it is on `rebase build`.",
+            "`rebase db backup list` lists them, the way `rebase cloud db backup list` does."
+        ]
     },
-    backups: { usage: "rebase db backups", summary: "List stored backups." },
+    backups: {
+        usage: "rebase db backups list [--out <path|s3://…>]",
+        summary: "List stored backups.",
+        notes: ["`rebase db backup list` is the same command, spelled the cloud family's way."]
+    },
     restore: {
         usage: "rebase db restore <dump> [--target-db <name>] [--create-db] --yes",
         summary: "Restore a backup with pg_restore.",
@@ -949,7 +957,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("branch")}     Database branching (create, list, switch, delete, info)
   ${chalk.blue.bold("backup")}     Create a backup with pg_dump (--out <path|s3://…>)
   ${chalk.blue.bold("restore")}    Restore a backup with pg_restore (destructive; needs --yes)
-  ${chalk.blue.bold("backups")}    List stored backups (backups list)
+  ${chalk.blue.bold("backups")}    List stored backups (db backup list is the same)
 
 ${chalk.green.bold("Examples")}
   ${chalk.gray("# Quick development workflow")}

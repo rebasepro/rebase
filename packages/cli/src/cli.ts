@@ -148,6 +148,10 @@ export async function entry(args: string[]) {
                 spec: {
                     "--collections-dir": String,
                     "--output": String,
+                    // The alias `build`, `cloud env pull` and `db backup` carry.
+                    // Two names for one concept across one CLI is a thing you
+                    // have to remember rather than know.
+                    "--out": "--output",
                     "--from": String,
                     "--token": String,
                     "-c": "--collections-dir",
