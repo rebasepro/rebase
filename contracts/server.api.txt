@@ -9,7 +9,7 @@ SourceFile z
 class ApiError { badRequest, code, conflict, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
 class BlockedUrlError
 class BundleError { hint }
-class CronScheduler { getJob, getJobLogs, getJobLogsFromDb, listJobs, registerJobs, setClient, setJobEnabled, setStore, start, stop, triggerJob }
+class CronScheduler { getJob, getJobLogs, getJobLogsFromDb, listJobs, listRejectedJobs, registerJobs, setClient, setJobEnabled, setStore, start, stop, triggerJob }
 class DefaultDriverRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class GCSStorageController { deleteObject, getObject, getSignedUrl, getType, listObjects, putObject }
@@ -98,6 +98,7 @@ function createSpotifyProvider
 function createStorageController
 function createStorageRoutes
 function createTwitterProvider
+function createUnconfiguredEmailService
 function defaultBackoff
 function defineCron
 function defineFunction
@@ -354,9 +355,9 @@ type WelcomeEmailTemplateFunction
 class EntityReference { databaseId, driver, fullPath, id, isEntityReference, path, pathWithId }
 class EntityRelation { data, id, isEntityReference, isEntityRelation, path, pathWithId }
 class GeoPoint { latitude, longitude }
-class ListLimitError { code, details, maxLimit, status }
-class RebaseApiError { code, details, status }
-class RebaseClientError { code, details, status }
+class ListLimitError { code, details, maxLimit, requestId, retryAfterSeconds, status }
+class RebaseApiError { code, details, requestId, retryAfterSeconds, status }
+class RebaseClientError { code, details, requestId, retryAfterSeconds, status }
 class Vector { value }
 const ADMIN_COLLECTION_KEYS
 const ADMIN_PROPERTY_KEYS
@@ -437,6 +438,7 @@ function isSchemaAdmin
 function isSchemaEditingAdmin
 function isSerializedCollectionRef
 function isToMany
+function isUnsupported
 function isValidEngine
 function nestAdminCollectionKeys
 function nestAdminKeysOf
@@ -461,6 +463,7 @@ function sortKeyToString
 function storageEnvSuffix
 function toCanonicalOp
 function topic
+function unsupportedMethod
 function usesLegacyRlsFunctions
 interface AdminAPI { bootstrap, createUser, deleteUser, getUser, listRoles, listUsers, listUsersPaginated, resetPassword, updateUser }
 interface AdminUser { createdAt, displayName, email, metadata, photoURL, providerId, roles, uid, updatedAt }
@@ -527,7 +530,7 @@ interface ConditionContext { entityId, index, isNew, now, path, previousValues, 
 interface CountOptions { databaseId, filter, logical, searchString }
 interface CreateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
 interface CronAPI { getJob, getJobLogs, listJobs, toggleJob, triggerJob }
-interface CronJobContext { jobId, log, rebase, scheduledAt }
+interface CronJobContext { jobId, log, rebase, scheduledAt, signal }
 interface CronJobDefinition { catchUpWindowSeconds, description, enabled, handler, name, schedule, timeoutSeconds }
 interface CronJobLogEntry { durationMs, error, finishedAt, jobId, logs, manual, result, startedAt, success }
 interface CronJobStatus { description, enabled, id, lastDurationMs, lastError, lastRunAt, name, nextRunAt, schedule, state, totalFailures, totalRuns }
@@ -619,7 +622,7 @@ interface RebaseBundleFunction { file, name, portable, requires }
 interface RebaseBundleManifest { app, build, bundleFormat, collections, deps, entry, functions, hooks, kind, resources, runtime, schemaVersion, storage }
 interface RebaseBundleStatic { dir, path, spa }
 interface RebaseClient { admin, apiKeys, apiPath, auth, backups, baseUrl, call, createStorageSource, cron, data, dataAsAdmin, email, fetchStorageSources, functions, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
-interface RebaseErrorInit { cause, code, details, status }
+interface RebaseErrorInit { cause, code, details, requestId, retryAfterSeconds, status }
 interface RebaseProjectContract { collectionSlugs, collections, generatedAt, runtime, schemaVersion }
 interface RebaseProjectLink { apiUrl, org, project }
 interface RebaseProjectManifest { $schema, apps, rebase, telemetry }
@@ -650,8 +653,8 @@ interface RestFetchService { aggregate, fetchCollectionForRest, fetchOneForRest 
 interface RolesContainPolicyExpression { kind, roles }
 interface RolesOnlySecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface RolesOverlapPolicyExpression { kind, roles }
-interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
-interface SDKQueryBuilderInterface { count, find, include, limit, listen, offset, orderBy, search, vectorSearch, where, where }
+interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where, where }
+interface SDKQueryBuilderInterface { count, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
 interface SQLAdmin { executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase }
 interface SaveManyProps { collection, path, rows, upsert }
 interface SaveProps { collection, id, path, previousValues, status, upsert, values }
@@ -772,6 +775,7 @@ type ListenOneProps
 type MongoProperties
 type MongoProperty
 type NoSuchKey { didYouMean, noSuchKey }
+type NonColumnFieldPath
 type OnAction
 type OrderBySortTuple
 type OrderBySpec
@@ -826,10 +830,10 @@ type WirePrimaryKeys
 ## @rebasepro/client
 class MemoryOfflineStore { clear, deleteCache, dequeue, enqueue, getCache, listCache, listCacheEntries, listQueue, setCache, setCacheMany }
 class QueryBuilder { find, include, limit, listen, offset, orderBy, search, vectorSearch, where }
-class RebaseApiError { code, details, status }
-class RebaseClientError { code, details, status }
+class RebaseApiError { code, details, requestId, retryAfterSeconds, status }
+class RebaseClientError { code, details, requestId, retryAfterSeconds, status }
 class RebasePaginationError { code }
-class RebaseRealtimeChannel { broadcast, enableHistory, history, join, leave, name, onBroadcast, onBroadcast, onPresence, sequence, track, untrack }
+class RebaseRealtimeChannel { broadcast, enableHistory, history, join, leave, name, onBroadcast, onBroadcast, onError, onPresence, sequence, track, untrack }
 class RebaseWebSocketClient { authenticate, checkUniqueField, count, createBranch, delete, deleteBranch, disconnect, ensureConnected, executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCollection, fetchCurrentDatabase, fetchOne, fetchTableMetadata, fetchUnmappedTables, getAuthToken, hasSocket, listBranches, listenCollection, listenOne, on, onChannelMessage, onReconnect, onUnauthorized, reauthenticate, save, sendMessage, setAuthTokenGetter }
 function and
 function cond
@@ -879,8 +883,8 @@ interface PresenceDiff { joins, leaves }
 interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, headers, onUnauthorized, realtime, schemaVersion, storageUrlOrigin, token, websocketUrl }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
 interface RowSnapshotMeta { fromCache, hasPendingWrites }
-interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
-interface SDKQueryBuilderInterface { count, find, include, limit, listen, offset, orderBy, search, vectorSearch, where, where }
+interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where, where }
+interface SDKQueryBuilderInterface { count, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
 interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
 type AuthChangeEvent
 type AuthConfig
@@ -925,6 +929,7 @@ function buildConditionContext
 function buildRebaseData
 function buildRoutedRebaseData
 function buildSdkData
+function callbackRefusal
 function canCreateEntity
 function canDeleteEntity
 function canEditEntity
