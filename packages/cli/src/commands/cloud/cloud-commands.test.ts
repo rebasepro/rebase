@@ -535,9 +535,11 @@ describe("cloud subcommand dispatch", () => {
         cap.restore();
 
         expect(storage).not.toHaveBeenCalled();
-        const help = JSON.parse(cap.output()) as { command: string; actions: string[] };
+        // `actions` is a list of descriptions now, not of bare words: a piped
+        // `--help` carries what the terminal page carries.
+        const help = JSON.parse(cap.output()) as { command: string; actions: Array<{ action: string }> };
         expect(help.command).toBe("cloud");
-        expect(help.actions).toContain("storage");
+        expect(help.actions.map(a => a.action)).toContain("storage");
     });
 
     /**

@@ -14,7 +14,7 @@ import {
     readLink,
     colorStatus,
     emit,
-    emitHelp,
+    printGroupHelp,
     keyValues,
     fetchTenantBaseDomain,
     projectHost,
@@ -705,26 +705,33 @@ export async function storageCommand(action: string | undefined, rawArgs: string
 }
 
 export function printStorageHelp(): void {
-    emitHelp("storage", ["list", "create", "attach"], () => {
-        console.log("");
-        console.log(chalk.bold("  rebase cloud storage"));
-        console.log("");
-        console.log("  " + chalk.blue.bold("storage") + "                   List this project's storage");
-        console.log("  " + chalk.blue.bold("storage create") + "            Provision platform-managed storage");
-        console.log("  " + chalk.blue.bold("storage attach") + "            Attach your own S3-compatible bucket");
-        console.log("");
-        console.log(chalk.gray("  attach options:"));
-        console.log(chalk.gray("    --bucket <name>          Bucket name (required)"));
-        console.log(chalk.gray("    --access-key-id <id>     Access key ID (required)"));
-        console.log(chalk.gray("    --secret-access-key <s>  Secret access key (required)"));
-        console.log(chalk.gray("    --endpoint <url>         S3 endpoint; omit for AWS"));
-        console.log(chalk.gray("    --region <region>        Region"));
-        console.log(chalk.gray("    --force-path-style       Required by MinIO and some gateways"));
-        console.log("");
-        console.log(chalk.gray("  Without either, file storage stays off: uploads are refused with"));
-        console.log(chalk.gray("  501 STORAGE_NOT_CONFIGURED rather than written to a container"));
-        console.log(chalk.gray("  filesystem that is erased on the next restart."));
-        console.log("");
+    printGroupHelp({
+        group: "storage",
+        title: "The project's object storage",
+        actions: [
+            { action: "list",
+description: "The buckets this project has, and their state" },
+            { action: "create",
+description: "Provision platform-managed storage. Takes no options" },
+            {
+                action: "attach",
+                description: "Attach your own S3-compatible bucket",
+                flags: [
+                    ["--bucket <name>", "Bucket name. Required"],
+                    ["--access-key-id <id>", "Access key ID. Required"],
+                    ["--secret-access-key <s>", "Secret access key. Required"],
+                    ["--endpoint <url>", "S3 endpoint. Omit for AWS"],
+                    ["--region <region>", "Region"],
+                    ["--force-path-style", "Required by MinIO and some gateways"]
+                ]
+            }
+        ],
+        notes: [
+            "Without either, file storage stays off: uploads are refused with 501",
+            "STORAGE_NOT_CONFIGURED rather than written to a container filesystem that is",
+            "erased on the next restart.",
+            "Redeploy after `attach` for the tenant to pick the credentials up."
+        ]
     });
 }
 

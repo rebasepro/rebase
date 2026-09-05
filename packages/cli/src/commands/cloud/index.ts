@@ -353,7 +353,10 @@ export const CLOUD_GROUPS = [
     "env", "domains", "extensions", "settings",
     "orgs",
     "db",
-    "webhooks", "storage", "clusters", "billing"
+    // `resources` dispatches, has a page, and was absent from this list — so the
+    // one command that names what a project costs was undiscoverable from
+    // `rebase cloud --help`, which is where an agent finds the family.
+    "webhooks", "storage", "resources", "clusters", "billing"
 ];
 
 function printCloudHelp(): void {

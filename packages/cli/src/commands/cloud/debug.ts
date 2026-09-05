@@ -44,7 +44,7 @@ import {
     colorStatus,
     keyValues,
     emit,
-    emitHelp,
+    printGroupHelp,
     isJsonMode,
     fail,
     reportError,
@@ -1021,37 +1021,47 @@ title: "📄 Logs" });
 }
 
 export function printDebugHelp(): void {
-    emitHelp("debug", ["health", "logs", "errors", "requests", "boot", "pod", "db"], () => {
-        console.log(`
-${chalk.bold("rebase cloud debug")} — Find out why a deployed project is misbehaving
-
-${chalk.green.bold("Usage")}
-  rebase cloud debug ${chalk.blue("<subcommand>")} [options]
-
-${chalk.green.bold("End-to-end")}
-  ${chalk.blue.bold("health")}                  Probe the live URL and explain every status code ${chalk.gray("(default)")}
-
-${chalk.green.bold("Runtime")}
-  ${chalk.blue.bold("logs")} ${chalk.gray("[--since 15m]")}      Recent application logs
-  ${chalk.blue.bold("errors")} ${chalk.gray("[--since 1h]")}     Error and warning lines only
-  ${chalk.blue.bold("requests")} ${chalk.gray("[--since 15m]")}  HTTP requests the server logged ${chalk.gray("(status, path, latency)")}
-  ${chalk.blue.bold("boot")}                    What the server decided at startup ${chalk.gray("(storage, functions, auth)")}
-  ${chalk.blue.bold("pod")}                     Replicas, image, namespace, cluster placement
-
-${chalk.green.bold("Data")}
-  ${chalk.blue.bold("db")}                      Connection shape + the port-forward recipe ${chalk.gray("(no password)")}
-
-${chalk.green.bold("Options")}
-  ${chalk.blue("--since <dur>")}           Lookback window: ${chalk.gray("90s, 15m, 2h, 1d")}
-  ${chalk.blue("--tail <n>")}              Lines to read per pod ${chalk.gray("(default 500)")}
-  ${chalk.blue("--previous")}              Read the CRASHED container instance ${chalk.gray("(where the reason lives)")}
-  ${chalk.blue("--host <hostname>")}       Probe this address instead of the project's own
-  ${chalk.blue("--collection <name>")}     Collection for the unauth-read probe ${chalk.gray("(default: users)")}
-  ${chalk.blue("--function <name>")}       Also assert this function loaded ${chalk.gray("(checked against the listing)")}
-  ${chalk.blue("--project, -p <slug>")}    Operate on a project without linking
-
-${chalk.gray("Everything here is read-only. `health` exits non-zero when a check fails,")}
-${chalk.gray("so it works in a deploy script. To restart a workload, use `rebase cloud restart`.")}
-`);
+    printGroupHelp({
+        group: "debug",
+        title: "Find out why a deployed project is misbehaving",
+        actions: [
+            {
+                action: "health",
+                section: "End-to-end",
+                description: "Probe the live URL and explain every status code (the default)",
+                flags: [
+                    ["--host <hostname>", "Probe this address instead of the project's own"],
+                    ["--collection <name>", "Collection for the unauth-read probe. Default: users"],
+                    ["--function <name>", "Also assert this function loaded, against the listing"]
+                ]
+            },
+            { action: "logs",
+section: "Runtime",
+description: "Recent application logs" },
+            { action: "errors",
+section: "Runtime",
+description: "Error and warning lines only" },
+            { action: "requests",
+section: "Runtime",
+description: "HTTP requests the server logged: status, path, latency" },
+            { action: "boot",
+section: "Runtime",
+description: "What the server decided at startup: storage, functions, auth" },
+            { action: "pod",
+section: "Runtime",
+description: "Replicas, image, namespace, cluster placement" },
+            { action: "db",
+section: "Data",
+description: "Connection shape and the port-forward recipe. Never the password" }
+        ],
+        options: [
+            ["--since <dur>", "Lookback window: 90s, 15m, 2h, 1d"],
+            ["--tail <n>", "Lines to read per pod. Default: 500"],
+            ["--previous", "Read the CRASHED container instance, where the reason lives"]
+        ],
+        notes: [
+            "Everything here is read-only. `health` exits non-zero when a check fails, so it works in a",
+            "deploy script. To restart a workload, use `rebase cloud restart`."
+        ]
     });
 }

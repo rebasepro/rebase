@@ -23,7 +23,7 @@
  *     description of the command rather than sixty lines of ANSI to scrape.
  */
 import chalk from "chalk";
-import { emitHelp } from "./context";
+import { emitHelp, GLOBAL_HELP_FLAGS } from "./context";
 
 export interface ActionHelp {
     /** `cloud projects create` — no leading `rebase`. */
@@ -39,25 +39,12 @@ export interface ActionHelp {
     notes?: string[];
 }
 
-/**
- * Flags every cloud command accepts, documented once.
- *
- * Excluded from the spec comparison below — they are merged in by
- * `parseCloudArgs` for every command in the family, so repeating them per entry
- * would be nine copies of the same four lines.
+/*
+ * `GLOBAL_HELP_FLAGS` and `GLOBAL_SPEC_KEYS` moved to `context.ts`, next to the
+ * `GLOBAL_CLOUD_FLAGS` they describe — the group pages print them too, and
+ * `context` cannot import this module (this one imports it). `GLOBAL_SPEC_KEYS`
+ * is derived from the spec now rather than listed a second time.
  */
-export const GLOBAL_HELP_FLAGS: Array<[string, string]> = [
-    ["--project, -p <slug>", "Operate on a project without linking this directory"],
-    ["--json", "Machine-readable output (also when piped, or REBASE_JSON=1)"],
-    ["--url <origin>", "Target a specific control plane (or REBASE_CLOUD_URL)"],
-    ["--yes, -y", "Skip confirmation prompts"],
-    ["--debug", "Print the untouched error body after a failure"]
-];
-
-/** Flag names that `parseCloudArgs` adds to every command in the family. */
-export const GLOBAL_SPEC_KEYS = new Set([
-    "--json", "--yes", "--help", "--project", "--url", "-p", "-y", "-h", "--debug"
-]);
 
 export const ACTION_HELP: Record<string, ActionHelp> = {
     projects: {

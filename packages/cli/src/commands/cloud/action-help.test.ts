@@ -16,7 +16,8 @@
 import { describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { ACTION_HELP, GLOBAL_SPEC_KEYS, printActionHelp } from "./action-help";
+import { ACTION_HELP, printActionHelp } from "./action-help";
+import { GLOBAL_SPEC_KEYS } from "./context";
 import { CREATE_PROJECT_FLAGS } from "./projects";
 import { CREATE_DATABASE_FLAGS } from "./databases";
 import { DEPLOY_FLAGS } from "./deploy";

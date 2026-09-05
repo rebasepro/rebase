@@ -10,7 +10,7 @@
  */
 import arg from "arg";
 import chalk from "chalk";
-import { requireClient, requireProject, displayProjectRef, emit, emitHelp, keyValues, success, fail, reportError } from "./context";
+import { requireClient, requireProject, displayProjectRef, emit, printGroupHelp, keyValues, success, fail, reportError } from "./context";
 
 interface ProjectSettings {
     id: string | number;
@@ -145,23 +145,22 @@ updated: patch }
 }
 
 export function printSettingsHelp(): void {
-    emitHelp("settings", ["show", "set"], () => {
-        console.log(`
-${chalk.bold("rebase cloud settings")} — Project configuration
-
-${chalk.green.bold("Commands")}
-  ${chalk.blue.bold("show")}                      Show current settings
-  ${chalk.blue.bold("set")} ${chalk.gray("[flags]")}               Update settings
-
-${chalk.green.bold("Set flags")}
-  ${chalk.blue("--name")} ${chalk.gray("<name>")}
-  ${chalk.blue("--subdomain")} ${chalk.gray("<sub>")}
-  ${chalk.blue("--repo")} ${chalk.gray("<git url>")}
-  ${chalk.blue("--branch")} ${chalk.gray("<branch>")}
-
-${chalk.green.bold("Options")}
-  ${chalk.blue("--json")}                    Machine-readable output
-  ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
-`);
+    printGroupHelp({
+        group: "settings",
+        title: "Project configuration",
+        actions: [
+            { action: "show",
+description: "Name, subdomain, repository and branch as recorded" },
+            {
+                action: "set",
+                description: "Change one or more of them",
+                flags: [
+                    ["--name <name>", "Display name"],
+                    ["--subdomain <sub>", "The <slug>.rebase.website host"],
+                    ["--repo <git url>", "Repository to build from"],
+                    ["--branch <branch>", "Branch to build"]
+                ]
+            }
+        ]
     });
 }

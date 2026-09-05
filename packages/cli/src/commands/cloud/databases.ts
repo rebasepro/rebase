@@ -15,7 +15,7 @@ import {
     displayProjectRef,
     parseCloudArgs,
     emit,
-    emitHelp,
+    printGroupHelp,
     confirmDestructive,
     colorStatus,
     keyValues,
@@ -737,31 +737,73 @@ acknowledgeNoCutover: true },
 }
 
 export function printDbHelp(): void {
-    emitHelp("db", ["list", "create", "info", "test", "backup", "pitr"], () => {
-        console.log(`
-${chalk.bold("rebase cloud db")} — Database & backups
+    printGroupHelp({
+        group: "db",
+        title: "Database & backups",
+        actions: [
+            { action: "list",
+section: "Database",
+description: "List databases attached to the project" },
+            {
+                action: "create",
+                section: "Database",
+                description: "Attach a managed or bring-your-own database",
+                flags: [
+                    ["--type <managed|byodb>", "Which kind to attach"],
+                    ["--connection-string <url>", "The external PostgreSQL URL, for byodb"],
+                    ["--wait", "Wait for the managed database to be reachable"],
+                    ["--timeout <seconds>", "Ceiling on that wait"]
+                ]
+            },
+            {
+                action: "info",
+                section: "Database",
+                description: "Connection details",
+                flags: [["--reveal", "Include the password. Without it, the value is masked"]]
+            },
+            { action: "test",
+section: "Database",
+description: "Test database connectivity" },
 
-${chalk.green.bold("Commands")}
-  ${chalk.blue.bold("list")}                      List databases attached to the project
-  ${chalk.blue.bold("create")}                    Attach a managed or bring-your-own database
-  ${chalk.blue.bold("info")} ${chalk.gray("[--reveal]")}           Connection details ${chalk.gray("(password only with --reveal)")}
-  ${chalk.blue.bold("test")}                      Test database connectivity
-  ${chalk.blue.bold("backup list")}               List backups
-  ${chalk.blue.bold("backup create")}             Create a manual backup
-  ${chalk.blue.bold("backup restore")} ${chalk.gray("<file>")}     Restore a backup
-  ${chalk.blue.bold("backup status")}             Automated-backup health
-  ${chalk.blue.bold("backup download")} ${chalk.gray("<file>")}    Signed URL for a backup
-  ${chalk.blue.bold("pitr status")}               Point-in-time recovery window
-  ${chalk.blue.bold("pitr restore")} ${chalk.gray("--target <ISO>")} Stage a recovery ${chalk.gray("(does not repoint)")}
-  ${chalk.blue.bold("pitr cutover")} ${chalk.gray("-y")}           Repoint the app at the staged recovery
-  ${chalk.blue.bold("pitr discard")} ${chalk.gray("-y")}           Delete a staged recovery
+            { action: "backup list",
+section: "Backups",
+description: "List backups" },
+            { action: "backup create",
+section: "Backups",
+description: "Create a manual backup" },
+            { action: "backup restore",
+args: "<file>",
+section: "Backups",
+description: "Restore a backup" },
+            { action: "backup status",
+section: "Backups",
+description: "Automated-backup health" },
+            { action: "backup download",
+args: "<file>",
+section: "Backups",
+description: "Signed URL for a backup" },
 
-${chalk.green.bold("Options")}
-  ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
-  ${chalk.blue("--reveal")}                  Include the DB password ${chalk.gray("(info)")}
-  ${chalk.blue("--type")}                    managed | byodb ${chalk.gray("(create)")}
-  ${chalk.blue("--connection-string")}       External DB URL ${chalk.gray("(byodb)")}
-  ${chalk.blue("--json")}                    Machine-readable output
-`);
+            { action: "pitr status",
+section: "Point-in-time recovery",
+description: "The window a recovery can target" },
+            {
+                action: "pitr restore",
+                section: "Point-in-time recovery",
+                description: "Stage a recovery. Does NOT repoint the app",
+                flags: [["--target <ISO>", "The instant to recover to"]]
+            },
+            { action: "pitr cutover",
+section: "Point-in-time recovery",
+description: "Repoint the app at the staged recovery" },
+            { action: "pitr discard",
+section: "Point-in-time recovery",
+description: "Delete a staged recovery" }
+        ],
+        notes: [
+            "A project has exactly one database: `create` refuses rather than attaching a second, because",
+            "which of two rows a deploy uses is undefined.",
+            "A managed database is provisioned at the project's FIRST DEPLOY, so `test` failing before then",
+            "is not a fault."
+        ]
     });
 }
