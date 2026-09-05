@@ -26,7 +26,6 @@ export const PACKAGE_ENTRIES = {
     "@rebasepro/server/functions": "packages/server/src/functions/index.ts",
     "@rebasepro/server-postgres": "packages/server-postgres/src/index.ts",
     "@rebasepro/server-mongo": "packages/server-mongo/src/index.ts",
-    "@rebasepro/client-postgres": "packages/client-postgres/src/index.ts",
     "@rebasepro/types": "packages/types/src/index.ts",
     "@rebasepro/common": "packages/common/src/index.ts",
     "@rebasepro/utils": "packages/utils/src/index.ts",

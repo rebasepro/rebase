@@ -27,6 +27,14 @@
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.es.js",
+      "default": "./dist/index.es.js"
+    },
+    "./package.json": "./package.json"
+  },
   "type": "module",
   "source": "src/index.ts",
   "bin": {

@@ -25,6 +25,14 @@
   "mcpName": "io.github.rebasepro/rebase",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "type": "module",
   "bin": {
     "rebase-mcp": "bin/rebase-mcp.js"

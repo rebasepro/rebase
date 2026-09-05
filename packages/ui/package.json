@@ -31,6 +31,11 @@
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
+  "//sideEffects": "The stylesheet is the side effect. `index.css` and the CSS the build emits are imported for what they do, not for what they export, so a bundler told this package is side-effect-free would drop them and ship an unstyled admin panel.",
+  "sideEffects": [
+    "**/*.css",
+    "./index.css"
+  ],
   "engines": {
     "node": ">=22.22.0"
   },
