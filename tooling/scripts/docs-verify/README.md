@@ -82,7 +82,7 @@ release carries `version-pin: ignore`.
 
 `website/`, `tooling/rebase-agent-skills/`, `examples/*/`, the marketing components, the
 MCP manifests — and the repository's own agent instructions: `AGENT.md`,
-`.agents/*.md` and `.agent/workflows/*.md` (`AGENT_INSTRUCTION_GLOBS` in
+`.agent/workflows/*.md` (`AGENT_INSTRUCTION_GLOBS` in
 `extract.mjs`).
 
 That last group was added because the gap was load-bearing. While every checked

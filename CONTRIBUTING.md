@@ -93,6 +93,19 @@ checked out at `saas/`. It is absent from a public clone; pnpm ignores a pattern
 that matches nothing, so the install is unaffected and those two scripts are the
 only things that will not run.
 
+## Coding Standards
+
+**[.agent/workflows/coding-standards.md](.agent/workflows/coding-standards.md)**
+is the rule set this codebase is held to: no `as any` and no structural cast
+standing in for one, no dynamic `require`, no REST polling on a realtime
+framework, no hidden `__dunder` metadata on data objects, foreign keys that stay
+scalars beside their hydrated relation, and comments that describe what the code
+is rather than what it used to be. It lives under `.agent/` because agents read
+it too; it is not a document written *for* agents and optional for people.
+
+`.agent/workflows/` has four more: `rebase-architecture.md`,
+`schema-migration.md`, `ui-components.md` and `deployment.md`.
+
 ## Commits and the Changelog
 
 Commit messages are [Conventional Commits](https://www.conventionalcommits.org/),

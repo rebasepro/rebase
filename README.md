@@ -344,6 +344,26 @@ If your AI coding agent or database role permissions cause a `permission denied 
 
 ---
 
+## Contributing
+
+Bug fixes, features and documentation are all welcome.
+**[CONTRIBUTING.md](CONTRIBUTING.md)** is the whole path: clone, install, start
+the database, run the app, and the one command — `pnpm ci:static` — that runs
+what CI runs. It also covers the commit format, the changelog rule, and how to
+run one package's tests.
+
+Two more worth knowing before a first pull request:
+
+- **[.agent/workflows/coding-standards.md](.agent/workflows/coding-standards.md)** —
+  the engineering rules this codebase is held to, and the reasons behind them.
+  No `as any`, no dynamic `require`, no polling on a realtime framework, no
+  hidden dunder properties on data objects. Written for an AI agent, and exactly
+  as binding on a person.
+- **[docs/gates.md](docs/gates.md)** — every automated check, what it protects,
+  and how to bank its baseline when it has one.
+
+---
+
 ## Support & Community
 
 - 📖 [Documentation](https://rebase.pro/docs)
