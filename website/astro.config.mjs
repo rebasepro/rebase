@@ -331,7 +331,47 @@ export default defineConfig({
             tailwindcss()
         ],
         resolve: {
-            dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "react-compiler-runtime"],
+            // `@rebasepro/*` is here for the same reason React is, and the symptom
+            // was worse. The aliases below point three packages at their `src`,
+            // so an import of `@rebasepro/types` from inside `packages/cms/src`
+            // and one from `packages/ui/src` reach the same file down two
+            // different symlink chains — and Vite kept them as two modules. The
+            // FieldWidgetPreview island shipped `@rebasepro/types` twice.
+            //
+            // Two copies is normally waste. Here it is a build failure, because
+            // `packages/types` registers resource kinds at module scope against a
+            // registry it hangs off `globalThis` with `Symbol.for`. Two copies
+            // both register `topic`; identical specs are idempotent, so the site
+            // built — until one copy was a stale `dist` whose `topic` had
+            // `envBases: []` and the other a fresh one with
+            // `["REBASE_TOPIC_URL"]`. Then `registerResourceKind` did what it is
+            // supposed to do and refused, and `astro build` died rendering
+            // /de/docs/collections/properties. The failure therefore depended on
+            // how stale someone's `dist` was, which is why it followed no one.
+            dedupe: [
+                "react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "react-compiler-runtime",
+                "@rebasepro/app",
+                "@rebasepro/cli",
+                "@rebasepro/client",
+                "@rebasepro/cms-types",
+                "@rebasepro/cms",
+                "@rebasepro/codegen",
+                "@rebasepro/common",
+                "@rebasepro/firebase",
+                "@rebasepro/forms",
+                "@rebasepro/inference",
+                "@rebasepro/mcp",
+                "@rebasepro/plugin-ai",
+                "@rebasepro/plugin-insights",
+                "@rebasepro/rls-check",
+                "@rebasepro/server-mongo",
+                "@rebasepro/server-postgres",
+                "@rebasepro/server",
+                "@rebasepro/studio",
+                "@rebasepro/types",
+                "@rebasepro/ui",
+                "@rebasepro/utils"
+            ],
             alias: {
                 "@rebasepro/ui": path.resolve(new URL(".", import.meta.url).pathname, "../packages/ui/src"),
                 "@rebasepro/editor": path.resolve(new URL(".", import.meta.url).pathname, "../packages/editor/src"),
