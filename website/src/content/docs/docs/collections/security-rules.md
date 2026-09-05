@@ -154,7 +154,9 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.authUid()` | `rebase.uid()` |
 | `policy.authRoles()` | `rebase.roles()` |
 
-### `authenticated()` and `registered()` <span class="since-badge" data-since="0.18">Since 0.18</span>
+### `authenticated()` and `registered()`
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Two different things are called anonymous, and it is worth being precise about
 which one a rule means.

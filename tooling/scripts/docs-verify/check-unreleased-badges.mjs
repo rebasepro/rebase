@@ -168,6 +168,22 @@ export function checkUnreleasedBadges(root) {
             const body = lines.slice(start, end).join("\n");
             const badged = [...body.matchAll(BADGE)].map(m => m[1] || m[2]);
 
+            // A badge *inside* a heading joins the heading's text, so
+            // `## First User Bootstrap` becomes `#first-user-bootstrap-since-018`
+            // and every link written against the old anchor 404s in silence.
+            // The badge goes on the line under the heading instead.
+            if (/^#{1,6}\s/.test(lines[start] || "") && BADGE.test(lines[start])) {
+                BADGE.lastIndex = 0;
+                findings.push({
+                    file,
+                    line: start + 1,
+                    message:
+                        "badge is inside the heading, which rewrites the heading's anchor — " +
+                        "put it on the line below instead."
+                });
+            }
+            BADGE.lastIndex = 0;
+
             for (const version of badged) {
                 // A badge for something already out is worse than none: the
                 // reader trusts it and skips a feature they have.

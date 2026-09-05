@@ -19,7 +19,7 @@ The REST API underneath returns the token nested instead, as
 `{ user, tokens: { accessToken, … } }`. That difference only matters if you also
 call `/api/auth/*` directly with `fetch`, where `body.accessToken` is `undefined`
 and the token is at `body.tokens.accessToken`. See
-[the wire format](/docs/backend/authentication#response-format).
+[the wire format](/docs/backend/auth-endpoints/#response-format).
 :::
 
 ## Email / Password

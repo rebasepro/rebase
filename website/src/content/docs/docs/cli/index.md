@@ -253,7 +253,9 @@ rebase apps init <name>      # register a new app in rebase.json
 rebase apps config <app>     # what one app resolves to
 ```
 
-### `rebase status` <span class="since-badge" data-since="0.18">Since 0.18</span>
+### `rebase status`
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Everything this project declares, and whether the environment actually binds it:
 

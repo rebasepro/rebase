@@ -82,7 +82,16 @@ export default defineConfig({
                         { label: "Quickstart", slug: "docs/getting-started/quickstart" },
                         { label: "Project Structure", slug: "docs/getting-started/project-structure" },
                         { label: "Environment & Configuration", slug: "docs/getting-started/configuration" },
-                        { label: "Upgrading", slug: "docs/upgrading" },
+                        {
+                            label: "Upgrading",
+                            collapsed: true,
+                            items: [
+                                { label: "Which hop", slug: "docs/upgrading" },
+                                { label: "0.14 → 0.17", slug: "docs/upgrading/0-14-to-0-17" },
+                                { label: "0.13 → 0.14", slug: "docs/upgrading/0-13-to-0-14" },
+                                { label: "0.12 → 0.13", slug: "docs/upgrading/0-12-to-0-13" }
+                            ]
+                        },
                         { label: "Compatibility", slug: "docs/compatibility" },
                         // Published, mirrored from the repo root on every
                         // `generate-all`, linked from the upgrade guide — and
@@ -124,6 +133,8 @@ export default defineConfig({
                         { label: "REST API", slug: "docs/backend/api" },
                         { label: "Live schema editing", slug: "docs/backend/live-schema-editing" },
                         { label: "Authentication", slug: "docs/backend/authentication" },
+                        { label: "Auth endpoints", slug: "docs/backend/auth-endpoints" },
+                        { label: "Custom auth adapters", slug: "docs/backend/auth-adapters" },
                         { label: "Storage Configuration", slug: "docs/backend/storage" },
                         { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },
                         { label: "MongoDB", slug: "docs/backend/mongodb" },

@@ -1,0 +1,130 @@
+---
+slug: docs/upgrading/0-13-to-0-14
+title: Upgrading 0.13 to 0.14
+sidebar_label: 0.13 → 0.14
+description: Every wire key becomes camelCase, anonymous sign-in becomes opt-in, and one package is removed.
+---
+
+# Upgrading 0.13 → 0.14
+
+Sections 0–10 above are the 0.12 → 0.13 hop. The three below are 0.13 → 0.14. If
+you are already on 0.13, start here.
+
+Two of them are breaking. The first stops code compiling, which is the good case;
+the second changes who can obtain an account, and announces itself only as a 403
+your users hit and you do not.
+
+---
+
+## 11. The API is camelCase throughout — `author_id` is now `authorId`
+
+### What changed
+
+A field's wire name is its property key, and `columnName` renames only the
+*column*. That rule did not change — but two of the four sources of keys never
+had a property key to use, and both fell back to the column name:
+
+- a **foreign key derived from a relation** had no property of its own, so
+  `belongsTo` on `author` served the `author_id` column under its own name;
+- **introspection** wrote the raw column name as the property key.
+
+So `GET /api/data/users` answered `displayName` while `GET /api/data/posts`
+beside it answered `author_id`, and nothing visible from outside said which a
+field would land in. Both now derive a camelCase key.
+
+```diff
+- GET /api/data/posts        →  { "id": 1, "title": "Hello", "author_id": 3 }
++ GET /api/data/posts        →  { "id": 1, "title": "Hello", "authorId": 3 }
+
+- ?where={"author_id":["==",3]}     400 UNKNOWN_FILTER_FIELD
++ ?where={"authorId":["==",3]}
+```
+
+**The database does not change.** Columns stay snake_case, `\d posts` still shows
+`author_id`, no migration runs, and `rebase doctor` reports no drift.
+
+### What you have to do
+
+**Re-run `rebase generate-sdk`.** `row.author_id` stops compiling and
+`row.authorId` starts — the compiler names every call site for you. This is the
+half you do not have to search for.
+
+**Then find the half the compiler cannot see.** Hand-written `where` and
+`orderBy` keys, raw `fetch` consumers, and anything reading a row by key:
+
+```bash
+grep -rn "_id\"\|_id'\|\._id\b" src/ config/
+grep -rnE '(where|orderBy)[^)]*"[a-z]+_[a-z]+"' src/ config/
+```
+
+A filter key that no longer resolves is a **400 with `UNKNOWN_FILTER_FIELD`**,
+and the error lists the valid names. It fails closed on purpose — a dropped
+condition widens a result set, which is the one failure you do not want to be
+silent. A row read by the old key, though, is just `undefined`, and nothing
+raises.
+
+### If your project was introspected rather than authored
+
+This is the largest single change for you. `rebase schema introspect` no longer
+echoes column names on the wire: a `customer_id` column is generated as a
+`customerId` property carrying `columnName: "customer_id"`, and is served,
+filtered and sorted as `customerId`. **Re-running introspection is what produces
+the new collections.** The column, the constraints and the policies are
+untouched.
+
+> A property key *you* wrote is still your key, whatever its shape. Nothing
+> camel-cases a name someone already chose — only the two sources that never had
+> a name to use. There is no dual-key emission and no compatibility flag, because
+> serving both spellings would leave both conventions in place permanently, which
+> was the defect.
+
+---
+
+## 12. Anonymous sign-in is opt-in
+
+### What changed
+
+`POST /auth/anonymous` answers **403** until you set `auth.allowAnonymous: true`.
+
+Anonymous sign-in is registration that never asked: it inserts a `users` row and
+assigns `defaultRole` exactly as `POST /auth/register` does. But both anonymous
+routes were mounted unconditionally and consulted none of the registration gates,
+so a backend that had closed the door still handed out permanent accounts —
+`POST /auth/anonymous` for the row and the session, then `POST /auth/anonymous/link`
+to put credentials on it, the second authenticated only by the token the first
+had just issued.
+
+### What you have to do
+
+If you use anonymous sessions — guest carts, trials, unauthenticated drafts —
+opt in explicitly:
+
+```diff ts
+ auth: {
++    allowAnonymous: true
+ }
+```
+
+If you do not, there is nothing to do, and the 403 is the point.
+
+**Check which one you are before you deploy.** The symptom of guessing wrong is
+sign-in failing for users who never had credentials to re-enter:
+
+```bash
+grep -rn "signInAnonymously\|/auth/anonymous" src/ config/ frontend/
+```
+
+---
+
+## 13. `@rebasepro/client-postgres` is gone
+
+Remove it from `package.json`. If you imported from it, the SDK reaches Postgres
+through the ordinary client — there is no separate package to install.
+
+---
+
+## Next
+
+- [Upgrading 0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) — the hop after this one
+- [The upgrade checklist](/docs/upgrading/#upgrade-checklist) — what to run afterwards
+- [Changelog](/docs/changelog/) — the release notes these sections summarise

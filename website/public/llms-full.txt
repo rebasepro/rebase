@@ -814,30 +814,318 @@ function Widget() {
 
 ## Upgrading an existing app
 
-This guide covers three hops, in the order you have to make them.
+Three hops, newest first. Start at the one above the version you are on and work
+downwards — or, if you are coming from 0.12, start at the bottom and work up.
 
-**Part 1 (sections 0–10) is 0.12 → 0.13.** It removes the `auth` schema, renames
-packages, changes what `id` means, drops CJS, moves the admin panel to
-react-router 8, and — most importantly — **fixes three ways access could be
-granted that you did not ask for**: a security rule that was silently permissive,
-and two on the realtime socket. Read the first three sections before anything
-else. Section 0 is the one that changes SQL you may have written by hand;
-sections 1 and 2 alter who can read your data, and none of them announces itself.
+| You are on | Read | What it does to you |
+|---|---|---|
+| **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | The admin packages are renamed, resources are declared rather than configured, and a bundle built before it will not boot on a current runtime. 0.15 and 0.16 break nothing, so this is one hop from 0.14. |
+| **0.13** | [0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) | Every wire key is camelCase, and anonymous sign-in is opt-in. |
+| **0.12** | [0.12 → 0.13](/docs/upgrading/0-12-to-0-13/) | The largest hop, and the only one that changes **who can read your data**. It removes the `auth` schema, renames packages, changes what `id` means, drops CJS, moves the admin panel to react-router 8, and fixes three ways access could be granted that you did not ask for. |
 
-**Part 2 (sections 11–13) is 0.13 → 0.14.** Every wire key is camelCase, and
-anonymous sign-in is opt-in. If you are already on 0.13, skip straight to
-[section 11](#11-the-api-is-camelcase-throughout--author_id-is-now-authorid).
+Each page's sections are in the order you have to make them, and each one names
+the symptom you would otherwise debug from the wrong end.
 
-**Part 3 (sections 14–19) is 0.14 → 0.17.** The admin packages are renamed,
-resources are declared rather than configured, and a bundle built before it will
-not boot on a current runtime. 0.15 and 0.16 break nothing, so this is one hop
-from 0.14. If you are already on 0.16, skip to
-[section 14](#14-rebaseproadmin-is-rebaseprocms).
+Then, whichever hop you made:
 
-Work through the sections in order. Each one names the symptom you would
-otherwise debug from the wrong end.
+- [The upgrade checklist](#upgrade-checklist) below — the greps and commands worth
+  running afterwards, in one block.
+
+### Upgrade checklist
+
+```
+[ ] grep for authenticated() and (auth|rebase).uid() IS NOT NULL in config/collections/
+[ ] decide the intent of each rule; rewrite the ones that meant "public"
+[ ] replace not(authenticated()) with serverContext()
+[ ] if realtime.requireAuth was true with an AuthAdapter, treat the socket as
+    having been open — verify RLS on every subscribable collection (section 2)
+[ ] SELECT ... FROM pg_policies — record the qual of every policy BEFORE
+[ ] update package names and imports
+[ ] grep for rebase.data — it is now rebase.dataAsAdmin (section 8)
+[ ] grep for the other ten removed deprecated exports (section 8)
+[ ] drop react-router-dom; import RouterProvider from "react-router/dom"
+[ ] check node >= 22.22.0 and react >= 19.2.7 (react-router 8 requires both)
+[ ] move defaultSecurityRules into config/collections/index.ts
+[ ] grep for .userId
+[ ] grep for row.id on tables not keyed on id
+[ ] run db push
+[ ] run rebase doctor --policies — expect no Insecure or Orphaned entries
+[ ] SELECT ... FROM pg_policies again — confirm every intended change landed
+[ ] exercise the app signed OUT, in a private window — watch the websocket too
+
+--- 0.13 → 0.14 (part 2) ---
+[ ] re-run rebase generate-sdk, then build — the compiler finds row.author_id
+[ ] grep for snake_case where/orderBy keys; a stale one is a 400, not a warning
+[ ] grep for raw fetch consumers reading row.<something>_id — these read
+    undefined and raise nothing
+[ ] if the project was introspected, re-run rebase schema introspect
+[ ] decide anonymous sign-in: set auth.allowAnonymous: true, or confirm you
+    never used it (grep for signInAnonymously)
+[ ] drop @rebasepro/client-postgres from package.json
+
+--- 0.14 → 0.17 (part 3) ---
+[ ] rename @rebasepro/admin → @rebasepro/cms and admin-types → cms-types,
+    and RebaseAdmin → RebaseCMS
+[ ] move dataSources / storageSources out of the backend config into
+    rebase.json and config/, then `rebase build` — an old bundle will not boot
+[ ] grep collections for admin.titleProperty; it is refused at boot now
+[ ] grep crons for ctx.client and for `userId` as an identity key
+[ ] rename --legacy to --workspace wherever build/start is scripted
+[ ] if you implement EmailService yourself, `send` must return a result
+```
+
+`rebase doctor --policies` is the one to wire into CI: it exits non-zero on a
+policy still carrying the permissive tautology, and on one an earlier push
+superseded. The `pg_policies` reads before and after are still worth the minute —
+they show you the expressions themselves, which is the only way to spot a
+fail-open policy written in a spelling the detector does not match. Neither the
+packages nor the type system will tell you: the change lives in the database, and
+`db push` is the only thing that puts it there.
+
+### Related
+
+- [Changelog](/docs/changelog/) — the release notes each of these sections summarises
+- [Compatibility](/docs/compatibility/) — the six contracts, and which ones a version can break
+- [CLI Commands](/docs/cli/) — `rebase doctor` and the commands the checklists run
+
+## Upgrading 0.14 to 0.17
+
+## Upgrading 0.14 → 0.17
+
+0.15 and 0.16 add and fix things; neither breaks anything. Everything in this
+part landed in **0.17.0**.
+
+Under 0.x the minor is the breaking position — `^0.16.0` resolves
+`>=0.16.0 <0.17.0` — so none of it reaches a project until you deliberately move
+to 0.17.
+
+### 14. `@rebasepro/admin` is `@rebasepro/cms`
+
+And `@rebasepro/admin-types` is `@rebasepro/cms-types`. "Admin" named two things
+at once: the whole panel, and the content-management half of it.
+
+```diff lang="ts"
+- import { RebaseAdmin } from "@rebasepro/admin";
+- import { defineCollection } from "@rebasepro/admin-types";
++ import { RebaseCMS } from "@rebasepro/cms";
++ import { defineCollection } from "@rebasepro/cms-types";
+```
+
+Change the specifier and `RebaseAdmin` to `RebaseCMS`. There is no alias: a shim
+would keep both meanings of "admin" alive, which is the thing being fixed. The
+old packages stop at 0.16.0 on npm and receive nothing after it, so `^0.16.0`
+keeps resolving rather than breaking — it just stops moving.
+
+**Your collection files do not change.** The `admin:` key is deliberately
+untouched, along with `AdminCollection*`, `ADMIN_COLLECTION_KEYS`, the `admin`
+auth role and `/api/admin` — those name something other than the CMS product.
+
+The panel's mode value moved with the package (`"content"` → `"cms"`). It is
+persisted per browser and migrates on read, so an existing browser keeps working.
+
+### 15. Resources are declared, not configured
+
+`dataSources` and `storageSources` are gone from `RebaseBackendConfig`. Declare
+them in `rebase.json` and the config package instead.
+
+**A bundle built before this will not boot on a current runtime.** Rebuild it:
+
+```bash
+rebase build
+```
+
+`rebase eject infra` is gone too, along with `rebase.infra.json` and the
+`{"$env": "..."}` indirection. Resources bind from the environment on the
+`<BASE>__<KEY>` convention, which is what every deployment already used.
+
+### 16. `admin.titleProperty` is rejected at boot
+
+Use `admin.display.title` — the same string works there.
+
+```diff lang="ts"
+  admin: {
+-     titleProperty: "name"
++     display: { title: "name" }
+  }
+```
+
+This can stop a project that starts today, which is the point: silence would
+mean the title quietly reverting to the derived one with nothing to explain why.
+
+### 17. `ctx.client` in a cron is `ctx.rebase`
+
+And `userId` is no longer accepted as an identity spelling anywhere — it is
+`uid` throughout.
+
+```diff lang="ts"
+- export default defineCron({ schedule: "0 3 * * *", async handler({ client }) {
+-     await client.dataAsAdmin.collection("orders").find();
++ export default defineCron({ schedule: "0 3 * * *", async handler({ rebase }) {
++     await rebase.dataAsAdmin.collection("orders").find();
+  } });
+```
+
+### 18. CLI flag rename
+
+The `--legacy` flag on `build` and `start` is now `--workspace`. The mode is
+supported, not retired, and the old name said otherwise.
+
+```diff
+- rebase build --legacy
++ rebase build --workspace
+```
+
+Worth grepping your scripts and CI for: `arg` runs permissively on these two
+commands, so the old spelling is **ignored rather than rejected** — the build
+succeeds and silently uses the other mode.
+
+### 19. `EmailService.send` returns a result
+
+Breaking only for code that *implements* `EmailService`: a `send` returning
+`Promise<void>` no longer satisfies it. Callers are unaffected — they may ignore
+the result — and the `auth.email.sendEmail` hook stays permissive, so an
+existing `async () => {}` provider still works and simply reports nothing.
+
+### Next
+
+- [The upgrade checklist](/docs/upgrading/#upgrade-checklist) — what to run afterwards
+- [Upgrading 0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) — the hop before this one
+- [Changelog](/docs/changelog/) — the release notes these sections summarise
+
+## Upgrading 0.13 to 0.14
+
+## Upgrading 0.13 → 0.14
+
+Sections 0–10 above are the 0.12 → 0.13 hop. The three below are 0.13 → 0.14. If
+you are already on 0.13, start here.
+
+Two of them are breaking. The first stops code compiling, which is the good case;
+the second changes who can obtain an account, and announces itself only as a 403
+your users hit and you do not.
 
 ---
+
+### 11. The API is camelCase throughout — `author_id` is now `authorId`
+
+#### What changed
+
+A field's wire name is its property key, and `columnName` renames only the
+*column*. That rule did not change — but two of the four sources of keys never
+had a property key to use, and both fell back to the column name:
+
+- a **foreign key derived from a relation** had no property of its own, so
+  `belongsTo` on `author` served the `author_id` column under its own name;
+- **introspection** wrote the raw column name as the property key.
+
+So `GET /api/data/users` answered `displayName` while `GET /api/data/posts`
+beside it answered `author_id`, and nothing visible from outside said which a
+field would land in. Both now derive a camelCase key.
+
+```diff
+- GET /api/data/posts        →  { "id": 1, "title": "Hello", "author_id": 3 }
++ GET /api/data/posts        →  { "id": 1, "title": "Hello", "authorId": 3 }
+
+- ?where={"author_id":["==",3]}     400 UNKNOWN_FILTER_FIELD
++ ?where={"authorId":["==",3]}
+```
+
+**The database does not change.** Columns stay snake_case, `\d posts` still shows
+`author_id`, no migration runs, and `rebase doctor` reports no drift.
+
+#### What you have to do
+
+**Re-run `rebase generate-sdk`.** `row.author_id` stops compiling and
+`row.authorId` starts — the compiler names every call site for you. This is the
+half you do not have to search for.
+
+**Then find the half the compiler cannot see.** Hand-written `where` and
+`orderBy` keys, raw `fetch` consumers, and anything reading a row by key:
+
+```bash
+grep -rn "_id\"\|_id'\|\._id\b" src/ config/
+grep -rnE '(where|orderBy)[^)]*"[a-z]+_[a-z]+"' src/ config/
+```
+
+A filter key that no longer resolves is a **400 with `UNKNOWN_FILTER_FIELD`**,
+and the error lists the valid names. It fails closed on purpose — a dropped
+condition widens a result set, which is the one failure you do not want to be
+silent. A row read by the old key, though, is just `undefined`, and nothing
+raises.
+
+#### If your project was introspected rather than authored
+
+This is the largest single change for you. `rebase schema introspect` no longer
+echoes column names on the wire: a `customer_id` column is generated as a
+`customerId` property carrying `columnName: "customer_id"`, and is served,
+filtered and sorted as `customerId`. **Re-running introspection is what produces
+the new collections.** The column, the constraints and the policies are
+untouched.
+
+> A property key *you* wrote is still your key, whatever its shape. Nothing
+> camel-cases a name someone already chose — only the two sources that never had
+> a name to use. There is no dual-key emission and no compatibility flag, because
+> serving both spellings would leave both conventions in place permanently, which
+> was the defect.
+
+---
+
+### 12. Anonymous sign-in is opt-in
+
+#### What changed
+
+`POST /auth/anonymous` answers **403** until you set `auth.allowAnonymous: true`.
+
+Anonymous sign-in is registration that never asked: it inserts a `users` row and
+assigns `defaultRole` exactly as `POST /auth/register` does. But both anonymous
+routes were mounted unconditionally and consulted none of the registration gates,
+so a backend that had closed the door still handed out permanent accounts —
+`POST /auth/anonymous` for the row and the session, then `POST /auth/anonymous/link`
+to put credentials on it, the second authenticated only by the token the first
+had just issued.
+
+#### What you have to do
+
+If you use anonymous sessions — guest carts, trials, unauthenticated drafts —
+opt in explicitly:
+
+```diff ts
+ auth: {
++    allowAnonymous: true
+ }
+```
+
+If you do not, there is nothing to do, and the 403 is the point.
+
+**Check which one you are before you deploy.** The symptom of guessing wrong is
+sign-in failing for users who never had credentials to re-enter:
+
+```bash
+grep -rn "signInAnonymously\|/auth/anonymous" src/ config/ frontend/
+```
+
+---
+
+### 13. `@rebasepro/client-postgres` is gone
+
+Remove it from `package.json`. If you imported from it, the SDK reaches Postgres
+through the ordinary client — there is no separate package to install.
+
+---
+
+### Next
+
+- [Upgrading 0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) — the hop after this one
+- [The upgrade checklist](/docs/upgrading/#upgrade-checklist) — what to run afterwards
+- [Changelog](/docs/changelog/) — the release notes these sections summarise
+
+## Upgrading 0.12 to 0.13
+
+## Upgrading 0.12 → 0.13
+
+The largest hop, and the only one that changes **who can read your data**.
+Sections 0, 1 and 2 do that; read them before anything else. Section 0 changes
+SQL you may have written by hand, and sections 1 and 2 alter who can read your
+data. None of them announces itself.
 
 ### 0. The `auth` schema is gone — read this first
 
@@ -1367,276 +1655,11 @@ restores the old behaviour.
 
 ---
 
-## Part 2 — 0.13 to 0.14
-
-Sections 0–10 above are the 0.12 → 0.13 hop. The three below are 0.13 → 0.14. If
-you are already on 0.13, start here.
-
-Two of them are breaking. The first stops code compiling, which is the good case;
-the second changes who can obtain an account, and announces itself only as a 403
-your users hit and you do not.
-
----
-
-### 11. The API is camelCase throughout — `author_id` is now `authorId`
-
-#### What changed
-
-A field's wire name is its property key, and `columnName` renames only the
-*column*. That rule did not change — but two of the four sources of keys never
-had a property key to use, and both fell back to the column name:
-
-- a **foreign key derived from a relation** had no property of its own, so
-  `belongsTo` on `author` served the `author_id` column under its own name;
-- **introspection** wrote the raw column name as the property key.
-
-So `GET /api/data/users` answered `displayName` while `GET /api/data/posts`
-beside it answered `author_id`, and nothing visible from outside said which a
-field would land in. Both now derive a camelCase key.
-
-```diff
-- GET /api/data/posts        →  { "id": 1, "title": "Hello", "author_id": 3 }
-+ GET /api/data/posts        →  { "id": 1, "title": "Hello", "authorId": 3 }
-
-- ?where={"author_id":["==",3]}     400 UNKNOWN_FILTER_FIELD
-+ ?where={"authorId":["==",3]}
-```
-
-**The database does not change.** Columns stay snake_case, `\d posts` still shows
-`author_id`, no migration runs, and `rebase doctor` reports no drift.
-
-#### What you have to do
-
-**Re-run `rebase generate-sdk`.** `row.author_id` stops compiling and
-`row.authorId` starts — the compiler names every call site for you. This is the
-half you do not have to search for.
-
-**Then find the half the compiler cannot see.** Hand-written `where` and
-`orderBy` keys, raw `fetch` consumers, and anything reading a row by key:
-
-```bash
-grep -rn "_id\"\|_id'\|\._id\b" src/ config/
-grep -rnE '(where|orderBy)[^)]*"[a-z]+_[a-z]+"' src/ config/
-```
-
-A filter key that no longer resolves is a **400 with `UNKNOWN_FILTER_FIELD`**,
-and the error lists the valid names. It fails closed on purpose — a dropped
-condition widens a result set, which is the one failure you do not want to be
-silent. A row read by the old key, though, is just `undefined`, and nothing
-raises.
-
-#### If your project was introspected rather than authored
-
-This is the largest single change for you. `rebase schema introspect` no longer
-echoes column names on the wire: a `customer_id` column is generated as a
-`customerId` property carrying `columnName: "customer_id"`, and is served,
-filtered and sorted as `customerId`. **Re-running introspection is what produces
-the new collections.** The column, the constraints and the policies are
-untouched.
-
-> A property key *you* wrote is still your key, whatever its shape. Nothing
-> camel-cases a name someone already chose — only the two sources that never had
-> a name to use. There is no dual-key emission and no compatibility flag, because
-> serving both spellings would leave both conventions in place permanently, which
-> was the defect.
-
----
-
-### 12. Anonymous sign-in is opt-in
-
-#### What changed
-
-`POST /auth/anonymous` answers **403** until you set `auth.allowAnonymous: true`.
-
-Anonymous sign-in is registration that never asked: it inserts a `users` row and
-assigns `defaultRole` exactly as `POST /auth/register` does. But both anonymous
-routes were mounted unconditionally and consulted none of the registration gates,
-so a backend that had closed the door still handed out permanent accounts —
-`POST /auth/anonymous` for the row and the session, then `POST /auth/anonymous/link`
-to put credentials on it, the second authenticated only by the token the first
-had just issued.
-
-#### What you have to do
-
-If you use anonymous sessions — guest carts, trials, unauthenticated drafts —
-opt in explicitly:
-
-```diff ts
- auth: {
-+    allowAnonymous: true
- }
-```
-
-If you do not, there is nothing to do, and the 403 is the point.
-
-**Check which one you are before you deploy.** The symptom of guessing wrong is
-sign-in failing for users who never had credentials to re-enter:
-
-```bash
-grep -rn "signInAnonymously\|/auth/anonymous" src/ config/ frontend/
-```
-
----
-
-### 13. `@rebasepro/client-postgres` is gone
-
-Remove it from `package.json`. If you imported from it, the SDK reaches Postgres
-through the ordinary client — there is no separate package to install.
-
----
-
-## Part 3 — 0.14 to 0.17
-
-0.15 and 0.16 add and fix things; neither breaks anything. Everything in this
-part landed in **0.17.0**.
-
-Under 0.x the minor is the breaking position — `^0.16.0` resolves
-`>=0.16.0 <0.17.0` — so none of it reaches a project until you deliberately move
-to 0.17.
-
-### 14. `@rebasepro/admin` is `@rebasepro/cms`
-
-And `@rebasepro/admin-types` is `@rebasepro/cms-types`. "Admin" named two things
-at once: the whole panel, and the content-management half of it.
-
-```diff lang="ts"
-- import { RebaseAdmin } from "@rebasepro/admin";
-- import { defineCollection } from "@rebasepro/admin-types";
-+ import { RebaseCMS } from "@rebasepro/cms";
-+ import { defineCollection } from "@rebasepro/cms-types";
-```
-
-Change the specifier and `RebaseAdmin` to `RebaseCMS`. There is no alias: a shim
-would keep both meanings of "admin" alive, which is the thing being fixed. The
-old packages stop at 0.16.0 on npm and receive nothing after it, so `^0.16.0`
-keeps resolving rather than breaking — it just stops moving.
-
-**Your collection files do not change.** The `admin:` key is deliberately
-untouched, along with `AdminCollection*`, `ADMIN_COLLECTION_KEYS`, the `admin`
-auth role and `/api/admin` — those name something other than the CMS product.
-
-The panel's mode value moved with the package (`"content"` → `"cms"`). It is
-persisted per browser and migrates on read, so an existing browser keeps working.
-
-### 15. Resources are declared, not configured
-
-`dataSources` and `storageSources` are gone from `RebaseBackendConfig`. Declare
-them in `rebase.json` and the config package instead.
-
-**A bundle built before this will not boot on a current runtime.** Rebuild it:
-
-```bash
-rebase build
-```
-
-`rebase eject infra` is gone too, along with `rebase.infra.json` and the
-`{"$env": "..."}` indirection. Resources bind from the environment on the
-`<BASE>__<KEY>` convention, which is what every deployment already used.
-
-### 16. `admin.titleProperty` is rejected at boot
-
-Use `admin.display.title` — the same string works there.
-
-```diff lang="ts"
-  admin: {
--     titleProperty: "name"
-+     display: { title: "name" }
-  }
-```
-
-This can stop a project that starts today, which is the point: silence would
-mean the title quietly reverting to the derived one with nothing to explain why.
-
-### 17. `ctx.client` in a cron is `ctx.rebase`
-
-And `userId` is no longer accepted as an identity spelling anywhere — it is
-`uid` throughout.
-
-```diff lang="ts"
-- export default defineCron({ schedule: "0 3 * * *", async handler({ client }) {
--     await client.dataAsAdmin.collection("orders").find();
-+ export default defineCron({ schedule: "0 3 * * *", async handler({ rebase }) {
-+     await rebase.dataAsAdmin.collection("orders").find();
-  } });
-```
-
-### 18. CLI flag rename
-
-The `--legacy` flag on `build` and `start` is now `--workspace`. The mode is
-supported, not retired, and the old name said otherwise.
-
-```diff
-- rebase build --legacy
-+ rebase build --workspace
-```
-
-Worth grepping your scripts and CI for: `arg` runs permissively on these two
-commands, so the old spelling is **ignored rather than rejected** — the build
-succeeds and silently uses the other mode.
-
-### 19. `EmailService.send` returns a result
-
-Breaking only for code that *implements* `EmailService`: a `send` returning
-`Promise<void>` no longer satisfies it. Callers are unaffected — they may ignore
-the result — and the `auth.email.sendEmail` hook stays permissive, so an
-existing `async () => {}` provider still works and simply reports nothing.
-
-### Upgrade checklist
-
-```
-[ ] grep for authenticated() and (auth|rebase).uid() IS NOT NULL in config/collections/
-[ ] decide the intent of each rule; rewrite the ones that meant "public"
-[ ] replace not(authenticated()) with serverContext()
-[ ] if realtime.requireAuth was true with an AuthAdapter, treat the socket as
-    having been open — verify RLS on every subscribable collection (section 2)
-[ ] SELECT ... FROM pg_policies — record the qual of every policy BEFORE
-[ ] update package names and imports
-[ ] grep for rebase.data — it is now rebase.dataAsAdmin (section 8)
-[ ] grep for the other ten removed deprecated exports (section 8)
-[ ] drop react-router-dom; import RouterProvider from "react-router/dom"
-[ ] check node >= 22.22.0 and react >= 19.2.7 (react-router 8 requires both)
-[ ] move defaultSecurityRules into config/collections/index.ts
-[ ] grep for .userId
-[ ] grep for row.id on tables not keyed on id
-[ ] run db push
-[ ] run rebase doctor --policies — expect no Insecure or Orphaned entries
-[ ] SELECT ... FROM pg_policies again — confirm every intended change landed
-[ ] exercise the app signed OUT, in a private window — watch the websocket too
-
---- 0.13 → 0.14 (part 2) ---
-[ ] re-run rebase generate-sdk, then build — the compiler finds row.author_id
-[ ] grep for snake_case where/orderBy keys; a stale one is a 400, not a warning
-[ ] grep for raw fetch consumers reading row.<something>_id — these read
-    undefined and raise nothing
-[ ] if the project was introspected, re-run rebase schema introspect
-[ ] decide anonymous sign-in: set auth.allowAnonymous: true, or confirm you
-    never used it (grep for signInAnonymously)
-[ ] drop @rebasepro/client-postgres from package.json
-
---- 0.14 → 0.17 (part 3) ---
-[ ] rename @rebasepro/admin → @rebasepro/cms and admin-types → cms-types,
-    and RebaseAdmin → RebaseCMS
-[ ] move dataSources / storageSources out of the backend config into
-    rebase.json and config/, then `rebase build` — an old bundle will not boot
-[ ] grep collections for admin.titleProperty; it is refused at boot now
-[ ] grep crons for ctx.client and for `userId` as an identity key
-[ ] rename --legacy to --workspace wherever build/start is scripted
-[ ] if you implement EmailService yourself, `send` must return a result
-```
-
-`rebase doctor --policies` is the one to wire into CI: it exits non-zero on a
-policy still carrying the permissive tautology, and on one an earlier push
-superseded. The `pg_policies` reads before and after are still worth the minute —
-they show you the expressions themselves, which is the only way to spot a
-fail-open policy written in a spelling the detector does not match. Neither the
-packages nor the type system will tell you: the change lives in the database, and
-`db push` is the only thing that puts it there.
-
-### Related
-
-- [Changelog](/docs/changelog/) — the release notes each of these sections summarises
-- [Compatibility](/docs/compatibility/) — the six contracts, and which ones a version can break
-- [CLI Commands](/docs/cli/) — `rebase doctor` and the commands the checklists run
+### Next
+
+- [Upgrading 0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) — the hop after this one
+- [The upgrade checklist](/docs/upgrading/#upgrade-checklist) — what to run afterwards
+- [Security Rules (RLS)](/docs/collections/security-rules/) — the rule vocabulary sections 0–2 are about
 
 ## Compatibility
 
@@ -6286,7 +6309,9 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.authUid()` | `rebase.uid()` |
 | `policy.authRoles()` | `rebase.roles()` |
 
-#### `authenticated()` and `registered()` <span class="since-badge" data-since="0.18">Since 0.18</span>
+#### `authenticated()` and `registered()`
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Two different things are called anonymous, and it is worth being precise about
 which one a rule means.
@@ -8749,7 +8774,9 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.authUid()` | `rebase.uid()` |
 | `policy.authRoles()` | `rebase.roles()` |
 
-#### `authenticated()` and `registered()` <span class="since-badge" data-since="0.18">Since 0.18</span>
+#### `authenticated()` and `registered()`
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Two different things are called anonymous, and it is worth being precise about
 which one a rule means.
@@ -10100,6 +10127,11 @@ working in:
 
 ## Authentication
 
+Authentication is three pages, because it is three jobs. This one is **configuration**: what goes in the `auth` block and in the environment.
+
+- [Endpoints and tokens](/docs/backend/auth-endpoints/) — the routes the backend mounts, the response shapes, MFA, the database context a policy sees, JWKS and service keys.
+- [Custom auth adapters](/docs/backend/auth-adapters/) — replacing the built-in provider with Clerk, Firebase Auth or your own.
+
 ### Overview
 
 Rebase includes a complete backend authentication system:
@@ -10167,7 +10199,7 @@ const backend = await initializeRebaseBackend({
 |-----|------|---------|--------------|
 | `collection` | `CollectionConfig` | — | The users collection. See [Collection-Level Auth Configuration](#collection-level-auth-configuration) |
 | `jwtSecret` | `string` | — | HS256 signing secret. Required in production |
-| `signingKeys` | `JwtSigningKeyConfig[]` | — | Asymmetric signing keys — see [Asymmetric Tokens and JWKS](#asymmetric-tokens-and-jwks) |
+| `signingKeys` | `JwtSigningKeyConfig[]` | — | Asymmetric signing keys — see [Asymmetric Tokens and JWKS](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) |
 | `activeKid` | `string` | first key | Which of `signingKeys` mints new tokens |
 | `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
 | `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
@@ -10177,7 +10209,7 @@ const backend = await initializeRebaseBackend({
 | `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts |
 | `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` for invite-by-email flows |
 | `defaultRole` | `string` | — | Role given to a newly registered user when none is specified |
-| `serviceKey` | `string` | — | Static key for server-to-server calls — see [Service Key Authentication](#service-key-authentication) |
+| `serviceKey` | `string` | — | Static key for server-to-server calls — see [Service Key Authentication](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, for password reset, verification, invitations and magic links |
 | `magicLink` | `boolean` | `false` | Enable passwordless email sign-in. Needs `email` configured; without it the routes answer `503 EMAIL_NOT_CONFIGURED` |
 | `emailOtp` | `boolean` | `false` | Enable six-digit sign-in codes by email — see [One-time codes](#one-time-codes-by-email). Same email requirement |
@@ -10498,6 +10530,90 @@ A user who signed up with Google and has no password:
   It re-proves ownership of the address by email, after which the account has
   both sign-in methods.
 
+### Auto-Created Tables
+
+On first startup, Rebase automatically provisions the `auth` schema and the following tables in the database (bound to the schema defined in your collection, e.g., `rebase`):
+
+- **`rebase.users`** — User accounts with email, password hash, metadata, and a `roles` text[] column (roles are stored as inline text arrays to optimize queries and avoid joins).
+- **`rebase.refresh_tokens`** — Long-lived sessions carrying hashed refresh tokens, user agents, and IP addresses. Includes a unique index on `token_hash` and a unique constraint on `(user_id, user_agent, ip_address)` to track active device sessions.
+- **`rebase.password_reset_tokens`** — Expirable single-use tokens for password recovery flows.
+- **`rebase.mfa_factors`** — Enrolled multi-factor authentication methods (e.g. TOTP secrets encrypted with AES-256).
+- **`rebase.mfa_challenges`** — Verification logs tracking active MFA verification attempts.
+- **`rebase.recovery_codes`** — Hashed multi-factor backup/recovery codes.
+- **`rebase.app_config`** — Key-value store for system configurations.
+
+### First User Bootstrap
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+When no users exist in the database and the server is **not** running with `NODE_ENV=production`, the first person to register automatically becomes an admin. After that, registration is controlled by the `allowRegistration` setting.
+
+In production that window is closed, because a host with a public name is reachable before its operator has registered, and whoever got there first would own it. A production deployment names its first admin in the environment instead — `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD`, created at boot while the table is still empty — or assigns the role with the service key. With the window closed, an empty table refuses the bootstrap registration with `SETUP_REQUIRED` (and says so), a first account created through open registration is an ordinary account, `GET /api/auth/config` never reports `needsSetup`, `POST /api/admin/bootstrap` refuses, and the boot log warns when the table is empty and no admin is named.
+
+On a laptop this means you can always bootstrap a fresh database without seeding it manually. To prevent concurrent runs and schema generation race conditions on hot reloading (HMR) or startup, bootstrapping operations are synchronized using a Postgres advisory lock:
+```sql
+SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
+```
+
+### Collection-Level Auth Configuration
+
+Instead of relying solely on the default database auth rules, you can mark any Postgres collection (such as `users.ts` or a custom `members.ts` collection) as the authentication collection. This is configured via the `auth` property on the collection itself:
+
+```typescript
+
+const membersCollection = defineCollection({
+  name: "Members",
+  slug: "members",
+  table: "members",
+  auth: {
+    enabled: true,
+    
+    // Customize what happens when an admin creates a user via the REST API
+    onCreateUser: async (values, ctx) => {
+      const hash = await ctx.hashPassword("welcome123");
+      return {
+        values: { ...values, passwordHash: hash, emailVerified: true },
+        temporaryPassword: "welcome123"
+      };
+    },
+
+    // Customize what happens when an admin resets a user's password in the admin panel
+    onResetPassword: async (userId, ctx) => {
+      const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
+      return {
+        temporaryPassword: tempPassword,
+        invitationSent: false
+      };
+    },
+
+    // Inject/override auth-specific actions (e.g. show/hide the reset password button)
+    actions: {
+      resetPassword: true // Or false to disable, or a custom EntityAction
+    }
+  },
+  properties: { ... }
+});
+```
+
+When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive an `AuthCollectionContext` facade containing:
+- `hashPassword(password: string): Promise<string>` — Hash password using the configured hashing algorithm (e.g. scrypt).
+- `sendEmail?: (options) => Promise<EmailSendResult>` — Send an email (only available when email service is configured). Resolves with what the provider reported — `messageId`, `accepted`, `rejected` — so a hook can store the id and later thread a reply back to it.
+- `emailConfigured: boolean` — Whether email service is configured.
+- `appName: string` — The app name from email config.
+- `resetPasswordUrl: string` — The password reset link base URL.
+
+### Next Steps
+
+- **[Endpoints and tokens](/docs/backend/auth-endpoints/)** — every route this configuration mounts
+- **[Custom auth adapters](/docs/backend/auth-adapters/)** — bringing your own identity provider
+- **[Frontend Authentication](/docs/frontend/authentication/)** — login UI, auth controller, user management
+- **[Security Rules (RLS)](/docs/collections/security-rules/)** — row-level access control
+- **[Client SDK Authentication](/docs/sdk/authentication/)** — auth methods in the client SDK
+
+## Auth endpoints and tokens
+
+The routes [the `auth` block](/docs/backend/authentication/) mounts, and the tokens they hand back.
+
 ### Auth Endpoints
 
 All auth endpoints are mounted at `/api/auth/`:
@@ -10549,7 +10665,7 @@ service key:
 | `DELETE` | `/api/admin/users/:uid` | Delete one user |
 | `POST` | `/api/admin/users/:uid/reset-password` | Reset a user's password without their current one |
 | `GET` | `/api/admin/roles` | List the roles this backend knows |
-| `POST` | `/api/admin/bootstrap` | Let the earliest-registered user claim the admin role while none exists. Refused in production — see [First User Bootstrap](#first-user-bootstrap) |
+| `POST` | `/api/admin/bootstrap` | Let the earliest-registered user claim the admin role while none exists. Refused in production — see [First User Bootstrap](/docs/backend/authentication/#first-user-bootstrap) |
 
 All data API endpoints require a valid `Authorization: Bearer <token>` header when `requireAuth: true` (the default).
 
@@ -10601,7 +10717,7 @@ shape off a raw `fetch` yields `undefined`, which shows up as "login succeeded
 but there is no access token" — the login was fine, the token was one level down.
 :::
 
-With [`cookieAuth`](#refresh-tokens-in-an-httponly-cookie) enabled the refresh
+With [`cookieAuth`](/docs/backend/authentication/#refresh-tokens-in-an-httponly-cookie) enabled the refresh
 token travels as an `httpOnly` cookie and `tokens.refreshToken` is an empty
 string in the body. The access token is unaffected.
 
@@ -10680,18 +10796,6 @@ and `photoURL` — never the email, roles, or metadata of the looked-up user. It
 is **off by default** because it lets any signed-in user probe which emails have
 accounts; enable it only when your invite UX needs it.
 
-### Auto-Created Tables
-
-On first startup, Rebase automatically provisions the `auth` schema and the following tables in the database (bound to the schema defined in your collection, e.g., `rebase`):
-
-- **`rebase.users`** — User accounts with email, password hash, metadata, and a `roles` text[] column (roles are stored as inline text arrays to optimize queries and avoid joins).
-- **`rebase.refresh_tokens`** — Long-lived sessions carrying hashed refresh tokens, user agents, and IP addresses. Includes a unique index on `token_hash` and a unique constraint on `(user_id, user_agent, ip_address)` to track active device sessions.
-- **`rebase.password_reset_tokens`** — Expirable single-use tokens for password recovery flows.
-- **`rebase.mfa_factors`** — Enrolled multi-factor authentication methods (e.g. TOTP secrets encrypted with AES-256).
-- **`rebase.mfa_challenges`** — Verification logs tracking active MFA verification attempts.
-- **`rebase.recovery_codes`** — Hashed multi-factor backup/recovery codes.
-- **`rebase.app_config`** — Key-value store for system configurations.
-
 ### Row-Level Security (RLS) Database Context
 
 Rebase bridges request authentication directly down to PostgreSQL Row-Level Security (RLS). Every database query executed through a user-scoped driver runs inside a database transaction (`db.transaction()`) that configures transaction-local configuration parameters:
@@ -10738,64 +10842,6 @@ CREATE POLICY owner_access ON posts
     TO public
     USING (author_id = rebase.uid() OR string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 ```
-
-### First User Bootstrap <span class="since-badge" data-since="0.18">Since 0.18</span>
-
-When no users exist in the database and the server is **not** running with `NODE_ENV=production`, the first person to register automatically becomes an admin. After that, registration is controlled by the `allowRegistration` setting.
-
-In production that window is closed, because a host with a public name is reachable before its operator has registered, and whoever got there first would own it. A production deployment names its first admin in the environment instead — `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD`, created at boot while the table is still empty — or assigns the role with the service key. With the window closed, an empty table refuses the bootstrap registration with `SETUP_REQUIRED` (and says so), a first account created through open registration is an ordinary account, `GET /api/auth/config` never reports `needsSetup`, `POST /api/admin/bootstrap` refuses, and the boot log warns when the table is empty and no admin is named.
-
-On a laptop this means you can always bootstrap a fresh database without seeding it manually. To prevent concurrent runs and schema generation race conditions on hot reloading (HMR) or startup, bootstrapping operations are synchronized using a Postgres advisory lock:
-```sql
-SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
-```
-
-### Collection-Level Auth Configuration
-
-Instead of relying solely on the default database auth rules, you can mark any Postgres collection (such as `users.ts` or a custom `members.ts` collection) as the authentication collection. This is configured via the `auth` property on the collection itself:
-
-```typescript
-
-const membersCollection = defineCollection({
-  name: "Members",
-  slug: "members",
-  table: "members",
-  auth: {
-    enabled: true,
-    
-    // Customize what happens when an admin creates a user via the REST API
-    onCreateUser: async (values, ctx) => {
-      const hash = await ctx.hashPassword("welcome123");
-      return {
-        values: { ...values, passwordHash: hash, emailVerified: true },
-        temporaryPassword: "welcome123"
-      };
-    },
-
-    // Customize what happens when an admin resets a user's password in the admin panel
-    onResetPassword: async (userId, ctx) => {
-      const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
-      return {
-        temporaryPassword: tempPassword,
-        invitationSent: false
-      };
-    },
-
-    // Inject/override auth-specific actions (e.g. show/hide the reset password button)
-    actions: {
-      resetPassword: true // Or false to disable, or a custom EntityAction
-    }
-  },
-  properties: { ... }
-});
-```
-
-When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive an `AuthCollectionContext` facade containing:
-- `hashPassword(password: string): Promise<string>` — Hash password using the configured hashing algorithm (e.g. scrypt).
-- `sendEmail?: (options) => Promise<EmailSendResult>` — Send an email (only available when email service is configured). Resolves with what the provider reported — `messageId`, `accepted`, `rejected` — so a hook can store the id and later thread a reply back to it.
-- `emailConfigured: boolean` — Whether email service is configured.
-- `appName: string` — The app name from email config.
-- `resetPasswordUrl: string` — The password reset link base URL.
 
 ### Asymmetric Tokens and JWKS
 
@@ -10891,6 +10937,17 @@ This key is never logged and never leaves the process. It is used by the `rebase
 #### Timing-Attack Protection & Key Requirements
 
 To prevent timing attacks, Rebase validates both the user-configured service key and the internal key using constant-time string comparison (`safeCompare`). The user-configured service key **must be at least 32 characters long**; if a key shorter than 32 characters is configured, Rebase will throw a configuration error on startup and fail-closed.
+
+### Next Steps
+
+- **[Authentication](/docs/backend/authentication/)** — the configuration these routes come from
+- **[Custom auth adapters](/docs/backend/auth-adapters/)** — replacing the provider behind them
+- **[Security Rules (RLS)](/docs/collections/security-rules/)** — what a policy does with `rebase.uid()`
+- **[Client SDK Authentication](/docs/sdk/authentication/)** — calling these routes from the SDK
+
+## Custom auth adapters
+
+Rebase ships its own authentication — [configure it here](/docs/backend/authentication/). This page is the other case: an identity provider you already run, or already pay for.
 
 ### Custom Auth Adapters
 
@@ -11121,9 +11178,9 @@ If you wish to allow user CRUD operations directly inside the Rebase Admin Dashb
 
 ### Next Steps
 
-- **[Frontend Authentication](/docs/frontend/authentication)** — Login UI, auth controller, user management
-- **[Security Rules (RLS)](/docs/collections/security-rules)** — Row-level access control
-- **[Client SDK Authentication](/docs/sdk/authentication)** — Auth methods in the client SDK
+- **[Authentication](/docs/backend/authentication/)** — the built-in provider's configuration
+- **[Endpoints and tokens](/docs/backend/auth-endpoints/)** — the routes an adapter has to satisfy
+- **[Security Rules (RLS)](/docs/collections/security-rules/)** — what the claims an adapter returns are used for
 
 ## Storage Configuration
 
@@ -18853,7 +18910,7 @@ The REST API underneath returns the token nested instead, as
 `{ user, tokens: { accessToken, … } }`. That difference only matters if you also
 call `/api/auth/*` directly with `fetch`, where `body.accessToken` is `undefined`
 and the token is at `body.tokens.accessToken`. See
-[the wire format](/docs/backend/authentication#response-format).
+[the wire format](/docs/backend/auth-endpoints/#response-format).
 :::
 
 ### Email / Password
@@ -20827,7 +20884,9 @@ rebase apps init <name>      # register a new app in rebase.json
 rebase apps config <app>     # what one app resolves to
 ```
 
-#### `rebase status` <span class="since-badge" data-since="0.18">Since 0.18</span>
+#### `rebase status`
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Everything this project declares, and whether the environment actually binds it:
 
@@ -21510,7 +21569,9 @@ The suggested SQL is printed with the caller-id function your database actually 
 spellings are recognised when reading policies, so a Rebase database mid-migration from
 the pre-1.0 `auth` schema is still checked.
 
-#### policy-authenticated-tautology <span class="since-badge" data-since="0.18">Since 0.18</span>
+#### policy-authenticated-tautology
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 **Policy admits every signed-in caller to every row.** High.
 
