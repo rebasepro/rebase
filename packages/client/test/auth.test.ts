@@ -168,6 +168,41 @@ expiresAt: Date.now() + 100000 }));
             expect(auth.getSession()?.expiresAt).toBe(session.expiresAt);
         });
 
+        /**
+         * The logged-out flash, pinned.
+         *
+         * In cookie mode the refresh token is in an HttpOnly cookie the page
+         * cannot read, so a restore is *always* a round trip — and
+         * `getSession()` is synchronous, so on the first render it answers
+         * `null` whether there is a session or not. An app that reads it
+         * without awaiting `isInitialized()` renders the signed-out view on
+         * every reload, which is what `examples/sdk-demo` did.
+         */
+        it("has no session to hand out until isInitialized resolves, in cookie mode", async () => {
+            const { transport, mockFetch } = createMockTransport();
+            let releaseRefresh: (value: MockResponse) => void;
+            mockFetch.mockReturnValueOnce(new Promise<MockResponse>((resolve) => {
+                releaseRefresh = resolve;
+            }));
+
+            const auth = createAuth(transport, {
+                storage: createMemoryStorage(),
+                authFlowMode: "cookie"
+            });
+
+            // Before: nothing, and it is not because there is nothing.
+            expect(auth.getSession()).toBeNull();
+
+            releaseRefresh!({
+                ok: true,
+                json: async () => ({ tokens: mockTokens(Date.now() + 3600000) })
+            });
+            await auth.isInitialized();
+
+            // After: the session the cookie stood for.
+            expect(auth.getSession()?.accessToken).toBe("fake-jwt");
+        });
+
         it("resolves isInitialized after failed restore", async () => {
             const storage = createMemoryStorage();
             storage.setItem("rebase_auth", "invalid-json");

@@ -14289,6 +14289,80 @@ Token refresh happens automatically, but you can trigger it manually:
 const session = await client.auth.refreshSession();
 ```
 
+### Where the Session Lives: `authFlowMode`
+
+```typescript
+const client = createRebaseClient({
+    baseUrl: API_URL,
+    auth: { authFlowMode: "cookie" }
+});
+```
+
+| Mode | Where the refresh token is | When to use it |
+|------|----------------------------|----------------|
+| `"json"` *(default)* | Returned in the response body, kept in `localStorage` | A native app, a script, anything without a browser's cookie jar |
+| `"cookie"` | An **HttpOnly** cookie the backend sets | A browser app. Script running on your page cannot read it, which is what makes it XSS-safe |
+
+Cookie mode needs `auth.cookieAuth` on the backend, and it is what the generated
+frontend template uses.
+
+### Waiting for the Session to Be Restored
+
+**A restored session is not available on the first render.** `getSession()` is
+synchronous, so on page load it answers `null` while the restore is still in
+flight — and in cookie mode a restore is *always* in flight, because the refresh
+token is in a cookie the page cannot read, so the client has to ask the server
+for a fresh access token.
+
+Reading it synchronously is what produces a logged-out flash on every reload:
+
+```typescript no-verify
+// Wrong: renders the signed-out view for one round trip, every reload.
+const session = client.auth.getSession();
+if (!session) return <SignIn />;
+```
+
+`isInitialized()` resolves once the client has finished trying — whether it
+found a session or not:
+
+```typescript
+async function currentUser() {
+    await client.auth.isInitialized();
+    return client.auth.getSession()?.user ?? null;
+}
+```
+
+In React, that is one effect:
+
+```tsx
+
+function useCurrentUser() {
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        client.auth.isInitialized().then(() => {
+            if (cancelled) return;
+            setUser(client.auth.getSession()?.user ?? null);
+            setLoading(false);
+        });
+        return () => { cancelled = true; };
+    }, []);
+
+    return { user, loading };
+}
+```
+
+`useRebaseAuthController` in `@rebasepro/app` already does this, so an app built
+on the generated template gets it for free.
+
+A successful restore also reaches `onAuthStateChange` as `TOKEN_REFRESHED` — it
+*is* a refresh — but a listener alone cannot tell you that the restore finished:
+a boot with no session emits nothing at all, which is indistinguishable from one
+still in progress. Await `isInitialized()` for that question and use the
+listener for changes after it.
+
 ### Auth State Listener
 
 React to authentication changes across your application:
@@ -14303,6 +14377,13 @@ const unsubscribe = client.auth.onAuthStateChange((event, session) => {
 // Stop listening
 unsubscribe();
 ```
+
+| Event | When |
+|-------|------|
+| `SIGNED_IN` | A sign-in or sign-up completed |
+| `TOKEN_REFRESHED` | The access token was renewed — including the silent renewal that restores a session on page load |
+| `USER_UPDATED` | `updateUser()` changed the profile |
+| `SIGNED_OUT` | A sign-out, or a refresh that failed for good |
 
 ### Password Management
 
