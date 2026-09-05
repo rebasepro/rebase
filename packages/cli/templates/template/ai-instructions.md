@@ -13,6 +13,7 @@
 | `pnpm generate:sdk` | Regenerate the typed client from the collections |
 | `pnpm build` then `pnpm start` | Build the deployable bundle, then run it |
 | `pnpm skills:install` | Install the Rebase skills for your assistant |
+| `pnpm example` | Run `scripts/example.ts` against the running backend — the SDK, end to end |
 | `rebase doctor` | What disagrees between collections, generated schema and the live database — run this before guessing |
 | `pnpm deploy` | Deploys this project. Never run it; see below |
 
