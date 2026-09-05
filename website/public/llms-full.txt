@@ -4831,6 +4831,12 @@ GET /api/data/products?page=3
 
 The default limit is **50**, the maximum is **1000**. Both come from `DEFAULT_LIST_LIMIT` / `MAX_LIST_LIMIT`, which the generated OpenAPI spec reports too — a `limit` above the maximum is rejected rather than clamped.
 
+All three window parameters are refused rather than repaired, and each names
+itself: `INVALID_LIMIT`, `INVALID_OFFSET` (a whole number of 0 or more) and
+`INVALID_PAGE` (a whole number of 1 or more). A window quietly different from
+the one asked for cannot be told apart from having reached the end of the
+collection, which is why none of them is clamped or ignored.
+
 #### Response Format
 
 List responses include pagination metadata:
@@ -4889,7 +4895,7 @@ body.
 
 | Status | Typical code | Means |
 |--------|--------------|-------|
-| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT` | The request is malformed or asks for something impossible |
+| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | The request is malformed or asks for something impossible |
 | 401 | `UNAUTHORIZED` | No credential, or one that identifies nobody |
 | 403 | `FORBIDDEN`, `DB_PERMISSION_DENIED` | A credential that identifies somebody without the right |
 | 404 | `NOT_FOUND` | The thing addressed does not exist |

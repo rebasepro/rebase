@@ -216,22 +216,26 @@ describe("reserved parameter names", () => {
      * parameter name is, today, a breaking change for anyone whose schema
      * already uses it.
      */
-    it("KNOWN: a filter on a reserved-name column is silently not applied", () => {
-        const options = roundTrip({ where: { page: ["==", "home"] } });
+    it("KNOWN: a filter on a reserved-name column is not applied", () => {
+        // `orderBy` still loses the filter with no diagnostic, which is the
+        // shape of the finding. `page` and `offset` used to as well; they now
+        // 400, because `eq.home` is not a whole number — loud, and still not
+        // the filter that was asked for.
+        const options = roundTrip({ where: { orderBy: ["==", "home"] } });
         expect(options.where).toBeUndefined();
-        // …and it was read as pagination instead.
-        expect(options.offset).toBeDefined();
+
+        expect(() => roundTrip({ where: { page: ["==", "home"] } })).toThrow();
     });
 
     /**
      * The full classification, because the names do not all fail the same way
-     * and the difference is the whole point: twelve of the fourteen lose the
-     * filter with no diagnostic, while two happen to 400 — `where` because
-     * `eq.x` is not JSON, and `limit` because the list-limit resolver refuses a
-     * value that is not a whole number instead of falling back to the default.
-     * Both are accidents of another check rather than collision handling, but
-     * loud is strictly better than silent here, and the table below is what the
-     * fix would have to make uniform.
+     * and the difference is the whole point: ten of the fourteen lose the
+     * filter with no diagnostic, while four 400 — `where` because `eq.x` is not
+     * JSON, and `limit`/`offset`/`page` because the window parameters refuse a
+     * value that is not a whole number instead of falling back to a default.
+     * All four are accidents of another check rather than collision handling,
+     * but loud is strictly better than silent here, and the table below is what
+     * the fix would have to make uniform.
      */
     it("pins how each reserved name fails", () => {
         const classify = (name: string): "applied" | "silently-dropped" | "rejected" => {
@@ -245,10 +249,11 @@ describe("reserved parameter names", () => {
         const actual = Object.fromEntries(RESERVED.map(n => [n, classify(n)]));
         expect(actual).toEqual({
             // Refused, not dropped: `?limit=eq.x` is not a whole number, and the
-            // resolver answers that with a 400 rather than a default page.
+            // window parameters answer that with a 400 rather than a default
+            // page or a silently ignored parameter.
             limit: "rejected",
-            offset: "silently-dropped",
-            page: "silently-dropped",
+            offset: "rejected",
+            page: "rejected",
             orderBy: "silently-dropped",
             include: "silently-dropped",
             fields: "silently-dropped",
