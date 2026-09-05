@@ -40,6 +40,7 @@
     "build": "vite build && vite build --config vite.config.functions.ts && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs && node --experimental-vm-modules --no-warnings ../../tooling/scripts/assert-portable-entry.mjs dist/functions/index.js",
     "test:lint": "eslint \"src/**\" --quiet",
     "test": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --passWithNoTests --forceExit",
+    "test:watch": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --watch",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
   },
   "exports": {

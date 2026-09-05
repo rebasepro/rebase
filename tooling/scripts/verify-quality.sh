@@ -1,7 +1,24 @@
 #!/usr/bin/env bash
 # ============================================================
-# verify-quality.sh — Systematic code quality & testing verifier
+# verify-quality.sh — what CI runs, from a fresh clone
 # Run from monorepo root:  ./tooling/scripts/verify-quality.sh
+#
+# This is the script CONTRIBUTING and the pull-request template point at, so
+# it has to be true that passing it means the pipeline will pass. Three things
+# used to make that false:
+#
+#   - it never type-checked anything. `pnpm build` is esbuild, which strips
+#     types WITHOUT checking them, so a type error passed here and failed in
+#     CI's first step;
+#   - `npx fallow` named a tool declared in no package.json. On a fresh clone
+#     npx tries to fetch it, and its result was a warning either way — a step
+#     that could not fail, reporting on a tool nobody has;
+#   - it ran a hand-picked handful of gates while CI ran twenty-five.
+#
+# So the static half is now `pnpm ci:static`, the same command the workflow
+# runs, and the list lives in one place (tooling/scripts/ci-static.mjs, and
+# docs/gates.md). What is left here is what that command deliberately does not
+# do: the build, the unit suites, and the browser end-to-end tests.
 # ============================================================
 
 RED='\033[0;31m'
@@ -30,26 +47,19 @@ else
     err "Monorepo build failed."
 fi
 
-# 2. ESLint Check
-section "2. Code Style & Linting Check (ESLint)"
-echo "Running ESLint..."
-if npx eslint . --quiet; then
-    ok "No ESLint warnings or errors found."
+# 2. The static gates — the same list, in the same order, as CI's `static` job.
+#    Includes the type check, ESLint, the ratchets and the docs verifier, so
+#    none of them needs a step of its own here.
+section "2. Static Gates (pnpm ci:static)"
+echo "Running the CI static gate list..."
+if pnpm run ci:static; then
+    ok "All static gates passed."
 else
-    err "ESLint checks failed. Please fix style or React rules violations."
+    err "One or more static gates failed. Each names the script to re-run."
 fi
 
-# 3. Fallow Dead Code & Structural Analysis
-section "3. Dead Code & Structural Analysis (Fallow)"
-echo "Running Fallow analysis..."
-if npx fallow --quiet --fail-on-issues 2>/dev/null; then
-    ok "No dead code or structural issues found."
-else
-    warn "Fallow found dead code or structural issues. Run 'npx fallow' for details."
-fi
-
-# 4. Unit Tests Check
-section "4. Unit Tests Suite"
+# 3. Unit Tests Check
+section "3. Unit Tests Suite"
 echo "Running unit tests (pnpm test)..."
 if pnpm test; then
     ok "All unit tests passed successfully."
@@ -57,8 +67,16 @@ else
     err "Some unit tests failed."
 fi
 
-# 5. E2E Tests Check
-section "5. Playwright E2E Integration Suite"
+# 4. E2E Tests Check
+#    Playwright ships no browser with the npm package: on a fresh clone the
+#    suite fails with "Executable doesn't exist" before running a single test.
+#    Installing is idempotent and near-instant once the browser is there, so it
+#    is a step rather than a precondition somebody has to have read about.
+section "4. Playwright E2E Integration Suite"
+echo "Ensuring the Chromium build Playwright expects is installed..."
+if ! pnpm exec playwright install chromium; then
+    err "Could not install Chromium for Playwright."
+fi
 echo "Running Playwright E2E tests (including SQL Console and Collection Editor)..."
 if pnpm run e2e; then
     ok "All E2E integration tests passed successfully."
@@ -66,8 +84,8 @@ else
     err "Playwright E2E tests failed."
 fi
 
-# 6. Build Health Check (Vite & Bundles)
-section "6. Bundle ESM/CJS Health Check"
+# 5. Build Health Check (Vite & Bundles)
+section "5. Bundle ESM/CJS Health Check"
 if [ -f "./tooling/scripts/check-packages.sh" ]; then
     echo "Running build-health package check..."
     if ./tooling/scripts/check-packages.sh; then
@@ -77,22 +95,6 @@ if [ -f "./tooling/scripts/check-packages.sh" ]; then
     fi
 else
     warn "check-packages.sh not found, skipping."
-fi
-
-# 7. Docs API Drift Check
-section "7. Docs API Drift (snippets + all-locale identifiers)"
-# Warn-first: the baseline is not yet clean, so a finding must not fail the
-# build. Once `node tooling/scripts/verify-docs.mjs` reports zero, add --strict here
-# and move this into the err() path to make it blocking.
-if [ -f "./tooling/scripts/verify-docs.mjs" ]; then
-    echo "Typechecking doc snippets against workspace source..."
-    if node --max-old-space-size=8192 tooling/scripts/verify-docs.mjs; then
-        ok "Docs verification passed."
-    else
-        warn "Docs verification reported findings (see above)."
-    fi
-else
-    warn "verify-docs.mjs not found, skipping."
 fi
 
 # Summary

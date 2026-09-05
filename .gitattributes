@@ -2,3 +2,31 @@
 /.yarn/releases/*    binary
 /.yarn/plugins/**/*  binary
 /.pnp.*              binary linguist-generated
+
+# ── Media ─────────────────────────────────────────────────────────────────────
+# The marketing videos and screenshots are what makes this repository ~890 MB on
+# the server against a 195 MB checkout: every revision of a 3 MB .webm is still
+# in the history. `binary` stops git treating them as text — no newline
+# conversion on a Windows checkout, no attempt to produce a diff or a three-way
+# merge of two encodes.
+#
+# Not Git LFS, deliberately. Moving them there rewrites every commit that ever
+# touched one, which changes every SHA after the first video landed: every open
+# pull request has to be rebased, every existing clone is detached from the new
+# history, and every reference to a commit — in the changelog, in an audit note,
+# in an issue — stops resolving. It also moves the cost rather than removing it,
+# onto LFS bandwidth quota that a fork does not inherit. CONTRIBUTING documents
+# `git clone --filter=blob:none` instead, which gives a contributor the same
+# saving with no history change at all.
+*.webm binary
+*.mp4  binary
+*.mov  binary
+*.gif  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.avif binary
+*.webp binary
+*.ico  binary
+*.woff binary
+*.woff2 binary

@@ -16,7 +16,7 @@
  *      each fenced ts/js block against workspace source.
  *
  * Both stages also cover the repository's *own* agent instructions — `AGENT.md`,
- * `.agents/` and `.agent/workflows/` (see AGENT_INSTRUCTION_GLOBS in
+ * `.agent/workflows/` (see AGENT_INSTRUCTION_GLOBS in
  * docs-verify/extract.mjs). They were the one documentation surface no glob
  * reached, and they drifted the whole time everything else stayed clean: the
  * relation API they taught (`cardinality` + `direction`) had not existed since

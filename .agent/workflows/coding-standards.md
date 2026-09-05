@@ -9,6 +9,18 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
 - **Lazy casting is forbidden**: Do NOT use `as any` to bypass the TypeScript compiler. It defeats the entire purpose of a strongly-typed framework.
 - **Provide proper abstractions**: If an configuration object is dynamically passed (e.g., to a bootstrapper), define a rigorous interface (e.g., `RebaseAuthConfig` with an index signature `[key: string]: unknown` for extensibility) instead of leaving it as `unknown` and later casting it.
 - **Narrow types safely**: Use type guards (`typeof`, `instanceof`, custom type predicates) rather than forcing assertions. If you must use assertions, cast to a specific, modeled interface representing reality, NEVER `any`.
+- **A structural cast is the same offence.** `driver as { executeSql?: ... }` is `as any` written so it does not look like one: it asserts a shape the compiler never checked, and it is exactly the pattern that reaches for a method the driver may not have. To run raw SQL, narrow `driver.admin` with the `isSQLAdmin` guard from `@rebasepro/types`:
+
+  ```typescript
+  import { isSQLAdmin } from "@rebasepro/types";
+
+  const driver = c.get("driver");
+  const admin = driver?.admin;
+  if (!isSQLAdmin(admin)) {
+      throw new Error("Native SQL execution is not available on the current data driver.");
+  }
+  const results = await admin.executeSql(sql, params);
+  ```
 
 ## 2. Framework Configuration Completeness
 - Provide exhaustive typings for all core modules (`init.ts`, routing, middlewares).

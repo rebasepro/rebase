@@ -78,7 +78,7 @@ const GLOBS = [
     "tooling/rebase-agent-skills/**/*.md",
     "examples/*/*.md",
     "README.md",
-    ".agents/*.md"
+    ".agent/workflows/*.md"
 ];
 
 /**

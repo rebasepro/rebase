@@ -82,7 +82,7 @@ release carries `version-pin: ignore`.
 
 `website/`, `tooling/rebase-agent-skills/`, `examples/*/`, `packages/*/README.md`,
 the marketing components, the MCP manifests — and the repository's own agent
-instructions: `AGENT.md`, `.agents/*.md` and `.agent/workflows/*.md`
+instructions: `AGENT.md` and `.agent/workflows/*.md`
 (`AGENT_INSTRUCTION_GLOBS` in `extract.mjs`).
 
 The package READMEs joined late, and paid for themselves on the first run:

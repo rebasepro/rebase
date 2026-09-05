@@ -39,6 +39,7 @@
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && pnpm exec esbuild src/vitePlugin.ts --platform=node --format=esm --outfile=dist/vitePlugin.js && pnpm exec esbuild src/debug/index.ts --bundle --format=esm --jsx=automatic --external:react --external:react-dom --external:react/jsx-runtime --external:@rebasepro/* --outfile=dist/debug.js && node ../../tooling/scripts/assert-build-output.mjs",
     "test:lint": "eslint \"src/**\" --quiet",
     "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
     "clean": "rm -rf dist && find ./src \\( -name '*.js' -o -name '*.d.ts' \\) -type f | xargs rm -f",
     "generateIcons": "ts-node --esm src/icons/generateIcons.ts"
   },

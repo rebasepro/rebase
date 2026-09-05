@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Every workspace package declares a way to run its tests.
+ * Every workspace package declares a way to run its tests — once, and watching.
  *
  * `packages/firebase` is the one that does not, and the consequence is the
  * reason this gate exists rather than a lint rule: it *has* tests —
@@ -22,6 +22,14 @@
  *
  * The list is exact: a package that gains a test script fails until it is taken
  * off, so the file cannot quietly describe a repository that has moved on.
+ *
+ * ## And `test:watch`
+ *
+ * The same argument one step further. CONTRIBUTING now tells people to iterate
+ * with `pnpm --filter @rebasepro/<pkg> test:watch`, and that sentence was false
+ * for all twenty-one packages when it was written: not one declared the script,
+ * so the documented loop was "run the whole suite again". An instruction nothing
+ * checks is one that stops being true, so the gate checks it.
  *
  *     pnpm check:test-scripts
  */
@@ -49,6 +57,7 @@ const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 const bold = (s) => `\x1b[1m${s}\x1b[0m`;
 
 const missing = [];
+const missingWatch = [];
 const fixed = [];
 
 for (const entry of fs.readdirSync(PACKAGES, { withFileTypes: true })) {
@@ -62,12 +71,15 @@ for (const entry of fs.readdirSync(PACKAGES, { withFileTypes: true })) {
 
     if (!hasScript && !excused) missing.push(entry.name);
     if (hasScript && excused) fixed.push(entry.name);
+    // A package with no runner cannot have a watching one either; that gap is
+    // already recorded above, so do not report it twice.
+    if (hasScript && !pkg.scripts["test:watch"]) missingWatch.push(entry.name);
 }
 
-if (missing.length === 0 && fixed.length === 0) {
+if (missing.length === 0 && missingWatch.length === 0 && fixed.length === 0) {
     const excused = Object.keys(KNOWN_WITHOUT_TESTS).length;
     console.log(green(
-        `✓ every package declares a test script${excused > 0 ? `, apart from ${excused} recorded` : ""}.`
+        `✓ every package declares \`test\` and \`test:watch\`${excused > 0 ? `, apart from ${excused} recorded` : ""}.`
     ));
     process.exit(0);
 }
@@ -79,6 +91,17 @@ if (missing.length > 0) {
         "\n  `pnpm -r test` walks the packages that define the script, so this does not\n" +
         "  show up as a skipped suite — it does not show up at all. If the package has\n" +
         "  test files, they have never run.\n"
+    ));
+}
+
+if (missingWatch.length > 0) {
+    console.error(red(`\n✗ ${missingWatch.length} package(s) declare no \`test:watch\` script.\n`));
+    for (const name of missingWatch) console.error(`  ${bold(`packages/${name}`)}`);
+    console.error(dim(
+        "\n  CONTRIBUTING tells contributors to iterate with `test:watch`. Add it beside\n" +
+        "  `test`: `vitest` for a vitest package (watching is its default, `run` is what\n" +
+        "  turns it off), `jest --watch` for a jest one — without `--forceExit`, which\n" +
+        "  kills the process the watcher exists to keep alive.\n"
     ));
 }
 

@@ -99,12 +99,13 @@ export const NO_VERIFY_BUDGET = 99;
  * `AGENT.md` is `.gitignore`d (it is the maintainer's local copy), so it is
  * absent in CI and contributes nothing there. It is globbed anyway: the local
  * run is where it gets edited, and a glob that matches nothing costs nothing.
- * The two tracked surfaces — `.agents/` and `.agent/workflows/` — are what the
- * blocking CI gate actually holds.
+ * `.agent/workflows/` is the tracked surface, and what the blocking CI gate
+ * actually holds. There was a second, `.agents/AGENTS.md` — one letter apart,
+ * which is how it came to hold a near-duplicate of the same type-safety rule;
+ * it is merged into `.agent/workflows/coding-standards.md`.
  */
 export const AGENT_INSTRUCTION_GLOBS = [
     "AGENT.md",
-    ".agents/*.md",
     ".agent/workflows/*.md"
 ];
 
