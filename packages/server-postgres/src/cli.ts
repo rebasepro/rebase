@@ -1303,6 +1303,23 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
 }
 
 async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<void> {
+    // The same second line of defence `dbCommand` above carries, for the same
+    // reason: this file is also its own CLI, spawned directly by
+    // `resolvePluginCliScript` and executable on its own. Nothing here had a
+    // `--help` case, so `schema generate --help` regenerated the schema and
+    // `schema introspect --help` rewrote the collection files — a flag whose
+    // entire job is to print text, overwriting authored source.
+    //
+    // Guarded by a real subcommand: the internal callers below re-enter this
+    // function with a synthesised argv, and none of them can carry `--help`.
+    if (subcommand && (rawArgs.includes("--help") || rawArgs.includes("-h"))) {
+        out("");
+        out(chalk.bold(`  rebase schema ${subcommand}`));
+        out(chalk.gray("  Run `rebase schema --help` for the full page — this is the driver's own entry point."));
+        out("");
+        return;
+    }
+
     if (subcommand === "stale") {
         await schemaStaleCommand(rawArgs);
         return;

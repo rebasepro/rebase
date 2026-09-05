@@ -12,10 +12,24 @@ import {
     findEnvFile
 } from "../utils/project";
 import { recordEvent } from "../telemetry";
+import { wantsHelp } from "../utils/args";
 
 export async function schemaCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
-    if (!subcommand || subcommand === "--help") {
-        printSchemaHelp();
+    // `--help` is answered here, before `requireProjectRoot` and before the
+    // driver is spawned — the same shape `db.ts` already uses, and for the same
+    // reason.
+    //
+    // `cli.ts` rewrites the subcommand to `"--help"` only when the user named
+    // none, so `rebase schema --help` was covered and `rebase schema generate
+    // --help` was not: the flag travelled into `rawArgs.slice(2)` and reached
+    // the driver, whose own `schemaCommand` has no `--help` case. It *ran the
+    // generator* — overwriting `src/schema.generated.ts` — for a flag whose
+    // entire job is to print text. Worse, the first thing it hit outside a
+    // project was `requireProjectRoot`, so `rebase schema introspect --help` in
+    // an empty directory exited 1 with "Could not find a Rebase project root":
+    // help you cannot read until you already have a project is help for nobody.
+    if (!subcommand || subcommand === "--help" || wantsHelp(rawArgs)) {
+        printSchemaHelp(subcommand === "--help" ? undefined : subcommand);
         return;
     }
 
@@ -72,7 +86,41 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     }
 }
 
-function printSchemaHelp() {
+/** One page per subcommand, so `rebase schema <action> --help` says something. */
+const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: string[] }> = {
+    generate: {
+        usage: "rebase schema generate [--collections <dir>] [--output <file>] [--watch]",
+        summary: "Generate the Drizzle schema from the collection definitions.",
+        notes: ["--watch regenerates on every change to a collection file."]
+    },
+    introspect: {
+        usage: "rebase schema introspect [--output <dir>] [--schema <name>] [--force]",
+        summary: "Read an existing database and write Rebase collection definitions from it.",
+        notes: ["--force overwrites collection files that are already there."]
+    },
+    stale: {
+        usage: "rebase schema stale [--fix]",
+        summary: "Report generated schema files that no longer match the collections.",
+        notes: ["--fix regenerates them instead of only reporting."]
+    }
+};
+
+function printSchemaHelp(action?: string) {
+    const entry = action ? SCHEMA_ACTION_HELP[action] : undefined;
+    if (entry) {
+        console.log(`
+${chalk.bold(`rebase schema ${action}`)}
+
+  ${entry.summary}
+
+${chalk.green.bold("Usage")}
+  ${chalk.blue(entry.usage)}
+${entry.notes?.length ? `\n${chalk.green.bold("Notes")}\n${entry.notes.map(n => `  ${chalk.gray(`• ${n}`)}`).join("\n")}\n` : ""}
+${chalk.gray("Run `rebase schema --help` for every subcommand.")}
+`);
+        return;
+    }
+
     console.log(`
 ${chalk.bold("rebase schema")} — Schema management commands
 
@@ -83,6 +131,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.gray("(Commands are provided by your active database driver plugin)")}
   ${chalk.blue.bold("generate")}    Generate Schema from collection definitions
   ${chalk.blue.bold("introspect")}  Introspect an existing database to generate collection definitions
+  ${chalk.blue.bold("stale")}       Report generated schema files that no longer match the collections
 
 ${chalk.green.bold("generate Options")}
   ${chalk.blue("--collections, -c")}  Path to collections directory
@@ -91,5 +140,10 @@ ${chalk.green.bold("generate Options")}
 
 ${chalk.green.bold("introspect Options")}
   ${chalk.blue("--output, -o")}       Output directory for generated collection files
+  ${chalk.blue("--schema")}           Postgres schema to read (default: public)
+  ${chalk.blue("--force, -f")}        Overwrite collection files that already exist
+
+${chalk.green.bold("stale Options")}
+  ${chalk.blue("--fix")}              Regenerate the stale files instead of only reporting them
 `);
 }
