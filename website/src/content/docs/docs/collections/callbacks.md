@@ -138,7 +138,7 @@ const articlesCollection: PostgresCollectionConfig<Article> = {
 
 ### `beforeSave`
 
-Called before a entity is written to the database. Return the modified values.
+Called before a record is written to the database. Return the modified values.
 
 ```typescript
 beforeSave: async ({
@@ -245,7 +245,7 @@ afterRead: async ({
 
 ### `beforeDelete`
 
-Called before a entity is deleted. Throw to block deletion.
+Called before a record is deleted. Throw to block deletion.
 
 ```typescript
 beforeDelete: async ({
@@ -321,7 +321,7 @@ Each collection accessor (`context.data.<slug>`) provides these methods:
 | `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Fetch a single entity by ID |
 | `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Create a new entity |
 | `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Update an existing entity |
-| `.delete()` | `delete(id: string \| number) → void` | Delete a entity |
+| `.delete()` | `delete(id: string \| number) → void` | Delete a record |
 | `.count()` | `count(params?: FindParams) → number` | Count matching entities |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Real-time subscription (where supported) |
 | `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single entity |

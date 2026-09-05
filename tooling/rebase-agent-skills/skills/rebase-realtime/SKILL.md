@@ -905,7 +905,7 @@ If 10 entities change within 300ms, only **one** database query is executed for 
 
 ## Nested Relation Updates
 
-The realtime engine handles nested relation paths (e.g., `"posts/70/tags"`). When a entity changes at a nested path:
+The realtime engine handles nested relation paths (e.g., `"posts/70/tags"`). When a record changes at a nested path:
 
 1. The exact path is notified (`"posts/70/tags"`).
 2. All parent paths are also notified (`"posts"`, `"posts/70"`).

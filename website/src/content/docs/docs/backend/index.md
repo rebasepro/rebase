@@ -226,7 +226,7 @@ The REST API is auto-generated from your collections. Every collection gets thes
 | `GET` | `/api/data/:slug` | List entities (with filter, sort, limit, search) |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
 | `POST` | `/api/data/:slug` | Create a new entity |
-| `DELETE` | `/api/data/:slug/:id` | Delete a entity |
+| `DELETE` | `/api/data/:slug/:id` | Delete a record |
 
 ### Query Parameters
 

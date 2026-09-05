@@ -1573,7 +1573,7 @@ The `onClick` and `isEnabled` handlers receive:
 | `selectionController` | `SelectionController \| undefined` | Multi-select state (collection view) |
 | `view` | `"collection" \| "form"` | Where the action was triggered |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the entity form is opened |
-| `highlightEntity` | `(entity) => void` | Highlight a entity row |
+| `highlightEntity` | `(entity) => void` | Highlight an entity row |
 | `unhighlightEntity` | `(entity) => void` | Remove highlight |
 | `navigateBack` | `() => void` | Navigate back (e.g., after deleting) |
 | `onCollectionChange` | `() => void` | Refresh the collection view |

@@ -83,6 +83,7 @@
 - [Data Import & Export](https://rebase.pro/docs/frontend/data-import-export): Import data from CSV, JSON, and Excel files into your collections, and export collection data to CSV or JSON with optional computed fields.
 - [Plugin System](https://rebase.pro/docs/plugins): Extend Rebase with plugins — inject UI components, modify collections, add toolbar actions, and create custom field builders.
 - [Hooks Reference](https://rebase.pro/docs/hooks): React hooks provided by Rebase for accessing auth, data, navigation, side panels, storage, and UI state.
+- [Studio Tools](https://rebase.pro/docs/studio): Rebase Studio provides developer tools for visual schema editing, SQL queries, JavaScript scripting, RLS policy management, and storage browsing.
 - [Client SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
 - [Querying Data](https://rebase.pro/docs/sdk/querying): CRUD operations, fluent query builder, filter operators, pagination, sorting, and relation fetching with the Rebase Client SDK.
 - [Authentication](https://rebase.pro/docs/sdk/authentication): Client-side authentication with the Rebase SDK — email/password sign-in, OAuth providers, session management, and auth state listeners.
@@ -95,7 +96,6 @@
 - [AI Instruction Files](https://rebase.pro/docs/ai/instruction-files): Every scaffolded Rebase project ships ai-instructions.md plus one-line pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md — one source of truth, many filenames.
 - [CLI Reference](https://rebase.pro/docs/cli): Rebase CLI commands for project initialization, schema generation, database migrations, and SDK generation.
 - [Schema Generation](https://rebase.pro/docs/cli/schema): Generate Drizzle ORM schemas from collection definitions, create SQL migrations, and keep your database in sync with the Rebase CLI.
-- [Studio Tools](https://rebase.pro/docs/studio): Rebase Studio provides developer tools for visual schema editing, SQL queries, JavaScript scripting, RLS policy management, and storage browsing.
 - [rls-check](https://rebase.pro/docs/rls-check): Audit row-level security on any PostgreSQL database — Supabase, Neon, RDS, or your own server. Read-only, no signup, no Rebase required.
 - [Architecture Overview](https://rebase.pro/docs/architecture): Understand how Rebase's backend, frontend, client SDK, and database integrate to form a complete Backend-as-a-Service.
 - [Schema as Code](https://rebase.pro/docs/architecture/schema-as-code): How Rebase uses TypeScript collections as the single source of truth for your database schema, UI, and API.

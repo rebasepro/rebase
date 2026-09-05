@@ -252,7 +252,7 @@ Methods:
 
 | Method | Description |
 |--------|-------------|
-| `open({ path, entityId, collection })` | Open a entity in a side panel |
+| `open({ path, entityId, collection })` | Open an entity in a side panel |
 | `close()` | Close the current side panel |
 | `replace({ path, entityId, collection })` | Replace the current side panel content |
 

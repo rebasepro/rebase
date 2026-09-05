@@ -44,8 +44,8 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | `GET` | `/api/data/{slug}/aggregate` | Aggregate over matching entities | `200` |
 | `GET` | `/api/data/{slug}/:id` | Get a single entity by ID | `200` |
 | `POST` | `/api/data/{slug}` | Create a new entity | `201` |
-| `PATCH` | `/api/data/{slug}/:id` | Update a entity — partial, only what you send | `200` |
-| `DELETE` | `/api/data/{slug}/:id` | Delete a entity | `204` |
+| `PATCH` | `/api/data/{slug}/:id` | Update a record — partial, only what you send | `200` |
+| `DELETE` | `/api/data/{slug}/:id` | Delete a record | `204` |
 
 ### Subcollection Routes
 
@@ -467,7 +467,7 @@ curl -H "Authorization: Bearer $TOKEN" \
   "https://example.com/api/data/products?status=eq.active&price=gte.50&orderBy=createdAt:desc&limit=10&offset=0&include=category"
 ```
 
-### Create a entity
+### Create a record
 
 ```bash
 curl -X POST \
@@ -477,7 +477,7 @@ curl -X POST \
   "https://example.com/api/data/products"
 ```
 
-### Update a entity
+### Update a record
 
 ```bash
 curl -X PATCH \
@@ -487,7 +487,7 @@ curl -X PATCH \
   "https://example.com/api/data/products/uuid-123"
 ```
 
-### Delete a entity
+### Delete a record
 
 ```bash
 curl -X DELETE \

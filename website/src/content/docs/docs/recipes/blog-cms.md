@@ -230,7 +230,7 @@ You now have a fully functional blog CMS with:
 - Draft → Review → Published workflow
 - Auto-generated URL slugs
 - RLS policies limiting authors to their own posts
-- Full audit trail via entity history
+- Full audit trail through entity history
 
 ## Querying from the SDK
 

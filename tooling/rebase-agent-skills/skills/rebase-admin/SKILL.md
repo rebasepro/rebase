@@ -1,6 +1,6 @@
 ---
 name: rebase-admin
-description: Guide for navigating the Rebase admin panel, opening entities in side drawers, building URLs, embedding collection panels, using the collection registry, and programmatic navigation. Use this skill when an agent or user needs to navigate to a collection view, open a entity in the side panel/drawer, build admin URLs, embed a collection inside a custom page, use the entity selection dialog, or access admin-specific controllers.
+description: Guide for navigating the Rebase admin panel, opening entities in side drawers, building URLs, embedding collection panels, using the collection registry, and programmatic navigation. Use this skill when an agent or user needs to navigate to a collection view, open an entity in the side panel/drawer, build admin URLs, embed a collection inside a custom page, use the entity selection dialog, or access admin-specific controllers.
 ---
 
 # Rebase Admin (`@rebasepro/cms`)
@@ -21,7 +21,7 @@ The `@rebasepro/cms` package provides the admin-panel layer for Rebase. It handl
 | Embed a collection in a custom page | `<CollectionPanel>` | `@rebasepro/cms` |
 | Add custom top-level views | `<RebaseCMS views={[...]}>` | `@rebasepro/cms` |
 | Replace how one property is edited or shown | `admin: { Field, Preview }` | see §12 |
-| Open a entity selection dialog | `useSelectionDialog()` | `@rebasepro/cms` |
+| Open an entity selection dialog | `useSelectionDialog()` | `@rebasepro/cms` |
 | Open a custom side dialog | `useSideDialogsController()` | `@rebasepro/cms` |
 | Set breadcrumbs | `useBreadcrumbsController()` | `@rebasepro/cms` |
 | Access full admin context | `useAdminContext()` | `@rebasepro/cms` |
@@ -572,7 +572,7 @@ context.data;           // DataSource from RebaseContext
 
 ## 10. Common Patterns
 
-### Navigate to a collection and open a entity
+### Navigate to a collection and open an entity
 
 ```tsx
 import { useUrlController, useSidePanel } from "@rebasepro/cms";
@@ -887,8 +887,8 @@ The admin package exports the following components (from `@rebasepro/cms`):
 | `getLastSegment(path)` | Get last path segment |
 | `getCollectionBySlugWithin(collections, slug)` | Find collection in array |
 | `mergeEntityActions(...)` | Merge entity action arrays |
-| `resolveEntityAction(...)` | Resolve a entity action |
-| `resolveEntityView(...)` | Resolve a entity view |
+| `resolveEntityAction(...)` | Resolve an entity action |
+| `resolveEntityView(...)` | Resolve an entity view |
 | `isReferenceProperty(prop)` | Check if property is a reference |
 | `isRelationProperty(prop)` | Check if property is a relation |
 | `getIconForProperty(prop)` | Get icon for a property type |

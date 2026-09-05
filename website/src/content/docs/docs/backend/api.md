@@ -23,9 +23,9 @@ For each collection, the following endpoints are generated:
 | `GET` | `/api/data/:slug` | List entities |
 | `GET` | `/api/data/:slug/count` | Count entities |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
-| `POST` | `/api/data/:slug` | Create a entity |
-| `PATCH` | `/api/data/:slug/:id` | Update a entity (partial — only the properties you send are written) |
-| `DELETE` | `/api/data/:slug/:id` | Delete a entity |
+| `POST` | `/api/data/:slug` | Create a record |
+| `PATCH` | `/api/data/:slug/:id` | Update a record (partial — only the properties you send are written) |
+| `DELETE` | `/api/data/:slug/:id` | Delete a record |
 | `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
 | `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
 | `POST` | `/api/data/:slug/bulk/delete` | Delete many entities in one transaction |
