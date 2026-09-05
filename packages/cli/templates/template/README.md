@@ -138,7 +138,7 @@ Collections are defined once in `config/collections/` and used by both the front
 
 All configuration is managed through a single `.env` file in the project root. Both the backend and frontend read from this file:
 
-- **Backend**: loads via `dotenv` from `../../.env` (relative to `backend/src/`)
+- **Backend**: the runtime loads the project root's `.env` before it boots
 - **Frontend**: Vite reads `VITE_*` variables via `envDir` pointing to the project root
 - **Scripts**: load via `dotenv` from the project root
 
@@ -149,15 +149,20 @@ All configuration is managed through a single `.env` file in the project root. B
 Two containers: PostgreSQL, and the Rebase runtime with your built project
 mounted into it. There is no application image to build.
 
-The runtime creates its auth tables at boot but **not** your collection tables —
-a container restart must not be able to change a schema as a side effect — so
-push the schema once, while the database is up.
+This is the [variant above](#variant-your-own-postgresql), packaged: the
+compose database is a database of your own, so step 0 is the same one line.
 
 ```bash
+# 0. Point the project at the compose database: uncomment DATABASE_URL in .env
+#    (the line whose host is 127.0.0.1 and whose password matches
+#    DATABASE_PASSWORD — `rebase init` wrote it there, commented out)
+
 # 1. Build your project into ./dist-bundle
 pnpm run build          # or: npm run build
 
-# 2. Start the database and create the tables from your collections
+# 2. Start the database. Boot creates the tables from your collections;
+#    `db:push` is for what it leaves alone — junction-table RLS, and any
+#    change that is not purely additive.
 docker compose up -d db
 pnpm run db:push        # or: npm run db:push
 

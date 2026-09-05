@@ -36,6 +36,114 @@ import { moduleDir as __helpersDirname } from "./module-dir";
  * second, matching the order {@link resolveLocalBin} searches — the driver may
  * be installed a level up from where the command runs.
  */
+export type ProjectPackageManager = "pnpm" | "npm" | "yarn" | "bun" | "unknown";
+
+/**
+ * Which package manager installed this project, read off its lockfile.
+ *
+ * Every remedy for a blocked build script is package-manager specific, and
+ * naming the wrong one is the same failure as naming none: `pnpm approve-builds`
+ * is not a thing an npm user can run, and `pnpm.onlyBuiltDependencies` is a key
+ * npm does not read. This existed as a pnpm-only message for long enough that
+ * npm 12 — which blocks dependency lifecycle scripts by default, the way pnpm 10
+ * does — could ship and leave every npm reader three unfollowable commands deep.
+ *
+ * The lockfile, not `npm_config_user_agent`: the question is how the project's
+ * `node_modules` was built, not which binary happens to be invoking us. Walks up
+ * because commands run from `backend/` in a scaffolded project, and the lockfile
+ * is at the workspace root.
+ */
+export function detectProjectPackageManager(startDir: string = process.cwd()): ProjectPackageManager {
+    const lockfiles: Array<[string, ProjectPackageManager]> = [
+        ["pnpm-lock.yaml", "pnpm"],
+        ["bun.lock", "bun"],
+        ["bun.lockb", "bun"],
+        ["yarn.lock", "yarn"],
+        ["package-lock.json", "npm"]
+    ];
+
+    let dir = path.resolve(startDir);
+    while (true) {
+        for (const [file, manager] of lockfiles) {
+            if (fs.existsSync(path.join(dir, file))) return manager;
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) return "unknown";
+        dir = parent;
+    }
+}
+
+/**
+ * How to let `@ariga/atlas` run its `preinstall`, in the reader's own package
+ * manager.
+ *
+ * Returns the lines to print after "the binary is missing but the package is
+ * installed". Kept next to {@link detectProjectPackageManager} so the two move
+ * together, and returned rather than printed so it can be asserted on.
+ */
+export function describeBuildScriptRemedy(
+    packageName: string,
+    manager: ProjectPackageManager = detectProjectPackageManager()
+): string[] {
+    switch (manager) {
+        case "npm":
+            // npm 12 blocks dependency install scripts unless the root
+            // package.json allowlists them. `rebase init` scaffolds the entry;
+            // a project that predates it, or one that vendored its own
+            // package.json, needs to add it.
+            return [
+                `    npm install-scripts approve ${packageName}`,
+                "",
+                "  or, to record it in the project (what `rebase init` scaffolds):",
+                "",
+                "    // package.json",
+                `    "allowScripts": { "${packageName}": true }`,
+                "",
+                "  Then re-run `npm install`."
+            ];
+        case "yarn":
+            return [
+                "    // .yarnrc.yml",
+                "    enableScripts: true",
+                "",
+                "  Then re-run `yarn install`."
+            ];
+        case "bun":
+            return [
+                "    // package.json",
+                `    "trustedDependencies": ["${packageName}"]`,
+                "",
+                "  Then re-run `bun install`."
+            ];
+        case "pnpm":
+        default:
+            return [
+                "    pnpm approve-builds",
+                "",
+                "  or, to record it in the project (what `rebase init` scaffolds):",
+                "",
+                "    // package.json",
+                `    "pnpm": { "onlyBuiltDependencies": ["${packageName}"] }`,
+                "",
+                "  Then re-run `pnpm install`."
+            ];
+    }
+}
+
+/** `add <pkg>` as a dev dependency, in the reader's own package manager. */
+export function describeDevAddCommand(
+    packageName: string,
+    manager: ProjectPackageManager = detectProjectPackageManager()
+): string {
+    switch (manager) {
+        case "npm": return `npm install -D ${packageName}`;
+        case "yarn": return `yarn add -D ${packageName}`;
+        case "bun": return `bun add -d ${packageName}`;
+        case "pnpm":
+        default: return `pnpm add -D ${packageName}`;
+    }
+}
+
 export function diagnoseMissingBin(packageName: string): "not-installed" | "build-script-blocked" {
     const bases = [
         pathToFileURL(path.join(process.cwd(), "package.json")),

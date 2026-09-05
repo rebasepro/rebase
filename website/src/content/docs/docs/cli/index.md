@@ -194,6 +194,23 @@ The target is always this project's local development database and cannot be
 chosen: `--database-url` is refused rather than accepted, so there is no way to
 spell "pull into production". `--from` is the only direction.
 
+### `rebase db url`
+
+Print the connection string this project is using, and nothing else, so it
+pipes:
+
+```bash
+rebase db url
+psql "$(rebase db url)"
+```
+
+The managed development database is the case that needs this: `.env` leaves
+`DATABASE_URL` commented out on purpose, and the port is derived from the
+project path, so nothing on disk names it. When you have set a `DATABASE_URL`
+of your own, that is what this prints — the resolution order is the same one
+every other command follows. It starts the managed database if it is not
+already running.
+
 ### `rebase db stop` / `rebase db reset`
 
 For the managed development database only:

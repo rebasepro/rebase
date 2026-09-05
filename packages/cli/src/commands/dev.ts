@@ -17,7 +17,7 @@
 import chalk from "chalk";
 import { execa, execaCommandSync, type ResultPromise } from "execa";
 
-import { managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
+import { managedNotices, prepareDatabaseEnv, resolveComposeUrl } from "../dev-db/prepare";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -27,6 +27,7 @@ import {
     findBackendDir,
     findFrontendDir,
     findEnvFile,
+    readEnvFile,
     resolveTsx,
     validateTsxInstallation,
     getActiveBackendPlugin,
@@ -174,6 +175,15 @@ export function devWatchIncludes(
 
 /** Well-known filename the backend writes its actual port to. */
 export const DEV_PORT_FILENAME = ".rebase-dev-port";
+
+/**
+ * The `PORT` the scaffold's own `.env.example` ships.
+ *
+ * `rebase init` copies that file into `.env` verbatim, so every new project has
+ * this value whether or not anyone meant it. `init.test.ts` asserts the
+ * template still says this number, so the two cannot drift apart in silence.
+ */
+export const SCAFFOLD_DEFAULT_PORT = 3001;
 
 /**
  * Compute a deterministic port from the project root path.
@@ -378,19 +388,53 @@ async function ensureGeneratedSchema(projectRoot: string): Promise<void> {
 }
 
 /**
+ * One variable's value out of `.env` text, or undefined when it has none.
+ *
+ * The obvious `\s*(.+?)\s*$` does not do this, because `\s` matches a newline
+ * and `$` under /m matches at every line end: on `VITE_API_URL=` followed by
+ * `# VITE_GOOGLE_CLIENT_ID=`, the leading `\s*` ate the line break and the
+ * capture returned the *next* line. The scaffold ships `VITE_API_URL=` empty,
+ * so every first `rebase dev` read a comment as its value, decided it differed
+ * from the derived URL, and warned that a variable the developer had not set
+ * was being ignored.
+ *
+ * Horizontal whitespace only, so a value stops at its own line.
+ */
+export function readEnvValue(envText: string, key: string): string | undefined {
+    const match = envText.match(
+        new RegExp(`^[^\\S\\r\\n]*${key}[^\\S\\r\\n]*=[^\\S\\r\\n]*(.*?)[^\\S\\r\\n]*$`, "m")
+    );
+    if (!match) return undefined;
+
+    const value = match[1].replace(/^["']|["']$/g, "");
+
+    return value.length > 0 ? value : undefined;
+}
+
+/**
  * The database half of `rebase dev` starting up.
  *
  * Separated from `ensureDevDatabase` so that everything needing a project on
  * disk lives here and the decision logic stays testable without one.
  */
-async function runDatabasePreflight(options: { projectRoot: string; disabled: boolean }): Promise<void> {
+async function runDatabasePreflight(options: {
+    projectRoot: string;
+    disabled: boolean;
+    /**
+     * The DSN the preflight decides from, when the caller resolved one that is
+     * not in `.env`. `--docker` is exactly that case: the compose URL is
+     * derived, so reading `.env` here saw nothing and the container the flag
+     * asked for was never started.
+     */
+    databaseUrl?: string;
+}): Promise<void> {
     const { projectRoot, disabled } = options;
 
     const hasCollections = projectHasCollections(projectRoot);
 
     const outcome = await ensureDevDatabase({
         projectRoot,
-        databaseUrl: readEnvVar(projectRoot, "DATABASE_URL"),
+        databaseUrl: options.databaseUrl ?? readEnvVar(projectRoot, "DATABASE_URL"),
         disabled,
         hasCollections,
         pushSchema: async () => {
@@ -434,6 +478,13 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     const frontendDir = findFrontendDir(projectRoot);
     const backendOnly = args["--backend-only"] || false;
     const frontendOnly = args["--frontend-only"] || false;
+    /**
+     * Start no database at all — not the compose container, and not the managed
+     * one either. Read once, here, because both halves of `dev` have to agree:
+     * gating only the preflight left the managed PGlite starting anyway, which
+     * is the one database a scaffolded project would otherwise get.
+     */
+    const noDb = Boolean(args["--no-db"]) || process.env.REBASE_DEV_NO_DB === "1";
     const shouldGenerate = args["--generate"] || process.env.REBASE_AUTO_GENERATE === "true" || process.env.REBASE_GENERATE === "true";
 
     // Resolve the ports ONCE, before starting anything. Both, because the
@@ -462,11 +513,37 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         await ensureGeneratedSchema(projectRoot);
         await runDatabasePreflight({
             projectRoot,
-            disabled: Boolean(args["--no-db"]) || process.env.REBASE_DEV_NO_DB === "1"
+            disabled: noDb,
+            // `--docker` names a container, not a connection string, and the
+            // preflight is what starts it. Derived from the compose file so the
+            // two halves agree on which database "the docker one" is.
+            databaseUrl: args["--docker"]
+                ? resolveComposeUrl(projectRoot, readEnvFile(projectRoot)) ?? undefined
+                : undefined
         });
     }
 
     const children: ResultPromise[] = [];
+
+    /**
+     * Whether this project has an admin panel to serve at all.
+     *
+     * A headless project declares one app, of type "backend", so there is no
+     * `frontend/` and never will be. Warning that a directory is "missing" for
+     * a shape that has no such directory reads as a broken scaffold on the
+     * very first run of the very command the headless quickstart names.
+     */
+    const declaresStaticApp = (() => {
+        try {
+            const { manifest } = loadManifest(projectRoot);
+            return Object.values(manifest.apps ?? {}).some(app => app.type === "static");
+        } catch {
+            // A manifest that will not load is a different problem, reported
+            // elsewhere. Fall back to the directory, which is what this check
+            // used to be.
+            return Boolean(frontendDir);
+        }
+    })();
 
     // --- State for printing the banner ---
     let frontendUrl = "";
@@ -481,20 +558,88 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // eslint-disable-next-line no-control-regex
     const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
 
+    /**
+     * The connection string of the database this run started, when it started
+     * one. Filled in below; read by the headless banner, which is the only
+     * place a headless project could learn it — there is no admin panel to
+     * open, and `.env` deliberately does not name the managed database.
+     */
+    let managedConnectionString: string | null = null;
+
+    /**
+     * Where the backend mounted Swagger, if it mounted it at all.
+     *
+     * Read from the backend's own log rather than assumed: a headless project
+     * with no tables yet serves no data API and no Swagger, and the banner must
+     * not name a URL that answers 404.
+     */
+    let swaggerPath: string | null = null;
+
     function printSummary() {
-        if (!frontendUrl || !backendUrl) return;
+        if (!backendUrl) return;
+        // A headless project has no frontend URL to wait for, and waiting for
+        // one meant it got no banner at all: the first run of `rebase dev`
+        // ended in log lines, with the API URL, the Swagger path and the
+        // database it had just created all unstated.
+        if (declaresStaticApp && !frontendUrl) return;
         if (debounceSummary) clearTimeout(debounceSummary);
         debounceSummary = setTimeout(() => {
             if (bannerPrinted) return;
+
+            const api = `http://localhost:${resolvedBackendPort}`;
+            /** `[label, value]` per line; an empty pair is a blank line. */
+            const lines: Array<[string, string]> = declaresStaticApp
+                ? [
+                    ["", ""],
+                    ["✦ Rebase Admin App is ready!", ""],
+                    ["➜ Admin: ", stripAnsi(frontendUrl)],
+                    // Both, because both are needed and only one was printed.
+                    // The admin URL is where you log in; the API URL is what
+                    // every SDK client, curl and Swagger link needs — and it is
+                    // not derivable from the other, since the two ports are
+                    // derived separately from this project's path.
+                    ["➜ API:   ", api],
+                    ["", ""]
+                ]
+                : [["", ""], ["✦ Rebase API is ready!", ""], ["➜ API:      ", api]];
+
+            if (!declaresStaticApp) {
+                // Only when it is actually mounted. A project with no tables
+                // yet mounts no data API and no Swagger, and printing a URL
+                // that 404s is worse than printing nothing — the reader spends
+                // the next ten minutes deciding whether their install is
+                // broken. The backend says which; this reads its own child.
+                if (swaggerPath) {
+                    lines.push(["➜ Swagger:  ", `${api}${swaggerPath}`]);
+                } else {
+                    // Say why, in the box the reader is actually looking at.
+                    // "No docs" with no reason reads as a broken install.
+                    lines.push(["  ", "(no tables served yet, so no data API and no docs)"]);
+                }
+                if (managedConnectionString) {
+                    lines.push(["", ""]);
+                    lines.push(["Database (managed, this project only):", ""]);
+                    lines.push(["  ", managedConnectionString]);
+                    lines.push(["  ", "also: rebase db url"]);
+                }
+                lines.push(["", ""]);
+            }
+
+            // Sized to its contents. A fixed width silently pushed the right
+            // border off the moment a value was longer than the cell, and a
+            // managed connection string — port and all — always is.
+            const inner = Math.max(...lines.map(([label, value]) => label.length + value.length)) + 4;
+
             console.log("");
-            console.log(chalk.cyan("┌────────────────────────────────────────────────────────────┐"));
-            console.log(chalk.cyan("│                                                            │"));
-            console.log(chalk.cyan("│   ✦ Rebase Admin App is ready!                             │"));
-            const cleanUrl = stripAnsi(frontendUrl);
-            const paddedUrl = cleanUrl.padEnd(41);
-            console.log(chalk.cyan("│   ➜ Frontend URL: ") + chalk.white(paddedUrl) + chalk.cyan("│"));
-            console.log(chalk.cyan("│                                                            │"));
-            console.log(chalk.cyan("└────────────────────────────────────────────────────────────┘"));
+            console.log(chalk.cyan("┌" + "─".repeat(inner) + "┐"));
+            for (const [label, value] of lines) {
+                console.log(
+                    chalk.cyan("│  ") + label + chalk.white(value) +
+                    " ".repeat(inner - 2 - label.length - value.length) +
+                    chalk.cyan("│")
+                );
+            }
+            console.log(chalk.cyan("└" + "─".repeat(inner) + "┘"));
             console.log("");
             bannerPrinted = true;
         }, 500);
@@ -650,12 +795,30 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // DATABASE_URL is untouched; a project without one gets a managed
         // Postgres started here, which is what makes `rebase dev` the only
         // command a new project needs.
-        const prepared = await prepareDatabaseEnv(projectRoot, {
+        // `--no-db` means start nothing, and that includes the managed
+        // database. It used to gate only the preflight, so the one path that
+        // actually starts a database on a scaffolded project — the managed
+        // PGlite, started here — ran anyway: `rebase dev --no-db` wrote
+        // `.rebase/pglite/`, booted a daemon and served against it, which is
+        // the opposite of what a reader asking for no database expects. The
+        // backend is left to fail on the DATABASE_URL it cannot find, which is
+        // the failure the flag exists to produce.
+        const prepared = noDb ? null : await prepareDatabaseEnv(projectRoot, {
             flagUrl: typeof args["--database-url"] === "string" ? args["--database-url"] : null,
             flagDocker: Boolean(args["--docker"]),
             onProgress: (message) => console.log(chalk.gray(`  ${message}`))
         });
-        Object.assign(env, prepared.env);
+        if (prepared) Object.assign(env, prepared.env);
+        /**
+         * Whether this run is on the managed database.
+         *
+         * `db push` is the remedy for what boot leaves alone, and it cannot run
+         * against the managed one at all — Atlas plans by diffing against a
+         * second, empty database, and PGlite serves exactly one. So every
+         * remedy that names it has to know which database is under this run.
+         */
+        const managed = prepared?.database.kind === "managed";
+        if (managed) managedConnectionString = prepared?.env.DATABASE_URL ?? null;
 
         // Always inject PORT so the backend uses our resolved port instead of
         // its hardcoded default (3001). This prevents cross-project collisions
@@ -674,11 +837,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
         console.log(`  ${chalk.cyan("▶")} Backend:  ${chalk.gray(backendDir)}`);
         console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(String(startPort))}`);
-        console.log(`  ${chalk.gray("↳ Database")} = ${chalk.white(prepared.description)}`);
+        console.log(`  ${chalk.gray("↳ Database")} = ${chalk.white(
+            prepared ? prepared.description : "none (--no-db) — the backend needs DATABASE_URL"
+        )}`);
         // Stated on every start rather than left to be discovered. A developer
         // who does not know requests are serialized here will read the
         // difference as a bug in their own code.
-        for (const line of managedNotices(prepared).slice(1)) console.log(`  ${chalk.gray(line)}`);
+        if (prepared) {
+            for (const line of managedNotices(prepared).slice(1)) console.log(`  ${chalk.gray(line)}`);
+        }
 
         // The .env's PORT / VITE_API_URL look authoritative but are overridden in
         // dev: we derive a per-project port to avoid cross-project collisions and
@@ -687,16 +854,20 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         if (envFile) {
             try {
                 const envText = fs.readFileSync(envFile, "utf-8");
-                const readEnvKey = (key: string): string | undefined => {
-                    const m = envText.match(new RegExp(`^\\s*${key}\\s*=\\s*(.+?)\\s*$`, "m"));
-                    return m ? m[1].replace(/^["']|["']$/g, "") : undefined;
-                };
-                const envPort = readEnvKey("PORT");
-                const envApiUrl = readEnvKey("VITE_API_URL");
+                const envPort = readEnvValue(envText, "PORT");
+                const envApiUrl = readEnvValue(envText, "VITE_API_URL");
                 // Only name the keys — never echo a raw `http://localhost:<port>`
                 // value, so log scrapers don't mistake it for the dev server URL.
                 const overridden: string[] = [];
-                if (envPort && envPort !== String(startPort)) overridden.push("PORT");
+                // A value equal to the scaffold's own default was written by
+                // the scaffold, not chosen by anyone, so there is nothing to
+                // warn about: this fired on the very first `rebase dev` of
+                // every new project, about a line the developer had not read
+                // yet, for a setting that applies to a command they had not
+                // run. A warning that is always there is a warning nobody
+                // reads when it matters.
+                const portWasChosen = Boolean(envPort) && envPort !== String(SCAFFOLD_DEFAULT_PORT);
+                if (portWasChosen && envPort !== String(startPort)) overridden.push("PORT");
                 if (envApiUrl && envApiUrl !== `http://localhost:${startPort}`) overridden.push("VITE_API_URL");
                 if (overridden.length > 0) {
                     console.log(chalk.yellow(
@@ -839,7 +1010,21 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         }
 
         if (!shouldGenerate) {
-            // Watch collections folder and warn about potential schema drift
+            // Watch the collections folder and regenerate the schema from it.
+            //
+            // This used to print a box telling the reader to run `rebase schema
+            // generate` themselves, which made the documented first edit fail
+            // in a way nothing named. tsx restarts the backend on a config
+            // change, boot's additive ensure adds the new column to the
+            // database — and then the very first save of a row carrying it
+            // answered 400 VALIDATION_UNKNOWN_FIELDS, because the driver looks
+            // its columns up in `backend/src/schema.generated.ts` and that file
+            // was still the one generated before the edit. The database was
+            // right; the generated module was the stale half.
+            //
+            // Regenerating it here is the same call `dev` already makes at
+            // startup: no database, idempotent, about two seconds. The reader's
+            // single instruction is now "save the file".
             const collectionsDir = path.join(projectRoot, "config", "collections");
             if (fs.existsSync(collectionsDir)) {
                 let driftDebounce: NodeJS.Timeout | null = null;
@@ -851,23 +1036,36 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     if (!affectsSqlSchema(collectionsDir, filename)) return;
                     if (driftDebounce) clearTimeout(driftDebounce);
                     driftDebounce = setTimeout(() => {
-                        // The box is drawn at a fixed width, so a name longer
-                        // than the cell would push the right border off.
-                        const shown = filename!.length > 31 ? `…${filename!.slice(-30)}` : filename!.padEnd(31);
-                        console.log([
-                            "",
-                            chalk.yellow("  ┌──────────────────────────────────────────────────────────────┐"),
-                            chalk.yellow("  │  ⚠️  Collection file changed: ") + chalk.white(shown) + chalk.yellow("│"),
-                            chalk.yellow("  │                                                              │"),
-                            chalk.yellow("  │  Your schema may be out of sync. Run:                        │"),
-                            chalk.yellow("  │    ") + chalk.cyan("rebase schema generate") + chalk.yellow("   regenerate Drizzle schema        │"),
-                            chalk.yellow("  │    ") + chalk.cyan("rebase db push        ") + chalk.yellow("   sync schema to database          │"),
-                            chalk.yellow("  │    ") + chalk.cyan("rebase doctor         ") + chalk.yellow("   check for drift                  │"),
-                            chalk.yellow("  │                                                              │"),
-                            chalk.yellow("  │  TIP: Use ") + chalk.bold("rebase dev --generate") + chalk.yellow(" for auto-regeneration        │"),
-                            chalk.yellow("  └──────────────────────────────────────────────────────────────┘"),
-                            ""
-                        ].join("\n"));
+                        void (async () => {
+                            // The box is drawn at a fixed width, so a name longer
+                            // than the cell would push the right border off.
+                            const shown = filename!.length > 31 ? `…${filename!.slice(-30)}` : filename!.padEnd(31);
+                            console.log([
+                                "",
+                                chalk.yellow("  ┌──────────────────────────────────────────────────────────────┐"),
+                                chalk.yellow("  │  🔄 Collection file changed: ") + chalk.white(shown) + chalk.yellow("│"),
+                                chalk.yellow("  │     Regenerating the schema…                                 │"),
+                                chalk.yellow("  └──────────────────────────────────────────────────────────────┘")
+                            ].join("\n"));
+
+                            await ensureGeneratedSchema(projectRoot);
+
+                            console.log([
+                                chalk.green("  ✓ Schema regenerated. The backend restarts and boot creates what"),
+                                chalk.green("    is missing — a new collection, a new property."),
+                                // `db push` is the remedy for what boot leaves alone, and it
+                                // cannot run against the managed database at all: Atlas plans
+                                // by diffing against a second, empty database, and PGlite
+                                // serves exactly one. Naming it there sends the reader to a
+                                // command that answers with a refusal.
+                                ...(managed
+                                    ? [chalk.gray("    A renamed column, a narrowed type or a removed field needs your"),
+                                       chalk.gray("    own PostgreSQL: set DATABASE_URL, then rebase db push.")]
+                                    : [chalk.gray("    For what boot leaves alone — a renamed column, a narrowed type,"),
+                                       chalk.gray(`    a removed field — run ${chalk.cyan("rebase db push")}.`)]),
+                                ""
+                            ].join("\n"));
+                        })();
                     }, 500);
                 });
             }
@@ -976,6 +1174,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
                 noticeWatcherVerdict(line);
                 const cleanLine = stripAnsi(line);
+                const swaggerMatch = cleanLine.match(/Swagger UI available.*"path":"([^"]+)"/);
+                if (swaggerMatch) swaggerPath = swaggerMatch[1];
+
                 const serverMatch = cleanLine.match(/Server running at http:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
                 if (serverMatch) {
                     backendAnnounced = true;
@@ -1047,7 +1248,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // Start frontend immediately if backend-only mode or no backend
     if (!backendOnly && frontendDir && (frontendOnly || !backendDir)) {
         startFrontend(null);
-    } else if (!backendOnly && !frontendDir) {
+    } else if (!backendOnly && !frontendDir && declaresStaticApp) {
         console.warn(chalk.yellow("  ⚠ No frontend/ directory found, skipping frontend."));
     }
 
@@ -1079,23 +1280,43 @@ ${chalk.green.bold("Usage")}
   rebase dev [options]
 
 ${chalk.green.bold("Options")}
-  ${chalk.blue("--backend-only, -b")}   Only start the backend server
-  ${chalk.blue("--frontend-only, -f")}  Only start the frontend server
-  ${chalk.blue("--port, -P")}           Backend port (default: auto-detected per project)
+  ${chalk.blue("--backend-only, -b")}    Only start the backend server
+  ${chalk.blue("--frontend-only, -f")}   Only start the frontend server
+  ${chalk.blue("--port, -P")}            Backend port (default: auto-detected per project)
   ${chalk.blue("--generate, -g")}        Enable automatic schema and SDK generation on startup and file changes
-  ${chalk.blue("--no-db")}               Never start the database or push the schema
+  ${chalk.blue("--database-url")} ${chalk.gray("<url>")}  Use this Postgres, ahead of everything else
+  ${chalk.blue("--docker")}              Use the project's docker-compose ${chalk.gray("db")} service
+  ${chalk.blue("--no-db")}               Start no database at all
+
+${chalk.green.bold("Which database")}
+  Ordered, and the order is the promise. The first of these that says
+  something wins:
+
+    1. ${chalk.blue("--database-url <url>")}    on this command line
+    2. ${chalk.gray("DATABASE_URL")}            in the shell environment
+    3. the branch this checkout is switched to ${chalk.gray("(rebase db branch switch)")}
+    4. ${chalk.gray("DATABASE_URL")}            in the project's .env
+    5. ${chalk.blue("--docker")}, or ${chalk.gray("devDatabase: \"docker\"")} in rebase.json
+    6. the managed development database ${chalk.gray("(PGlite, data in .rebase/)")}
+
+  A scaffolded project sets none of 1–5, so it lands on (6): no Docker,
+  nothing to install, and the collections' tables are created at boot.
+
+  ${chalk.blue("--docker")} reaches the ${chalk.gray("db")} service in this project's docker-compose.yml,
+  starting the container if nothing is listening on its port, and pushing
+  the schema when this command is what started it. Its connection string
+  is derived from the compose file and ${chalk.gray("DATABASE_PASSWORD")} in .env — the same
+  string .env carries, commented out, as ${chalk.gray("DATABASE_URL")}.
+
+  A database that is already running is never touched: no schema push,
+  no connection. A DATABASE_URL pointing anywhere other than this machine
+  is left alone entirely. Pass ${chalk.blue("--no-db")}, or set REBASE_DEV_NO_DB=1, to
+  start nothing — the backend then fails on the database it cannot reach,
+  which is the point.
 
 ${chalk.green.bold("Description")}
   Starts both the backend (tsx watch + Hono) and frontend (Vite)
   dev servers concurrently with color-coded output prefixes.
-
-  If DATABASE_URL points at this machine and nothing is listening on it,
-  the project's docker-compose \`db\` service is started first and the
-  schema is pushed to it — so a freshly scaffolded project needs only
-  this one command. A database that is already running is never touched:
-  no schema push, no connection. A DATABASE_URL pointing anywhere other
-  than localhost is left alone entirely. Pass --no-db, or set
-  REBASE_DEV_NO_DB=1, to skip all of it.
 
   Each project automatically receives a unique default port derived
   from its directory path, preventing collisions when running multiple

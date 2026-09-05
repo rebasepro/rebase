@@ -216,6 +216,12 @@ const resolvedPackageDirs = new Map();
  */
 const EXTERNAL_PACKAGES = new Set([
     "@aws-sdk/client-ses",
+    // The scaffold's webfonts. Side-effect imports in the template's App.tsx,
+    // which Project Structure quotes verbatim; nothing in this repo renders
+    // that app, so the monorepo carries neither the packages nor a reason to.
+    "@fontsource-variable/instrument-sans",
+    "@fontsource-variable/inter",
+    "@fontsource/jetbrains-mono",
     "bcrypt",
     "dotenv",
     "drizzle-kit",

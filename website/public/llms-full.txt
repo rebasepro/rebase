@@ -133,8 +133,9 @@ This scaffolds a project with three packages:
 ### Prerequisites
 
 - **Node.js** 22.22+ (a headless `--headless` project needs only 20)
-- **Docker** — to run the included PostgreSQL container. (Or bring your own PostgreSQL: local install, Neon, Supabase, etc.)
 - **pnpm** (recommended) or npm
+
+No database to install, and no Docker. `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. See [Variant: use your own PostgreSQL](#variant-use-your-own-postgresql) if you would rather supply one — a local install, Neon, Supabase, or the container this scaffold ships.
 
 ### Your Environment Is Already Configured
 
@@ -177,7 +178,7 @@ Pin a port with `rebase dev --port 3001`.
 | `--template <name>` | `init` | Start from a template other than the default |
 | `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
 | `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one |
-| `--no-db` | `dev` | Touch no database at all; you bring one |
+| `--no-db` | `dev` | Start no database at all — not the container and not the managed one. Set `DATABASE_URL` yourself |
 
 ### Variant: use your own PostgreSQL
 
@@ -283,28 +284,31 @@ export const collections = [
 
 ### Create the Table
 
-Restart the dev servers. `rebase dev` regenerates the schema from your
-collections and boot creates the new table, so your **Products** collection
-appears in the navigation.
+Save the file. That is the whole step: `rebase dev` regenerates
+`backend/src/schema.generated.ts` from your collections, restarts the backend,
+and boot creates the new table — so your **Products** collection appears in the
+navigation.
 
-On your own PostgreSQL you can also apply it without restarting:
+The same is true of a property added to a collection you already have: save,
+and the column is there.
+
+`rebase db push` is for the changes boot deliberately leaves alone — a renamed
+column, a narrowed type, a removed field, and junction-table RLS on
+many-to-many relations. It needs your own PostgreSQL:
 
 ```bash
 pnpm run db:push
 ```
 
-That is also the command for the changes boot leaves alone — a renamed column, a
-narrowed type, a removed field.
-
 ### Database Commands Reference
 
 | Command | Description |
 |---------|-------------|
-| `rebase schema generate` | Generate Drizzle schema from your TypeScript collections |
+| `rebase schema generate` | Generate the Drizzle schema from your TypeScript collections. No database needed — `rebase dev` runs it for you |
 | `rebase schema introspect` | Generate TypeScript collections from an existing database |
-| `rebase db push` | Push schema changes directly to the database (dev only) |
-| `rebase db generate` | Generate SQL migration files |
-| `rebase db migrate` | Run pending migrations |
+| `rebase db push` | Push schema changes directly to the database. Needs your own PostgreSQL |
+| `rebase db generate` | Generate SQL migration files. Needs your own PostgreSQL |
+| `rebase db migrate` | Run pending migrations. Needs your own PostgreSQL |
 
 ### What's Next
 
@@ -364,20 +368,55 @@ The frontend is a standard **Vite + React + TypeScript** application. The key fi
 
 ```typescript title="frontend/src/App.tsx"
 
-// `rebase dev` injects VITE_API_URL with the port it actually bound, so this
-// needs no hardcoded localhost — and a deployed build serves the admin from the
-// same origin as the API, where an empty value is what you want.
-const rebaseClient = createRebaseClient({
-    baseUrl: import.meta.env.VITE_API_URL,
-    auth: { authFlowMode: "cookie" }
-});
+// `rebase dev` injects VITE_API_URL with the port it actually bound, and that
+// port is derived from this project's path rather than fixed — so a
+// `http://localhost:3001` fallback here names a port nothing is listening on.
+// A deployed build serves the admin from the same origin as the API, where an
+// empty value is exactly what you want.
+const API_URL = import.meta.env.VITE_API_URL;
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+export function App() {
+    const rebaseClient = React.useMemo(() => createRebaseClient({
+        baseUrl: API_URL,
+        // Store the refresh token in an httpOnly cookie (XSS-safe) rather than
+        // localStorage. The backend issues it via `auth.cookieAuth`.
+        auth: { authFlowMode: "cookie" }
+    }), []);
+
+    const authController = useRebaseAuthController({
+        client: rebaseClient,
+        googleClientId: GOOGLE_CLIENT_ID
+    });
+
+    return (
+        <ErrorBoundary fullPage>
+            <Rebase
+                client={rebaseClient}
+                authController={authController}
+            >
+                <RebaseAuth />
+                <RebaseCMS
+                    collections={collections}
+                />
+                <RebaseStudio/>
+                <RebaseShell title="Rebase"/>
+            </Rebase>
+        </ErrorBoundary>
+    );
+}
 ```
+
+`main.tsx` mounts it under a `react-router` `basename` taken from
+`import.meta.env.BASE_URL`, which `rebase build` sets from the `path` this app
+declares in `rebase.json` — so the assets, the router and the server agree on
+one value without it being written down three times.
 
 #### Key Concepts
 
 - **`createRebaseClient`** — Creates the SDK client that handles HTTP requests, WebSocket connections, and auth token management
 - **`virtual:rebase-collections`** — A Vite plugin that auto-imports your shared collections at build time
-- **Controllers** — `useBuildNavigationStateController`, `useBuildCollectionRegistryController`, etc. — these configure routing, collection resolution, and UI configuration
+- **`useRebaseAuthController`** — Holds the signed-in user and the token lifecycle, and is what `<Rebase>` distributes to everything below it
 
 ### Backend (`backend/`)
 
@@ -415,7 +454,7 @@ Collections are the **single source of truth** for your data model. They are def
 
 ```typescript title="config/collections/products.ts"
 
-export const productsCollection = defineCollection({
+const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     properties: {
@@ -423,6 +462,10 @@ export const productsCollection = defineCollection({
         price: { type: "number", name: "Price" }
     }
 });
+
+// The default export is what the registry picks up — every collection in the
+// scaffold is written this way.
+export default productsCollection;
 ```
 
 The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api/data/products`), and the PostgreSQL table name defaults to it. Add `table` only when they differ.
@@ -434,7 +477,10 @@ The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api
 3. **The frontend** reads them (via Vite plugin) to render tables, forms, and navigation
 4. **The CLI** reads them to generate migration files with `rebase schema generate`
 
-Changes to collections propagate everywhere automatically.
+While `rebase dev` is running, saving a file under `config/collections/`
+regenerates `backend/src/schema.generated.ts` and restarts the backend, and boot
+creates the tables and columns that are missing. Outside `rebase dev` the same
+step is `rebase schema generate`.
 
 ### Next Steps
 
@@ -462,7 +508,7 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/mydb` |
+| `DATABASE_URL` | PostgreSQL connection string. **Optional in development** — unset, `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. Required everywhere else. | `postgresql://user:pass@localhost:5432/mydb` |
 | `JWT_SECRET` | Secret key for signing JWT tokens. Use a strong random string (min 32 chars). **Required in production** (auto-generated in development). | `a1b2c3d4e5...` |
 
 > **`sslmode=no-verify` is a node-postgres spelling, not a libpq one.**
@@ -17217,6 +17263,23 @@ revoked as they should be.
 The target is always this project's local development database and cannot be
 chosen: `--database-url` is refused rather than accepted, so there is no way to
 spell "pull into production". `--from` is the only direction.
+
+#### `rebase db url`
+
+Print the connection string this project is using, and nothing else, so it
+pipes:
+
+```bash
+rebase db url
+psql "$(rebase db url)"
+```
+
+The managed development database is the case that needs this: `.env` leaves
+`DATABASE_URL` commented out on purpose, and the port is derived from the
+project path, so nothing on disk names it. When you have set a `DATABASE_URL`
+of your own, that is what this prints — the resolution order is the same one
+every other command follows. It starts the managed database if it is not
+already running.
 
 #### `rebase db stop` / `rebase db reset`
 

@@ -438,6 +438,12 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         return;
     }
 
+    if (subcommand === "url") {
+        await printDatabaseUrl(projectRoot, rawArgs);
+
+        return;
+    }
+
     // Handled here rather than by the driver, for the same reason `stop` and
     // `reset` are: it writes per-checkout CLI state. The driver creates and
     // drops the databases; which one this checkout talks to is not its
@@ -459,6 +465,49 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         reportSpawnFailure(error);
         process.exit(1);
     }
+}
+
+/**
+ * `rebase db url` — the connection string this project is using, on stdout.
+ *
+ * The managed database is the one case where nothing on disk names it: `.env`
+ * ships `DATABASE_URL` commented out on purpose, the port is derived from the
+ * project path, and the data lives under `.rebase/`. A headless project has no
+ * admin panel to open either, so before this there was no way to point `psql`,
+ * a GUI client or a seeding script at the database `rebase dev` had just
+ * created — short of reading the CLI's source.
+ *
+ * Resolution is the same ordered rule every other command uses, so this prints
+ * your own `DATABASE_URL` when you have set one rather than inventing a second
+ * answer. Nothing but the URL goes to stdout, so it pipes:
+ *
+ *     psql "$(rebase db url)"
+ *
+ * It starts the managed database if it is not running, because a connection
+ * string for a database nobody is serving is not an answer.
+ */
+async function printDatabaseUrl(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
+    const { prepareDatabaseEnv } = await import("../dev-db/prepare");
+    const { readEnvFile } = await import("../utils/project");
+
+    const prepared = await prepareDatabaseEnv(projectRoot, {
+        flagUrl: readFlagValue(rawArgs, "--database-url"),
+        flagDocker: rawArgs.includes("--docker"),
+        quiet: true,
+        // Progress goes to stderr: stdout is the URL and nothing else.
+        onProgress: message => console.error(chalk.gray(`  ${message}`))
+    });
+
+    const url = prepared.env.DATABASE_URL
+        ?? readEnvFile(projectRoot).DATABASE_URL
+        ?? process.env.DATABASE_URL;
+    if (!url) {
+        console.error(chalk.red("  ✗ This project has no database URL to print."));
+        console.error(chalk.gray("    Set DATABASE_URL in .env, or run `rebase dev` to start the managed one."));
+        process.exit(1);
+    }
+
+    console.log(url);
 }
 
 /**
@@ -912,6 +961,14 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         summary: "List stored backups.",
         notes: ["`rebase db backup list` is the same command, spelled the cloud family's way."]
     },
+    url: {
+        usage: "rebase db url",
+        summary: "Print the connection string this project uses. Nothing else goes to stdout, so it pipes.",
+        notes: [
+            "psql \"$(rebase db url)\"",
+            "Starts the managed database if it is not already running."
+        ]
+    },
     restore: {
         usage: "rebase db restore <dump> [--target-db <name>] [--create-db] --yes",
         summary: "Restore a backup with pg_restore.",
@@ -954,6 +1011,7 @@ ${chalk.green.bold("Usage")}
 
 ${chalk.green.bold("Commands")}
   ${chalk.gray("(Commands are provided by your active database driver plugin)")}
+  ${chalk.blue.bold("url")}        Print the connection string this project uses (pipes into psql)
   ${chalk.blue.bold("pull")}       Copy another database into local dev (--from <url>, --anonymize)
   ${chalk.blue.bold("stop")}       Stop the managed development database (data is kept)
   ${chalk.blue.bold("reset")}      Delete the managed development database and start over

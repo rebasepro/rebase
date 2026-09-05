@@ -9,6 +9,7 @@ import net from "net";
 import os from "os";
 import path from "path";
 import {
+    composeDatabaseUrl,
     composeDeclaresDbService,
     ensureDevDatabase,
     parseLoopbackDsn,
@@ -78,6 +79,79 @@ describe("composeDeclaresDbService", () => {
 
     it("is false for a compose file with no services at all", () => {
         expect(composeDeclaresDbService("name: myapp\n")).toBe(false);
+    });
+});
+
+describe("composeDatabaseUrl", () => {
+    /** The `db` service `rebase init` writes, in the shape the scan reads. */
+    const SCAFFOLD = [
+        "name: myapp",
+        "",
+        "services:",
+        "  db:",
+        "    image: pgvector/pgvector:pg18",
+        "    restart: unless-stopped",
+        "    environment:",
+        "      POSTGRES_USER: rebase_app",
+        "      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}",
+        "      POSTGRES_DB: rebase",
+        "    # Published so `rebase db push` can reach it from the host.",
+        "    ports:",
+        '      - "5435:5432"',
+        "    volumes:",
+        "      - postgres_data:/var/lib/postgresql",
+        "",
+        "  api:",
+        "    image: rebasepro/server",
+        "    ports:",
+        '      - "3001:3001"',
+        "",
+        "volumes:",
+        "  postgres_data:"
+    ].join("\n");
+
+    it("derives the URL `rebase init` writes as the commented-out DATABASE_URL", () => {
+        // The two must agree, or uncommenting that line and passing --docker
+        // reach two different databases.
+        expect(composeDatabaseUrl(SCAFFOLD, { DATABASE_PASSWORD: "s3cret" })).toBe(
+            "postgresql://rebase_app:s3cret@127.0.0.1:5435/rebase?options=-c%20search_path%3Dpublic&sslmode=disable"
+        );
+    });
+
+    it("uses compose's own ${VAR:-default} when .env sets no password", () => {
+        expect(composeDatabaseUrl(SCAFFOLD, {})).toContain("rebase_app:changeme@127.0.0.1:5435");
+    });
+
+    it("takes the db service's published port, not another service's", () => {
+        // `api` publishes 3001 in the same file. Reading the wrong `ports:`
+        // block would point the backend at itself.
+        expect(composeDatabaseUrl(SCAFFOLD, {})).toContain(":5435/rebase");
+    });
+
+    it("percent-encodes a password with URL metacharacters in it", () => {
+        expect(composeDatabaseUrl(SCAFFOLD, { DATABASE_PASSWORD: "p@ss/word" }))
+            .toContain("rebase_app:p%40ss%2Fword@");
+    });
+
+    it("is null when the file declares no db service", () => {
+        expect(composeDatabaseUrl([
+            "services:",
+            "  api:",
+            "    image: rebasepro/server"
+        ].join("\n"), {})).toBeNull();
+    });
+
+    it("is null when the db service publishes no host port", () => {
+        // Unreachable from the host, so there is no URL to hand anyone —
+        // and guessing 5432 would name somebody else's Postgres.
+        expect(composeDatabaseUrl([
+            "services:",
+            "  db:",
+            "    environment:",
+            "      POSTGRES_USER: rebase_app",
+            "      POSTGRES_PASSWORD: pw",
+            "      POSTGRES_DB: rebase"
+        ].join("\n"), {})).toBeNull();
     });
 });
 

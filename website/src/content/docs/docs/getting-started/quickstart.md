@@ -21,8 +21,9 @@ This scaffolds a project with three packages:
 ## Prerequisites
 
 - **Node.js** 22.22+ (a headless `--headless` project needs only 20)
-- **Docker** — to run the included PostgreSQL container. (Or bring your own PostgreSQL: local install, Neon, Supabase, etc.)
 - **pnpm** (recommended) or npm
+
+No database to install, and no Docker. `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. See [Variant: use your own PostgreSQL](#variant-use-your-own-postgresql) if you would rather supply one — a local install, Neon, Supabase, or the container this scaffold ships.
 
 ## Your Environment Is Already Configured
 
@@ -65,7 +66,7 @@ Pin a port with `rebase dev --port 3001`.
 | `--template <name>` | `init` | Start from a template other than the default |
 | `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
 | `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one |
-| `--no-db` | `dev` | Touch no database at all; you bring one |
+| `--no-db` | `dev` | Start no database at all — not the container and not the managed one. Set `DATABASE_URL` yourself |
 
 ## Variant: use your own PostgreSQL
 
@@ -173,28 +174,31 @@ export const collections = [
 
 ## Create the Table
 
-Restart the dev servers. `rebase dev` regenerates the schema from your
-collections and boot creates the new table, so your **Products** collection
-appears in the navigation.
+Save the file. That is the whole step: `rebase dev` regenerates
+`backend/src/schema.generated.ts` from your collections, restarts the backend,
+and boot creates the new table — so your **Products** collection appears in the
+navigation.
 
-On your own PostgreSQL you can also apply it without restarting:
+The same is true of a property added to a collection you already have: save,
+and the column is there.
+
+`rebase db push` is for the changes boot deliberately leaves alone — a renamed
+column, a narrowed type, a removed field, and junction-table RLS on
+many-to-many relations. It needs your own PostgreSQL:
 
 ```bash
 pnpm run db:push
 ```
 
-That is also the command for the changes boot leaves alone — a renamed column, a
-narrowed type, a removed field.
-
 ## Database Commands Reference
 
 | Command | Description |
 |---------|-------------|
-| `rebase schema generate` | Generate Drizzle schema from your TypeScript collections |
+| `rebase schema generate` | Generate the Drizzle schema from your TypeScript collections. No database needed — `rebase dev` runs it for you |
 | `rebase schema introspect` | Generate TypeScript collections from an existing database |
-| `rebase db push` | Push schema changes directly to the database (dev only) |
-| `rebase db generate` | Generate SQL migration files |
-| `rebase db migrate` | Run pending migrations |
+| `rebase db push` | Push schema changes directly to the database. Needs your own PostgreSQL |
+| `rebase db generate` | Generate SQL migration files. Needs your own PostgreSQL |
+| `rebase db migrate` | Run pending migrations. Needs your own PostgreSQL |
 
 ## What's Next
 

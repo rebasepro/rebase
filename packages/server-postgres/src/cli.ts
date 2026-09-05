@@ -9,6 +9,9 @@ import { out, outWarn, outError } from "./cli-output";
 import { formatRelativeTime } from "@rebasepro/utils";
 import {
     diagnoseMissingBin,
+    detectProjectPackageManager,
+    describeBuildScriptRemedy,
+    describeDevAddCommand,
     resolveLocalBin,
     getTableIncludes,
     getDevDatabaseUrl,
@@ -1029,27 +1032,32 @@ async function runAtlas(
         // that produces the far more common of the two states.
         outError(chalk.red("\n✗ The atlas binary is missing, so the schema cannot be applied.\n"));
 
+        // Every remedy below is package-manager specific, and this used to print
+        // pnpm's unconditionally. npm 12 blocks a dependency's install scripts
+        // the same way pnpm 10 does, so an npm reader was handed `pnpm
+        // approve-builds` and a `"pnpm"` package.json key — correct advice, for
+        // somebody else. Read the lockfile and answer the reader in front of us.
+        const manager = detectProjectPackageManager();
+
         if (diagnoseMissingBin("@ariga/atlas") === "build-script-blocked") {
             outError(chalk.yellow("  @ariga/atlas IS installed — only its binary is missing.\n"));
             outError(chalk.gray(
-                "  It downloads that binary in a `preinstall` script, and pnpm 10+ does not\n" +
-                "  run a dependency's scripts unless you allow it. The install still exits 0,\n" +
-                "  so the only sign is `Ignored build scripts: @ariga/atlas` in its output.\n"
+                "  It downloads that binary in a `preinstall` script, and pnpm 10+ and npm 12+\n" +
+                "  do not run a dependency's scripts unless you allow it. The install still\n" +
+                "  exits 0, so the only sign is a line several screens up: pnpm's\n" +
+                "  `Ignored build scripts: @ariga/atlas`, or npm's `install scripts blocked`.\n"
             ));
             outError("  Fix it with either:\n");
-            outError(chalk.bold("    pnpm approve-builds\n"));
-            outError("  or, to record it in the project (what `rebase init` scaffolds):\n");
-            outError(chalk.bold(
-                "    // package.json\n" +
-                "    \"pnpm\": { \"onlyBuiltDependencies\": [\"@ariga/atlas\"] }\n"
-            ));
-            outError(chalk.gray("  Then re-run `pnpm install`.\n"));
+            for (const line of describeBuildScriptRemedy("@ariga/atlas", manager)) {
+                outError(line ? chalk.bold(line) : "");
+            }
+            outError("");
         } else {
             outError(chalk.gray("  It is not installed in this project.\n"));
             outError("  Install it with:\n");
-            outError(chalk.bold("    pnpm add -D @ariga/atlas\n"));
+            outError(chalk.bold(`    ${describeDevAddCommand("@ariga/atlas", manager)}\n`));
             outError(chalk.gray(
-                "  If pnpm then reports `Ignored build scripts`, also run `pnpm approve-builds` —\n" +
+                "  If the install then reports blocked or ignored build scripts, allow them too —\n" +
                 "  the package carries a `preinstall` script that fetches the binary.\n"
             ));
         }

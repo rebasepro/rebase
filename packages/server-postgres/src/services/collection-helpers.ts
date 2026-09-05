@@ -121,10 +121,19 @@ export function assertWritableColumns(
     // error is reachable on paths where the REST field check was skipped, and
     // an `excludeFromApi` column is documented as never being served to a
     // caller. Naming what was sent is the actionable half anyway.
+    //
+    // The remedy is named because the overwhelmingly common cause is not a
+    // typo. It is a property that was added to the collection while the
+    // generated schema module still describes the table as it was: the column
+    // exists in the database — boot's additive ensure created it — and this
+    // check reads the module, so the first save of a row carrying the new
+    // property answered 400 and said only that the column did not exist.
     throw ApiError.badRequest(
         `'${collectionPath}' has no column${unknown.length > 1 ? "s" : ""} ` +
         `${unknown.map(key => `'${key}'`).join(", ")}, so the value${unknown.length > 1 ? "s" : ""} ` +
-        "would have been dropped before the statement was built.",
+        "would have been dropped before the statement was built. " +
+        "If you just added the propert" + (unknown.length > 1 ? "ies" : "y") +
+        ", the generated schema is behind the collection: run `rebase schema generate`.",
         "VALIDATION_UNKNOWN_FIELDS"
     );
 }

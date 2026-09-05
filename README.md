@@ -94,8 +94,8 @@ rather than fixed ones, so they differ between projects. `PORT` and
 
 Useful flags: `--yes` (required when there is no terminal to prompt, such as CI),
 `--headless` (see below), `--template <name>`, and `--install` / `--no-install`
-on `init`; `--docker` on `dev` to use Postgres in a container instead, and
-`--no-db` to bring your own.
+on `init`; `--docker` on `dev` to use the compose Postgres in this project
+instead, and `--no-db` to start nothing — set `DATABASE_URL` yourself.
 
 **To use your own Postgres instead:** uncomment `DATABASE_URL` in `.env` and run
 `pnpm run dev` again. Nothing else changes — a `DATABASE_URL` that is set is

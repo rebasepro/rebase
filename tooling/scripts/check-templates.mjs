@@ -572,5 +572,59 @@ if (engineFindings.length > 0) {
     process.exit(1);
 }
 
+// ── Docs that quote a template file must quote the file ──────────────────────
+//
+// Project Structure is page three, and its `App.tsx` block had drifted into a
+// file that exists nowhere: no default export, a `createRebaseClient` at module
+// scope, and controllers (`useBuildNavigationStateController`) that no package
+// exports. A newcomer meets that on page three and concludes the scaffold is
+// broken; an agent writes an entry point the scaffold ignores.
+//
+// So the block is not "kept in step" — it IS the file, and this says so.
+const QUOTED_FILES = [
+    {
+        doc: "website/src/content/docs/docs/getting-started/project-structure.md",
+        fence: '```typescript title="frontend/src/App.tsx"',
+        file: "packages/cli/templates/template/frontend/src/App.tsx"
+    }
+];
+
+const quoteFindings = [];
+for (const { doc, fence, file } of QUOTED_FILES) {
+    const docPath = path.join(repoRoot, doc);
+    const filePath = path.join(repoRoot, file);
+    if (!fs.existsSync(docPath) || !fs.existsSync(filePath)) {
+        quoteFindings.push(`${doc} or ${file} is missing`);
+        continue;
+    }
+
+    const text = fs.readFileSync(docPath, "utf8");
+    const start = text.indexOf(`${fence}\n`);
+    if (start === -1) {
+        quoteFindings.push(`${doc} has no block fenced \`${fence}\``);
+        continue;
+    }
+
+    const bodyStart = start + fence.length + 1;
+    const end = text.indexOf("\n```", bodyStart);
+    const quoted = text.slice(bodyStart, end === -1 ? undefined : end).trimEnd();
+    const actual = fs.readFileSync(filePath, "utf8").trimEnd();
+
+    if (quoted !== actual) {
+        quoteFindings.push(
+            `${doc} quotes ${file}, but the two differ. `
+            + "Paste the file into the block — the doc is not a paraphrase of it."
+        );
+    }
+}
+
+if (quoteFindings.length > 0) {
+    console.error("\nQuoted-file findings:\n");
+    for (const f of quoteFindings) console.error(`  ✗ ${f}`);
+    console.error("");
+    process.exit(1);
+}
+
 console.log(`\nAll ${PRESETS.length} init presets compile, and the baas backend.`);
 console.log("Each scaffold's Node floor covers the packages it depends on.");
+console.log(`${QUOTED_FILES.length} documented template file(s) match the template.`);

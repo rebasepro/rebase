@@ -5,6 +5,14 @@ packages:
 linkWorkspacePackages: true
 blockExoticSubdeps: false
 minimumReleaseAge: 0
+# Both of these used to live in `.npmrc` as `verify-deps-before-run` and
+# `confirm-modules-purge`. pnpm 11 does not read them from there any more —
+# `pnpm config get verify-deps-before-run` answers `undefined` with the .npmrc
+# in place, and `verifyDepsBeforeRun` here answers `false` — so the settings had
+# quietly stopped applying. npm 12 meanwhile warns about both on every install
+# and every `npm run`, saying they will stop working.
+verifyDepsBeforeRun: false
+confirmModulesPurge: false
 allowBuilds:
   esbuild: true
   sharp: true

@@ -20,12 +20,18 @@
         "schema:generate": "rebase schema generate --collections ../config/collections",
         "generate:sdk": "rebase generate-sdk",
         "skills:install": "rebase skills install",
+        "example": "tsx scripts/example.ts",
         "deploy": "rebase cloud deploy"
     },
     "devDependencies": {
         "@rebasepro/cli": "workspace:*",
         "@rebasepro/types": "workspace:*",
+        "tsx": "^4.20.6",
         "typescript": "^5.9.2"
+    },
+    "dependencies": {
+        "@rebasepro/client": "workspace:*",
+        "dotenv": "^16.0.0"
     },
     "engines": {
         "node": ">=22.22.0"
@@ -36,5 +42,8 @@
             "sharp",
             "@ariga/atlas"
         ]
+    },
+    "allowScripts": {
+        "@ariga/atlas": true
     }
 }

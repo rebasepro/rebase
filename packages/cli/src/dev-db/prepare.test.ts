@@ -35,6 +35,24 @@ function writeEnvFile(contents: string): void {
     fs.writeFileSync(path.join(root, ".env"), contents, "utf8");
 }
 
+/** The `db` service `rebase init` writes, trimmed to what the derivation reads. */
+function writeComposeFile(hostPort = "5435"): void {
+    fs.writeFileSync(path.join(root, "docker-compose.yml"), [
+        "name: demo",
+        "",
+        "services:",
+        "  db:",
+        "    image: pgvector/pgvector:pg18",
+        "    environment:",
+        "      POSTGRES_USER: rebase_app",
+        "      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}",
+        "      POSTGRES_DB: rebase",
+        "    ports:",
+        `      - "${hostPort}:5432"`,
+        ""
+    ].join("\n"), "utf8");
+}
+
 describe("an explicit database", () => {
     it("adds nothing to the environment when DATABASE_URL is already set", async () => {
         // The child already has what it needs. Anything added here could only
@@ -75,17 +93,32 @@ describe("an explicit database", () => {
         expect(fs.existsSync(path.join(root, ".rebase"))).toBe(false);
     });
 
-    it("adds nothing for --docker either", async () => {
+    it("hands --docker the compose service's own URL", async () => {
+        // The one case that MUST export a connection string. `.env` leaves
+        // DATABASE_URL commented out, so before this the backend booted with no
+        // database at all — while the container the flag asked for was never
+        // started either, because the preflight decides from a DSN.
+        writeComposeFile();
+        writeEnvFile("DATABASE_PASSWORD=s3cret\n");
+
         const prepared = await prepareDatabaseEnv(root, { flagDocker: true });
 
         expect(prepared.database.kind).toBe("docker");
-        expect(prepared.env).toEqual({});
+        expect(prepared.env.DATABASE_URL).toBe(
+            "postgresql://rebase_app:s3cret@127.0.0.1:5435/rebase?options=-c%20search_path%3Dpublic&sslmode=disable"
+        );
         expect(fs.existsSync(path.join(root, ".rebase"))).toBe(false);
+    });
+
+    it("refuses --docker when there is no compose db service to reach", async () => {
+        await expect(prepareDatabaseEnv(root, { flagDocker: true }))
+            .rejects.toThrow(/--docker needs a docker-compose\.yml/);
     });
 
     it("treats an empty DATABASE_URL as absent rather than as a connection string", async () => {
         // `DATABASE_URL=` is what someone writes to mean "not this one".
-        writeEnvFile("DATABASE_URL=\n");
+        writeComposeFile();
+        writeEnvFile("DATABASE_URL=\nDATABASE_PASSWORD=s3cret\n");
 
         const prepared = await prepareDatabaseEnv(root, { flagDocker: true });
 

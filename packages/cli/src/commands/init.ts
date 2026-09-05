@@ -201,7 +201,7 @@ export function buildInitQuestions(params: BuildQuestionsParams): Record<string,
     questions.push({
         type: "input",
         name: "databaseUrl",
-        message: "Enter your PostgreSQL database connection string (leave blank to use a local default):",
+        message: "PostgreSQL connection string (blank = a managed database for this project, no setup):",
         default: "",
         validate: (input: string) => {
             if (input.trim() && /[\r\n]/.test(input)) {
@@ -247,8 +247,11 @@ ${chalk.bold("Usage")}
 ${chalk.bold("Options")}
   ${chalk.blue("-t, --template")} ${chalk.gray("<preset>")}   blog | ecommerce | blank ${chalk.gray("(default: blog)")}
   ${chalk.blue("--headless")}                Backend only — no admin panel, no collections
-  ${chalk.blue("-y, --yes")}                 Accept defaults, never prompt ${chalk.gray("(required for CI / non-TTY)")}
+  ${chalk.blue("-y, --yes")}                 Never prompt ${chalk.gray("(required for CI / non-TTY)")}
+                            ${chalk.gray("Skips git init and dependency install — the interactive")}
+                            ${chalk.gray("defaults say yes to both. Pass --git / --install for those.")}
   ${chalk.blue("-i, --install")}             Install dependencies after scaffolding
+  ${chalk.blue("--no-install")}              Scaffold only, install nothing ${chalk.gray("(the default)")}
   ${chalk.blue("-g, --git")}                 Initialize a git repository and make an initial commit
   ${chalk.blue("--database-url")} ${chalk.gray("<url>")}      Use an existing database instead of the generated one
   ${chalk.blue("--introspect")}              Generate collections from that database ${chalk.gray("(implies --template blank; needs --install)")}
@@ -286,6 +289,12 @@ ${chalk.bold("Rebase")} — Create a new project 🚀
 export const INIT_FLAGS = {
     "--git": Boolean,
     "--install": Boolean,
+    // The default, spelled out. `arg` has no negation, so without this entry a
+    // CI script that writes what reads naturally — `rebase init app --yes
+    // --no-install` — died on "Unknown or unexpected option", and both the
+    // README and the Quickstart documented a flag the parser rejected. When
+    // both are passed, the explicit "no" wins.
+    "--no-install": Boolean,
     "--database-url": String,
     "--introspect": Boolean,
     "--template": String,
@@ -336,6 +345,13 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
 
     const headlessArg = args["--headless"] === true ? true : undefined;
 
+    // `--no-install` is an explicit "no", not merely the absence of a "yes": it
+    // suppresses the interactive question too, so `rebase init app --no-install`
+    // asks one fewer thing rather than asking and ignoring the answer.
+    const noInstall = args["--no-install"] === true;
+    const installFlag = noInstall ? false : (args["--install"] ?? false);
+    const hasInstallFlag = noInstall || args["--install"] === true;
+
     if (isNonInteractive) {
         const projectName = nameArg || "my-rebase-app";
         const targetDirectory = path.resolve(process.cwd(), projectName);
@@ -345,7 +361,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         return {
             projectName: path.basename(targetDirectory),
             git: args["--git"] ?? false,
-            installDeps: args["--install"] ?? false,
+            installDeps: installFlag,
             targetDirectory,
             templateDirectory,
             databaseUrl: args["--database-url"] || undefined,
@@ -377,7 +393,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         templateArg,
         headlessArg,
         hasGitFlag: !!args["--git"],
-        hasInstallFlag: !!args["--install"],
+        hasInstallFlag,
         pm
     });
 
@@ -392,7 +408,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
     return {
         projectName,
         git: args["--git"] || answers.git || false,
-        installDeps: args["--install"] || answers.installDeps || false,
+        installDeps: noInstall ? false : (args["--install"] || answers.installDeps || false),
         targetDirectory,
         templateDirectory,
         databaseUrl: (answers.databaseUrl as string)?.trim() || undefined,
@@ -580,6 +596,12 @@ async function createProject(options: InitOptions) {
     // Rename .env.example to .env if it exists and randomize secrets
     await configureEnvFile(options.targetDirectory, options.databaseUrl);
 
+    // The manifest's build command is the project's package manager, not npm.
+    // The template has to spell one of them, and `npm run build --workspace
+    // frontend` in a pnpm project is a second package manager reading a
+    // lockfile it did not write.
+    await useProjectPackageManagerInManifest(options.targetDirectory, options.pmCommands);
+
     // Create the repository now, but commit at the very end — see
     // commitScaffold below for why the two halves are separated.
     let gitInitialized = false;
@@ -705,11 +727,11 @@ async function createProject(options: InitOptions) {
         }
     } else if (isBaas) {
         // One step, then the thing that is actually this mode's job. `dev`
-        // starts the database container itself; a headless project has no
-        // collections, so there is no schema to push and the tables are the
-        // developer's to create.
+        // starts the database itself; a headless project has no collections, so
+        // there is no schema to push and the tables are the developer's to
+        // create.
         console.log(chalk.gray("  # A local database configuration has been generated in .env."));
-        console.log(chalk.gray("  # 1. Start everything — the database container comes up with it:"));
+        console.log(chalk.gray("  # 1. Start everything — the database comes up with it:"));
         console.log(`  ${chalk.cyan(runDev.join(" "))}`);
         console.log("");
         console.log(chalk.gray("  # 2. Create your tables (migrations, SQL, any tool you like)."));
@@ -718,14 +740,26 @@ async function createProject(options: InitOptions) {
         console.log(`  ${chalk.cyan("ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;")}`);
         console.log(chalk.gray("  #    The API logs any table it skips, and why."));
     } else {
-        // The whole first run, in one command: `dev` starts the database
-        // container and pushes the schema before it starts the servers. The two
-        // steps that used to be printed here are still available — and still
-        // documented under `rebase dev --help` — for anyone who wants to drive
-        // them separately.
+        // The whole first run, in one command.
+        //
+        // Deliberately does NOT say "container". This branch is the one a new
+        // project takes, and it is precisely the branch with no container in it:
+        // `.env` ships DATABASE_URL commented out, so `dev` starts the managed
+        // PGlite database rather than Docker. Saying otherwise sent a reader who
+        // had no Docker installed off to install it, to satisfy a step that was
+        // never going to run — and made the whole quickstart look like it
+        // required a daemon it does not.
+        //
+        // "schema" covers two things `dev` now does before serving: generating
+        // the Drizzle schema from the collections, and applying the collections
+        // to the database. The push-and-Docker steps that used to be printed
+        // here are still documented under `rebase dev --help`.
         console.log(chalk.gray("  # A local database configuration has been generated in .env."));
-        console.log(chalk.gray("  # Start everything — the database container and schema are set up for you:"));
+        console.log(chalk.gray("  # Start everything — the database and schema are set up for you,"));
+        console.log(chalk.gray("  # with no Docker and nothing else to install:"));
         console.log(`  ${chalk.cyan(runDev.join(" "))}`);
+        console.log("");
+        console.log(chalk.gray("  # To use a Postgres of your own instead, uncomment DATABASE_URL in .env."));
     }
 
     console.log("");
@@ -830,6 +864,43 @@ force: true });
     });
 }
 
+/**
+ * Rewrite `rebase.json`'s static-app build command for this project's package manager.
+ *
+ * The template must spell one of them, and it spells npm. In a pnpm project
+ * that is a second package manager invoked against a lockfile it did not
+ * write — `rebase build` then either installs a second tree or fails on a
+ * workspace flag npm and pnpm spell differently.
+ */
+async function useProjectPackageManagerInManifest(
+    targetDirectory: string,
+    pmCommands: PMCommands
+): Promise<void> {
+    const manifestPath = path.join(targetDirectory, "rebase.json");
+    if (!fs.existsSync(manifestPath)) return;
+
+    try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
+            apps?: Record<string, { type?: string; root?: string; build?: string }>;
+        };
+        let changed = false;
+        for (const app of Object.values(manifest.apps ?? {})) {
+            if (app.type !== "static" || !app.root || !app.build) continue;
+            const rewritten = pmCommands.runWorkspace(app.root, "build").join(" ");
+            if (rewritten !== app.build) {
+                app.build = rewritten;
+                changed = true;
+            }
+        }
+        if (changed) {
+            fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 4)}\n`, "utf8");
+        }
+    } catch {
+        // A manifest that will not parse is `rebase build`'s problem to report,
+        // and scaffolding must not fail on a cosmetic rewrite.
+    }
+}
+
 async function applyPreset(targetDirectory: string, preset: TemplatePreset): Promise<void> {
     const collectionsDir = path.join(targetDirectory, "config", "collections");
     const presetsDir = path.join(collectionsDir, "presets");
@@ -885,6 +956,16 @@ async function replacePlaceholders(options: InitOptions) {
     const versionCache = new Map<string, string>();
     /** Packages with no release matching the CLI's own version. */
     const unreleased = new Map<string, string>();
+    /**
+     * Packages for which every registry query failed, not just the version-pinned one.
+     *
+     * The difference matters and used to be invisible. With no network, all
+     * three lookups throw, every package falls back to "latest", and the
+     * refusal below fired with the words "not a problem with your machine,
+     * your network, or your package manager" — telling a developer on a train
+     * to report a release gap in Rebase.
+     */
+    const unreachable = new Set<string>();
 
     // Use npm view for registry queries — it's universal and works regardless of PM
     const viewBin = "npm";
@@ -918,6 +999,9 @@ async function replacePlaceholders(options: InitOptions) {
                     const { stdout } = await execa(viewBin, ["view", pkgName, "version"]);
                     versionToUse = stdout.trim() || "latest";
                 } catch {
+                    // Not "this package has no such version" — the registry
+                    // answered nothing at all, for any query.
+                    unreachable.add(pkgName);
                     versionToUse = "latest";
                 }
             }
@@ -964,6 +1048,20 @@ async function replacePlaceholders(options: InitOptions) {
     // failure names this as the cause, so stop here and say it plainly.
     const cliIsStable = cliVersion !== "latest" && !cliVersion.includes("-");
     const prereleasePins = [...unreleased].filter(([, version]) => version === "latest" || version.includes("-"));
+
+    // Every package unreachable is a connectivity failure, not a release gap.
+    // Both produce the same symptom — nothing resolved, so everything pinned
+    // "latest" — and only one of them is worth a bug report.
+    if (unreachable.size > 0 && unreachable.size === versionCache.size) {
+        throw new Error(
+            "Could not reach the npm registry.\n\n" +
+            `Every version lookup failed (${unreachable.size} package(s)), so nothing could be\n` +
+            "pinned. This is a network or registry problem, not a problem with Rebase:\n" +
+            "check your connection, your proxy, and `npm config get registry`.\n\n" +
+            "Stopped before writing dependency versions or installing anything. The\n" +
+            `project directory ${path.basename(options.targetDirectory)}/ was created and is safe to delete.`
+        );
+    }
 
     if (cliIsStable && prereleasePins.length > 0) {
         const lines = prereleasePins.map(([name, version]) => `    ${name} → ${version}`).join("\n");
@@ -1286,16 +1384,15 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
                 // stays here, one `#` away, because the alternative — a project
                 // that mentions Docker nowhere — makes switching to it a
                 // documentation lookup instead of an edit.
+                // Deliberately short: the header copied from `.env.example`
+                // sits directly above and already says what unset means. Saying
+                // it twice, in the first section of the first file a new
+                // developer opens, is how a generated file starts reading like
+                // boilerplate nobody wrote on purpose.
                 [
-                    "# DATABASE_URL is commented out on purpose.",
-                    "#",
-                    "# `rebase dev` starts a managed PostgreSQL for this project — no Docker,",
-                    "# no setup, and the data lives in .rebase/. Set this variable to use a",
-                    "# database of your own instead; it always wins over the managed one.",
-                    "#",
-                    "# To use the docker-compose Postgres that ships with this project:",
-                    "#   docker compose up -d db",
-                    "# then uncomment the line below.",
+                    "# Commented out on purpose — that is what selects the managed database.",
+                    "# To use the docker-compose Postgres this project ships instead:",
+                    "#   docker compose up -d db, then uncomment the line below.",
                     `# DATABASE_URL=postgresql://rebase_app:${dbPassword}@127.0.0.1:${dbPort}/rebase?options=-c%20search_path%3Dpublic&sslmode=disable`,
                     `DATABASE_PASSWORD=${dbPassword}`
                 ].join("\n")

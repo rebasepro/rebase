@@ -22,8 +22,12 @@ CREATE POLICY your_table_owner ON your_table
 `rebase.uid()`, `rebase.roles()` and `rebase.jwt()` are provided by Rebase and read the
 identity of the authenticated request.
 
-To serve unprotected tables anyway (development only), set
-`baas: { unprotectedTables: "serve" }` in `backend/src/index.ts`.
+Serving one anyway is `baas: { unprotectedTables: "serve" }`, and it is passed
+to `initializeRebaseBackend` — so it needs a project that owns its entrypoint.
+This scaffold has none: the published runtime boots it. Run `rebase eject` if
+you want that file, and read the flag for what it is — every authenticated
+request runs as one database role, so a table with no policy is handed whole to
+every signed-in caller.
 
 ## Run it
 
@@ -32,24 +36,36 @@ pnpm install
 pnpm dev
 ```
 
-- API: `http://localhost:3001/api/data/<table>`
-- Docs: `http://localhost:3001/api/swagger`
-- Health: `http://localhost:3001/health`
+`rebase dev` prints the URL it bound, and a box with the API, the Swagger path
+and the database it is using. **Read that box**: the port is derived from this
+project's path rather than fixed, so several Rebase projects can run at once,
+and `PORT` in `.env` applies to `rebase start`, not here.
 
-Set `DATABASE_URL` in `.env` to point at your database.
+- API: `<the printed URL>/api/data/<table>`
+- Docs: `<the printed URL>/api/swagger`
+- Health: `<the printed URL>/health`
+
+There is no database to install: with no `DATABASE_URL` set, `rebase dev` runs a
+managed PostgreSQL for this project, with its data under `.rebase/`. Set
+`DATABASE_URL` in `.env` to point at a database of your own — it always wins.
+`rebase db url` prints whichever one is in use, so it pipes straight into psql.
 
 ## Use it from an app
 
 ```ts
 import { createRebaseClient } from "@rebasepro/client";
 
-const rebase = createRebaseClient({ baseUrl: "http://localhost:3001" });
+// The URL `rebase dev` printed. `pnpm example` reads it from .rebase-dev-url
+// for you rather than hardcoding a port.
+const rebase = createRebaseClient({ baseUrl: process.env.REBASE_URL! });
 const posts = await rebase.data.collection("posts").find();
 ```
 
 ## Adding an admin UI later
 
-Nothing here locks you out of it. Switch `mode` to `"cms"` in
-`backend/src/index.ts`, add a `config/collections` directory, and add a frontend
-that renders them. See MODULAR-ARCHITECTURE.md in the Rebase repo for the three
-adoption modes.
+Nothing here locks you out of it. Add a `config/collections/` directory and a
+frontend that renders them: the backend serves an admin panel once collections
+exist, because the mode is derived from whether any are declared rather than
+set anywhere. There is no `backend/src/index.ts` to edit — the published
+runtime boots this project — and `rebase eject` writes one if you want to own
+the entrypoint.

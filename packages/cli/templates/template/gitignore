@@ -34,3 +34,7 @@ uploads/
 # Built project bundle (`rebase build`)
 dist-bundle/
 .rebase/
+
+# Generated SDK (`rebase generate-sdk`) — regenerated from the collections,
+# and stale copies in review diffs are noise nobody reads.
+generated/

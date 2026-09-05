@@ -23,7 +23,7 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/mydb` |
+| `DATABASE_URL` | PostgreSQL connection string. **Optional in development** — unset, `rebase dev` runs a managed PostgreSQL for the project, with its data under `.rebase/`. Required everywhere else. | `postgresql://user:pass@localhost:5432/mydb` |
 | `JWT_SECRET` | Secret key for signing JWT tokens. Use a strong random string (min 32 chars). **Required in production** (auto-generated in development). | `a1b2c3d4e5...` |
 
 > **`sslmode=no-verify` is a node-postgres spelling, not a libpq one.**

@@ -113,6 +113,102 @@ export function composeDeclaresDbService(yamlText: string): boolean {
     return false;
 }
 
+/**
+ * The connection string the compose file's `db` service will answer on.
+ *
+ * `--docker` used to be a flag that changed a banner and nothing else: it
+ * resolved to `kind: "docker"`, and every caller then had no URL to reach the
+ * container with, so the backend booted with no `DATABASE_URL` at all and died
+ * on the message a project with no database gets. The container it had just
+ * been asked for was never started, because the preflight that starts it needs
+ * a DSN to decide the database is local and not running.
+ *
+ * So the URL is derived rather than required: the compose file names the user,
+ * the database and the published host port, and `.env` holds the password
+ * compose itself interpolates. That is the same string `rebase init` writes as
+ * the commented-out `DATABASE_URL`, which is what makes uncommenting that line
+ * and passing `--docker` reach the same database.
+ *
+ * Returns null when the file declares no `db` service, or declares one this
+ * scan cannot read — a `--docker` that cannot be honoured has to say so, and
+ * a guess would point at somebody else's Postgres on 5432.
+ *
+ * Same text scan as {@link composeDeclaresDbService}, for the same reason.
+ */
+export function composeDatabaseUrl(
+    yamlText: string,
+    env: Record<string, string | undefined> = {}
+): string | null {
+    let inServices = false;
+    let inDb = false;
+    let dbIndent = 0;
+    let section: "environment" | "ports" | null = null;
+    const found: Record<string, string> = {};
+    let hostPort: string | null = null;
+
+    for (const rawLine of yamlText.split(/\r?\n/)) {
+        const line = rawLine.replace(/\t/g, "    ");
+        if (/^\s*#/.test(line) || line.trim() === "") continue;
+
+        if (/^services:\s*$/.test(line)) { inServices = true; continue; }
+        if (inServices && /^\S/.test(line)) { inServices = false; inDb = false; continue; }
+        if (!inServices) continue;
+
+        const indent = line.length - line.trimStart().length;
+        const dbHeader = line.match(/^(\s{2,})db:\s*$/);
+        if (dbHeader) { inDb = true; dbIndent = dbHeader[1].length; section = null; continue; }
+        // A sibling service at the same indent as `db:` ends it.
+        if (inDb && indent <= dbIndent) { inDb = false; section = null; continue; }
+        if (!inDb) continue;
+
+        const key = line.match(/^\s+(environment|ports):\s*$/);
+        if (key) { section = key[1] as "environment" | "ports"; continue; }
+        // Any other key of the service ends the block we were reading.
+        if (/^\s+[A-Za-z_][\w-]*:\s*\S/.test(line) && !/^\s+POSTGRES_/.test(line)) {
+            if (!/^\s*-\s/.test(line.trimStart())) section = null;
+        }
+
+        if (section === "environment") {
+            const pair = line.match(/^\s+(POSTGRES_(?:USER|PASSWORD|DB)):\s*(.+?)\s*$/);
+            if (pair) found[pair[1]] = pair[2].replace(/^["']|["']$/g, "");
+            continue;
+        }
+
+        if (section === "ports" && hostPort === null) {
+            // `- "5435:5432"`. Only a mapping whose container side is Postgres's
+            // own port is the one to dial; anything else is a different service.
+            const mapping = line.match(/^\s*-\s*["']?(?:[\d.]+:)?(\d+):5432(?:\/tcp)?["']?\s*$/);
+            if (mapping) hostPort = mapping[1];
+        }
+    }
+
+    const user = expandComposeValue(found.POSTGRES_USER, env);
+    const password = expandComposeValue(found.POSTGRES_PASSWORD, env);
+    const database = expandComposeValue(found.POSTGRES_DB, env);
+    if (!user || !password || !database || !hostPort) return null;
+
+    return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}` +
+        `@127.0.0.1:${hostPort}/${database}?options=-c%20search_path%3Dpublic&sslmode=disable`;
+}
+
+/**
+ * `${VAR:-default}`, `${VAR}` and a literal, resolved the way compose resolves
+ * them — against the project's `.env`, which is the file compose itself reads.
+ */
+function expandComposeValue(
+    raw: string | undefined,
+    env: Record<string, string | undefined>
+): string | null {
+    if (!raw) return null;
+    const interpolated = raw.replace(/\$\{([A-Za-z_][\w]*)(?::?-([^}]*))?\}/g, (_all, name, fallback) => {
+        const value = env[name];
+        if (value !== undefined && value !== "") return value;
+        return fallback ?? "";
+    });
+    const trimmed = interpolated.trim();
+    return trimmed.length > 0 ? trimmed : null;
+}
+
 /** Is something accepting connections there right now? */
 export function probeTcp(host: string, port: number, timeoutMs = 700): Promise<boolean> {
     return new Promise(resolve => {

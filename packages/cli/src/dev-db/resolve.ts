@@ -62,6 +62,14 @@ export type DevDatabase =
     | {
         kind: "docker";
         source: "docker";
+        /**
+         * The compose `db` service's connection string, derived by the caller.
+         *
+         * Null when the project has no compose file to derive one from, which
+         * is a `--docker` that cannot be honoured rather than a fallback: the
+         * caller says so instead of guessing at `localhost:5432`.
+         */
+        url: string | null;
     }
     | {
         kind: "managed";
@@ -79,6 +87,13 @@ export interface ResolveDevDatabaseInput {
     envFile?: Record<string, string> | null;
     /** `devDatabase` from `rebase.json`, if the project recorded a preference. */
     manifestPreference?: "managed" | "docker" | null;
+    /**
+     * The compose `db` service's connection string, when the project has one.
+     *
+     * Passed in rather than read here so this function stays pure. Only
+     * consulted for the Docker case; an explicit `DATABASE_URL` still wins.
+     */
+    composeUrl?: string | null;
     /**
      * The branch this checkout is switched to, already resolved to a URL.
      *
@@ -124,7 +139,7 @@ export function resolveDevDatabase(input: ResolveDevDatabaseInput = {}): DevData
     // for Docker is a choice about *how to get* a database, not which one, so a
     // DATABASE_URL that already names one outranks it.
     if (input.flagDocker || input.manifestPreference === "docker") {
-        return { kind: "docker", source: "docker" };
+        return { kind: "docker", source: "docker", url: present(input.composeUrl) };
     }
 
     return { kind: "managed", source: "managed" };
