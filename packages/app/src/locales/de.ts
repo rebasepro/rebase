@@ -978,5 +978,16 @@ no_filter: "No filter",
     studio_branches_read_failed: "Die Branches dieses Projekts konnten nicht gelesen werden",
     studio_schema_no_collections: "Keine Collections deklariert",
     studio_schema_no_collections_body: "Es gibt noch nichts zu zeichnen. Lege eine Collection unter config/collections/ an oder öffne „Collections bearbeiten“, um hier eine hinzuzufügen.",
-    studio_schema_introspect_hint: "Bei einer Datenbank, die bereits Tabellen hat, schreibt rebase schema introspect die Collection-Dateien für dich."
+    studio_schema_introspect_hint: "Bei einer Datenbank, die bereits Tabellen hat, schreibt rebase schema introspect die Collection-Dateien für dich.",
+
+
+    // ─── Studio: RLS editor confirmations ───────────────────────
+    studio_rls_enable_confirm_title: "Sicherheit auf Zeilenebene aktivieren?",
+    studio_rls_enable_confirm_body: "Bis eine Richtlinie es erlaubt, ist jede Zeile von {{table}} unlesbar. Postgres verweigert standardmäßig.",
+    studio_rls_disable_confirm_title: "Sicherheit auf Zeilenebene deaktivieren?",
+    studio_rls_disable_confirm_body: "Alle Richtlinien für {{table}} werden nicht mehr durchgesetzt. Wer die Tabelle erreicht, kann jede Zeile lesen und schreiben.",
+    studio_rls_drop_policy_title: "Diese Richtlinie löschen?",
+    studio_rls_drop_policy_body: "{{policy}} wird in der Datenbank aus {{table}} entfernt. In den Code wird nichts geschrieben, ein Deploy kann sie also zurückbringen.",
+    studio_rls_unapplied: "Nicht angewendet",
+    studio_rls_unapplied_tooltip: "Im Code deklariert, aber noch nicht in der Datenbank. Hier speichern, um die Änderung zu planen und anzuwenden, oder `rebase db push` ausführen."
 };

@@ -4,7 +4,8 @@ import { Entity, Property, TableMetadata, User } from "@rebasepro/types";
 import { deepEqual as equal } from "fast-equals";
 
 import { CollectionsConfigController } from "./types/config_controller";
-import { useCustomizationController, useRebaseContext, useAuthController, useSnackbarController } from "@rebasepro/app";
+import { useCustomizationController, useRebaseContext, useAuthController, useSnackbarController, useBridgeRegistration } from "@rebasepro/app";
+import type { StudioSchemaEditing } from "@rebasepro/app";
 import { getTableName } from "@rebasepro/common";
 import { useNavigate } from "react-router";
 import { CollectionEditorController } from "./types/collection_editor_controller";
@@ -75,6 +76,28 @@ export const ConfigControllerProvider = React.memo(
                 .then((tables: string[]) => setUnmappedTables(tables))
                 .catch((e: unknown) => console.warn("Could not fetch unmapped tables:", e));
         }, [databaseAdmin, authController.initialLoading, authController.user, collectionConfigController.collections]);
+
+        /**
+         * Studio's writers, routed through the same plan/apply dialog the
+         * collection editor uses.
+         *
+         * The RLS editor used to POST a mapped table's rules straight to
+         * `/schema-editor/collection/save`: no plan, no confirmation, no sight
+         * of the SQL — while the identical edit two tabs away showed all three.
+         * Studio cannot import this controller (`@rebasepro/cms` is a *peer*
+         * of `@rebasepro/studio`, and Studio has to run without it), so it
+         * arrives over the bridge, and `available` is what a caller checks
+         * before reaching for it.
+         */
+        const schemaEditing = useMemo<StudioSchemaEditing>(() => ({
+            available: !collectionConfigController.readOnly,
+            updateCollection: (collectionId, patch) =>
+                collectionConfigController.updateCollection({
+                    id: collectionId,
+                    collectionData: patch as Record<string, never>
+                })
+        }), [collectionConfigController]);
+        useBridgeRegistration("schemaEditing", schemaEditing);
 
         const onFetchTableMetadata = useCallback(async (tableName: string): Promise<TableMetadata | undefined> => {
             return databaseAdmin?.fetchTableMetadata?.(tableName) as Promise<TableMetadata | undefined>;

@@ -1058,5 +1058,16 @@ export const en: RebaseTranslations = {
     studio_branches_read_failed: "Could not read this project's branches",
     studio_schema_no_collections: "No collections declared",
     studio_schema_no_collections_body: "There is nothing to draw yet. Add a collection under config/collections/, or open Edit collections to add one here.",
-    studio_schema_introspect_hint: "Against a database that already has tables, rebase schema introspect writes the collection files for you."
+    studio_schema_introspect_hint: "Against a database that already has tables, rebase schema introspect writes the collection files for you.",
+
+
+    // ─── Studio: RLS editor confirmations ───────────────────────
+    studio_rls_enable_confirm_title: "Enable Row Level Security?",
+    studio_rls_enable_confirm_body: "Until a policy allows it, every row of {{table}} becomes unreadable. Postgres denies by default.",
+    studio_rls_disable_confirm_title: "Disable Row Level Security?",
+    studio_rls_disable_confirm_body: "Every policy on {{table}} stops being enforced. Anyone who can reach the table can read and write every row.",
+    studio_rls_drop_policy_title: "Drop this policy?",
+    studio_rls_drop_policy_body: "{{policy}} is removed from {{table}} in the database. Nothing is written to your code, so a deploy can restore it.",
+    studio_rls_unapplied: "Unapplied",
+    studio_rls_unapplied_tooltip: "Declared in your code, not yet in the database. Save it here to plan and apply the change, or run `rebase db push`."
 };

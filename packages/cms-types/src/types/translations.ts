@@ -1142,4 +1142,15 @@ export interface RebaseTranslations {
     studio_schema_no_collections?: string;
     studio_schema_no_collections_body?: string;
     studio_schema_introspect_hint?: string;
+
+
+    // ─── Studio: RLS editor confirmations ───────────────────────
+    studio_rls_enable_confirm_title?: string;
+    studio_rls_enable_confirm_body?: string;
+    studio_rls_disable_confirm_title?: string;
+    studio_rls_disable_confirm_body?: string;
+    studio_rls_drop_policy_title?: string;
+    studio_rls_drop_policy_body?: string;
+    studio_rls_unapplied?: string;
+    studio_rls_unapplied_tooltip?: string;
 }

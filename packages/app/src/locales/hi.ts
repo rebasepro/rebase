@@ -978,5 +978,16 @@ no_filter: "No filter",
     studio_branches_read_failed: "इस प्रोजेक्ट की ब्रांच नहीं पढ़ी जा सकीं",
     studio_schema_no_collections: "कोई कलेक्शन घोषित नहीं",
     studio_schema_no_collections_body: "अभी बनाने के लिए कुछ नहीं है। config/collections/ में एक कलेक्शन जोड़ें, या यहाँ जोड़ने के लिए “कलेक्शन संपादित करें” खोलें।",
-    studio_schema_introspect_hint: "जिस डेटाबेस में पहले से टेबल हैं, वहाँ rebase schema introspect आपके लिए कलेक्शन फ़ाइलें लिख देता है।"
+    studio_schema_introspect_hint: "जिस डेटाबेस में पहले से टेबल हैं, वहाँ rebase schema introspect आपके लिए कलेक्शन फ़ाइलें लिख देता है।",
+
+
+    // ─── Studio: RLS editor confirmations ───────────────────────
+    studio_rls_enable_confirm_title: "पंक्ति-स्तरीय सुरक्षा सक्षम करें?",
+    studio_rls_enable_confirm_body: "जब तक कोई नीति अनुमति न दे, {{table}} की कोई पंक्ति पढ़ी नहीं जा सकेगी। Postgres डिफ़ॉल्ट रूप से मना करता है।",
+    studio_rls_disable_confirm_title: "पंक्ति-स्तरीय सुरक्षा अक्षम करें?",
+    studio_rls_disable_confirm_body: "{{table}} पर सभी नीतियाँ लागू होना बंद हो जाएँगी। जो भी टेबल तक पहुँच सकता है, हर पंक्ति पढ़ और लिख सकेगा।",
+    studio_rls_drop_policy_title: "इस नीति को हटाएँ?",
+    studio_rls_drop_policy_body: "{{policy}} को डेटाबेस में {{table}} से हटा दिया जाएगा। आपके कोड में कुछ नहीं लिखा जाता, इसलिए डिप्लॉय इसे वापस ला सकता है।",
+    studio_rls_unapplied: "लागू नहीं",
+    studio_rls_unapplied_tooltip: "आपके कोड में घोषित, डेटाबेस में अभी नहीं। बदलाव की योजना बनाकर लागू करने के लिए इसे यहाँ सहेजें, या `rebase db push` चलाएँ।"
 };

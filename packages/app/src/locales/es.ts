@@ -999,5 +999,16 @@ no_filter: "No filter",
     studio_branches_read_failed: "No se han podido leer las ramas de este proyecto",
     studio_schema_no_collections: "No hay colecciones declaradas",
     studio_schema_no_collections_body: "Todavía no hay nada que dibujar. Añade una colección en config/collections/, o abre «Editar colecciones» para añadir una aquí.",
-    studio_schema_introspect_hint: "Contra una base de datos que ya tiene tablas, rebase schema introspect escribe los archivos de colección por ti."
+    studio_schema_introspect_hint: "Contra una base de datos que ya tiene tablas, rebase schema introspect escribe los archivos de colección por ti.",
+
+
+    // ─── Studio: RLS editor confirmations ───────────────────────
+    studio_rls_enable_confirm_title: "¿Activar la seguridad a nivel de fila?",
+    studio_rls_enable_confirm_body: "Hasta que una política lo permita, ninguna fila de {{table}} será legible. Postgres deniega por defecto.",
+    studio_rls_disable_confirm_title: "¿Desactivar la seguridad a nivel de fila?",
+    studio_rls_disable_confirm_body: "Todas las políticas de {{table}} dejan de aplicarse. Quien pueda alcanzar la tabla podrá leer y escribir todas las filas.",
+    studio_rls_drop_policy_title: "¿Eliminar esta política?",
+    studio_rls_drop_policy_body: "{{policy}} se elimina de {{table}} en la base de datos. No se escribe nada en tu código, así que un despliegue puede restaurarla.",
+    studio_rls_unapplied: "Sin aplicar",
+    studio_rls_unapplied_tooltip: "Declarada en tu código, todavía no en la base de datos. Guárdala aquí para planificar y aplicar el cambio, o ejecuta `rebase db push`."
 };
