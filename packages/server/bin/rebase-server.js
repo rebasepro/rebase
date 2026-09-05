@@ -27,12 +27,27 @@ Arguments:
   bundle-dir            Path to the bundle. Defaults to $REBASE_BUNDLE, then ./dist-bundle
 
 Key environment variables:
+  NODE_ENV              "production" for a deployment. It closes the first-admin
+                        window, requires CORS_ORIGINS, refuses local file
+                        storage and turns the OpenAPI docs off
   DATABASE_URL          Connection string for the default database (required)
   JWT_SECRET            Signing secret, >=32 chars (required in production)
+  REBASE_SERVICE_KEY    Server-to-server credential that bypasses row-level
+                        security. Treat it like a database superuser password
   PORT                  Port to bind (default 3001)
   CORS_ORIGINS          Comma-separated allowed origins (required in production)
+  REBASE_ADMIN_EMAIL    The first admin account, created once while the user
+  REBASE_ADMIN_PASSWORD table is empty (>=12 chars). In production the first
+                        account to register is NOT promoted, so without these
+                        a fresh deployment has no way in
+  DISABLE_SELF_REGISTRATION  "true" to refuse sign-ups outright
   REBASE_METRICS        "true" to expose Prometheus metrics at /metrics
-  REBASE_MIGRATE_ON_BOOT  none | ensure  (collection tables: run 'rebase db push')
+  REBASE_MIGRATE_ON_BOOT  none | ensure (default). "ensure" creates missing
+                        tables and columns at boot, INCLUDING your collections',
+                        additively, and applies their row-level security. It
+                        never alters, drops or narrows: those go through
+                        'rebase db push' from a checkout, along with
+                        junction-table RLS for many-to-many relations
 
 Additional databases and buckets are configured by suffixing the variable with
 the source key, e.g. DATABASE_URL__ANALYTICS or S3_BUCKET__MEDIA.

@@ -18075,7 +18075,32 @@ npm install -g @rebasepro/server @rebasepro/server-postgres
 rebase-server /srv/myapp/dist-bundle
 ```
 
-Run it under systemd, with `Environment=` lines for the variables above.
+`rebase-server --help` lists the variables it reads. Under systemd:
+
+```ini title="/etc/systemd/system/rebase.service"
+[Service]
+ExecStart=/usr/bin/rebase-server /srv/myapp/dist-bundle
+Restart=always
+Environment=NODE_ENV=production
+Environment=DATABASE_URL=postgresql://rebase:...@127.0.0.1:5432/rebase
+Environment=JWT_SECRET=...
+Environment=REBASE_SERVICE_KEY=...
+Environment=CORS_ORIGINS=https://app.example.com
+Environment=DISABLE_SELF_REGISTRATION=true
+Environment=REBASE_ADMIN_EMAIL=you@example.com
+Environment=REBASE_ADMIN_PASSWORD=...
+```
+
+`NODE_ENV=production` is not decoration. Left unset the process runs in
+development mode: it reflects localhost origins, serves the OpenAPI spec, and
+**leaves the first-admin window open** — so the first stranger to find the
+sign-up form becomes the administrator. The two `REBASE_ADMIN_*` lines are what
+replace that window; see [Your first
+admin](/docs/getting-started/deployment/#your-first-admin).
+
+Prefer `EnvironmentFile=/etc/rebase.env` with the file at mode 0600 over
+`Environment=` lines for the secrets: a unit file is world-readable, and
+`systemctl show` prints every `Environment=` value.
 
 ### Connection pooling
 
