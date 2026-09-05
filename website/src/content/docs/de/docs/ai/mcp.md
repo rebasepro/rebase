@@ -1,7 +1,7 @@
 ---
 title: MCP-Server
 sidebar_label: MCP-Server
-description: Verbinden Sie Claude Code, Cursor, die Gemini CLI oder einen beliebigen MCP-Client mit einem Rebase-Projekt – die 40 bereitgestellten Tools, die Anmeldedaten für die Authentifizierung und das Loopback-Gate, das zwischen einem Agenten und der Produktion steht.
+description: Verbinden Sie Claude Code, Cursor, die Gemini CLI oder einen beliebigen MCP-Client mit einem Rebase-Projekt – die 41 bereitgestellten Tools, die Anmeldedaten für die Authentifizierung und das Loopback-Gate, das zwischen einem Agenten und der Produktion steht.
 ---
 
 `@rebasepro/mcp` ist ein [Model Context Protocol](https://modelcontextprotocol.io)-Server,
@@ -209,7 +209,7 @@ dieses Ziel befindet sich auf der Loopback-Schnittstelle.** Das Gate ist als
 Liste derjenigen Tools formuliert, die *nicht* reguliert werden, sodass ein
 später hinzugefügtes Tool standardmäßig geschützt ist.
 
-- **Nicht reguliert – Lesezugriffe:** `rebase_schema_introspect`, `rebase_doctor`,
+- **Nicht reguliert – Lesezugriffe:** `rebase_schema_plan`, `rebase_schema_introspect`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
@@ -305,15 +305,16 @@ registrierte Projekt enthält; behandeln Sie sie entsprechend.
 
 ## Tool-Referenz
 
-40 Tools in acht Gruppen. Mit ⚠ markierte Tools werden bei nicht-lokalen Zielen
+41 Tools in acht Gruppen. Mit ⚠ markierte Tools werden bei nicht-lokalen Zielen
 verweigert, sofern Sie dies nicht explizit erlauben.
 
-### Schema & Datenbank (11)
+### Schema & Datenbank (12)
 
 Starten die Rebase CLI im aktiven Projektverzeichnis.
 
 | Tool | Erforderlich | Beschreibung |
 |---|---|---|
+| `rebase_schema_plan` | — | Zeigt das SQL, das `rebase_db_push` ausführen würde, ohne etwas davon auszuführen |
 | `rebase_schema_generate` | — | Drizzle-Schema aus Collection-Definitionen generieren |
 | `rebase_db_push` ⚠ | — | Schema direkt auf die Datenbank anwenden (Dev-Abkürzung) |
 | `rebase_schema_introspect` | — | Live-Datenbank in Collection-Definitionen introspektieren |

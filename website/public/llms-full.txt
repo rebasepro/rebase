@@ -14948,7 +14948,7 @@ problems. It is worth knowing which one you are reaching for:
 
 | | What it is | Who consumes it |
 |---|---|---|
-| [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 40 tools over your schema, data, users, storage, cron and dev server | An assistant, at runtime |
+| [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 41 tools over your schema, data, users, storage, cron and dev server | An assistant, at runtime |
 | [**Agent skills**](/docs/ai/skills) | 20 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
 | [**API keys**](/docs/backend/api#api-keys) | Scoped machine credentials, per collection and per operation | Anything calling the HTTP API |
@@ -15222,7 +15222,7 @@ in between but the assistant's judgement about which project is active.
 on the loopback interface.** The gate is written as a list of what is *not*
 gated, so a tool added later arrives protected by default.
 
-- **Not gated — reads:** `rebase_schema_introspect`, `rebase_doctor`,
+- **Not gated — reads:** `rebase_schema_plan`, `rebase_schema_introspect`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
@@ -15312,15 +15312,16 @@ it accordingly.
 
 ### Tool reference
 
-40 tools, in eight groups. Tools marked ⚠ are refused against non-local targets
+41 tools, in eight groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
-#### Schema & database (11)
+#### Schema & database (12)
 
 Spawn the Rebase CLI in the active project directory.
 
 | Tool | Required | Description |
 |---|---|---|
+| `rebase_schema_plan` | — | Show the SQL `rebase_db_push` would run, without running any of it |
 | `rebase_schema_generate` | — | Generate Drizzle schema from collection definitions |
 | `rebase_db_push` ⚠ | — | Apply the schema directly to the database (dev shortcut) |
 | `rebase_schema_introspect` | — | Introspect the live database into collection definitions |

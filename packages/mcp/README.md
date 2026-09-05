@@ -70,16 +70,17 @@ Rows, user records, storage listings, cron jobs, function responses and CLI outp
 
 <!-- generated: mcp tool tables — pnpm generate:mcp-readme -->
 
-40 tools, in 8 groups. Tools marked ⚠ are refused against a non-local
+41 tools, in 8 groups. Tools marked ⚠ are refused against a non-local
 target unless `REBASE_MCP_ALLOW_REMOTE_WRITES=true` — see the gate above.
 
-### Schema & database (11)
+### Schema & database (12)
 
 Spawn the Rebase CLI in the active project directory.
 
 | Tool | Required | Description |
 |---|---|---|
 | `rebase_schema_generate` | — | Generate Drizzle schema from Rebase TypeScript collection definitions |
+| `rebase_schema_plan` | — | Show the SQL that rebase_db_push would run, without running any of it |
 | `rebase_db_push` ⚠ | — | Apply the current Drizzle schema directly to the database (development shortcut, skips migration files) |
 | `rebase_schema_introspect` | — | Introspect the live database and generate Rebase collection definitions from existing tables |
 | `rebase_db_generate` | — | Generate SQL migration files from schema changes (compares current Drizzle schema against the last entity) |

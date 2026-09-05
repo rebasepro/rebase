@@ -9,7 +9,7 @@ Probleme lösen. Es lohnt sich zu wissen, nach welcher davon Sie greifen:
 
 | | Was es ist | Wer es nutzt |
 |---|---|---|
-| [**MCP server**](/docs/ai/mcp) | Ein stdio-basierter Model Context Protocol-Server mit 40 Tools für Ihr Schema, Daten, Benutzer, Speicher, Cron und Dev-Server | Ein Assistent zur Laufzeit |
+| [**MCP server**](/docs/ai/mcp) | Ein stdio-basierter Model Context Protocol-Server mit 41 Tools für Ihr Schema, Daten, Benutzer, Speicher, Cron und Dev-Server | Ein Assistent zur Laufzeit |
 | [**Agent skills**](/docs/ai/skills) | 20 Markdown-Skill-Dateien, die durch `rebase skills install` in Ihr Repository geschrieben werden | Ein Assistent als Referenzmaterial |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus assistentenspezifische Pointer-Dateien, erstellt durch `rebase init` | Ein Assistent als dauerhaft aktive Regeln |
 | [**API keys**](/docs/backend/api#api-keys) | Bereichsbezogene Maschinen-Zugangsdaten, pro Collection und pro Operation | Alles, was die HTTP-API aufruft |

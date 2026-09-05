@@ -1176,3 +1176,91 @@ describe("the environment block outranks the persisted registry", () => {
         });
     });
 });
+
+describe("showing a schema change before making it", () => {
+    const handler = () => (server as any)._requestHandlers.get("tools/call");
+
+    /** Drive the mocked `spawn` to a chosen exit code and output. */
+    function cliReturns(output: string, code: number) {
+        (mockSpawn.stdout.on as any).mockImplementation((event: string, cb: (b: Buffer) => void) => {
+            if (event === "data") cb(Buffer.from(output));
+            return mockSpawn.stdout;
+        });
+        (mockSpawn.stderr.on as any).mockImplementation(() => mockSpawn.stderr);
+        (mockSpawn.on as any).mockImplementation((event: string, cb: (c: number) => void) => {
+            if (event === "close") cb(code);
+            return mockSpawn;
+        });
+    }
+
+    /** `db push` is gated on DATABASE_URL being loopback; give it one. */
+    function targetIsLocal() {
+        vi.stubEnv("DATABASE_URL", "postgresql://u:p@localhost:5432/scratch");
+    }
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.clearAllMocks();
+    });
+
+    it("registers a plan tool that runs a dry push", () => {
+        expect(ALL_TOOLS.map((t) => t.name)).toContain("rebase_schema_plan");
+    });
+
+    it("plans without touching the environment, so the gate lets it through", () => {
+        expect(READ_ONLY_TOOLS.has("rebase_schema_plan")).toBe(true);
+        expect(gatedTargetFor("rebase_schema_plan")).toBeNull();
+        // The push it previews is still gated.
+        expect(gatedTargetFor("rebase_db_push")).toBe("db");
+    });
+
+    it("passes --dry-run, not a bare push", async () => {
+        cliReturns("Planned changes:\n  ALTER TABLE posts ADD COLUMN subtitle text", 0);
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "rebase_schema_plan", arguments: {} }
+        });
+        const argv = (spawn as any).mock.calls.at(-1)[1] as string[];
+        expect(argv).toEqual(expect.arrayContaining(["rebase", "db", "push", "--dry-run"]));
+        expect(result.content[0].text).toContain("ALTER TABLE posts ADD COLUMN subtitle");
+        expect(result.isError).toBeUndefined();
+    });
+
+    it("marks a non-zero CLI exit as an error rather than describing one", async () => {
+        cliReturns("something went wrong", 1);
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "rebase_doctor", arguments: {} }
+        });
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("Command exited with code 1");
+    });
+
+    it("hands a destructive refusal back as a human's decision, not a flag to find", async () => {
+        targetIsLocal();
+        cliReturns(
+            "  ✗ Aborting: destructive changes require confirmation.\n" +
+            "    Re-run interactively, or pass --allow-destructive to proceed.",
+            1
+        );
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "rebase_db_push", arguments: {} }
+        });
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("not yours to approve");
+        expect(result.content[0].text).toContain("rebase db push --allow-destructive");
+        expect(result.content[0].text).toContain("rebase db backup");
+    });
+
+    it("says nothing about --allow-destructive when the push succeeded", async () => {
+        targetIsLocal();
+        cliReturns("Schema applied.", 0);
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "rebase_db_push", arguments: {} }
+        });
+        expect(result.isError).toBeUndefined();
+        expect(result.content[0].text).not.toContain("not yours to approve");
+    });
+});

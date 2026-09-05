@@ -538,7 +538,12 @@ function clearClientCache(): void {
  * auditable at a glance and a new tool now arrives protected.
  */
 export const READ_ONLY_TOOLS = new Set<string>([
-    // CLI tools that only inspect the database
+    // CLI tools that only inspect the database. `rebase_schema_plan` is
+    // `db push --dry-run`: it reads the live schema, prints the diff, and
+    // applies nothing — including the auth-schema step, which is skipped
+    // precisely so that "show me what would happen" does not change anything
+    // on the way.
+    "rebase_schema_plan",
     "rebase_schema_introspect",
     "rebase_doctor",
     "rebase_db_branch_list",
@@ -834,8 +839,15 @@ properties: {} },
         cmd: ["schema", "generate"]
     },
     {
+        name: "rebase_schema_plan",
+        description: "Show the SQL that rebase_db_push would run, without running any of it. Read this before proposing a schema change: it names every statement, and marks the ones that destroy data.",
+        inputSchema: { type: "object",
+properties: {} },
+        cmd: ["db", "push", "--dry-run"]
+    },
+    {
         name: "rebase_db_push",
-        description: "Apply the current Drizzle schema directly to the database (development shortcut, skips migration files).",
+        description: "Apply the current Drizzle schema directly to the database (development shortcut, skips migration files). Refuses changes that destroy data — use rebase_schema_plan first, then ask the human to run `rebase db push --allow-destructive`.",
         inputSchema: { type: "object",
 properties: {} },
         cmd: ["db", "push"]
@@ -1287,8 +1299,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: ALL_TOOLS
 }));
 
-/** Spawn the rebase CLI using the project's detected package manager. */
-function runRebaseCmd(commandArgs: string[]): Promise<string> {
+/**
+ * Spawn the rebase CLI using the project's detected package manager.
+ *
+ * The exit code comes back with the output. It used to be folded into a string
+ * — `Command exited with code 1\n\n…` — and handed over as an ordinary result,
+ * so a failed migration and a successful one differed only in prose. MCP has
+ * `isError` for exactly this, and a model that has to parse a sentence to learn
+ * whether a command worked will eventually parse it wrong.
+ */
+function runRebaseCmd(commandArgs: string[]): Promise<{ output: string; code: number }> {
     const projectDir = getProjectDir();
     const pm = detectPackageManager(projectDir);
     const { command, args: execArgs } = getExecCommand(pm);
@@ -1306,12 +1326,37 @@ function runRebaseCmd(commandArgs: string[]): Promise<string> {
         const chunks: string[] = [];
         child.stdout?.on("data", (d: Buffer) => chunks.push(d.toString()));
         child.stderr?.on("data", (d: Buffer) => chunks.push(d.toString()));
-        child.on("error", (err) => resolve(`Error spawning command: ${err.message}`));
+        child.on("error", (err) => resolve({ output: `Error spawning command: ${err.message}`, code: -1 }));
         child.on("close", (code) => {
             const output = chunks.join("").trim();
-            resolve(code !== 0 ? `Command exited with code ${code}\n\n${output}` : output || "(no output)");
+            resolve({
+                output: code !== 0 ? `Command exited with code ${code}\n\n${output}` : output || "(no output)",
+                code: code ?? -1
+            });
         });
     });
+}
+
+/**
+ * The one refusal an agent cannot act on alone, spelled out.
+ *
+ * `db push` refuses a destructive change on a non-TTY, which every MCP call is,
+ * and prints the plan while exiting 1. Without this the model sees a failure
+ * with a flag buried in it and its next move is to find a way to pass the flag
+ * — which is the wrong move: dropping a column is a decision, and the person
+ * whose data it is has to make it. Naming the command *for the human* is what
+ * turns a dead end into a handoff.
+ */
+function destructiveRefusalHint(toolName: string, output: string): string | null {
+    if (toolName !== "rebase_db_push") return null;
+    if (!/destructive changes require confirmation|--allow-destructive/.test(output)) return null;
+    return (
+        "\n\nThis push was refused because it destroys data, and that is not yours to approve. " +
+        "Show the planned SQL above (rebase_schema_plan prints it without running anything), " +
+        "say which statements drop data, and ask the person you are working with to run:\n\n" +
+        "    rebase db backup\n" +
+        "    rebase db push --allow-destructive\n"
+    );
 }
 
 // Dev server management
@@ -1361,8 +1406,8 @@ function untrustedJsonResult(source: string, data: unknown) {
 }
 
 /** Raw text from the target environment (CLI stdout, dev-server logs), marked as untrusted. */
-function untrustedTextResult(source: string, text: string) {
-    return textResult(untrustedEnvelope(source, text));
+function untrustedTextResult(source: string, text: string, isError = false) {
+    return { ...textResult(untrustedEnvelope(source, text)), ...(isError ? { isError: true } : {}) };
 }
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -1396,8 +1441,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             cmdArgs.push(assertValidBranchName(argsObj.name, "name"));
         }
 
-        const result = await runRebaseCmd(cmdArgs);
-        return untrustedTextResult(`the "${name}" CLI command`, result);
+        const { output, code } = await runRebaseCmd(cmdArgs);
+        const hint = destructiveRefusalHint(name, output);
+        return untrustedTextResult(`the "${name}" CLI command`, output + (hint ?? ""), code !== 0);
     }
 
     // ── Project management tools ────────────────────────────────────────

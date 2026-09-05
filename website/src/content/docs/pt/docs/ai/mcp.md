@@ -1,7 +1,7 @@
 ---
 title: Servidor MCP
 sidebar_label: Servidor MCP
-description: Conecte o Claude Code, Cursor, Gemini CLI ou qualquer cliente MCP a um projeto Rebase — as 40 ferramentas que ele expõe, a credencial com a qual ele se autentica e a proteção de loopback que fica entre um agente e a produção.
+description: Conecte o Claude Code, Cursor, Gemini CLI ou qualquer cliente MCP a um projeto Rebase — as 41 ferramentas que ele expõe, a credencial com a qual ele se autentica e a proteção de loopback que fica entre um agente e a produção.
 ---
 
 `@rebasepro/mcp` é um servidor do [Model Context Protocol](https://modelcontextprotocol.io)
@@ -191,7 +191,7 @@ no meio além do julgamento do assistente sobre qual projeto está ativo.
 na interface de loopback.** A proteção é escrita como uma lista do que *não* é
 protegido, portanto, uma ferramenta adicionada posteriormente já chega protegida por padrão.
 
-- **Não protegidas — leituras:** `rebase_schema_introspect`, `rebase_doctor`,
+- **Não protegidas — leituras:** `rebase_schema_plan`, `rebase_schema_introspect`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
@@ -282,15 +282,16 @@ com o devido cuidado.
 
 ## Referência de ferramentas
 
-40 ferramentas, em oito grupos. As ferramentas marcadas com ⚠ são recusadas contra destinos
+41 ferramentas, em oito grupos. As ferramentas marcadas com ⚠ são recusadas contra destinos
 não locais, a menos que você desative a proteção.
 
-### Schema e banco de dados (11)
+### Schema e banco de dados (12)
 
 Executam a CLI do Rebase no diretório do projeto ativo.
 
 | Ferramenta | Obrigatório | Descrição |
 |---|---|---|
+| `rebase_schema_plan` | — | Mostra o SQL que o `rebase_db_push` executaria, sem executar nada |
 | `rebase_schema_generate` | — | Gerar schema do Drizzle a partir das definições de coleções |
 | `rebase_db_push` ⚠ | — | Aplicar o schema diretamente ao banco de dados (atalho de desenvolvimento) |
 | `rebase_schema_introspect` | — | Fazer a introspecção do banco de dados ativo para definições de coleções |

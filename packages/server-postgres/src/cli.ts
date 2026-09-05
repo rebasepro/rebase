@@ -211,6 +211,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         {
             "--collections": String,
             "--allow-destructive": Boolean,
+            "--dry-run": Boolean,
             "--yes": Boolean,
             "-c": "--collections",
             "-y": "--yes"
@@ -345,10 +346,16 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             await schemaCommand("generate", rawArgs);
             await generatePostgresDdlCommand(rawArgs);
             out("");
-            out(chalk.gray("  Step 2/3: Pushing schema to database with Atlas..."));
+            const dryRun = argsList["--dry-run"] === true;
+            out(chalk.gray(dryRun
+                ? "  Step 2/3: Planning the change against the database (nothing is applied)..."
+                : "  Step 2/3: Pushing schema to database with Atlas..."));
             out("");
             const databaseUrl = process.env.DATABASE_URL;
-            if (databaseUrl) {
+            // Skipped under --dry-run: this creates the auth schema and its
+            // functions, which is a write. "Show me what would happen" that
+            // changes something on the way is not a plan.
+            if (databaseUrl && !dryRun) {
                 await ensureAuthSchemaAndFunctions(databaseUrl);
             }
 
@@ -363,6 +370,40 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 { captureStdout: true }
             );
             const destructive = detectDestructiveStatements(plan);
+
+            // `--dry-run` stops here, having printed the SQL and nothing else.
+            //
+            // It exists because the only way to see this plan was to trigger
+            // the destructive gate, and the gate prints the plan while exiting
+            // 1 — so "what would this do?" was answerable only by a command
+            // that looked like a failure, and unanswerable at all when the
+            // change was additive. An agent with no way to show the SQL either
+            // asks a human to approve something neither of them has read, or
+            // runs the push to find out.
+            if (dryRun) {
+                out(chalk.gray("  Step 3/3: --dry-run — nothing was applied."));
+                out("");
+                if (plan.trim()) {
+                    out(chalk.bold("  Planned changes:"));
+                    out(chalk.gray(plan.trim().split("\n").map((l) => `       ${l}`).join("\n")));
+                } else {
+                    out(chalk.green("  ✓ No changes: the database already matches these collections."));
+                }
+                out("");
+                if (destructive.length > 0) {
+                    outWarn(chalk.yellow(`  ⚠️  ${destructive.length} of those DESTROY data:`));
+                    for (const d of destructive) {
+                        outWarn(chalk.red(`       ${d.kind}: `) + chalk.gray(d.statement.replace(/\s+/g, " ")));
+                    }
+                    outWarn("");
+                    outWarn(chalk.yellow("  Applying them needs `rebase db push --allow-destructive`. Back up first: rebase db backup"));
+                    outWarn("");
+                }
+                out(chalk.gray("  The auth schema step was skipped, because it writes. A real push runs it first."));
+                out("");
+                return;
+            }
+
             const allowDestructive = argsList["--allow-destructive"] === true || argsList["--yes"] === true;
             const decision = decidePushSafety({
                 destructiveCount: destructive.length,

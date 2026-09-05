@@ -9,7 +9,7 @@ problemas diferentes. Vale a pena saber qual delas você está buscando:
 
 | | O que é | Quem consome |
 |---|---|---|
-| [**Servidor MCP**](/docs/ai/mcp) | Um servidor Model Context Protocol via stdio com 40 ferramentas sobre seu schema, dados, usuários, storage, cron e servidor de desenvolvimento | Um assistente, em tempo de execução |
+| [**Servidor MCP**](/docs/ai/mcp) | Um servidor Model Context Protocol via stdio com 41 ferramentas sobre seu schema, dados, usuários, storage, cron e servidor de desenvolvimento | Um assistente, em tempo de execução |
 | [**Agent skills**](/docs/ai/skills) | 20 arquivos de skill em Markdown gravados no seu repositório por `rebase skills install` | Um assistente, como material de referência |
 | [**Arquivos de instrução**](/docs/ai/instruction-files) | `ai-instructions.md` mais arquivos de apontamento específicos por assistente, gravados por `rebase init` | Um assistente, como regras sempre ativas |
 | [**Chaves de API**](/docs/backend/api#api-keys) | Credenciais de máquina com escopo delimitado, por coleção e por operação | Qualquer cliente que chame a API HTTP |

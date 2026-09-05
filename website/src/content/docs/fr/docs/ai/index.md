@@ -9,7 +9,7 @@ Rebase fournit quatre éléments distincts pour les assistants IA, et ils répon
 
 | | Ce que c'est | Qui le consomme |
 |---|---|---|
-| [**Serveur MCP**](/docs/ai/mcp) | Un serveur stdio Model Context Protocol avec 40 outils couvrant votre schéma, vos données, utilisateurs, stockage, cron et serveur de dev | Un assistant, au runtime |
+| [**Serveur MCP**](/docs/ai/mcp) | Un serveur stdio Model Context Protocol avec 41 outils couvrant votre schéma, vos données, utilisateurs, stockage, cron et serveur de dev | Un assistant, au runtime |
 | [**Compétences d'agent**](/docs/ai/skills) | 20 fichiers de compétences Markdown écrits dans votre dépôt par `rebase skills install` | Un assistant, en tant que documentation de référence |
 | [**Fichiers d'instructions**](/docs/ai/instruction-files) | `ai-instructions.md` ainsi que des fichiers pointeurs par assistant, générés par `rebase init` | Un assistant, en tant que règles permanentes |
 | [**Clés d'API**](/docs/backend/api#api-keys) | Identifiants machine délimités, par collection et par opération | Tout ce qui appelle l'API HTTP |

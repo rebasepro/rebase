@@ -16,7 +16,8 @@ The Rebase MCP server provides these tools for AI agents. Use the MCP tool calli
 |------|-------------|------------|
 | `rebase_schema_generate` | Generate Drizzle schema from collection definitions. Run after adding or modifying collection files | — |
 | `rebase_schema_introspect` | Introspect the live database and generate Rebase collection definitions from existing tables | — |
-| `rebase_db_push` | Apply the current Drizzle schema directly to the database (development shortcut, skips migration files) | — |
+| `rebase_schema_plan` | Show the SQL `rebase_db_push` would run, without running any of it. Read this before proposing a schema change | — |
+| `rebase_db_push` | Apply the current Drizzle schema directly to the database (development shortcut, skips migration files). Refuses anything that destroys data — plan it, then ask a human to run `rebase db push --allow-destructive` | — |
 | `rebase_db_generate` | Generate SQL migration files from schema changes (compares current Drizzle schema against the last entity) | — |
 | `rebase_db_migrate` | Run all pending SQL migrations against the database | — |
 

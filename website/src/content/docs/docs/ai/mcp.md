@@ -1,7 +1,7 @@
 ---
 title: MCP Server
 sidebar_label: MCP Server
-description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 40 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
+description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 41 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
 ---
 
 `@rebasepro/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
@@ -191,7 +191,7 @@ in between but the assistant's judgement about which project is active.
 on the loopback interface.** The gate is written as a list of what is *not*
 gated, so a tool added later arrives protected by default.
 
-- **Not gated — reads:** `rebase_schema_introspect`, `rebase_doctor`,
+- **Not gated — reads:** `rebase_schema_plan`, `rebase_schema_introspect`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
@@ -281,15 +281,16 @@ it accordingly.
 
 ## Tool reference
 
-40 tools, in eight groups. Tools marked ⚠ are refused against non-local targets
+41 tools, in eight groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
-### Schema & database (11)
+### Schema & database (12)
 
 Spawn the Rebase CLI in the active project directory.
 
 | Tool | Required | Description |
 |---|---|---|
+| `rebase_schema_plan` | — | Show the SQL `rebase_db_push` would run, without running any of it |
 | `rebase_schema_generate` | — | Generate Drizzle schema from collection definitions |
 | `rebase_db_push` ⚠ | — | Apply the schema directly to the database (dev shortcut) |
 | `rebase_schema_introspect` | — | Introspect the live database into collection definitions |

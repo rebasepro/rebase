@@ -1,7 +1,7 @@
 ---
 title: Server MCP
 sidebar_label: Server MCP
-description: Connetti Claude Code, Cursor, Gemini CLI o qualsiasi client MCP a un progetto Rebase — i 40 strumenti che espone, le credenziali con cui si autentica e il gate di loopback posto tra un agente e la produzione.
+description: Connetti Claude Code, Cursor, Gemini CLI o qualsiasi client MCP a un progetto Rebase — i 41 strumenti che espone, le credenziali con cui si autentica e il gate di loopback posto tra un agente e la produzione.
 ---
 
 `@rebasepro/mcp` è un server [Model Context Protocol](https://modelcontextprotocol.io)
@@ -191,7 +191,7 @@ frapposto se non la valutazione dell'assistente su quale progetto sia attivo.
 trovi sull'interfaccia di loopback.** Il gate è strutturato come un elenco di ciò che *non* è
 sottoposto a restrizione; pertanto, qualsiasi strumento aggiunto successivamente sarà protetto per impostazione predefinita.
 
-- **Non soggetti a restrizioni — letture:** `rebase_schema_introspect`, `rebase_doctor`,
+- **Non soggetti a restrizioni — letture:** `rebase_schema_plan`, `rebase_schema_introspect`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
@@ -282,14 +282,15 @@ trattalo con la dovuta cautela.
 
 ## Riferimento degli strumenti
 
-40 strumenti, suddivisi in otto gruppi. Gli strumenti contrassegnati con ⚠ vengono rifiutati su destinazioni non locali, a meno che non si scelga esplicitamente di consentirli.
+41 strumenti, suddivisi in otto gruppi. Gli strumenti contrassegnati con ⚠ vengono rifiutati su destinazioni non locali, a meno che non si scelga esplicitamente di consentirli.
 
-### Schema e database (11)
+### Schema e database (12)
 
 Avviano la CLI di Rebase nella directory del progetto attivo.
 
 | Strumento | Richiesto | Descrizione |
 |---|---|---|
+| `rebase_schema_plan` | — | Mostra l'SQL che `rebase_db_push` eseguirebbe, senza eseguirne nulla |
 | `rebase_schema_generate` | — | Genera lo schema Drizzle dalle definizioni delle collezioni |
 | `rebase_db_push` ⚠ | — | Applica lo schema direttamente al database (scorciatoia di sviluppo) |
 | `rebase_schema_introspect` | — | Esegue l'introspezione del database attivo nelle definizioni delle collezioni |

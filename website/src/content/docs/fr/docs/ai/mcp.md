@@ -1,7 +1,7 @@
 ---
 title: Serveur MCP
 sidebar_label: Serveur MCP
-description: Connectez Claude Code, Cursor, Gemini CLI ou tout client MCP à un projet Rebase — les 40 outils qu'il expose, l'identifiant avec lequel il s'authentifie et la barrière de loopback qui s'interpose entre un agent et la production.
+description: Connectez Claude Code, Cursor, Gemini CLI ou tout client MCP à un projet Rebase — les 41 outils qu'il expose, l'identifiant avec lequel il s'authentifie et la barrière de loopback qui s'interpose entre un agent et la production.
 ---
 
 `@rebasepro/mcp` est un serveur [Model Context Protocol](https://modelcontextprotocol.io)
@@ -202,7 +202,7 @@ sur l'interface de loopback.** La barrière est conçue comme une liste de ce qu
 n'*est pas* restreint, de sorte qu'un outil ajouté ultérieurement est protégé par
 défaut.
 
-- **Non restreint — lectures :** `rebase_schema_introspect`, `rebase_doctor`,
+- **Non restreint — lectures :** `rebase_schema_plan`, `rebase_schema_introspect`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
@@ -298,15 +298,16 @@ projet que vous avez enregistré ; traitez-le en conséquence.
 
 ## Référence des outils
 
-40 outils, répartis en huit groupes. Les outils marqués d'un ⚠ sont refusés sur les
+41 outils, répartis en huit groupes. Les outils marqués d'un ⚠ sont refusés sur les
 cibles non locales, sauf si vous désactivez cette restriction.
 
-### Schéma & base de données (11)
+### Schéma & base de données (12)
 
 Lance la CLI Rebase dans le répertoire du projet actif.
 
 | Outil | Requis | Description |
 |---|---|---|
+| `rebase_schema_plan` | — | Affiche le SQL que `rebase_db_push` exécuterait, sans rien exécuter |
 | `rebase_schema_generate` | — | Générer le schéma Drizzle à partir des définitions de collection |
 | `rebase_db_push` ⚠ | — | Appliquer le schéma directement à la base de données (raccourci de développement) |
 | `rebase_schema_introspect` | — | Introspecter la base de données active pour générer les définitions de collection |
