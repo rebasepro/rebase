@@ -5,17 +5,23 @@ import { fileURLToPath } from "url";
 /**
  * This CLI's own version, and the User-Agent built from it.
  *
- * Three call sites used to answer "what version am I?" and each answered it
- * differently: `cli.ts` walked one directory up from `__dirname`, `init.ts`
- * walked up looking for a folder literally named `cli`, and every HTTP request
- * to the control plane answered it not at all. The last one is the expensive
- * gap — the control plane cannot refuse a CLI that is too old for its wire
- * format if no request ever says which CLI is calling.
+ * Four call sites used to answer "what version am I?" and each answered it
+ * differently. `cli.ts` walked one directory up from `__dirname`. `init.ts`
+ * walked up looking for a folder literally named `cli`. `bundle.ts` had
+ * `resolveCliVersion`, which walked up at most five levels for a manifest whose
+ * `name` matched — the only one of the three that was actually correct, and the
+ * one the other two did not know existed. Every HTTP request to the control
+ * plane answered it not at all, which is the expensive gap: a control plane
+ * cannot refuse a CLI that is too old for its wire format if no request ever
+ * says which CLI is calling.
  *
- * Resolved by walking up for the manifest that actually names this package,
- * rather than by counting directories or matching a folder name: `dist/` is one
- * level down in a published install and two in a source checkout, and a folder
- * named `cli` is not guaranteed to be ours.
+ * One answer now, and it is `bundle.ts`'s: walk up for the manifest that names
+ * this package, rather than counting directories or matching a folder name.
+ * `dist/` is one level down in a published install and two in a source
+ * checkout, and a folder called `cli` is not guaranteed to be ours. Two
+ * differences from that original — `fileURLToPath` instead of `new
+ * URL().pathname`, which is what makes it survive a path containing a space,
+ * and no five-level ceiling.
  */
 function readVersion(): string {
     let dir = path.dirname(fileURLToPath(import.meta.url));

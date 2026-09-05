@@ -32,6 +32,7 @@ import {
     type RebaseBackendAppConfig
 } from "@rebasepro/types";
 import { resolveBackendPaths } from "./manifest";
+import { cliVersion } from "./utils/version";
 import { analyseFunctionsDirectory, summarisePortability } from "./function-portability";
 import {
     getActiveBackendPlugin,
@@ -1184,7 +1185,7 @@ stdio: "inherit" });
         resources: resourceGraph,
         deps: { declared },
         build: {
-            cli: resolveCliVersion(),
+            cli: cliVersion(),
             node: process.versions.node.split(".")[0],
             createdAt: new Date().toISOString()
         }
@@ -1631,7 +1632,7 @@ spa: options.spa ?? true }] },
         // Nothing to install beside a static bundle — it is just files.
         deps: { declared: {} },
         build: {
-            cli: resolveCliVersion(),
+            cli: cliVersion(),
             node: process.versions.node.split(".")[0],
             createdAt: new Date().toISOString()
         }
@@ -1748,27 +1749,6 @@ function resolveServerVersion(projectRoot: string): string {
         } catch {
             // fall through
         }
-    }
-    return "unknown";
-}
-
-export function resolveCliVersion(): string {
-    try {
-        const here = path.dirname(new URL(import.meta.url).pathname);
-        let dir = here;
-        for (let i = 0; i < 5; i++) {
-            const candidate = path.join(dir, "package.json");
-            if (fs.existsSync(candidate)) {
-                const pkg = JSON.parse(fs.readFileSync(candidate, "utf8")) as {
-                    name?: string;
-                    version?: string;
-                };
-                if (pkg.name === "@rebasepro/cli" && pkg.version) return pkg.version;
-            }
-            dir = path.dirname(dir);
-        }
-    } catch {
-        // Version is informational; an unknown value must not fail a build.
     }
     return "unknown";
 }

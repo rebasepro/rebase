@@ -20,12 +20,12 @@ import type { RebaseAppConfig, RebaseStaticAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
+import { cliVersion } from "../utils/version";
 import { buildableApps, findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
 import {
     buildBundle,
     buildStaticBundle,
     detectFrameworkDepDrift,
-    resolveCliVersion,
     DEFAULT_BUNDLE_DIR,
     VENDOR_SIZE_WARN_BYTES
 } from "../bundle";
@@ -249,9 +249,9 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                A warning rather than a hard failure: the CLI cannot know that a
                newer package has actually been published, and refusing to build
                over a guess would be worse than saying it out loud. */
-            const drift = detectFrameworkDepDrift(projectRoot, resolveCliVersion());
+            const drift = detectFrameworkDepDrift(projectRoot, cliVersion());
             if (drift.behind.length > 0) {
-                console.log(chalk.yellow(`    ⚠ framework dependencies older than this CLI (${resolveCliVersion()}):`));
+                console.log(chalk.yellow(`    ⚠ framework dependencies older than this CLI (${cliVersion()}):`));
                 for (const dep of drift.behind) {
                     console.log(chalk.dim(`      ${dep.name}@${dep.range}  (${dep.file})`));
                 }

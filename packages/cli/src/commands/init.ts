@@ -9,6 +9,7 @@ import { cp } from "fs/promises";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
+import { cliVersion } from "../utils/version";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { resolveCloudUrl, writeLink } from "./cloud/context";
 import type { PackageManager, PMCommands } from "../utils/package-manager";
@@ -927,12 +928,9 @@ function firstLine(text: string): string {
 async function replacePlaceholders(options: InitOptions) {
     const filesToProcess = TEMPLATE_PLACEHOLDER_FILES;
 
-    const packageJsonPath = path.resolve(cliRoot!, "package.json");
-    let cliVersion = "latest";
-    if (fs.existsSync(packageJsonPath)) {
-        const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-        cliVersion = pkg.version || "latest";
-    }
+    // `unknown` only when the manifest could not be read at all, which is the
+    // same "nothing to pin, nothing to confirm" case `latest` used to stand for.
+    const version = cliVersion();
 
     const fileContents = new Map<string, string>();
     const allPackages = new Set<string>();
@@ -949,13 +947,13 @@ async function replacePlaceholders(options: InitOptions) {
 
     // `latest` means this CLI could not read its own manifest — there is no
     // version to confirm, and nothing to gain from asking.
-    const skipProbe = process.env.REBASE_E2E === "true" || cliVersion === "latest";
-    const probe: ReleaseProbe = skipProbe ? { kind: "published" } : await probeRelease(cliVersion);
+    const skipProbe = process.env.REBASE_E2E === "true" || version === "unknown";
+    const probe: ReleaseProbe = skipProbe ? { kind: "published" } : await probeRelease(version);
 
     if (probe.kind === "gap") {
         throw new Error(
-            `Rebase ${cliVersion} is not fully published to npm.\n\n` +
-            `${RELEASE_PROBE_PACKAGE} has no ${cliVersion} release — the registry has ${probe.found}.\n` +
+            `Rebase ${version} is not fully published to npm.\n\n` +
+            `${RELEASE_PROBE_PACKAGE} has no ${version} release — the registry has ${probe.found}.\n` +
             `Every @rebasepro package ships at one version, so scaffolding would pin ${allPackages.size}\n` +
             `dependencies at a version that is not there, and the install would fail.\n\n` +
             "That is a release gap in Rebase itself — not a problem with your machine,\n" +
@@ -967,11 +965,11 @@ async function replacePlaceholders(options: InitOptions) {
     }
 
     if (probe.kind === "published") {
-        console.log(chalk.gray(`  Pinning ${allPackages.size} @rebasepro package(s) to ${cliVersion}...`));
+        console.log(chalk.gray(`  Pinning ${allPackages.size} @rebasepro package(s) to ${version}...`));
     }
 
     if (probe.kind === "unreachable") {
-        console.log(chalk.gray(`  Pinning @rebasepro packages to ${cliVersion} (this CLI's version).`));
+        console.log(chalk.gray(`  Pinning @rebasepro packages to ${version} (this CLI's version).`));
         console.log(chalk.yellow(`  Could not reach npm to confirm the release: ${probe.reason}`));
         console.log(chalk.gray("  The pin is right either way — install will say so if the version is missing."));
     }
@@ -981,7 +979,7 @@ async function replacePlaceholders(options: InitOptions) {
         for (const pkgName of allPackages) {
             content = content.replace(
                 new RegExp(`"${pkgName}":\\s*"workspace:\\*"`, "g"),
-                `"${pkgName}": "${cliVersion}"`
+                `"${pkgName}": "${version}"`
             );
         }
         fs.writeFileSync(fullPath, content, "utf-8");
@@ -1058,16 +1056,8 @@ async function findAvailablePort(startPort: number): Promise<number> {
  * names a version that was never published.
  */
 function readCliVersion(): string {
-    try {
-        const manifest = path.resolve(cliRoot!, "package.json");
-        if (fs.existsSync(manifest)) {
-            const pkg = JSON.parse(fs.readFileSync(manifest, "utf-8"));
-            if (typeof pkg.version === "string" && pkg.version) return pkg.version;
-        }
-    } catch {
-        // Fall through — see the doc comment.
-    }
-    return "latest";
+    const version = cliVersion();
+    return version === "unknown" ? "latest" : version;
 }
 
 /**
