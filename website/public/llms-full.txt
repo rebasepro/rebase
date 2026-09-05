@@ -4782,6 +4782,59 @@ GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
 GET /api/data/products?and=(active.eq.true,price.gt.0)
 ```
 
+**One group per request, and `or` wins.** If a request carries both `?or=` and
+`?and=`, the `and` is ignored — they are two spellings of the same slot, not two
+filters. Nest instead:
+
+```bash
+GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
+```
+
+Groups may nest 32 levels deep; past that the request is refused with
+`INVALID_LOGICAL_GROUP`.
+
+A group **narrows** alongside the field filters rather than replacing them — see
+[How the filters combine](#how-the-filters-combine).
+
+#### The `where` JSON dialect
+
+The field filters above are one of two ways to send a filter. The other is a
+single JSON object, which is what the OpenAPI document publishes on every
+`GET /api/data/{slug}` and what the nested subcollection routes take:
+
+```bash
+GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
+```
+
+Each key is a field, each value a canonical `[operator, value]` tuple — the same
+tuples the SDK writes. A value may also be a pre-serialized dot-string
+(`{"status":"eq.active"}`) or a bare scalar (`{"status":"active"}`); all three
+compile to the same condition.
+
+The difference worth knowing: **JSON carries types.** `?price=gte.100` sends the
+string `"100"` and the driver casts it by column type, while
+`?where={"price":[">=",100]}` sends a number. For a column whose text and
+numeric readings differ — a version string, a zero-padded code — that is the
+parameter to reach for.
+
+A malformed `where` is a 400 `INVALID_WHERE`, not a silently dropped filter:
+dropping it would run the read unfiltered and return everything row-level
+security happens to allow.
+
+#### How the filters combine
+
+`?field=op.value`, `?where=`, `?or=`/`?and=` and `?searchString=` are
+independent, and every one of them that is present must match:
+
+```text
+(field filters and `where`, AND-ed together)
+  AND (the logical group)
+  AND (the search string)
+```
+
+There is no way to OR one against another. Anything that is not a plain AND of
+those groups belongs inside a single `or=`/`and=` tree.
+
 ### Sorting
 
 Use `orderBy` with the format `field:direction`:
@@ -13656,6 +13709,20 @@ negative, or fractional one — is refused with a 400 `INVALID_LIMIT` rather tha
 clamped, because a silently smaller page cannot be told apart from the last one.
 To read past that ceiling, walk the pages with `iterate()` or `findAll()`.
 
+#### Which reads are wrapped, and which are not
+
+Two shapes, and one rule: **a window is wrapped, a whole answer is not.**
+
+| Method | Returns | Why |
+|--------|---------|-----|
+| `find()`, `listen()` | `{ data, meta }` | One page. `meta.total` / `meta.hasMore` are the only way to know there is more |
+| `findAll()`, `createMany()`, `updateMany()` | `M[]` | Nothing left over to report — the walk finished, or the batch *is* the rows |
+| `iterate()` | one row at a time | Nothing is materialised at all |
+| `findById()`, `get()`, `create()`, `update()` | one row | Not a list |
+
+`data` is not a wrapper the SDK sometimes adds and sometimes forgets. It is
+where the pagination metadata lives, and it is there exactly when there is some.
+
 #### Reading everything: `iterate()` and `findAll()`
 
 `iterate()` streams every row a query matches, one at a time, fetching a page at
@@ -14198,6 +14265,14 @@ const result = await client.call<{ summary: string }>(
     { articleId: 42 }
 );
 ```
+
+Both return **the function's response body, verbatim**. Neither reaches into it
+for a `data` key, so a function that answers `{ data: [...] }` gives you that
+object and you read `.data` yourself.
+
+`call()` takes a full path and always POSTs; `invoke()` takes a function name
+and can take a method, a sub-path and headers. Use `invoke()` unless you are
+calling something that is not a function.
 
 ### Next Steps
 

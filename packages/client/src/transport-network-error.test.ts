@@ -105,6 +105,86 @@ describe("the offline code is spelled like every other code", () => {
     });
 });
 
+/**
+ * The envelope's `requestId` and the response's `Retry-After` were both read
+ * off the wire and then dropped: a bug report could not quote the one string
+ * that finds the server-side line, and the offline queue's backoff ignored a
+ * server that had said exactly how long to wait.
+ */
+describe("a failed response carries what it said about itself", () => {
+    const failing = (init: {
+        status: number;
+        body: unknown;
+        headers?: Record<string, string>;
+    }) => createTransport({
+        baseUrl: "http://localhost:3000",
+        fetch: jest.fn(async () => ({
+            ok: false,
+            status: init.status,
+            statusText: "Too Many Requests",
+            headers: { get: (name: string) => init.headers?.[name] ?? null },
+            text: async () => JSON.stringify(init.body)
+        })) as unknown as typeof globalThis.fetch
+    });
+
+    it("keeps the envelope's requestId", async () => {
+        const transport = failing({
+            status: 409,
+            body: { error: { message: "nope", code: "CONFLICT", requestId: "req-9f1c" } }
+        });
+
+        const error = await transport.request("/data/posts").catch((e: unknown) => e);
+        expect((error as RebaseApiError).requestId).toBe("req-9f1c");
+    });
+
+    it("falls back to the X-Request-ID header when the body carries none", async () => {
+        const transport = failing({
+            status: 500,
+            body: { error: { message: "boom", code: "INTERNAL_ERROR" } },
+            headers: { "X-Request-ID": "req-from-header" }
+        });
+
+        const error = await transport.request("/data/posts").catch((e: unknown) => e);
+        expect((error as RebaseApiError).requestId).toBe("req-from-header");
+    });
+
+    it("reads Retry-After as seconds", async () => {
+        const transport = failing({
+            status: 429,
+            body: { error: { message: "slow down", code: "RATE_LIMITED" } },
+            headers: { "Retry-After": "30" }
+        });
+
+        const error = await transport.request("/data/posts").catch((e: unknown) => e);
+        expect((error as RebaseApiError).retryAfterSeconds).toBe(30);
+    });
+
+    it("reads Retry-After as an HTTP date too, which is the other legal spelling", async () => {
+        const at = new Date(Date.now() + 45_000).toUTCString();
+        const transport = failing({
+            status: 503,
+            body: { error: { message: "down", code: "SERVICE_UNAVAILABLE" } },
+            headers: { "Retry-After": at }
+        });
+
+        const error = await transport.request("/data/posts").catch((e: unknown) => e);
+        const seconds = (error as RebaseApiError).retryAfterSeconds!;
+        expect(seconds).toBeGreaterThanOrEqual(43);
+        expect(seconds).toBeLessThanOrEqual(46);
+    });
+
+    it("leaves both undefined when the server said neither", async () => {
+        const transport = failing({
+            status: 404,
+            body: { error: { message: "gone", code: "NOT_FOUND" } }
+        });
+
+        const error = await transport.request("/data/posts").catch((e: unknown) => e);
+        expect((error as RebaseApiError).requestId).toBeUndefined();
+        expect((error as RebaseApiError).retryAfterSeconds).toBeUndefined();
+    });
+});
+
 /** The two helpers this workstream added, on the class they describe. */
 describe("unsupported-method stubs", () => {
     it("are recognised, and a plain function is not", () => {

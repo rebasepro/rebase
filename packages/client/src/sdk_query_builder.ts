@@ -52,7 +52,16 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
     where(logicalCondition: LogicalCondition): this;
     where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown): this {
         if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {
-            this.params.logical = columnOrCondition as LogicalCondition;
+            // A second group **narrows** rather than replaces. Every other
+            // `.where()` on this builder adds a condition, and `find()`'s
+            // `where`/`logical`/`search` are AND-ed with each other — so a
+            // second `.where(or(…))` silently discarding the first was the one
+            // call on the chain that widened the result set instead. An `or`
+            // that is dropped returns rows the caller filtered out.
+            const next = columnOrCondition as LogicalCondition;
+            this.params.logical = this.params.logical
+                ? { type: "and", conditions: [this.params.logical, next] }
+                : next;
             return this;
         }
 

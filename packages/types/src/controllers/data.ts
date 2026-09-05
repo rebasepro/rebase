@@ -673,6 +673,26 @@ export interface SDKCollectionClient<
 > {
     /**
      * Find multiple records with optional filtering, pagination, and sorting.
+     *
+     * ## What a list method returns
+     *
+     * Two shapes, and one rule that tells them apart: **a window is wrapped, a
+     * whole answer is not.**
+     *
+     * - `find()` and `listen()` return {@link FindResult} — `{ data, meta }` —
+     *   because they hand back *one page*. `meta.total` and `meta.hasMore` are
+     *   the caller's only way to know there is more, so a bare array would lose
+     *   the answer to the question the call raises.
+     * - `findAll()`, `createMany()` and `updateMany()` return a plain `M[]`,
+     *   because there is nothing left over to report: the walk finished, or the
+     *   batch is exactly the rows that were written. A `meta` there would be
+     *   `{ total: rows.length, hasMore: false }`, which says nothing.
+     * - `iterate()` yields rows one at a time and never materialises a list at
+     *   all.
+     *
+     * So `data` is not a wrapper the SDK sometimes adds and sometimes forgets —
+     * it is where the pagination metadata lives, and it is present exactly when
+     * there is some.
      */
     find(params?: FindParams<M>): Promise<FindResult<M>>;
 
@@ -824,10 +844,18 @@ export interface SDKCollectionClient<
     /**
      * Update an existing record by ID.
      * @param data The fields to update (the collection's `Update` shape).
+     * @param options Per-request write options — notably `idempotencyKey`.
      * @returns The updated row.
      * @throws {RebaseApiError} with status 404 when the record does not exist.
+     *
+     * `create`, `createMany`, `updateMany`, `delete` and `deleteMany` all took
+     * {@link WriteOptions}; this one did not, so the single-row update was the
+     * one write on the surface that could not be made idempotent. A client that
+     * never sees the response retries, and without a key the server cannot tell
+     * that retry from a second deliberate edit — which on a `PATCH` that
+     * increments or appends is a second edit applied.
      */
-    update(id: string | number, data: U): Promise<M>;
+    update(id: string | number, data: U, options?: WriteOptions): Promise<M>;
 
     /**
      * Update many records in a single request and a single transaction.

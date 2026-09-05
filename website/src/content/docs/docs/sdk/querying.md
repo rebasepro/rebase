@@ -384,6 +384,20 @@ negative, or fractional one — is refused with a 400 `INVALID_LIMIT` rather tha
 clamped, because a silently smaller page cannot be told apart from the last one.
 To read past that ceiling, walk the pages with `iterate()` or `findAll()`.
 
+### Which reads are wrapped, and which are not
+
+Two shapes, and one rule: **a window is wrapped, a whole answer is not.**
+
+| Method | Returns | Why |
+|--------|---------|-----|
+| `find()`, `listen()` | `{ data, meta }` | One page. `meta.total` / `meta.hasMore` are the only way to know there is more |
+| `findAll()`, `createMany()`, `updateMany()` | `M[]` | Nothing left over to report — the walk finished, or the batch *is* the rows |
+| `iterate()` | one row at a time | Nothing is materialised at all |
+| `findById()`, `get()`, `create()`, `update()` | one row | Not a list |
+
+`data` is not a wrapper the SDK sometimes adds and sometimes forgets. It is
+where the pagination metadata lives, and it is there exactly when there is some.
+
 ### Reading everything: `iterate()` and `findAll()`
 
 `iterate()` streams every row a query matches, one at a time, fetching a page at
@@ -926,6 +940,14 @@ const result = await client.call<{ summary: string }>(
     { articleId: 42 }
 );
 ```
+
+Both return **the function's response body, verbatim**. Neither reaches into it
+for a `data` key, so a function that answers `{ data: [...] }` gives you that
+object and you read `.data` yourself.
+
+`call()` takes a full path and always POSTs; `invoke()` takes a function name
+and can take a method, a sub-path and headers. Use `invoke()` unless you are
+calling something that is not a function.
 
 ## Next Steps
 

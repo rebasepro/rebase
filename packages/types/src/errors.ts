@@ -63,6 +63,25 @@ export interface RebaseErrorInit {
     code?: RebaseErrorCode;
     /** Structured error payload returned by the server, when present. */
     details?: unknown;
+    /**
+     * The server's correlation id for the request that failed, when it sent
+     * one — the `requestId` in the error envelope, which also comes back on the
+     * `X-Request-ID` header.
+     *
+     * The envelope has carried it for a while; the client dropped it on the
+     * floor, so a bug report from an app could never quote the one string that
+     * finds the server-side line.
+     */
+    requestId?: string;
+    /**
+     * Seconds to wait before retrying, from the response's `Retry-After`
+     * header. Present on a 429 and on some 503s.
+     *
+     * Also dropped. The offline queue's own backoff therefore ignored a server
+     * that had said exactly how long to wait — the one number that turns a
+     * retry storm into a queue that drains.
+     */
+    retryAfterSeconds?: number;
     /** The underlying error this one wraps, if any. */
     cause?: unknown;
 }
@@ -98,6 +117,10 @@ export class RebaseApiError extends Error {
     readonly code?: RebaseErrorCode;
     /** Structured error payload from the server, when present. */
     readonly details?: unknown;
+    /** See {@link RebaseErrorInit.requestId}. Quote it in a bug report. */
+    readonly requestId?: string;
+    /** See {@link RebaseErrorInit.retryAfterSeconds}. */
+    readonly retryAfterSeconds?: number;
 
     constructor(message: string, init: RebaseErrorInit = {}) {
         super(message);
@@ -105,6 +128,8 @@ export class RebaseApiError extends Error {
         this.status = init.status;
         this.code = init.code;
         this.details = init.details;
+        this.requestId = init.requestId;
+        this.retryAfterSeconds = init.retryAfterSeconds;
         if (init.cause !== undefined) {
             // `cause` is standard on Error but not always in the lib target's type.
             (this as { cause?: unknown }).cause = init.cause;

@@ -241,10 +241,13 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
          * and the route now name one verb, and a spec-validating gateway in
          * front of the API sees the operation the server actually implements.
          */
-        async update(id: string | number, data: Partial<M>) {
+        async update(id: string | number, data: Partial<M>, options?: WriteOptions) {
             const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
                 method: "PATCH",
-                body: JSON.stringify(data)
+                body: JSON.stringify(data),
+                ...(options?.idempotencyKey
+                    ? { headers: { "Idempotency-Key": options.idempotencyKey } }
+                    : {})
             });
             return raw as M;
         },

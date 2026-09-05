@@ -138,6 +138,59 @@ GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
 GET /api/data/products?and=(active.eq.true,price.gt.0)
 ```
 
+**One group per request, and `or` wins.** If a request carries both `?or=` and
+`?and=`, the `and` is ignored — they are two spellings of the same slot, not two
+filters. Nest instead:
+
+```bash
+GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
+```
+
+Groups may nest 32 levels deep; past that the request is refused with
+`INVALID_LOGICAL_GROUP`.
+
+A group **narrows** alongside the field filters rather than replacing them — see
+[How the filters combine](#how-the-filters-combine).
+
+### The `where` JSON dialect
+
+The field filters above are one of two ways to send a filter. The other is a
+single JSON object, which is what the OpenAPI document publishes on every
+`GET /api/data/{slug}` and what the nested subcollection routes take:
+
+```bash
+GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
+```
+
+Each key is a field, each value a canonical `[operator, value]` tuple — the same
+tuples the SDK writes. A value may also be a pre-serialized dot-string
+(`{"status":"eq.active"}`) or a bare scalar (`{"status":"active"}`); all three
+compile to the same condition.
+
+The difference worth knowing: **JSON carries types.** `?price=gte.100` sends the
+string `"100"` and the driver casts it by column type, while
+`?where={"price":[">=",100]}` sends a number. For a column whose text and
+numeric readings differ — a version string, a zero-padded code — that is the
+parameter to reach for.
+
+A malformed `where` is a 400 `INVALID_WHERE`, not a silently dropped filter:
+dropping it would run the read unfiltered and return everything row-level
+security happens to allow.
+
+### How the filters combine
+
+`?field=op.value`, `?where=`, `?or=`/`?and=` and `?searchString=` are
+independent, and every one of them that is present must match:
+
+```text
+(field filters and `where`, AND-ed together)
+  AND (the logical group)
+  AND (the search string)
+```
+
+There is no way to OR one against another. Anything that is not a plain AND of
+those groups belongs inside a single `or=`/`and=` tree.
+
 ## Sorting
 
 Use `orderBy` with the format `field:direction`:

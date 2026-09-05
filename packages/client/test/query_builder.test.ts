@@ -466,12 +466,24 @@ describe("QueryBuilder — where(logicalCondition)", () => {
         expect(decoded).toContain("or=(author.eq.a,author.eq.b)");
     });
 
-    it("a second logical group replaces the first", () => {
+    /**
+     * A second group **narrows**, like every other `.where()` on the chain.
+     *
+     * It used to replace the first, silently — the one call on the builder that
+     * made a query match *more* rows rather than fewer. `find()`'s own
+     * `where`/`logical`/`search` are AND-ed with each other, and a dropped `or`
+     * returns rows the caller wrote the filter to exclude, which is the
+     * direction that does not announce itself.
+     */
+    it("a second logical group ANDs with the first", () => {
         const qb = new QueryBuilder(createMockCollection());
         qb.where(or(cond("a", "==", 1))).where(and(cond("b", "==", 2)));
         expect(getParams(qb).logical).toEqual({
             type: "and",
-            conditions: [{ column: "b", operator: "==", value: 2 }]
+            conditions: [
+                { type: "or", conditions: [{ column: "a", operator: "==", value: 1 }] },
+                { type: "and", conditions: [{ column: "b", operator: "==", value: 2 }] }
+            ]
         });
     });
 });

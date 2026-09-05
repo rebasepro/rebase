@@ -5,6 +5,7 @@ import { hasAdministrativeRole } from "./admin-roles";
 import { ANONYMOUS_USER_ID, DataDriver, isPublicStoragePath } from "@rebasepro/types";
 import { verifyAccessToken, AccessTokenPayload, isJwtConfigured, verifyDownloadToken, type DownloadTokenPayload } from "./jwt";
 import type { HonoEnv } from "../api/types";
+import { ApiError, errorHandler } from "../api/errors";
 import { scopeDataDriver } from "./rls-scope";
 import { safeCompare } from "./crypto-utils";
 import { isApiKeyToken, validateApiKey } from "./api-keys/api-key-middleware";
@@ -77,6 +78,30 @@ export interface AuthMiddlewareOptions {
 }
 
 /**
+ * Answer a refusal with the canonical envelope, through the same formatter
+ * every route uses.
+ *
+ * These middlewares used to hand-build `c.json({ error: { message, code } },
+ * 401)` — seven near-copies of it, which is how they came to omit `requestId`
+ * while every other error on the server carried it: the one string a bug report
+ * quotes was missing from precisely the errors an app hits most. It also meant
+ * a routine 401 (a client refreshing before it knows whether a session exists)
+ * logged like an incident, because `ApiError.expected` never reached the
+ * logger.
+ *
+ * `errorHandler` is *called* rather than thrown to. A throw only becomes an
+ * envelope where an `onError` is registered, and these middlewares are mounted
+ * by callers this package does not control — `defineFunction` hands users a
+ * Hono app and invites them to put `requireAuth` on a route of it. Making the
+ * status depend on the mount point would turn a 401 into a 500 for exactly
+ * those callers. Calling the formatter directly gets the envelope with none of
+ * that.
+ */
+function refuse(c: Context<HonoEnv>, error: ApiError): Response {
+    return errorHandler(error, c) as Response;
+}
+
+/**
  * Hono middleware that requires a valid JWT token via Authorization header.
  * Returns 401 if token is missing or invalid.
  *
@@ -97,23 +122,13 @@ export const requireAuth: MiddlewareHandler<HonoEnv> = async (
     const token = extractBearerToken(c.req.header("authorization"));
 
     if (token === undefined) {
-        return c.json({
-            error: {
-                message: "Authorization header missing or invalid",
-                code: "UNAUTHORIZED"
-            }
-        }, 401);
+        return refuse(c, ApiError.unauthenticated("Authorization header missing or invalid"));
     }
 
     const payload = await verifyAccessToken(token);
 
     if (!payload) {
-        return c.json({
-            error: {
-                message: "Invalid or expired token",
-                code: "UNAUTHORIZED"
-            }
-        }, 401);
+        return refuse(c, ApiError.unauthenticated("Invalid or expired token"));
     }
 
     c.set("user", payload);
@@ -176,12 +191,7 @@ export function createRequireAuth(options?: {
         const token = extractBearerToken(c.req.header("authorization"));
 
         if (token === undefined) {
-            return c.json({
-                error: {
-                    message: "Authorization header missing or invalid",
-                    code: "UNAUTHORIZED"
-                }
-            }, 401);
+            return refuse(c, ApiError.unauthenticated("Authorization header missing or invalid"));
         }
 
         // Check service key first (constant-time comparison)
@@ -195,12 +205,7 @@ roles: ["admin"] } as AccessTokenPayload);
         const payload = await verifyAccessToken(token);
 
         if (!payload) {
-            return c.json({
-                error: {
-                    message: "Invalid or expired token",
-                    code: "UNAUTHORIZED"
-                }
-            }, 401);
+            return refuse(c, ApiError.unauthenticated("Invalid or expired token"));
         }
 
         if (resolveRoles || revocationRepo) {
@@ -208,9 +213,7 @@ roles: ["admin"] } as AccessTokenPayload);
                 // Same watermark the data plane checks. An admin route is the
                 // last place a revoked token should still work.
                 if (revocationRepo && await isAccessTokenRevoked(revocationRepo, payload)) {
-                    return c.json({
-                        error: { message: "Session has been revoked", code: "SESSION_REVOKED" }
-                    }, 401);
+                    return refuse(c, ApiError.unauthorized("Session has been revoked", "SESSION_REVOKED"));
                 }
                 c.set("user", resolveRoles
                     ? { ...payload, roles: await resolveRoles(payload.uid) }
@@ -248,24 +251,14 @@ export const requireAdmin: MiddlewareHandler<HonoEnv> = async (
 ) => {
     const user = c.get("user");
     if (!user) {
-        return c.json({
-            error: {
-                message: "User not authenticated. requireAuth middleware is missing?",
-                code: "UNAUTHORIZED"
-            }
-        }, 401);
+        return refuse(c, ApiError.unauthorized("User not authenticated. requireAuth middleware is missing?"));
     }
 
     const roles = (typeof user === "object" && user !== null && "roles" in user) ? (user.roles || []) : [];
     const isAdmin = hasAdministrativeRole(roles as string[]);
 
     if (!isAdmin) {
-        return c.json({
-            error: {
-                message: "Admin privileges required for this operation",
-                code: "FORBIDDEN"
-            }
-        }, 403);
+        return refuse(c, ApiError.forbidden("Admin privileges required for this operation"));
     }
 
     return next();
@@ -375,8 +368,7 @@ roles: [] }));
 roles: ["anon"] }));
                 }
             } catch (error) {
-                return c.json({ error: { message: "Unauthorized",
-code: "UNAUTHORIZED" } }, 401);
+                return refuse(c, ApiError.unauthenticated("Unauthorized"));
             }
         } else {
             // Default JWT path (with optional service key support)
@@ -442,8 +434,7 @@ code: "INTERNAL_ERROR" } }, 500);
                         // Token present but invalid — always reject.
                         // Providing a malformed token should never grant access,
                         // regardless of requireAuth setting.
-                        return c.json({ error: { message: "Invalid or expired token",
-code: "UNAUTHORIZED" } }, 401);
+                        return refuse(c, ApiError.unauthenticated("Invalid or expired token"));
                     }
                 }
             } else {
@@ -473,15 +464,11 @@ code: "INTERNAL_ERROR" } }, 500);
         // the same config. Naming the switch is what makes that one fact instead
         // of two mysteries.
         if (enforceAuth && !c.get("user")) {
-            return c.json({
-                error: {
-                    message:
-                        "Unauthorized: Authentication required. This is the API-level gate, not a row " +
-                        "rule — a collection granting public reads still needs a caller. Set " +
-                        "AUTH_REQUIRE=false (or `auth.requireAuth: false`) to let RLS alone decide.",
-                    code: "UNAUTHORIZED"
-                }
-            }, 401);
+            return refuse(c, ApiError.unauthenticated(
+                "Unauthorized: Authentication required. This is the API-level gate, not a row " +
+                "rule — a collection granting public reads still needs a caller. Set " +
+                "AUTH_REQUIRE=false (or `auth.requireAuth: false`) to let RLS alone decide."
+            ));
         }
 
         return next();
@@ -662,14 +649,9 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
      * URL reports a "path mismatch" for a path that matches perfectly.
      */
     const denyMismatch = (outcome: "deny-path" | "deny-storage") =>
-        c.json({
-            error: {
-                message: outcome === "deny-storage"
-                    ? "Forbidden: Scoped token storage mismatch"
-                    : "Forbidden: Scoped token path mismatch",
-                code: "FORBIDDEN"
-            }
-        }, 403);
+        refuse(c, ApiError.forbidden(outcome === "deny-storage"
+            ? "Forbidden: Scoped token storage mismatch"
+            : "Forbidden: Scoped token path mismatch"));
 
     // 1. Authorization: Bearer <token>
     const bearerToken = extractBearerToken(authHeader);
@@ -688,7 +670,7 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
 
         // If it's a file serving route, explicitly reject full access JWTs
         if (isFileRoute) {
-            return c.json({ error: { message: "Unauthorized: Access JWT not allowed on file routes", code: "UNAUTHORIZED" } }, 401);
+            return refuse(c, ApiError.unauthenticated("Unauthorized: Access JWT not allowed on file routes"));
         }
 
         // Otherwise (e.g. /metadata/*) let it pass to downstream requireAuth
@@ -709,7 +691,7 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
         }
 
         // Explicitly reject query-token if it is not a valid scoped download token (e.g. if it is a full access JWT)
-        return c.json({ error: { message: "Unauthorized: Invalid or unauthorized token", code: "UNAUTHORIZED" } }, 401);
+        return refuse(c, ApiError.unauthenticated("Unauthorized: Invalid or unauthorized token"));
     }
 
     return next();

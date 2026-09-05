@@ -301,6 +301,37 @@ title: "Updated" });
      * selector per visible cell, so a single `collection_update` fanned out
      * into one identical count request per row.
      */
+    /**
+     * `create`, `createMany`, `updateMany`, `delete` and `deleteMany` all took
+     * `WriteOptions`; the single-row `update` did not, so it was the one write
+     * on the surface that could not be made idempotent. A client that never
+     * sees the response retries, and without a key the server cannot tell that
+     * retry from a second deliberate edit — which on a `PATCH` that increments
+     * or appends is a second edit applied.
+     */
+    describe("update takes WriteOptions like every other write", () => {
+        it("sends the idempotency key", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockResolvedValue({ id: 1 } as never);
+
+            await client.update(1, { title: "x" }, { idempotencyKey: "attempt-1" });
+
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/1", expect.objectContaining({
+                method: "PATCH",
+                headers: { "Idempotency-Key": "attempt-1" }
+            }));
+        });
+
+        it("sends no header when no key was given", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockResolvedValue({ id: 1 } as never);
+
+            await client.update(1, { title: "x" });
+
+            expect(mockRequest.mock.calls[0][1]).not.toHaveProperty("headers");
+        });
+    });
+
     describe("count request de-duplication", () => {
         it("issues one request for concurrent identical counts", async () => {
             const client = createCollectionClient<PostModel>(transport, "posts");

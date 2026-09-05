@@ -474,7 +474,12 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
     where(logicalCondition: LogicalCondition): this;
     where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown): this {
         if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {
-            this.params.logical = columnOrCondition as LogicalCondition;
+            // A second group narrows rather than replaces — see the SDK
+            // builder in `@rebasepro/client`, which had the same defect.
+            const next = columnOrCondition as LogicalCondition;
+            this.params.logical = this.params.logical
+                ? { type: "and", conditions: [this.params.logical, next] }
+                : next;
             return this;
         }
         if (!this.params.where) this.params.where = {};

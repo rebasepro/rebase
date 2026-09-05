@@ -719,64 +719,16 @@ export class RebaseWebSocketClient {
             }
         }
 
-        // Handle instant row-level patches for collection subscriptions.
-        // These arrive before the full refetch and give immediate cross-tab feedback.
-        if (subscriptionId && type === "collection_patch") {
-            const subscriptionKey = this.backendToCollectionKey.get(subscriptionId);
-            if (subscriptionKey) {
-                const collectionSub = this.collectionSubscriptions.get(subscriptionKey);
-                if (collectionSub && collectionSub.isInitialDataReceived && collectionSub.latestData) {
-                    const patchWireEntity = message.row ?? null;
-                    const patchMessage = message as unknown as { id: string; pks?: PrimaryKeyInfo[] };
-                    const patchEntityId = patchMessage.id;
-                    // The server knows the key columns; remember them, because the
-                    // refetch reconciliation needs them too and carries no id.
-                    if (patchMessage.pks) collectionSub.pks = patchMessage.pks;
-                    const patchRow = patchWireEntity ? (patchWireEntity as unknown as Record<string, unknown>) : null;
-                    let updated: Record<string, unknown>[];
-
-                    if (patchRow === null) {
-                        // Row was deleted — remove it from the cached list
-                        updated = collectionSub.latestData.filter(
-                            e => this.rowAddress(e, collectionSub.pks) !== String(patchEntityId)
-                        );
-                    } else {
-                        // Row was created or updated — merge into the cached list.
-                        // Matched against the patch's own address rather than
-                        // anything read off the row: `patchRow.id` is undefined
-                        // for a table not keyed on `id`, so every update looked
-                        // like a new row and was prepended as a duplicate.
-                        const idx = collectionSub.latestData.findIndex(
-                            e => this.rowAddress(e, collectionSub.pks) === String(patchEntityId)
-                        );
-                        if (idx >= 0) {
-                            // Update in place (preserve array position)
-                            updated = [...collectionSub.latestData];
-                            updated[idx] = patchRow;
-                        } else {
-                            // New row — prepend (most recently created first)
-                            updated = [patchRow, ...collectionSub.latestData];
-                        }
-                    }
-
-                    collectionSub.latestData = updated;
-                    collectionSub.lastUpdated = Date.now();
-
-                    // Fire all callbacks with the patched data
-                    collectionSub.callbacks.forEach(callback => {
-                        try {
-                            callback.onUpdate(updated);
-                        } catch (error) {
-                            console.error("Error in collection patch callback:", error);
-                            if (callback.onError) {
-                                callback.onError(error instanceof Error ? error : new Error(String(error)));
-                            }
-                        }
-                    });
-                    return;
-                }
-            }
-        }
+        // `collection_patch` was handled here. Nothing sends it any more: the
+        // server's immediate row patch was replaced by a scoped refetch, which
+        // is the only delivery on any path — `realtime-patch-pks.test.ts` in
+        // `@rebasepro/server-postgres` asserts zero patch frames, and says so.
+        //
+        // A branch for a message that cannot arrive is not harmless. It carried
+        // its own copy of the cache-merge rules — insert-vs-update by derived
+        // address, delete by filter — beside the refetch reconciliation that
+        // now does the same job, so a fix to one of them was a fix to half the
+        // client, in a half nobody could reach to notice.
 
         // Handle subscription updates for row subscriptions
         if (subscriptionId && type === "single_update") {
