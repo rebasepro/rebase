@@ -119,7 +119,7 @@ transaction that carries the write.** There is no "fire and forget" tier: the
 row and everything its callbacks did commit together or not at all.
 
 - **`beforeSave`, `beforeDelete`** — if the callback throws, the operation is rejected with an HTTP 400 carrying your message and the code `CALLBACK_REJECTED`, and the database write never happens. Throw a `RebaseApiError` from `@rebasepro/types` to pick the status yourself — see [Entity Callbacks](/docs/collections/callbacks#beforesave).
-- **`afterRead`** — the returned row (or transformed row) is what the caller receives. On a request-scoped read the transaction is `READ ONLY`.
+- **`afterRead`** — the returned row (or transformed row) is what the caller receives. Its transaction is `READ ONLY` — see [below](#afterread-cannot-write).
 - **`afterSave`, `afterDelete`** — run *before* the commit, awaited. A throw here rolls the row back and answers the same **400 `CALLBACK_REJECTED`**, with `details.stage` naming the hook. They hold the transaction open while they run, so a slow one is a lock held.
 - **`afterSaveError`** — runs when the save failed, on the way out.
 
@@ -144,6 +144,54 @@ does not belong in the callback body:
 
 The rule of thumb: if the work should still happen when the write is undone, it
 is not part of the write, so it does not go in the hook.
+
+### `afterRead` cannot write
+
+A request-scoped read opens its transaction `READ ONLY`. `afterRead` runs inside
+it, so **no write from that callback can succeed** — not a `context.data`
+create, not an update, not one buried in a helper it calls. Postgres refuses the
+statement with SQLSTATE `25006`, and the caller is answered:
+
+```json
+{ "error": { "message": "An `afterRead` callback tried to write. …",
+             "code": "READ_ONLY_TRANSACTION",
+             "details": { "dbCode": "25006" } } }
+```
+
+That is a 409, not a 500: it is your code being refused, not the server failing.
+The read-only mode is deliberate — a read that quietly writes is a read whose
+cost, locks and RLS surface nobody budgeted for.
+
+So **read auditing does not belong in `afterRead`**. Log the read outside the
+request instead — from a background job fed by whatever you already emit, or
+from a custom function that does the read *and* the write with two separate
+calls:
+
+```typescript no-verify
+// ✗ Fails with READ_ONLY_TRANSACTION on every read.
+callbacks: {
+    afterRead: async ({ path, row, context }) => {
+        await context.data.read_log.create({ path, uid: context.user?.uid });
+        return row;
+    }
+}
+```
+
+```typescript no-verify
+// ✓ The read and the audit row are two operations, and only the second writes.
+import { rebase } from "@rebasepro/server";
+
+export default defineFunction("read-article", (app) => {
+    app.get("/:id", async (c) => {
+        const article = await c.var.driver.fetchOne({ path: "articles", id: c.req.param("id") });
+        await rebase.dataAsAdmin.read_log.create({ path: "articles", uid: c.var.user?.uid });
+        return c.json(article);
+    });
+});
+```
+
+Write-side auditing has no such problem: `afterSave` and `afterDelete` run in a
+read-write transaction, and the audit row commits with the change it records.
 
 ---
 
@@ -172,7 +220,10 @@ const instance = await initializeRebaseBackend({
 
 ### Global Audit Logging
 
-Log all deletions across every collection:
+Record every deletion, across every collection, in an `audit_log` table. Because
+`afterDelete` runs in the delete's own transaction, the audit row and the
+deletion commit together — there is no window in which one exists without the
+other:
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -180,14 +231,23 @@ import { initializeRebaseBackend } from "@rebasepro/server";
 const instance = await initializeRebaseBackend({
     // ... other config
     callbacks: {
-        afterDelete({ collection, id, context }) {
-            console.log(
-                `[AUDIT] User ${context.user?.uid} deleted ${collection.slug}/${id}`
-            );
+        async afterDelete({ collection, id, row, context }) {
+            if (collection.slug === "audit_log") return;   // don't audit the audit
+            await context.data.audit_log.create({
+                action: "delete",
+                collection: collection.slug,
+                entity_id: String(id),
+                actor: context.user?.uid ?? "anonymous",
+                snapshot: row
+            });
         }
     }
 });
 ```
+
+Note what this buys and what it costs: if the audit row cannot be written, the
+delete does not happen either. For an audit trail that is usually what you want.
+If it is not, catch the error in the callback and say so in a comment.
 
 ### Collection-Specific Logic
 

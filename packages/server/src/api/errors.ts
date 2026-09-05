@@ -25,6 +25,21 @@ interface PgLikeError {
 const SQLSTATE_RE = /^[0-9A-Z]{5}$/;
 
 /**
+ * What SQLSTATE 25006 means here, in the only terms that help the author fix it.
+ *
+ * Every request-scoped read runs `withTransaction(..., { accessMode: "read
+ * only" })`, so a write attempted anywhere under it — including from a
+ * `context.data` call inside an `afterRead` callback — is refused by Postgres
+ * rather than by us. The callback name is in the message because that is the
+ * file the reader has to open, and nothing else on a read path can raise this.
+ */
+const READ_ONLY_TRANSACTION_MESSAGE =
+    "An `afterRead` callback tried to write. Request-scoped reads run in a READ ONLY " +
+    "transaction, so neither the callback nor anything it calls (context.data included) " +
+    "may write. Move the write outside the read: enqueue a background job, or use " +
+    "`rebase.dataAsAdmin` from a job or a custom function.";
+
+/**
  * Walk the cause chain for the underlying database error, identified by a
  * 5-char SQLSTATE `code`. Drizzle wraps the pg error in `.cause`, and route
  * code sometimes wraps drizzle again, so the real error may sit several
@@ -213,7 +228,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         } satisfies ErrorResponse, (error.statusCode || 500) as ContentfulStatusCode);
     }
 
-    const statusCode = error.statusCode || codeToStatus(error.code) || 500;
+    let statusCode = error.statusCode || codeToStatus(error.code) || 500;
     let code = error.code || "INTERNAL_ERROR";
 
     // Handle DB connection and specific system errors for better logging
@@ -267,6 +282,17 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
                 "or a stale FORCE ROW LEVEL SECURITY flag binding the owner connection."
             );
         }
+        // 25006 read_only_sql_transaction. A request-scoped read opens its
+        // transaction `READ ONLY`, so the only way to reach this is user code on
+        // a read path attempting a write — which means an `afterRead` callback,
+        // or something it called. Left in the generic branch it was a 500
+        // "Internal Server Error", indistinguishable from the database being
+        // down; it is the caller's own code, and it is not a server failure.
+        if (dbError.code === "25006") {
+            code = "READ_ONLY_TRANSACTION";
+            statusCode = 409;
+            parts.push(READ_ONLY_TRANSACTION_MESSAGE);
+        }
         logMessage = parts.join(". ");
     }
 
@@ -298,6 +324,13 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
                 ""
             ].join("\n"));
         }
+    } else if (code === "READ_ONLY_TRANSACTION") {
+        // A 4xx: the application's own callback, refused. Not a server fault, so
+        // not an ❌ in the log either.
+        logger.warn(
+            `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
+            (reqId ? ` [${reqId}]` : "")
+        );
     } else {
         // Unexpected errors — log at error level
         logger.error(
@@ -321,7 +354,11 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // Sanitize the message for the client to prevent leaking sensitive details
     // like SQL queries or internal IP addresses.
     let clientMessage = "An unexpected error occurred";
-    if (statusCode < 500 && error.message) {
+    if (code === "READ_ONLY_TRANSACTION") {
+        // Ahead of the generic 4xx arm below, which would echo the raw driver
+        // message ("Failed query: insert into …") back to the caller.
+        clientMessage = READ_ONLY_TRANSACTION_MESSAGE;
+    } else if (statusCode < 500 && error.message) {
         // If it's a 4xx error (e.g. from validation), it's generally safe to send the message
         clientMessage = error.message;
     } else if (error instanceof ApiError || error.name === "ApiError") {
@@ -379,6 +416,7 @@ function codeToStatus(code?: string): number | undefined {
         CONFLICT: 409,
         EMAIL_EXISTS: 409,
         ROLE_EXISTS: 409,
+        READ_ONLY_TRANSACTION: 409,
         SCHEMA_DRIFT: 500,
         DB_PERMISSION_DENIED: 500,
         INTERNAL_ERROR: 500,

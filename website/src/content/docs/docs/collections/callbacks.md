@@ -251,6 +251,21 @@ afterRead: async ({
 }
 ```
 
+:::caution[It runs in a READ ONLY transaction]
+A request-scoped read opens its transaction `READ ONLY`, and `afterRead` runs
+inside it. Any write from here — a `context.data` create, an update, one hidden
+in a helper — is refused by Postgres with SQLSTATE `25006`, and the caller gets
+**409 `READ_ONLY_TRANSACTION`** naming the callback.
+
+Reads are fine, and that is what this hook is for: enriching a row from another
+collection, decrypting a field, masking PII.
+
+If you need a write on a read — a view counter, a read audit — do it outside the
+read: enqueue a [background job](/docs/backend/jobs), or write it from a
+[custom function](/docs/backend/custom-functions) through `rebase.dataAsAdmin`
+after the read returns.
+:::
+
 ### `beforeDelete`
 
 Called before a entity is deleted. Throw to block deletion.

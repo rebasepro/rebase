@@ -238,6 +238,27 @@ describe("Error Handler (Hono)", () => {
             expect(body.error.details.detail).toContain("already exists");
         });
 
+        it("names the callback when a read-only transaction refuses a write (25006)", async () => {
+            // The only user code on a read path is `afterRead`, and every
+            // request-scoped read opens `READ ONLY`. So this SQLSTATE has one
+            // cause, and the answer should say which file to open — rather than
+            // the 500 "Internal Server Error" it used to be, which reads as the
+            // database being down.
+            const app = createDbApp(nestedDbError({
+                code: "25006",
+                message: "cannot execute INSERT in a read-only transaction"
+            }));
+            const res = await app.request("/boom");
+            expect(res.status).toBe(409);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("READ_ONLY_TRANSACTION");
+            expect(body.error.message).toContain("afterRead");
+            expect(body.error.message).toContain("READ ONLY");
+            expect(body.error.details.dbCode).toBe("25006");
+            // The 4xx arm must not echo the driver's own "Failed query: …" text.
+            expect(body.error.message).not.toContain("Failed query");
+        });
+
         it("does not treat non-SQLSTATE codes as database errors", async () => {
             const err = new Error("boom") as Error & { code: string };
             err.code = "ERR_SOMETHING";
