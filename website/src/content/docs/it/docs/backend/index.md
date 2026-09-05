@@ -52,8 +52,8 @@ Dopo l'inizializzazione, queste rotte vengono montate:
 | `/api/data/collections` | Endpoint per i metadati delle collezioni |
 | `/api/data/:slug` | Operazioni CRUD per collezione (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Cronologia delle modifiche delle entità (quando abilitata) |
-| `/api/data/docs` | Specifica OpenAPI (quando `enableSwagger: true`) |
-| `/api/data/swagger` | Swagger UI (modalità sviluppo, quando `enableSwagger: true`) |
+| `/api/docs` | Specifica OpenAPI (quando `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (modalità sviluppo, quando `enableSwagger: true`) |
 | `/api/functions/*` | Rotte per funzioni personalizzate (quando `functionsDir` è impostato) |
 | `/api/cron/*` | Gestione dei Cron job (solo per admin, quando `cronsDir` è impostato) |
 | WebSocket on upgrade | Sottoscrizioni in tempo reale |

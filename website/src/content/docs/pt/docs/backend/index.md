@@ -52,8 +52,8 @@ Após a inicialização, estas rotas são montadas:
 | `/api/data/collections` | Endpoint de metadados de coleção |
 | `/api/data/:slug` | Operações CRUD por coleção (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Histórico de alterações de entidade (quando ativado) |
-| `/api/data/docs` | Especificação OpenAPI (quando `enableSwagger: true`) |
-| `/api/data/swagger` | Swagger UI (modo de desenvolvimento, quando `enableSwagger: true`) |
+| `/api/docs` | Especificação OpenAPI (quando `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (modo de desenvolvimento, quando `enableSwagger: true`) |
 | `/api/functions/*` | Rotas de funções personalizadas (quando `functionsDir` está definido) |
 | `/api/cron/*` | Gestão de tarefas cron (apenas para administradores, quando `cronsDir` está definido) |
 | WebSocket on upgrade | Subscrições em tempo real |

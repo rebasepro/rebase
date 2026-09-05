@@ -52,8 +52,8 @@ Nach der Initialisierung werden diese Routen gemountet:
 | `/api/data/collections` | Endpunkt für Sammlungsmetadaten |
 | `/api/data/:slug` | CRUD-Operationen pro Sammlung (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entitätsänderungshistorie (falls aktiviert) |
-| `/api/data/docs` | OpenAPI-Spezifikation (wenn `enableSwagger: true`) |
-| `/api/data/swagger` | Swagger UI (Entwicklungsmodus, wenn `enableSwagger: true`) |
+| `/api/docs` | OpenAPI-Spezifikation (wenn `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (Entwicklungsmodus, wenn `enableSwagger: true`) |
 | `/api/functions/*` | Benutzerdefinierte Funktionsrouten (wenn `functionsDir` gesetzt ist) |
 | `/api/cron/*` | Cron-Job-Verwaltung (nur für Administratoren, wenn `cronsDir` gesetzt ist) |
 | WebSocket bei Upgrade | Echtzeit-Abonnements |

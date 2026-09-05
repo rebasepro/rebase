@@ -52,8 +52,8 @@ Après l'initialisation, ces routes sont montées :
 | `/api/data/collections` | Point d'extrémité des métadonnées de collection |
 | `/api/data/:slug` | Opérations CRUD par collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Historique des modifications d'entité (si activé) |
-| `/api/data/docs` | Spécification OpenAPI (lorsque `enableSwagger: true`) |
-| `/api/data/swagger` | Interface utilisateur Swagger (mode dev, lorsque `enableSwagger: true`) |
+| `/api/docs` | Spécification OpenAPI (lorsque `enableSwagger: true`) |
+| `/api/swagger` | Interface utilisateur Swagger (mode dev, lorsque `enableSwagger: true`) |
 | `/api/functions/*` | Routes de fonctions personnalisées (lorsque `functionsDir` est défini) |
 | `/api/cron/*` | Gestion des tâches cron (réservé aux administrateurs, lorsque `cronsDir` est défini) |
 | WebSocket sur mise à niveau | Abonnements en temps réel |

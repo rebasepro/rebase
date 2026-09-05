@@ -99,8 +99,8 @@ After initialization, these routes are mounted:
 | `/api/data/collections` | Collection metadata endpoint |
 | `/api/data/:slug` | CRUD operations per collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
-| `/api/data/docs` | OpenAPI spec (when `enableSwagger: true`) |
-| `/api/data/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
+| `/api/docs` | OpenAPI spec (when `enableSwagger: true`) |
+| `/api/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
 | `/api/functions/*` | Custom function routes (when `functionsDir` is set) |
 | `/api/cron/*` | Cron job management (admin-only, when `cronsDir` is set) |
 | WebSocket on upgrade | Real-time subscriptions |
