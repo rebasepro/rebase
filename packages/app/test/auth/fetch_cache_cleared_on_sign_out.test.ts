@@ -21,6 +21,14 @@ jest.mock("../../src/hooks/data/useData", () => ({
     useData: () => ({ collection: () => ({ findById: () => new Promise(() => undefined) }) })
 }));
 
+// `useFetch` also reads the whole Rebase context, and this suite renders it with
+// no `<Rebase>` above. That used to work by accident: the contexts defaulted to
+// `{}`, so every hook answered with an empty object. They say so now, and the
+// only part of the context this suite touches is nothing at all.
+jest.mock("../../src/hooks/useRebaseContext", () => ({
+    useRebaseContext: () => ({})
+}));
+
 function mockAuth(onChange: { current?: (e: AuthChangeEvent, s: RebaseSession | null) => void }) {
     return {
         getSession: () => null,

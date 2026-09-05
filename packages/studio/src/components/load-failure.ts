@@ -1,10 +1,10 @@
 /**
- * Why a storage listing failed — and whether it is the platform's fault.
+ * Why a Studio listing failed — and whether it is the platform's fault.
  *
  * ## Why this is a function
  *
- * The pane rendered one view for every failure: a red card titled **"Error
- * loading storage"** with whatever string came back underneath.
+ * The storage pane rendered one view for every failure: a red card titled
+ * **"Error loading storage"** with whatever string came back underneath.
  *
  * On 2026-08-27 a customer opened the Files tab of a healthy project and read
  * "Error loading storage — Not authorized for this object". Nothing was broken.
@@ -18,16 +18,29 @@
  * A refusal and a failure need different words, a different colour, and a
  * different next step: one is "your rule said no", the other is "we could not
  * ask". Retry is an affordance for the second and noise on the first.
+ *
+ * ## Why it is shared
+ *
+ * Storage was the only pane that had learned this. Backups, Cron Jobs, API Keys
+ * and Branches each caught the error, opened a snackbar that is gone in four
+ * seconds, and left their list empty — so a reader who looked away, or arrived
+ * after the toast, was told "No backups found yet" about a database that has
+ * backups and an account that may not list them. One classifier and one view, so
+ * the next pane inherits the distinction instead of rediscovering it.
+ *
+ * The view that renders one of these is `load-failure-view.tsx`. It is a
+ * separate file so that this classifier — the part with the rules in it — can
+ * be tested without dragging in `@rebasepro/app` and, behind it, react-router.
  */
 
-export type StorageFailureKind =
-    /** The project's own authorize hook said no. Not an error. */
+export type LoadFailureKind =
+    /** The project's own rules, or the caller's own role, said no. Not an error. */
     | "denied"
-    /** We could not reach or read the store. */
+    /** We could not reach or read the source. */
     | "unavailable";
 
-export interface StorageFailure {
-    kind: StorageFailureKind;
+export interface LoadFailure {
+    kind: LoadFailureKind;
     /** The message as the server gave it, never re-worded. */
     detail: string;
     /** Offering retry against a standing policy teaches people the button does nothing. */
@@ -44,12 +57,12 @@ function statusOf(err: unknown): number | null {
     return null;
 }
 
-export function classifyStorageFailure(err: unknown): StorageFailure {
+export function classifyLoadFailure(err: unknown): LoadFailure {
     const detail = err instanceof Error ? err.message : String(err);
     const status = statusOf(err);
 
-    // 403 is the hook's answer; 401 means the caller is not signed in as anyone
-    // the hook can evaluate, which is the same conversation from the other end.
+    // 403 is the rule's answer; 401 means the caller is not signed in as anyone
+    // a rule can evaluate, which is the same conversation from the other end.
     // The message match is the fallback, because an SDK that flattens an error
     // to a string is exactly how this reached the screen unclassified.
     const denied =

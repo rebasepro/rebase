@@ -11,9 +11,10 @@ export * from "./ErrorTooltip";
 export * from "./RebaseLogo";
 
 export * from "./AIIcon";
-export * from "./Debug/UIStyleGuide";
-export * from "./Debug/UIReferenceView";
-export { CrmDashboardDemo } from "./Debug/crm-dashboard/CrmDashboardDemo";
+// `UIStyleGuide`, `UIReferenceView` and `CrmDashboardDemo` used to be exported
+// here, which meant every consumer of this package shipped a file that renders
+// every component in the kit and a fake CRM with its sample data. They are
+// `@rebasepro/app/debug` now — see `src/debug/index.ts`.
 export * from "./UserSettingsView";
 export * from "./LanguageToggle";
 export * from "./UserSelectPopover";

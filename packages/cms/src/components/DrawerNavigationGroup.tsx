@@ -4,7 +4,7 @@ import { ChevronDownIcon, cls, iconSize, Typography } from "@rebasepro/ui";
 
 import { IconForView, getIcon } from "@rebasepro/app";
 import { DrawerNavigationItem } from "./DrawerNavigationItem";
-import { useTranslation, useComponentOverride } from "@rebasepro/app";
+import { useTranslation, useComponentOverride, useNavigationGroupLabel } from "@rebasepro/app";
 
 export interface DrawerNavigationGroupProps {
     /**
@@ -66,6 +66,10 @@ export function DrawerNavigationGroup({
     icon
 }: DrawerNavigationGroupProps) {
     const { t } = useTranslation();
+    // The group name is the identifier everything else keys off — the icon
+    // mapping, the collapse memory, `AppView.group`. Only the header is
+    // translated, and only for the groups Rebase itself ships.
+    const groupLabel = useNavigationGroupLabel();
     const ResolvedDrawerNavigationItem = useComponentOverride("Shell.DrawerNavigationItem", DrawerNavigationItem);
 
     // The icon decorates the header, and stops there. It used to also strip the
@@ -105,7 +109,7 @@ export function DrawerNavigationGroup({
                         color={"secondary"}
                         className="font-semibold text-[11px] uppercase tracking-wider flex-grow line-clamp-1 text-surface-400 dark:text-surface-400"
                     >
-                        {(group || t("views_group"))}
+                        {(groupLabel(group) || t("views_group"))}
                     </Typography>
                     {headerActions && (
                         <div onClick={(e) => e.stopPropagation()}>

@@ -503,7 +503,7 @@ Switch the admin layout view modes within the admin panel.
 import { useAdminModeController } from "@rebasepro/app";
 
 function ModeToggle() {
-    const { mode, setMode } = useAdminModeController(); // mode is "content" | "studio" | "settings"
+    const { mode, setMode } = useAdminModeController(); // mode is "cms" | "studio" | "settings"
 
     return <button onClick={() => setMode("studio")}>Switch to Studio View</button>;
 }

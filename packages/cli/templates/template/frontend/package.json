@@ -5,7 +5,6 @@
     "type": "module",
     "dependencies": {
         "@rebasepro/app": "workspace:*",
-        "@rebasepro/plugin-ai": "workspace:*",
         "@rebasepro/client": "workspace:*",
         "@rebasepro/cms": "workspace:*",
         "@rebasepro/studio": "workspace:*",

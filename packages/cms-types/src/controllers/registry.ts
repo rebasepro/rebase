@@ -78,8 +78,30 @@ export interface RebaseCMSConfig<EC extends AdminCollection = AdminCollection> {
 }
 
 export interface RebaseStudioConfig {
+    /**
+     * Which built-in tools to register. Omit for all of them; pass a shorter
+     * list to hide the rest.
+     */
     tools?: ("sql" | "js" | "rls" | "schema" | "storage" | "cron" | "schema-visualizer" | "branches" | "backups" | "api" | "logs" | "api-keys")[];
+
+    /** Replaces the Studio landing page. */
     homePage?: ReactNode;
+
+    /**
+     * Your own tools, added beside the built-in ones.
+     *
+     * These are ordinary {@link AppView}s — the only thing that makes a view a
+     * Studio tool rather than a CMS view is being registered here rather than
+     * on `<RebaseCMS views>`: the drawer shows CMS views in content mode and
+     * these in Studio mode.
+     *
+     * @example
+     * ```tsx
+     * <RebaseStudio devViews={[
+     *     { slug: "queues", name: "Queues", group: "Compute", view: <QueuesView/> }
+     * ]}/>
+     * ```
+     */
     devViews?: AppView[];
 }
 

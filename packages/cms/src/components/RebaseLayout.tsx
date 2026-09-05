@@ -39,12 +39,19 @@ export interface RebaseLayoutProps {
  * **Independently usable**: Use this when you want the Rebase layout
  * without its default route definitions.
  *
+ * It takes no children: the routed view arrives through react-router's
+ * `<Outlet/>`. This example used to pass `<Route>` elements, which is neither
+ * what the component renders nor something `RebaseLayoutProps` accepts — a
+ * reader following it wrote a type error whose message was about `children`,
+ * not about routes.
+ *
+ * Hand it to `<RebaseRouteDefs layout>`, which renders the routes inside it:
+ *
  * @example
  * ```tsx
- * <RebaseLayout title="My Admin" appBar={<AppBar/>}>
- *   <Route path="/" element={<MyHomePage />} />
- *   <Route path="/custom" element={<CustomView />} />
- * </RebaseLayout>
+ * <RebaseRouteDefs layout={<RebaseLayout title="My Admin" appBar={<AppBar/>}/>}>
+ *     <Route path="/custom" element={<CustomView/>}/>
+ * </RebaseRouteDefs>
  * ```
  */
 export function RebaseLayout(props: RebaseLayoutProps) {

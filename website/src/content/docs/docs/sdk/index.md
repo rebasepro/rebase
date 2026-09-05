@@ -97,8 +97,7 @@ A property key *you* wrote is your key, whatever its shape — nothing renames a
 
 ## Quick Example
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 // Create
 const product = await client.data.products.create({
     name: "Camera",

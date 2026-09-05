@@ -19,3 +19,10 @@ export type { RouterCollectionStudioViewProps } from "./collection_editor/ui/col
 
 export { RouterCollectionsStudioView } from "./collection_editor/ui/collection_editor/RouterCollectionsStudioView";
 export type { RouterCollectionsStudioViewProps } from "./collection_editor/ui/collection_editor/RouterCollectionsStudioView";
+
+// The plan/apply dialog. Reachable here for the same reason as the two above:
+// the barrel would put it back in the eager bundle and undo the `lazyChunk` in
+// `useLiveSchemaEditing`, and `index.ts` used to say "import it by path" about
+// a path that did not exist.
+export { SchemaChangeDialog } from "./collection_editor/ui/collection_editor/SchemaChangeDialog";
+export type { SchemaChangeDialogProps } from "./collection_editor/ui/collection_editor/SchemaChangeDialog";

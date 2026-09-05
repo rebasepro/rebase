@@ -582,8 +582,7 @@ unsubscribe();
 
 ### Listen to Collection Changes
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 // Via CollectionClient
 const unsubscribe = rebase.data.posts.listen(
     { where: { status: ['==', 'published'] }, limit: 50 },
@@ -599,8 +598,7 @@ const unsubscribe = rebase.data.posts.listen(
 
 ### Listen to a Single Entity
 
-<!-- docs-verify: W4-03 owns this — `listenById` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 const unsubscribe = rebase.data.posts.listenById(
     'post-123',
     (entity) => {

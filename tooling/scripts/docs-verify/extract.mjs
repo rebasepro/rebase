@@ -71,13 +71,19 @@ const COMMENT_OPT_OUT = /<!--\s*docs-verify:\s*ignore\s*-->/;
  * is also the cheapest way to make a failing check go away, and nothing stopped
  * the number climbing. It sat at 96 before the strictNullChecks and
  * whole-declaration passes landed; those turned up 25 more fences whose owners
- * are other workstreams (W2-03, W4-03, W10-02), each marked with an HTML
- * comment naming the task that will unmark it.
+ * were other workstreams (W2-03, W4-03, W10-02), each marked with an HTML
+ * comment naming the task that would unmark it.
+ *
+ * All three have landed. Twenty-two of those marks are gone: `listen`,
+ * `listenById` and `count` are no longer optional, and the two malformed
+ * literals and the `admin:` key that was never on `AppView` were fixed rather
+ * than excused. Four were real — `client.ws` and `rebase.storage` are genuinely
+ * optional — and are narrowed in the samples instead.
  *
  * So: the number may go down, never up. Lower this constant when you clear
  * fences; raising it needs a reason written next to it.
  */
-export const NO_VERIFY_BUDGET = 121;
+export const NO_VERIFY_BUDGET = 99;
 
 /**
  * The repository's own agent instructions.

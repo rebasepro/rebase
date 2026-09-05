@@ -1,5 +1,11 @@
 import React from "react";
-import type { RebasePlugin, SlotContribution } from "@rebasepro/cms-types";
+import type {
+    RebasePlugin,
+    AnySlotContribution,
+    PluginGenericProps,
+    CollectionWidgetsSlotProps,
+    HomeCardWidgetSlotProps
+} from "@rebasepro/cms-types";
 import type { InsightsPluginConfig } from "./types";
 import { InsightsProvider } from "./engine/InsightsProvider";
 import { HomeCardInsightSlot } from "./components/HomeCardInsightSlot";
@@ -44,14 +50,14 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
     const { insights, cacheTTL } = config;
 
     return React.useMemo(() => {
-        const slots: SlotContribution[] = [];
+        const slots: AnySlotContribution[] = [];
 
         // ── Home page insights ────────────────────────────────────────────
         if (insights.home && insights.home.length > 0) {
             const homeInsights = insights.home;
             slots.push({
                 slot: "home.children.start" as const,
-                Component: (props: Record<string, unknown>) => (
+                Component: (props: PluginGenericProps) => (
                     <HomeInsightsSlot
                         {...props}
                         insights={homeInsights}
@@ -73,9 +79,8 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                 // 1. Inline in collection list view
                 slots.push({
                     slot: "collection.widgets" as const,
-                    Component: (props: Record<string, unknown>) => {
-                        const path = props.path as string;
-                        const collectionSlug = path?.split("/").filter(Boolean).pop() ?? "";
+                    Component: (props: CollectionWidgetsSlotProps) => {
+                        const collectionSlug = props.path?.split("/").filter(Boolean).pop() ?? "";
                         if (collectionSlug !== slug) return null;
 
                         // Skip relation-scoped views (e.g. a single product's Orders
@@ -83,12 +88,11 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                         // carries no parent entity id, so a definition cannot narrow to
                         // the parent — and rendering "Revenue $36.2K" above one product's
                         // two orders reads as a figure for those orders.
-                        const parentEntityIds = props.parentEntityIds as string[] | undefined;
-                        if (parentEntityIds && parentEntityIds.length > 0) return null;
+                        if (props.parentEntityIds && props.parentEntityIds.length > 0) return null;
 
                         return (
                             <CollectionInsightsInline
-                                {...props as { path: string; collection: unknown; parentCollectionSlugs: string[], parentEntityIds: string[] }}
+                                {...props}
                                 insights={collectionInsights}
                             />
                         );
@@ -99,12 +103,11 @@ export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
                 // 2. Auto-extract scorecards for home page card
                 slots.push({
                     slot: "home.card.widget" as const,
-                    Component: (props: Record<string, unknown>) => {
-                        const cardSlug = props.slug as string;
-                        if (cardSlug !== slug) return null;
+                    Component: (props: HomeCardWidgetSlotProps) => {
+                        if (props.slug !== slug) return null;
                         return (
                             <HomeCardInsightSlot
-                                {...props as { slug: string; collection: unknown; context: unknown }}
+                                {...props}
                                 insights={collectionInsights}
                             />
                         );

@@ -10,45 +10,95 @@ The Rebase frontend is a **React framework** that renders your admin panel. It r
 
 In the default scaffold, the admin panel **is** the frontend: it's served at the root of your deployed URL. If you build your own product app instead, you can mount the admin under a prefix like `/admin` in the same deployment — see [Changing the Base URL](/docs/getting-started/deployment#changing-the-base-url).
 
-The key components that make up a Rebase frontend:
+This is `frontend/src/App.tsx` as `rebase init` writes it — the whole admin
+panel, four declarations inside one provider:
 
 ```tsx
-<Rebase
-    client={rebaseClient}
-    authController={authController}
->
-    {({ loading }) => (
-        <Scaffold>
-            <AppBar />
-            <Drawer title="My App" />
-            <Outlet />
-            <SideDialogs />
-        </Scaffold>
-    )}
-</Rebase>
+import React from "react";
+import { Rebase, RebaseAuth, useRebaseAuthController } from "@rebasepro/app";
+import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import { RebaseStudio } from "@rebasepro/studio";
+import { createRebaseClient } from "@rebasepro/client";
+import { collections } from "virtual:rebase-collections";
+
+const client = createRebaseClient({
+    baseUrl: import.meta.env.VITE_API_URL,
+    auth: { authFlowMode: "cookie" }
+});
+
+export function App() {
+    const authController = useRebaseAuthController({ client });
+
+    return (
+        <Rebase client={client} authController={authController}>
+            {/* Sign-in screen. Pass `loginView` to replace it. */}
+            <RebaseAuth/>
+            <RebaseCMS collections={collections}/>
+            <RebaseStudio/>
+            <RebaseShell title="My App"/>
+        </Rebase>
+    );
+}
 ```
+
+The first three render nothing: they *register* configuration into the
+provider. `<RebaseShell>` is what draws — it reads that registry and builds the
+navigation, routes and layout from it. So the order they appear in does not
+matter, and adding a feature means adding a component, not rewiring a tree.
+
+| Component | Package | Registers |
+|---|---|---|
+| `<RebaseAuth>` | `@rebasepro/app` | the sign-in screen (`loginView`) |
+| `<RebaseCMS>` | `@rebasepro/cms` | collections, custom views, the home page, the collection editor |
+| `<RebaseStudio>` | `@rebasepro/studio` | the developer tools (SQL, RLS, logs, backups…) |
+| `<RebaseShell>` | `@rebasepro/cms` | nothing — it renders the admin from everything above |
+
+Drop `<RebaseStudio>` and you have a content-only CMS; drop `<RebaseCMS>` and
+you have the developer tools alone. To lay the shell out by hand instead, see
+[Advanced: manual layout](#advanced-manual-layout).
 
 ## The Rebase Provider
 
 `<Rebase>` is the root provider that makes all Rebase functionality available to child components via context. It accepts:
 
+All twenty-two of them, in full — the table used to list ten, and two of those
+were props the component never read:
+
+<!-- rebase-props:start -->
 | Prop | Description |
 |------|-------------|
-| `client` | `RebaseClient` instance for data, auth, and storage |
-| `authController` | Authentication state and methods |
-| `dataSources` | Additional data sources (see [Multiple sources](/docs/backend/multiple-sources)) |
-| `storageSource` / `storageSources` | File storage operations, and named storage sources |
-| `userConfigPersistence` | Local UI preferences (column widths, etc.) |
-| `entityViews` | Global custom entity view tabs |
-| `entityActions` | Global entity actions |
-| `plugins` | Plugin instances |
+| `children` | The admin's root components — `<RebaseCMS>`, `<RebaseStudio>`, `<RebaseShell>`. A render function is the manual-layout escape hatch. |
+| `apiUrl` | Base URL of the backend API, made available to every hook via `useApiConfig()` |
+| `dateTimeFormat` | How dates are printed. Defaults to `MMMM dd, yyyy, HH:mm:ss` |
+| `locale` | Initial language of the admin, and the locale dates are formatted in — see [Translations](/docs/frontend/i18n) |
+| `client` | `RebaseClient` instance: the default source for data, auth and storage |
+| `dataSources` | Extra data sources, for collections that name one — see [Multiple sources](/docs/backend/multiple-sources) |
+| `authController` | Authentication state and methods. Replaces the `client.auth` subscription outright |
+| `storageSource` | The default storage source, overriding `client.storage` |
+| `storageSources` | Named storage sources beyond the default |
+| `databaseAdmin` | Administrative database operations (SQL, schema discovery). Only Studio needs it |
+| `userConfigPersistence` | Local UI preferences — column widths, collapsed groups |
+| `onAnalyticsEvent` | Called for every analytics event the admin emits |
+| `entityLinkBuilder` | Returns a URL for the "open in your app" button on an entity form |
+| `plugins` | Plugin instances — see [Plugins](/docs/plugins) |
 | `slots` | Slot contributions declared directly, without a plugin |
-| `basePath` / `baseCollectionPath` | URL prefixes when the admin is not at the site root |
-| `components` | Component overrides |
+| `propertyConfigs` | Custom field widgets, keyed by the name a property names in `propertyConfig` |
+| `entityViews` | Global custom entity view tabs |
+| `collectionViews` | Custom collection view modes, available to any collection by `key` |
+| `entityActions` | Global entity actions |
+| `effectiveRoleController` | Simulate a different role while dev mode is on |
+| `translations` | Override or extend any UI string, keyed by locale — see [Translations](/docs/frontend/i18n) |
+| `components` | Replace built-in components — see [Component Overrides](/docs/frontend/component-overrides) |
+<!-- rebase-props:end -->
 
 The navigation, URL and collection-registry controllers are **not** `<Rebase>`
 props — they are built by the hooks below and consumed inside the admin tree
 (`<RebaseShell>` wires them for you in the default scaffold).
+
+Neither is the URL prefix. When the admin is mounted under a path, that belongs
+on `<RebaseCMS basePath="/admin">`, which is what resolves URLs to collections —
+and only when the router has no `basename` of its own. See
+[Changing the Base URL](/docs/getting-started/deployment#changing-the-base-url).
 
 ## Two data shapes
 
@@ -84,11 +134,70 @@ const { data: entities } = await data.collection("posts").find();
 entities[0].values.title;
 ```
 
-## Controllers
+## Advanced: manual layout
 
-Controllers are React hooks that configure specific aspects of the framework:
+Everything below replaces `<RebaseShell>`. You need it only when the stock
+layout is in the way — a different chrome around the admin, a route tree of
+your own, an app where the admin is one page among many. If you are not
+replacing the layout, stop at [Custom Views](#custom-views).
 
-### `useBuildNavigationStateController`
+`<RebaseShell>` is sugar for four layers, and you can take them one at a time:
+
+```tsx
+<Rebase client={client} authController={authController}>
+    <RebaseCMS collections={collections}/>
+    <RebaseStudio/>
+
+    {/* login screen until there is a user */}
+    <RebaseAuthGate>
+        {/* builds the navigation, URL and collection-registry controllers */}
+        <RebaseNavigation>
+            {/* the admin's routes, drawn inside the layout you pass */}
+            <RebaseRouteDefs layout={<RebaseLayout title="My App"/>}/>
+        </RebaseNavigation>
+    </RebaseAuthGate>
+</Rebase>
+```
+
+The order is fixed: `RebaseAuthGate → RebaseNavigation → RebaseRouteDefs →
+RebaseLayout`. `RebaseAuthGate` shows the login view until there is a user, so
+nothing below it renders for a signed-out visitor; `RebaseNavigation` builds
+the navigation, URL and collection-registry controllers that `RebaseRouteDefs`
+and every collection view read, so `RebaseRouteDefs` outside it throws.
+
+Each layer is usable on its own. `<RebaseAuthGate>` alone gates your own app
+behind Rebase's login. Swap `<RebaseLayout>` for your own component to keep the
+routing and lose the chrome; drop `<RebaseRouteDefs>` too and you are building
+the routes yourself out of the components in
+[Scaffold Components](#scaffold-components).
+
+Below that floor `<Rebase>` also accepts a **render prop** instead of children,
+which hands you the context and the loading flag and leaves the entire tree to
+you:
+
+```tsx
+<Rebase client={rebaseClient} authController={authController}>
+    {({ context, loading }) => (
+        <Scaffold>
+            <AppBar/>
+            <Drawer title="My App"/>
+            <Outlet/>
+            <SideDialogs/>
+        </Scaffold>
+    )}
+</Rebase>
+```
+
+At that point nothing is wired for you: you build the controllers below by
+hand and render the routes yourself.
+
+### Controllers
+
+Controllers are React hooks that configure specific aspects of the framework.
+`<RebaseNavigation>` calls all of them for you — reach for these only inside a
+render prop.
+
+#### `useBuildNavigationStateController`
 
 The main controller that wires everything together:
 
@@ -112,7 +221,7 @@ const navigationStateController = useBuildNavigationStateController({
 });
 ```
 
-### `useBuildCollectionRegistryController`
+#### `useBuildCollectionRegistryController`
 
 Manages how collections are resolved from URL paths:
 
@@ -122,7 +231,7 @@ const collectionRegistryController = useBuildCollectionRegistryController({
 });
 ```
 
-### `useBuildUrlController`
+#### `useBuildUrlController`
 
 Configures URL generation:
 
@@ -134,7 +243,7 @@ const urlController = useBuildUrlController({
 });
 ```
 
-### `useBuildModeController`
+#### `useBuildModeController`
 
 Manages light/dark theme:
 
@@ -143,16 +252,16 @@ const modeController = useBuildModeController();
 // Provides: modeController.mode ("light" | "dark"), modeController.toggleMode()
 ```
 
-### `useBuildAdminModeController`
+#### `useBuildAdminModeController`
 
 Toggles between Studio and Content modes:
 
 ```typescript
 const adminModeController = useBuildAdminModeController();
-// Provides: adminModeController.mode ("studio" | "content")
+// Provides: adminModeController.mode ("cms" | "studio" | "settings")
 ```
 
-## Scaffold Components
+### Scaffold Components
 
 | Component | Description |
 |-----------|-------------|
@@ -167,29 +276,56 @@ const adminModeController = useBuildAdminModeController();
 
 ## Custom Views
 
-Add top-level navigation views for dashboards, tools, or custom pages:
+Add top-level navigation views for dashboards, tools, or custom pages. An
+`AppView` is a flat object — everything below sits at the top level, there is no
+nested `admin` block:
 
-<!-- docs-verify: W10-02 owns this sample — the comma is inside the comment, and `admin` is not a key of `AppView`. -->
-```tsx no-verify
+```tsx
+import type { AppView } from "@rebasepro/cms-types";
+
 const views: AppView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",
-        view: <MyDashboard />
+        icon: "LayoutDashboard",
+        view: <MyDashboard/>
     },
     {
         slug: "settings",
         name: "App Settings",
-        view: <AppSettings />,
-        nestedRoutes: true,   // Support sub-paths
-        admin: {
-            icon: "settings",
-            group: "Analytics"
-        }
+        icon: "Settings",
+        group: "Admin",
+        // Register `settings/*` too, so the view can route inside itself.
+        nestedRoutes: true,
+        // Reachable by URL, but not listed in the drawer.
+        hideFromNavigation: true,
+        view: <AppSettings/>
     }
 ];
-
 ```
+
+Hand them to `<RebaseCMS>`, next to your collections — that is the component
+that registers navigation:
+
+```tsx
+<RebaseCMS collections={collections} views={views}/>
+```
+
+| Field | |
+|---|---|
+| `slug` | the path it is reached at, under the admin root |
+| `name` | the label in the drawer and on the home page |
+| `view` | the element to render, or a `ComponentType` to render it lazily |
+| `icon` | a [Lucide](https://lucide.dev/icons/) icon name, e.g. `"ShoppingCart"` — or any node |
+| `group` | groups views together in the drawer; `"Admin"` and `"Settings"` sink to the bottom |
+| `pinToBottom` | sinks the group to the bottom under any name — prefer it over the two magic strings |
+| `nestedRoutes` | also registers `slug/*`, for a view with routes of its own |
+| `hideFromNavigation` | keeps the route, drops the nav entry |
+| `roles` | only users holding one of these roles see the view, or can reach it |
+| `description` | Markdown, shown on the home-page card |
+
+To put a view under **Studio** instead of the CMS, pass it to
+[`<RebaseStudio devViews>`](/docs/studio#adding-your-own-tool).
 
 ## Styling
 
@@ -213,4 +349,5 @@ Rebase uses **Tailwind CSS v4** and supports light/dark modes. Customize via:
 - **[Custom Fields](/docs/frontend/custom-fields)** — Build custom form fields
 - **[Entity Views](/docs/frontend/entity-views)** — Add tabs to entity editors
 - **[View Modes](/docs/frontend/view-modes)** — List, Table, Cards, Kanban
+- **[Translations](/docs/frontend/i18n)** — Change any string, or add a language
 - **[Plugins](/docs/plugins)** — Extend the framework

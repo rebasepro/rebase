@@ -54,13 +54,45 @@ the **[Slots](/docs/frontend/slots)** page.
 
 ## Using Plugins
 
-Pass plugin instances to the navigation controller:
+Plugins go on `<Rebase>`, next to the client. Everything below it — the
+navigation, the collection views, the forms — reads them from there:
 
-```typescript
-const dataEnhancementPlugin = useDataEnhancementPlugin();
+```tsx
+import { Rebase, useRebaseAuthController } from "@rebasepro/app";
+import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 
-const plugins = [dataEnhancementPlugin];
+export function App() {
+    const authController = useRebaseAuthController({ client });
+    const dataEnhancementPlugin = useDataEnhancementPlugin();
 
+    return (
+        <Rebase
+            client={client}
+            authController={authController}
+            plugins={[dataEnhancementPlugin]}
+        >
+            <RebaseCMS collections={collections}/>
+            <RebaseShell title="My App"/>
+        </Rebase>
+    );
+}
+```
+
+Plugins are usually built by a hook, so the array is rebuilt on every render;
+that is fine, and it is why `plugins` is a prop rather than something you
+memoize by hand. Two plugins with the same `key` are a mistake — `<Rebase>`
+logs the duplicates rather than silently dropping one.
+
+For a single contribution you do not need a plugin at all: `<Rebase slots>`
+takes the same `SlotContribution` entries directly.
+
+### Under manual composition
+
+Only if you have replaced `<RebaseShell>` with the layers underneath it does
+the plugin list have to be threaded by hand, into the navigation controller:
+
+```tsx
 const navigationStateController = useBuildNavigationStateController({
     plugins,
     collections: () => collections,
@@ -71,6 +103,10 @@ const navigationStateController = useBuildNavigationStateController({
     urlController
 });
 ```
+
+`<RebaseNavigation>` does exactly this call for you, reading `plugins` off the
+customization controller `<Rebase>` provides. See
+[Advanced: manual layout](/docs/frontend#advanced-manual-layout).
 
 ## Building a Plugin
 

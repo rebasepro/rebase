@@ -14,8 +14,7 @@ The WebSocket connection is established automatically when a `websocketUrl` is a
 
 Use `listen()` to subscribe to a collection query. The callback fires whenever the matching data set changes:
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`, so the sample cannot compile under strictNullChecks until it is not. -->
-```typescript no-verify
+```typescript
 const unsubscribe = client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
     (response) => {
@@ -30,8 +29,7 @@ unsubscribe();
 
 The `listen()` method accepts the same `FindParams` as `find()` — you can filter, sort, and paginate your subscription:
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 const unsubscribe = client.data.orders.listen(
     {
         where: { status: ["==", "pending"] },
@@ -77,8 +75,7 @@ rows beside it. There is no separate first-paint emission and no flag to check:
   **lower bound** — the rows on this page plus the ones paged past to reach
   them — and `meta.hasMore` is `true` when the page came back full.
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
     (result) => {
@@ -154,8 +151,7 @@ so a subscriber has no way to notice.
 
 Every subscription returns an `unsubscribe` function. Call it to stop receiving updates and clean up the WebSocket listener:
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 const unsubscribe = client.data.products.listen(
     undefined,
     (response) => { /* ... */ }
@@ -167,8 +163,7 @@ unsubscribe();
 
 In React, use `useEffect` cleanup:
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```tsx no-verify
+```tsx
 useEffect(() => {
     const unsubscribe = client.data.products.listen(
         { where: { active: ["==", true] } },

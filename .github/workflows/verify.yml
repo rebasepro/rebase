@@ -286,6 +286,30 @@ jobs:
       # interchangeably — they are not the same thing, and nothing said so.
       - name: JSDoc coverage on the authoring types
         run: pnpm run check:jsdoc-coverage
+      # The `<Rebase>` props table documented ten of twenty-four props, and two
+      # of the ten were declared on RebaseProps and never read by Rebase.tsx.
+      # A hand-written table drifts the moment a prop is added.
+      - name: "<Rebase> props table"
+        run: pnpm run check:rebase-props
+
+      # Two places recommended `@rebasepro/studio/components/SQLEditor/SQLEditor`
+      # as a deep import. That package exports `.` and nothing else, so
+      # following the advice fails with ERR_PACKAGE_PATH_NOT_EXPORTED and there
+      # is nothing the reader can configure to fix it.
+      - name: Subpath imports resolve
+        run: pnpm run check:subpath-imports
+
+      # The Studio docs table names each tool's slug and drawer group, which are
+      # facts about one useMemo in RebaseStudio.tsx. cron-jobs.md sent readers
+      # to an "Automation" section that has never existed.
+      - name: Studio tools table
+        run: pnpm run check:studio-tools
+
+      # The backups pane said "See docs/backups.md" — a path in this repository,
+      # not in the reader's project, so following it finds nothing and there is
+      # no way to discover where the page actually is.
+      - name: UI strings name reachable paths
+        run: pnpm run check:ui-string-paths
 
       # Astro and JSX drop the newline between a word and an adjacent tag rather
       # than collapsing it to a space, so a paragraph broken across two source

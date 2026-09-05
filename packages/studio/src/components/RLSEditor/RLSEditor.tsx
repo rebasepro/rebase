@@ -1,5 +1,5 @@
 
-import { useStudioCollectionRegistry, useStudioCapabilities } from "@rebasepro/app";
+import { useStudioCollectionRegistry, useStudioCapabilities, useStudioSchemaEditing } from "@rebasepro/app";
 import { useApiBase, useApiConfig } from "@rebasepro/app";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
@@ -26,13 +26,13 @@ import {
     Trash2Icon,
     Typography
 } from "@rebasepro/ui";
-import { useRebaseContext, useSnackbarController, ErrorView, useTranslation } from "@rebasepro/app";
+import { useRebaseContext, useSnackbarController, ErrorView, useTranslation, ConfirmationDialog } from "@rebasepro/app";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL } from "@rebasepro/common";
 import { getPolicyNamesForRule, getPolicyNamesForRules, getPolicyOperations } from "@rebasepro/utils";
 import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRules } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
-import { saveSecurityRulesToCodebase } from "./saveSecurityRules";
+import { saveRules, isCancellation } from "./saveRules";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
 
@@ -162,14 +162,81 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
        `basePath`, which is `/api` only by default. */
     const apiBase = useApiBase() ?? `${apiUrl.replace(/\/+$/, "")}/api`;
 
+    const schemaEditing = useStudioSchemaEditing();
+
+    /** Through the plan/apply dialog when there is one — see `saveRules`. */
     const saveSecurityRules = useCallback(
-        (collectionId: string, securityRules: unknown[]) => saveSecurityRulesToCodebase({
-            apiBase,
-            collectionId,
-            securityRules,
-            getAuthToken: apiConfig?.getAuthToken
-        }),
-        [apiBase, apiConfig]);
+        (collectionId: string, securityRules: unknown[]) =>
+            saveRules(
+                schemaEditing,
+                { apiBase, getAuthToken: apiConfig?.getAuthToken },
+                collectionId,
+                securityRules
+            ),
+        [apiBase, apiConfig, schemaEditing]);
+
+    /** Closing the plan dialog is an answer, not a failure — see `saveRules`. */
+    const reportSaveFailure = useCallback((e: unknown) => {
+        if (isCancellation(e)) return;
+        snackbarController.open({ type: "error",
+            message: e instanceof Error ? e.message : String(e) });
+    }, [snackbarController]);
+
+    const [editingPolicy, setEditingPolicy] = useState<PostgresPolicy | "new" | null>(null);
+
+    /**
+     * The two destructive actions used `window.confirm`, which is the browser's
+     * dialog and not this app's: it cannot be styled, cannot be translated, and
+     * is suppressed outright in a sandboxed iframe — where the click then did
+     * the thing silently, with no confirmation at all.
+     */
+    const [confirmToggleRls, setConfirmToggleRls] = useState<{ table: string; schema: string; enabled: boolean } | null>(null);
+    const [confirmDropPolicy, setConfirmDropPolicy] = useState<{ policyName: string; table: string; schema: string } | null>(null);
+    const [confirming, setConfirming] = useState(false);
+
+    const applyToggleRls = useCallback(async () => {
+        if (!confirmToggleRls) return;
+        const { table, schema, enabled } = confirmToggleRls;
+        const action = enabled ? "DISABLE" : "ENABLE";
+        setConfirming(true);
+        try {
+            await databaseAdmin!.executeSql!(
+                `ALTER TABLE ${sanitizeSqlIdentifier(schema)}.${sanitizeSqlIdentifier(table)} ${action} ROW LEVEL SECURITY`
+            );
+            snackbarController.open({ type: "success",
+                message: `RLS ${action.toLowerCase()}d on ${table}` });
+            setConfirmToggleRls(null);
+            fetchRLSData();
+        } catch (e: unknown) {
+            snackbarController.open({ type: "error",
+                message: e instanceof Error ? e.message : String(e) });
+        } finally {
+            setConfirming(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [confirmToggleRls, databaseAdmin, snackbarController]);
+
+    const applyDropPolicy = useCallback(async () => {
+        if (!confirmDropPolicy) return;
+        const { policyName, table, schema } = confirmDropPolicy;
+        setConfirming(true);
+        try {
+            await databaseAdmin!.executeSql!(
+                `DROP POLICY ${sanitizeSqlIdentifier(policyName)} ON ${sanitizeSqlIdentifier(schema)}.${sanitizeSqlIdentifier(table)}`
+            );
+            snackbarController.open({ type: "success",
+                message: `Policy "${policyName}" dropped` });
+            setConfirmDropPolicy(null);
+            fetchRLSData();
+        } catch (e: unknown) {
+            snackbarController.open({ type: "error",
+                message: e instanceof Error ? e.message : String(e) });
+        } finally {
+            setConfirming(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [confirmDropPolicy, databaseAdmin, snackbarController]);
+
     const { t } = useTranslation();
 
     const [isLoading, setIsLoading] = useState(true);
@@ -178,8 +245,6 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
     const [selectedTable, setSelectedTable] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState(0);
     const [junctionTableNames, setJunctionTableNames] = useState<Set<string>>(new Set());
-
-    const [editingPolicy, setEditingPolicy] = useState<PostgresPolicy | "new" | null>(null);
 
     /**
      * Native PostgreSQL roles, for the policy editor's `TO` list.
@@ -721,21 +786,11 @@ totalPolicies };
                                         <Button
                                             variant="text"
                                             size="small"
-                                            onClick={async () => {
-                                                const table = activeTableData.tableName;
-                                                const qualifiedTable = `${sanitizeSqlIdentifier(activeTableData.schemaName)}.${sanitizeSqlIdentifier(table)}`;
-                                                const action = activeTableData.rlsEnabled ? "DISABLE" : "ENABLE";
-                                                if (!confirm(`Are you sure you want to ${action.toLowerCase()} Row Level Security on "${table}"?`)) return;
-                                                try {
-                                                    await databaseAdmin!.executeSql!(`ALTER TABLE ${qualifiedTable} ${action} ROW LEVEL SECURITY`);
-                                                    snackbarController.open({ type: "success",
-message: `RLS ${action.toLowerCase()}d on ${table}` });
-                                                    fetchRLSData();
-                                                } catch (e: unknown) {
-                                                    snackbarController.open({ type: "error",
-message: e instanceof Error ? e.message : String(e) });
-                                                }
-                                            }}
+                                            onClick={() => setConfirmToggleRls({
+                                                table: activeTableData.tableName,
+                                                schema: activeTableData.schemaName,
+                                                enabled: activeTableData.rlsEnabled
+                                            })}
                                         >
                                             {activeTableData.rlsEnabled ? t("studio_rls_disable_rls") : t("studio_rls_enable_rls")}
                                         </Button>
@@ -851,8 +906,7 @@ message: "Policy saved successfully" });
                                             setEditingPolicy(null);
                                             fetchRLSData();
                                         } catch (e: unknown) {
-                                            snackbarController.open({ type: "error",
-message: e instanceof Error ? e.message : String(e) });
+                                            reportSaveFailure(e);
                                         }
                                     } else {
                                         // No codebase to write to (hosted console), or an
@@ -988,9 +1042,9 @@ message: e instanceof Error ? e.message : String(e) });
                                                             <KeyIcon size={iconSize.smallest} className="text-text-secondary dark:text-text-secondary-dark shrink-0"/>
                                                             <Typography variant="body2" className="truncate">{policy.policyname}</Typography>
                                                             {policy.status === "code_only" && (
-                                                                <Tooltip title="This policy is defined in your code but hasn't been applied to the database yet.">
+                                                                <Tooltip title={t("studio_rls_unapplied_tooltip")}>
                                                                     <div className="px-1.5 py-0.5 rounded text-[10px] uppercase bg-primary/10 text-primary border border-primary/20 shrink-0">
-                                                                        Unapplied
+                                                                        {t("studio_rls_unapplied")}
                                                                     </div>
                                                                 </Tooltip>
                                                             )}
@@ -1044,8 +1098,7 @@ message: e instanceof Error ? e.message : String(e) });
 message: "Policy imported successfully" });
                                                                         fetchRLSData();
                                                                     } catch (e: unknown) {
-                                                                        snackbarController.open({ type: "error",
-message: e instanceof Error ? e.message : String(e) });
+                                                                        reportSaveFailure(e);
                                                                     }
                                                                 }}
                                                             >
@@ -1059,20 +1112,11 @@ message: e instanceof Error ? e.message : String(e) });
                                                             <Tooltip title={t("studio_rls_delete")} asChild={true}>
                                                                 <IconButton
                                                                     size="small"
-                                                                    onClick={async () => {
-                                                                        const table = activeTableData!.tableName;
-                                                                        const qualifiedTable = `${sanitizeSqlIdentifier(activeTableData!.schemaName)}.${sanitizeSqlIdentifier(table)}`;
-                                                                        if (!confirm(`Drop policy "${policy.policyname}" from table "${table}"?`)) return;
-                                                                        try {
-                                                                            await databaseAdmin!.executeSql!(`DROP POLICY ${sanitizeSqlIdentifier(policy.policyname)} ON ${qualifiedTable}`);
-                                                                            snackbarController.open({ type: "success",
-message: `Policy "${policy.policyname}" dropped` });
-                                                                            fetchRLSData();
-                                                                        } catch (e: unknown) {
-                                                                            snackbarController.open({ type: "error",
-message: e instanceof Error ? e.message : String(e) });
-                                                                        }
-                                                                    }}
+                                                                    onClick={() => setConfirmDropPolicy({
+                                                                        policyName: policy.policyname,
+                                                                        table: activeTableData!.tableName,
+                                                                        schema: activeTableData!.schemaName
+                                                                    })}
                                                                 >
                                                                     <Trash2Icon size={iconSize.smallest}/>
                                                                 </IconButton>
@@ -1122,6 +1166,31 @@ message: e instanceof Error ? e.message : String(e) });
                         )}
                     </div>
                 }
+            />
+
+            <ConfirmationDialog
+                open={confirmToggleRls !== null}
+                loading={confirming}
+                onAccept={applyToggleRls}
+                onCancel={() => setConfirmToggleRls(null)}
+                title={confirmToggleRls?.enabled
+                    ? t("studio_rls_disable_confirm_title")
+                    : t("studio_rls_enable_confirm_title")}
+                body={confirmToggleRls?.enabled
+                    ? t("studio_rls_disable_confirm_body", { table: confirmToggleRls?.table ?? "" })
+                    : t("studio_rls_enable_confirm_body", { table: confirmToggleRls?.table ?? "" })}
+            />
+
+            <ConfirmationDialog
+                open={confirmDropPolicy !== null}
+                loading={confirming}
+                onAccept={applyDropPolicy}
+                onCancel={() => setConfirmDropPolicy(null)}
+                title={t("studio_rls_drop_policy_title")}
+                body={t("studio_rls_drop_policy_body", {
+                    policy: confirmDropPolicy?.policyName ?? "",
+                    table: confirmDropPolicy?.table ?? ""
+                })}
             />
         </div>
     );

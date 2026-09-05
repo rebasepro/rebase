@@ -19,9 +19,12 @@ import {
     RefreshCwIcon,
     Typography
 } from "@rebasepro/ui";
-import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
+import { useRebaseClient, useSnackbarController, useTranslation } from "@rebasepro/app";
 import type { CronJobStatus, CronJobLogEntry } from "@rebasepro/types";
 import type { RebaseClient } from "@rebasepro/types";
+
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { LoadFailureView } from "../load-failure-view";
 
 function formatDuration(ms: number): string {
     if (ms < 1000) return `${ms}ms`;
@@ -52,12 +55,15 @@ disabled: "bg-surface-400"
 export function CronJobsView() {
     const client = useRebaseClient<RebaseClient>();
     const snackbar = useSnackbarController();
+    const { t } = useTranslation();
     const [jobs, setJobs] = useState<CronJobStatus[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [logs, setLogs] = useState<CronJobLogEntry[]>([]);
     const [logsLoading, setLogsLoading] = useState(false);
     const [triggering, setTriggering] = useState<string | null>(null);
+    /** Why the job listing failed, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
 
     // Refs so effects never re-fire due to identity changes
     const clientRef = useRef(client);
@@ -77,14 +83,16 @@ export function CronJobsView() {
             }
             try {
                 const res = await c.cron.listJobs();
-                if (!cancelled) setJobs(res.jobs);
-            } catch (e: unknown) {
                 if (!cancelled) {
-                    snackbarRef.current.open({
-                        type: "error",
-                        message: e instanceof Error ? e.message : String(e)
-                    });
+                    setJobs(res.jobs);
+                    setFailure(null);
                 }
+            } catch (e: unknown) {
+                // A snackbar over an empty list said "No Cron Jobs Registered"
+                // about a project whose crons the caller may not read. This
+                // view polls every 15s, so the toast is also gone long before
+                // anyone looks.
+                if (!cancelled) setFailure(classifyLoadFailure(e));
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -154,16 +162,13 @@ export function CronJobsView() {
         try {
             const res = await c.cron.listJobs();
             setJobs(res.jobs);
+            setFailure(null);
         } catch (e: unknown) {
             // Swallowed before, which left the list showing whatever it last
             // held — or nothing — after a failed refresh. "No cron jobs" and
-            // "could not read the cron jobs" are not the same statement, and
-            // this view has a snackbar precisely so they can be told apart; the
-            // initial load already uses it.
-            snackbarRef.current.open({
-                type: "error",
-                message: e instanceof Error ? e.message : String(e)
-            });
+            // "could not read the cron jobs" are not the same statement, so the
+            // reason stays on screen rather than passing through a snackbar.
+            setFailure(classifyLoadFailure(e));
         }
     }
 
@@ -219,13 +224,31 @@ message: e instanceof Error ? e.message : String(e) });
 
     if (loading) return <div className="flex items-center justify-center h-full"><CircularProgress/></div>;
 
+    if (failure) return (
+        <LoadFailureView
+            failure={failure}
+            title={t("studio_cron_read_failed")}
+            deniedTitle={t("studio_cron_denied_title")}
+            deniedHint={t("studio_cron_denied_hint")}
+            onRetry={refreshJobs}
+        />
+    );
+
     if (jobs.length === 0) return (
         <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
             <CalendarIcon size={iconSize.medium} className="text-surface-300 dark:text-surface-600"/>
-            <Typography variant="h6" color="secondary">No Cron Jobs Registered</Typography>
+            <Typography variant="h6" color="secondary">{t("studio_cron_empty_title")}</Typography>
             <Typography variant="body2" color="disabled" className="max-w-md">
-                Create a file in your <code className="text-xs bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded font-mono">crons/</code> directory that default-exports a <code className="text-xs bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded font-mono">CronJobDefinition</code>.
+                {t("studio_cron_empty_body")}
             </Typography>
+            <a
+                href="https://rebase.pro/docs/backend/cron-jobs"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary text-sm underline"
+            >
+                {t("studio_read_the_docs")}
+            </a>
         </div>
     );
 
@@ -236,7 +259,7 @@ message: e instanceof Error ? e.message : String(e) });
                 <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
                     <div className="flex items-center gap-2">
                         <CalendarIcon size={iconSize.smallest} className="text-primary"/>
-                        <Typography variant="subtitle2" className="font-semibold">Cron Jobs</Typography>
+                        <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_cron")}</Typography>
                         <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{jobs.length}</Chip>
                     </div>
                     <IconButton size="small" onClick={refreshJobs} title="Refresh"><RefreshCwIcon size={iconSize.smallest}/></IconButton>

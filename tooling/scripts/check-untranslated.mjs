@@ -40,7 +40,13 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASELINE = path.join(ROOT, "tooling", "scripts", "untranslated-baseline.json");
 const EN = path.join(ROOT, "packages/app/src/locales/en.ts");
-const SCANNED = ["packages/cms/src"];
+/**
+ * Studio is in here because it is the other half of the admin a user reads.
+ * `packages/app/src/locales/en.ts` already declares ~60 `studio_*` keys and
+ * every locale carries them, so a Studio string written out in English is
+ * exactly the same defect as one in the panel — it was simply out of scope.
+ */
+const SCANNED = ["packages/cms/src", "packages/studio/src"];
 const update = process.argv.includes("--update");
 
 const red = (s) => `\x1b[31m${s}\x1b[0m`;
@@ -86,6 +92,14 @@ for (const file of SCANNED.flatMap(sourceFiles)) {
         if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) continue;
         // Already translated on this line, `?? "English"` fallback included.
         if (line.includes("t(\"")) continue;
+        // `group:` and `icon:` take identifiers, not labels. A group name is
+        // what `StudioHomePage` orders by and what `navigationGroupMappings`
+        // keys its icons off — translating it at the declaration is the bug,
+        // and `useNavigationGroupLabel` translates the header instead. An
+        // `icon` is a Lucide name and is never rendered as text. Both collide
+        // with real keys ("Database", "Access Control") often enough that
+        // banking them would teach the next reader to break the ordering.
+        if (/^\s*(group|icon):\s*"/.test(trimmed) || /^(group|icon):\s*"/.test(trimmed)) continue;
         for (const { key, value } of strings) {
             if (line.includes(`"${value}"`) || line.includes(`>${value}<`)) {
                 const id = `${rel}::${key}`;

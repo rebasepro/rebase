@@ -85,17 +85,14 @@ function StatCard({ title, value }: { title: string; value: string | number }) {
 
 ## Register as a Custom View
 
-<!-- docs-verify: W10-02 owns this sample — `admin` is not a key of `AppView`. -->
-```tsx no-verify
+```tsx
 const views: AppView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",
         view: <DashboardView />,
-        admin: {
-            icon: "dashboard",
-            group: "Analytics"
-        }
+        icon: "LayoutDashboard",
+        group: "Analytics"
     }
 ];
 

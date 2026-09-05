@@ -77,6 +77,7 @@
 - [Frontend Overview](https://rebase.pro/docs/frontend): Build and customize the Rebase admin panel with React — controllers, scaffold, routing, and views.
 - [Extending Rebase](https://rebase.pro/docs/frontend/extending): A decision guide for choosing the right extension mechanism — plugins, slots, component overrides, entity views, actions, and more.
 - [Styling Custom UI](https://rebase.pro/docs/frontend/styling): Build custom views, home pages and actions out of the same components and theme tokens as the rest of the admin, so they look native and follow the theme.
+- [Translations](https://rebase.pro/docs/frontend/i18n): Change any string in the Rebase admin, add a language, or read the current locale from your own components.
 - [Component Overrides (Swizzling)](https://rebase.pro/docs/frontend/component-overrides): Override default UI components with custom implementations at the application or collection level.
 - [Authentication & Login](https://rebase.pro/docs/frontend/authentication): Set up the auth controller, login view, and role simulation in your Rebase React frontend.
 - [Storage & File Uploads](https://rebase.pro/docs/frontend/storage): Add file upload fields to your collections, manage files programmatically, and route uploads to different storage backends.

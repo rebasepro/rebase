@@ -78,7 +78,7 @@ import {
     Typography,
     UserIcon
 } from "@rebasepro/ui";
-import { RebaseLogo } from "../RebaseLogo";
+import { RebaseLogo } from "../components/RebaseLogo";
 import { CrmDashboardDemo } from "./crm-dashboard/CrmDashboardDemo";
 import { CollectionTableDemo, CardViewDemo, KanbanBoardDemo } from "./collection-views";
 

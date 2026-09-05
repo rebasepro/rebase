@@ -14,5 +14,7 @@ import { RebaseDataContext } from "../../contexts/RebaseDataContext";
  * @group Hooks and utilities
  */
 export const useData = (): RebaseData => {
-    return useContext(RebaseDataContext);
+    const data = useContext(RebaseDataContext);
+    if (!data) throw new Error("useData must be used inside <Rebase>");
+    return data;
 };

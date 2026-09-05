@@ -22,8 +22,37 @@ export type { BreadcrumbEntry, BreadcrumbsController };
  * When the admin is present, a bridge provider injects real implementations.
  * When the admin is absent, noop defaults ensure Studio works standalone.
  */
+/**
+ * Editing a collection's source through the admin's plan/apply flow.
+ *
+ * Studio has its own writers — the RLS editor saves a policy, the collection
+ * editor saves a property — and until this existed they did not go to the same
+ * place. Saving a policy on a mapped table POSTed the rules straight to
+ * `/schema-editor/collection/save`: no plan, no dialog, no record of what SQL
+ * the change would produce, while the identical edit made two tabs away in the
+ * collection editor showed all three.
+ *
+ * `available` is false when there is no collection editor above this Studio —
+ * the hosted console against somebody else's container, or a panel that never
+ * enabled it — and the caller falls back to whatever it did before.
+ */
+export interface StudioSchemaEditing {
+    available: boolean;
+    /**
+     * Merge `patch` into the collection and take it through plan → confirm →
+     * apply: the same dialog `useLiveSchemaEditing` shows the collection
+     * editor.
+     *
+     * Resolves once the change has been applied, or written source-only if
+     * that is what was chosen. Rejects with `SchemaChangeCancelled` when the
+     * dialog was closed — which is not an error to report, it is an answer.
+     */
+    updateCollection: (collectionId: string, patch: Record<string, unknown>) => Promise<void>;
+}
+
 export interface StudioBridge {
     collectionRegistry: CollectionRegistryController;
+    schemaEditing: StudioSchemaEditing;
     sidePanelController: SidePanelController;
     urlController: UrlController;
     navigationState: NavigationStateController;
@@ -68,6 +97,13 @@ const NOOP_COLLECTION_REGISTRY: CollectionRegistryController = {
     initialised: false
 };
 
+const NOOP_SCHEMA_EDITING: StudioSchemaEditing = {
+    available: false,
+    updateCollection: async () => {
+        throw new Error("No collection editor is mounted — check `available` before calling this.");
+    }
+};
+
 const NOOP_SIDE_PANEL: SidePanelController = {
     open: () => {},
     replace: () => {},
@@ -102,6 +138,7 @@ const DEFAULT_CAPABILITIES: StudioCapabilities = {
 
 const NOOP_BRIDGE: StudioBridge = {
     collectionRegistry: NOOP_COLLECTION_REGISTRY,
+    schemaEditing: NOOP_SCHEMA_EDITING,
     sidePanelController: NOOP_SIDE_PANEL,
     urlController: NOOP_URL_CONTROLLER,
     navigationState: NOOP_NAVIGATION_STATE,
@@ -162,6 +199,14 @@ export function StudioBridgeProvider({
 }
 
 // ─── Convenience hooks ──────────────────────────────────────────────
+
+/**
+ * Source editing through the admin's plan/apply dialog. `available` is false
+ * when no collection editor is mounted.
+ */
+export function useStudioSchemaEditing(): StudioSchemaEditing {
+    return useContext(StudioBridgeContext).schemaEditing;
+}
 
 /** Collection registry — returns noop if the admin is not present. */
 export function useStudioCollectionRegistry(): CollectionRegistryController {

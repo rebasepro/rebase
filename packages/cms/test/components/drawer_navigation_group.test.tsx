@@ -12,6 +12,9 @@ jest.mock("@rebasepro/app", () => ({
     // resolves to undefined — which is the switch the group renders on.
     getIcon: (key?: string) => (key ? <svg data-testid="group-icon"/> : undefined),
     useTranslation: () => ({ t: (k: string) => k }),
+    // Only the header label is translated; the group name stays the identifier
+    // the icon mapping and the collapse memory key off.
+    useNavigationGroupLabel: () => (group: string) => group,
     useComponentOverride: (_slot: string, fallback: unknown) => fallback
 }));
 

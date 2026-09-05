@@ -8,7 +8,7 @@ import type { RebaseContext } from "../rebase_context";
 import type { NavigationGroupMapping, AppView } from "../controllers/navigation";
 
 import type { User } from "@rebasepro/types";
-import type { SlotContribution } from "./slots";
+import type { AnySlotContribution } from "./slots";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 /**
@@ -112,7 +112,7 @@ export interface RebasePlugin {
     /**
      * UI slot contributions rendered at the matching extension points.
      */
-    slots?: SlotContribution[];
+    slots?: AnySlotContribution[];
 
     /**
      * HOC providers wrapping root or form content.

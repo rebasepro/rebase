@@ -760,14 +760,21 @@ const isAdmin = window.location.pathname.startsWith("/admin");
 const ProductApp = lazy(() => import("./App"));
 const AdminApp = lazy(() => import("./AdminApp"));
 
-if (isAdmin) {
-    // The admin uses useBlocker → needs a DATA router
-    const router = createBrowserRouter([{ path: "/admin/*", element: <AdminApp /> }]);
-    root.render(<RouterProvider router={router} />);
-} else {
-    root.render(<BrowserRouter><ProductApp /></BrowserRouter>);
-}
+// The admin uses useBlocker → needs a DATA router. Use one for both halves.
+const router = isAdmin
+    ? createBrowserRouter([{ path: "/*", element: <AdminApp/> }], { basename: "/admin" })
+    : createBrowserRouter([{ path: "/*", element: <ProductApp/> }]);
+
+root.render(<RouterProvider router={router}/>);
 ```
+
+When the admin is the whole frontend, do not hand-write the prefix at all: set
+`apps.<name>.path` in `rebase.json` and `rebase build` passes it to Vite as
+`base`, which the scaffold's `main.tsx` already reads back out of
+`import.meta.env.BASE_URL` and gives to the router as `basename`.
+
+The alternative, when the admin is nested inside a route of a larger app with
+no `basename`, is to tell the CMS about the prefix instead:
 
 ```tsx
 // frontend/src/AdminApp.tsx — tell the admin about the prefix
