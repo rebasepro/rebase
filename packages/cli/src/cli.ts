@@ -257,21 +257,25 @@ ${chalk.green.bold("Usage")}
 ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("init")}                    Create a new Rebase project
   ${chalk.blue.bold("dev")}                     Start the development server
-  ${chalk.blue.bold("build")}                   Build all workspace packages
+  ${chalk.blue.bold("build")}                   Build the apps declared in rebase.json into a bundle
   ${chalk.blue.bold("start")}                   Start the backend server ${chalk.gray("(production)")}
   ${chalk.blue.bold("apps list")}               Show the apps this repository declares
-  ${chalk.blue.bold("eject")}                   Take ownership of the server process and image
 
 ${chalk.green.bold("Schema")}
   ${chalk.blue.bold("schema generate")}         Generate Drizzle schema from collections
   ${chalk.blue.bold("schema introspect")}       Introspect database → Rebase collections
+  ${chalk.blue.bold("schema stale")}            Report generated schema files the collections have moved past
   ${chalk.blue.bold("schema")} ${chalk.gray("--help")}           Show schema command help
 
 ${chalk.green.bold("Database")}
   ${chalk.blue.bold("db push")}                 Apply schema directly to database ${chalk.gray("(dev)")}
   ${chalk.blue.bold("db generate")}             Generate SQL migration files
   ${chalk.blue.bold("db migrate")}              Run pending migrations
-  ${chalk.blue.bold("db")} ${chalk.gray("--help")}               Show database command help
+  ${chalk.blue.bold("db pull")}                 Copy another database into local development
+  ${chalk.blue.bold("db branch")}               Create, list, switch and delete database branches
+  ${chalk.blue.bold("db stop")}                 Stop the managed development database ${chalk.gray("(data is kept)")}
+  ${chalk.blue.bold("db reset")}                Delete the managed development database and start over
+  ${chalk.blue.bold("db")} ${chalk.gray("--help")}               Backup, restore, and every flag
 
 ${chalk.green.bold("SDK")}
   ${chalk.blue.bold("generate-sdk")}            Generate a typed TypeScript SDK from collections
@@ -281,9 +285,12 @@ ${chalk.green.bold("Auth")}
   ${chalk.blue.bold("auth")} ${chalk.gray("--help")}             Show auth command help
 
 ${chalk.green.bold("Diagnostics")}
-  ${chalk.blue.bold("doctor")}                  Detect schema drift between collections, schema, and DB
   ${chalk.blue.bold("status")}                  Show every resource and whether its variables are set
+  ${chalk.blue.bold("doctor")}                  Detect schema drift between collections, schema, and DB
   ${chalk.blue.bold("resources")}               List the databases, buckets and topics this project declares
+
+${chalk.green.bold("Take ownership")}
+  ${chalk.blue.bold("eject")}                   Own the server process and the image ${chalk.gray("(one-way)")}
 
 ${chalk.green.bold("AI Agent Skills")}
   ${chalk.blue.bold("skills install")}          Install Rebase agent skills for your AI coding assistant

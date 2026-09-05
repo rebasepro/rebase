@@ -35,6 +35,7 @@
  */
 import arg from "arg";
 import chalk from "chalk";
+import { unknownCommand, unknownCommandMessage } from "../../utils/unknown-command";
 import {
     requireClient,
     requireProject,
@@ -971,8 +972,6 @@ path: projectId });
  * the older spelling of `pod` and stays out of it: suggesting the name we no
  * longer print in the help would teach the wrong one.
  */
-import { unknownCommand, unknownCommandMessage } from "../../utils/unknown-command";
-
 const DEBUG_SUBCOMMANDS = ["health", "logs", "errors", "boot", "requests", "pod", "db"] as const;
 
 export async function debugCommand(action: string | undefined, rawArgs: string[]): Promise<void> {

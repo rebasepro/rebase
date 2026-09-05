@@ -5,6 +5,7 @@ import inquirer from "inquirer";
 import { createRequire } from "module";
 import { findProjectRoot } from "../utils/project";
 import { wantsHelp } from "../utils/args";
+import { unknownCommand } from "../utils/unknown-command";
 
 const require = createRequire(import.meta.url);
 
@@ -212,8 +213,6 @@ export function installForAgent(
 
     return { skills: count, assets: assetCount };
 }
-
-import { unknownCommand } from "../utils/unknown-command";
 
 /** Everything the switch below dispatches, for the did-you-mean. */
 const SKILLS_SUBCOMMANDS = ["install"] as const;

@@ -26,6 +26,7 @@ import {
     writeManifest
 } from "../manifest";
 import { readLink } from "./cloud/context";
+import { unknownCommand } from "../utils/unknown-command";
 
 function printHelp(): void {
     console.log(`
@@ -42,8 +43,6 @@ ${chalk.bold("Options")}
   -h, --help                   Show this help
 `.trim());
 }
-
-import { unknownCommand } from "../utils/unknown-command";
 
 /** Everything the switch below dispatches, for the did-you-mean. */
 const APPS_SUBCOMMANDS = ["list", "init", "config"] as const;

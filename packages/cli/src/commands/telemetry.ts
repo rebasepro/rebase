@@ -2,6 +2,7 @@ import chalk from "chalk";
 
 import { describeState } from "../telemetry/consent";
 import { configPath, endpoint, previewEvent, readConfig, readProjectPolicy, setConsent } from "../telemetry";
+import { unknownCommand } from "../utils/unknown-command";
 
 /**
  * `rebase telemetry` — the command that makes the rest of it inspectable.
@@ -11,8 +12,6 @@ import { configPath, endpoint, previewEvent, readConfig, readProjectPolicy, setC
  * the same builder the sender uses, so what appears here is what would go, not
  * a documentation comment that quietly fell out of date two releases ago.
  */
-import { unknownCommand } from "../utils/unknown-command";
-
 /** Everything the switch below dispatches, for the did-you-mean. */
 const TELEMETRY_SUBCOMMANDS = ["status", "show", "enable", "disable"] as const;
 
