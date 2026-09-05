@@ -172,6 +172,10 @@ Stated plainly, because finding out later is worse:
 
 - **No region choice.** Everything runs in one region today. The placement model
   exists in the platform, but a project cannot pick a region.
+  `projects create --provider` and `--region` are not the exception they look
+  like: they record which of the control plane's registered deploy targets a
+  project belongs to, and there is one, so both default to it and neither moves a
+  project anywhere else. `rebase cloud projects create --help` says the same.
 - **Not self-serve.** Access is granted in batches; there is no sign-up-and-pay.
 - **No published SLA**, and no SOC 2. If you need either, say so when you request
   access rather than assuming.

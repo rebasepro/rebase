@@ -101,8 +101,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--link", "Link this directory to the new project"],
             ["--repo <url>", "Git repository to build from"],
             ["--branch <name>", "Git branch. Default: main"],
-            ["--provider <gcp|hetzner|…>", "Where to run it (default: the platform's target)"],
-            ["--region <region>", "Region within the provider"],
+            // Not a region picker. See the note below — the flags record where
+            // the project is placed, and the beta has one place to put it.
+            ["--provider <gcp|hetzner|…>", "Which deploy target to record. Default: the one this control plane would use"],
+            ["--region <region>", "Region recorded on the project. Default: that target's own region"],
             ["--cpu <n>", "vCPU per instance"],
             ["--memory <size>", "Memory per instance, e.g. 512Mi"],
             ["--replicas <n>", "Instance count"],
@@ -121,7 +123,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ],
         notes: [
             "The subdomain cannot be changed in passing later — a typo here is a new project.",
-            "A managed database is created at the project's FIRST DEPLOY, not here."
+            "A managed database is created at the project's FIRST DEPLOY, not here.",
+            "--provider and --region are not a region picker. They record which of the control plane's "
+                + "registered deploy targets this project belongs to; the private beta has one, so both "
+                + "default to it and neither moves a project anywhere else."
         ]
     },
 
