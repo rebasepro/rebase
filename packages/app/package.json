@@ -37,7 +37,7 @@
   "scripts": {
     "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found \u2014 use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
     "watch": "vite build --watch",
-    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && pnpm exec esbuild src/vitePlugin.ts --platform=node --format=esm --outfile=dist/vitePlugin.js && node ../../tooling/scripts/assert-build-output.mjs",
+    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && pnpm exec esbuild src/vitePlugin.ts --platform=node --format=esm --outfile=dist/vitePlugin.js && pnpm exec esbuild src/debug/index.ts --bundle --format=esm --jsx=automatic --external:react --external:react-dom --external:react/jsx-runtime --external:@rebasepro/* --outfile=dist/debug.js && node ../../tooling/scripts/assert-build-output.mjs",
     "test:lint": "eslint \"src/**\" --quiet",
     "test": "jest --passWithNoTests",
     "clean": "rm -rf dist && find ./src \\( -name '*.js' -o -name '*.d.ts' \\) -type f | xargs rm -f",
@@ -49,6 +49,12 @@
       "development": "./dist/index.es.js",
       "import": "./dist/index.es.js",
       "default": "./dist/index.es.js"
+    },
+    "./debug": {
+      "types": "./dist/debug/index.d.ts",
+      "development": "./dist/debug.js",
+      "import": "./dist/debug.js",
+      "default": "./dist/debug.js"
     },
     "./vitePlugin": {
       "types": "./dist/vitePlugin.d.ts",

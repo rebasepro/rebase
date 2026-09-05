@@ -6,7 +6,7 @@ import type { EntityCustomView } from "../types/entity_views";
 import type { CollectionCustomView } from "../types/collection_views";
 import type { RebasePlugin } from "../types/plugins";
 import type { PropertyConfig } from "../types/property_config";
-import type { SlotContribution } from "../types/slots";
+import type { AnySlotContribution } from "../types/slots";
 import type { ComponentOverrideMap } from "../types/component_overrides";
 
 export type CustomizationController = {
@@ -24,7 +24,7 @@ export type CustomizationController = {
     /**
      * Pre-merged slots from plugins + direct slot contributions.
      */
-    resolvedSlots: SlotContribution[];
+    resolvedSlots: AnySlotContribution[];
 
     /**
      * List of additional custom views for entities.

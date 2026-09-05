@@ -55,10 +55,23 @@ export function useSlot<K extends SlotName>(
         return resolvedSlots
             .filter(s => s.slot === slot)
             .sort((a, b) => (a.order ?? 50) - (b.order ?? 50))
-            .map((s, i) => (
-                <ErrorBoundary key={`${slot}_${i}`}>
-                    <s.Component {...(stableProps as unknown as Record<string, unknown>)} {...(s.props ?? {})}/>
-                </ErrorBoundary>
-            ));
+            .map((s, i) => {
+                // `filter` cannot narrow a discriminated union through a
+                // callback, so `s.Component` is still "some slot's component"
+                // here and its props are the union of every slot's. The line
+                // above is what makes this safe, and it is one line above.
+                //
+                // This one deliberate cast is the price of `SlotContribution`
+                // declaring `ComponentType<SlotRegistry[K]>` instead of
+                // `ComponentType<any>` — which is what turns a component
+                // written against the wrong slot's props into an error where
+                // it is registered, rather than `undefined` at render.
+                const Component = s.Component as unknown as React.ComponentType<Record<string, unknown>>;
+                return (
+                    <ErrorBoundary key={`${slot}_${i}`}>
+                        <Component {...(stableProps as unknown as Record<string, unknown>)} {...(s.props ?? {})}/>
+                    </ErrorBoundary>
+                );
+            });
     }, [resolvedSlots, slot, stableProps]);
 }

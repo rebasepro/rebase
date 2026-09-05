@@ -8,7 +8,8 @@ import type { AnalyticsEvent } from "@rebasepro/cms-types";
 declare function gtag(...args: unknown[]): void;
 
 import { useRebaseAuthController } from "@rebasepro/app";
-import { Rebase, RebaseAuth, UIReferenceView } from "@rebasepro/app";
+import { Rebase, RebaseAuth } from "@rebasepro/app";
+import { UIReferenceView } from "@rebasepro/app/debug";
 import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
 import type { RebasePlugin } from "@rebasepro/cms-types";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";

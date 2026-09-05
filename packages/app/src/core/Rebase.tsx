@@ -1,6 +1,6 @@
 "use client";
 import type { RebaseProps } from "./RebaseProps";
-import type { CustomizationController, RebasePlugin, SlotContribution } from "@rebasepro/cms-types";
+import type { CustomizationController, RebasePlugin, AnySlotContribution } from "@rebasepro/cms-types";
 import type { ComponentOverrideMap } from "@rebasepro/cms-types";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -86,7 +86,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
     }
 
     // Merge direct slots with plugin slots.
-    const resolvedSlots: SlotContribution[] = useMemo(() => [
+    const resolvedSlots: AnySlotContribution[] = useMemo(() => [
         ...directSlots,
         ...((plugins ?? []).flatMap((p) => p.slots ?? []))
     ], [directSlots, plugins]);

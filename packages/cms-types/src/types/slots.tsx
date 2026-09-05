@@ -120,11 +120,21 @@ export interface SlotContribution<K extends SlotName = SlotName> {
     slot: K;
 
     /**
-     * The component to render in the slot.
-     * Typed loosely so mixed-slot arrays work.
-     * Type safety is provided at the `useSlot` call site.
+     * The component to render in the slot, taking that slot's props.
+     *
+     * This was `React.ComponentType<any>`, "typed loosely so mixed-slot arrays
+     * work" — and the looseness was doing real damage: `{ slot:
+     * "collection.actions", Component: MyThing }` typechecked whatever
+     * `MyThing`'s props were, so a component written against the wrong slot's
+     * props compiled, registered, and then read `undefined` off every prop it
+     * expected. The only check was at the `useSlot` render site, which is
+     * inside the framework and reports nothing to the author.
+     *
+     * The mixed-array problem is real but is a problem with the *array*, not
+     * with this field: see {@link AnySlotContribution}, which distributes over
+     * the slot names so each element is checked against its own slot.
      */
-    Component: React.ComponentType<any>;
+    Component: React.ComponentType<SlotRegistry[K]>;
 
     /**
      * Additional props to merge into the slot props before rendering.
@@ -136,6 +146,21 @@ export interface SlotContribution<K extends SlotName = SlotName> {
      */
     order?: number;
 }
+
+/**
+ * A contribution to *some* slot, checked against that slot.
+ *
+ * `SlotContribution[]` cannot be the type of a mixed list: with `K` left at its
+ * default the props become the union of every slot's, and a component is
+ * contravariant in its props, so nothing satisfies it. Distributing the union
+ * over the slot names instead gives one member per slot, and TypeScript picks
+ * the member whose `slot` matches — which is what makes
+ * `{ slot: "collection.actions", Component: WrongProps }` an error at the
+ * declaration rather than a silent `undefined` at render.
+ *
+ * @group Plugins
+ */
+export type AnySlotContribution = { [K in SlotName]: SlotContribution<K> }[SlotName];
 
 // ── Prop interfaces for slots ─────────────────────────────────────────
 

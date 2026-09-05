@@ -1,6 +1,6 @@
 import React from "react";
 import { User, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, CollectionRegistryController, DatabaseAdmin, RebaseClient } from "@rebasepro/types";
-import { Locale, AuthController, AnalyticsEvent, UserConfigurationPersistence, UrlController, NavigationStateController, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, CollectionCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/cms-types";
+import { Locale, AuthController, AnalyticsEvent, UserConfigurationPersistence, UrlController, NavigationStateController, RebaseContext, EntityLinkBuilder, RebasePlugin, AnySlotContribution, PropertyConfig, EntityCustomView, CollectionCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/cms-types";
 
 /**
  * A data source registered on `<Rebase>`. Extends the shared
@@ -259,7 +259,7 @@ export type RebaseProps<USER extends User, DB = unknown> = {
     /**
      * Extra slots for the admin
      */
-    slots?: SlotContribution[];
+    slots?: AnySlotContribution[];
 
     /**
      * Property configs (widgets)
