@@ -580,6 +580,8 @@ export const en = {
   "pricing.cloud.feat2": "Deploy from the CLI, roll back from the console",
   "pricing.cloud.feat3": "You state the resources; the bill follows them",
   "pricing.cloud.feat4": "The same code self-hosts — leaving is a redeploy",
+  "pricing.cloud.billingNote":
+    "The first deploy needs a payment method on the organization. You attach one once — rebase cloud billing setup — before you deploy.",
   "pricing.ent.name": "Enterprise",
   "pricing.ent.price": "Custom",
   "pricing.ent.priceNote": "Talk to us about your requirements",

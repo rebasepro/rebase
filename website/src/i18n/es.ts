@@ -507,6 +507,8 @@ export const es = {
   "pricing.cloud.feat2": "Despliega desde la CLI, revierte desde la consola",
   "pricing.cloud.feat3": "Tú defines los recursos; la factura los sigue",
   "pricing.cloud.feat4": "El mismo código se autoaloja — irse es un redespliegue",
+  "pricing.cloud.billingNote":
+    "El primer despliegue necesita un método de pago en la organización. Se añade una sola vez — rebase cloud billing setup — antes de desplegar.",
   "pricing.ent.name": "Empresa",
   "pricing.ent.price": "A medida",
   "pricing.ent.priceNote": "Habla con nosotros sobre tus necesidades",

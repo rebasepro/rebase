@@ -13,7 +13,7 @@ import {
     fail,
     reportError,
     emit,
-    emitHelp,
+    printGroupHelp,
     note,
     requireInteractive
 } from "./context";
@@ -181,14 +181,23 @@ function slugify(s: string): string {
 }
 
 export function printOrgsHelp(): void {
-    emitHelp("orgs", ["list", "create", "members"], () => {
-        console.log(`
-${chalk.bold("rebase cloud orgs")} — Manage organizations
-
-${chalk.green.bold("Commands")}
-  ${chalk.blue.bold("list")}              List organizations you belong to
-  ${chalk.blue.bold("create")}            Create a new organization ${chalk.gray("(--name, --slug)")}
-  ${chalk.blue.bold("members")}           List members of the active organization
-`);
+    printGroupHelp({
+        command: "cloud orgs",
+        title: "Organizations",
+        actions: [
+            { action: "list",
+description: "List organizations you belong to" },
+            {
+                action: "create",
+                description: "Create a new organization",
+                flags: [
+                    ["--name <name>", "Display name"],
+                    ["--slug <slug>", "URL slug. Derived from the name when omitted"]
+                ]
+            },
+            { action: "members",
+description: "List members of the active organization" }
+        ],
+        notes: ["The active one is what `rebase cloud use` selects, and what billing is scoped to."]
     });
 }

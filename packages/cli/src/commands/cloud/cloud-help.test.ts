@@ -54,7 +54,8 @@ vi.mock("./context", async (importOriginal) => {
     };
 });
 
-const { cloudCommand } = await import("./index");
+const { cloudCommand, CLOUD_GROUPS, CLOUD_GROUP_NAMES, GROUP_HELP, GROUP_ALIASES } = await import("./index");
+const { ACTION_HELP } = await import("./action-help");
 const context = await import("./context");
 const link = await import("./link");
 const deploy = await import("./deploy");
@@ -208,11 +209,67 @@ describe("rebase cloud <group> --help", () => {
         expect(printed).toContain("--type");
     });
 
-    it("falls back to the index page for a group with no page of its own", async () => {
-        await cloudCommand("logs", argv("logs", "--help"));
-        // printCloudHelp is module-local, so its output is the observable.
+    /**
+     * The claim the docs make — "every group answers `--help`" — as a test.
+     *
+     * It was not true. Fourteen of the twenty-nine words the index lists had no
+     * page of their own and fell through to the index itself, which is a list of
+     * groups and not one flag: `login --password`, `link`'s positional URL, the
+     * `-y` that `stop` requires and every resource dial had no discoverable
+     * spelling anywhere in the CLI. A help page that answers with the table of
+     * contents is indistinguishable from one that is missing, which is why this
+     * asserts on the index's own headline rather than on "something printed".
+     */
+    it("gives every group the index lists a page of its own", () => {
+        const missing = CLOUD_GROUP_NAMES.filter(
+            group => !(ACTION_HELP[GROUP_ALIASES[group] ?? group] || GROUP_HELP[group])
+        );
+        expect(
+            missing,
+            `no --help page for: ${missing.join(", ")}. A group with none falls through to the index, `
+            + "which lists sibling groups and not one flag."
+        ).toEqual([]);
+    });
+
+    it.each(CLOUD_GROUP_NAMES)("answers `%s --help` without falling through to the index", async (group) => {
+        await cloudCommand(group, argv(group, "--help"));
+        const printed = logSpy.mock.calls.map(c => String(c[0])).join("\n");
+        // The index page's headline. A group whose own printer is mocked here
+        // prints nothing at all, which is also not the index.
+        expect(printed).not.toContain("Manage your apps on Rebase Cloud");
+        for (const handler of allHandlers()) expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("still falls back to the index for a word that is not a group", async () => {
+        await cloudCommand("nonesuch", argv("nonesuch", "--help"));
         expect(logSpy).toHaveBeenCalled();
         const printed = logSpy.mock.calls.map(c => String(c[0])).join("\n");
-        expect(printed).toContain("rebase cloud");
+        expect(printed).toContain("Manage your apps on Rebase Cloud");
+    });
+
+    /**
+     * The index lists each group once.
+     *
+     * `clusters` appeared twice, in the same section, under two different
+     * descriptions — because the page existed as a hand-formatted template
+     * literal beside the array that fed the JSON form, so nothing related the
+     * two. The page is generated from the array now, and this is what keeps the
+     * array from growing its own duplicate.
+     */
+    it("names each group exactly once", () => {
+        expect(CLOUD_GROUP_NAMES).toEqual([...new Set(CLOUD_GROUP_NAMES)]);
+    });
+
+    it("prints each group exactly once on the page a person reads", async () => {
+        await cloudCommand(undefined, argv());
+        const printed = logSpy.mock.calls.map(c => String(c[0])).join("\n");
+        for (const group of CLOUD_GROUP_NAMES) {
+            const lines = printed.split("\n").filter(line => new RegExp(`^\\s{2}${group}(\\s|$)`).test(line));
+            expect(lines.length, `${group} appears ${lines.length} times on the index`).toBe(1);
+        }
+    });
+
+    it("gives every group on the page a description", () => {
+        for (const entry of CLOUD_GROUPS) expect(entry.description.length).toBeGreaterThan(0);
     });
 });

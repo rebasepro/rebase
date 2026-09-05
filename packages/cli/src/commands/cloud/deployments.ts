@@ -2,10 +2,11 @@
  * Deployment lifecycle: `rebase cloud deployments list`, `rollback`, `cancel`.
  *
  * The rollback rule is the load-bearing part. A rollback is only honoured for a
- * SUCCESSFUL deploy that recorded an image (`status === "success" && imageUrl`);
- * anything else 409s `deploy_not_rollbackable` server-side. So this module never
- * offers — and refuses to invoke — a rollback the server would reject, exactly
- * mirroring the console's `isRollbackable`.
+ * SUCCESSFUL deploy that recorded an artefact — an `imageUrl` from a custom
+ * build, or a `bundleId` from a managed deploy; anything else 409s
+ * `deploy_not_rollbackable` server-side. So this module never offers — and
+ * refuses to invoke — a rollback the server would reject, exactly mirroring the
+ * console's `isRollbackable`.
  */
 import chalk from "chalk";
 import {
@@ -33,6 +34,8 @@ export interface DeploymentRow {
     finished_at?: string | Date;
     imageUrl?: string;
     image_url?: string;
+    bundleId?: string;
+    bundle_id?: string;
     rollbackOf?: string;
     rollback_of?: string;
     triggeredBy?: string;
@@ -65,12 +68,30 @@ function deploymentImage(dep: DeploymentRow): string | null {
 }
 
 /**
- * The backend's rule EXACTLY: a rollback is honoured only for a successful
- * deploy that recorded an image. Any other row 409s `deploy_not_rollbackable`.
+ * The bundle a managed deploy shipped, or null.
+ *
+ * A managed deploy publishes no image — the platform image is the platform's
+ * half of the runtime — so this is the artefact a rollback restores there.
+ */
+function deploymentBundle(dep: DeploymentRow): string | null {
+    return str(dep, "bundleId", "bundle_id");
+}
+
+/**
+ * The backend's rule EXACTLY (`rollbackTargetOf`): a rollback is honoured only
+ * for a successful deploy that recorded an image or a bundle. Any other row
+ * 409s `deploy_not_rollbackable`.
+ *
+ * The bundle half was missing, and it took the whole managed tier with it: a
+ * managed deploy records no image, so `rebase cloud rollback` refused every
+ * managed project before it even asked the server.
  */
 export function isRollbackable(dep: DeploymentRow): boolean {
-    return dep.status === "success" && deploymentImage(dep) !== null;
+    return dep.status === "success" && (deploymentImage(dep) !== null || deploymentBundle(dep) !== null);
 }
+
+/** What a rollback needs, said the way a refusal should say it. */
+const ROLLBACKABLE_RULE = "needs a successful deploy that recorded an image or a bundle";
 
 /** finishedAt − createdAt in ms, or null (still running / missing / skewed). */
 export function deploymentDurationMs(dep: DeploymentRow): number | null {
@@ -119,6 +140,10 @@ export function deploymentView(dep: DeploymentRow): Record<string, unknown> {
         finishedAt: isoOf(dep, "finishedAt", "finished_at"),
         durationMs,
         image: deploymentImage(dep),
+        // Published beside `image` rather than folded into it: they are
+        // different artefacts from different halves of the platform, and a
+        // script that pinned one would silently match the other.
+        bundle: deploymentBundle(dep),
         rollbackOf: str(dep, "rollbackOf", "rollback_of"),
         isRollback: str(dep, "rollbackOf", "rollback_of") !== null,
         rollbackable: isRollbackable(dep),
@@ -360,7 +385,7 @@ export async function rollbackCommand(rawArgs: string[]): Promise<void> {
         // contract, mirrored from the backend's rollback rule.
         if (!isRollbackable(target!)) {
             fail(
-                `Deployment ${explicitId} is not rollbackable (needs a successful deploy that recorded an image).`,
+                `Deployment ${explicitId} is not rollbackable (${ROLLBACKABLE_RULE}).`,
                 "List candidates with `rebase cloud deployments list`.",
                 "deploy_not_rollbackable"
             );
@@ -369,7 +394,7 @@ export async function rollbackCommand(rawArgs: string[]): Promise<void> {
         const rollbackable = rows!.filter(isRollbackable);
         if (!rollbackable.length) {
             fail(
-                "No rollbackable deployment found (needs a successful deploy that recorded an image).",
+                `No rollbackable deployment found (${ROLLBACKABLE_RULE}).`,
                 "List history with `rebase cloud deployments list`.",
                 "deploy_not_rollbackable"
             );
@@ -390,7 +415,10 @@ export async function rollbackCommand(rawArgs: string[]): Promise<void> {
             success: boolean;
             deployment: { id: string };
             rolledBackTo: string;
-            imageUrl: string;
+            // Exactly one is non-null, and which one says whether a custom
+            // build's image or a managed deploy's bundle is being restored.
+            imageUrl: string | null;
+            bundleId: string | null;
         }>("deploy", { projectId,
 deploymentId: String(target!.id),
 client: "cli" }, { path: "rollback" });
@@ -401,7 +429,11 @@ client: "cli" }, { path: "rollback" });
                 keyValues([
                     ["New deployment", res.deployment?.id ? String(res.deployment.id) : undefined],
                     ["Rolled back to", res.rolledBackTo],
-                    ["Image", res.imageUrl]
+                    // Only the one that applies. Printing "Image: —" at somebody
+                    // who has never had an image is the same wrong answer the
+                    // refusal used to give.
+                    ["Image", res.imageUrl ?? undefined],
+                    ["Bundle", res.bundleId ?? undefined]
                 ]);
                 console.log(chalk.gray("  Follow it with `rebase cloud logs -f`."));
                 console.log("");
@@ -410,7 +442,8 @@ client: "cli" }, { path: "rollback" });
                 success: true,
                 deploymentId: res.deployment?.id ?? null,
                 rolledBackTo: res.rolledBackTo,
-                imageUrl: res.imageUrl
+                imageUrl: res.imageUrl ?? null,
+                bundleId: res.bundleId ?? null
             }
         );
     } catch (e) {

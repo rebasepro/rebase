@@ -6,14 +6,17 @@
  * that resolves nowhere near the user's app. The host is per-deployment config,
  * so it can only come from the control plane (`platform-config`).
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
     fetchDeployTargets,
     fetchTenantBaseDomain,
     formatTenantHost,
+    initOutputMode,
     projectHost,
+    setJsonModeForTest,
     type CloudClient
 } from "./context";
+import { printEnvHelp } from "./env";
 
 /** A client whose only exercised surface is `functions.invoke`. */
 function fakeClient(invoke: (name: string) => Promise<unknown>): CloudClient {
@@ -127,5 +130,91 @@ deployTargets: [] }));
     it("treats a non-array `deployTargets` as no answer at all", async () => {
         const client = fakeClient(async () => ({ deployTargets: "gcp" }));
         await expect(fetchDeployTargets(client, "https://junk.example")).resolves.toBeUndefined();
+    });
+});
+
+/**
+ * Which language `--help` answers in.
+ *
+ * "stdout is not a TTY" is the right rule for a RESULT and the wrong one for a
+ * help page: `rebase cloud db --help | less` is a person asking for the page.
+ * There was no way to say so — `--json` could only turn the mode on, and
+ * `REBASE_JSON` was tested against the literal `"1"`, so every other value
+ * including `"0"` fell through to the TTY test and set it anyway.
+ */
+describe("initOutputMode", () => {
+    const before = process.env.REBASE_JSON;
+    afterEach(() => {
+        if (before === undefined) delete process.env.REBASE_JSON;
+        else process.env.REBASE_JSON = before;
+        setJsonModeForTest(false);
+    });
+
+    it("honours REBASE_JSON=0 against a pipe", () => {
+        process.env.REBASE_JSON = "0";
+        expect(initOutputMode(["node", "rebase", "cloud", "env", "--help"])).toBe(false);
+    });
+
+    it("still lets --json win over REBASE_JSON=0", () => {
+        // Most explicit wins: the flag is on the line the caller just typed.
+        process.env.REBASE_JSON = "0";
+        expect(initOutputMode(["node", "rebase", "cloud", "env", "--json"])).toBe(true);
+    });
+
+    it("takes REBASE_JSON=1 on a terminal", () => {
+        process.env.REBASE_JSON = "1";
+        expect(initOutputMode(["node", "rebase", "cloud", "env"])).toBe(true);
+    });
+});
+
+/**
+ * A piped group page carries the same content as the terminal one.
+ *
+ * It did not. `emitHelp` was handed a list of action WORDS, so
+ * `rebase cloud env --help | cat` answered
+ * `{"command":"env","actions":["list","set","unset","reveal","pull"]}` — no
+ * descriptions, no flags, and not the paragraph about build-time variables that
+ * is the reason the page exists. This family forces JSON mode off a TTY, so that
+ * was every scripted and every agent-driven read of it. One description now,
+ * rendered twice.
+ */
+describe("printGroupHelp", () => {
+    afterEach(() => setJsonModeForTest(false));
+
+    function pipedPage(print: () => void): Record<string, unknown> {
+        setJsonModeForTest(true);
+        const chunks: string[] = [];
+        const original = process.stdout.write.bind(process.stdout);
+        // @ts-expect-error test shim
+        process.stdout.write = (chunk: string) => {
+            chunks.push(String(chunk));
+            return true;
+        };
+        try {
+            print();
+        } finally {
+            process.stdout.write = original;
+        }
+        return JSON.parse(chunks.join("")) as Record<string, unknown>;
+    }
+
+    it("carries every action's description and flags", () => {
+        const page = pipedPage(printEnvHelp) as {
+            command: string;
+            actions: Array<{ action: string; description: string; flags: Array<{ flag: string }> }>;
+            notes: string[];
+        };
+
+        expect(page.command).toBe("cloud env");
+        const set = page.actions.find(a => a.action === "set");
+        expect(set?.description).toBeTruthy();
+        expect(set?.flags.map(f => f.flag)).toContain("--secret");
+        // The paragraph that only existed in the terminal rendering.
+        expect(page.notes.join(" ")).toContain("BUILD time");
+    });
+
+    it("names the globals, so a reader does not have to find the index page", () => {
+        const page = pipedPage(printEnvHelp) as { globalFlags: Array<{ flag: string }> };
+        expect(page.globalFlags.map(f => f.flag)).toContain("--json");
     });
 });

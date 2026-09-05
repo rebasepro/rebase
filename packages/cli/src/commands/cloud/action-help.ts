@@ -23,7 +23,7 @@
  *     description of the command rather than sixty lines of ANSI to scrape.
  */
 import chalk from "chalk";
-import { emitHelp } from "./context";
+import { emitHelp, GLOBAL_HELP_FLAGS } from "./context";
 
 export interface ActionHelp {
     /** `cloud projects create` — no leading `rebase`. */
@@ -39,25 +39,12 @@ export interface ActionHelp {
     notes?: string[];
 }
 
-/**
- * Flags every cloud command accepts, documented once.
- *
- * Excluded from the spec comparison below — they are merged in by
- * `parseCloudArgs` for every command in the family, so repeating them per entry
- * would be nine copies of the same four lines.
+/*
+ * `GLOBAL_HELP_FLAGS` and `GLOBAL_SPEC_KEYS` moved to `context.ts`, next to the
+ * `GLOBAL_CLOUD_FLAGS` they describe — the group pages print them too, and
+ * `context` cannot import this module (this one imports it). `GLOBAL_SPEC_KEYS`
+ * is derived from the spec now rather than listed a second time.
  */
-export const GLOBAL_HELP_FLAGS: Array<[string, string]> = [
-    ["--project, -p <slug>", "Operate on a project without linking this directory"],
-    ["--json", "Machine-readable output (also when piped, or REBASE_JSON=1)"],
-    ["--url <origin>", "Target a specific control plane (or REBASE_CLOUD_URL)"],
-    ["--yes, -y", "Skip confirmation prompts"],
-    ["--debug", "Print the untouched error body after a failure"]
-];
-
-/** Flag names that `parseCloudArgs` adds to every command in the family. */
-export const GLOBAL_SPEC_KEYS = new Set([
-    "--json", "--yes", "--help", "--project", "--url", "-p", "-y", "-h", "--debug"
-]);
 
 export const ACTION_HELP: Record<string, ActionHelp> = {
     projects: {
@@ -101,8 +88,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--link", "Link this directory to the new project"],
             ["--repo <url>", "Git repository to build from"],
             ["--branch <name>", "Git branch. Default: main"],
-            ["--provider <gcp|hetzner|…>", "Where to run it (default: the platform's target)"],
-            ["--region <region>", "Region within the provider"],
+            // Not a region picker. See the note below — the flags record where
+            // the project is placed, and the beta has one place to put it.
+            ["--provider <gcp|hetzner|…>", "Which deploy target to record. Default: the one this control plane would use"],
+            ["--region <region>", "Region recorded on the project. Default: that target's own region"],
             ["--cpu <n>", "vCPU per instance"],
             ["--memory <size>", "Memory per instance, e.g. 512Mi"],
             ["--replicas <n>", "Instance count"],
@@ -121,7 +110,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ],
         notes: [
             "The subdomain cannot be changed in passing later — a typo here is a new project.",
-            "A managed database is created at the project's FIRST DEPLOY, not here."
+            "A managed database is created at the project's FIRST DEPLOY, not here.",
+            "--provider and --region are not a region picker. They record which of the control plane's "
+                + "registered deploy targets this project belongs to; the private beta has one, so both "
+                + "default to it and neither moves a project anywhere else."
         ]
     },
 
@@ -402,17 +394,20 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
     "webhooks create": {
         command: "cloud webhooks create",
         usage:
-            "cloud webhooks create --name <name> --table <table> --url <url> [--events <list>]",
+            "cloud webhooks create --name <name> --table <table> --endpoint <url> [--events <list>]",
         summary: "Register an outbound webhook on a table's row changes.",
         flags: [
             ["--name <name>", "Required. What it is called in listings"],
             ["--table <table>", "Required. The table whose changes fire it"],
-            ["--url <url>", "Required. Where the POST goes"],
+            ["--endpoint <url>", "Required. Where the POST goes"],
             ["--events <list>", "Comma-separated: insert, update, delete. Default: all three"]
         ],
         examples: [
-            "rebase cloud webhooks create --name notify --table orders --url https://example.com/hook",
-            "rebase cloud webhooks create --name audit --table users --url https://example.com/hook --events insert,delete"
+            "rebase cloud webhooks create --name notify --table orders --endpoint https://example.com/hook",
+            "rebase cloud webhooks create --name audit --table users --endpoint https://example.com/hook --events insert,delete"
+        ],
+        notes: [
+            "`--endpoint`, not `--url`: every cloud command's `--url` names the control plane, and one written here would be authenticated against instead of called."
         ]
     },
 
@@ -446,16 +441,243 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     billing: {
         command: "cloud billing",
-        usage: "cloud billing [portal|usage]",
+        usage: "cloud billing [setup|checkout]",
         summary:
-            "The selected organization's billing. `usage` reports what is currently running and what "
-            + "it costs; `portal` opens the Stripe customer portal. Organization-scoped, not project-scoped.",
+            "The selected organization's billing. Bare, it prints the billing account, the card on "
+            + "file and what the linked project costs per month; `setup` attaches a card (one-time, "
+            + "opens a browser); `checkout` opens a Stripe session for one project. "
+            + "Organization-scoped, not project-scoped.",
         flags: [],
         examples: [
             "rebase cloud billing",
-            "rebase cloud billing usage --json",
-            "rebase cloud billing portal"
+            "rebase cloud billing setup",
+            "rebase cloud billing checkout --project shop"
+        ],
+        notes: [
+            "`setup` comes before the first deploy: without a card the control plane answers 402, and `deploy` refuses before it builds."
         ]
+    },
+
+    /* ── The resource dials ─────────────────────────────────────────────
+     *
+     * Two pages rather than one, because they answer different questions:
+     * `resources` is "what does this project have, and what does it cost",
+     * `resources set` is "what may I change it to". The prices are not
+     * repeated here — the control plane quotes them and both pages say so,
+     * which is the only version of this that cannot go stale. */
+
+    resources: {
+        command: "cloud resources",
+        usage: "cloud resources [set] [options]",
+        summary:
+            "What this project reserves, and what the control plane would invoice for it. Bare, it "
+            + "prints every dial and an itemised €/month; `set` changes one. An empty dial means the "
+            + "platform default, which moves when the default moves — a dial pinned to the same "
+            + "number does not.",
+        flags: [],
+        examples: [
+            "rebase cloud resources",
+            "rebase cloud resources --json",
+            "rebase cloud resources set --help"
+        ],
+        notes: [
+            "The price is the control plane's own quote for these dials, itemised line by line — not a tier, and not a number this CLI computes."
+        ]
+    },
+
+    "resources set": {
+        command: "cloud resources set",
+        usage: "cloud resources set [--cpu <n>] [--memory <size>] [--replicas <n>] [...]",
+        summary:
+            "Change one or more of a project's dials. At least one is required: a patch with nothing "
+            + "in it is a typo, and reporting success for a change nobody made is worse than refusing.",
+        flags: [
+            ["--cpu <n>", "App CPU request per instance, e.g. 500m or 2. Default: 250m"],
+            ["--memory <size>", "App memory request per instance, e.g. 512Mi or 2Gi. Default: 512Mi"],
+            ["--replicas <n>", "Instances that always exist — the autoscaler's floor, and what is billed at rest"],
+            ["--spot <true|false>", "Preemptible capacity: cheaper, and restarted without notice"],
+            ["--scale-to-zero <true|false>", "Request-billed compute that stops when idle, at the cost of a cold start"],
+            ["--db-mode <shared|dedicated>", "Pooled cluster, or one of this project's own"],
+            ["--db-instances <n>", "1–3. 1 is a single instance with no failover; 2 adds an automatic standby"],
+            ["--db-cpu <n>", "Database CPU request per instance. Default: 500m"],
+            ["--db-memory <size>", "Database memory request per instance. Default: 2Gi"],
+            ["--storage <size>", "Database volume size"],
+            ["--autoscale-max <n>", "1–16. The ceiling the app may reach, and the worst case it may be billed"],
+            ["--autoscale-cpu-target <pct>", "10–95. CPU utilisation the autoscaler holds, against the request. Default: 70"],
+            ["--no-autoscale", "Turn autoscaling off. The only way to: a ceiling at or below --replicas is refused"]
+        ],
+        examples: [
+            "rebase cloud resources set --cpu 500m --memory 2Gi",
+            "rebase cloud resources set --replicas 2 --autoscale-max 6",
+            "rebase cloud resources set --db-mode dedicated --db-instances 2"
+        ],
+        notes: [
+            "Run `rebase cloud resources` first — it prints the current dials and the €/month this project is quoted.",
+            "Applied immediately: the app rolls its pods and the subscription is prorated from today. A change that restarts the database waits for a maintenance window.",
+            "The valid ranges are the target cluster's, not this CLI's — GKE Autopilot bills a 250m/512Mi floor and rewrites a memory:CPU ratio outside 1:1–6.5:1, a Hetzner node has neither constraint. The control plane refuses what it cannot honour and names the field."
+        ]
+    },
+
+    /* ── Session, link, and the operations with no flags of their own ────
+     *
+     * Every one of these fell through to the index page, which lists groups
+     * and not one flag — so `login --password`, `link`'s positional URL and
+     * the `-y` that `stop` requires had no discoverable spelling. They take
+     * few options, and that is exactly what a reader needs told. */
+
+    login: {
+        command: "cloud login",
+        usage: "cloud login [--email <address>] [--password <password>]",
+        summary:
+            "Sign in to the control plane and write the session to ~/.rebase/credentials.json. "
+            + "Prompts for whatever is missing when attached to a terminal, and refuses rather than "
+            + "hangs when it is not.",
+        flags: [
+            ["--email, -e <address>", "The account's email. Prompted when omitted, or REBASE_CLOUD_EMAIL"],
+            ["--password <password>", "Discouraged: a password written here is recorded in your shell history and visible in the process table. Prefer the prompt, or REBASE_CLOUD_PASSWORD"]
+        ],
+        examples: [
+            "rebase cloud login",
+            "rebase cloud login --email me@example.com",
+            "rebase cloud login --url https://cloud.example.com"
+        ],
+        notes: [
+            "--password warns, once, before the request: by the time a login succeeds the password is already in the history file.",
+            "There is no machine token yet, so CI genuinely needs a human's credentials. REBASE_CLOUD_EMAIL and "
+                + "REBASE_CLOUD_PASSWORD are how a secret store hands them over without them appearing on a command line."
+        ]
+    },
+
+    logout: {
+        command: "cloud logout",
+        usage: "cloud logout [--url <origin>]",
+        summary:
+            "Forget the session for a control plane. Idempotent — logging out when you are not "
+            + "logged in is a success, and `wasLoggedIn` in the JSON is how a script tells the two apart.",
+        flags: [],
+        examples: ["rebase cloud logout"]
+    },
+
+    whoami: {
+        command: "cloud whoami",
+        usage: "cloud whoami",
+        summary: "Who this session is, which control plane it is against, and what this directory is linked to.",
+        flags: [],
+        examples: ["rebase cloud whoami", "rebase cloud whoami --json"]
+    },
+
+    link: {
+        command: "cloud link",
+        usage: "cloud link [<url>] [--project <slug>]",
+        summary:
+            "Bind this directory to a backend, by writing .rebase/cloud.json. With a cloud project "
+            + "(picked interactively, or named with --project) the rest of the family needs no flags. "
+            + "With a positional URL it links straight at a running Rebase API — no control plane, no "
+            + "login — which is what makes the multi-repo workflow available to self-hosters.",
+        flags: [],
+        examples: [
+            "rebase cloud link",
+            "rebase cloud link --project shop",
+            "rebase cloud link https://api.example.com"
+        ],
+        notes: [
+            "A positional URL is verified before it is written: an address that does not answer is still linked, but you are told.",
+            ".rebase/cloud.json is not a secret and is not your credentials — those live in ~/.rebase/credentials.json."
+        ]
+    },
+
+    unlink: {
+        command: "cloud unlink",
+        usage: "cloud unlink",
+        summary:
+            "Remove this directory's link. Idempotent, like logout: `unlinked: false` says there was "
+            + "nothing to remove.",
+        flags: [],
+        examples: ["rebase cloud unlink"]
+    },
+
+    use: {
+        command: "cloud use",
+        usage: "cloud use [<org>]",
+        summary:
+            "Select the active organization — the one `projects create`, `billing` and `orgs` act on. "
+            + "Named, it is set; omitted, you pick from the ones this account belongs to.",
+        flags: [],
+        examples: ["rebase cloud use", "rebase cloud use acme"]
+    },
+
+    open: {
+        command: "cloud open",
+        usage: "cloud open",
+        summary:
+            "Open the console in a browser — the linked project's page when this directory is linked, "
+            + "the dashboard otherwise. The URL is the result, so a piped run prints it instead.",
+        flags: [],
+        examples: ["rebase cloud open"]
+    },
+
+    rollback: {
+        command: "cloud rollback",
+        usage: "cloud rollback [<deploymentId>] [--yes]",
+        summary:
+            "Put a previous successful deployment back into service. Without an id, the most recent "
+            + "rollbackable deployment that is not the live one. History is appended, never rewound: "
+            + "a rollback is a new deployment row pointing back at the old one.",
+        flags: [],
+        examples: [
+            "rebase cloud rollback",
+            "rebase cloud deployments list",
+            "rebase cloud rollback 214 --yes"
+        ],
+        notes: [
+            "`rebase cloud deployments list` marks which rows are rollbackable. One that is not is refused here rather than by a 409 from the control plane."
+        ]
+    },
+
+    cancel: {
+        command: "cloud cancel",
+        usage: "cloud cancel [<deploymentId>] [--yes]",
+        summary:
+            "Stop the build in flight for this project. Without an id, whichever one is deploying. "
+            + "Also the way out of a project whose status claims a deploy that no deployment row backs.",
+        flags: [],
+        examples: ["rebase cloud cancel", "rebase cloud cancel 214 --yes"]
+    },
+
+    start: {
+        command: "cloud start",
+        usage: "cloud start",
+        summary: "Bring a stopped project back into service.",
+        flags: [],
+        examples: ["rebase cloud start"]
+    },
+
+    stop: {
+        command: "cloud stop",
+        usage: "cloud stop [--yes]",
+        summary:
+            "Stop the project. This is downtime, so it is confirmed — pass --yes to skip the prompt, "
+            + "which a non-interactive run must.",
+        flags: [],
+        examples: ["rebase cloud stop", "rebase cloud stop --yes"]
+    },
+
+    restart: {
+        command: "cloud restart",
+        usage: "cloud restart [--yes]",
+        summary:
+            "Stop the project and start it again. A real stop and start, with genuine downtime in "
+            + "between, so it is confirmed like `stop`.",
+        flags: [],
+        examples: ["rebase cloud restart --yes"]
+    },
+
+    metrics: {
+        command: "cloud metrics",
+        usage: "cloud metrics",
+        summary: "Live CPU, memory and disk for the project's running units, as the control plane reports them.",
+        flags: [],
+        examples: ["rebase cloud metrics", "rebase cloud metrics --json"]
     }
 };
 

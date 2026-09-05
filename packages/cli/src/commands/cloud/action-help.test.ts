@@ -16,11 +16,14 @@
 import { describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { ACTION_HELP, GLOBAL_SPEC_KEYS, printActionHelp } from "./action-help";
+import { ACTION_HELP, printActionHelp } from "./action-help";
+import { GLOBAL_SPEC_KEYS } from "./context";
 import { CREATE_PROJECT_FLAGS } from "./projects";
 import { CREATE_DATABASE_FLAGS } from "./databases";
 import { DEPLOY_FLAGS } from "./deploy";
 import { ENV_SET_FLAGS } from "./env";
+import { RESOURCES_SET_FLAGS, BILLING_ACTIONS } from "./resources";
+import { LOGIN_FLAGS } from "./auth";
 
 /**
  * Which spec backs which page.
@@ -36,8 +39,8 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "projects create": CREATE_PROJECT_FLAGS,
     "projects delete": {},
     "db create": CREATE_DATABASE_FLAGS,
-    "db backup": { "--yes": Boolean },
-    "db pitr": { "--target": String, "--yes": Boolean },
+    "db backup": {},
+    "db pitr": { "--target": String },
     deploy: DEPLOY_FLAGS,
     deployments: null,
     "deployments list": { "--limit": Number, "--all": Boolean },
@@ -55,12 +58,34 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
         "--force-path-style": Boolean
     },
     webhooks: null,
-    "webhooks create": { "--name": String, "--table": String, "--url": String, "--events": String },
+    "webhooks create": { "--name": String, "--table": String, "--endpoint": String, "--events": String },
     "webhooks delete": {},
     billing: {},
     logs: null,
     status: null,
-    "clusters verify": null
+    "clusters verify": null,
+    // The dials. `resources set` scans `rawArgs` rather than parsing a spec —
+    // `--no-autoscale` is value-less — so `RESOURCES_SET_FLAGS` is the
+    // description of that line, derived from `DIAL_FLAGS`.
+    resources: null,
+    "resources set": RESOURCES_SET_FLAGS,
+    // Session, link and the operations whose only options are the global ones.
+    // `{}` rather than `null` on purpose: it says "this command declares nothing
+    // of its own", which turns the reverse check on — a page inventing a flag
+    // here fails rather than being skipped.
+    login: LOGIN_FLAGS,
+    logout: {},
+    whoami: null,
+    link: {},
+    unlink: null,
+    use: null,
+    open: null,
+    rollback: {},
+    cancel: {},
+    start: {},
+    stop: {},
+    restart: {},
+    metrics: null
 };
 
 /** `--name, -n <name>` → `--name`. The page spells flags for a reader. */
@@ -73,6 +98,18 @@ function documentedNames(entry: { flags: Array<[string, string]> }): Set<string>
         }
     }
     return names;
+}
+
+/**
+ * The action words a usage line offers — `cloud billing [setup|checkout]` →
+ * `["setup", "checkout"]`.
+ *
+ * Only the bracketed group, so `cloud billing` itself and a `<slug>` placeholder
+ * are not mistaken for actions.
+ */
+function actionWordsIn(usage: string): string[] {
+    const group = /[[<]([a-z|-]+)[\]>]/.exec(usage);
+    return group ? group[1].split("|") : [];
 }
 
 /** Spec keys a page has to document: not the globals, not the aliases. */
@@ -94,19 +131,151 @@ function documentableKeys(spec: Record<string, unknown>): string[] {
  * of `dist/index.es.js` by somebody deploying a real project.
  */
 function commandsThatParseTheirOwnLine(): string[] {
-    const dir = __dirname;
     const found = new Set<string>();
-    for (const file of fs.readdirSync(dir)) {
-        // Not action-help.ts: its own entries carry the same literal, so
-        // including it would make the check compare the list with itself.
-        if (!file.endsWith(".ts") || file.includes(".test.") || file === "action-help.ts") continue;
-        const source = fs.readFileSync(path.join(dir, file), "utf8");
+    for (const source of cloudSources()) {
         for (const match of source.matchAll(/command:\s*"cloud ([^"]+)"/g)) {
             found.add(match[1]);
         }
     }
+    // A group page names itself the same way — `printGroupHelp({ command:
+    // "cloud db", … })` — and IS the page for that word. Subtracted rather than
+    // pattern-matched apart, so the two producers of the literal cannot be
+    // told apart by regex luck.
+    for (const group of commandsWithAGroupPage()) found.delete(group);
     return [...found].sort();
 }
+
+/** Every non-test module in this directory, minus the page file itself. */
+function cloudSources(): string[] {
+    const dir = __dirname;
+    return fs.readdirSync(dir)
+        // Not action-help.ts: its own entries carry the same literal, so
+        // including it would make the check compare the list with itself.
+        .filter(file => file.endsWith(".ts") && !file.includes(".test.") && file !== "action-help.ts")
+        .map(file => fs.readFileSync(path.join(dir, file), "utf8"));
+}
+
+/** The commands answered by a rendered group page rather than an `ACTION_HELP` entry. */
+function commandsWithAGroupPage(): string[] {
+    const found = new Set<string>();
+    for (const source of cloudSources()) {
+        for (const match of source.matchAll(/printGroupHelp\(\{\s*command:\s*"cloud ?([^"]*)"/g)) {
+            if (match[1]) found.add(match[1]);
+        }
+    }
+    return [...found].sort();
+}
+
+/**
+ * Every flag declared in a `spec:` handed to `parseCloudArgs`, from the source.
+ *
+ * Only that property, and deliberately not every `arg({…})` in the family: a
+ * command that parses the raw line itself — `login`, `power`, `link` — MUST
+ * declare `--project`, `-p` and `--yes`, because `arg` only consumes a flag
+ * together with its value when the flag is in its spec, and an undeclared
+ * `--project acme` would leave `acme` as a positional. Those declarations are
+ * separate, permissive parses of the same line, not entries in a merge.
+ *
+ * A `spec:` is different. `parseCloudArgs` spreads it OVER the globals, so a key
+ * that repeats one silently replaces it.
+ */
+function specFlagsBySource(): Array<{ file: string; flag: string }> {
+    const found: Array<{ file: string; flag: string }> = [];
+    for (const file of fs.readdirSync(__dirname)) {
+        if (!file.endsWith(".ts") || file.includes(".test.")) continue;
+        // context.ts DECLARES the globals; it is the one file allowed to.
+        if (file === "context.ts") continue;
+        const source = fs.readFileSync(path.join(__dirname, file), "utf8");
+        for (const match of source.matchAll(/\bspec:\s*\{([^}]*)\}/g)) {
+            for (const flag of match[1].matchAll(/"(-{1,2}[A-Za-z][\w-]*)"\s*:/g)) {
+                found.push({ file,
+flag: flag[1] });
+            }
+        }
+    }
+    // The specs hoisted into named constants, which the regex above cannot see
+    // because they are not written at the call. `CREATE_DATABASE_FLAGS` is not
+    // here: `db create` parses with `arg` directly, so it is in the first
+    // category and has to declare `--project` for itself.
+    for (const [name, spec] of [
+        ["deploy.ts", DEPLOY_FLAGS],
+        ["projects.ts", CREATE_PROJECT_FLAGS],
+        ["env.ts", ENV_SET_FLAGS]
+    ] as const) {
+        for (const flag of Object.keys(spec)) found.push({ file: name,
+flag });
+    }
+    return found;
+}
+
+/**
+ * Every "I do not know that word" refusal carries `unknown_command`.
+ *
+ * `fail`'s code defaults to the string `"error"`, and four groups took it:
+ * `env`, `domains`, `extensions` and `settings` answered a mistyped action with
+ * `{"error":{"code":"error"}}`. An envelope whose only machine-readable field is
+ * the word "error" is not machine-readable — it forces the substring-matching on
+ * `message` that the envelope exists to remove — and it made a typo
+ * indistinguishable from a server failure to anything reading the code.
+ *
+ * Read from the source rather than driven per command, because the point is the
+ * class: a new group written in the same shape fails here on the commit that
+ * adds it, not the day an agent branches on the code.
+ */
+describe("unknown-action refusals", () => {
+    /** `fail("Unknown … command: …", hint, code)` occurrences, with their code. */
+    function unknownActionRefusals(): Array<{ text: string; code: string | null }> {
+        const found: Array<{ text: string; code: string | null }> = [];
+        for (const source of cloudSources()) {
+            for (const match of source.matchAll(/fail\(\s*`Unknown [^`]*`,([\s\S]{0,200}?)\);/g)) {
+                const code = /,\s*"([a-z_]+)"\s*$/.exec(match[1].trim());
+                found.push({ text: match[0].split("\n")[0],
+code: code ? code[1] : null });
+            }
+        }
+        return found;
+    }
+
+    it("finds the refusals it is checking, so an empty sweep cannot pass", () => {
+        expect(unknownActionRefusals().length).toBeGreaterThan(6);
+    });
+
+    it("all carry unknown_command, never `fail`'s default", () => {
+        const wrong = unknownActionRefusals().filter(r => r.code !== "unknown_command");
+        expect(
+            wrong.map(r => `${r.text} → ${r.code ?? "(default: \"error\")"}`),
+            "a mistyped action and a server failure must not answer with the same code"
+        ).toEqual([]);
+    });
+});
+
+describe("no command's spec redeclares a global flag", () => {
+    /**
+     * `parseCloudArgs` merges `GLOBAL_CLOUD_FLAGS` UNDER the command's own spec,
+     * so a per-command key that repeats a global one wins the merge — and it
+     * does not shadow the global's other readers, which go on reading the raw
+     * line for themselves.
+     *
+     * `webhooks create --url` was the live instance. `resolveCloudUrl` reads
+     * `--url` off the raw line for every command in this family, so
+     * `webhooks create --name x --table y --url https://example.com/hook` sent
+     * the customer's webhook endpoint to `requireClient` as the control plane to
+     * authenticate against. The documented example could not create a webhook.
+     * The flag is `--endpoint` now; this is the sweep for the class.
+     */
+    it("finds the specs it is checking, so an empty sweep cannot pass", () => {
+        expect(specFlagsBySource().length).toBeGreaterThan(20);
+    });
+
+    it("declares no flag that GLOBAL_SPEC_KEYS already covers", () => {
+        const collisions = specFlagsBySource().filter(entry => GLOBAL_SPEC_KEYS.has(entry.flag));
+        expect(
+            collisions.map(c => `${c.file}: ${c.flag}`),
+            "a spec key with a global's spelling replaces the global in the merge, while the global's "
+            + "other readers keep reading the raw line — so the two disagree about what the value means."
+        ).toEqual([]);
+    });
+});
 
 describe("ACTION_HELP", () => {
     it("has a page for every command that parses its own line", () => {
@@ -122,6 +291,16 @@ describe("ACTION_HELP", () => {
         // Without this, a rename of `parseCloudArgs`'s `command` field would
         // make the check above vacuous and silent.
         expect(commandsThatParseTheirOwnLine().length).toBeGreaterThan(10);
+    });
+
+    it("finds the group pages it subtracts, so the subtraction cannot swallow the sweep", () => {
+        // The other half of the same guard: if `printGroupHelp` were renamed,
+        // this would return nothing and the subtraction would be a no-op — which
+        // is the safe direction, but silent. If it returned everything, the
+        // sweep above would pass vacuously.
+        expect(commandsWithAGroupPage().sort()).toEqual(
+            ["db", "debug", "domains", "env", "extensions", "orgs", "settings", "storage"]
+        );
     });
 
     it("pairs every page with a spec, or with an explicit null", () => {
@@ -161,6 +340,21 @@ describe("ACTION_HELP", () => {
         // reader copies, and `check-doc-commands.mjs` checks the same shape for
         // the markdown.
         for (const example of entry.examples) expect(example.startsWith("rebase cloud ")).toBe(true);
+    });
+
+    /**
+     * A group's usage line lists action words, and those words have to be the
+     * ones the group dispatches.
+     *
+     * `cloud billing [portal|usage]` was the page; the dispatch answered `setup`
+     * and `checkout`. So both documented words fell out of the chain into the
+     * default action and printed the billing account — a page describing two
+     * commands that do not exist, answering as if they did.
+     */
+    it.each([
+        ["billing", BILLING_ACTIONS]
+    ])("%s's usage line names the actions it dispatches", (key, dispatched) => {
+        expect(actionWordsIn(ACTION_HELP[key].usage).sort()).toEqual([...dispatched].sort());
     });
 
     it("says, on the two commands that hide it, where a managed database comes from", () => {

@@ -19,7 +19,7 @@ import {
     displayProjectRef,
     parseCloudArgs,
     emit,
-    emitHelp,
+    printGroupHelp,
     confirmDestructive,
     keyValues,
     success,
@@ -98,7 +98,7 @@ export async function extensionsCommand(action: string | undefined, rawArgs: str
             printExtensionsHelp();
             break;
         default:
-            fail(`Unknown extensions command: ${action}`, "Try `rebase cloud extensions --help`.");
+            fail(`Unknown extensions command: ${action}`, "Run `rebase cloud extensions --help`.", "unknown_command");
     }
 }
 
@@ -255,19 +255,19 @@ extensionName: name }, { path: "disable" });
 }
 
 export function printExtensionsHelp(): void {
-    emitHelp("extensions", ["list", "enable", "disable"], () => {
-        console.log(`
-${chalk.bold("rebase cloud extensions")} — Postgres extensions
-
-${chalk.green.bold("Commands")}
-  ${chalk.blue.bold("list")}                      List extensions and their state
-  ${chalk.blue.bold("enable")} ${chalk.gray("<name> [-y]")}        Enable one ${chalk.gray("(pgvector alias ⇒ vector)")}
-  ${chalk.blue.bold("disable")} ${chalk.gray("<name>")}            Disable one
-
-${chalk.green.bold("Options")}
-  ${chalk.blue("--yes, -y")}                 Confirm a DB-restarting change
-  ${chalk.blue("--json")}                    Machine-readable output
-  ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
-`);
+    printGroupHelp({
+        command: "cloud extensions",
+        title: "Postgres extensions",
+        actions: [
+            { action: "list",
+description: "List extensions and their state" },
+            { action: "enable",
+args: "<name>",
+description: "Enable one — `pgvector` is accepted for `vector`" },
+            { action: "disable",
+args: "<name>",
+description: "Disable one" }
+        ],
+        notes: ["Enabling or disabling one restarts the database, so it needs --yes when nothing can prompt."]
     });
 }

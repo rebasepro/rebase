@@ -154,6 +154,40 @@ status: "success" })).toBe(false);
 status: "failed",
 imageUrl: "img:1" })).toBe(false);
     });
+
+    // A managed deploy publishes no image — the platform image is the
+    // platform's half of the runtime — and ships a BUNDLE instead. While this
+    // rule knew only about images, `rebase cloud rollback` refused every managed
+    // project locally, before the server was ever asked.
+    it("is true for a successful managed deploy, which has a bundle and no image", () => {
+        expect(isRollbackable({ id: 1,
+status: "success",
+bundleId: "bundle-1" })).toBe(true);
+        expect(isRollbackable({ id: 1,
+status: "success",
+bundle_id: "bundle-1" })).toBe(true);
+    });
+
+    it("is false for a failed managed deploy", () => {
+        expect(isRollbackable({ id: 1,
+status: "failed",
+bundleId: "bundle-1" })).toBe(false);
+    });
+
+    it("is false for a managed row from before bundles were recorded", () => {
+        expect(isRollbackable({ id: 1,
+status: "success",
+bundleId: "" })).toBe(false);
+    });
+
+    it("publishes the bundle beside the image, so a script can tell them apart", () => {
+        const view = deploymentView({ id: 7,
+status: "success",
+bundleId: "bundle-1" });
+        expect(view.bundle).toBe("bundle-1");
+        expect(view.image).toBeNull();
+        expect(view.rollbackable).toBe(true);
+    });
 });
 
 describe("deploymentDurationMs", () => {
@@ -535,9 +569,11 @@ describe("cloud subcommand dispatch", () => {
         cap.restore();
 
         expect(storage).not.toHaveBeenCalled();
-        const help = JSON.parse(cap.output()) as { command: string; actions: string[] };
+        // `actions` is a list of descriptions now, not of bare words: a piped
+        // `--help` carries what the terminal page carries.
+        const help = JSON.parse(cap.output()) as { command: string; actions: Array<{ action: string }> };
         expect(help.command).toBe("cloud");
-        expect(help.actions).toContain("storage");
+        expect(help.actions.map(a => a.action)).toContain("storage");
     });
 
     /**
