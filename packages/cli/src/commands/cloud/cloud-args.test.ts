@@ -49,7 +49,15 @@ import { resolveDomainArg } from "./domains";
 import { resolveExtensionArgs } from "./extensions";
 import { resolveDeploymentIdArg } from "./deployments";
 import { resolveBackupArgs } from "./databases";
-import { resolveWebhookIdArg, webhooksCommand, resolveClusterVerifyArgs } from "./resources";
+import {
+    resolveWebhookIdArg,
+    webhooksCommand,
+    resolveClusterVerifyArgs,
+    storageCommand,
+    clustersCommand,
+    resourcesCommand,
+    billingCommand
+} from "./resources";
 import { resolveProjectArg } from "./projects";
 import { resolveDeployArgs } from "./deploy";
 
@@ -504,5 +512,54 @@ baseline: true });
     it("refuses an undeclared flag rather than verifying a cluster named after it", async () => {
         const err = await refusalOf(() => resolveClusterVerifyArgs(argv("clusters", "verify", "--baselin")));
         expect(err.code).toBe("usage");
+    });
+});
+
+/**
+ * A mistyped action word refuses. It used to run the group's DEFAULT action.
+ *
+ * These four groups are written as a chain of `if (action === "x") return …`
+ * with the listing at the bottom, so anything that matched nothing fell through
+ * to it: `storage creat` listed the buckets and exited 0, `clusters verifyy`
+ * listed the clusters, `resources et --cpu 500m` printed the current dials, and
+ * `billing usage` printed the billing account. Every one of them reports a typo
+ * as a successful run of a command nobody asked for — which is worse than an
+ * error, because an agent branching on the exit code learns nothing and a person
+ * reads plausible output.
+ *
+ * The refusal comes before the client is built, so none of these needs a
+ * session — which is also what makes it cheap enough to do on every group.
+ */
+describe("a mistyped action word refuses instead of running the default", () => {
+    it.each([
+        ["storage", (line: string[]) => storageCommand("creat", line)],
+        ["clusters", (line: string[]) => clustersCommand("verifyy", line)],
+        ["resources", (line: string[]) => resourcesCommand("et", line)],
+        ["webhooks", (line: string[]) => webhooksCommand("creat", line)]
+    ])("%s", async (group, run) => {
+        const err = await refusalOf(() => run(argv(group, "typo")));
+        expect(err.code).toBe("unknown_command");
+        expect(err.message).toContain(group);
+    });
+
+    it("billing, whose action is a positional rather than the dispatcher's", async () => {
+        const err = await refusalOf(() => billingCommand(argv("billing", "usage")));
+        expect(err.code).toBe("unknown_command");
+    });
+
+    it("still runs the default action when no word was given at all", async () => {
+        // The guard must not swallow the bare form, which is every one of these
+        // groups' listing.
+        const client = {
+            functions: { invoke: vi.fn(async () => ({})) },
+            data: { collection: () => ({ find: async () => ({ data: [] }) }) }
+        };
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client,
+            url: "https://cp.example"
+        });
+        const log = vi.spyOn(console, "log").mockImplementation(() => {});
+        await storageCommand(undefined, argv("storage"));
+        log.mockRestore();
     });
 });

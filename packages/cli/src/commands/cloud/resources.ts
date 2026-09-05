@@ -517,7 +517,15 @@ export function resolveWebhookIdArg(rawArgs: string[]): string | undefined {
     }).positionals[0];
 }
 
+/** The action words `rebase cloud webhooks` dispatches. No word means `list`. */
+export const WEBHOOKS_ACTIONS = ["list", "create", "delete"] as const;
+
 export async function webhooksCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
+    // Before the parse and before the client: `webhooks creat` used to fall past
+    // both `if`s and LIST the webhooks, exit 0, and leave the caller believing
+    // one had been created.
+    requireKnownAction("webhooks", subcommand, WEBHOOKS_ACTIONS);
+
     // Both lines are parsed BEFORE the client is built. A line the parser will
     // refuse is refused without first spending a login round-trip on it — and
     // for `delete`, without the ambiguity of a refusal that arrives after the
@@ -635,6 +643,9 @@ projectId });
 
 /* ─── storage ──────────────────────────────────────────────────── */
 
+/** The action words `rebase cloud storage` dispatches. No word means `list`. */
+export const STORAGE_ACTIONS = ["list", "create", "attach"] as const;
+
 export async function storageCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
     // `rebase cloud storage` used to only ever list. A tenant could therefore
     // reach durable storage only by creating a bucket by hand in a cloud
@@ -649,6 +660,9 @@ export async function storageCommand(action: string | undefined, rawArgs: string
     if (action === "create") return storageCreateCommand(rawArgs);
     if (action === "attach") return storageAttachCommand(rawArgs);
     if (action === "help") return printStorageHelp();
+    // Everything that is not one of those, and is not `list` or nothing, is a
+    // typo — and used to LIST, exit 0, and read as a bucket that was created.
+    requireKnownAction("storage", action, STORAGE_ACTIONS);
 
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
@@ -891,6 +905,9 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
 
 /* ─── clusters ─────────────────────────────────────────────────── */
 
+/** The action words `rebase cloud clusters` dispatches. No word means `list`. */
+export const CLUSTERS_ACTIONS = ["list", "add", "verify"] as const;
+
 /**
  * `rebase cloud clusters` — list, register and verify the clusters tenants run on.
  *
@@ -902,6 +919,9 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
 export async function clustersCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
     if (action === "verify") return clustersVerifyCommand(rawArgs);
     if (action === "add") return clustersAddCommand(rawArgs);
+    // `clusters verifyy` used to LIST the clusters and exit 0 — the one command
+    // whose whole purpose is to answer a yes/no question about a specific one.
+    requireKnownAction("clusters", action, CLUSTERS_ACTIONS);
     return clustersListCommand(rawArgs);
 }
 
@@ -1310,6 +1330,12 @@ status: acct.status ?? null }
 
 /* ─── resources: what this project is given ─────────────────────── */
 
+/**
+ * The action words `rebase cloud resources` dispatches. No word, or `show`,
+ * prints the dials and the quote.
+ */
+export const RESOURCES_ACTIONS = ["show", "set"] as const;
+
 /** The dials, and the flag that sets each. */
 const DIAL_FLAGS = {
     "--cpu": "cpu",
@@ -1376,6 +1402,10 @@ const BOOLEAN_DIALS = new Set(["preemptible", "scaleToZero"]);
  * having — a check in a client only covers the clients that run it.
  */
 export async function resourcesCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
+    // `resources et --cpu 500m` used to SHOW the dials and exit 0, so a caller
+    // that meant to change one was told what it currently is and nothing else.
+    requireKnownAction("resources", action, RESOURCES_ACTIONS);
+
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
 
