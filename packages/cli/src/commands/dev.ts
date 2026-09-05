@@ -627,6 +627,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             onProgress: (message) => console.log(chalk.gray(`  ${message}`))
         });
         if (prepared) Object.assign(env, prepared.env);
+        /**
+         * Whether this run is on the managed database.
+         *
+         * `db push` is the remedy for what boot leaves alone, and it cannot run
+         * against the managed one at all — Atlas plans by diffing against a
+         * second, empty database, and PGlite serves exactly one. So every
+         * remedy that names it has to know which database is under this run.
+         */
+        const managed = prepared?.database.kind === "managed";
 
         // Always inject PORT so the backend uses our resolved port instead of
         // its hardcoded default (3001). This prevents cross-project collisions
@@ -810,7 +819,21 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             // still reloads automatically when files there are edited/updated manually.
             watchArgs.splice(1, 0, `--watch="${path.join("..", "config", "**", "*")}"`);
 
-            // Watch collections folder and warn about potential schema drift
+            // Watch the collections folder and regenerate the schema from it.
+            //
+            // This used to print a box telling the reader to run `rebase schema
+            // generate` themselves, which made the documented first edit fail
+            // in a way nothing named. tsx restarts the backend on a config
+            // change, boot's additive ensure adds the new column to the
+            // database — and then the very first save of a row carrying it
+            // answered 400 VALIDATION_UNKNOWN_FIELDS, because the driver looks
+            // its columns up in `backend/src/schema.generated.ts` and that file
+            // was still the one generated before the edit. The database was
+            // right; the generated module was the stale half.
+            //
+            // Regenerating it here is the same call `dev` already makes at
+            // startup: no database, idempotent, about two seconds. The reader's
+            // single instruction is now "save the file".
             const collectionsDir = path.join(projectRoot, "config", "collections");
             if (fs.existsSync(collectionsDir)) {
                 let driftDebounce: NodeJS.Timeout | null = null;
@@ -822,23 +845,36 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     if (!affectsSqlSchema(collectionsDir, filename)) return;
                     if (driftDebounce) clearTimeout(driftDebounce);
                     driftDebounce = setTimeout(() => {
-                        // The box is drawn at a fixed width, so a name longer
-                        // than the cell would push the right border off.
-                        const shown = filename!.length > 31 ? `…${filename!.slice(-30)}` : filename!.padEnd(31);
-                        console.log([
-                            "",
-                            chalk.yellow("  ┌──────────────────────────────────────────────────────────────┐"),
-                            chalk.yellow("  │  ⚠️  Collection file changed: ") + chalk.white(shown) + chalk.yellow("│"),
-                            chalk.yellow("  │                                                              │"),
-                            chalk.yellow("  │  Your schema may be out of sync. Run:                        │"),
-                            chalk.yellow("  │    ") + chalk.cyan("rebase schema generate") + chalk.yellow("   regenerate Drizzle schema        │"),
-                            chalk.yellow("  │    ") + chalk.cyan("rebase db push        ") + chalk.yellow("   sync schema to database          │"),
-                            chalk.yellow("  │    ") + chalk.cyan("rebase doctor         ") + chalk.yellow("   check for drift                  │"),
-                            chalk.yellow("  │                                                              │"),
-                            chalk.yellow("  │  TIP: Use ") + chalk.bold("rebase dev --generate") + chalk.yellow(" for auto-regeneration        │"),
-                            chalk.yellow("  └──────────────────────────────────────────────────────────────┘"),
-                            ""
-                        ].join("\n"));
+                        void (async () => {
+                            // The box is drawn at a fixed width, so a name longer
+                            // than the cell would push the right border off.
+                            const shown = filename!.length > 31 ? `…${filename!.slice(-30)}` : filename!.padEnd(31);
+                            console.log([
+                                "",
+                                chalk.yellow("  ┌──────────────────────────────────────────────────────────────┐"),
+                                chalk.yellow("  │  🔄 Collection file changed: ") + chalk.white(shown) + chalk.yellow("│"),
+                                chalk.yellow("  │     Regenerating the schema…                                 │"),
+                                chalk.yellow("  └──────────────────────────────────────────────────────────────┘")
+                            ].join("\n"));
+
+                            await ensureGeneratedSchema(projectRoot);
+
+                            console.log([
+                                chalk.green("  ✓ Schema regenerated. The backend restarts and boot creates what"),
+                                chalk.green("    is missing — a new collection, a new property."),
+                                // `db push` is the remedy for what boot leaves alone, and it
+                                // cannot run against the managed database at all: Atlas plans
+                                // by diffing against a second, empty database, and PGlite
+                                // serves exactly one. Naming it there sends the reader to a
+                                // command that answers with a refusal.
+                                ...(managed
+                                    ? [chalk.gray("    A renamed column, a narrowed type or a removed field needs your"),
+                                       chalk.gray("    own PostgreSQL: set DATABASE_URL, then rebase db push.")]
+                                    : [chalk.gray("    For what boot leaves alone — a renamed column, a narrowed type,"),
+                                       chalk.gray(`    a removed field — run ${chalk.cyan("rebase db push")}.`)]),
+                                ""
+                            ].join("\n"));
+                        })();
                     }, 500);
                 });
             }

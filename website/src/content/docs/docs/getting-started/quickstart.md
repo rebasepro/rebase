@@ -174,18 +174,21 @@ export const collections = [
 
 ## Create the Table
 
-Restart the dev servers. `rebase dev` regenerates the schema from your
-collections and boot creates the new table, so your **Products** collection
-appears in the navigation.
+Save the file. That is the whole step: `rebase dev` regenerates
+`backend/src/schema.generated.ts` from your collections, restarts the backend,
+and boot creates the new table — so your **Products** collection appears in the
+navigation.
 
-On your own PostgreSQL you can also apply it without restarting:
+The same is true of a property added to a collection you already have: save,
+and the column is there.
+
+`rebase db push` is for the changes boot deliberately leaves alone — a renamed
+column, a narrowed type, a removed field, and junction-table RLS on
+many-to-many relations. It needs your own PostgreSQL:
 
 ```bash
 pnpm run db:push
 ```
-
-That is also the command for the changes boot leaves alone — a renamed column, a
-narrowed type, a removed field.
 
 ## Database Commands Reference
 
