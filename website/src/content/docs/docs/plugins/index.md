@@ -6,7 +6,13 @@ description: Extend Rebase with plugins — inject UI components, modify collect
 
 ## Overview
 
-Plugins are the primary extension mechanism in Rebase. They can:
+**Plugins are an admin-panel concept.** They run in the browser, inside the
+React admin, and are registered where you build it. Nothing in this page reaches
+the backend: a plugin cannot add a route, a callback or a cron. For those, see
+[Custom Functions](/docs/backend/custom-functions), [Entity
+Callbacks](/docs/collections/callbacks) and [Cron Jobs](/docs/backend/cron-jobs).
+
+Plugins are the primary extension mechanism in the panel. They can:
 
 - Wrap the entire app with a **provider** (context, state management)
 - Add **home page actions** and widgets
@@ -109,6 +115,30 @@ const enhancementPlugin = useDataEnhancementPlugin();
 ```
 
 ![Data enhancement](/img/data_enhancement.png)
+
+:::caution[This one sends data off your machine]
+Autofill posts the entity's field values to a hosted service to generate a
+suggestion. By default that service is **`https://app.rebase.pro/api/functions/ai`**,
+which Rebase runs — free to use, no configuration, and no credential attached:
+the requests are anonymous, bounded by rate limit rather than by identity. Your
+JWT is not sent.
+
+Whether that is acceptable depends on what is in the fields. Point `endpoint` at
+your own deployment to keep generation inside your infrastructure:
+
+```typescript no-verify
+const enhancementPlugin = useDataEnhancementPlugin({
+    endpoint: "https://ai.internal.example.com"
+});
+```
+
+The wire format is the whole contract — see `api.ts` in `@rebasepro/plugin-ai`,
+with a reference implementation in the control plane's `functions/ai.ts`. The
+plugin renders nothing until the host it points at reports itself available on
+`GET /status`, so a wrong URL is a missing button rather than a failed request.
+
+Every other built-in plugin is local to the browser and sends nothing anywhere.
+:::
 
 ## Collection Injection
 
