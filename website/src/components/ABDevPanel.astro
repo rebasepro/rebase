@@ -176,6 +176,13 @@ const experimentsJson = JSON.stringify(EXPERIMENTS);
         var H = document.documentElement;
         H.setAttribute("data-ab-" + experimentId, variant);
 
+        // Session-scoped force, honoured by the apply() in Layout.astro so the preview
+        // survives a view transition (and outranks an expired experiment being retired).
+        var forced = {};
+        try { forced = JSON.parse(sessionStorage.getItem("rb_ab_force") || "{}"); } catch(e) {}
+        forced[experimentId] = variant;
+        try { sessionStorage.setItem("rb_ab_force", JSON.stringify(forced)); } catch(e) {}
+
         // Update cookie
         var m = document.cookie.match(/(^|;)\s*rb_ab\s*=\s*([^;]+)/);
         var a = {};
@@ -185,26 +192,11 @@ const experimentsJson = JSON.stringify(EXPERIMENTS);
         document.cookie = "rb_ab=" + encodeURIComponent(JSON.stringify(a)) +
             ";path=/;max-age=7776000;samesite=lax" + dm;
 
-        // Rebuild AB styles
-        var css = "";
-        // Content variant CSS
-        EXPERIMENTS.forEach(function(exp) {
-            var v = H.getAttribute("data-ab-" + exp.id);
-            if (v && v !== "control") {
-                css += '[data-ab-show="' + exp.id + ':control"]{display:none!important}';
-                css += '[data-ab-show="' + exp.id + ':' + v + '"]{display:block!important}';
-            }
-        });
-
-        var existing = document.getElementById("ab-styles");
-        if (existing) existing.remove();
-        if (css) {
-            var s = document.createElement("style");
-            s.id = "ab-styles";
-            s.textContent = css;
-            document.head.appendChild(s);
-        }
-
+        // No stylesheet to rebuild: variant visibility is static CSS in Layout.astro
+        // keyed on the data-ab-* attribute set above, so flipping the attribute is the
+        // whole switch. The panel used to inject its own <style id="ab-styles"> and
+        // remove only that one, leaving the head's stale rules live alongside it — two
+        // variants of the same experiment rendered at once.
         renderExperiments();
     }
 
