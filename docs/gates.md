@@ -23,14 +23,19 @@ Three prefixes, and the prefix says what kind of thing it is:
 rather than checking it, and they are named in the table's last column rather
 than being gates of their own.
 
-**One script breaks the rule: `rls:check`.** It is not renamed to `check:rls`
-because that name is printed in the docs site in six locales, in
-`docs/compatibility.md` and in the audit notes, and the right fix for those
-readers is not a different script name — it is to stop pointing them at a
-monorepo script at all and give them `npx @rebasepro/rls-check`, which is the
-published binary. Renaming first would leave twelve translated pages naming a
-command that no longer exists. `check:gates-doc` carries this as its one exact
-exception, so a *second* offender fails.
+Three names sit outside it, and `check:gates-doc` holds each as an exact
+exception carrying its reason — so a fourth still fails.
+
+- `typecheck` and the root `test` predate the convention and are the two most
+  typed commands in the repository. Renaming them rewrites every reference to
+  buy nothing.
+- **`rls:check` is the one the rule loses to.** It is not renamed to
+  `check:rls` because that name is printed on the docs site in six locales, in
+  `docs/compatibility.md` and in the audit notes — and the right change for
+  those readers is not a different script name. It is to stop pointing them at a
+  monorepo script at all and give them `npx @rebasepro/rls-check`, the published
+  binary. Renaming first would leave twelve translated pages naming a command
+  that no longer exists.
 
 ## Running them
 
@@ -53,7 +58,7 @@ this list, in this order.
 | `check:core-types` | The core packages with `@rebasepro/cms-types` absent, which the gate above structurally cannot check. | — |
 | `check:headless` | The backend never *executes* React or a UI package: every collection file imported under a rejecting loader hook. | — |
 | `check:types-headless` | The type-level counterpart — sources, built `.d.ts` and manifests, where thirteen files once imported React types a BaaS install could not resolve. | — |
-| `check:browser-deps` | A published package declaring a browser-only dependency without naming React, which neither guard above sees. | — |
+| `check:browser-deps` | The other direction: a browser-facing package pulling a server framework into `node_modules` through an auto-installed peer, which neither headless guard sees. | — |
 | `check:baas-types` | A real BaaS project typechecked with `react` mapped to a stub: a React type reached through an alias. | — |
 | `check:runtime-image` | Every container image the shipped files name has a workflow that publishes it. | — |
 | `check:runtime-deps` | The packages the runtime image promises to supply are installed there, at a compatible version, with their own dependencies and peers. | — |
