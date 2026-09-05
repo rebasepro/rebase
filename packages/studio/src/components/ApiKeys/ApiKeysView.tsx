@@ -29,6 +29,8 @@ import type { ApiKeyMasked, ApiKeyWithSecret, RebaseClient } from "@rebasepro/ty
 
 import { CreateApiKeyDialog } from "./CreateApiKeyDialog";
 import { permissionSummary, resourceLabel, resourcePhrase } from "./permissions";
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { LoadFailureView } from "../load-failure-view";
 
 /* ═══════════════════════════════════════════════════════════════
    Helpers
@@ -74,6 +76,8 @@ export function ApiKeysView() {
     const [showSecret, setShowSecret] = useState<ApiKeyWithSecret | null>(null);
     const [revoking, setRevoking] = useState<string | null>(null);
     const [confirmRevoke, setConfirmRevoke] = useState<ApiKeyMasked | null>(null);
+    /** Why the key listing failed, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
 
     const clientRef = useRef(client);
     clientRef.current = client;
@@ -86,11 +90,12 @@ export function ApiKeysView() {
         try {
             const res = await c.apiKeys.listKeys();
             setKeys(res.keys);
+            setFailure(null);
         } catch (e: unknown) {
-            snackbarRef.current.open({
-                type: "error",
-                message: e instanceof Error ? e.message : String(e)
-            });
+            // "No API keys yet" is a claim about the project. A refused listing
+            // is a claim about the caller, and only one of the two is an
+            // invitation to create a key.
+            setFailure(classifyLoadFailure(e));
         } finally {
             setLoading(false);
         }
@@ -143,7 +148,17 @@ export function ApiKeysView() {
                         </div>
                     </div>
                     <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                        {activeKeys.length === 0 && inactiveKeys.length === 0 && (
+                        {failure && (
+                            <LoadFailureView
+                                failure={failure}
+                                title="Could not read this project's API keys"
+                                deniedTitle="You cannot list this project's API keys"
+                                deniedHint={<>Nothing is wrong with the project. Managing API keys is an admin
+                                    operation, and the signed-in account was refused.</>}
+                                onRetry={loadKeys}
+                            />
+                        )}
+                        {!failure && activeKeys.length === 0 && inactiveKeys.length === 0 && (
                             <div className="flex flex-col items-center justify-center h-full gap-3 text-center p-6">
                                 <KeyRoundIcon size={iconSize.medium} className="text-surface-300 dark:text-surface-600"/>
                                 <Typography variant="body2" color="secondary">No API keys yet</Typography>

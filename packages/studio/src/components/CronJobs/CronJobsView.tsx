@@ -23,6 +23,9 @@ import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
 import type { CronJobStatus, CronJobLogEntry } from "@rebasepro/types";
 import type { RebaseClient } from "@rebasepro/types";
 
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { LoadFailureView } from "../load-failure-view";
+
 function formatDuration(ms: number): string {
     if (ms < 1000) return `${ms}ms`;
     if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
@@ -58,6 +61,8 @@ export function CronJobsView() {
     const [logs, setLogs] = useState<CronJobLogEntry[]>([]);
     const [logsLoading, setLogsLoading] = useState(false);
     const [triggering, setTriggering] = useState<string | null>(null);
+    /** Why the job listing failed, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
 
     // Refs so effects never re-fire due to identity changes
     const clientRef = useRef(client);
@@ -77,14 +82,16 @@ export function CronJobsView() {
             }
             try {
                 const res = await c.cron.listJobs();
-                if (!cancelled) setJobs(res.jobs);
-            } catch (e: unknown) {
                 if (!cancelled) {
-                    snackbarRef.current.open({
-                        type: "error",
-                        message: e instanceof Error ? e.message : String(e)
-                    });
+                    setJobs(res.jobs);
+                    setFailure(null);
                 }
+            } catch (e: unknown) {
+                // A snackbar over an empty list said "No Cron Jobs Registered"
+                // about a project whose crons the caller may not read. This
+                // view polls every 15s, so the toast is also gone long before
+                // anyone looks.
+                if (!cancelled) setFailure(classifyLoadFailure(e));
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -154,16 +161,13 @@ export function CronJobsView() {
         try {
             const res = await c.cron.listJobs();
             setJobs(res.jobs);
+            setFailure(null);
         } catch (e: unknown) {
             // Swallowed before, which left the list showing whatever it last
             // held — or nothing — after a failed refresh. "No cron jobs" and
-            // "could not read the cron jobs" are not the same statement, and
-            // this view has a snackbar precisely so they can be told apart; the
-            // initial load already uses it.
-            snackbarRef.current.open({
-                type: "error",
-                message: e instanceof Error ? e.message : String(e)
-            });
+            // "could not read the cron jobs" are not the same statement, so the
+            // reason stays on screen rather than passing through a snackbar.
+            setFailure(classifyLoadFailure(e));
         }
     }
 
@@ -218,6 +222,17 @@ message: e instanceof Error ? e.message : String(e) });
     const selectedJob = jobs.find(j => j.id === selectedId);
 
     if (loading) return <div className="flex items-center justify-center h-full"><CircularProgress/></div>;
+
+    if (failure) return (
+        <LoadFailureView
+            failure={failure}
+            title="Could not read this project's cron jobs"
+            deniedTitle="You cannot list this project's cron jobs"
+            deniedHint={<>Nothing is wrong with the project. The cron API is admin-only, and the
+                signed-in account was refused.</>}
+            onRetry={refreshJobs}
+        />
+    );
 
     if (jobs.length === 0) return (
         <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">

@@ -29,6 +29,9 @@ import { isBranchAdmin } from "@rebasepro/types";
 import type { BranchInfo } from "@rebasepro/types";
 import { formatRelativeTime } from "@rebasepro/utils";
 
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { LoadFailureView } from "../load-failure-view";
+
 function formatSize(bytes: number | undefined): string {
     if (bytes === undefined || bytes === null) return "—";
     if (bytes < 1024) return `${bytes} B`;
@@ -62,6 +65,9 @@ export function BranchesView() {
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
 
+    /** Why the branch listing failed, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
+
     // Refs
     const snackbarRef = useRef(snackbar);
     snackbarRef.current = snackbar;
@@ -76,11 +82,12 @@ export function BranchesView() {
         try {
             const result = await branchAdmin.listBranches();
             setBranches(result);
+            setFailure(null);
         } catch (e: unknown) {
-            snackbarRef.current.open({
-                type: "error",
-                message: e instanceof Error ? e.message : String(e)
-            });
+            // "No branches yet. Create one…" over a refused listing invites the
+            // reader to create a branch they are not allowed to see, and then
+            // hides the one they already have.
+            setFailure(classifyLoadFailure(e));
         } finally {
             setLoading(false);
         }
@@ -179,7 +186,16 @@ export function BranchesView() {
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                    {branches.length === 0 ? (
+                    {failure ? (
+                        <LoadFailureView
+                            failure={failure}
+                            title="Could not read this project's branches"
+                            deniedTitle="You cannot list this project's branches"
+                            deniedHint={<>Nothing is wrong with the project. Branching runs on the admin
+                                connection, and the signed-in account was refused.</>}
+                            onRetry={loadBranches}
+                        />
+                    ) : branches.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
                             <CopyIcon size={iconSize.small} className="text-surface-300 dark:text-surface-600"/>
                             <Typography variant="body2" color="disabled" className="text-[13px]">

@@ -16,6 +16,9 @@ import {
 import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
 import type { BackupInfo, RebaseClient } from "@rebasepro/types";
 
+import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { LoadFailureView } from "../load-failure-view";
+
 function formatSize(bytes: number | undefined): string {
     if (bytes === undefined || bytes === null) return "—";
     if (bytes < 1024) return `${bytes} B`;
@@ -40,6 +43,8 @@ export function BackupsView() {
     const [configured, setConfigured] = useState(true);
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState<string | null>(null);
+    /** Why the listing failed, classified — see `load-failure.ts`. */
+    const [failure, setFailure] = useState<LoadFailure | null>(null);
 
     const clientRef = useRef(client);
     clientRef.current = client;
@@ -53,16 +58,18 @@ export function BackupsView() {
             setConfigured(false);
             return;
         }
+        setFailure(null);
         try {
             const res = await c.backups.list();
             setBackups(res.backups);
             setDestinationKind(res.destinationKind);
             setConfigured(res.configured);
         } catch (e: unknown) {
-            snackbarRef.current.open({
-                type: "error",
-                message: e instanceof Error ? e.message : String(e)
-            });
+            // The snackbar is gone in seconds, and the list underneath it is
+            // empty — which is how a refused listing came to read "No backups
+            // found yet" about a database that has backups. Keep the reason on
+            // screen instead.
+            setFailure(classifyLoadFailure(e));
         } finally {
             setLoading(false);
         }
@@ -133,7 +140,18 @@ export function BackupsView() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-5">
-                {!configured ? (
+                {failure ? (
+                    <LoadFailureView
+                        failure={failure}
+                        title="Could not read this project's backups"
+                        deniedTitle="You cannot list this project's backups"
+                        deniedHint={<>Nothing is wrong with the project. Listing backups needs an admin
+                            connection, and the signed-in account was refused — check
+                            <code className="mx-1 font-mono text-[12px]">ADMIN_CONNECTION_STRING</code>
+                            and the account&apos;s role.</>}
+                        onRetry={load}
+                    />
+                ) : !configured ? (
                     <Alert color="info">
                         <Typography variant="body2" className="text-[13px]">
                             <strong>Backups are not configured.</strong> Set
