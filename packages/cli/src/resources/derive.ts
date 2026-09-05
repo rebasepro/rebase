@@ -229,6 +229,23 @@ function collectionEdges(collection: CollectionConfig, declared: Set<string>): A
 }
 
 /**
+ * A cron file that would not import, said in terms somebody can act on.
+ *
+ * The graph is derived by evaluating each cron module, in a process with none
+ * of the deployment's environment — so a cron that reaches a module validating
+ * `DATABASE_URL` at import fails here and works perfectly at boot. The raw
+ * message is a Zod error about a variable, which reads as "the environment is
+ * wrong" when the environment is not the point.
+ */
+function cronLoadIssue(problem: string): string {
+    return `${problem}\n` +
+        "    `rebase resources` evaluates each cron file to read its schedule, and it is a build " +
+        "step: no .env, no secrets. Move work that needs the deployment's environment inside the " +
+        "handler — `const { x } = await import(\"…\")` — so the module scope imports nothing that " +
+        "reads configuration.";
+}
+
+/**
  * Evaluate a project's config and return the graph it declares.
  *
  * Clears any previously registered declarations first, so deriving twice in one
@@ -306,6 +323,12 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
     // Through the runtime's own loader, so the id the graph records is the id
     // the scheduler runs — the filename — and a cron that would not load at
     // boot does not load here either.
+    //
+    // Which means the module is EVALUATED, in a build step that has none of the
+    // deployment's environment. A cron whose module scope reaches something that
+    // validates `DATABASE_URL` at import therefore derives on a laptop with a
+    // `.env` and nowhere else. That is worth an explicit sentence rather than a
+    // stack, so `cronLoadIssue` adds one.
     if (cronsDir && fs.existsSync(cronsDir)) {
         // The runtime's loader logs each job as it loads, to stdout, as JSON
         // — which is also where `rebase resources --json` writes the graph.
@@ -320,10 +343,13 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
             // not specified" — the same trap the split-roles e2e records.
             const { problems } = await loadCronJobsWithDiagnostics(cronsDir, url => import(url));
             for (const problem of problems) {
-                issues.push({ path: path.relative(projectRoot, cronsDir), message: problem });
+                issues.push({ path: path.relative(projectRoot, cronsDir), message: cronLoadIssue(problem) });
             }
         } catch (err) {
-            issues.push({ path: path.relative(projectRoot, cronsDir), message: err instanceof Error ? err.message : String(err) });
+            issues.push({
+                path: path.relative(projectRoot, cronsDir),
+                message: cronLoadIssue(err instanceof Error ? err.message : String(err))
+            });
         } finally {
             if (previousLevel === undefined) delete process.env.LOG_LEVEL;
             else process.env.LOG_LEVEL = previousLevel;

@@ -543,6 +543,25 @@ with its schedule and zone, so a host reads a project's schedules before it
 runs anything. A cron binds from no environment variable; `rebase status`
 shows it green with nothing to configure.
 
+Reading the schedule means importing the file, and `rebase resources` is a build
+step: no `.env`, no secrets. So keep a cron's **module scope** free of anything
+that reads configuration at import — a database client built at the top of a
+helper, an `env.ts` that validates `DATABASE_URL`. Import that work inside the
+handler instead:
+
+```ts
+async handler({ log }) {
+    const { runSeed } = await import("../src/seed.js");
+    await runSeed();
+    log("done");
+}
+```
+
+The handler runs in the deployment, where those variables exist. A top-level
+import of the same module makes the graph derivable only on a machine that
+happens to have a `.env` — and it loads the whole dependency into every boot
+that merely registers the job.
+
 ## Next Steps
 
 - **[Backend Overview](/docs/backend)** — Full backend configuration reference

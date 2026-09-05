@@ -1,5 +1,4 @@
 import { defineCron } from "@rebasepro/server";
-import { runSeed } from "../src/seed.js";
 
 /**
  * Periodically wipes and reseeds every demo collection so the public
@@ -22,6 +21,14 @@ export default defineCron({
     timeoutSeconds: 600,
 
     async handler({ log }) {
+        // Imported here, not at module scope. A cron file is read twice: once
+        // by the scheduler, which has the deployment's environment, and once by
+        // `rebase resources`, which is a build step and has none. The seeder
+        // reaches `env.ts`, which validates `DATABASE_URL` at import — so a
+        // top-level import made the graph underivable on any machine without a
+        // `.env`, CI included. It also kept the whole seeder and its Postgres
+        // connection factory out of every boot that only registers this job.
+        const { runSeed } = await import("../src/seed.js");
         log("Resetting demo data — truncating and reseeding all collections…");
         await runSeed();
         log("Demo data reset complete.");
