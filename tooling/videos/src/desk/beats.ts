@@ -57,6 +57,22 @@ export interface Beat {
 
 const cell = (col: number, row: number): View => ({ x: col * CELL.w, y: row * CELL.h, zoom: 1 });
 
+/**
+ * THE TEMPO. Every beat below was first timed at a 180-words-a-minute read
+ * and the film came in at 78 seconds; it played a shade fast. Rather than
+ * re-time eleven beats and eleven lines by hand, the sheet keeps its
+ * original numbers and everything after the cold open is stretched by
+ * this factor — beats, moves and the narration's frames alike, so no
+ * relationship between them changes. 1.1 is 86 seconds and a 164-word
+ * read. What is NOT stretched is anything inside a window: typing speed,
+ * a report streaming, a spring — those are how fast the product is, and
+ * the product did not get slower.
+ */
+export const TEMPO = 1.1;
+const COLD_OPEN = 66;
+/** A frame from the original sheet, on the stretched timeline. */
+export const tempo = (raw: number): number => COLD_OPEN + Math.round((raw - COLD_OPEN) * TEMPO);
+
 /** The whole desk, framed on its content rather than its edges: the windows
  *  span roughly 240..5680 by 180..3160, and a 0.34 zoom from (150, 120) puts
  *  that box on the frame. */
@@ -69,23 +85,23 @@ const ALL: View = { x: 150, y: 120, zoom: 0.34 };
 const FINAL: View = { x: -226, y: -92, zoom: 0.3 };
 
 export const BEATS: Beat[] = [
-    { id: "hook", start: 66, view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.3 },
-    { id: "rule", start: 340, view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
-    { id: "push", start: 600, view: { x: 0, y: 420, zoom: 1 }, roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "users", start: 860, view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
-    { id: "agent", start: 1096, view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
-    { id: "panel", start: 1290, view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "views", start: 1550, view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
-    { id: "schema", start: 1650, view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
-    { id: "studio", start: 1770, view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
-    { id: "commands", start: 1870, view: { x: 0, y: 900, zoom: 1 }, roll: 0.7, ground: "base", reveal: 0.3 },
-    { id: "all", start: 2050, view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "hook", start: tempo(66), view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.3 },
+    { id: "rule", start: tempo(340), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
+    { id: "push", start: tempo(600), view: { x: 0, y: 420, zoom: 1 }, roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "users", start: tempo(860), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
+    { id: "agent", start: tempo(1096), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
+    { id: "panel", start: tempo(1290), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "views", start: tempo(1550), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "schema", start: tempo(1650), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
+    { id: "studio", start: tempo(1770), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
+    { id: "commands", start: tempo(1870), view: { x: 0, y: 900, zoom: 1 }, roll: 0.7, ground: "base", reveal: 0.3 },
+    { id: "all", start: tempo(2050), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
 ];
 
 /** The cold open holds the camera on the hook before anything is on it. */
 export const OPENING: View = cell(0, 0);
 
-export const DESK_DURATION = 2350;
+export const DESK_DURATION = tempo(2350);
 
 export const beat = (id: string): Beat => {
     const b = BEATS.find((x) => x.id === id);
@@ -102,9 +118,9 @@ export const MOVE_LEAD = 8;
  *  frames is a whip, and the one move that crosses the whole desk (the pull
  *  back at the end) gets its own, slower, number. */
 export function moveFrames(from: View, to: View): number {
-    if (to.zoom !== from.zoom) return 64;
+    if (to.zoom !== from.zoom) return Math.round(64 * TEMPO);
     const d = Math.hypot(to.x - from.x, to.y - from.y);
-    return Math.round(30 + d / 300);
+    return Math.round((30 + d / 300) * TEMPO);
 }
 
 /**

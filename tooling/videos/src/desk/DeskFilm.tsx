@@ -7,7 +7,7 @@ import { Mark } from "../components/Mark";
 import { ramp, SHIFT } from "../components/motion";
 import { FONT, FRAME, INK } from "../theme";
 import { Narration } from "../Narration";
-import { DESK_NARRATION } from "./script";
+import { DESK_FRAMES_PER_WORD, DESK_NARRATION } from "./script";
 
 /**
  * The film: the ribbon, the desk on it, and two things in SCREEN space that
@@ -27,7 +27,7 @@ export const RebaseDesk: React.FC = () => (
 export const RebaseDeskVO: React.FC = () => (
     <>
         <RebaseDesk />
-        <Narration script={DESK_NARRATION} />
+        <Narration script={DESK_NARRATION} framesPerWord={DESK_FRAMES_PER_WORD} />
     </>
 );
 

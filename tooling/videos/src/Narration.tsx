@@ -24,7 +24,10 @@ const READ_AHEAD = 36;
 const HOLD = 16;
 const FADE = 10;
 
-export const Narration: React.FC<{ script?: typeof NARRATION }> = ({ script = NARRATION }) => {
+export const Narration: React.FC<{ script?: typeof NARRATION; framesPerWord?: number }> = ({
+    script = NARRATION,
+    framesPerWord = FRAMES_PER_WORD,
+}) => {
     const frame = useCurrentFrame();
 
     let line: (typeof NARRATION)[number] | undefined;
@@ -34,8 +37,8 @@ export const Narration: React.FC<{ script?: typeof NARRATION }> = ({ script = NA
     }
     if (!line) return null;
 
-    const spoken = line.words.filter((_, i) => frame >= line!.at + i * FRAMES_PER_WORD).length;
-    const endsAt = line.at + line.words.length * FRAMES_PER_WORD;
+    const spoken = line.words.filter((_, i) => frame >= line!.at + i * framesPerWord).length;
+    const endsAt = line.at + line.words.length * framesPerWord;
     if (frame > endsAt + HOLD + FADE) return null;
 
     const alpha = Math.max(
