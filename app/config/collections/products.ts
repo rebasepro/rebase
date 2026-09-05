@@ -1,11 +1,10 @@
 import ordersCollection from "./orders";
 import productLocalesCollection from "./product_locales";
 import { LOCALE_ENUM } from "../locales";
-import { defineCollection } from "@rebasepro/cms-types";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { joinParts, money } from "../display";
 
-const productsCollection = defineCollection({
+const productsCollection: PostgresCollectionConfig = {
     name: "Products",
     singularName: "Product",
     slug: "products",
@@ -216,7 +215,7 @@ const productsCollection = defineCollection({
         {
             kind: "via",
             relationName: "orders",
-            target: (): PostgresCollectionConfig => ordersCollection,
+            target: () => ordersCollection,
             cardinality: "many",
             joinPath: [
                 {
@@ -238,7 +237,7 @@ const productsCollection = defineCollection({
         {
             kind: "hasMany",
             relationName: "product_locales",
-            target: (): PostgresCollectionConfig => productLocalesCollection,
+            target: () => productLocalesCollection,
             overrides: {
                 admin: { hideFromNavigation: false }
             }
@@ -344,7 +343,7 @@ const productsCollection = defineCollection({
             }
         ]
     }
-});
+};
 
 
 export default productsCollection;

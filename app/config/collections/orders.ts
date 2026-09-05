@@ -1,7 +1,6 @@
-import { EntityCallbackContext } from "@rebasepro/common";
+import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
 import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
-import { defineCollection } from "@rebasepro/cms-types";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { fullName, joinParts, money, relatedRecord } from "../display";
 
@@ -13,7 +12,7 @@ const getRelationId = (val: unknown): string | number | undefined => {
     return undefined;
 };
 
-const ordersCollection = defineCollection({
+const ordersCollection: PostgresCollectionConfig = {
     name: "Orders",
     singularName: "Order",
     slug: "orders",
@@ -42,7 +41,7 @@ const ordersCollection = defineCollection({
             },
             relation: {
                 kind: "belongsTo",
-                target: (): PostgresCollectionConfig => customersCollection,
+                target: () => customersCollection,
             }
         },
         status: {
@@ -199,7 +198,7 @@ const ordersCollection = defineCollection({
         {
             kind: "hasMany",
             relationName: "order_items",
-            target: (): PostgresCollectionConfig => orderItemsCollection,
+            target: () => orderItemsCollection
             // No `hideFromNavigation: false` override here any more. It existed
             // because that one flag used to govern both the drawer and a parent's
             // tab strip, so a line-items table could not be kept out of the drawer
@@ -344,7 +343,7 @@ const ordersCollection = defineCollection({
             }
         ]
     }
-});
+};
 
 // Helper function to update customer lifetime value and total orders count
 async function updateCustomerMetrics(customerId: string | number, context: EntityCallbackContext) {

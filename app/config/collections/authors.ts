@@ -3,11 +3,10 @@
 // the framework contract for exactly this, so module init order never matters.
 // fallow-ignore-next-line circular-dependency
 import postsCollection from "./posts";
-import { defineCollection } from "@rebasepro/cms-types";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { joinParts } from "../display";
 
-const authorsCollection = defineCollection({
+const authorsCollection: PostgresCollectionConfig = {
     name: "Authors",
     singularName: "Author",
     slug: "authors",
@@ -86,7 +85,7 @@ const authorsCollection = defineCollection({
         {
             kind: "hasMany",
             relationName: "posts",
-            target: (): PostgresCollectionConfig => postsCollection,
+            target: () => postsCollection,
             }
     ],
     admin: {
@@ -127,7 +126,7 @@ const authorsCollection = defineCollection({
         // order they are listed under nor one a reader can scan.
         sort: ["name", "asc"]
     }
-});
+};
 
 
 export default authorsCollection;

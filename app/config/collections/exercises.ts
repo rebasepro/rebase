@@ -1,6 +1,6 @@
-import { defineCollection } from "@rebasepro/cms-types";
+import type { PostgresCollectionConfig } from "@rebasepro/types";
 
-const exercisesCollection = defineCollection({
+const exercisesCollection: PostgresCollectionConfig = {
     name: "Exercises",
     singularName: "Exercise",
     slug: "exercises",
@@ -409,6 +409,6 @@ const exercisesCollection = defineCollection({
             }
         ]
     }
-});
+};
 
 export default exercisesCollection;
