@@ -304,14 +304,14 @@ function resolveSchemaSource(from: string, cwd: string): string {
 
     if (!link) {
         console.log(chalk.red("  ✗ This checkout is not linked to a project."));
-        console.log(chalk.gray("    Run `rebase link <url>`, or pass --from <url>."));
+        console.log(chalk.gray("    Run `rebase cloud link <url>`, or pass --from <url>."));
         process.exit(1);
     }
 
     const apiUrl = link.apiUrl;
     if (!apiUrl) {
         console.log(chalk.red("  ✗ The project link has no API URL."));
-        console.log(chalk.gray("    Re-link with `rebase link <url>` to record one."));
+        console.log(chalk.gray("    Re-link with `rebase cloud link <url>` to record one."));
         process.exit(1);
     }
 

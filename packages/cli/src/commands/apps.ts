@@ -215,7 +215,11 @@ async function printAppConfig(appName: string | undefined, asJson: boolean): Pro
 
     if (!apiUrl) {
         console.log(chalk.yellow("This checkout is not linked to a project yet."));
-        console.log(chalk.dim(`  Run ${chalk.cyan("rebase link")} (cloud) or ${chalk.cyan("rebase link <url>")} (self-hosted).`));
+        // `rebase cloud link`, not `rebase link`. There has never been a
+        // top-level `link` command — `cli.ts` dispatches `cloud`, and the link
+        // lives inside that family — so this hint named something that exits 1
+        // on the very screen that exists to tell you what to run next.
+        console.log(chalk.dim(`  Run ${chalk.cyan("rebase cloud link")} (cloud) or ${chalk.cyan("rebase cloud link <url>")} (self-hosted).`));
         console.log("");
     }
 
