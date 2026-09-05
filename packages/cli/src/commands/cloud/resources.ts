@@ -1474,7 +1474,7 @@ const DIAL_FLAGS = {
  * `--no-autoscale` is value-less and a dial's value may not be consumed as one
  * — so this is a description of that line, not a second parser for it.
  */
-export const RESOURCES_SET_FLAGS: Record<string, unknown> = {
+export const COMPUTE_SET_FLAGS: Record<string, unknown> = {
     ...Object.fromEntries(Object.keys(DIAL_FLAGS).map((flag) => [flag, String])),
     "--no-autoscale": Boolean
 };

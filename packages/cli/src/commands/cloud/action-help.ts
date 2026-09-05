@@ -506,17 +506,43 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
-    /* ── The resource dials ─────────────────────────────────────────────
+    /* ── The graph, and the dials ───────────────────────────────────────
      *
-     * Two pages rather than one, because they answer different questions:
-     * `resources` is "what does this project have, and what does it cost",
-     * `resources set` is "what may I change it to". The prices are not
-     * repeated here — the control plane quotes them and both pages say so,
-     * which is the only version of this that cannot go stale. */
+     * `resources` is what the project declares against what the platform
+     * holds; `compute` is CPU, memory, replicas and what they cost. They were
+     * one word once, which is how `rebase cloud resources` came to mean the
+     * dials and `rebase resources` the graph — the same word for two things,
+     * one letter of context apart.
+     *
+     * `compute` is two pages rather than one, because they answer different
+     * questions: bare is "what does this project have, and what does it cost",
+     * `set` is "what may I change it to". The prices are not repeated here —
+     * the control plane quotes them and both pages say so, which is the only
+     * version of this that cannot go stale. */
 
     resources: {
         command: "cloud resources",
-        usage: "cloud resources [set] [options]",
+        usage: "cloud resources [list|prune] [options]",
+        summary:
+            "Each database and bucket this project's deploys recorded: whether the last deploy's "
+            + "code still declares it, and whether the platform made it. A deploy never removes a "
+            + "provisioned database when its declaration goes — that would be data deleted by a "
+            + "push — so it keeps, binds and bills it until `prune` names it.",
+        flags: [],
+        examples: [
+            "rebase cloud resources",
+            "rebase cloud resources --json",
+            "rebase cloud resources prune database analytics"
+        ],
+        notes: [
+            "`rebase resources` reads the code; this reads the platform. The two disagreeing is the point of the page.",
+            "For CPU, memory, replicas and cost, that is `rebase cloud compute`."
+        ]
+    },
+
+    compute: {
+        command: "cloud compute",
+        usage: "cloud compute [set] [options]",
         summary:
             "What this project reserves, and what the control plane would invoice for it. Bare, it "
             + "prints every dial and an itemised €/month; `set` changes one. An empty dial means the "
@@ -524,18 +550,18 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             + "number does not.",
         flags: [],
         examples: [
-            "rebase cloud resources",
-            "rebase cloud resources --json",
-            "rebase cloud resources set --help"
+            "rebase cloud compute",
+            "rebase cloud compute --json",
+            "rebase cloud compute set --help"
         ],
         notes: [
             "The price is the control plane's own quote for these dials, itemised line by line — not a tier, and not a number this CLI computes."
         ]
     },
 
-    "resources set": {
-        command: "cloud resources set",
-        usage: "cloud resources set [--cpu <n>] [--memory <size>] [--replicas <n>] [...]",
+    "compute set": {
+        command: "cloud compute set",
+        usage: "cloud compute set [--cpu <n>] [--memory <size>] [--replicas <n>] [...]",
         summary:
             "Change one or more of a project's dials. At least one is required: a patch with nothing "
             + "in it is a typo, and reporting success for a change nobody made is worse than refusing.",
@@ -555,12 +581,12 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--no-autoscale", "Turn autoscaling off. The only way to: a ceiling at or below --replicas is refused"]
         ],
         examples: [
-            "rebase cloud resources set --cpu 500m --memory 2Gi",
-            "rebase cloud resources set --replicas 2 --autoscale-max 6",
-            "rebase cloud resources set --db-mode dedicated --db-instances 2"
+            "rebase cloud compute set --cpu 500m --memory 2Gi",
+            "rebase cloud compute set --replicas 2 --autoscale-max 6",
+            "rebase cloud compute set --db-mode dedicated --db-instances 2"
         ],
         notes: [
-            "Run `rebase cloud resources` first — it prints the current dials and the €/month this project is quoted.",
+            "Run `rebase cloud compute` first — it prints the current dials and the €/month this project is quoted.",
             "Applied immediately: the app rolls its pods and the subscription is prorated from today. A change that restarts the database waits for a maintenance window.",
             "The valid ranges are the target cluster's, not this CLI's — GKE Autopilot bills a 250m/512Mi floor and rewrites a memory:CPU ratio outside 1:1–6.5:1, a Hetzner node has neither constraint. The control plane refuses what it cannot honour and names the field."
         ]

@@ -21,6 +21,7 @@ import {
     parseCloudArgs,
     emit,
     confirmDestructive,
+    requireKnownAction,
     success,
     fail,
     reportError
@@ -35,35 +36,19 @@ interface ResourceRow {
     note?: string;
 }
 
+/** The action words `rebase cloud resources` dispatches. No word lists. */
+export const DECLARED_RESOURCES_ACTIONS = ["list", "prune"] as const;
+
 export async function declaredResourcesCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
-    switch (action) {
-        case undefined:
-        case "list":
-            await listResources(rawArgs);
-            break;
-        case "prune":
-            await pruneResource(rawArgs);
-            break;
-        case "--help":
-            printDeclaredResourcesHelp();
-            break;
-        default:
-            fail(`Unknown resources command: ${action}`, "Try `rebase cloud resources --help`.");
+    // Through `requireKnownAction`, like every other group: a mistyped word
+    // used to reach `fail`'s default code, so `resources lst` and a control
+    // plane that fell over answered with the same `"error"`.
+    requireKnownAction("resources", action, DECLARED_RESOURCES_ACTIONS);
+    if (action === "prune") {
+        await pruneResource(rawArgs);
+        return;
     }
-}
-
-export function printDeclaredResourcesHelp(): void {
-    console.log(`
-${chalk.bold("rebase cloud resources")} — what this project declares, against what the platform holds
-
-  ${chalk.blue("rebase cloud resources")}                          List each database and bucket: declared? provisioned?
-  ${chalk.blue("rebase cloud resources prune database <key>")}     Remove a provisioned database the code no longer declares
-
-A deploy records what your code declares and provisions what it can. It never removes
-anything: a database that vanishes from a commit is kept, bound and billed until you
-prune it here. For what the code declares, run ${chalk.blue("rebase resources")}; for CPU, memory
-and cost, ${chalk.blue("rebase cloud compute")}.
-`);
+    await listResources(rawArgs);
 }
 
 async function listResources(rawArgs: string[]): Promise<void> {
@@ -113,7 +98,7 @@ async function listResources(rawArgs: string[]): Promise<void> {
 
 async function pruneResource(rawArgs: string[]): Promise<void> {
     const { flags: args, positionals } = parseCloudArgs({
-        spec: { "--yes": Boolean },
+        spec: {},
         rawArgs,
         commandWords: 3, // cloud resources prune
         command: "cloud resources prune",

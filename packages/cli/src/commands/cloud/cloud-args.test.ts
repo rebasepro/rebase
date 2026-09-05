@@ -56,7 +56,7 @@ import {
     resolveClusterAddArgs,
     storageCommand,
     clustersCommand,
-    resourcesCommand,
+    computeCommand,
     billingCommand
 } from "./resources";
 import { resolveProjectArg } from "./projects";
@@ -522,7 +522,7 @@ baseline: true });
  * These four groups are written as a chain of `if (action === "x") return …`
  * with the listing at the bottom, so anything that matched nothing fell through
  * to it: `storage creat` listed the buckets and exited 0, `clusters verifyy`
- * listed the clusters, `resources et --cpu 500m` printed the current dials, and
+ * listed the clusters, `compute et --cpu 500m` printed the current dials, and
  * `billing usage` printed the billing account. Every one of them reports a typo
  * as a successful run of a command nobody asked for — which is worse than an
  * error, because an agent branching on the exit code learns nothing and a person
@@ -535,7 +535,7 @@ describe("a mistyped action word refuses instead of running the default", () => 
     it.each([
         ["storage", (line: string[]) => storageCommand("creat", line)],
         ["clusters", (line: string[]) => clustersCommand("verifyy", line)],
-        ["resources", (line: string[]) => resourcesCommand("et", line)],
+        ["compute", (line: string[]) => computeCommand("et", line)],
         ["webhooks", (line: string[]) => webhooksCommand("creat", line)]
     ])("%s", async (group, run) => {
         const err = await refusalOf(() => run(argv(group, "typo")));

@@ -22,7 +22,7 @@ import { CREATE_PROJECT_FLAGS } from "./projects";
 import { CREATE_DATABASE_FLAGS } from "./databases";
 import { DEPLOY_FLAGS } from "./deploy";
 import { ENV_SET_FLAGS } from "./env";
-import { RESOURCES_SET_FLAGS, BILLING_ACTIONS } from "./resources";
+import { COMPUTE_SET_FLAGS, BILLING_ACTIONS } from "./resources";
 import { LOGIN_FLAGS } from "./auth";
 
 /**
@@ -38,7 +38,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     clusters: null,
     "projects create": CREATE_PROJECT_FLAGS,
     "projects delete": {},
-    "resources prune": { "--yes": Boolean },
+    "resources prune": {},
     "db create": CREATE_DATABASE_FLAGS,
     "db backup": {},
     "db pitr": { "--target": String },
@@ -65,11 +65,14 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     logs: null,
     status: null,
     "clusters verify": null,
-    // The dials. `resources set` scans `rawArgs` rather than parsing a spec —
-    // `--no-autoscale` is value-less — so `RESOURCES_SET_FLAGS` is the
-    // description of that line, derived from `DIAL_FLAGS`.
+    // The graph. Neither listing nor pruning declares a flag of its own —
+    // `prune`'s `--yes` is the global one.
     resources: null,
-    "resources set": RESOURCES_SET_FLAGS,
+    // The dials. `compute set` scans `rawArgs` rather than parsing a spec —
+    // `--no-autoscale` is value-less — so `COMPUTE_SET_FLAGS` is the
+    // description of that line, derived from `DIAL_FLAGS`.
+    compute: null,
+    "compute set": COMPUTE_SET_FLAGS,
     // Session, link and the operations whose only options are the global ones.
     // `{}` rather than `null` on purpose: it says "this command declares nothing
     // of its own", which turns the reverse check on — a page inventing a flag
