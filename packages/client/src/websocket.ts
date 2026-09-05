@@ -657,7 +657,8 @@ export class RebaseWebSocketClient {
         // before the subscription paths — none of which would match it, and
         // the message would otherwise fall through and be dropped silently.
         if (typeof message.channel === "string" &&
-            (type === "broadcast" || type === "presence_state" || type === "presence_diff" || type === "channel_history")) {
+            (type === "broadcast" || type === "presence_state" || type === "presence_diff"
+                || type === "channel_history" || type === "ERROR" || type === "error")) {
             const handlers = this.channelHandlers.get(message.channel);
             if (handlers) {
                 for (const handler of [...handlers]) {
@@ -879,13 +880,16 @@ export class RebaseWebSocketClient {
         }
 
         // An error that matched no waiter used to fall off the end of this
-        // method and disappear. Channel frames are the ones that always do:
+        // method and disappear. Channel frames are the ones that always did:
         // they are fire-and-forget by design, so no `pendingRequests` entry
         // exists to reject and the server's errors about them — RATE_LIMITED,
         // CHANNEL_FORBIDDEN, CHANNEL_HISTORY_WRITE_FAILED — were dropped while
-        // `await channel.broadcast(...)` resolved as if it had been sent. A
-        // console warning is the floor, not the answer: an `onError` on
-        // `RebaseRealtimeChannel` is the shape this should eventually take.
+        // `await channel.broadcast(...)` resolved as if it had been sent.
+        //
+        // The server now names the channel on those, and the channel-addressed
+        // branch above delivers them to `channel.onError()`. This stays as the
+        // floor for an error that names nothing — including one from a server
+        // older than that change.
         if (type === "ERROR" || type === "error" || message.error) {
             const { errorMessage, errorCode } = extractMessageError(message);
             console.warn(

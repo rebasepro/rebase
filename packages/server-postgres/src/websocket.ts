@@ -235,12 +235,23 @@ channelWindowStart: Date.now() });
 
                 // Handle authentication first
                 // Helper: send a canonical error frame
+                // `channel` is carried for a channel frame so the client can
+                // deliver the error to the channel it is about. Channel frames
+                // are fire-and-forget — no pending request to reject, no
+                // subscription id — so without it a `RATE_LIMITED` on a
+                // broadcast had nowhere to go but a console warning.
                 const sendError = (errType: "ERROR" | "AUTH_ERROR", code: string, msg: string) => {
+                    const channel = CHANNEL_MESSAGE_TYPES.has(type)
+                        ? (payload as { channel?: unknown } | undefined)?.channel
+                        : undefined;
                     ws.send(JSON.stringify({
                         type: errType,
                         requestId,
-                        payload: { error: { message: msg,
-code } }
+                        ...(typeof channel === "string" && { channel }),
+                        payload: {
+                            error: { message: msg, code },
+                            ...(typeof channel === "string" && { channel })
+                        }
                     }));
                 };
 
