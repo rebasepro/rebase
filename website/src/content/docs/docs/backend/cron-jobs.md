@@ -533,16 +533,18 @@ const job: CronJobDefinition = {
 export default job;
 ```
 
-## Next Steps
-
-- **[Backend Overview](/docs/backend)** — Full backend configuration reference
-- **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
-- **[Webhook Integration](/docs/recipes/webhooks)** — Send notifications on events
-
 ## Crons in the resource graph
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Every cron file is also a declaration. `rebase resources` lists it under the
 name of the file — the same id the scheduler runs it as and the Studio shows —
 with its schedule and zone, so a host reads a project's schedules before it
 runs anything. A cron binds from no environment variable; `rebase status`
 shows it green with nothing to configure.
+
+## Next Steps
+
+- **[Backend Overview](/docs/backend)** — Full backend configuration reference
+- **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
+- **[Webhook Integration](/docs/recipes/webhooks)** — Send notifications on events

@@ -76,13 +76,22 @@ follows and jump-to-definition lands on.
 In a function, the same handles reach the resource:
 
 ```ts
+import { defineFunction } from "@rebasepro/server/functions";
 import { analytics, media } from "../../config/resources";
 
-const rows = await rebase.sql("select count(*) from page_views", { database: analytics });
-await rebase.bucket(media).putObject({ key, file });
+export default defineFunction((app, { rebase }) => {
+    app.post("/report", async (c) => {
+        const rows = await rebase.sql("select count(*) from page_views", { database: analytics });
+        const file = new File([JSON.stringify(rows)], "report.json", { type: "application/json" });
+        await rebase.bucket(media).putObject({ key: "report.json", file });
+        return c.json({ ok: true });
+    });
+});
 ```
 
 ### Seeing what you declared
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 ```bash
 rebase resources            # list them

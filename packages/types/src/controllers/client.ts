@@ -320,7 +320,7 @@ export interface RebaseClient<DB = unknown> {
      *
      * ```ts
      * import { media } from "../../config/resources";
-     * await rebase.bucket(media).upload(key, file);
+     * await rebase.bucket(media).putObject({ key, file });
      * ```
      *
      * Named after the constructor: `bucket("media")` declares it, and
@@ -476,6 +476,16 @@ export interface RebaseServerClient<DB = unknown> extends Omit<RebaseClient<DB>,
      * than discovering it at the call.
      */
     sql(query: string, options?: { database?: ResourceRef; role?: string; params?: unknown[] }): Promise<Record<string, unknown>[]>;
+
+    /**
+     * The storage source a bucket handle names. Always present server-side.
+     *
+     * Always, for the same reason {@link RebaseServerClient.email} is: a
+     * backend with no storage configured at all answers with a refusal naming
+     * what to set, rather than with `undefined` and a `is not a function`
+     * three frames from the cause. See {@link RebaseClient.bucket}.
+     */
+    bucket(source: ResourceRef): StorageSource;
 }
 
 /**

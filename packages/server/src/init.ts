@@ -2607,24 +2607,31 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // by key, straight to its controller. Refuses an unknown source by name
     // rather than handing back the default — a write that lands in the wrong
     // bucket is the failure that looks like success.
-    if (storageRegistry || storageController) {
-        Object.assign(serverClient, {
-            bucket: (source: import("@rebasepro/types").ResourceRef) => {
-                const key = resourceKeyOf(source);
-                if (storageRegistry) {
-                    const found = storageRegistry.get(key);
-                    if (found) return found;
-                    throw new Error(
-                        `No storage source "${key}" is configured on this backend. ` +
-                        `Configured: ${storageRegistry.list().map(k => `"${k}"`).join(", ") || "(none)"}. ` +
-                        "Declare it in config/resources.ts and bind it — `rebase status` shows which variable."
-                    );
-                }
-                if (key === DEFAULT_STORAGE_ID) return storageController;
+    // Installed unconditionally, like `email`: a backend with no storage at all
+    // refuses by name instead of leaving the property undefined, where the
+    // first sign of trouble is `rebase.bucket is not a function` at the call.
+    Object.assign(serverClient, {
+        bucket: (source: import("@rebasepro/types").ResourceRef) => {
+            const key = resourceKeyOf(source);
+            if (storageRegistry) {
+                const found = storageRegistry.get(key);
+                if (found) return found;
+                throw new Error(
+                    `No storage source "${key}" is configured on this backend. ` +
+                    `Configured: ${storageRegistry.list().map(k => `"${k}"`).join(", ") || "(none)"}. ` +
+                    "Declare it in config/resources.ts and bind it — `rebase status` shows which variable."
+                );
+            }
+            if (storageController && key === DEFAULT_STORAGE_ID) return storageController;
+            if (storageController) {
                 throw new Error(`No storage source "${key}" is configured on this backend; only the default is.`);
             }
-        });
-    }
+            throw new Error(
+                `No storage source "${key}" is configured: this backend has no storage at all. ` +
+                "Declare a bucket in config/resources.ts and bind it — `rebase status` shows which variable."
+            );
+        }
+    });
 
     // Attach email service to the server client when configured.
     // The email service may come from the auth bootstrapper or from the auth config directly.
