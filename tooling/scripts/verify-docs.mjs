@@ -46,6 +46,9 @@ import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
 import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
 import { checkErrorCodes } from "./docs-verify/check-error-codes.mjs";
+import { checkMcpToolTables } from "./docs-verify/check-mcp-tool-tables.mjs";
+import { checkAiInstructions } from "./docs-verify/check-ai-instructions.mjs";
+import { checkSkillClaims } from "./docs-verify/check-skill-claims.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -78,6 +81,9 @@ if (asJson) {
         out.envReference = checkEnvReference(ROOT).findings;
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
         out.errorCodes = checkErrorCodes(ROOT).findings;
+        out.mcpToolTables = checkMcpToolTables(ROOT).findings;
+        out.aiInstructions = checkAiInstructions(ROOT).findings;
+        out.skillClaims = checkSkillClaims(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -240,14 +246,62 @@ if (only === "both" || only === "names") {
 }
 
 if (only === "both" || only === "names") {
-    console.log(`\n${YELLOW}━━━ Agent-bundle manifests ━━━${NC}`);
-    const { findings: bad, scanned } = checkAgentBundle(ROOT);
-    console.log(`${DIM}Scanned ${scanned} MCP manifest(s) in tooling/rebase-agent-skills/.${NC}`);
+    console.log(`\n${YELLOW}━━━ Always-on instruction files (all locales) ━━━${NC}`);
+    const { findings: bad, scanned } = checkAiInstructions(ROOT);
+    console.log(`${DIM}Scanned ${scanned} instruction file(s) against RebaseServerClient.${NC}`);
     if (!bad.length) {
-        console.log(`${GREEN}✓ Every MCP server manifest names something that exists.${NC}`);
+        console.log(`${GREEN}✓ Every accessor and specifier a scaffold teaches exists.${NC}`);
     } else {
         findings += bad.length;
-        console.log(`${RED}✗ ${bad.length} manifest(s) pointing at nothing:${NC}`);
+        console.log(`${RED}✗ ${bad.length} rule(s) naming something that does not exist:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Skill claims against source ━━━${NC}`);
+    const { findings: bad, scanned } = checkSkillClaims(ROOT);
+    console.log(`${DIM}Checked ${scanned} skill file(s) against the values the code declares.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every limit, path, signature and count a skill states matches source.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} claim(s) the code contradicts:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ MCP tool tables ━━━${NC}`);
+    const { findings: bad } = checkMcpToolTables(ROOT);
+    console.log(`${DIM}Compared packages/mcp/README.md against ALL_TOOLS.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ The npm README's tool tables are the ones the server registers.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} generated block(s) out of date:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Agent bundle: manifests, tool names, repository URLs ━━━${NC}`);
+    const { findings: bad, scanned } = checkAgentBundle(ROOT);
+    console.log(`${DIM}Scanned ${scanned} MCP manifest(s), plus every tool name and first-party URL in tooling/rebase-agent-skills/.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every launcher, tool name and repository URL in the bundle names something that exists.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} reference(s) pointing at nothing:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);

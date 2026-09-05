@@ -1,7 +1,7 @@
 ---
 title: MCP Server
 sidebar_label: MCP Server
-description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 40 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
+description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 41 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
 ---
 
 `@rebasepro/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
@@ -18,42 +18,82 @@ shows you the config block.
 ## Connecting a client
 
 The server is published to npm and needs no install step; `npx` fetches it.
+Every block below is the whole integration.
 
-For **Claude Code**, add it to `.mcp.json` at your project root:
+**Claude Code** — `.mcp.json` at your project root. `rebase init` writes this
+file for you:
 
 ```json title=".mcp.json"
 {
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
-      "env": {
-        "REBASE_PROJECT_DIR": "/absolute/path/to/your/project"
-      }
+      "args": ["-y", "@rebasepro/mcp"]
     }
   }
 }
 ```
 
-**Cursor** uses the same shape in `.cursor/mcp.json`, and **Gemini CLI** in
-`.gemini/settings.json`. Any MCP client that can spawn a stdio server works —
-the block above is the whole integration.
+**Cursor** — the same shape, in `.cursor/mcp.json`:
 
-`REBASE_PROJECT_DIR` should be the directory containing `rebase.json`. If you
-omit it, the server uses its working directory, which is whatever the client
-happened to spawn it in.
+```json title=".cursor/mcp.json"
+{
+  "mcpServers": {
+    "rebase": {
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"]
+    }
+  }
+}
+```
 
-### Configuration
+**Gemini CLI** — `.gemini/settings.json`, under the same key:
 
-| Variable | Default | Description |
-|---|---|---|
-| `REBASE_PROJECT_DIR` | `process.cwd()` | Project root — used to find collections, `.env` and the dev server state |
-| `REBASE_BASE_URL` | `http://localhost:3001` | Backend URL |
-| `REBASE_API_TOKEN` / `REBASE_TOKEN` | *(empty)* | The token used for every API call |
-| `REBASE_MCP_ALLOW_REMOTE_WRITES` | `false` | Opt destructive tools out of the loopback gate |
+```json title=".gemini/settings.json"
+{
+  "mcpServers": {
+    "rebase": {
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"]
+    }
+  }
+}
+```
 
-The server loads `.env` from `$REBASE_PROJECT_DIR/.env` or
-`$REBASE_PROJECT_DIR/app/.env` at startup.
+**Codex CLI** — TOML rather than JSON, in `~/.codex/config.toml`. It is
+user-level, not per-project, so name the project directory here:
+
+```toml title="~/.codex/config.toml"
+[mcp_servers.rebase]
+command = "npx"
+args = ["-y", "@rebasepro/mcp"]
+env = { REBASE_PROJECT_DIR = "/absolute/path/to/your/project" }
+```
+
+**Kiro** — `.kiro/settings/mcp.json`:
+
+```json title=".kiro/settings/mcp.json"
+{
+  "mcpServers": {
+    "rebase": {
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"]
+    }
+  }
+}
+```
+
+Any MCP client that can spawn a stdio server works; the shape is the same.
+
+### Which directory it acts on
+
+`REBASE_PROJECT_DIR` should be the directory containing `rebase.json`. Omit it
+and the server uses its working directory, which for a project-level config file
+is the project — that is why only the user-level Codex block sets it.
+
+Set it and it wins: the environment rebuilds the `default` project on every
+start, so an absolute path in a per-user config outranks anything remembered in
+`~/.rebase/projects.json`.
 
 ## What the server can reach
 
@@ -191,12 +231,12 @@ in between but the assistant's judgement about which project is active.
 on the loopback interface.** The gate is written as a list of what is *not*
 gated, so a tool added later arrives protected by default.
 
-- **Not gated — reads:** `rebase_schema_introspect`, `rebase_doctor`,
+- **Not gated — reads:** `rebase_schema_plan`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
-  `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
+  `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`.
-- **Not gated — local only:** `rebase_schema_generate`, `rebase_db_generate`,
+- **Not gated — local only:** `rebase_schema_introspect`, `rebase_schema_generate`, `rebase_db_generate`,
   `rebase_generate_sdk`, the dev-server tools and the project-registry tools.
   These write local files or local state and have no remote target to check.
 - **Gated against `DATABASE_URL`:** the remaining CLI tools — `rebase_db_push`,
@@ -262,13 +302,17 @@ environments. While `rebase dev` is running, the server reads the active port an
 service key from `.rebase/state.json` in the project directory, which is what
 makes the local case zero-config.
 
-:::note[`REBASE_PROJECT_DIR` only seeds the registry once]
-The env var creates the `default` project **only if the registry has no
-`default` entry yet**. Once `~/.rebase/projects.json` exists, changing
-`REBASE_PROJECT_DIR` has no effect on an already-registered `default`, and the
-registry's `activeProject` is what tools actually target. If an assistant seems
-to be reading the wrong database, call `rebase_project_current` first — it is
-almost always this.
+:::note[The environment block wins over the registry]
+`REBASE_PROJECT_DIR`, `REBASE_BASE_URL` and `REBASE_API_TOKEN` rebuild the
+`default` project **on every start**, not just the first one. The rebuild is
+whole-entry: a token registered against the old `projectDir` is dropped rather
+than carried into a directory it was never issued for.
+
+The persisted `default` is used only when the client's config sets none of the
+three. `activeProject` is still sticky, so if a previous session called
+`rebase_project_switch`, tools target that project and the server says so on
+stderr. If an assistant seems to be reading the wrong database, call
+`rebase_project_current` first.
 :::
 
 Tokens are stored in that registry **in plaintext**. It is a file in your home
@@ -277,15 +321,16 @@ it accordingly.
 
 ## Tool reference
 
-40 tools, in eight groups. Tools marked ⚠ are refused against non-local targets
+41 tools, in eight groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
-### Schema & database (11)
+### Schema & database (12)
 
 Spawn the Rebase CLI in the active project directory.
 
 | Tool | Required | Description |
 |---|---|---|
+| `rebase_schema_plan` | — | Show the SQL `rebase_db_push` would run, without running any of it |
 | `rebase_schema_generate` | — | Generate Drizzle schema from collection definitions |
 | `rebase_db_push` ⚠ | — | Apply the schema directly to the database (dev shortcut) |
 | `rebase_schema_introspect` | — | Introspect the live database into collection definitions |
@@ -327,10 +372,10 @@ admin. That is why they are gated rather than treated as merely "additive".
 | Tool | Required | Description |
 |---|---|---|
 | `storage_list_objects` | — | List stored objects |
-| `storage_get_metadata` | `key` | Metadata plus a temporary signed download URL |
+| `storage_get_download_url` | `key` | A temporary signed download URL and its expiry — not object metadata |
 | `storage_delete_object` ⚠ | `key` | Delete an object |
 
-`storage_get_metadata` is classified as a read because it does not change the
+`storage_get_download_url` is classified as a read because it does not change the
 environment — but the signed URL it mints is a bearer capability that outlives
 the tool call.
 
@@ -394,12 +439,12 @@ Collections are discovered from `app/config/collections/`,
 `config/collections/` or `collections/` under the active project directory —
 whichever exists.
 
-`rebase://schema` is listed **only if** the generated schema is at exactly
-`app/backend/src/schema.generated.ts`. That is a single hardcoded path with no
-fallbacks, so a project laid out differently — or one that has not run
-`rebase schema generate` yet — simply will not see the resource offered. If it
-is missing and you expected it, check the path before concluding the server is
-broken.
+`rebase://schema` is listed **only if** the generated schema exists.
+`findBackendDir` looks for `backend/` and then `app/backend/` under the active
+project directory, and reads `src/schema.generated.ts` from whichever it finds —
+so both the scaffolded layout and this monorepo's work, and a project laid out a
+third way, or one that has not run `rebase schema generate` yet, simply will not
+see the resource offered.
 
 ## Recommended setup
 

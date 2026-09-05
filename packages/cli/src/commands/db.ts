@@ -928,9 +928,12 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
  */
 const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: string[] }> = {
     push: {
-        usage: "rebase db push [--collections <dir>] [--allow-destructive] [--yes]",
+        usage: "rebase db push [--collections <dir>] [--dry-run] [--allow-destructive] [--yes]",
         summary: "Apply the schema straight to the database. Development only — it does not write a migration.",
-        notes: ["A change that would drop data needs --allow-destructive."]
+        notes: [
+            "--dry-run prints the SQL and applies nothing. Read it before you approve it.",
+            "A change that would drop data needs --allow-destructive."
+        ]
     },
     generate: {
         usage: "rebase db generate [--collections <dir>]",

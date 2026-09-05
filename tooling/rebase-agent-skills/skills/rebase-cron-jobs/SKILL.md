@@ -388,7 +388,7 @@ On startup, the scheduler seeds `totalRuns`, `totalFailures`, and `lastRunAt` co
 
 ## REST API
 
-All routes are mounted at `/api/cron` and **require admin authentication** (`requireAuth` + `requireAdmin` middleware).
+All routes are mounted at `/api/admin/cron` and **require admin authentication** (`requireAuth` + `requireAdmin` middleware). `/api/cron` is kept alive as a legacy alias and answers with a `Deprecation` header; write the `/api/admin` path.
 
 > **IMPORTANT FOR AGENTS**: All cron REST endpoints require an admin JWT or service key in the `Authorization` header. Unauthenticated requests will receive 401/403.
 

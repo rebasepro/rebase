@@ -87,7 +87,7 @@
 - [Offline & Local-First Sync](https://rebase.pro/docs/sdk/offline): Enable the Rebase Client SDK's local-first sync engine — a local row database, instant offline writes with rollback, and reactive live queries.
 - [Storage & Files](https://rebase.pro/docs/sdk/storage): Upload, download, list, and delete files using the Rebase Client SDK's storage module.
 - [AI & Agents](https://rebase.pro/docs/ai): What Rebase ships for AI coding assistants and autonomous agents — an MCP server, project-local agent skills, scaffolded instruction files, and the credential model that decides what an agent can actually reach.
-- [MCP Server](https://rebase.pro/docs/ai/mcp): Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 40 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
+- [MCP Server](https://rebase.pro/docs/ai/mcp): Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 41 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
 - [Agent Skills](https://rebase.pro/docs/ai/skills): rebase skills install writes 21 Rebase reference skills into your repo, in the layout your AI assistant expects — Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity.
 - [AI Instruction Files](https://rebase.pro/docs/ai/instruction-files): Every scaffolded Rebase project ships ai-instructions.md plus one-line pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md — one source of truth, many filenames.
 - [CLI Reference](https://rebase.pro/docs/cli): Rebase CLI commands for project initialization, schema generation, database migrations, and SDK generation.

@@ -12,11 +12,23 @@ const require = createRequire(import.meta.url);
 /**
  * Supported agent environments and their target directories.
  *
- * `flatLayout` says where the installed rule file sits relative to the skill's
- * own assets. A subdirectory layout writes `<skill>/SKILL.md`, so a link the
- * skill spells `references/x.md` resolves as written; a flat layout writes
- * `<skill>.md` one level up, so those links have to be re-pointed at the
- * per-skill asset directory. See `rewriteAssetLinks`.
+ * Every agent `rebase init` writes a pointer file for has an entry here. That
+ * was not true: `rebase init` writes `CLAUDE.md`, `AGENTS.md`, `.cursorrules`,
+ * `.windsurfrules` and `.github/copilot-instructions.md`, and the installer
+ * covered four of the five — so a Codex or Copilot user was told, by a file in
+ * their own repository, to run an installer that had nothing to offer them.
+ *
+ * `flatLayout` marks the agents whose rules directory is loaded *whole*, into
+ * every request. Writing 21 skills there put ~84,000 characters of always-on
+ * context in front of every question a person asked Cursor — more than the task
+ * itself, on every turn, most of it about parts of Rebase they were not
+ * touching. Those agents get one short index rule instead, and the skill bodies
+ * go in per-skill subdirectories the index names, which the agent reads when it
+ * needs one. `indexFile` is the name of that rule.
+ *
+ * A subdirectory layout has no such problem: the rule file already sits beside
+ * its own assets, so `references/x.md` resolves as written and nothing is
+ * loaded until it is opened.
  */
 const AGENTS = {
     cursor: {
@@ -24,9 +36,10 @@ const AGENTS = {
         detectDir: ".cursor",
         targetDir: ".cursor/rules",
         flatLayout: true,
-        /** Cursor uses .mdc files (Markdown with Context). */
+        indexFile: "rebase.mdc",
+        /** The body is not a rule file here — `indexFile` is. */
         transformFile: (skillName: string, content: string) => ({
-            fileName: `${skillName}.mdc`,
+            fileName: path.join(skillName, "SKILL.md"),
             content
         })
     },
@@ -46,9 +59,10 @@ const AGENTS = {
         detectDir: ".windsurf",
         targetDir: ".windsurf/rules",
         flatLayout: true,
-        /** Windsurf uses plain .md files. */
+        indexFile: "rebase.md",
+        /** The body is not a rule file here — `indexFile` is. */
         transformFile: (skillName: string, content: string) => ({
-            fileName: `${skillName}.md`,
+            fileName: path.join(skillName, "SKILL.md"),
             content
         })
     },
@@ -58,6 +72,41 @@ const AGENTS = {
         targetDir: ".agents/skills",
         flatLayout: false,
         /** Gemini uses the standard SKILL.md format in subdirectories. */
+        transformFile: (skillName: string, content: string) => ({
+            fileName: path.join(skillName, "SKILL.md"),
+            content
+        })
+    },
+    codex: {
+        label: "Codex CLI",
+        detectDir: ".codex",
+        targetDir: ".codex/skills",
+        flatLayout: false,
+        /** Codex reads AGENTS.md; the skills sit beside its own config. */
+        transformFile: (skillName: string, content: string) => ({
+            fileName: path.join(skillName, "SKILL.md"),
+            content
+        })
+    },
+    kiro: {
+        label: "Kiro",
+        detectDir: ".kiro",
+        targetDir: ".kiro/steering",
+        flatLayout: true,
+        indexFile: "rebase.md",
+        /** The body is not a rule file here — `indexFile` is. */
+        transformFile: (skillName: string, content: string) => ({
+            fileName: path.join(skillName, "SKILL.md"),
+            content
+        })
+    },
+    copilot: {
+        label: "GitHub Copilot",
+        detectDir: ".github",
+        targetDir: ".github/instructions",
+        flatLayout: true,
+        indexFile: "rebase.instructions.md",
+        /** The body is not a rule file here — `indexFile` is. */
         transformFile: (skillName: string, content: string) => ({
             fileName: path.join(skillName, "SKILL.md"),
             content
@@ -146,21 +195,65 @@ export function loadSkills(skillsDir: string): LoadedSkill[] {
 }
 
 /**
- * Re-point a skill's own asset links at the per-skill subdirectory, for the
- * agents whose rule file does not live in it.
+ * The one always-on rule a flat-layout agent gets, in place of every skill.
  *
- * Only paths that name a file the skill actually ships are rewritten, and only
- * where they start a path segment — so prose that happens to contain the same
- * words is left alone.
+ * Cursor and Windsurf load their whole rules directory into each request. With
+ * a rule file per skill that was ~84,000 characters of Rebase reference in
+ * front of every question, whether or not the question was about Rebase — and
+ * an instruction an assistant skims is an instruction it does not follow.
+ *
+ * So the always-on part is this: a table of what exists and where to read it.
+ * `alwaysApply: true` because knowing the skills are there costs a few hundred
+ * characters and is the whole point; the bodies stay on disk until the agent
+ * opens one.
  */
-export function rewriteAssetLinks(content: string, assets: string[], skillName: string): string {
-    let out = content;
-    for (const asset of assets) {
-        const posix = asset.split(path.sep).join("/");
-        const escaped = posix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        out = out.replace(new RegExp(`(?<![\\w/.-])${escaped}`, "g"), `${skillName}/${posix}`);
-    }
-    return out;
+export function renderSkillIndex(skills: LoadedSkill[], agentKey: AgentKey): string {
+    const agent = AGENTS[agentKey];
+    const bodyPath = (name: string) => agent.transformFile(name, "").fileName.split(path.sep).join("/");
+    const rows = skills
+        .map((skill) => `| \`${skill.name}\` | ${describe(skill)} | \`${bodyPath(skill.name)}\` |`)
+        .join("\n");
+
+    return [
+        "---",
+        "description: Rebase — the skills index. Read the file named for the task before writing Rebase code.",
+        "alwaysApply: true",
+        "---",
+        "",
+        "# Rebase skills",
+        "",
+        `This project uses [Rebase](https://rebase.pro). ${skills.length} reference skills are`,
+        "installed beside this file. **Read the one that covers the task before writing",
+        "code** — they are the difference between a collection that compiles and one that",
+        "does not.",
+        "",
+        "| Skill | Covers | Read |",
+        "|---|---|---|",
+        rows,
+        "",
+        "Start with `rebase-basics` if you are not sure: it opens with the recipes for",
+        "adding a collection, a function and an RLS rule, and names the commands.",
+        ""
+    ].join("\n");
+}
+
+/**
+ * A skill's one-line summary, from its own front matter.
+ *
+ * Read rather than written here so a new skill needs no edit in this file, and
+ * truncated because the index is only worth having while it stays short.
+ */
+function describe(skill: LoadedSkill): string {
+    const described = /^description:\s*(.+)$/m.exec(skill.content.split("---")[1] ?? "");
+    const text = (described?.[1] ?? "").trim().replace(/\|/g, "\\|");
+    const firstSentence = /^.*?\.(?:\s|$)/.exec(text)?.[0]?.trim() ?? text;
+    const fallback = skill.name.replace(/^rebase-/, "").replace(/-/g, " ");
+    if (!firstSentence) return fallback;
+    if (firstSentence.length <= 140) return firstSentence;
+    // Cut at a word boundary. A description sliced mid-word ("using the collect")
+    // reads as a corrupted file rather than as a summary.
+    const cut = firstSentence.slice(0, 140);
+    return `${cut.slice(0, cut.lastIndexOf(" ")).replace(/[,;:]$/, "")}…`;
 }
 
 /** Detect which agent environments already exist in the project. */
@@ -189,10 +282,12 @@ export function installForAgent(
     let count = 0;
     let assetCount = 0;
     for (const skill of skills) {
-        const body = agent.flatLayout
-            ? rewriteAssetLinks(skill.content, skill.assets, skill.name)
-            : skill.content;
-        const { fileName, content } = agent.transformFile(skill.name, body);
+        // Every layout now writes the body into a per-skill subdirectory, so a
+        // link the skill spells `references/x.md` resolves as written and no
+        // rewriting is needed. What differs is whether that file is also the
+        // agent's *rule* file (subdirectory layouts) or something the index
+        // points at (flat ones).
+        const { fileName, content } = agent.transformFile(skill.name, skill.content);
         const targetPath = path.join(targetBase, fileName);
 
         // Ensure parent directory exists (for subdirectory-based formats)
@@ -209,6 +304,10 @@ export function installForAgent(
             fs.copyFileSync(path.join(skill.dir, asset), assetTarget);
             assetCount++;
         }
+    }
+
+    if (agent.flatLayout && agent.indexFile) {
+        fs.writeFileSync(path.join(targetBase, agent.indexFile), renderSkillIndex(skills, agentKey), "utf-8");
     }
 
     return { skills: count, assets: assetCount };

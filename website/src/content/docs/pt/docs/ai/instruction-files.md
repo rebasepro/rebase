@@ -37,6 +37,21 @@ O `.github/copilot-instructions.md` é idêntico, exceto pelo caminho relativo
 Isso acontece em todo `rebase init`, para todos os presets, incluindo `--headless`.
 Não há nenhuma flag nem prompt.
 
+O `rebase init` também escreve `.mcp.json`, que aponta o Claude Code, o Cursor
+e qualquer outro cliente MCP para o [servidor MCP do Rebase](/pt/docs/ai/mcp):
+
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "rebase": { "command": "npx", "args": ["-y", "@rebasepro/mcp"] }
+  }
+}
+```
+
+Não há `REBASE_PROJECT_DIR` nele, de propósito: o cliente inicia o servidor na
+raiz do projeto, e um caminho absoluto é a única linha desse arquivo que não
+pode ser commitada.
+
 ## Por que um ponteiro em vez de uma cópia
 
 Os arquivos de ponteiro são deliberadamente sem conteúdo próprio. Os assistentes seguem links
@@ -56,7 +71,7 @@ mesmo em repositórios que não sejam projetos Rebase.
 ## Com o que o `ai-instructions.md` começa
 
 O arquivo gerado é deliberadamente curto — ele aponta para
-[`rebase skills install`](/docs/ai/skills) para mais detalhes e, em seguida, define quatro regras que
+[`rebase skills install`](/docs/ai/skills) para mais detalhes e, em seguida, define as regras que
 os assistentes erram com frequência suficiente para valer a pena repeti-las no início de cada
 sessão:
 
@@ -65,11 +80,13 @@ sessão:
    [Schema as Code](/docs/architecture/schema-as-code).
 2. **Migrações são feitas em duas etapas.** `rebase schema generate`, depois `rebase db push`
    em desenvolvimento, ou `rebase db generate && rebase db migrate` para produção.
-3. **Use o SDK.** Acesse via `client.data.<slug>` (browser) / `rebase.dataAsAdmin.<slug>` (server); SQL puro e chamadas diretas do Drizzle
+3. **Use o SDK.** Acesse via `rebase.dataAsAdmin.<slug>` para trabalho feito com a
+   identidade do serviço, ou `getDriver(c)` dentro de uma função quando a leitura
+   deve rodar como o chamador. No servidor o cliente não expõe um acessor `data` simples. SQL puro e chamadas diretas do Drizzle
    ignoram validações, callbacks e RLS.
 4. **Proteja todas as rotas customizadas.** As rotas em `backend/functions/` são montadas
    *sem* autenticação. Use `requireAuth` / `requireAdmin` do
-   `@rebasepro/server` no próprio slot de middleware da rota — ler
+   `@rebasepro/server/functions` no próprio slot de middleware da rota — ler
    `c.get("user")` não é uma proteção, e `app.use()` após a rota também não.
 
 Essa última regra é fundamental. Ela faz a diferença entre um middleware que

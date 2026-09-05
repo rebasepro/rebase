@@ -335,7 +335,22 @@ Every new project scaffolded with `rebase init` automatically includes a pre-con
 - Structuring custom functions and cron jobs.
 
 ### 2. Built-in MCP Server
-Rebase runs a Model Context Protocol (MCP) server that connects your AI assistant directly to your live Rebase schemas and databases for automated schema discovery, entity management, and data migrations.
+`rebase init` writes `.mcp.json`, so Claude Code, Cursor and any other MCP client can drive the project the moment it is scaffolded:
+
+```json
+{
+  "mcpServers": {
+    "rebase": {
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"]
+    }
+  }
+}
+```
+
+It speaks MCP over stdio and needs no login: while `rebase dev` is running it reads the backend URL and service key from `.rebase/state.json`. Write tools are refused against anything that is not on the loopback interface, which is the single most valuable thing in the package.
+
+[**Setup, the tool list, and what the server can reach →**](https://rebase.pro/docs/ai/mcp) — copy-paste blocks for Claude Code, Cursor, Gemini CLI, Codex and Kiro, and the credential model to read before pointing an assistant at a database you care about.
 
 ### 3. Troubleshooting Database Permissions in Studio
 If your AI coding agent or database role permissions cause a `permission denied for table <table_name>` error when executing queries in the **Rebase Studio SQL Editor**:

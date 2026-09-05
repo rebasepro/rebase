@@ -37,6 +37,21 @@ Please refer to and follow the instructions defined in [ai-instructions.md](./ai
 Cela se produit lors de chaque `rebase init`, pour chaque preset y compris `--headless`.
 Il n'y a aucun flag ni aucune invite.
 
+`rebase init` écrit également `.mcp.json`, qui pointe Claude Code, Cursor et
+n'importe quel autre client MCP vers le [serveur MCP Rebase](/fr/docs/ai/mcp) :
+
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "rebase": { "command": "npx", "args": ["-y", "@rebasepro/mcp"] }
+  }
+}
+```
+
+Il n'y a pas de `REBASE_PROJECT_DIR` dedans, et c'est volontaire : le client
+lance le serveur à la racine du projet, et un chemin absolu est la seule ligne de
+ce fichier qui ne peut pas être commitée.
+
 ## Pourquoi un pointeur plutôt qu'une copie
 
 Les fichiers pointeurs sont délibérément dépourvus de contenu. Les assistants
@@ -60,7 +75,7 @@ projets Rebase.
 
 Le fichier généré est délibérément court — il renvoie à
 [`rebase skills install`](/docs/ai/skills) pour plus de détails, puis énonce
-quatre règles que les assistants ne respectent pas assez souvent pour qu'il soit
+les règles que les assistants ne respectent pas assez souvent pour qu'il soit
 utile de les répéter au début de chaque session :
 
 1. **Schéma en tant que code.** Les collections sont définies dans
@@ -70,11 +85,14 @@ utile de les répéter au début de chaque session :
 2. **Les migrations se font en deux étapes.** `rebase schema generate`, puis
    `rebase db push` en développement, ou `rebase db generate && rebase db migrate`
    pour la production.
-3. **Utilisez le SDK.** Passez par `client.data.<slug>` (browser) / `rebase.dataAsAdmin.<slug>` (server) ; le SQL brut et les
+3. **Utilisez le SDK.** Passez par `rebase.dataAsAdmin.<slug>` pour le travail
+   effectué sous l'identité du service, ou par `getDriver(c)` dans une fonction
+   lorsque la lecture doit s'exécuter en tant qu'appelant. Le client serveur n'expose pas
+   d'accesseur `data` simple ; le SQL brut et les
    appels Drizzle directs contournent la validation, les callbacks et le RLS.
 4. **Protégez chaque route personnalisée.** Les routes dans `backend/functions/`
    sont montées *sans* authentification. Utilisez `requireAuth` / `requireAdmin`
-   de `@rebasepro/server` dans l'emplacement middleware propre à la route — lire
+   de `@rebasepro/server/functions` dans l'emplacement middleware propre à la route — lire
    `c.get("user")` n'est pas une protection, tout comme `app.use()` placé après
    la route.
 

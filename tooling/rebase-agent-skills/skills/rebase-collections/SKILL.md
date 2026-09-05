@@ -53,7 +53,7 @@ A `string` property can also act as a lightweight reference via its `reference` 
 
 ### Schema-as-Code
 
-Collections are defined as standalone TypeScript files under `config/collections/` relative to the project root. The visual Studio edits these files via AST manipulation — it never runs raw SQL. This preserves custom callbacks and complex configuration.
+Collections are defined as standalone TypeScript files under `config/collections/` relative to the project root, and each one is registered in the `collections` array exported by that directory's `index.ts` — a file that is not in the array does not exist as far as the CLI or the runtime is concerned. The visual Studio edits these files via AST manipulation — it never runs raw SQL. This preserves custom callbacks and complex configuration.
 
 ## Defining a Collection
 
@@ -1948,7 +1948,23 @@ internal_note: {
 
 ## Schema Migration Workflow
 
-After modifying collections, apply changes to the database:
+**A new collection file is invisible until it is in the barrel.** Add it to the
+`collections` array exported by `config/collections/index.ts`:
+
+```typescript title="config/collections/index.ts"
+import postsCollection from "./posts.js";
+import productsCollection from "./products.js";   // ← the new one
+
+export const collections = [postsCollection, productsCollection];
+```
+
+`rebase generate-sdk`, `rebase build` and the runtime all load that index and
+read `collections` from it — none of them scans the directory. A file left out
+of the array produces no error and no table; it simply is not there. (The
+directory scan in `generate_sdk.ts` is a *fallback* for projects with no index
+file at all, so a project that has one gets the array or nothing.)
+
+Then apply the changes to the database:
 
 ```bash
 # All commands run from the project root directory unless noted

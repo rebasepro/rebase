@@ -43,7 +43,7 @@ const backend = await initializeRebaseBackend({
 |----------|------|---------|-------------|
 | `from` | `string` | — | **Required.** Sender address. Format: `"noreply@example.com"` or `"MyApp <noreply@example.com>"` |
 | `smtp` | `SMTPConfig` | `undefined` | SMTP server configuration (see below) |
-| `sendEmail` | `(options: EmailSendOptions) => Promise<void>` | `undefined` | Custom send function — replaces SMTP entirely |
+| `sendEmail` | `(options: EmailSendOptions) => Promise<EmailSendResult>` | `undefined` | Custom send function — replaces SMTP entirely. Return what your provider reported; the message id is what makes a reply threadable |
 | `resetPasswordUrl` | `string` | `""` | Base URL for password reset links. The reset link becomes `{resetPasswordUrl}/reset-password?token={token}` |
 | `verifyEmailUrl` | `string` | `""` | Base URL for email verification links. The link becomes `{verifyEmailUrl}/verify-email?token={token}` |
 | `appName` | `string` | `"Rebase"` | Application name used in email subjects and body text |
@@ -79,7 +79,7 @@ The `EmailService` interface is exposed on the `rebase.email` singleton:
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `send` | `(options: EmailSendOptions) => Promise<void>` | Send a single email |
+| `send` | `(options: EmailSendOptions) => Promise<EmailSendResult>` | Send a single email. Resolves with what the provider reported — the message id among it — and throws on failure. It returned `void` before 0.17 |
 | `isConfigured` | `() => boolean` | Returns `true` when SMTP or a custom `sendEmail` function is configured |
 | `verifyConnection` | `() => Promise<boolean>` | *(Optional)* Test SMTP connectivity. Returns `true` on success, `false` on failure. For custom `sendEmail`, returns `true` if the function is set |
 

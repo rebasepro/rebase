@@ -1,9 +1,9 @@
 /**
  * The agent bundle's own manifests, against the packages they name.
  *
- * `tooling/rebase-agent-skills/` ships four launch configs — `.mcp.json` for Cursor,
- * `kiro/mcp.json`, `gemini-extension.json`, and the plugin manifests. Three of
- * them launched:
+ * `tooling/rebase-agent-skills/` used to ship four launch configs — `.mcp.json`
+ * for Cursor, `kiro/mcp.json`, `gemini-extension.json`, and two plugin
+ * manifests. Three of them launched:
  *
  *     node node_modules/@rebasepro/mcp/dist/cli.js
  *
@@ -20,12 +20,18 @@
  * package it names; for `npx`/`pnpm dlx` the package must exist and must expose
  * a bin to run.
  *
- * `checkRepositoryUrls` is the second half, for the same class one level up: a
- * manifest can also point at a *repository* that does not exist. See its own
- * docblock.
+ * Those four manifests are gone — no installer ever looked where they sat, and
+ * `files: ["skills/"]` kept them out of the tarball too — but the check stays,
+ * because the next one added has to be right, and this is the shape of wrong it
+ * would be.
+ *
+ * `checkToolNames` and `checkRepositoryUrls` are the other two halves, for the
+ * same class in prose: a file here can name a *tool* or a *repository* that does
+ * not exist. See their own docblocks.
  */
 import { readFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
+import { loadMcpTools } from "./mcp-tools.mjs";
 
 /** Launchers whose first non-flag argument is a package name, not a path. */
 const PACKAGE_RUNNERS = new Set(["npx", "bunx", "pnpx"]);
@@ -150,6 +156,7 @@ export function checkAgentBundle(root) {
         }
     }
 
+    checkToolNames(root, findings);
     checkRepositoryUrls(root, findings);
 
     return { findings, scanned };
@@ -236,6 +243,73 @@ function checkRepositoryUrls(root, findings) {
                         `names \`github.com/${named}\`, but this bundle is published from ` +
                         `\`github.com/${declared}\` (its package.json says so). A repository that ` +
                         `does not exist answers 404 for every install command built on it.`
+                });
+            }
+        });
+    }
+}
+
+/**
+ * `rebase_*` names written in the bundle, against the tools that exist.
+ *
+ * Kiro's POWER.md advertised "Generate collection schemas with AI" and "Export
+ * collection data" as MCP capabilities. Neither is a tool, and neither has ever
+ * been one — the file was written from a product pitch rather than from
+ * `ALL_TOOLS`. That manifest is deleted now, but the failure mode is the skills'
+ * too: five of them tell the agent to prefer MCP tools over hand-written API
+ * calls, so a tool name in this bundle is an instruction, and an invented one is
+ * an instruction that cannot be followed.
+ *
+ * Two sources of truth, both derived:
+ *
+ *   - `ALL_TOOLS` in `packages/mcp/src/index.ts`, for what the server registers.
+ *   - every `rebase_…` identifier that appears anywhere in package source, for
+ *     the ones that are not tools at all — `rebase_user` is a Postgres role and
+ *     `rebase_entity_changes` is a NOTIFY channel, and both are correct to
+ *     write. The rule is not "must be a tool", it is "must be a real thing".
+ */
+function knownRebaseIdentifiers(root) {
+    const known = new Set();
+    for (const rel of globSync("packages/*/src/**/*.ts", { cwd: root })) {
+        if (rel.split(path.sep).some(part => part === "node_modules")) continue;
+        let source;
+        try {
+            source = readFileSync(path.join(root, rel), "utf8");
+        } catch {
+            continue;
+        }
+        for (const m of source.matchAll(/\brebase_[a-z0-9_]+\b/g)) known.add(m[0]);
+    }
+    return known;
+}
+
+function checkToolNames(root, findings) {
+    const tools = new Set(loadMcpTools(root).groups.flatMap(g => g.tools.map(t => t.name)));
+    // A resolution failure would pass every file silently. Say so instead.
+    if (!tools.size) {
+        findings.push({
+            file: "packages/mcp/src/index.ts",
+            message: "ALL_TOOLS parsed to nothing — the tool-name check is not running."
+        });
+        return;
+    }
+    const known = knownRebaseIdentifiers(root);
+
+    for (const rel of globSync(["tooling/rebase-agent-skills/**/*.md", "tooling/rebase-agent-skills/**/*.json"], { cwd: root })) {
+        if (rel.split(path.sep).some(part => part === "node_modules")) continue;
+        const lines = readFileSync(path.join(root, rel), "utf8").split("\n");
+        const reported = new Set();
+        lines.forEach((line, i) => {
+            for (const m of line.matchAll(/`(rebase_[a-z0-9_]+)`/g)) {
+                const name = m[1];
+                if (tools.has(name) || known.has(name) || reported.has(name)) continue;
+                reported.add(name);
+                findings.push({
+                    file: `${rel}:${i + 1}`,
+                    message:
+                        `names \`${name}\`, which is neither a tool in ALL_TOOLS nor an identifier ` +
+                        "anywhere in package source. Five skills tell the agent to prefer MCP tools " +
+                        "over hand-written API calls, so a name here is an instruction."
                 });
             }
         });

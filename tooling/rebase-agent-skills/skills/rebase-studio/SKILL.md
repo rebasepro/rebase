@@ -5,11 +5,11 @@ description: Guide for using and customizing the Rebase Studio developer tools l
 
 # Rebase Studio
 
-Rebase Studio (`@rebasepro/studio`) is the developer tools layer for Rebase. It provides 9 built-in tools — SQL Console, JS Console, RLS Editor, Storage browser, Cron Jobs manager, Schema Visualizer, Branches manager, API Explorer, and Logs Explorer — accessible via the "Studio" mode toggle in the sidebar.
+Rebase Studio (`@rebasepro/studio`) is the developer tools layer for Rebase. It provides 11 built-in tools — SQL Console, JS Console, RLS Editor, Storage browser, Cron Jobs manager, Schema Visualizer, Branches manager, Backups, API Explorer, Logs Explorer and API Keys — accessible via the "Studio" mode toggle in the sidebar.
 
 ## Overview
 
-- **9 built-in dev tools** — all lazy-loaded and code-split so they don't impact initial bundle size
+- **11 built-in dev tools** — all lazy-loaded and code-split so they don't impact initial bundle size
 - **StudioHomePage** — customizable landing page with tool cards grouped by section
 - **Studio Bridge** — hooks that connect Studio tools to CMS data (collections, navigation, side panels)
 

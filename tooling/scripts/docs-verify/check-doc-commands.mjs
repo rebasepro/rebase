@@ -54,6 +54,13 @@ const DOC_GLOBS = [
     // only the glob nobody had added.
     "website/src/content/docs/**/*.md",
     "website/src/content/docs/**/*.mdx",
+    // Every package README, because npm renders them and nothing else checked
+    // them. `@rebasepro/mcp` told its readers to run `npx rebase-mcp` in two
+    // places: `rebase-mcp` is this package's *binary*, the package is
+    // `@rebasepro/mcp`, and the unscoped name on npm belongs to somebody else.
+    // Check 4 below already knew how to catch that — it had simply never been
+    // pointed at the files.
+    "packages/*/README.md",
     ...AGENT_INSTRUCTION_GLOBS
 ];
 

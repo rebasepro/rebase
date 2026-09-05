@@ -9,9 +9,14 @@
  * existing pattern; do not invent a layout") was unfollowable.
  *
  * So the assertion is not "assets are copied somewhere". It is that a link a
- * SKILL.md writes resolves, from where that agent's rule file was installed —
- * which differs between the subdirectory layouts (Claude, Gemini) and the flat
- * ones (Cursor, Windsurf).
+ * SKILL.md writes resolves from where that skill's body was installed.
+ *
+ * The second regression pinned here is the one that made a flat layout
+ * expensive. Cursor and Windsurf load their whole rules directory into every
+ * request; a rule file per skill meant ~84,000 characters of Rebase reference
+ * in front of every question a person asked, whether or not it was about
+ * Rebase. Those agents now get one short always-on index and read a body when
+ * they need it, so the size of what is always applied is a thing to assert.
  */
 import { execFileSync } from "child_process";
 import fs from "fs";
@@ -19,7 +24,7 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { installForAgent, loadSkills, rewriteAssetLinks } from "./skills";
+import { installForAgent, loadSkills, renderSkillIndex } from "./skills";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** The bundle in this repository — `packages/cli/src/commands` → root. */
@@ -28,11 +33,17 @@ const BUNDLE_SKILLS = path.join(BUNDLE_ROOT, "skills");
 
 /** Where each agent's rule file lands, and what a relative link resolves against. */
 const LAYOUTS = {
-    claude: { dir: ".claude/skills", ruleFile: (s: string) => `${s}/SKILL.md` },
-    gemini: { dir: ".agents/skills", ruleFile: (s: string) => `${s}/SKILL.md` },
-    cursor: { dir: ".cursor/rules", ruleFile: (s: string) => `${s}.mdc` },
-    windsurf: { dir: ".windsurf/rules", ruleFile: (s: string) => `${s}.md` }
+    claude: { dir: ".claude/skills", index: null },
+    gemini: { dir: ".agents/skills", index: null },
+    cursor: { dir: ".cursor/rules", index: "rebase.mdc" },
+    windsurf: { dir: ".windsurf/rules", index: "rebase.md" },
+    codex: { dir: ".codex/skills", index: null },
+    kiro: { dir: ".kiro/steering", index: "rebase.md" },
+    copilot: { dir: ".github/instructions", index: "rebase.instructions.md" }
 } as const;
+
+/** Every layout writes the body at `<skill>/SKILL.md` under its target dir. */
+const bodyOf = (s: string) => `${s}/SKILL.md`;
 
 let scratch: string;
 
@@ -75,7 +86,7 @@ describe("loadSkills", () => {
 
 describe("installForAgent", () => {
     for (const [agent, layout] of Object.entries(LAYOUTS)) {
-        it(`leaves every reference link in the installed ${agent} rule file resolvable`, () => {
+        it(`leaves every reference link in the installed ${agent} skill resolvable`, () => {
             const skills = loadSkills(fixture());
             const project = path.join(scratch, `project-${agent}`);
             fs.mkdirSync(project, { recursive: true });
@@ -83,31 +94,63 @@ describe("installForAgent", () => {
             const result = installForAgent(agent as keyof typeof LAYOUTS, skills, project);
             expect(result).toEqual({ skills: 2, assets: 1 });
 
-            const rulePath = path.join(project, layout.dir, layout.ruleFile("demo-skill"));
-            const installed = fs.readFileSync(rulePath, "utf-8");
+            const bodyPath = path.join(project, layout.dir, bodyOf("demo-skill"));
+            const installed = fs.readFileSync(bodyPath, "utf-8");
 
             const links = [...installed.matchAll(/`([^`]*references\/[^`]+)`/g)].map(m => m[1]);
             expect(links.length).toBeGreaterThan(0);
             for (const link of links) {
-                expect(fs.existsSync(path.resolve(path.dirname(rulePath), link))).toBe(true);
+                expect(fs.existsSync(path.resolve(path.dirname(bodyPath), link))).toBe(true);
+            }
+        });
+
+        it(`installs no oversized always-applied rule for ${agent}`, () => {
+            const skills = loadSkills(fixture());
+            const project = path.join(scratch, `project-size-${agent}`);
+            fs.mkdirSync(project, { recursive: true });
+            installForAgent(agent as keyof typeof LAYOUTS, skills, project);
+
+            const base = path.join(project, layout.dir);
+            const topLevel = fs.readdirSync(base, { withFileTypes: true }).filter(e => e.isFile());
+            if (layout.index) {
+                // Exactly one file at the top level: the index. Everything a
+                // flat-layout agent loads unconditionally is that one file.
+                expect(topLevel.map(e => e.name)).toEqual([layout.index]);
+            } else {
+                expect(topLevel).toEqual([]);
+            }
+            for (const entry of topLevel) {
+                expect(fs.readFileSync(path.join(base, entry.name), "utf-8").length).toBeLessThan(8000);
             }
         });
     }
 });
 
-describe("rewriteAssetLinks", () => {
-    it("only rewrites paths that name a file the skill ships", () => {
-        const out = rewriteAssetLinks(
-            "see references/a.md, but references/ghost.md is prose",
-            [path.join("references", "a.md")],
-            "demo"
-        );
-        expect(out).toBe("see demo/references/a.md, but references/ghost.md is prose");
+describe("renderSkillIndex", () => {
+    it("names every skill, and where to read it", () => {
+        const skills = loadSkills(BUNDLE_SKILLS);
+        const index = renderSkillIndex(skills, "cursor");
+        for (const skill of skills) {
+            expect(index).toContain(`\`${skill.name}\``);
+            expect(index).toContain(`${skill.name}/SKILL.md`);
+        }
     });
 
-    it("does not rewrite a path that is already qualified", () => {
-        const out = rewriteAssetLinks("skills/references/a.md", [path.join("references", "a.md")], "demo");
-        expect(out).toBe("skills/references/a.md");
+    it("stays small enough to be worth applying always", () => {
+        // The whole point: this is what replaces ~84,000 characters of
+        // always-on rules. A version of it that grew past a few thousand would
+        // be the same problem with an extra step.
+        const index = renderSkillIndex(loadSkills(BUNDLE_SKILLS), "cursor");
+        expect(index).toContain("alwaysApply: true");
+        expect(index.length).toBeLessThan(8000);
+    });
+
+    it("summarises each skill from its own front matter", () => {
+        const skills = loadSkills(fixture());
+        // The fixture's skills have no front matter, so the fallback is the
+        // skill name — never an empty cell.
+        const index = renderSkillIndex(skills, "windsurf");
+        expect(index).toContain("| `demo-skill` | demo skill |");
     });
 });
 

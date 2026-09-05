@@ -37,6 +37,21 @@ Please refer to and follow the instructions defined in [ai-instructions.md](./ai
 Esto ocurre en cada `rebase init`, para cada preset, incluido `--headless`.
 No hay ningún flag ni confirmación interactiva.
 
+`rebase init` también escribe `.mcp.json`, que apunta Claude Code, Cursor y
+cualquier otro cliente MCP al [servidor MCP de Rebase](/es/docs/ai/mcp):
+
+```json title=".mcp.json"
+{
+  "mcpServers": {
+    "rebase": { "command": "npx", "args": ["-y", "@rebasepro/mcp"] }
+  }
+}
+```
+
+Dentro no hay `REBASE_PROJECT_DIR`, y es intencionado: el cliente arranca el
+servidor en la raíz del proyecto, y una ruta absoluta es la única línea de ese
+archivo que no se puede confirmar en el repositorio.
+
 ## Por qué un puntero en lugar de una copia
 
 Los archivos de puntero están deliberadamente vacíos de contenido. Los asistentes
@@ -60,7 +75,7 @@ adoptarlo en repositorios que ni siquiera sean proyectos de Rebase.
 
 El archivo generado es deliberadamente breve: remite a
 [`rebase skills install`](/docs/ai/skills) para mayor profundidad y luego
-establece cuatro reglas en las que los asistentes se equivocan con la frecuencia
+establece las reglas en las que los asistentes se equivocan con la frecuencia
 suficiente como para que valga la pena repetirlas al inicio de cada sesión:
 
 1. **Esquema como código.** Las colecciones se definen en `config/collections/`.
@@ -69,11 +84,14 @@ suficiente como para que valga la pena repetirlas al inicio de cada sesión:
 2. **Las migraciones son de dos pasos.** `rebase schema generate`, luego
    `rebase db push` en desarrollo, o `rebase db generate && rebase db migrate`
    para producción.
-3. **Usa el SDK.** Accede a través de `client.data.<slug>` (browser) / `rebase.dataAsAdmin.<slug>` (server); el SQL directo y
+3. **Usa el SDK.** Accede a través de `rebase.dataAsAdmin.<slug>` para el trabajo
+   realizado con la identidad del servicio, o `getDriver(c)` dentro de una función
+   cuando la lectura deba ejecutarse como el llamante. En el servidor el cliente no expone
+   un accesor `data` simple. el SQL directo y
    las llamadas directas a Drizzle omiten la validación, los callbacks y RLS.
 4. **Protege cada ruta personalizada.** Las rutas en `backend/functions/` se
    montan *sin* autenticación. Usa `requireAuth` / `requireAdmin` de
-   `@rebasepro/server` en la propia ranura de middleware de la ruta — leer
+   `@rebasepro/server/functions` en la propia ranura de middleware de la ruta — leer
    `c.get("user")` no es una protección, y tampoco lo es `app.use()` después
    de la ruta.
 
