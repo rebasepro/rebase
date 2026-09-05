@@ -21,7 +21,7 @@ import { CREATE_PROJECT_FLAGS } from "./projects";
 import { CREATE_DATABASE_FLAGS } from "./databases";
 import { DEPLOY_FLAGS } from "./deploy";
 import { ENV_SET_FLAGS } from "./env";
-import { RESOURCES_SET_FLAGS } from "./resources";
+import { RESOURCES_SET_FLAGS, BILLING_ACTIONS } from "./resources";
 import { LOGIN_FLAGS } from "./auth";
 
 /**
@@ -97,6 +97,18 @@ function documentedNames(entry: { flags: Array<[string, string]> }): Set<string>
         }
     }
     return names;
+}
+
+/**
+ * The action words a usage line offers — `cloud billing [setup|checkout]` →
+ * `["setup", "checkout"]`.
+ *
+ * Only the bracketed group, so `cloud billing` itself and a `<slug>` placeholder
+ * are not mistaken for actions.
+ */
+function actionWordsIn(usage: string): string[] {
+    const group = /[[<]([a-z|-]+)[\]>]/.exec(usage);
+    return group ? group[1].split("|") : [];
 }
 
 /** Spec keys a page has to document: not the globals, not the aliases. */
@@ -255,6 +267,21 @@ describe("ACTION_HELP", () => {
         // reader copies, and `check-doc-commands.mjs` checks the same shape for
         // the markdown.
         for (const example of entry.examples) expect(example.startsWith("rebase cloud ")).toBe(true);
+    });
+
+    /**
+     * A group's usage line lists action words, and those words have to be the
+     * ones the group dispatches.
+     *
+     * `cloud billing [portal|usage]` was the page; the dispatch answered `setup`
+     * and `checkout`. So both documented words fell out of the chain into the
+     * default action and printed the billing account — a page describing two
+     * commands that do not exist, answering as if they did.
+     */
+    it.each([
+        ["billing", BILLING_ACTIONS]
+    ])("%s's usage line names the actions it dispatches", (key, dispatched) => {
+        expect(actionWordsIn(ACTION_HELP[key].usage).sort()).toEqual([...dispatched].sort());
     });
 
     it("says, on the two commands that hide it, where a managed database comes from", () => {

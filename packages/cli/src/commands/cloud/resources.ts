@@ -20,6 +20,7 @@ import {
     projectHost,
     openUrl,
     parseCloudArgs,
+    requireKnownAction,
     success,
     fail,
     reportError,
@@ -1103,6 +1104,18 @@ async function clustersListCommand(rawArgs: string[]): Promise<void> {
 
 /* ─── billing ──────────────────────────────────────────────────── */
 
+/**
+ * The action words `rebase cloud billing` dispatches. No word at all is the
+ * account view, which is why it is not in the list.
+ *
+ * Exported because `action-help.test.ts` holds the page's usage line to it: the
+ * page said `cloud billing [portal|usage]` and the dispatch answered `setup` and
+ * `checkout`, so both documented words fell through to the default and printed
+ * the account — a help page describing a command that does not exist, and a typo
+ * exiting 0.
+ */
+export const BILLING_ACTIONS = ["setup", "checkout"] as const;
+
 export async function billingCommand(rawArgs: string[]): Promise<void> {
     // Parsed before the client is built: an unusable line should be refused
     // without first spending a login round-trip on it.
@@ -1113,6 +1126,7 @@ export async function billingCommand(rawArgs: string[]): Promise<void> {
         command: "cloud billing",
         maxPositionals: 1
     }).positionals[0];
+    requireKnownAction("billing", action, BILLING_ACTIONS);
 
     const { client, url } = await requireClient(rawArgs);
     const org = getContextOrg(url);

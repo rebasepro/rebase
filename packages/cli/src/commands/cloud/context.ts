@@ -865,6 +865,36 @@ positionals: parsed.positionals };
 }
 
 /**
+ * Refuse an action word its group does not dispatch. Returns for `undefined`,
+ * which is every group's default action.
+ *
+ * The groups that switch on their action already do this in a `default:` case.
+ * The groups written as a chain of `if (action === "x") return …` did not: a
+ * word that matched nothing fell out of the chain into the *default* action, so
+ * `rebase cloud storage creat` listed the buckets and exited 0, and
+ * `rebase cloud billing usage` printed the account. Reporting a typo as a
+ * successful run of a different command is the failure mode this family exists
+ * to not have — an agent branching on the exit code learns nothing, and a person
+ * reads the output of a command they did not ask for.
+ *
+ * One spelling, so the code is `unknown_command` everywhere rather than the
+ * default `"error"` half of them used, and the hint always names the group's own
+ * `--help` rather than the index page.
+ */
+export function requireKnownAction(
+    group: string,
+    action: string | undefined,
+    known: readonly string[]
+): void {
+    if (action === undefined || known.includes(action)) return;
+    fail(
+        `Unknown ${group} command: ${action}`,
+        `Run \`rebase cloud ${group} --help\`. Actions: ${known.join(", ")}.`,
+        "unknown_command"
+    );
+}
+
+/**
  * `--timeout <seconds>` as milliseconds, or `fallbackMs` when it was not given.
  *
  * One function rather than one per command, because two commands take this flag
