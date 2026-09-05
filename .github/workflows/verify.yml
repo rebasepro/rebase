@@ -282,6 +282,12 @@ jobs:
       - name: Subpath imports resolve
         run: pnpm run check:subpath-imports
 
+      # The Studio docs table names each tool's slug and drawer group, which are
+      # facts about one useMemo in RebaseStudio.tsx. cron-jobs.md sent readers
+      # to an "Automation" section that has never existed.
+      - name: Studio tools table
+        run: pnpm run check:studio-tools
+
       # Astro and JSX drop the newline between a word and an adjacent tag rather
       # than collapsing it to a space, so a paragraph broken across two source
       # lines at that boundary renders "or runrebase dev". Invisible in the

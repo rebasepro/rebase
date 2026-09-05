@@ -91,6 +91,7 @@
     "check:untranslated": "node tooling/scripts/check-untranslated.mjs",
     "check:rebase-props": "node tooling/scripts/check-rebase-props-table.mjs",
     "check:subpath-imports": "node tooling/scripts/check-subpath-imports.mjs",
+    "check:studio-tools": "node tooling/scripts/check-studio-tools-table.mjs",
     "harness": "node tooling/scripts/harness/harness.mjs",
     "harness:preflight": "node tooling/scripts/harness/harness.mjs preflight",
     "harness:eval": "node tooling/scripts/harness/harness.mjs eval",

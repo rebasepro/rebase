@@ -304,7 +304,7 @@ await client.cron.toggleJob("health-check", true);  // resume
 
 ## Studio Dashboard
 
-When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio under the **Automation** section. The dashboard provides:
+When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio under **Compute**, beside the JS console. The dashboard provides:
 
 - **Job list** — All registered jobs with live status indicators
 - **Detail panel** — Schedule, next/last run, duration, and error information

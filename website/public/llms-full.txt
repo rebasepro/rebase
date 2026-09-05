@@ -8687,7 +8687,7 @@ await client.cron.toggleJob("health-check", true);  // resume
 
 ### Studio Dashboard
 
-When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio under the **Automation** section. The dashboard provides:
+When cron jobs are configured, a **Cron Jobs** tool appears in Rebase Studio under **Compute**, beside the JS console. The dashboard provides:
 
 - **Job list** — All registered jobs with live status indicators
 - **Detail panel** — Schedule, next/last run, duration, and error information
@@ -10465,7 +10465,7 @@ Toggles between Studio and Content modes:
 
 ```typescript
 const adminModeController = useBuildAdminModeController();
-// Provides: adminModeController.mode ("studio" | "content")
+// Provides: adminModeController.mode ("cms" | "studio" | "settings")
 ```
 
 #### Scaffold Components
@@ -13232,7 +13232,7 @@ Switch the admin layout view modes within the admin panel.
 ```typescript
 
 function ModeToggle() {
-    const { mode, setMode } = useAdminModeController(); // mode is "content" | "studio" | "settings"
+    const { mode, setMode } = useAdminModeController(); // mode is "cms" | "studio" | "settings"
 
     return <button onClick={() => setMode("studio")}>Switch to Studio View</button>;
 }
