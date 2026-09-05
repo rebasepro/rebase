@@ -6794,8 +6794,7 @@ A property key *you* wrote is your key, whatever its shape — nothing renames a
 
 ### Quick Example
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 // Create
 const product = await client.data.products.create({
     name: "Camera",
@@ -13402,8 +13401,7 @@ Both methods return an **unsubscribe function** you call to stop receiving updat
 
 Use `listen()` to receive updates whenever records in a collection change:
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 const unsubscribe = client.data.products.listen(
   undefined, // FindParams — pass undefined for all records
   (response) => {
@@ -13424,8 +13422,7 @@ The callback receives a `FindResponse<M>` containing:
 
 Pass `FindParams` as the first argument to filter the subscription:
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 const unsubscribe = client.data.products.listen(
   {
     where: { status: ["==", "published"] },
@@ -13444,8 +13441,7 @@ The server respects these filters — only matching records are included in upda
 
 Use `listenById()` to watch a specific record:
 
-<!-- docs-verify: W4-03 owns this — `listenById` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 const unsubscribe = client.data.products.listenById(
   "product-123",
   (entity) => {
@@ -13467,8 +13463,7 @@ The callback receives `Entity<M> | undefined`. A value of `undefined` means the 
 
 Both `listen()` and `listenById()` return an unsubscribe function. Call it to stop receiving updates and clean up server-side resources:
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 const unsubscribe = client.data.products.listen(undefined, (response) => {
   // handle updates
 });
@@ -13690,14 +13685,15 @@ The client SDK automatically reconnects when the WebSocket connection drops:
 
 You can listen to connection lifecycle events:
 
-<!-- docs-verify: W4-03 owns this — `client.ws` is optional on the client, same class as `listen`. -->
-```typescript no-verify
-const ws = client.ws; // Access the WebSocket client
-
-ws.on("connect", () => console.log("Connected"));
-ws.on("disconnect", () => console.log("Disconnected"));
-ws.on("reconnect", () => console.log("Reconnected"));
-ws.on("error", (error) => console.error("Error:", error));
+```typescript
+// `ws` is undefined on a client built without realtime, so narrow it once.
+const ws = client.ws;
+if (ws) {
+    ws.on("connect", () => console.log("Connected"));
+    ws.on("disconnect", () => console.log("Disconnected"));
+    ws.on("reconnect", () => console.log("Reconnected"));
+    ws.on("error", (error) => console.error("Error:", error));
+}
 ```
 
 ### Authentication & RLS
@@ -20005,8 +20001,7 @@ A property key *you* wrote is your key, whatever its shape — nothing renames a
 
 ### Quick Example
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 // Create
 const product = await client.data.products.create({
     name: "Camera",
@@ -21520,8 +21515,7 @@ The WebSocket connection is established automatically when a `websocketUrl` is a
 
 Use `listen()` to subscribe to a collection query. The callback fires whenever the matching data set changes:
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`, so the sample cannot compile under strictNullChecks until it is not. -->
-```typescript no-verify
+```typescript
 const unsubscribe = client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
     (response) => {
@@ -21536,8 +21530,7 @@ unsubscribe();
 
 The `listen()` method accepts the same `FindParams` as `find()` — you can filter, sort, and paginate your subscription:
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 const unsubscribe = client.data.orders.listen(
     {
         where: { status: ["==", "pending"] },
@@ -21583,8 +21576,7 @@ rows beside it. There is no separate first-paint emission and no flag to check:
   **lower bound** — the rows on this page plus the ones paged past to reach
   them — and `meta.hasMore` is `true` when the page came back full.
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
     (result) => {
@@ -21660,8 +21652,7 @@ so a subscriber has no way to notice.
 
 Every subscription returns an `unsubscribe` function. Call it to stop receiving updates and clean up the WebSocket listener:
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```typescript no-verify
+```typescript
 const unsubscribe = client.data.products.listen(
     undefined,
     (response) => { /* ... */ }
@@ -21673,8 +21664,7 @@ unsubscribe();
 
 In React, use `useEffect` cleanup:
 
-<!-- docs-verify: W4-03 owns this — `listen` is optional on `SDKCollectionClient`. -->
-```tsx no-verify
+```tsx
 useEffect(() => {
     const unsubscribe = client.data.products.listen(
         { where: { active: ["==", true] } },
@@ -27481,17 +27471,14 @@ function StatCard({ title, value }: { title: string; value: string | number }) {
 
 ### Register as a Custom View
 
-<!-- docs-verify: W10-02 owns this sample — `admin` is not a key of `AppView`. -->
-```tsx no-verify
+```tsx
 const views: AppView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",
         view: <DashboardView />,
-        admin: {
-            icon: "dashboard",
-            group: "Analytics"
-        }
+        icon: "LayoutDashboard",
+        group: "Analytics"
     }
 ];
 
