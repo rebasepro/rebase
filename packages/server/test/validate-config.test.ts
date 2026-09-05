@@ -42,10 +42,38 @@ describe("a current-era config", () => {
         expect(findCollectionConfigProblems([valid()])).toEqual([]);
     });
 
-    it("does not look inside the admin block for keys it simply does not know", () => {
-        // The block belongs to @rebasepro/cms-types, which the server may not
-        // import. Guessing at its contents here would reject keys the panel adds.
+    it("warns on a key the admin block does not have", () => {
+        // It used to look the other way here, on the reasoning that the block
+        // belongs to @rebasepro/cms-types and guessing at its contents would
+        // reject options the panel had added. But the list it is checked
+        // against — `ADMIN_COLLECTION_KEYS` — lives in core so that core can
+        // read it, and cms-types type-checks it against the options in both
+        // directions. It cannot fall behind the panel, so the block was simply
+        // the one place where a typo produced no signal at all.
         const collection = { ...valid(), admin: { icon: "Article", somethingTheAdminAdded: true } };
+        const [problem] = warnings([collection]);
+        expect(problem.path).toBe("posts.admin.somethingTheAdminAdded");
+        expect(errors([collection])).toEqual([]);
+    });
+
+    it("suggests the key an admin typo was one edit from", () => {
+        const collection = valid();
+        collection.properties.body = { name: "Body", type: "string", admin: { multilne: true } } as never;
+
+        const [problem] = warnings([collection]);
+
+        expect(problem.path).toBe("posts.properties.body.admin.multilne");
+        expect(problem.message).toContain("Did you mean `multiline`?");
+    });
+
+    it("accepts every key the admin block really has", () => {
+        const collection = valid();
+        collection.properties.body = {
+            name: "Body",
+            type: "string",
+            admin: { multiline: true, markdown: true, readOnly: false, columnWidth: 200 }
+        } as never;
+
         expect(findCollectionConfigProblems([collection])).toEqual([]);
     });
 

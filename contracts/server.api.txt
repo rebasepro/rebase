@@ -1086,6 +1086,7 @@ function hashString
 function hydrateRegExp
 function isDefaultFieldConfigId
 function isEmptyObject
+function isNearMiss
 function isObject
 function isPlainObject
 function isPrototypePollutingKey
@@ -1109,6 +1110,7 @@ function setIn
 function sha1Hex
 function singular
 function slugify
+function suggestNearMiss
 function toArray
 function toPostgresIdentifier
 function toWireKey

@@ -778,16 +778,35 @@ export function defineCollection(collection: CollectionConfig): CollectionConfig
  */
 export type { AdminCollectionKey } from "@rebasepro/types";
 
+/** Compiles only when `T` is `never` — see {@link _EveryAdminCollectionOptionIsListed}. */
+type AssertNeverKey<T extends never = never> = T;
+
+/** Local alias, so the assertion below can name the list's element type. */
+type AdminCollectionKeyName = typeof CORE_ADMIN_COLLECTION_KEYS[number];
+
 /**
  * Core's list, re-exported through a `satisfies` clause that is the agreement
  * check: a key core names that is not an option here fails to compile, and
  * `satisfies` keeps the literal tuple type rather than widening it to `string[]`.
- *
- * The reverse direction — an option missing from core's list — has no type-level
- * expression, since there is no exhaustiveness check over an optional-property
- * keyof. `test/admin_collection.test.ts` counts them instead.
  */
 export const ADMIN_COLLECTION_KEYS = CORE_ADMIN_COLLECTION_KEYS satisfies readonly (keyof AdminCollectionOptions)[];
+
+/**
+ * And the reverse: an option declared here that core's list does not name.
+ *
+ * This direction was believed to have no type-level expression — `keyof` over
+ * optional properties does in fact yield them all, so it does. A test counted
+ * the list instead, which catches a *change* in size but not a key added to the
+ * options and forgotten here.
+ *
+ * It matters more since the boot validator started warning about unrecognised
+ * `admin` keys: a real option missing from this list would make the server
+ * report a correct config as a typo, and a check that cries wolf gets switched
+ * off. The compile error arrives at the person adding the option, which is the
+ * only moment anyone can fix it cheaply.
+ */
+type _EveryAdminCollectionOptionIsListed =
+    AssertNeverKey<Exclude<keyof AdminCollectionOptions, AdminCollectionKeyName>>;
 
 
 /**

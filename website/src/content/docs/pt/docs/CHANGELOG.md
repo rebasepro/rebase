@@ -149,6 +149,31 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ### Fixed
 
+- **A typo inside an `admin` block was the one config mistake with no signal at
+  all.** The boot validator checked the collection's keys, each property's keys
+  and each relation's keys — and then stopped at the edge of `admin`, on the
+  reasoning that the block belongs to `@rebasepro/cms-types` and the panel adds
+  to it. But the lists to check against, `ADMIN_COLLECTION_KEYS` and
+  `ADMIN_PROPERTY_KEYS`, live in core *so that core can read them*, and
+  `@rebasepro/cms-types` type-checks both against the option types. So
+  `admin: { multilne: true }` booted clean, rendered a single-line input, and left
+  nothing to find.
+
+  Both blocks are checked now, as warnings under the existing
+  `REBASE_STRICT_COLLECTION_CONFIG` policy, and every unknown-key message — at any
+  level — carries the near-miss when there is one: *"`multilne` is not a known
+  property `admin` key and is being ignored. Did you mean `multiline`?"* The
+  suggester is the CLI's, moved into `@rebasepro/utils` as `isNearMiss` and
+  `suggestNearMiss`.
+
+  Both key lists now assert completeness against the option types in *both*
+  directions, at compile time. The reverse direction was believed to have no
+  type-level expression and had never been checked; on its first run it found two
+  real options that had never been listed — `format` on a number property and
+  `renderInForm` on a relation. Left unlisted, they would have made this new
+  warning fire on correct config, which is how a check earns its way into being
+  switched off.
+
 - **Two enum entries with the same `id` silently removed the enum.** The ids are
   the labels of a Postgres enum type, so a duplicate makes `CREATE TYPE
   "posts_status" AS ENUM ('draft', 'draft')` — which Postgres refuses with

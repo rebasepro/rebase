@@ -89,7 +89,12 @@ describe("ADMIN_PROPERTY_KEYS", () => {
     it("covers the base options and every per-type extension", () => {
         // Same tripwire as above. Bump it deliberately, alongside the list.
         // 25: `span` joined and `widthPercentage`, which it replaced, is gone.
-        expect(ADMIN_PROPERTY_KEYS).toHaveLength(25);
+        // 27: `format` (AdminNumberOptions) and `renderInForm`
+        // (AdminRelationOptions) had never been listed. That is no longer
+        // something a count can be the first to notice — `property_options.ts`
+        // now asserts the reverse direction at compile time, and this pair is
+        // what the assertion found on its first run.
+        expect(ADMIN_PROPERTY_KEYS).toHaveLength(27);
     });
 
     it("names nothing that belongs to the property contract", () => {

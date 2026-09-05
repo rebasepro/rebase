@@ -1,6 +1,8 @@
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
 import type { PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property } from "@rebasepro/types";
 
+import { suggestNearMiss } from "@rebasepro/utils";
+
 import { logger } from "../utils/logger";
 
 /**
@@ -416,17 +418,27 @@ class ProblemCollector {
         );
     }
 
-    /** A key nobody recognises. Might be metadata, might be newer than us. */
-    unknown(path: string, key: string, context: string): void {
+    /**
+     * A key nobody recognises. Might be metadata, might be newer than us.
+     *
+     * `known` is the list this key was checked against, when there is one. The
+     * near-miss out of it is what turns "something is wrong somewhere in this
+     * file" into a one-line fix — `multilne` is not a key anybody will spot by
+     * re-reading the config, because it looks exactly like the key it is not.
+     */
+    unknown(path: string, key: string, context: string, known?: readonly string[]): void {
         if (this.unknownKeys === "off") return;
+        const suggestion = known ? suggestNearMiss(known, key) : undefined;
         this.problems.push({
             severity: this.unknownKeys === "error" ? "error" : "warning",
             kind: "key",
             path,
             message:
                 `\`${key}\` is not a known ${context} key and is being ignored. ` +
-                "If it is deliberate metadata this is safe; if it is a typo or a key from an older " +
-                "version, the feature it configures is silently absent."
+                (suggestion
+                    ? `Did you mean \`${suggestion}\`?`
+                    : "If it is deliberate metadata this is safe; if it is a typo or a key from an older " +
+                      "version, the feature it configures is silently absent.")
         });
     }
 }
@@ -456,7 +468,7 @@ function checkRelation(
             continue;
         }
         if (!RELATION_KEYS.has(key)) {
-            collect.unknown(`${path}.${key}`, key, "relation");
+            collect.unknown(`${path}.${key}`, key, "relation", [...RELATION_KEYS]);
         }
     }
 
@@ -604,6 +616,44 @@ function checkEnumValues(
     collect.error(path, "`enum` must be an array of `{ id, label }` or a record of id → label.");
 }
 
+/**
+ * The keys inside an `admin` block, against the list core owns.
+ *
+ * This block used to be checked for *removed* keys only, on the reasoning that
+ * it belongs to `@rebasepro/cms-types` and a completeness check here would
+ * reject options the panel had added. That reasoning had one flaw: the lists it
+ * would be checked against, `ADMIN_COLLECTION_KEYS` and `ADMIN_PROPERTY_KEYS`,
+ * live in core precisely so that core can read them, and `@rebasepro/cms-types`
+ * type-checks both against the option types in both directions. They cannot fall
+ * behind the panel.
+ *
+ * So the block was the one place in a collection where a typo cost nothing to
+ * make and produced no signal at all. `admin: { multilne: true }` booted clean
+ * and rendered a single-line input, and the config said otherwise.
+ *
+ * A warning, not an error, and it goes through {@link ProblemCollector.unknown}:
+ * the `REBASE_STRICT_COLLECTION_CONFIG` policy governs it like every other
+ * unrecognised key, so a project that wants these fatal can have them, and one
+ * running an older server against a newer panel is not blocked from booting.
+ */
+function checkAdminBlock(
+    block: Record<string, unknown>,
+    path: string,
+    known: readonly string[],
+    context: string,
+    collect: ProblemCollector
+): void {
+    const allowed = new Set<string>(known);
+    for (const key of Object.keys(block)) {
+        if (allowed.has(key)) continue;
+        // A key that moved *out* of the block has already been reported by its
+        // migration, which says where it went; saying "unknown" after that
+        // would be a second, worse message for the same key.
+        if (ADMIN_BLOCK_MIGRATIONS[key]) continue;
+        collect.unknown(`${path}.${key}`, key, context, known);
+    }
+}
+
 function checkProperty(
     property: unknown,
     path: string,
@@ -652,7 +702,15 @@ function checkProperty(
             continue;
         }
 
-        collect.unknown(`${path}.${key}`, key, `property (\`${String(type)}\`)`);
+        collect.unknown(`${path}.${key}`, key, `property (\`${String(type)}\`)`, [...allowed]);
+    }
+
+    // The property's own `admin` block. Checked against every key any property
+    // type's options declare, not the per-type subset: `ADMIN_PROPERTY_KEYS` is
+    // the union, and narrowing it here would reject a valid key on a type this
+    // file has no per-type list for.
+    if (isPlainObject(property.admin)) {
+        checkAdminBlock(property.admin, `${path}.admin`, ADMIN_PROPERTY_KEYS, "property `admin`", collect);
     }
 
     if (type === "relation" && property.relation !== undefined) {
@@ -802,18 +860,14 @@ function checkCollection(
             continue;
         }
 
-        collect.unknown(`${at}.${key}`, key, "collection");
+        collect.unknown(`${at}.${key}`, key, "collection", [...COLLECTION_KEYS]);
     }
 
-    // Only the keys that were *removed* from the block, never the ones it does
-    // not recognise: the block belongs to `@rebasepro/cms-types` and the panel
-    // adds to it, so a completeness check here would reject valid config. A
-    // removal is different — nothing will read the key again, and a title that
-    // silently reverts to the derived one is the failure this prevents.
     if (isPlainObject(collection.admin)) {
         for (const [key, migration] of Object.entries(ADMIN_BLOCK_MIGRATIONS)) {
             if (key in collection.admin) collect.migrated(`${at}.admin.${key}`, key, migration);
         }
+        checkAdminBlock(collection.admin, `${at}.admin`, ADMIN_COLLECTION_KEYS, "collection `admin`", collect);
     }
 
     if (isPlainObject(collection.properties)) {

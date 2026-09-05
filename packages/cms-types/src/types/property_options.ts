@@ -298,3 +298,18 @@ type AnyAdminPropertyOptionKey =
  * package, and this clause is what stops the data from drifting off the types.
  */
 export const ADMIN_PROPERTY_KEYS = CORE_ADMIN_PROPERTY_KEYS satisfies readonly AnyAdminPropertyOptionKey[];
+
+/**
+ * And the reverse direction: an option key these types declare that core's list
+ * does not name.
+ *
+ * The `satisfies` above only closes one side. This one matters since the boot
+ * validator started warning about unrecognised keys inside a property's `admin`
+ * block: an option missing from the list would make the server call a correct
+ * config a typo, and a check that cries wolf is a check people turn off.
+ */
+type _EveryAdminPropertyOptionIsListed =
+    AssertNeverPropertyKey<Exclude<AnyAdminPropertyOptionKey, typeof CORE_ADMIN_PROPERTY_KEYS[number]>>;
+
+/** Compiles only when `T` is `never`. */
+type AssertNeverPropertyKey<T extends never = never> = T;
