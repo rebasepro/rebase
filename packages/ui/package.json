@@ -54,6 +54,7 @@
     "build": "rm -rf dist || true && vite build && cp dist/src/index.css dist/src/theme.css dist/ && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
     "test:lint": "eslint \"src/**\" --quiet",
     "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
     "clean": "rm -rf dist && find ./src \\( -name '*.js' -o -name '*.d.ts' \\) -type f | xargs rm -f",
     "generateIcons": "bun --esm src/scripts/generateIcons.ts"
   },

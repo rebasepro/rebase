@@ -142,6 +142,59 @@ If you only want the fast half, `pnpm ci:static` on its own reads source and
 needs no build, no database and no browser. Every gate it runs is listed with
 what it protects in **[docs/gates.md](docs/gates.md)**.
 
+## Testing
+
+The root `pnpm test` runs every package's suite with `--workspace-concurrency=1`
+— serial on purpose, because several suites bind ports and open databases. It is
+about three and a half minutes.
+
+While working on one package, run that package:
+
+```bash
+pnpm --filter @rebasepro/server-postgres test
+pnpm --filter @rebasepro/server-postgres test:watch     # re-runs on save
+```
+
+Which runner you get depends on the package, and it changes how you name a
+single file:
+
+| Runner | Packages | One file |
+|---|---|---|
+| Vitest | `cli`, `mcp`, `rls-check` | `pnpm --filter @rebasepro/cli test src/utils/args` |
+| Jest | everything else | `pnpm --filter @rebasepro/ui test -- Button.test.tsx` |
+
+`packages/server-postgres` has both: `test` is Jest over `test/*`, and
+`test:e2e` is Vitest against the **built** `dist`, so build the package before
+running it.
+
+`@rebasepro/server` runs Jest under `NODE_OPTIONS="--experimental-vm-modules"`.
+Its `test` script sets that for you; a bare `npx jest` in that package fails on
+the first ESM import with `Cannot use import statement outside a module`.
+
+`packages/firebase` has tests and no runner — five of them, never executed. That
+is a recorded gap, not an oversight: `pnpm check:test-scripts` names it, and
+fixing it means adding a devDependency and a lockfile entry.
+
+### End-to-end
+
+The e2e suites are not part of `pnpm test`. They need three things first:
+
+```bash
+pnpm --filter './packages/*' -r run build   # they drive dist, not src
+pnpm exec playwright install chromium       # the npm package ships no browser
+docker compose -f app/backend/docker-compose.yml up -d db
+```
+
+The build is not optional for any of them: the CLI suite scaffolds a project
+that consumes every package as built output and refuses to start otherwise, and
+the Vitest suites import `dist` directly. Then:
+
+```bash
+pnpm e2e                                    # the Playwright admin-panel suite
+pnpm exec tsx tests/e2e/tests/cli-init-e2e.ts
+pnpm --filter @rebasepro/server-postgres test:e2e
+```
+
 ## Compatibility
 
 Rebase is `0.x`, so breaking changes to the authored TypeScript API are allowed
