@@ -28,11 +28,29 @@ export function createCronRoutes(scheduler: CronScheduler, skipped = 0): Hono<Ho
         // look identical from here. Say how many were dropped, as the
         // functions listing does, so the Studio panel and anyone with curl can
         // see it without boot-log access.
+        //
+        // Two ways to be dropped, counted together and reported apart. A file
+        // the loader could not read has only a count: the failure happened
+        // before there was a job to name. A schedule the scheduler refused has a
+        // name and a reason — most often "Expected 5 fields, got 6", from an
+        // expression copied out of a tool that supports seconds — and quoting it
+        // here turns a job that silently never fires into a one-line fix.
+        const rejected = scheduler.listRejectedJobs();
+        const total = skipped + rejected.length;
         return c.json({
             jobs,
-            ...(skipped > 0 && {
-                skipped,
-                note: `${skipped} cron file(s) failed to load and are NOT scheduled — see the server log for the reason.`
+            ...(total > 0 && {
+                skipped: total,
+                ...(rejected.length > 0 && { rejected }),
+                note: [
+                    skipped > 0 ? `${skipped} cron file(s) failed to load` : undefined,
+                    rejected.length > 0 ? `${rejected.length} job(s) have an invalid schedule` : undefined
+                ].filter(Boolean).join(" and ") +
+                    " — NOT scheduled. " +
+                    (rejected.length > 0
+                        ? "See `rejected` for the reason; "
+                        : "") +
+                    "the server log has the rest."
             })
         });
     });

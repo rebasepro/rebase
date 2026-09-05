@@ -14,6 +14,26 @@ import type { User } from "./users";
  * backend process. Keeping them in one type meant every backend module that
  * touched a callback signature transitively named the admin UI.
  *
+ * ### When the callback runs
+ *
+ * Server-side, **every** callback around a write — `beforeSave`, the SQL,
+ * `afterSave`; `beforeDelete`, the delete, `afterDelete` — runs inside the one
+ * transaction opened for that request, and each is awaited. There is no
+ * after-commit tier: `afterSave` and `afterDelete` run *before* the commit, so a
+ * throw in either rolls the write back and the caller is answered
+ * `400 CALLBACK_REJECTED` with `details.stage` naming the hook.
+ *
+ * Two consequences worth designing around:
+ *
+ * - A callback holds the transaction open while it runs. Slow work there is a
+ *   lock held and a pooled connection tied up. Anything that talks to a third
+ *   party belongs on the job queue, not in the body.
+ * - Work that must survive the write being undone does not belong here at all —
+ *   by construction it is not part of the write.
+ *
+ * A request-scoped `afterRead` is narrower still: its transaction is
+ * `READ ONLY`, so a write attempted from one fails with SQLSTATE `25006`.
+ *
  * @group Hooks and utilities
  */
 export type RebaseCallContext<USER extends User = User> = {

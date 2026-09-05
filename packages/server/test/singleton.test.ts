@@ -9,30 +9,30 @@ describe("rebase singleton", () => {
     });
 
     it("should throw when accessing properties before initialization", () => {
-        expect(() => rebase.data).toThrow(/server not initialized yet/);
+        expect(() => rebase.dataAsAdmin).toThrow(/server not initialized yet/);
     });
 
     it("should allow property access after initialization", () => {
         const mockData = { find: jest.fn() };
-        _setRebaseMock({ data: mockData } as Partial<RebaseClient>);
+        _setRebaseMock({ dataAsAdmin: mockData } as Partial<RebaseClient>);
 
-        expect(rebase.data).toBe(mockData);
+        expect(rebase.dataAsAdmin).toBe(mockData);
     });
 
     it("should throw on property assignment (set trap)", () => {
-        _setRebaseMock({ data: {} } as Partial<RebaseClient>);
+        _setRebaseMock({ dataAsAdmin: {} } as Partial<RebaseClient>);
 
         expect(() => {
-            (rebase as Record<string, unknown>).data = "overwritten";
-        }).toThrow(/Cannot set rebase\.data directly/);
+            (rebase as Record<string, unknown>).dataAsAdmin = "overwritten";
+        }).toThrow(/Cannot set rebase\.dataAsAdmin directly/);
     });
 
     it("should reset properly with _resetRebaseMock", () => {
-        _setRebaseMock({ data: {} } as Partial<RebaseClient>);
-        expect(() => rebase.data).not.toThrow();
+        _setRebaseMock({ dataAsAdmin: {} } as Partial<RebaseClient>);
+        expect(() => rebase.dataAsAdmin).not.toThrow();
 
         _resetRebaseMock();
-        expect(() => rebase.data).toThrow(/server not initialized yet/);
+        expect(() => rebase.dataAsAdmin).toThrow(/server not initialized yet/);
     });
 
     it("should throw if _setRebaseMock is called outside test env", () => {

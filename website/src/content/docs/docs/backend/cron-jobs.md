@@ -46,6 +46,10 @@ export default defineCron({
 });
 ```
 
+`rebase dev` watches the crons directory, so a job added while it is running is
+registered on the next reload — no restart. (It has to be told: the directory is
+scanned rather than imported, so the watcher cannot infer it.)
+
 :::note
 `defineCron` is an identity function — it returns the same object you pass in. A plain default-exported `CronJobDefinition` object works identically; `defineCron` simply provides compile-time type checking and editor autocomplete.
 :::
@@ -54,6 +58,11 @@ The **filename** (without extension) becomes the job's unique ID — e.g., `heal
 
 
 ## Configuration
+
+:::note[Where this goes]
+**Managed runtime:** nothing to configure — the runtime discovers `backend/crons/` on its own (`entry.crons` in `rebase.json` if you moved it). `REBASE_CRON_SCHEDULER` decides which process runs the scheduler.
+**Ejected:** `initializeRebaseBackend({ cronsDir })` in `backend/src/index.ts`.
+:::
 
 Enable cron jobs by adding `cronsDir` to your backend config:
 
@@ -71,7 +80,7 @@ That's it. Rebase will:
 2. Register each default export as a cron job
 3. Auto-create the `rebase.cron_logs` table in PostgreSQL (if the driver supports SQL)
 4. Start the scheduler and seed counters from existing DB logs
-5. Mount admin REST routes at `/api/cron`
+5. Mount admin REST routes at `/api/admin/cron`
 
 ## Schedule Syntax
 
@@ -142,6 +151,9 @@ interface CronJobContext {
     // Logger — captured lines appear in Studio and the logs API
     log: (...args: unknown[]) => void;
 
+    // Aborted when the run exceeds `timeoutSeconds`
+    signal: AbortSignal;
+
     // The server-side Rebase singleton — the same object `import { rebase }
     // from "@rebasepro/server"` returns, and the same one `defineFunction`
     // hands its callback.
@@ -150,6 +162,27 @@ interface CronJobContext {
 ```
 
 Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API.
+
+### `ctx.signal` — stop the work when the run stops
+
+The timeout ends the *run*: the scheduler stops waiting and records a failure.
+It does not end the handler. Pass `ctx.signal` to anything that takes one, and
+the work stops with it:
+
+```typescript no-verify
+export default defineCron({
+    name: "Sync inventory",
+    schedule: "*/15 * * * *",
+    timeoutSeconds: 60,
+    async handler({ signal, log }) {
+        const res = await fetch("https://supplier.example.com/stock", { signal });
+        log(`fetched ${res.status}`);
+    }
+});
+```
+
+Without it, a job whose timeout matches its interval leaks one abandoned request
+per tick — invisible, because every run is already recorded as failed.
 
 :::note[`ctx.client` was removed]
 It was a second name for `ctx.rebase`, and its type re-exposed `client.data` —
@@ -238,16 +271,16 @@ All cron routes require **admin authentication** (`requireAuth` + `requireAdmin`
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/cron` | List all registered cron jobs |
-| `GET` | `/api/cron/:id` | Get a single job's status |
-| `POST` | `/api/cron/:id/trigger` | Manually trigger a job |
-| `GET` | `/api/cron/:id/logs` | Get execution history (`?limit=N`) |
-| `PUT` | `/api/cron/:id` | Enable/disable a job (`{ "enabled": true }`) |
+| `GET` | `/api/admin/cron` | List all registered cron jobs |
+| `GET` | `/api/admin/cron/:id` | Get a single job's status |
+| `POST` | `/api/admin/cron/:id/trigger` | Manually trigger a job |
+| `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`) |
+| `PUT` | `/api/admin/cron/:id` | Enable/disable a job (`{ "enabled": true }`) |
 
 ### Example: List All Jobs
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/admin/cron
 ```
 
 ```json
@@ -269,11 +302,41 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
 }
 ```
 
+### Jobs that are not there
+
+A job that never fires is not in `jobs` — nothing registered it — so "my cron is
+missing" and "my cron will never run" look identical from this endpoint unless it
+says otherwise. It does:
+
+```json
+{
+    "jobs": [],
+    "skipped": 2,
+    "rejected": [
+        {
+            "id": "nightly-report",
+            "name": "Nightly report",
+            "schedule": "0 0 3 * * *",
+            "reason": "Expected 5 fields, got 6"
+        }
+    ],
+    "note": "1 cron file(s) failed to load and 1 job(s) have an invalid schedule — NOT scheduled. See `rejected` for the reason; the server log has the rest."
+}
+```
+
+`rejected` names the job and the reason. A file that failed to *load* has only a
+count: the failure happened before there was a job to name, so the reason is in
+the server log.
+
+The commonest entry here is the one above — six fields, from an expression
+copied out of a tool that supports seconds. Rebase takes five; drop the leading
+field.
+
 ### Example: Trigger a Job Manually
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3001/api/cron/health-check/trigger
+    http://localhost:3001/api/admin/cron/health-check/trigger
 ```
 
 ## Client SDK
@@ -369,23 +432,32 @@ A recovered run is a normal entry in `cron_logs` (`manual` is `false`), with a f
 ## Concurrency Guarding
 
 To ensure stability when executing resource-heavy operations, Rebase implements a strict **single-concurrency execution lock** per job ID:
-- **Scheduled Overlaps**: If a job's scheduled tick fires while the previous execution is still running, the scheduler skips the tick, logs a warning, and immediately schedules the next candidate run.
-- **Manual Trigger Collisions**: If an operator manually triggers a running job via Rebase Studio or the REST API, the request returns immediately with a skipped payload, protecting the active worker:
-  ```json
-  {
-    "jobId": "expire-users",
-    "success": true,
-    "result": { "skipped": true, "reason": "already_executing" },
-    "logs": ["Skipped: job is already running"]
-  }
-  ```
+- **Scheduled Overlaps**: If a job's scheduled tick fires while the previous execution is still running, the scheduler skips the tick and immediately schedules the next candidate run.
+- **Manual Trigger Collisions**: If an operator manually triggers a running job via Rebase Studio or the REST API, the request returns immediately with a skipped payload, protecting the active worker.
+
+Either way a row is written to `rebase.cron_logs`, so the skip is in the run
+history rather than only in the process log:
+
+```json
+{
+  "jobId": "expire-users",
+  "success": true,
+  "result": { "skipped": true, "reason": "already_executing" },
+  "logs": ["Skipped: the previous run has not finished"]
+}
+```
+
+`success: true` because nothing failed — `result.skipped` is what marks it. A
+run of these in a row is the signature of a job that has outgrown its schedule,
+and that is a pattern you can only see if the skips are recorded.
 
 ---
 
 ## Timeouts & Error Isolation
 
-- **Forced Timeout Race**: Execution blocks are wrapped in a `Promise.race` against a timeout timer derived from `timeoutSeconds` (default: `300` seconds / 5 minutes). If the handler hangs past this threshold, the promise is rejected, throwing:
+- **Forced Timeout Race**: Execution blocks are wrapped in a `Promise.race` against a timeout timer derived from `timeoutSeconds` (default: `300` seconds / 5 minutes). If the handler hangs past this threshold, `ctx.signal` is aborted and the promise is rejected, throwing:
   `Error: Cron job "<id>" timed out after <N>ms`
+  The abort is the half that stops the *work*; the rejection only stops the scheduler waiting. A handler that ignores `ctx.signal` keeps running past its own run.
 - **Fail-Safe Try/Catch**: Each job handler runs inside an isolated wrapper. Any uncaught exceptions are intercepted, formatting the error traceback into a string, setting the job status to `"error"`, and updating the `rebase.cron_logs` failure counters. A crash inside a single cron task will never crash the scheduler loop or the primary Hono HTTP web server.
 - **In-Memory Ring Buffer**: The scheduler maintains a ring buffer containing the last **50 runs** per job. This buffer is kept in memory to allow near-instant reads from the Rebase Studio UI.
 
@@ -431,13 +503,18 @@ const job: CronJobDefinition = {
     async handler(ctx) {
         ctx.log("Starting session cleanup...");
 
-        // Use the rebase singleton for admin-level database access
-        // const { data: expired } = await rebase.data.findMany("sessions", { ... });
-        const count = Math.floor(Math.random() * 50); // placeholder
+        // Admin-scoped data access — see `ctx.rebase` above.
+        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const expired = await ctx.rebase.dataAsAdmin.sessions.findAll({
+            where: { last_seen_at: ["<", cutoff] }
+        });
+        for (const session of expired) {
+            await ctx.rebase.dataAsAdmin.sessions.delete(session.id as string);
+        }
 
-        ctx.log(`Cleaned up ${count} expired sessions`);
+        ctx.log(`Cleaned up ${expired.length} expired sessions`);
 
-        return { deletedSessions: count };
+        return { deletedSessions: expired.length };
     },
 };
 

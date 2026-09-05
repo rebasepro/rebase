@@ -179,10 +179,38 @@ app: result as Hono });
     }
 
     if (problems.length > 0) {
+        // Advice keyed to what actually went wrong. The old line said
+        // "author them with `defineFunction(...)`" for every failure — which is
+        // the fix for a wrong export shape and no help at all for the commonest
+        // one: a file that threw while being imported, usually a module-scope
+        // `process.env.X` read that came back undefined. Told to reach for
+        // `defineFunction`, an author rewrites a file whose export was already
+        // correct and gets the same failure.
+        const advice: string[] = [];
+        if (problems.some(p => p.includes("(threw:"))) {
+            advice.push(
+                "  A file that threw ran at import time. Read configuration *inside* a handler " +
+                "(`requireEnv(c, \"STRIPE_KEY\")`, or a lazily-built client) rather than at module " +
+                "scope, where one undefined variable takes the whole file down before any route exists."
+            );
+        }
+        if (problems.some(p => p.includes("(no default export)"))) {
+            advice.push(
+                "  A file with no default export exports nothing the loader can mount. " +
+                "`export default defineFunction((app) => { … })`."
+            );
+        }
+        if (problems.some(p => p.includes("(not a Hono app or factory)"))) {
+            advice.push(
+                "  A default export the loader did not recognise is usually two copies of hono. " +
+                "Author with `defineFunction(...)` from @rebasepro/server/functions, which uses the " +
+                "server's own copy."
+            );
+        }
         logger.warn(
             `[functions] ${problems.length} function file(s) were skipped and will NOT be served:\n` +
             problems.map((p) => `  - ${p}`).join("\n") + "\n" +
-            "  Fix these or author them with `defineFunction(...)` for a typed, compile-checked contract."
+            advice.join("\n")
         );
     }
 

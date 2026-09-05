@@ -31,7 +31,7 @@ import {
     User
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
-import { buildPropertyCallbacks, buildSdkData, classifyTable, detectJunctionTables, resolveCollectionRelations, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
+import { buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, resolveCollectionRelations, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress } from "./services/collection-helpers";
 import { HistoryService } from "./history/HistoryService";
@@ -463,6 +463,13 @@ export class PostgresBackendDriver implements DataDriver {
             const contextForCallback = this.buildCallContext();
             return Promise.all(rows.map(async (row) => {
                 let fetched = row;
+                // `?? fetched` on every tier. An `afterRead` that mutates the row
+                // and returns nothing is a reasonable thing to write — the guide's
+                // own signature says the return is a transform, not a requirement
+                // — and on the tiers that lacked the fallback it replaced the row
+                // with `undefined`. The collection tier tolerated it, so the same
+                // callback worked or emptied the response depending on which
+                // block it was registered in.
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterRead) {
                     fetched = await globalCallbacks.afterRead({
@@ -470,7 +477,7 @@ export class PostgresBackendDriver implements DataDriver {
                         path,
                         row: fetched,
                         context: contextForCallback
-                    });
+                    }) ?? fetched;
                 }
                 // 2. Collection callbacks second
                 if (callbacks?.afterRead) {
@@ -488,7 +495,7 @@ export class PostgresBackendDriver implements DataDriver {
                         path,
                         row: fetched,
                         context: contextForCallback
-                    });
+                    }) ?? fetched;
                 }
                 return fetched;
             }));
@@ -582,6 +589,7 @@ export class PostgresBackendDriver implements DataDriver {
 
         if (row && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
             const contextForCallback = this.buildCallContext();
+            // `?? row` on every tier — see the note in `fetchCollection`.
             // 1. Global callbacks first
             if (globalCallbacks?.afterRead) {
                 row = await globalCallbacks.afterRead({
@@ -589,7 +597,7 @@ export class PostgresBackendDriver implements DataDriver {
                     path,
                     row,
                     context: contextForCallback
-                });
+                }) ?? row;
             }
             // 2. Collection callbacks second
             if (callbacks?.afterRead) {
@@ -607,7 +615,7 @@ export class PostgresBackendDriver implements DataDriver {
                     path,
                     row,
                     context: contextForCallback
-                });
+                }) ?? row;
             }
         }
 
@@ -774,6 +782,8 @@ export class PostgresBackendDriver implements DataDriver {
             );
 
             if (savedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
+                // `?? savedRow` on every tier — see the note in `fetchCollection`.
+                // Here it decided what the write's own response body contained.
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterRead) {
                     savedRow = await globalCallbacks.afterRead({
@@ -781,7 +791,7 @@ export class PostgresBackendDriver implements DataDriver {
                         path,
                         row: savedRow,
                         context: contextForCallback
-                    });
+                    }) ?? savedRow;
                 }
                 // 2. Collection callbacks second
                 if (callbacks?.afterRead) {
@@ -799,7 +809,7 @@ export class PostgresBackendDriver implements DataDriver {
                         path,
                         row: savedRow,
                         context: contextForCallback
-                    });
+                    }) ?? savedRow;
                 }
             }
 
@@ -817,43 +827,56 @@ export class PostgresBackendDriver implements DataDriver {
             // synthesized address rather than the column it now is.
             const savedValues = savedRow;
 
-            if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
-                // 1. Global callbacks first
-                if (globalCallbacks?.afterSave) {
-                    await globalCallbacks.afterSave({
-                        collection: resolvedCollection as unknown as CollectionConfig,
-                        path,
-                        id: savedId,
-                        values: savedValues,
-                        previousValues: previousValuesForHistory,
-                        status,
-                        context: contextForCallback
-                    });
+            // `afterSave` runs INSIDE the write's transaction and is awaited, so a
+            // throw here rolls the row back — the write and its consequences
+            // commit together or not at all. That is the contract the docs state,
+            // and it only holds if the throw is answerable: routed through the
+            // same `toCallbackError` path a `before*` hook uses, it becomes a 400
+            // `CALLBACK_REJECTED` naming the stage instead of a masked 500 whose
+            // message only the server log ever sees. Side effects that must not
+            // hold a transaction open (HTTP calls, mail) belong in a job — one
+            // enqueued in a transaction that rolls back was never enqueued.
+            try {
+                if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
+                    // 1. Global callbacks first
+                    if (globalCallbacks?.afterSave) {
+                        await globalCallbacks.afterSave({
+                            collection: resolvedCollection as unknown as CollectionConfig,
+                            path,
+                            id: savedId,
+                            values: savedValues,
+                            previousValues: previousValuesForHistory,
+                            status,
+                            context: contextForCallback
+                        });
+                    }
+                    // 2. Collection callbacks second
+                    if (callbacks?.afterSave) {
+                        await callbacks.afterSave({
+                            collection: resolvedCollection as CollectionConfig<M>,
+                            path,
+                            id: savedId,
+                            values: savedValues as Partial<M>,
+                            previousValues: previousValuesForHistory,
+                            status,
+                            context: contextForCallback
+                        });
+                    }
+                    // 3. Property callbacks third
+                    if (propertyCallbacks?.afterSave) {
+                        await propertyCallbacks.afterSave({
+                            collection: resolvedCollection as unknown as CollectionConfig,
+                            path,
+                            id: savedId,
+                            values: savedValues,
+                            previousValues: previousValuesForHistory,
+                            status,
+                            context: contextForCallback
+                        });
+                    }
                 }
-                // 2. Collection callbacks second
-                if (callbacks?.afterSave) {
-                    await callbacks.afterSave({
-                        collection: resolvedCollection as CollectionConfig<M>,
-                        path,
-                        id: savedId,
-                        values: savedValues as Partial<M>,
-                        previousValues: previousValuesForHistory,
-                        status,
-                        context: contextForCallback
-                    });
-                }
-                // 3. Property callbacks third
-                if (propertyCallbacks?.afterSave) {
-                    await propertyCallbacks.afterSave({
-                        collection: resolvedCollection as unknown as CollectionConfig,
-                        path,
-                        id: savedId,
-                        values: savedValues,
-                        previousValues: previousValuesForHistory,
-                        status,
-                        context: contextForCallback
-                    });
-                }
+            } catch (callbackError) {
+                throw toCallbackError(callbackError, "afterSave", path);
             }
 
             // Record row history (fire-and-forget, never blocks the save)
@@ -888,40 +911,41 @@ export class PostgresBackendDriver implements DataDriver {
             return savedRow;
         } catch (error) {
             if (globalCallbacks?.afterSaveError || callbacks?.afterSaveError || propertyCallbacks?.afterSaveError) {
+                // What the hook exists to see. It was documented from the start
+                // and never passed, so `props.error` was `undefined` in every
+                // handler ever written against the guide. `id` is the caller's
+                // when there is one — `"unknown"` was a string standing where a
+                // real key belonged — and `previousValues` is whatever the
+                // pre-write read managed to fetch, rather than a hardcoded
+                // `undefined` that hid an update's before-state.
+                const errorProps = {
+                    path,
+                    id,
+                    values: updatedValues,
+                    previousValues: previousValuesForHistory,
+                    status,
+                    error,
+                    context: contextForCallback
+                };
                 // 1. Global callbacks first
                 if (globalCallbacks?.afterSaveError) {
                     await globalCallbacks.afterSaveError({
                         collection: resolvedCollection as unknown as CollectionConfig,
-                        path,
-                        id: id || "unknown",
-                        values: updatedValues,
-                        previousValues: undefined,
-                        status,
-                        context: contextForCallback
+                        ...errorProps
                     });
                 }
                 // 2. Collection callbacks second
                 if (callbacks?.afterSaveError) {
                     await callbacks.afterSaveError({
                         collection: resolvedCollection as CollectionConfig<M>,
-                        path,
-                        id: id || "unknown",
-                        values: updatedValues,
-                        previousValues: undefined,
-                        status,
-                        context: contextForCallback
+                        ...errorProps
                     });
                 }
                 // 3. Property callbacks third
                 if (propertyCallbacks?.afterSaveError) {
                     await propertyCallbacks.afterSaveError({
                         collection: resolvedCollection as unknown as CollectionConfig,
-                        path,
-                        id: id || "unknown",
-                        values: updatedValues,
-                        previousValues: undefined,
-                        status,
-                        context: contextForCallback
+                        ...errorProps
                     });
                 }
             }
@@ -1205,7 +1229,12 @@ export class PostgresBackendDriver implements DataDriver {
                     }
                 }
                 if (preventDefault) {
-                    return;
+                    // A veto, not a silent no-op. Returning early left the route
+                    // answering `204 No Content` — "the row is gone" — for a row
+                    // that is still there, so the panel dropped it from the list
+                    // and the next reload brought it back. Same code a throw
+                    // produces, so one branch handles both.
+                    throw callbackRefusal("beforeDelete", targetPath);
                 }
             }
         } catch (callbackError) {
@@ -1218,37 +1247,44 @@ export class PostgresBackendDriver implements DataDriver {
             resolvedCollection?.databaseId
         );
 
-        if (globalCallbacks?.afterDelete || callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
-            // 1. Global callbacks first
-            if (globalCallbacks?.afterDelete) {
-                await globalCallbacks.afterDelete({
-                    collection: resolvedCollection as unknown as CollectionConfig,
-                    path: targetPath,
-                    id: row.id,
-                    row: targetRow,
-                    context: contextForCallback
-                });
+        // Same contract as `afterSave`: inside the transaction, awaited, and a
+        // throw undoes the delete rather than leaving the row gone and the
+        // cleanup half-done. See the comment on the `afterSave` block.
+        try {
+            if (globalCallbacks?.afterDelete || callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
+                // 1. Global callbacks first
+                if (globalCallbacks?.afterDelete) {
+                    await globalCallbacks.afterDelete({
+                        collection: resolvedCollection as unknown as CollectionConfig,
+                        path: targetPath,
+                        id: row.id,
+                        row: targetRow,
+                        context: contextForCallback
+                    });
+                }
+                // 2. Collection callbacks second
+                if (callbacks?.afterDelete) {
+                    await callbacks.afterDelete({
+                        collection: resolvedCollection as CollectionConfig<M>,
+                        path: targetPath,
+                        id: row.id,
+                        row: targetRow,
+                        context: contextForCallback
+                    });
+                }
+                // 3. Property callbacks third
+                if (propertyCallbacks?.afterDelete) {
+                    await propertyCallbacks.afterDelete({
+                        collection: resolvedCollection as unknown as CollectionConfig,
+                        path: targetPath,
+                        id: row.id,
+                        row: targetRow,
+                        context: contextForCallback
+                    });
+                }
             }
-            // 2. Collection callbacks second
-            if (callbacks?.afterDelete) {
-                await callbacks.afterDelete({
-                    collection: resolvedCollection as CollectionConfig<M>,
-                    path: targetPath,
-                    id: row.id,
-                    row: targetRow,
-                    context: contextForCallback
-                });
-            }
-            // 3. Property callbacks third
-            if (propertyCallbacks?.afterDelete) {
-                await propertyCallbacks.afterDelete({
-                    collection: resolvedCollection as unknown as CollectionConfig,
-                    path: targetPath,
-                    id: row.id,
-                    row: targetRow,
-                    context: contextForCallback
-                });
-            }
+        } catch (callbackError) {
+            throw toCallbackError(callbackError, "afterDelete", targetPath);
         }
 
         // Record delete history (fire-and-forget)

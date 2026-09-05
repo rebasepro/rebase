@@ -9,7 +9,7 @@ description: Appliquez des callbacks de cycle de vie transversaux à chaque coll
 Rebase fournit deux niveaux de callbacks du cycle de vie des entités — tous deux utilisent le même type `CollectionCallbacks` de `@rebasepro/types` :
 
 - **[Callbacks par collection](/docs/collections/callbacks)** : Définis sur les configurations de collections individuelles. Ils ne s'exécutent que pour cette collection.
-- **Callbacks globaux** : Définis sur `initializeRebaseBackend({ callbacks })`. Ils se déclenchent sur **chaque** collection, sur chaque chemin de données (API REST, WebSocket / temps réel, `rebase.data` côté serveur).
+- **Callbacks globaux** : Définis sur `initializeRebaseBackend({ callbacks })`. Ils se déclenchent sur **chaque** collection, sur chaque chemin de données (API REST, WebSocket / temps réel, `rebase.dataAsAdmin` côté serveur).
 
 Utilisez les callbacks globaux pour :
 - **Masquage des PII** — masquer les champs sensibles pour les appelants non administrateurs sur toutes les collections.

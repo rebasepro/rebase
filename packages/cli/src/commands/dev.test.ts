@@ -16,7 +16,54 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, getProjectPort, resolveStartPort } from "./dev";
+import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, devWatchIncludes, getProjectPort, resolveStartPort } from "./dev";
+
+/**
+ * `rebase dev` must notice a function or cron that did not exist when it
+ * started.
+ *
+ * tsx restarts on changes to what the entrypoint imports, and the runtime does
+ * not import these — it scans their directories at boot. So a brand-new
+ * `backend/functions/new.ts` was invisible until somebody restarted by hand,
+ * which is the opposite of what a watch mode is for. The `config/` case is
+ * older and worse: the flag meant to watch it, `--watch=<glob>`, is not a tsx
+ * flag at all, so tsx dropped it and the directory was never watched.
+ */
+describe("devWatchIncludes", () => {
+    const paths = {
+        REBASE_DEV_FUNCTIONS: "backend/functions",
+        REBASE_DEV_CRONS: "backend/crons"
+    };
+
+    it("watches the functions and crons directories, absolute", () => {
+        expect(devWatchIncludes("/srv/app", paths, false)).toEqual([
+            path.join("/srv/app", "backend", "functions"),
+            path.join("/srv/app", "backend", "crons")
+        ]);
+    });
+
+    it("adds config/ only when auto-generation is off", () => {
+        expect(devWatchIncludes("/srv/app", paths, true))
+            .toContain(path.join("/srv/app", "config"));
+        expect(devWatchIncludes("/srv/app", paths, false))
+            .not.toContain(path.join("/srv/app", "config"));
+    });
+
+    it("honours a manifest that moved the directories", () => {
+        expect(devWatchIncludes("/srv/app", {
+            REBASE_DEV_FUNCTIONS: "services/api/handlers",
+            REBASE_DEV_CRONS: "services/api/schedules"
+        }, false)).toEqual([
+            path.join("/srv/app", "services", "api", "handlers"),
+            path.join("/srv/app", "services", "api", "schedules")
+        ]);
+    });
+
+    it("drops an entry the manifest did not resolve", () => {
+        expect(devWatchIncludes("/srv/app", { REBASE_DEV_FUNCTIONS: "backend/functions" }, false))
+            .toEqual([path.join("/srv/app", "backend", "functions")]);
+    });
+});
 
 describe("getProjectPort", () => {
     it("returns a port in the range 3001–3999", () => {

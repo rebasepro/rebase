@@ -180,11 +180,10 @@ const views: AppView[] = [
         slug: "settings",
         name: "App Settings",
         view: <AppSettings />,
-        nestedRoutes: true  // Support sub-paths,
+        nestedRoutes: true,   // Support sub-paths
         admin: {
-            icon: "dashboard",
-            group: "Analytics",
-            icon: "settings"
+            icon: "settings",
+            group: "Analytics"
         }
     }
 ];

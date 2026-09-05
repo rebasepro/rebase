@@ -18,6 +18,12 @@ Rebase includes a complete backend authentication system:
 
 ## Configuration
 
+:::note[Where this goes]
+**Managed runtime:** environment — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` and the provider `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs. The users collection is whichever one the bundle names (`collections/users` by convention).
+**No managed route:** `auth.hooks`. They are functions; eject to pass them.
+**Ejected:** `initializeRebaseBackend({ auth })` in `backend/src/index.ts`.
+:::
+
 The `auth` block in `initializeRebaseBackend` controls all backend authentication:
 
 ```typescript no-verify
@@ -573,10 +579,10 @@ await initializeRebaseBackend({
 Then, from the client:
 
 ```typescript
-const profile = await rebase.auth.findUserByEmail("teammate@example.com");
+const profile = await client.auth.findUserByEmail("teammate@example.com");
 // → { uid, displayName, photoURL } | null   (never email/roles/metadata)
 if (profile) {
-    await rebase.data.team_members.create({ team_id, user_id: profile.uid });
+    await client.data.team_members.create({ team_id, user_id: profile.uid });
 }
 ```
 

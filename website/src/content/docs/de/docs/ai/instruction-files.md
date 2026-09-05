@@ -70,7 +70,7 @@ Sitzung zu wiederholen:
 2. **Migrationen bestehen aus zwei Schritten.** `rebase schema generate`, dann
    `rebase db push` in der Entwicklung oder `rebase db generate && rebase db migrate`
    für die Produktion.
-3. **Nutzen Sie das SDK.** Gehen Sie über `rebase.data.<slug>`; natives SQL und
+3. **Nutzen Sie das SDK.** Gehen Sie über `client.data.<slug>` (browser) / `rebase.dataAsAdmin.<slug>` (server); natives SQL und
    direkte Drizzle-Aufrufe umgehen Validierung, Callbacks und RLS.
 4. **Schützen Sie jede benutzerdefinierte Route.** Routen in `backend/functions/`
    werden *ohne* Authentifizierung eingebunden. Verwenden Sie `requireAuth` /

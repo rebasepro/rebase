@@ -93,6 +93,31 @@ export interface CronJobContext {
     log: (...args: unknown[]) => void;
 
     /**
+     * Aborted when the run exceeds `timeoutSeconds`.
+     *
+     * The timeout has always stopped the scheduler *waiting* — it loses the
+     * race and the run is recorded as failed. It has never stopped the handler:
+     * a `fetch` to an unresponsive host kept its socket, and a job on a
+     * five-minute schedule with a five-minute timeout accumulated one abandoned
+     * request per tick until the process ran out of sockets, all of it invisible
+     * because the run was already marked failed.
+     *
+     * Pass it to anything that takes one, and the work stops when the run does:
+     *
+     * @example
+     * export default defineCron({
+     *     name: "Sync inventory",
+     *     schedule: "*\/15 * * * *",
+     *     timeoutSeconds: 60,
+     *     async handler({ signal, log }) {
+     *         const res = await fetch("https://supplier.example.com/stock", { signal });
+     *         log(`fetched ${res.status}`);
+     *     }
+     * });
+     */
+    signal: AbortSignal;
+
+    /**
      * The server-side Rebase singleton — the **same object** `import { rebase }
      * from "@rebasepro/server"` returns, and the same one `defineFunction`
      * hands its callback. Spelled the same way here so that one thing has one

@@ -448,6 +448,8 @@ export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<Bun
 
     const callbacks = mod.callbacks;
 
+    warnOnUnreadConfigExports(mod, indexPath);
+
     return {
         dataSources: readArray<DataSourceDefinition>("dataSources"),
         storageSources: readArray<StorageSourceDefinition>("storageSources"),
@@ -456,6 +458,67 @@ export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<Bun
             ? callbacks as CollectionCallbacks
             : undefined
     };
+}
+
+/** Everything the managed runtime reads out of `config/index.ts`. */
+const READ_CONFIG_EXPORTS = new Set([
+    "dataSources",
+    "storageSources",
+    "storageAuthorize",
+    "callbacks",
+    // Not read here, but a legitimate export of this module: the admin build and
+    // the collections loader take it from the directory beside it.
+    "collections",
+    // Module machinery.
+    "default",
+    "__esModule"
+]);
+
+/**
+ * `initializeRebaseBackend` options that a managed bundle cannot supply.
+ *
+ * Every one of them is a function or a live handler — something no environment
+ * variable can express — so on the managed runtime there is no route for them at
+ * all. Exporting one from `config/index.ts` looks like it should work, does
+ * nothing, and says nothing. Each maps to the honest alternative.
+ */
+const NO_MANAGED_ROUTE: Record<string, string> = {
+    jobs: "no managed route — enqueue from a custom function, or eject and pass `jobs` to initializeRebaseBackend",
+    storagePolicies: "no managed route — express the rule in `storageAuthorize`, which IS read from here",
+    storageTriggers: "no managed route — react to the upload in a custom function, or eject",
+    rateLimit: "no managed route — put the limit in front of the deployment, or eject",
+    webhooks: "no managed route — send from a job or a custom function, or eject",
+    auth: "no managed route for `auth.hooks` — the rest of `auth` comes from environment variables; eject to pass hooks"
+};
+
+/**
+ * Say so when the config package exports something nothing will read.
+ *
+ * A managed deployment configures the runtime through environment variables and
+ * this one module. An export it does not recognise is not an error — the module
+ * is the project's, and may hold helpers, types, anything — but the six names
+ * below are `initializeRebaseBackend` options, and someone exporting one of
+ * those has been told by a docs page to pass it *somewhere*. They put it in the
+ * only file the runtime reads, it was dropped in silence, and the feature simply
+ * did not happen.
+ *
+ * Warn, never throw: a project is free to export whatever it likes from its own
+ * config module, and a boot that refuses over an unrecognised name would break
+ * every project that keeps a shared constant there.
+ */
+function warnOnUnreadConfigExports(mod: Record<string, unknown>, indexPath: string): void {
+    const unread = Object.keys(mod).filter(name => !READ_CONFIG_EXPORTS.has(name));
+    const known = unread.filter(name => name in NO_MANAGED_ROUTE);
+    if (known.length === 0) return;
+
+    logger.warn(
+        `⚠️ ${indexPath} exports ${known.map(name => `\`${name}\``).join(", ")}, and the managed ` +
+        "runtime does not read " + (known.length === 1 ? "it" : "them") + ".\n" +
+        known.map(name => `  • ${name}: ${NO_MANAGED_ROUTE[name]}`).join("\n") + "\n" +
+        "  The runtime reads only: " +
+        ["dataSources", "storageSources", "storageAuthorize", "callbacks"].map(n => `\`${n}\``).join(", ") +
+        ". Everything else is configured with environment variables, or by ejecting."
+    );
 }
 
 /**

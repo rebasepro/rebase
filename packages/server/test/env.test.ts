@@ -160,3 +160,59 @@ describe("env configuration and localhost validation", () => {
         expect(() => loadEnv(extension)).toThrow(/localhost/);
     });
 });
+
+/**
+ * A second copy of zod is the difference between a deploy that works and one
+ * that comes up, reports success, and runs zero crons.
+ *
+ * A managed bundle that installed its own zod ran with two copies loaded: the
+ * runtime's, which `loadEnv` uses, and the project's, which built the schema
+ * passed to `extend`. `.merge()` accepts it — the shapes are structurally
+ * identical — and then `.parse()` rejects every field carrying a `.default()`,
+ * because a default is recognised by class identity. Nothing in that failure
+ * mentioned zod, and it took the whole cron scheduler with it.
+ */
+describe("loadEnv({ extend }) and zod identity", () => {
+    const originalEnv = { ...process.env };
+
+    beforeEach(() => {
+        process.env = {};
+        process.env.DATABASE_URL = "postgresql://localhost:5432/rebase";
+        process.env.JWT_SECRET = "super-secret-jwt-key-must-be-long-long-long";
+    });
+
+    afterEach(() => {
+        process.env = { ...originalEnv };
+    });
+
+    /**
+     * A schema from a genuinely different zod implementation.
+     *
+     * `zod/v3` is a separate set of classes shipped inside the same package, so
+     * `instanceof` against the runtime's `ZodType` is false while `_def` is
+     * present and populated — exactly the shape a second *installed* copy
+     * produces, without this test depending on one being installed.
+     */
+    function foreignZodSchema(): unknown {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const foreign = require("zod/v3") as { z: { object: (shape: unknown) => unknown; string: () => { default: (v: string) => unknown } } };
+        return foreign.z.object({ STRIPE_KEY: foreign.z.string().default("sk_test") });
+    }
+
+    it("fails loudly, naming zod, rather than dropping every default", () => {
+        const extend = foreignZodSchema() as never;
+
+        expect(() => loadEnv({ extend })).toThrow(/different copy of zod/);
+        expect(() => loadEnv({ extend })).toThrow(/dedupe|dependencies/);
+    });
+
+    it("tells a caller who passed something that is not a schema at all", () => {
+        expect(() => loadEnv({ extend: { STRIPE_KEY: "string" } as never }))
+            .toThrow(/expects a zod object schema/);
+    });
+
+    it("still accepts a schema built by the runtime's own zod", () => {
+        expect(() => loadEnv({ extend: z.object({ STRIPE_KEY: z.string().default("sk_test") }) }))
+            .not.toThrow();
+    });
+});

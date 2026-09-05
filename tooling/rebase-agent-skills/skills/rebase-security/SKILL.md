@@ -205,7 +205,7 @@ This layer runs on every REST request. If the API key lacks the required permiss
 
 ## Layer 3: Global callbacks (every data path)
 
-Global callbacks are the **primary mechanism for backend-level security** when you cannot or do not want to use database-level RLS. They apply to **every** collection — a single cross-cutting point — and, unlike an API-boundary interceptor, they fire on *every* data path: REST, WebSocket/realtime, and server-side `rebase.data`. There is no read path that bypasses `afterRead`, which is what makes it safe to rely on for redaction.
+Global callbacks are the **primary mechanism for backend-level security** when you cannot or do not want to use database-level RLS. They apply to **every** collection — a single cross-cutting point — and, unlike an API-boundary interceptor, they fire on *every* data path: REST, WebSocket/realtime, and server-side `rebase.dataAsAdmin`. There is no read path that bypasses `afterRead`, which is what makes it safe to rely on for redaction.
 
 ### Configuration
 

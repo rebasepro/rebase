@@ -118,6 +118,39 @@ function devRuntimeEnv(projectRoot: string): Record<string, string> {
     return result;
 }
 
+/**
+ * Directories `tsx watch` must be told about explicitly, as absolute paths.
+ *
+ * tsx restarts on a change to anything the entrypoint *imports*. Functions and
+ * crons are not imported: the runtime scans their directories at boot. So
+ * adding `backend/functions/new.ts` while `rebase dev` ran did nothing —
+ * `GET /api/functions/new` stayed 404, and a new cron never registered — until
+ * somebody restarted by hand. The same is true of `config/`, which is read as
+ * data.
+ *
+ * `--include` is tsx's own answer to this, it takes a directory rather than a
+ * glob, and it tolerates a directory that does not exist yet: a `crons/`
+ * created mid-session starts being watched when it appears.
+ *
+ * @param projectRoot   Absolute path the relative entries are resolved against.
+ * @param paths         The `REBASE_DEV_*` map from {@link devRuntimeEnv}.
+ * @param includeConfig Whether `config/` is watched here. It is only when
+ *                      auto-generation is off; with `--generate` a dedicated
+ *                      watcher already regenerates the schema and SDK, and tsx
+ *                      restarts on the files that produces.
+ */
+export function devWatchIncludes(
+    projectRoot: string,
+    paths: { REBASE_DEV_FUNCTIONS?: string; REBASE_DEV_CRONS?: string },
+    includeConfig: boolean
+): string[] {
+    const dirs = [paths.REBASE_DEV_FUNCTIONS, paths.REBASE_DEV_CRONS]
+        .filter((entry): entry is string => Boolean(entry))
+        .map(entry => path.resolve(projectRoot, entry));
+    if (includeConfig) dirs.push(path.join(projectRoot, "config"));
+    return dirs;
+}
+
 /** Well-known filename the backend writes its actual port to. */
 export const DEV_PORT_FILENAME = ".rebase-dev-port";
 
@@ -762,16 +795,20 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         const usesStockRuntime = !fs.existsSync(ejectedEntry);
         const entryTarget = usesStockRuntime ? resolveDevRuntimeEntry() : "src/index.ts";
 
+        // Computed even for an ejected backend: the paths are where the *project*
+        // keeps its functions and crons, which is what dev has to watch, and an
+        // ejected entrypoint reads the same directories.
+        const runtimePaths = devRuntimeEnv(projectRoot);
         if (usesStockRuntime) {
-            Object.assign(env, devRuntimeEnv(projectRoot));
+            Object.assign(env, runtimePaths);
         }
 
         const watchArgs = ["watch", "--conditions", "development", quoteForShell(entryTarget)];
-        if (!shouldGenerate) {
-            // When auto-generation is disabled, watch the config/collections dir directly so the dev server
-            // still reloads automatically when files there are edited/updated manually.
-            watchArgs.splice(1, 0, `--watch="${path.join("..", "config", "**", "*")}"`);
+        for (const dir of devWatchIncludes(projectRoot, runtimePaths, !shouldGenerate)) {
+            watchArgs.splice(1, 0, "--include", quoteForShell(dir));
+        }
 
+        if (!shouldGenerate) {
             // Watch collections folder and warn about potential schema drift
             const collectionsDir = path.join(projectRoot, "config", "collections");
             if (fs.existsSync(collectionsDir)) {

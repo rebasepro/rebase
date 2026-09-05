@@ -448,7 +448,7 @@ export default defineFunction((app, { rebase }) => {
         const { email, reportData } = await c.req.json();
 
         // `rebase.email` always exists server-side — when SMTP is not
-        // configured it is a no-op sender, so ask whether it can actually send.
+        // configured its `send()` throws, so ask whether it can actually send.
         if (!rebase.email.isConfigured()) {
             return c.json({ error: "Email not configured" }, 503);
         }
@@ -501,9 +501,9 @@ export default defineCron({
 import { rebase } from "@rebasepro/server";
 
 // `rebase.email` is ALWAYS present server-side — `RebaseServerClient` declares
-// it non-optional, and a no-op sender is wired when SMTP is not configured. So
-// `if (!rebase.email)` is dead code; the question worth asking is whether it can
-// send.
+// it non-optional, and when SMTP is not configured a stand-in is wired whose
+// `send()` throws a message naming what to set. So `if (!rebase.email)` is dead
+// code; the question worth asking is whether it can send.
 if (!rebase.email.isConfigured()) {
     console.log("Email service exists but has no SMTP or sendEmail function");
 }

@@ -93,7 +93,7 @@ export function getCollectionByPath(collectionPath: string, registry: PostgresCo
  * thing against the *config* and is skipped on four paths — `strictWrites:
  * false`, a collection declaring no properties, an auth adapter that owns the
  * body's shape, and a nested route whose target cannot be walked — and it never
- * sees an in-process `rebase.data` write at all.
+ * sees an in-process `rebase.dataAsAdmin` write at all.
  *
  * It also gives `strictWrites: false` a truthful implementation. The flag is
  * documented for "a column that really does exist which the config never

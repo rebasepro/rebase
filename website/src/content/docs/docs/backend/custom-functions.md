@@ -24,11 +24,60 @@ Create a file in your `backend/functions/` directory that default-exports a Hono
 import { defineFunction } from "@rebasepro/server/functions";
 
 export default defineFunction((app) => {
-    app.get("/", (c) => c.json({ message: "Hello from custom function!" }));
+    app.post("/", async (c) => {
+        const { name } = await c.req.json<{ name?: string }>().catch(() => ({ name: undefined }));
+        return c.json({ message: `Hello, ${name ?? "world"}!` });
+    });
 });
 ```
 
 This mounts at **`/api/functions/hello`**. The filename (without extension) becomes the route prefix.
+
+`POST`, because that is what the SDK sends by default — see
+[Invoke from the client](#invoke-from-the-client). A `GET` route is just as
+valid; the caller then has to say `{ method: "GET" }`.
+
+`rebase dev` watches the functions directory, so a file added while it is
+running is mounted on the next reload — no restart. (It has to be told: the
+directory is scanned rather than imported, so the watcher cannot infer it.)
+
+## Invoke from the client
+
+```typescript
+import { createRebaseClient } from "@rebasepro/client";
+
+const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
+
+const { message } = await client.functions.invoke<{ message: string }>(
+    "hello",                 // the filename, without extension — one path segment
+    { name: "Ada" }          // JSON body; omitted for a GET
+);
+```
+
+`invoke` builds the URL, attaches the caller's token, and throws a
+`RebaseApiError` on a non-2xx — so the function's own error shape reaches the
+caller instead of a bare `fetch` rejection.
+
+Three things it takes beyond the name:
+
+```typescript
+// A different method. The payload is dropped for GET, since GET has no body.
+await client.functions.invoke("hello", undefined, { method: "GET" });
+
+// A sub-path — `/api/functions/hello/stats`. It goes here, never in the name:
+// a name containing "/" is refused rather than percent-encoded into a 404.
+await client.functions.invoke("hello", undefined, { method: "GET", path: "stats" });
+
+// A query string. Passed as `path`, with no separator inserted before `?`.
+await client.functions.invoke("reports", undefined, { method: "GET", path: "?days=30" });
+```
+
+:::note
+`client.call("functions/hello", …)` also reaches a function, and does something
+subtly different: it unwraps `res.data` when the response has one. Two ways in
+with two response contracts is a trap — use `functions.invoke`. `call` exists
+for routes mounted outside `/api/functions`, which `invoke` cannot express.
+:::
 
 :::important
 Import from **`@rebasepro/server/functions`**, not from `@rebasepro/server`.
@@ -39,6 +88,11 @@ See [Runtime portability](#runtime-portability) for the full contract.
 :::
 
 ## Configuration
+
+:::note[Where this goes]
+**Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`entry.functions` in `rebase.json` if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
+**Ejected:** `initializeRebaseBackend({ functionsDir })` in `backend/src/index.ts`.
+:::
 
 Enable custom functions by adding `functionsDir` to your backend config:
 

@@ -796,7 +796,7 @@ export function wrapAsSdkData(entityData: RebaseData): RebaseSdkData {
  * Build a flat {@link RebaseSdkData} from a `DataDriver`.
  *
  * This is the developer-facing SDK data layer used by backend framework
- * callbacks & scripts (`context.data` / `rebase.data`). It returns flat rows —
+ * callbacks & scripts (`context.data` / `rebase.dataAsAdmin`). It returns flat rows —
  * identical in shape to the frontend SDK client, down to how a relation is
  * served: a foreign key stays a foreign key, and a relation named in `include`
  * arrives as the target's own columns. The `{ __type: "relation" }` envelope is

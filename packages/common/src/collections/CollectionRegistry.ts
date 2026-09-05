@@ -36,7 +36,7 @@ export class CollectionRegistry {
 
     /**
      * Global lifecycle callbacks applied to every collection.
-     * Runs on all data paths (REST, WebSocket, `rebase.data`).
+     * Runs on all data paths (REST, WebSocket, `rebase.dataAsAdmin`).
      * Execution order: global → collection → property callbacks.
      */
     private _globalCallbacks?: CollectionCallbacks;

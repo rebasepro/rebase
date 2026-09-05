@@ -18,6 +18,17 @@ The Rebase backend is a **Node.js server** built on [Hono](https://hono.dev/) th
 
 Everything is initialized with a single function:
 
+:::note[Where this goes]
+The call below is what an **ejected** backend has, in `backend/src/index.ts`. On
+the **managed runtime** there is no such file: the runtime makes the call, and
+you configure it through environment variables and the four exports it reads
+from `config/index.ts` (`dataSources`, `storageSources`, `storageAuthorize`,
+`callbacks`). Every page in this section says which of the two applies to the
+option it documents, and names the ones that have no managed form. Export an
+option the runtime does not read and it warns you at boot rather than dropping
+it in silence.
+:::
+
 ```typescript
 import { initializeRebaseBackend } from "@rebasepro/server";
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
@@ -141,12 +152,39 @@ interface RebaseBackendConfig {
     functionsDir?: string;    // Auto-load Hono routes from a directory
 
     // Scheduled tasks
-    cronsDir?: string;        // Auto-load cron jobs from a directory
+    cronsDir?: string;         // Auto-load cron jobs from a directory
+    cronPersistence?: boolean; // Write run logs to rebase.cron_logs (default: true)
+
+    // HTTP behaviour
+    compression?: boolean;     // gzip/deflate for API responses (default: true)
+    maxBodySize?: number;      // Request-body ceiling in bytes (default: 10MB; 0 disables)
+    csrf?: { origin: string | string[] | ((origin: string) => boolean) };
+
+    // Schema editing
+    schemaEditor?: boolean;   // Force the schema-editor routes on or off
 
     // Logging
     logging?: { level?: "error" | "warn" | "info" | "debug" };
 }
 ```
+
+Five of those are easy to miss and change behaviour you can otherwise only
+observe:
+
+| Key | Default | What it does |
+|---|---|---|
+| `compression` | `true` | gzip/deflate on API responses, negotiated from `Accept-Encoding`. Already-compressed, streamed and `no-transform` bodies are left alone, so it is safe to leave on — a large JSON list typically drops by ~20x. Set `false` when nginx, Cloudflare or another proxy in front already compresses, to avoid paying twice. Environment: `REBASE_COMPRESSION`. |
+| `maxBodySize` | `10485760` (10MB) | Ceiling for request bodies on API routes; `0` disables it. Storage uploads use the storage config's own `maxFileSize` (50MB), which wins for those routes. Environment: `REBASE_MAX_BODY_SIZE`. |
+| `csrf` | off | **Opt-in.** A BaaS API is called by mobile apps, SPAs on other domains and CLI tools, none of which send an `Origin` a fixed list would accept — so this is not on by default. Turn it on with the origins your browser clients use. No environment form: eject to set it. |
+| `cronPersistence` | `true` | Whether run logs reach `rebase.cron_logs`. `false` keeps the jobs running and the history in memory only, which the Studio panel then loses on restart. |
+| `schemaEditor` | on outside production, when `collectionsDir` is set | Forces the schema-editor routes on or off. The editor rewrites collection *source files*, so it needs a directory to write to — and a built bundle has none, which is why a deployment never has it. |
+
+The rest of `RebaseBackendConfig` is either documented on its own page (`auth`,
+`storage`, `jobs`, `callbacks`, `liveSchema`, `rlsAudit`) or marked `@internal`:
+`bootstrappers`, `provisioningDriverResult`, `provisionSchema`, `corsHandled`,
+`functionsSelection`, `functionsUpstream` and `runtimeVersion` are filled in by
+`bootFromBundle` from the environment, and passing them by hand is a way to
+disagree with the runtime about what this process is.
 
 ## The Backend Instance
 

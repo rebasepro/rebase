@@ -4408,6 +4408,17 @@ The Rebase backend is a **Node.js server** built on [Hono](https://hono.dev/) th
 
 Everything is initialized with a single function:
 
+:::note[Where this goes]
+The call below is what an **ejected** backend has, in `backend/src/index.ts`. On
+the **managed runtime** there is no such file: the runtime makes the call, and
+you configure it through environment variables and the four exports it reads
+from `config/index.ts` (`dataSources`, `storageSources`, `storageAuthorize`,
+`callbacks`). Every page in this section says which of the two applies to the
+option it documents, and names the ones that have no managed form. Export an
+option the runtime does not read and it warns you at boot rather than dropping
+it in silence.
+:::
+
 ```typescript
 
 const instance = await initializeRebaseBackend({
@@ -4528,12 +4539,39 @@ interface RebaseBackendConfig {
     functionsDir?: string;    // Auto-load Hono routes from a directory
 
     // Scheduled tasks
-    cronsDir?: string;        // Auto-load cron jobs from a directory
+    cronsDir?: string;         // Auto-load cron jobs from a directory
+    cronPersistence?: boolean; // Write run logs to rebase.cron_logs (default: true)
+
+    // HTTP behaviour
+    compression?: boolean;     // gzip/deflate for API responses (default: true)
+    maxBodySize?: number;      // Request-body ceiling in bytes (default: 10MB; 0 disables)
+    csrf?: { origin: string | string[] | ((origin: string) => boolean) };
+
+    // Schema editing
+    schemaEditor?: boolean;   // Force the schema-editor routes on or off
 
     // Logging
     logging?: { level?: "error" | "warn" | "info" | "debug" };
 }
 ```
+
+Five of those are easy to miss and change behaviour you can otherwise only
+observe:
+
+| Key | Default | What it does |
+|---|---|---|
+| `compression` | `true` | gzip/deflate on API responses, negotiated from `Accept-Encoding`. Already-compressed, streamed and `no-transform` bodies are left alone, so it is safe to leave on — a large JSON list typically drops by ~20x. Set `false` when nginx, Cloudflare or another proxy in front already compresses, to avoid paying twice. Environment: `REBASE_COMPRESSION`. |
+| `maxBodySize` | `10485760` (10MB) | Ceiling for request bodies on API routes; `0` disables it. Storage uploads use the storage config's own `maxFileSize` (50MB), which wins for those routes. Environment: `REBASE_MAX_BODY_SIZE`. |
+| `csrf` | off | **Opt-in.** A BaaS API is called by mobile apps, SPAs on other domains and CLI tools, none of which send an `Origin` a fixed list would accept — so this is not on by default. Turn it on with the origins your browser clients use. No environment form: eject to set it. |
+| `cronPersistence` | `true` | Whether run logs reach `rebase.cron_logs`. `false` keeps the jobs running and the history in memory only, which the Studio panel then loses on restart. |
+| `schemaEditor` | on outside production, when `collectionsDir` is set | Forces the schema-editor routes on or off. The editor rewrites collection *source files*, so it needs a directory to write to — and a built bundle has none, which is why a deployment never has it. |
+
+The rest of `RebaseBackendConfig` is either documented on its own page (`auth`,
+`storage`, `jobs`, `callbacks`, `liveSchema`, `rlsAudit`) or marked `@internal`:
+`bootstrappers`, `provisioningDriverResult`, `provisionSchema`, `corsHandled`,
+`functionsSelection`, `functionsUpstream` and `runtimeVersion` are filled in by
+`bootFromBundle` from the environment, and passing them by hand is a way to
+disagree with the runtime about what this process is.
 
 ### The Backend Instance
 
@@ -5441,6 +5479,12 @@ Rebase includes a complete backend authentication system:
 
 ### Configuration
 
+:::note[Where this goes]
+**Managed runtime:** environment — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` and the provider `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs. The users collection is whichever one the bundle names (`collections/users` by convention).
+**No managed route:** `auth.hooks`. They are functions; eject to pass them.
+**Ejected:** `initializeRebaseBackend({ auth })` in `backend/src/index.ts`.
+:::
+
 The `auth` block in `initializeRebaseBackend` controls all backend authentication:
 
 ```typescript no-verify
@@ -5995,10 +6039,10 @@ await initializeRebaseBackend({
 Then, from the client:
 
 ```typescript
-const profile = await rebase.auth.findUserByEmail("teammate@example.com");
+const profile = await client.auth.findUserByEmail("teammate@example.com");
 // → { uid, displayName, photoURL } | null   (never email/roles/metadata)
 if (profile) {
-    await rebase.data.team_members.create({ team_id, user_id: profile.uid });
+    await client.data.team_members.create({ team_id, user_id: profile.uid });
 }
 ```
 
@@ -6463,6 +6507,11 @@ Rebase supports three storage backends:
 - **Google Cloud Storage / Firebase Storage** — Native GCS support via `@google-cloud/storage`
 
 ### Configuration
+
+:::note[Where this goes]
+**Managed runtime:** environment — `STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH` and their credentials (suffix `__<KEY>` for a named source). Access rules come from `export const storageAuthorize` in `config/index.ts`; extra buckets from `export const storageSources`.
+**Ejected:** `initializeRebaseBackend({ storage, storageAuthorize })` in `backend/src/index.ts`.
+:::
 
 Storage is configured in the `storage` block of `initializeRebaseBackend`:
 
@@ -7518,6 +7567,13 @@ By default a broadcast reaches currently-connected members and is then gone. Tha
 
 For an operation stream — collaborative editing, anything where a silent gap causes divergence — a channel can be configured to **retain** its messages. Retained broadcasts are given a per-channel sequence number and stored, so a client that reconnects can ask for everything after the last one it saw.
 
+:::caution[Where this goes]
+**Managed runtime: nowhere.** Channel retention and `realtime.bus` are part of
+the database adapter the managed runtime constructs itself, and neither has an
+environment form. Eject to configure them.
+**Ejected:** `createPostgresAdapter({ realtime })` in `backend/src/index.ts`.
+:::
+
 Retention is opt-in and configured here, on the server:
 
 ```typescript
@@ -8449,6 +8505,10 @@ export default defineCron({
 });
 ```
 
+`rebase dev` watches the crons directory, so a job added while it is running is
+registered on the next reload — no restart. (It has to be told: the directory is
+scanned rather than imported, so the watcher cannot infer it.)
+
 :::note
 `defineCron` is an identity function — it returns the same object you pass in. A plain default-exported `CronJobDefinition` object works identically; `defineCron` simply provides compile-time type checking and editor autocomplete.
 :::
@@ -8456,6 +8516,11 @@ export default defineCron({
 The **filename** (without extension) becomes the job's unique ID — e.g., `health-check`.
 
 ### Configuration
+
+:::note[Where this goes]
+**Managed runtime:** nothing to configure — the runtime discovers `backend/crons/` on its own (`entry.crons` in `rebase.json` if you moved it). `REBASE_CRON_SCHEDULER` decides which process runs the scheduler.
+**Ejected:** `initializeRebaseBackend({ cronsDir })` in `backend/src/index.ts`.
+:::
 
 Enable cron jobs by adding `cronsDir` to your backend config:
 
@@ -8473,7 +8538,7 @@ That's it. Rebase will:
 2. Register each default export as a cron job
 3. Auto-create the `rebase.cron_logs` table in PostgreSQL (if the driver supports SQL)
 4. Start the scheduler and seed counters from existing DB logs
-5. Mount admin REST routes at `/api/cron`
+5. Mount admin REST routes at `/api/admin/cron`
 
 ### Schedule Syntax
 
@@ -8544,6 +8609,9 @@ interface CronJobContext {
     // Logger — captured lines appear in Studio and the logs API
     log: (...args: unknown[]) => void;
 
+    // Aborted when the run exceeds `timeoutSeconds`
+    signal: AbortSignal;
+
     // The server-side Rebase singleton — the same object `import { rebase }
     // from "@rebasepro/server"` returns, and the same one `defineFunction`
     // hands its callback.
@@ -8552,6 +8620,27 @@ interface CronJobContext {
 ```
 
 Use `ctx.log()` to emit structured output. These lines are captured in the execution log and visible in Studio and via the REST API.
+
+#### `ctx.signal` — stop the work when the run stops
+
+The timeout ends the *run*: the scheduler stops waiting and records a failure.
+It does not end the handler. Pass `ctx.signal` to anything that takes one, and
+the work stops with it:
+
+```typescript no-verify
+export default defineCron({
+    name: "Sync inventory",
+    schedule: "*/15 * * * *",
+    timeoutSeconds: 60,
+    async handler({ signal, log }) {
+        const res = await fetch("https://supplier.example.com/stock", { signal });
+        log(`fetched ${res.status}`);
+    }
+});
+```
+
+Without it, a job whose timeout matches its interval leaks one abandoned request
+per tick — invisible, because every run is already recorded as failed.
 
 :::note[`ctx.client` was removed]
 It was a second name for `ctx.rebase`, and its type re-exposed `client.data` —
@@ -8639,16 +8728,16 @@ All cron routes require **admin authentication** (`requireAuth` + `requireAdmin`
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/cron` | List all registered cron jobs |
-| `GET` | `/api/cron/:id` | Get a single job's status |
-| `POST` | `/api/cron/:id/trigger` | Manually trigger a job |
-| `GET` | `/api/cron/:id/logs` | Get execution history (`?limit=N`) |
-| `PUT` | `/api/cron/:id` | Enable/disable a job (`{ "enabled": true }`) |
+| `GET` | `/api/admin/cron` | List all registered cron jobs |
+| `GET` | `/api/admin/cron/:id` | Get a single job's status |
+| `POST` | `/api/admin/cron/:id/trigger` | Manually trigger a job |
+| `GET` | `/api/admin/cron/:id/logs` | Get execution history (`?limit=N`) |
+| `PUT` | `/api/admin/cron/:id` | Enable/disable a job (`{ "enabled": true }`) |
 
 #### Example: List All Jobs
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/admin/cron
 ```
 
 ```json
@@ -8670,11 +8759,41 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
 }
 ```
 
+#### Jobs that are not there
+
+A job that never fires is not in `jobs` — nothing registered it — so "my cron is
+missing" and "my cron will never run" look identical from this endpoint unless it
+says otherwise. It does:
+
+```json
+{
+    "jobs": [],
+    "skipped": 2,
+    "rejected": [
+        {
+            "id": "nightly-report",
+            "name": "Nightly report",
+            "schedule": "0 0 3 * * *",
+            "reason": "Expected 5 fields, got 6"
+        }
+    ],
+    "note": "1 cron file(s) failed to load and 1 job(s) have an invalid schedule — NOT scheduled. See `rejected` for the reason; the server log has the rest."
+}
+```
+
+`rejected` names the job and the reason. A file that failed to *load* has only a
+count: the failure happened before there was a job to name, so the reason is in
+the server log.
+
+The commonest entry here is the one above — six fields, from an expression
+copied out of a tool that supports seconds. Rebase takes five; drop the leading
+field.
+
 #### Example: Trigger a Job Manually
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3001/api/cron/health-check/trigger
+    http://localhost:3001/api/admin/cron/health-check/trigger
 ```
 
 ### Client SDK
@@ -8769,23 +8888,32 @@ A recovered run is a normal entry in `cron_logs` (`manual` is `false`), with a f
 ### Concurrency Guarding
 
 To ensure stability when executing resource-heavy operations, Rebase implements a strict **single-concurrency execution lock** per job ID:
-- **Scheduled Overlaps**: If a job's scheduled tick fires while the previous execution is still running, the scheduler skips the tick, logs a warning, and immediately schedules the next candidate run.
-- **Manual Trigger Collisions**: If an operator manually triggers a running job via Rebase Studio or the REST API, the request returns immediately with a skipped payload, protecting the active worker:
-  ```json
-  {
-    "jobId": "expire-users",
-    "success": true,
-    "result": { "skipped": true, "reason": "already_executing" },
-    "logs": ["Skipped: job is already running"]
-  }
-  ```
+- **Scheduled Overlaps**: If a job's scheduled tick fires while the previous execution is still running, the scheduler skips the tick and immediately schedules the next candidate run.
+- **Manual Trigger Collisions**: If an operator manually triggers a running job via Rebase Studio or the REST API, the request returns immediately with a skipped payload, protecting the active worker.
+
+Either way a row is written to `rebase.cron_logs`, so the skip is in the run
+history rather than only in the process log:
+
+```json
+{
+  "jobId": "expire-users",
+  "success": true,
+  "result": { "skipped": true, "reason": "already_executing" },
+  "logs": ["Skipped: the previous run has not finished"]
+}
+```
+
+`success: true` because nothing failed — `result.skipped` is what marks it. A
+run of these in a row is the signature of a job that has outgrown its schedule,
+and that is a pattern you can only see if the skips are recorded.
 
 ---
 
 ### Timeouts & Error Isolation
 
-- **Forced Timeout Race**: Execution blocks are wrapped in a `Promise.race` against a timeout timer derived from `timeoutSeconds` (default: `300` seconds / 5 minutes). If the handler hangs past this threshold, the promise is rejected, throwing:
+- **Forced Timeout Race**: Execution blocks are wrapped in a `Promise.race` against a timeout timer derived from `timeoutSeconds` (default: `300` seconds / 5 minutes). If the handler hangs past this threshold, `ctx.signal` is aborted and the promise is rejected, throwing:
   `Error: Cron job "<id>" timed out after <N>ms`
+  The abort is the half that stops the *work*; the rejection only stops the scheduler waiting. A handler that ignores `ctx.signal` keeps running past its own run.
 - **Fail-Safe Try/Catch**: Each job handler runs inside an isolated wrapper. Any uncaught exceptions are intercepted, formatting the error traceback into a string, setting the job status to `"error"`, and updating the `rebase.cron_logs` failure counters. A crash inside a single cron task will never crash the scheduler loop or the primary Hono HTTP web server.
 - **In-Memory Ring Buffer**: The scheduler maintains a ring buffer containing the last **50 runs** per job. This buffer is kept in memory to allow near-instant reads from the Rebase Studio UI.
 
@@ -8829,13 +8957,18 @@ const job: CronJobDefinition = {
     async handler(ctx) {
         ctx.log("Starting session cleanup...");
 
-        // Use the rebase singleton for admin-level database access
-        // const { data: expired } = await rebase.data.findMany("sessions", { ... });
-        const count = Math.floor(Math.random() * 50); // placeholder
+        // Admin-scoped data access — see `ctx.rebase` above.
+        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const expired = await ctx.rebase.dataAsAdmin.sessions.findAll({
+            where: { last_seen_at: ["<", cutoff] }
+        });
+        for (const session of expired) {
+            await ctx.rebase.dataAsAdmin.sessions.delete(session.id as string);
+        }
 
-        ctx.log(`Cleaned up ${count} expired sessions`);
+        ctx.log(`Cleaned up ${expired.length} expired sessions`);
 
-        return { deletedSessions: count };
+        return { deletedSessions: expired.length };
     },
 };
 
@@ -8870,6 +9003,14 @@ external system.
 | A `setTimeout` in a callback | Once, in this process | No |
 
 ### Enabling
+
+:::caution[Where this goes]
+**Managed runtime: nowhere.** A task is a function, and no environment variable
+can carry one — exporting `jobs` from `config/index.ts` does nothing, and the
+runtime says so at boot. Do the work in a [custom
+function](/docs/backend/custom-functions) instead, or eject.
+**Ejected:** `initializeRebaseBackend({ jobs })` in `backend/src/index.ts`.
+:::
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -9017,11 +9158,59 @@ Create a file in your `backend/functions/` directory that default-exports a Hono
 // backend/functions/hello.ts
 
 export default defineFunction((app) => {
-    app.get("/", (c) => c.json({ message: "Hello from custom function!" }));
+    app.post("/", async (c) => {
+        const { name } = await c.req.json<{ name?: string }>().catch(() => ({ name: undefined }));
+        return c.json({ message: `Hello, ${name ?? "world"}!` });
+    });
 });
 ```
 
 This mounts at **`/api/functions/hello`**. The filename (without extension) becomes the route prefix.
+
+`POST`, because that is what the SDK sends by default — see
+[Invoke from the client](#invoke-from-the-client). A `GET` route is just as
+valid; the caller then has to say `{ method: "GET" }`.
+
+`rebase dev` watches the functions directory, so a file added while it is
+running is mounted on the next reload — no restart. (It has to be told: the
+directory is scanned rather than imported, so the watcher cannot infer it.)
+
+### Invoke from the client
+
+```typescript
+
+const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
+
+const { message } = await client.functions.invoke<{ message: string }>(
+    "hello",                 // the filename, without extension — one path segment
+    { name: "Ada" }          // JSON body; omitted for a GET
+);
+```
+
+`invoke` builds the URL, attaches the caller's token, and throws a
+`RebaseApiError` on a non-2xx — so the function's own error shape reaches the
+caller instead of a bare `fetch` rejection.
+
+Three things it takes beyond the name:
+
+```typescript
+// A different method. The payload is dropped for GET, since GET has no body.
+await client.functions.invoke("hello", undefined, { method: "GET" });
+
+// A sub-path — `/api/functions/hello/stats`. It goes here, never in the name:
+// a name containing "/" is refused rather than percent-encoded into a 404.
+await client.functions.invoke("hello", undefined, { method: "GET", path: "stats" });
+
+// A query string. Passed as `path`, with no separator inserted before `?`.
+await client.functions.invoke("reports", undefined, { method: "GET", path: "?days=30" });
+```
+
+:::note
+`client.call("functions/hello", …)` also reaches a function, and does something
+subtly different: it unwraps `res.data` when the response has one. Two ways in
+with two response contracts is a trap — use `functions.invoke`. `call` exists
+for routes mounted outside `/api/functions`, which `invoke` cannot express.
+:::
 
 :::important
 Import from **`@rebasepro/server/functions`**, not from `@rebasepro/server`.
@@ -9032,6 +9221,11 @@ See [Runtime portability](#runtime-portability) for the full contract.
 :::
 
 ### Configuration
+
+:::note[Where this goes]
+**Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`entry.functions` in `rebase.json` if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
+**Ejected:** `initializeRebaseBackend({ functionsDir })` in `backend/src/index.ts`.
+:::
 
 Enable custom functions by adding `functionsDir` to your backend config:
 
@@ -9501,7 +9695,7 @@ Unhandled promise rejections are logged rather than fatal: a fire-and-forget cal
 Rebase provides two levels of entity lifecycle callbacks — both use the same `CollectionCallbacks` type from `@rebasepro/types`:
 
 - **[Per-collection callbacks](/docs/collections/callbacks)**: Defined on individual collection configurations. They run only for that collection.
-- **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.data`).
+- **Global callbacks**: Defined on `initializeRebaseBackend({ callbacks })`. They fire on **every** collection, on every data path (REST API, WebSocket / realtime, server-side `rebase.dataAsAdmin`).
 
 Use global callbacks for:
 - **PII masking** — redact sensitive fields for non-admin callers across all collections.
@@ -9515,6 +9709,11 @@ Use global callbacks for:
 ---
 
 ### Configuration
+
+:::note[Where this goes]
+**Managed runtime:** `export const callbacks` from `config/index.ts` — the runtime reads it at boot.
+**Ejected:** `initializeRebaseBackend({ callbacks })` in `backend/src/index.ts`.
+:::
 
 Pass the `callbacks` key to `initializeRebaseBackend`:
 
@@ -9543,10 +9742,10 @@ const instance = await initializeRebaseBackend({
 type CollectionCallbacks = {
     afterRead?(props):   Record<string, unknown>;  // Transform row before returning to caller
     beforeSave?(props):  Partial<Values>;           // Modify values before writing to DB
-    afterSave?(props):   void;                      // Side-effects after successful save
+    afterSave?(props):   void;                      // After the write, still in the transaction
     afterSaveError?(props): void;                   // Side-effects after a failed save
-    beforeDelete?(props): boolean | void;           // Return false or throw to block deletion
-    afterDelete?(props): void;                      // Side-effects after successful deletion
+    beforeDelete?(props): boolean | void;           // Return false (403) or throw to block deletion
+    afterDelete?(props): void;                      // After the delete, still in the transaction
 };
 ```
 
@@ -9581,23 +9780,21 @@ Each callback receives a single props object. Common fields:
        ▼
  [Hono Router]
        │
- ┌─────┴───────────────────────────────────────────────────────┐
- │ 1. Global Callback: beforeSave (Blocking)                   │
- │ 2. Collection Callback: beforeSave (Blocking)               │
- └─────┬───────────────────────────────────────────────────────┘
-       │
  [Database Driver]
  ┌─────┴───────────────────────────────────────────────────────┐
- │ 3. Start PostgreSQL Transaction                             │
- │ 4. Set Config: app.user_id = '<uid>', app.user_roles = ...  │
+ │ 1. Start PostgreSQL Transaction                             │
+ │ 2. Set Config: app.user_id = '<uid>', app.user_roles = ...  │
+ │                                                             │
+ │ 3. Global Callback: beforeSave     ─┐                       │
+ │ 4. Collection Callback: beforeSave ─┘ awaited               │
  │ 5. Drizzle SQL execution & Postgres RLS evaluation          │
- │ 6. Commit Transaction                                       │
+ │ 6. Global Callback: afterSave      ─┐                       │
+ │ 7. Collection Callback: afterSave  ─┘ awaited               │
+ │                                                             │
+ │ 8. Commit  ← a throw anywhere in 3–7 rolls the write back   │
  └─────┬───────────────────────────────────────────────────────┘
        │
- ┌─────┴───────────────────────────────────────────────────────┐
- │ 7. Global Callback: afterSave                               │
- │ 8. Collection Callback: afterSave                           │
- └─────┬───────────────────────────────────────────────────────┘
+ [Realtime notifications flushed — after the commit, never before]
        │
        ▼
 [Client Response]
@@ -9607,9 +9804,83 @@ Each callback receives a single props object. Common fields:
 
 ### Blocking vs. Async Semantics
 
-- **`beforeSave`, `beforeDelete`** — blocking. If the callback throws, the operation is rejected with an HTTP 400 carrying your message and the code `CALLBACK_REJECTED`, and the database write never happens. Throw a `RebaseApiError` from `@rebasepro/types` to pick the status yourself — see [Entity Callbacks](/docs/collections/callbacks#beforesave).
-- **`afterRead`** — blocking. The returned row (or transformed row) is what the caller receives.
-- **`afterSave`, `afterDelete`, `afterSaveError`** — run after the transaction commits. They do not block the HTTP response.
+**Every callback in the list below is awaited, and all of them run inside the
+transaction that carries the write.** There is no "fire and forget" tier: the
+row and everything its callbacks did commit together or not at all.
+
+- **`beforeSave`, `beforeDelete`** — if the callback throws, the operation is rejected with an HTTP 400 carrying your message and the code `CALLBACK_REJECTED`, and the database write never happens. Throw a `RebaseApiError` from `@rebasepro/types` to pick the status yourself — see [Entity Callbacks](/docs/collections/callbacks#beforesave). A `beforeDelete` that *returns* `false` is the same refusal with no message, and answers **403** with that code.
+- **`afterRead`** — the returned row (or transformed row) is what the caller receives. Its transaction is `READ ONLY` — see [below](#afterread-cannot-write).
+- **`afterSave`, `afterDelete`** — run *before* the commit, awaited. A throw here rolls the row back and answers the same **400 `CALLBACK_REJECTED`**, with `details.stage` naming the hook. They hold the transaction open while they run, so a slow one is a lock held.
+- **`afterSaveError`** — runs when the save failed, on the way out.
+
+:::caution[This page used to say the opposite]
+Earlier versions said `afterSave` and `afterDelete` "run after the transaction
+commits" and "do not block the HTTP response". They never did either. Code that
+was written against that sentence — a webhook call in `afterSave`, say — has
+been holding a database transaction open for the length of an HTTP round trip,
+and rolling the row back whenever the remote end was down.
+:::
+
+#### Side effects that must not hold the transaction
+
+Anything slow, or anything that cannot be undone if the transaction rolls back,
+does not belong in the callback body:
+
+| Want | Do this instead |
+|---|---|
+| Call a third party, send mail, generate a file | [Enqueue a job](/docs/backend/jobs). A job enqueued in a transaction that rolls back was never enqueued — which is the behaviour you want. |
+| Tell other processes something happened | Publish on a [realtime channel](/docs/backend/realtime) after the write returns, not from inside the hook. |
+| Work in a [custom function](/docs/backend/custom-functions) that the caller need not wait for | `waitUntil(c, promise)` from `@rebasepro/server/functions` — it runs after the response, and the host waits for it before shutting down. |
+
+The rule of thumb: if the work should still happen when the write is undone, it
+is not part of the write, so it does not go in the hook.
+
+#### `afterRead` cannot write
+
+A request-scoped read opens its transaction `READ ONLY`. `afterRead` runs inside
+it, so **no write from that callback can succeed** — not a `context.data`
+create, not an update, not one buried in a helper it calls. Postgres refuses the
+statement with SQLSTATE `25006`, and the caller is answered:
+
+```json
+{ "error": { "message": "An `afterRead` callback tried to write. …",
+             "code": "READ_ONLY_TRANSACTION",
+             "details": { "dbCode": "25006" } } }
+```
+
+That is a 409, not a 500: it is your code being refused, not the server failing.
+The read-only mode is deliberate — a read that quietly writes is a read whose
+cost, locks and RLS surface nobody budgeted for.
+
+So **read auditing does not belong in `afterRead`**. Log the read outside the
+request instead — from a background job fed by whatever you already emit, or
+from a custom function that does the read *and* the write with two separate
+calls:
+
+```typescript no-verify
+// ✗ Fails with READ_ONLY_TRANSACTION on every read.
+callbacks: {
+    afterRead: async ({ path, row, context }) => {
+        await context.data.read_log.create({ path, uid: context.user?.uid });
+        return row;
+    }
+}
+```
+
+```typescript no-verify
+// ✓ The read and the audit row are two operations, and only the second writes.
+
+export default defineFunction("read-article", (app) => {
+    app.get("/:id", async (c) => {
+        const article = await c.var.driver.fetchOne({ path: "articles", id: c.req.param("id") });
+        await rebase.dataAsAdmin.read_log.create({ path: "articles", uid: c.var.user?.uid });
+        return c.json(article);
+    });
+});
+```
+
+Write-side auditing has no such problem: `afterSave` and `afterDelete` run in a
+read-write transaction, and the audit row commits with the change it records.
 
 ---
 
@@ -9637,21 +9908,33 @@ const instance = await initializeRebaseBackend({
 
 #### Global Audit Logging
 
-Log all deletions across every collection:
+Record every deletion, across every collection, in an `audit_log` table. Because
+`afterDelete` runs in the delete's own transaction, the audit row and the
+deletion commit together — there is no window in which one exists without the
+other:
 
 ```typescript no-verify
 
 const instance = await initializeRebaseBackend({
     // ... other config
     callbacks: {
-        afterDelete({ collection, id, context }) {
-            console.log(
-                `[AUDIT] User ${context.user?.uid} deleted ${collection.slug}/${id}`
-            );
+        async afterDelete({ collection, id, row, context }) {
+            if (collection.slug === "audit_log") return;   // don't audit the audit
+            await context.data.audit_log.create({
+                action: "delete",
+                collection: collection.slug,
+                entity_id: String(id),
+                actor: context.user?.uid ?? "anonymous",
+                snapshot: row
+            });
         }
     }
 });
 ```
+
+Note what this buys and what it costs: if the audit row cannot be written, the
+delete does not happen either. For an audit trail that is usually what you want.
+If it is not, catch the error in the callback and say so in a comment.
 
 #### Collection-Specific Logic
 
@@ -9681,6 +9964,11 @@ Entity history records a entity of entity values on every create, update, and de
 ### Enabling History
 
 #### Backend
+
+:::note[Where this goes]
+**Managed runtime:** `REBASE_HISTORY` (`true` by default; set `false` to turn it off). Retention settings have no environment form — eject to change them.
+**Ejected:** `initializeRebaseBackend({ history })` in `backend/src/index.ts`.
+:::
 
 Enable history in `initializeRebaseBackend`:
 
@@ -10060,10 +10348,25 @@ export const env = loadEnv({
 // env.STRIPE_SECRET_KEY → string        (validated, required)
 ```
 
+:::caution[The `z` you extend with must be the runtime's zod]
+Two copies of zod loaded at once is the one way this call goes wrong, and it
+used to go wrong silently. `.merge()` accepts a schema from the other copy —
+the shapes are identical — and then `.parse()` rejects every field carrying a
+`.default()`, because a default is recognised by class identity. The server came
+up, reported success, and ran none of its crons; nothing in the failure
+mentioned zod.
+
+Don't declare `zod` in your project's dependencies — the runtime provides it. If
+you must, match its major and let your bundler dedupe. `loadEnv` now refuses a
+foreign schema at boot with a message naming the fix, rather than accepting it
+and validating half of it.
+:::
+
 **Key behaviors:**
 - Auto-generates ephemeral `JWT_SECRET` and `REBASE_SERVICE_KEY` in development so you can start without manual setup.
 - Blocks auto-generated secrets in production — you must set them explicitly.
 - Validates that `CORS_ORIGINS` or `FRONTEND_URL` is set in production.
+- Refuses an `extend` schema built by a different copy of zod.
 
 See `.env.example` in the scaffolded app for the full list of supported variables.
 
@@ -10410,11 +10713,10 @@ const views: AppView[] = [
         slug: "settings",
         name: "App Settings",
         view: <AppSettings />,
-        nestedRoutes: true  // Support sub-paths,
+        nestedRoutes: true,   // Support sub-paths
         admin: {
-            icon: "dashboard",
-            group: "Analytics",
-            icon: "settings"
+            icon: "settings",
+            group: "Analytics"
         }
     }
 ];
@@ -12343,7 +12645,13 @@ exportable: {
 
 ### Overview
 
-Plugins are the primary extension mechanism in Rebase. They can:
+**Plugins are an admin-panel concept.** They run in the browser, inside the
+React admin, and are registered where you build it. Nothing in this page reaches
+the backend: a plugin cannot add a route, a callback or a cron. For those, see
+[Custom Functions](/docs/backend/custom-functions), [Entity
+Callbacks](/docs/collections/callbacks) and [Cron Jobs](/docs/backend/cron-jobs).
+
+Plugins are the primary extension mechanism in the panel. They can:
 
 - Wrap the entire app with a **provider** (context, state management)
 - Add **home page actions** and widgets
@@ -12442,6 +12750,30 @@ const enhancementPlugin = useDataEnhancementPlugin();
 ```
 
 ![Data enhancement](/img/data_enhancement.png)
+
+:::caution[This one sends data off your machine]
+Autofill posts the entity's field values to a hosted service to generate a
+suggestion. By default that service is **`https://app.rebase.pro/api/functions/ai`**,
+which Rebase runs — free to use, no configuration, and no credential attached:
+the requests are anonymous, bounded by rate limit rather than by identity. Your
+JWT is not sent.
+
+Whether that is acceptable depends on what is in the fields. Point `endpoint` at
+your own deployment to keep generation inside your infrastructure:
+
+```typescript no-verify
+const enhancementPlugin = useDataEnhancementPlugin({
+    endpoint: "https://ai.internal.example.com"
+});
+```
+
+The wire format is the whole contract — see `api.ts` in `@rebasepro/plugin-ai`,
+with a reference implementation in the control plane's `functions/ai.ts`. The
+plugin renders nothing until the host it points at reports itself available on
+`GET /status`, so a wrong URL is a missing button rather than a failed request.
+
+Every other built-in plugin is local to the browser and sends nothing anywhere.
+:::
 
 ### Collection Injection
 
@@ -12892,7 +13224,7 @@ function CustomAction() {
     const client = useRebaseClient();
 
     const handleAction = async () => {
-        const result = await client.call("functions/send-invoice", { invoiceId: "123" });
+        const result = await client.functions.invoke("send-invoice", { invoiceId: "123" });
         console.log(result);
     };
 
@@ -15640,8 +15972,9 @@ session:
    [Schema as Code](/docs/architecture/schema-as-code).
 2. **Migrations are two steps.** `rebase schema generate`, then `rebase db push`
    in development, or `rebase db generate && rebase db migrate` for production.
-3. **Use the SDK.** Go through `rebase.data.<slug>`; raw SQL and direct Drizzle
-   calls bypass validation, callbacks and RLS.
+3. **Use the SDK.** Go through `client.data.<slug>` in the browser and
+   `rebase.dataAsAdmin.<slug>` on the server; raw SQL and direct Drizzle calls
+   bypass validation, callbacks and RLS.
 4. **Guard every custom route.** Routes in `backend/functions/` are mounted
    *without* authentication. Use `requireAuth` / `requireAdmin` from
    `@rebasepro/server` in the route's own middleware slot — reading

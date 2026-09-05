@@ -55,11 +55,14 @@ export interface RebaseFunctionContext {
  *
  * @example
  * ```ts
- * import { defineFunction, requireAuth } from "@rebasepro/server";
+ * // The portable entry point, and a per-route guard — both for the reasons
+ * // their own docs give: this subpath pulls in nothing Node-only, and
+ * // `app.use("/*", requireAuth)` covers only the routes declared *below* it,
+ * // so a route appended later at the bottom of the file is unprotected.
+ * import { defineFunction, requireAuth } from "@rebasepro/server/functions";
  *
  * export default defineFunction((app, { rebase }) => {
- *     app.use("/*", requireAuth);
- *     app.get("/home", async (c) => {
+ *     app.get("/home", requireAuth, async (c) => {
  *         // `rebase.sql` runs on the owner connection: no RLS, no policies,
  *         // every row. It is the most privileged thing in this context —
  *         // more so than `dataAsAdmin`, which is merely admin-scoped.

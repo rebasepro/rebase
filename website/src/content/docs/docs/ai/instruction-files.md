@@ -65,8 +65,9 @@ session:
    [Schema as Code](/docs/architecture/schema-as-code).
 2. **Migrations are two steps.** `rebase schema generate`, then `rebase db push`
    in development, or `rebase db generate && rebase db migrate` for production.
-3. **Use the SDK.** Go through `rebase.data.<slug>`; raw SQL and direct Drizzle
-   calls bypass validation, callbacks and RLS.
+3. **Use the SDK.** Go through `client.data.<slug>` in the browser and
+   `rebase.dataAsAdmin.<slug>` on the server; raw SQL and direct Drizzle calls
+   bypass validation, callbacks and RLS.
 4. **Guard every custom route.** Routes in `backend/functions/` are mounted
    *without* authentication. Use `requireAuth` / `requireAdmin` from
    `@rebasepro/server` in the route's own middleware slot — reading

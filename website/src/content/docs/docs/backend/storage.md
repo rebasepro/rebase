@@ -14,6 +14,11 @@ Rebase supports three storage backends:
 
 ## Configuration
 
+:::note[Where this goes]
+**Managed runtime:** environment — `STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH` and their credentials (suffix `__<KEY>` for a named source). Access rules come from `export const storageAuthorize` in `config/index.ts`; extra buckets from `export const storageSources`.
+**Ejected:** `initializeRebaseBackend({ storage, storageAuthorize })` in `backend/src/index.ts`.
+:::
+
 Storage is configured in the `storage` block of `initializeRebaseBackend`:
 
 ### Local Storage

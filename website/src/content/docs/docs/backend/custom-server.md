@@ -36,10 +36,25 @@ export const env = loadEnv({
 // env.STRIPE_SECRET_KEY → string        (validated, required)
 ```
 
+:::caution[The `z` you extend with must be the runtime's zod]
+Two copies of zod loaded at once is the one way this call goes wrong, and it
+used to go wrong silently. `.merge()` accepts a schema from the other copy —
+the shapes are identical — and then `.parse()` rejects every field carrying a
+`.default()`, because a default is recognised by class identity. The server came
+up, reported success, and ran none of its crons; nothing in the failure
+mentioned zod.
+
+Don't declare `zod` in your project's dependencies — the runtime provides it. If
+you must, match its major and let your bundler dedupe. `loadEnv` now refuses a
+foreign schema at boot with a message naming the fix, rather than accepting it
+and validating half of it.
+:::
+
 **Key behaviors:**
 - Auto-generates ephemeral `JWT_SECRET` and `REBASE_SERVICE_KEY` in development so you can start without manual setup.
 - Blocks auto-generated secrets in production — you must set them explicitly.
 - Validates that `CORS_ORIGINS` or `FRONTEND_URL` is set in production.
+- Refuses an `extend` schema built by a different copy of zod.
 
 See `.env.example` in the scaffolded app for the full list of supported variables.
 
