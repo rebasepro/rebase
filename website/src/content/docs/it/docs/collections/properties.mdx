@@ -36,7 +36,7 @@ Tutti i tipi di proprietà condividono queste opzioni:
 | Proprietà | Tipo | Descrizione |
 |----------|------|-------------|
 | `type` | `string` | **Obbligatorio.** Tipo di dato (vedi sopra) |
-| `name` | `string` | **Obbligatorio.** Etichetta di visualizzazione |
+| `name` | `string` | Etichetta di visualizzazione. Per impostazione predefinita la chiave della proprietà, abbellita — `publishDate` → "Publish Date". |
 | `description` | `string` | Testo di aiuto mostrato sotto il campo |
 | `defaultValue` | `any` | Valore predefinito per nuove entità |
 | `validation` | `object` | Regole di validazione |
@@ -243,7 +243,7 @@ I campi numero vengono visualizzati come un input di testo standard con validazi
 | Proprietà | Tipo | Descrizione |
 |----------|------|-------------|
 | `enum` | `EnumValues` | Renderizza come selezione con valori numerici |
-| `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
+| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
 | `isId` | `string` | Strategia di generazione ID |
 | `admin.clearable` | `boolean` | Aggiunge un'icona per cancellare il valore (imposta su null) |
 

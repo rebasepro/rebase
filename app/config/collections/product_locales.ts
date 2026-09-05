@@ -3,9 +3,10 @@
 // fallow-ignore-next-line circular-dependency
 import productsCollection from "./products";
 import { LOCALE_ENUM } from "../locales";
+import { defineCollection } from "@rebasepro/cms-types";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 
-const productLocalesCollection: PostgresCollectionConfig = {
+const productLocalesCollection = defineCollection({
     name: "Product Locales",
     singularName: "Product Locale",
     slug: "product_locales",
@@ -25,7 +26,7 @@ const productLocalesCollection: PostgresCollectionConfig = {
             type: "relation",
             relation: {
                 kind: "belongsTo",
-                target: () => productsCollection,
+                target: (): PostgresCollectionConfig => productsCollection,
             }
         },
         locale: {
@@ -63,7 +64,7 @@ const productLocalesCollection: PostgresCollectionConfig = {
             status: "locale"
         }
     }
-};
+});
 
 
 export default productLocalesCollection;

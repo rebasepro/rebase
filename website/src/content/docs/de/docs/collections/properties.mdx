@@ -37,7 +37,7 @@ Alle Eigenschaftstypen teilen diese Optionen:
 | Property | Type | Beschreibung |
 |----------|------|-------------|
 | `type` | `string` | **Erforderlich.** Datentyp (siehe oben) |
-| `name` | `string` | **Erforderlich.** Anzeigebezeichnung |
+| `name` | `string` | Anzeigebezeichnung. Standardmäßig der Property-Schlüssel, verschönert — `publishDate` → "Publish Date". |
 | `description` | `string` | Hilfetext, der unterhalb des Feldes angezeigt wird |
 | `defaultValue` | `any` | Standardwert für neue Entitäten |
 | `validation` | `object` | Validierungsregeln |
@@ -244,7 +244,7 @@ Zahlenfelder werden als Standard-Texteingabe mit numerischer Validierung dargest
 | Property | Type | Beschreibung |
 |----------|------|-------------|
 | `enum` | `EnumValues` | Als Auswahl mit numerischen Werten rendern |
-| `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
+| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
 | `isId` | `string` | ID-Generierungsstrategie |
 | `admin.clearable` | `boolean` | Ein Symbol zum Löschen des Wertes hinzufügen (auf null setzen) |
 

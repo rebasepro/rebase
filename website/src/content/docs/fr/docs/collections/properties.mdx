@@ -36,7 +36,7 @@ Tous les types de propriétés partagent ces options :
 | Propriété | Type | Description |
 |----------|------|-------------|
 | `type` | `string` | **Obligatoire.** Type de données (voir ci-dessus) |
-| `name` | `string` | **Obligatoire.** Étiquette d'affichage |
+| `name` | `string` | Étiquette d'affichage. Par défaut la clé de la propriété, embellie — `publishDate` → "Publish Date". |
 | `description` | `string` | Texte d'aide affiché sous le champ |
 | `defaultValue` | `any` | Valeur par défaut pour les nouvelles entités |
 | `validation` | `object` | Règles de validation |
@@ -243,7 +243,7 @@ Les champs de nombre s'affichent comme un champ de saisie standard avec validati
 | Propriété | Type | Description |
 |----------|------|-------------|
 | `enum` | `EnumValues` | Rendu en tant que liste déroulante avec des valeurs numériques |
-| `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
+| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
 | `isId` | `string` | Stratégie de génération d'ID |
 | `admin.clearable` | `boolean` | Ajouter une icône pour effacer la valeur (définir à null) |
 

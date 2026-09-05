@@ -204,9 +204,9 @@ Ein häufiges Bedürfnis ist es, **nicht authentifizierten Benutzern** das Über
 ### Empfohlen: `access: "public"` mit `withCheck`
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const contactMessagesCollection: PostgresCollectionConfig = {
+const contactMessagesCollection = defineCollection({
     slug: "contact_messages",
     name: "Contact Messages",
     table: "contact_messages",
@@ -225,7 +225,7 @@ const contactMessagesCollection: PostgresCollectionConfig = {
     properties: {
         email: { name: "Email", type: "string" }
     }
-};
+});
 ```
 
 Der `access: "public"`-Shortcut generiert eine Richtlinie, die die Operation ohne Authentifizierung ermöglicht.
@@ -233,9 +233,9 @@ Der `access: "public"`-Shortcut generiert eine Richtlinie, die die Operation ohn
 ### Für Lead-Generierung / Anmeldungen
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const leadSignupsCollection: PostgresCollectionConfig = {
+const leadSignupsCollection = defineCollection({
     slug: "lead_magnet_signups",
     name: "Lead Magnet Signups",
     table: "lead_magnet_signups",
@@ -248,7 +248,7 @@ const leadSignupsCollection: PostgresCollectionConfig = {
     properties: {
         email: { name: "Email", type: "string" }
     }
-};
+});
 ```
 
 ### Wie anonyme Anfragen funktionieren

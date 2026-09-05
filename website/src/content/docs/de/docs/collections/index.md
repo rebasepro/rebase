@@ -121,8 +121,8 @@ Eine Annotation *validiert* das Objekt jedoch nur — sie kann Ihre Eigenschafts
 | `slug` | `string` | **Erforderlich.** URL-sicherer Bezeichner. Wird in der Admin-UI-URL und im REST-API-Pfad (`/api/data/{slug}`) verwendet. |
 | `name` | `string` | **Erforderlich.** Anzeigename (Plural). Wird in der Navigation und in Seitenüberschriften angezeigt. |
 | `singularName` | `string` | Anzeigename für eine einzelne Entität. Wird in „Neues Produkt“, „Produkt bearbeiten“ usw. verwendet. |
-| `table` | `string` | **Erforderlich.** PostgreSQL-Tabellenname. Wenn er sich vom `slug` unterscheidet, können URLs von Tabellennamen entkoppelt werden. |
-| `admin.icon` | `string` | Material-Icon-Schlüssel. Siehe [Google Fonts Icons](https://fonts.google.com/icons). |
+| `table` | `string` | PostgreSQL-Tabellenname. Standardmäßig `toSnakeCase(slug)` — nur setzen, um die URL vom Tabellennamen zu entkoppeln. |
+| `admin.icon` | `string` | Name eines [Lucide](https://lucide.dev/icons)-Icons, z. B. `"FileText"`, `"ShoppingCart"`. |
 
 ### Schema
 
@@ -141,7 +141,7 @@ Alle folgenden Felder gehören in `admin`.
 
 | Eigenschaft | Typ | Standard | Beschreibung |
 |----------|------|---------|-------------|
-| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"table"` | Standardansichtsmodus |
+| `defaultViewMode` | `"list" \| "table" \| "cards" \| "kanban"` | `"list"` | Standardansichtsmodus |
 | `enabledViews` | `ViewMode[]` | Alle vier | Welche Ansichtsmodi verfügbar sind |
 | `kanban` | `KanbanConfig` | — | Kanban-Konfiguration (Spalteneigenschaft). Immer zusammen mit `orderProperty` angeben — siehe [Ansichtsmodi](/docs/frontend/view-modes) |
 | `orderProperty` | `string` | — | Schlüssel der **string**-Eigenschaft, die den Drag-and-drop-Sortierschlüssel hält. Für ein funktionierendes Kanban-Board erforderlich |

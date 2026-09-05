@@ -204,9 +204,9 @@ Un besoin courant est de permettre aux **utilisateurs non authentifiés** de sou
 ### Recommandé : `access: "public"` avec `withCheck`
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const contactMessagesCollection: PostgresCollectionConfig = {
+const contactMessagesCollection = defineCollection({
     slug: "contact_messages",
     name: "Contact Messages",
     table: "contact_messages",
@@ -225,7 +225,7 @@ const contactMessagesCollection: PostgresCollectionConfig = {
     properties: {
         email: { name: "Email", type: "string" }
     }
-};
+});
 ```
 
 Le raccourci `access: "public"` génère une politique qui autorise l'opération sans nécessiter d'authentification.
@@ -233,9 +233,9 @@ Le raccourci `access: "public"` génère une politique qui autorise l'opération
 ### Pour la Capture de Leads / Inscriptions
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const leadSignupsCollection: PostgresCollectionConfig = {
+const leadSignupsCollection = defineCollection({
     slug: "lead_magnet_signups",
     name: "Lead Magnet Signups",
     table: "lead_magnet_signups",
@@ -248,7 +248,7 @@ const leadSignupsCollection: PostgresCollectionConfig = {
     properties: {
         email: { name: "Email", type: "string" }
     }
-};
+});
 ```
 
 ### Comment Fonctionnent les Requêtes Anonymes

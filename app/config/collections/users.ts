@@ -1,7 +1,7 @@
 import { maskEmail, maskName, maskValues } from "../masking";
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const usersCollection: PostgresCollectionConfig = {
+const usersCollection = defineCollection({
     name: "Users",
     singularName: "User",
     slug: "users",
@@ -163,6 +163,6 @@ span: 4 }
         listProperties: ["displayName", "email", "roles", "createdAt"],
         propertiesOrder: ["id", "email", "displayName", "roles", "createdAt"]
     }
-};
+});
 
 export default usersCollection;

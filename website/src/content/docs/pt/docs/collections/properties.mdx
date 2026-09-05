@@ -36,7 +36,7 @@ Todos os tipos de propriedades compartilham estas opções:
 | Propriedade | Tipo | Descrição |
 |----------|------|-------------|
 | `type` | `string` | **Obrigatório.** Tipo de dado (veja acima) |
-| `name` | `string` | **Obrigatório.** Rótulo de exibição |
+| `name` | `string` | Rótulo de exibição. Por padrão, a chave da propriedade, embelezada — `publishDate` → "Publish Date". |
 | `description` | `string` | Texto de ajuda exibido abaixo do campo |
 | `defaultValue` | `any` | Valor padrão para novas entidades |
 | `validation` | `object` | Regras de validação |
@@ -243,7 +243,7 @@ Campos numéricos são renderizados como um campo de texto padrão com validaç�
 | Propriedade | Tipo | Descrição |
 |----------|------|-------------|
 | `enum` | `EnumValues` | Renderizar como seletor com valores numéricos |
-| `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
+| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
 | `isId` | `string` | Estratégia de geração de ID |
 | `admin.clearable` | `boolean` | Adicionar um ícone para limpar o valor (definir como nulo) |
 

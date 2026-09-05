@@ -7,3 +7,9 @@
 //
 // A BaaS project has no admin panel and no reason for this file. Without it, `admin` on
 // a collection or a property is a type error, which is the guarantee.
+//
+// It is only needed by a file that annotates a collection with the *type* —
+// `const posts: PostgresCollectionConfig = { … }`. Every collection here is written with
+// `defineCollection()` instead, which is imported from `@rebasepro/cms-types` and brings
+// the augmentation with it. The reference stays because it costs one line and covers the
+// case where somebody reaches for the annotation.

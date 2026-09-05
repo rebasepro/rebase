@@ -121,7 +121,7 @@ export const orderItems = pgTable("order_items", {
 export const orders = pgTable("orders", {
     id: uuid("id").primaryKey().defaultRandom(),
     order_number: text("order_number").unique().notNull(),
-    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "restrict" }).notNull(),
     status: ordersStatus("status").notNull(),
     payment_status: ordersPayment_status("payment_status").notNull(),
     subtotal: numeric("subtotal"),

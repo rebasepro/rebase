@@ -32,6 +32,8 @@ import type {
     PostgresCollectionConfig,
     PostgresProperties,
     PostgresProperty,
+    Property,
+    Properties,
     StrictProperties,
     User
 } from "@rebasepro/types";
@@ -642,6 +644,70 @@ export type AdminCollectionOptions<
  */
 
 /**
+ * The engines a collection can name. Absent means Postgres.
+ *
+ * The discriminant that replaced three overloads of `defineCollection`. See
+ * {@link CollectionConfigForEngine} for why that mattered.
+ */
+type CollectionEngine = "postgres" | "firestore" | "mongodb";
+
+/**
+ * The concrete collection type an `engine` selects.
+ *
+ * `defineCollection` used to be three overloads — one per engine — and overload
+ * resolution is what made its errors unreadable. When no overload matches,
+ * TypeScript emits **one** diagnostic at the call site listing each overload's
+ * *first* failure, so:
+ *
+ *  - a bad `defaultValue` **and** a misspelled `admin.display.title` in the same
+ *    collection reported only the first. Fixing it revealed the second on the
+ *    next run, one per edit-compile cycle;
+ *  - the error landed on `defineCollection(`, not on the key that was wrong;
+ *  - and every Postgres collection's error dragged `FirebaseCollectionConfig`
+ *    and `MongoDBCollectionConfig` through the message, naming two engines the
+ *    author had not mentioned and does not use.
+ *
+ * With one signature there is no resolution to fail: each error is reported
+ * where it is, all of them at once, against the one config type the `engine`
+ * selects.
+ */
+type CollectionConfigForEngine<E, P, USER extends User> =
+    E extends "firestore" ? FirebaseCollectionConfig<EntityShapeOf<P>, USER>
+        : E extends "mongodb" ? MongoDBCollectionConfig<EntityShapeOf<P>, USER>
+            : PostgresCollectionConfig<EntityShapeOf<P>, USER>;
+
+/**
+ * `InferEntityType`, tolerant of a property map that has an error in it.
+ *
+ * `P` is deliberately **unconstrained** on the builder, and this is why. A
+ * constraint TypeScript cannot satisfy is a constraint it silently falls back
+ * from: one property with a bad `defaultValue` made `P extends PostgresProperties`
+ * fail, `P` became `PostgresProperties`, `M` became `Record<string, unknown>`,
+ * and every `admin` key — `display.title`, `listProperties`, `propertiesOrder` —
+ * widened to `string` and stopped being checked. So a collection with two
+ * mistakes reported one, and reported the second only after the first was fixed.
+ *
+ * With no constraint, `keyof P` survives a bad property and the `admin` block is
+ * still checked against the real key set. Exactness and the engine gate move
+ * into `StrictProperties`, which reports them on the property itself.
+ */
+type EntityShapeOf<P> = InferEntityType<{
+    [K in keyof P]: P[K] extends Property ? P[K] : Property;
+}>;
+
+/** The property union an engine admits — the engine gate, as a type. */
+type PropertyForEngine<E> =
+    E extends "firestore" ? FirebaseProperty
+        : E extends "mongodb" ? MongoProperty
+            : PostgresProperty;
+
+/** {@link PropertyForEngine} as a property map, for the `P` constraint. */
+type PropertiesForEngine<E> =
+    E extends "firestore" ? FirebaseProperties
+        : E extends "mongodb" ? MongoProperties
+            : PostgresProperties;
+
+/**
  * Define a collection with the admin block type-checked.
  *
  * The same identity function as `defineCollection` in `@rebasepro/common` — which
@@ -675,32 +741,41 @@ export type AdminCollectionOptions<
  * @group Builder
  */
 export function defineCollection<
-    const P extends PostgresProperties,
+    const E extends CollectionEngine = "postgres",
+    /**
+     * The properties, **constrained**. This is what checks them, and — just as
+     * importantly — what supplies the contextual type inside them: without a
+     * constraint the parameter of an inline
+     * `callbacks: { beforeSave: ({ value }) => … }` has nothing to be typed
+     * from, and TypeScript reports an implicit `any` on a callback the author
+     * wrote correctly.
+     */
+    const P extends PropertiesForEngine<E> & Properties = PropertiesForEngine<E> & Properties,
+    /**
+     * The properties again, **unconstrained**, and this is why there are two.
+     *
+     * A constraint TypeScript cannot satisfy is one it silently falls back
+     * from: one property with a bad `defaultValue` made `P` become
+     * `PostgresProperties`, the entity shape become `Record<string, unknown>`,
+     * and every `admin` key — `display.title`, `listProperties`,
+     * `propertiesOrder` — widen to `string` and stop being checked. A
+     * collection with two mistakes reported one, and revealed the second only
+     * after the first was fixed.
+     *
+     * `KEYS` has no constraint to fall back from, so `keyof KEYS` survives a bad
+     * property and the `admin` block is still checked against the real key set.
+     */
+    const KEYS = Properties,
     USER extends User = User
 >(
-    collection: Omit<PostgresCollectionConfig<InferEntityType<P>, USER>, "properties">
-        & { properties: StrictProperties<P, PostgresProperty> }
-): PostgresCollectionConfig<InferEntityType<P>, USER> & { properties: P };
+    collection: Omit<CollectionConfigForEngine<E, KEYS, USER>, "properties" | "engine">
+        & {
+            engine?: E;
+            properties: StrictProperties<P, PropertyForEngine<E>> & KEYS;
+        }
+): CollectionConfigForEngine<E, KEYS, USER> & { properties: KEYS };
 
-/** Define a Firestore-backed collection with the admin block checked. @group Builder */
-export function defineCollection<
-    const P extends FirebaseProperties,
-    USER extends User = User
->(
-    collection: Omit<FirebaseCollectionConfig<InferEntityType<P>, USER>, "properties">
-        & { properties: StrictProperties<P, FirebaseProperty> }
-): FirebaseCollectionConfig<InferEntityType<P>, USER> & { properties: P };
-
-/** Define a MongoDB-backed collection with the admin block checked. @group Builder */
-export function defineCollection<
-    const P extends MongoProperties,
-    USER extends User = User
->(
-    collection: Omit<MongoDBCollectionConfig<InferEntityType<P>, USER>, "properties">
-        & { properties: StrictProperties<P, MongoProperty> }
-): MongoDBCollectionConfig<InferEntityType<P>, USER> & { properties: P };
-
-/** Identity at runtime; the overloads above are the whole point. @group Builder */
+/** Identity at runtime; the signature above is the whole point. @group Builder */
 export function defineCollection(collection: CollectionConfig): CollectionConfig {
     return collection;
 }
@@ -717,16 +792,35 @@ export function defineCollection(collection: CollectionConfig): CollectionConfig
  */
 export type { AdminCollectionKey } from "@rebasepro/types";
 
+/** Compiles only when `T` is `never` — see {@link _EveryAdminCollectionOptionIsListed}. */
+type AssertNeverKey<T extends never = never> = T;
+
+/** Local alias, so the assertion below can name the list's element type. */
+type AdminCollectionKeyName = typeof CORE_ADMIN_COLLECTION_KEYS[number];
+
 /**
  * Core's list, re-exported through a `satisfies` clause that is the agreement
  * check: a key core names that is not an option here fails to compile, and
  * `satisfies` keeps the literal tuple type rather than widening it to `string[]`.
- *
- * The reverse direction — an option missing from core's list — has no type-level
- * expression, since there is no exhaustiveness check over an optional-property
- * keyof. `test/admin_collection.test.ts` counts them instead.
  */
 export const ADMIN_COLLECTION_KEYS = CORE_ADMIN_COLLECTION_KEYS satisfies readonly (keyof AdminCollectionOptions)[];
+
+/**
+ * And the reverse: an option declared here that core's list does not name.
+ *
+ * This direction was believed to have no type-level expression — `keyof` over
+ * optional properties does in fact yield them all, so it does. A test counted
+ * the list instead, which catches a *change* in size but not a key added to the
+ * options and forgotten here.
+ *
+ * It matters more since the boot validator started warning about unrecognised
+ * `admin` keys: a real option missing from this list would make the server
+ * report a correct config as a typo, and a check that cries wolf gets switched
+ * off. The compile error arrives at the person adding the option, which is the
+ * only moment anyone can fix it cheaply.
+ */
+type _EveryAdminCollectionOptionIsListed =
+    AssertNeverKey<Exclude<keyof AdminCollectionOptions, AdminCollectionKeyName>>;
 
 
 /**

@@ -1,5 +1,5 @@
 import { CollectionConfig, Property, Properties, MapProperty, ArrayProperty, StringProperty, NumberProperty, ResolvedRelation } from "@rebasepro/types";
-import { fieldKeyForColumn, findRelation, resolveCollectionRelations, sortCollectionsBySlug } from "@rebasepro/common";
+import { fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations, sortCollectionsBySlug } from "@rebasepro/common";
 import { toSafeIdentifier } from "./utils";
 
 /**
@@ -384,7 +384,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
                     ? `${fkType} | ${includedRelationType(relation, accessors)}`
                     : fkType;
 
-                const isRequired = Boolean(relation.validation?.required) && !shadowedByInclude;
+                const isRequired = isRelationRequired(collection, relation) && !shadowedByInclude;
                 lines.push(line(fkKey, isRequired ? tsType : `${tsType} | null`, !isRequired));
                 emittedKeys.add(fkKey);
             }
@@ -505,7 +505,7 @@ function emitWritableRelations(
     // `string | number` here accepted a string for a numeric-keyed target.
     const emit = (key: string, relation: ResolvedRelation): void => {
         if (emittedKeys.has(key)) return;
-        const optional = allOptional || !relation.validation?.required;
+        const optional = allOptional || !isRelationRequired(collection, relation);
         lines.push(line(key, foreignKeyType(relation), optional));
         emittedKeys.add(key);
     };

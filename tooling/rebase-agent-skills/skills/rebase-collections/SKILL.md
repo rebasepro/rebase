@@ -1165,14 +1165,14 @@ The link goes under `relation`, and its `kind` decides which fields apply.
 | `joinPath` | `JoinStep[]` | — | `via` only; read-only |
 | `cardinality` | `"one" \| "many"` | — | `via` only — a join chain cannot imply it |
 | `relationName` | `string` | property key | The name it is addressed by: `include`, admin tab, nested path segment |
-| `onDelete` | `OnAction` | — | Cascade rule on delete |
-| `onUpdate` | `OnAction` | — | Cascade rule on update |
+| `onDelete` | `OnAction` | `"restrict"` if required, else `"set null"` | Cascade rule on delete |
+| `onUpdate` | `OnAction` | — (Postgres `NO ACTION`) | Cascade rule on update |
 | `overrides` | `Partial<CollectionConfig>` | — | Override target collection config when rendered as subcollection tab |
 | `admin.fixedFilter` | `FilterValues` | — | Filter applied when selecting related entities |
 | `admin.includeId` | `boolean` | `true` | Show entity ID in the reference preview |
 | `admin.includeEntityLink` | `boolean` | `true` | Show link to open the related entity |
 | `isId` | `boolean` | — | Mark as primary key |
-| `validation` | `{ required?: boolean }` | — | Relation-level validation |
+| `validation` | `{ required?: boolean }` | — | On the **property**, not inside `relation` — a relation carrying its own `validation` is a boot error |
 
 ### Relation UI Options
 
@@ -1190,6 +1190,12 @@ The link goes under `relation`, and its `kind` decides which fields apply.
 | `"set null"` | Set FK to NULL |
 | `"no action"` | Defer to constraint check |
 | `"set default"` | Set FK to default value |
+
+Unset, `onDelete` is `"restrict"` for a required `belongsTo` and `"set null"`
+for an optional one. `required` says the child cannot exist without a parent, not
+that deleting the parent should delete the child — ask for `"cascade"` when that
+is what you mean. A `manyToMany` junction row is the exception: it defaults to
+`"cascade"`, because what it deletes is the link and not the target.
 
 ### Multi-Hop Joins (joinPath)
 

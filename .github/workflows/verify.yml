@@ -269,6 +269,13 @@ jobs:
       - name: Untranslated-string ratchet
         run: pnpm run check:untranslated
 
+      # The property and relation types are authored by hand, and for most of
+      # their fields the ONLY explanation anywhere is an editor's hover. A third
+      # of them had none, which is how `readOnly` and `disabled` came to be used
+      # interchangeably — they are not the same thing, and nothing said so.
+      - name: JSDoc coverage on the authoring types
+        run: pnpm run check:jsdoc-coverage
+
       # Astro and JSX drop the newline between a word and an adjacent tag rather
       # than collapsing it to a space, so a paragraph broken across two source
       # lines at that boundary renders "or runrebase dev". Invisible in the

@@ -38,7 +38,7 @@ All property types share these options:
 | Property | Type | Description |
 |----------|------|-------------|
 | `type` | `string` | **Required.** Data type (see above) |
-| `name` | `string` | **Required.** Display label |
+| `name` | `string` | Display label. Defaults to the property key, prettified — `publishDate` → "Publish Date". Set it when that derivation is wrong: `"URL"` rather than "Url". |
 | `description` | `string` | Help text shown below the field |
 | `defaultValue` | `any` | Default value for new entities |
 | `validation` | `object` | Validation rules |
@@ -252,7 +252,7 @@ Number fields render as a standard text input with numeric validation.
 | Property | Type | Description |
 |----------|------|-------------|
 | `enum` | `EnumValues` | Render as select with numeric values |
-| `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
+| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
 | `isId` | `string` | ID generation strategy |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 

@@ -297,9 +297,22 @@ export class CollectionRegistry {
                 if (declared) {
                     relationProperty.resolvedRelation = declared;
                 } else {
+                    // The boot validator refuses this shape outright, naming the
+                    // property and both ways to fix it — see
+                    // `checkRelationPropertiesResolve` in @rebasepro/server. This
+                    // stays as the second line, for the registries built outside
+                    // a validated boot: the panel's, and the collection editor's
+                    // preview of a config being written.
+                    //
+                    // Still `console.warn`. There is no logger below
+                    // @rebasepro/server, and this package runs in the browser as
+                    // well as on the server, so acquiring one is a design
+                    // decision rather than a substitution.
                     console.warn(
-                        `Relation property '${key}' on '${collection.slug}' declares no \`relation\`, and the ` +
-                        "collection has no relation of that name."
+                        `Relation property '${key}' on '${collection.slug}' names no relation: it has no ` +
+                        "`relation` block, and the collection's `relations` array has no entry called " +
+                        `'${key}'. The field will render no picker, generate no foreign key, and return ` +
+                        "nothing from `include()`."
                     );
                 }
             }

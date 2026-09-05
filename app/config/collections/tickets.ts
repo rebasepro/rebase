@@ -1,8 +1,9 @@
 import customersCollection from "./customers";
+import { defineCollection } from "@rebasepro/cms-types";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 import { fullName, joinParts, relatedRecord } from "../display";
 
-const ticketsCollection: PostgresCollectionConfig = {
+const ticketsCollection = defineCollection({
     name: "Tickets",
     singularName: "Ticket",
     slug: "tickets",
@@ -149,7 +150,7 @@ const ticketsCollection: PostgresCollectionConfig = {
             type: "relation",
             relation: {
                 kind: "belongsTo",
-                target: () => customersCollection,
+                target: (): PostgresCollectionConfig => customersCollection,
             }
         },
         assigned_to: {
@@ -266,6 +267,6 @@ const ticketsCollection: PostgresCollectionConfig = {
             }
         ]
     }
-};
+});
 
 export default ticketsCollection;

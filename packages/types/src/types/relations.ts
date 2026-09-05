@@ -39,15 +39,46 @@ export interface RelationBase {
     /** The collection on the other end. */
     target: () => AnyCollectionConfig;
 
+    /**
+     * What the database does to this side's foreign key when the target row's
+     * key changes. Emitted as the constraint's `ON UPDATE`.
+     *
+     * Unset means no clause, which Postgres reads as `NO ACTION`. Set
+     * `"cascade"` when the target's key is a natural key that can be edited —
+     * a slug, a SKU — so the pointers follow it.
+     *
+     * Only a `belongsTo` puts the key on this table, so this is the only kind
+     * where the clause is written here; on the other kinds it describes the
+     * constraint the target's own column carries.
+     */
     onUpdate?: OnAction;
+    /**
+     * What the database does to this side's rows when the target row is
+     * deleted. Emitted as the constraint's `ON DELETE`.
+     *
+     * Defaults, when unset, to `"set null"` for an optional relation and
+     * **`"restrict"`** for a required one. `NOT NULL` says a child cannot exist
+     * without a parent; it does not say deleting the parent should delete the
+     * child. Ask for `"cascade"` when that is what you mean — it is the one
+     * value that destroys rows you did not name.
+     *
+     * A `manyToMany` is the exception: its junction rows default to
+     * `"cascade"`, because the row deleted there is the link and not the target.
+     */
     onDelete?: OnAction;
 
-    /** Presentation overrides applied when this relation is rendered as a tab. */
+    /**
+     * Presentation overrides applied when this relation is rendered as a tab.
+     *
+     * Whether the link is *required* is not here: it is
+     * `validation: { required: true }` on the declaring property, the same key
+     * every other field uses. A relation carried its own copy until 0.18, and
+     * the two disagreed by construction — the DDL generator read the property
+     * (so the column was `NOT NULL`) while codegen read the relation (so the
+     * generated `Insert` type made it optional), and a `create()` that
+     * typechecked failed at the database.
+     */
     overrides?: Partial<AnyCollectionConfig>;
-
-    validation?: {
-        required?: boolean;
-    };
 }
 
 /**
@@ -191,6 +222,14 @@ export interface ViaRelation extends RelationBase {
     kind: "via";
     /** Whether the chain yields one row or many. Cannot be derived from a join chain. */
     cardinality: "one" | "many";
+    /**
+     * The joins, in order, from this collection's table to the target's.
+     *
+     * Each step names a table and the columns to join it on; the last step's
+     * table is the target. Read-only, because Rebase will not work out how to
+     * write through an arbitrary chain, and guessing is what this kind exists to
+     * stop.
+     */
     joinPath: JoinStep[];
 }
 
@@ -237,13 +276,27 @@ export type ResolvedRelation =
 export interface ResolvedRelationBase {
     /** Always set: defaulted during resolution if the author omitted it. */
     relationName: string;
+    /**
+     * The collection on the other end.
+     *
+     * Still a thunk — a relation between two collections that import each other
+     * has to be — but normalised: resolution unwraps the module namespace the
+     * author's `() => import(…)` may hand back, so every consumer gets the
+     * config and not a `{ default: … }` wrapper.
+     */
     target: () => AnyCollectionConfig;
     /** The target's slug, resolved once so consumers need not call `target()`. */
     targetSlug: string;
+    /** As authored — see {@link RelationBase.onUpdate}. Defaults are not filled in. */
     onUpdate?: OnAction;
+    /**
+     * As authored — see {@link RelationBase.onDelete}. `undefined` here means
+     * the author said nothing, and the DDL generator picks the default; it does
+     * **not** mean "no action".
+     */
     onDelete?: OnAction;
+    /** Presentation overrides applied when this relation is rendered as a tab. */
     overrides?: Partial<AnyCollectionConfig>;
-    validation?: { required?: boolean };
     /**
      * Whether one row or many come back. Derived from `kind` — kept because it
      * is what most consumers actually branch on, and because `via` is the one
@@ -317,6 +370,11 @@ export interface ResolvedManyToMany extends ResolvedRelationBase {
     cardinality: "many";
     writable: true;
     shared: true;
+    /**
+     * The junction table and its two key columns, with every default filled in:
+     * the table from both table names sorted and joined, the columns from each
+     * endpoint's slug.
+     */
     through: {
         table: string;
         sourceColumn: string;
@@ -328,6 +386,7 @@ export interface ResolvedManyToMany extends ResolvedRelationBase {
 export interface ResolvedVia extends ResolvedRelationBase {
     kind: "via";
     writable: false;
+    /** The chain as authored — see {@link ViaRelation.joinPath}. Nothing to default. */
     joinPath: JoinStep[];
 }
 

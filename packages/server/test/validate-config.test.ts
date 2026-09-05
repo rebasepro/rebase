@@ -42,10 +42,38 @@ describe("a current-era config", () => {
         expect(findCollectionConfigProblems([valid()])).toEqual([]);
     });
 
-    it("does not look inside the admin block for keys it simply does not know", () => {
-        // The block belongs to @rebasepro/cms-types, which the server may not
-        // import. Guessing at its contents here would reject keys the panel adds.
+    it("warns on a key the admin block does not have", () => {
+        // It used to look the other way here, on the reasoning that the block
+        // belongs to @rebasepro/cms-types and guessing at its contents would
+        // reject options the panel had added. But the list it is checked
+        // against — `ADMIN_COLLECTION_KEYS` — lives in core so that core can
+        // read it, and cms-types type-checks it against the options in both
+        // directions. It cannot fall behind the panel, so the block was simply
+        // the one place where a typo produced no signal at all.
         const collection = { ...valid(), admin: { icon: "Article", somethingTheAdminAdded: true } };
+        const [problem] = warnings([collection]);
+        expect(problem.path).toBe("posts.admin.somethingTheAdminAdded");
+        expect(errors([collection])).toEqual([]);
+    });
+
+    it("suggests the key an admin typo was one edit from", () => {
+        const collection = valid();
+        collection.properties.body = { name: "Body", type: "string", admin: { multilne: true } } as never;
+
+        const [problem] = warnings([collection]);
+
+        expect(problem.path).toBe("posts.properties.body.admin.multilne");
+        expect(problem.message).toContain("Did you mean `multiline`?");
+    });
+
+    it("accepts every key the admin block really has", () => {
+        const collection = valid();
+        collection.properties.body = {
+            name: "Body",
+            type: "string",
+            admin: { multiline: true, markdown: true, readOnly: false, columnWidth: 200 }
+        } as never;
+
         expect(findCollectionConfigProblems([collection])).toEqual([]);
     });
 
@@ -76,7 +104,7 @@ describe("known-renamed keys", () => {
         const relationName = found.find(p => p.path === "posts.properties.author.relationName");
         expect(relationName?.message).toContain("no longer read here");
         expect(relationName?.message).toContain("move `relationName` inside `relation`");
-        expect(relationName?.message).toContain("relations-tagged-union.mjs");
+        expect(relationName?.message).not.toContain("tooling/");
     });
 
     it("errors on `direction`, which the tagged union replaced rather than moved", () => {
@@ -103,7 +131,7 @@ describe("known-renamed keys", () => {
         expect(problem.path).toBe("posts.icon");
         expect(problem.message).toContain("moved into the collection's `admin` block in 0.11");
         expect(problem.message).toContain("admin: { icon: … }");
-        expect(problem.message).toContain("collections-admin-block.mjs");
+        expect(problem.message).not.toContain("tooling/");
     });
 
     it("errors on a property-level `ui`, which became `admin`", () => {
@@ -154,6 +182,39 @@ describe("known-renamed keys", () => {
         expect(problem.path).toBe("posts.properties.author.relation.localKey");
         expect(problem.message).toContain("not valid on a \"hasMany\" relation");
     });
+
+    // Not a rename with a silent fallback: the surviving key is one level up
+    // and unset, so ignoring this would turn a required relation optional in
+    // the generated types and nullable in the column, quietly.
+    it("errors on a relation carrying its own `validation`, naming the property's", () => {
+        const collection = valid();
+        collection.properties.author.relation = {
+            kind: "belongsTo",
+            target: () => ({}),
+            relationName: "author",
+            validation: { required: true }
+        } as never;
+
+        const [problem] = errors([collection]);
+
+        expect(problem.path).toBe("posts.properties.author.relation.validation");
+        expect(problem.message).toContain("no longer read here");
+        expect(problem.message).toContain("the property's `validation.required`");
+    });
+
+    it("errors on a `relations[]` entry carrying its own `validation`", () => {
+        const collection = { ...valid(), relations: [{
+            kind: "belongsTo",
+            relationName: "editor",
+            target: () => ({}),
+            validation: { required: true }
+        }] };
+
+        const [problem] = errors([collection]);
+
+        expect(problem.path).toBe("posts.relations[editor].validation");
+        expect(problem.message).toContain("the property's `validation.required`");
+    });
 });
 
 /**
@@ -198,6 +259,91 @@ describe("a `validation.matches` that cannot compile", () => {
 
     it("says nothing when there is no `matches` rule", () => {
         expect(errors([valid()])).toEqual([]);
+    });
+});
+
+/**
+ * An enum's ids are the labels of a Postgres enum type, and Postgres will not
+ * hold the same label twice.
+ *
+ * `CREATE TYPE "posts_status" AS ENUM ('draft', 'draft')` raises `23505` on
+ * `pg_enum_typid_label_index` — verified against PGlite — and boot read every
+ * `pg_catalog` unique violation as a lost race with a peer pod. So it skipped
+ * the statement, the type was never created, and the column became plain `TEXT`:
+ * the config said "one of these three", the database accepted any string, and
+ * nothing anywhere said so.
+ */
+describe("enum ids and labels", () => {
+    const withEnum = (values: unknown) => {
+        const collection = valid();
+        return {
+            ...collection,
+            properties: {
+                ...collection.properties,
+                status: { name: "Status", type: "string", enum: values }
+            }
+        };
+    };
+
+    it("errors on two entries sharing an id, naming the property", () => {
+        const [problem] = errors([withEnum([
+            { id: "draft", label: "Draft" },
+            { id: "published", label: "Published" },
+            { id: "draft", label: "Also draft" }
+        ])]);
+
+        expect(problem?.path).toBe("posts.properties.status.enum[2]");
+        expect(problem?.message).toContain("repeats the id `draft`");
+        expect(problem?.message).toMatch(/falls back to plain text/);
+    });
+
+    it("refuses to boot on it", () => {
+        expect(() => assertCollectionConfigs([withEnum([
+            { id: "draft", label: "Draft" },
+            { id: "draft", label: "Draft again" }
+        ])])).toThrow(/repeats the id/);
+    });
+
+    it("errors on a blank id", () => {
+        const [problem] = errors([withEnum([{ id: "  ", label: "Nothing" }])]);
+        expect(problem?.path).toBe("posts.properties.status.enum[0]");
+        expect(problem?.message).toContain("blank `id`");
+    });
+
+    it("errors on a blank label", () => {
+        const [problem] = errors([withEnum([{ id: "draft", label: "" }])]);
+        expect(problem?.message).toContain("blank `label`");
+    });
+
+    // A repeated label is not a database error — it is two dropdown options
+    // that read the same. Worth saying, not worth refusing to boot over.
+    it("warns on a repeated label", () => {
+        const found = warnings([withEnum([
+            { id: "draft", label: "Draft" },
+            { id: "wip", label: "Draft" }
+        ])]);
+        expect(found[0]?.message).toContain("repeats the label \"Draft\"");
+        expect(errors([withEnum([
+            { id: "draft", label: "Draft" },
+            { id: "wip", label: "Draft" }
+        ])])).toEqual([]);
+    });
+
+    it("accepts the record form, whose keys cannot collide", () => {
+        expect(errors([withEnum({ draft: "Draft", published: "Published" })])).toEqual([]);
+    });
+
+    it("errors on a blank label in the record form", () => {
+        const [problem] = errors([withEnum({ draft: "" })]);
+        expect(problem?.path).toBe("posts.properties.status.enum.draft");
+        expect(problem?.message).toContain("blank `label`");
+    });
+
+    it("says nothing about a well-formed enum", () => {
+        expect(findCollectionConfigProblems([withEnum([
+            { id: "draft", label: "Draft" },
+            { id: "published", label: "Published" }
+        ])])).toEqual([]);
     });
 });
 
@@ -318,6 +464,147 @@ describe("unrecognised keys", () => {
     });
 });
 
+/**
+ * Two questions no collection can answer about itself.
+ *
+ * `CollectionRegistry` registers by slug and by table name, and
+ * `_registerRecursively` returns early when the table is already there — so the
+ * second collection to claim either one was dropped without a word. Its routes
+ * did not exist, its relations resolved to the other collection's rows, and the
+ * file sat in `config/collections` looking loaded.
+ */
+describe("two collections claiming one identity", () => {
+    it("errors on a duplicate slug, naming both files", () => {
+        const a = { ...valid(), table: "posts_a" };
+        const b = { ...valid(), table: "posts_b" };
+
+        const [problem] = errors([a, b], { sources: ["posts.ts", "blog_posts.ts"] });
+
+        expect(problem.path).toBe("posts");
+        expect(problem.message).toContain("2 collections declare `slug: \"posts\"`");
+        expect(problem.message).toContain("posts.ts");
+        expect(problem.message).toContain("blog_posts.ts");
+    });
+
+    it("refuses to boot on it", () => {
+        expect(() => assertCollectionConfigs([
+            { ...valid(), table: "posts_a" },
+            { ...valid(), table: "posts_b" }
+        ])).toThrow(/declare `slug: "posts"`/);
+    });
+
+    it("falls back to the index when no source is given", () => {
+        const [problem] = errors([{ ...valid(), table: "a" }, { ...valid(), table: "b" }]);
+        expect(problem.message).toContain("collection[0]");
+        expect(problem.message).toContain("collection[1]");
+    });
+
+    it("errors on two slugs resolving to one table", () => {
+        const a = { ...valid(), slug: "posts", table: "content" };
+        const b = { ...valid(), slug: "articles", table: "content" };
+
+        const [problem] = errors([a, b], { sources: ["posts.ts", "articles.ts"] });
+
+        expect(problem.path).toBe("public.content");
+        expect(problem.message).toContain("resolve to the table `public.content`");
+        expect(problem.message).toContain("articles.ts");
+    });
+
+    // The table is derived from the slug when none is declared, so this is the
+    // shape a duplicate usually arrives in.
+    it("catches a duplicate table that nobody wrote down", () => {
+        const a = { ...valid(), slug: "posts", table: undefined };
+        const b = { ...valid(), slug: "posts", table: undefined };
+
+        expect(errors([a, b]).length).toBeGreaterThan(0);
+    });
+
+    it("says it once when the slug is what collided", () => {
+        // Both errors would fire — same slug, therefore same derived table —
+        // and the second adds nothing the first did not say.
+        const found = errors([{ ...valid(), table: undefined }, { ...valid(), table: undefined }]);
+        expect(found.map(p => p.path)).toEqual(["posts"]);
+    });
+
+    it("lets two collections share a name in different schemas", () => {
+        const a = { ...valid(), slug: "posts", table: "posts" };
+        const b = { ...valid(), slug: "archived_posts", table: "posts", schema: "archive" };
+
+        expect(errors([a, b])).toEqual([]);
+    });
+
+    it("says nothing about a directory of distinct collections", () => {
+        const a = { ...valid(), slug: "posts", table: "posts" };
+        const b = { ...valid(), slug: "authors", table: "authors" };
+
+        expect(findCollectionConfigProblems([a, b])).toEqual([]);
+    });
+});
+
+/**
+ * A relation property that names no relation is a relation in name only.
+ *
+ * The registry noticed and answered with one `console.warn` on stdout, at the
+ * moment the panel builds its registry — which in a deployed backend nobody
+ * reads. Everything downstream then behaved as though the field were not a
+ * relation at all: no picker in the form, no foreign key in the schema, nothing
+ * from `include()`.
+ */
+describe("a relation property that names no relation", () => {
+    const withRelationProperty = (property: unknown, relations?: unknown[]) => {
+        const collection = valid();
+        return {
+            ...collection,
+            properties: { ...collection.properties, editor: property },
+            ...(relations ? { relations } : {})
+        };
+    };
+
+    it("errors, naming the property and both ways to fix it", () => {
+        const [problem] = errors([withRelationProperty({ name: "Editor", type: "relation" })]);
+
+        expect(problem.path).toBe("posts.properties.editor");
+        expect(problem.message).toContain("names no relation");
+        expect(problem.message).toContain("`relation: { kind: …, target: … }`");
+        expect(problem.message).toContain("relationName: \"editor\"");
+    });
+
+    it("refuses to boot on it", () => {
+        expect(() => assertCollectionConfigs([withRelationProperty({ name: "Editor", type: "relation" })]))
+            .toThrow(/names no relation/);
+    });
+
+    it("is an incoherent config, not an unknown key", () => {
+        // `REBASE_STRICT_COLLECTION_CONFIG` has no bearing on it, and offering
+        // that variable as the remedy would send somebody somewhere useless.
+        const [problem] = errors([withRelationProperty({ name: "Editor", type: "relation" })]);
+        expect(problem.kind).toBe("incoherent");
+    });
+
+    it("accepts the inline block", () => {
+        expect(errors([withRelationProperty({
+            name: "Editor",
+            type: "relation",
+            relation: { kind: "belongsTo", target: () => ({}) }
+        })])).toEqual([]);
+    });
+
+    it("accepts a `relations[]` entry the property key addresses", () => {
+        expect(errors([withRelationProperty(
+            { name: "Editor", type: "relation" },
+            [{ kind: "belongsTo", relationName: "editor", target: () => ({}) }]
+        )])).toEqual([]);
+    });
+
+    it("still errors when the `relations[]` entry is called something else", () => {
+        const found = errors([withRelationProperty(
+            { name: "Editor", type: "relation" },
+            [{ kind: "belongsTo", relationName: "reviewer", target: () => ({}) }]
+        )]);
+        expect(found.map(p => p.path)).toContain("posts.properties.editor");
+    });
+});
+
 describe("reporting", () => {
     it("reports every problem across every collection in one pass", () => {
         // A user migrating wants the whole list, not one boot per defect.
@@ -325,6 +612,9 @@ describe("reporting", () => {
         const b = {
             ...valid(),
             slug: "authors",
+            // Its own table: `valid()` carries `table: "posts"`, and two
+            // collections resolving to one table is now its own error.
+            table: "authors",
             hideFromNavigation: true,
             properties: {
                 id: { name: "ID", type: "string", isId: "uuid" },
@@ -546,5 +836,77 @@ describe("the two kinds of problem are reported apart", () => {
             spy.mockRestore();
         }
         expect(logged.join("\n")).toContain("REBASE_STRICT_COLLECTION_CONFIG");
+    });
+});
+
+/**
+ * Every message here is read by somebody who installed `@rebasepro/server` from
+ * npm, and who has none of this repository on disk.
+ *
+ * Two of them used to end with "Run `node
+ * tooling/scripts/codemod/relations-tagged-union.mjs` to migrate the whole
+ * project". `tooling/` is not in the published package, so the single actionable
+ * instruction those messages carried was the one thing the reader could not do
+ * — and it sat where the per-key "write this instead" should have been.
+ *
+ * A grep over the source would not hold this: the same string is legitimate in a
+ * comment about this repo's own gates. So this asserts the property that
+ * matters — no path into this repository reaches a *message* — by driving the
+ * validator over every migrated key it knows and reading what comes out.
+ */
+describe("no message names a path inside this repository", () => {
+    const everyKnownMistake = (): unknown[] => [
+        // Collection-level keys that moved into the admin block.
+        { ...valid(), icon: "Article", group: "Content", listProperties: ["title"] },
+        // The admin block's own removed key.
+        { ...valid(), admin: { icon: "Article", titleProperty: "name" } },
+        // A property with presentation left at the top level, and a `ui` block.
+        {
+            ...valid(),
+            properties: {
+                ...valid().properties,
+                title: { name: "Title", type: "string", readOnly: true, multiline: true },
+                body: { name: "Body", type: "string", ui: { markdown: true } }
+            }
+        },
+        // A pre-0.11 flat relation, and the fields the tagged union dropped.
+        {
+            ...valid(),
+            properties: {
+                ...valid().properties,
+                author: {
+                    name: "Author",
+                    type: "relation",
+                    target: () => ({}),
+                    localKey: "author_id",
+                    direction: "owning",
+                    cardinality: "one",
+                    inverseRelationName: "posts"
+                }
+            }
+        },
+        // A relation with no `kind` at all.
+        {
+            ...valid(),
+            properties: {
+                ...valid().properties,
+                author: { name: "Author", type: "relation", relation: { target: () => ({}) } }
+            }
+        },
+        // An unknown key, which takes the other message path.
+        { ...valid(), whatIsThis: true, admin: { icon: "Article", multilne: true } }
+    ];
+
+    it("says nothing about `tooling/`, `packages/` or a `.mjs` script", () => {
+        const problems = findCollectionConfigProblems(everyKnownMistake());
+
+        // A guard over an empty list guards nothing.
+        expect(problems.length).toBeGreaterThan(10);
+
+        for (const problem of problems) {
+            expect(problem.message).not.toContain("tooling/");
+            expect(problem.message).not.toContain("packages/");
+            expect(problem.message).not.toMatch(/\.mjs\b/);
+        }
     });
 });
