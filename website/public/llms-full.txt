@@ -18633,9 +18633,11 @@ unaffected; those travel through Postgres CDC.
 
 ## Deploying Rebase on AWS
 
-Amazon Web Services (AWS) provides incredible scale and enterprise-grade security. For a production Rebase deployment, we recommend decoupling the architecture by using **Amazon RDS** for the PostgreSQL database and **AWS App Runner** (or ECS Fargate) to serve the Node.js backend. 
+Amazon Web Services (AWS) provides incredible scale and enterprise-grade security. For a production Rebase deployment, we recommend decoupling the architecture by using **Amazon RDS** for the PostgreSQL database and **AWS App Runner** (or ECS Fargate) to serve the runtime.
 
 To maintain strict European data compliance, ensure you operate entirely within an EU region, such as **eu-central-1 (Frankfurt)**, **eu-west-1 (Ireland)**, or **eu-west-3 (Paris)**.
+
+Nothing on this page is AWS-specific about your project. A Rebase deployment is two separable pieces — the published runtime image, and the **bundle** that `rebase build` produces — and the same bundle runs under Docker Compose on a laptop, on Rebase Cloud, under the [Helm chart](/docs/deployment/kubernetes) and here. Moving between them is a change of infrastructure, not of application.
 
 ### 1. Provision Amazon RDS (PostgreSQL)
 
@@ -18645,20 +18647,35 @@ To maintain strict European data compliance, ensure you operate entirely within 
 4. Under Templates, choose **Production** or **Free tier/Dev** depending on your load.
 5. Create a Master Username (e.g., `rebase_admin`) and securely generate a Master Password.
 6. Under Connectivity, ensure the database is placed within a **VPC** that your future App Runner instance can securely access (or make it publicly accessible if strictly controlling ingress IP ranges).
-7. Once provisioned, note the **Endpoint endpoint address** and assemble your URI:
+7. Once provisioned, note the **Endpoint address** and assemble your URI:
    `postgresql://rebase_admin:YOUR_PASSWORD@YOUR_ENDPOINT:5432/postgres`
 
-### 2. Push Image to ECR (Elastic Container Registry)
+If your collections declare a `vector` property, the instance needs the `pgvector` extension — RDS ships it, but it has to be enabled: `CREATE EXTENSION vector;` against the database, once.
 
-AWS App Runner pulls directly from ECR. Build your Docker image locally and push it.
+### 2. Build the bundle and bake it into an image
 
-1. Navigate to **Elastic Container Registry** and create a new private repository called `rebase-backend`.
-2. Grab the push commands provided by AWS in the console (which handle Docker authentication).
-3. Build your image locally **from the project root** — the backend Dockerfile needs the whole workspace as its build context (it copies `pnpm-workspace.yaml`, `backend/`, and `config/`), so `./backend` as the context will fail:
+There is **no application image to build from your source**. `rebase build` produces a `dist-bundle` directory with your compiled collections, functions, crons and — if your project declares a static app — your built frontend. The published runtime image runs it:
+
+```bash
+rebase build
+```
+
+For App Runner, which pulls from a registry, bake the bundle into a derived image. That is three lines and it pins exactly what runs:
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+1. Navigate to **Elastic Container Registry** and create a private repository called `rebase-backend`.
+2. Grab the push commands AWS shows in the console — they handle Docker authentication.
+3. Build and push, from the project root:
    ```bash
-   docker build -t rebase-backend -f backend/Dockerfile .
+   docker build -t rebase-backend .
    ```
-4. Tag and push it to your newly created ECR repository.
+4. Tag and push it to your ECR repository.
+
+Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched, and nothing about your project is rebuilt.
 
 ### 3. Deploy via AWS App Runner
 
@@ -18667,14 +18684,15 @@ App Runner is the simplest way to run containers on AWS without managing orchest
 1. Navigate to **AWS App Runner** and click **Create service**.
 2. Select **Container registry** and choose **Amazon ECR**.
 3. Browse and select your `rebase-backend` image.
-4. Under **Service settings**, set the Port to **3001**.
-5. Add the necessary Environment Variables under the configuration tab:
-   
+4. Under **Service settings**, set the Port to **8080** — the port the runtime image listens on unless `PORT` says otherwise.
+5. Set the **health check** path to `/livez`. Not `/health`: that one performs a database round-trip, so a liveness probe on it restarts a perfectly healthy service during a brief database hiccup.
+6. Add the environment variables:
+
 | Key | Value |
 |-----|-------|
-| `DATABASE_URL` | Your RDS Connection String |
-| `JWT_SECRET` | A secure randomly generated hash (32+ chars) |
-| `REBASE_SERVICE_KEY` | A secure randomly generated hash (32+ chars) |
+| `DATABASE_URL` | Your RDS connection string |
+| `JWT_SECRET` | A secure randomly generated string (32+ chars) |
+| `REBASE_SERVICE_KEY` | A secure randomly generated string (32+ chars) |
 | `NODE_ENV` | `production` |
 | `CORS_ORIGINS` | Your frontend domain (e.g., `https://yourdomain.com`) |
 | `FRONTEND_URL` | Your frontend URL (used for email links and CORS fallback) |
@@ -18682,47 +18700,73 @@ App Runner is the simplest way to run containers on AWS without managing orchest
 | `REBASE_ADMIN_EMAIL` | The first administrator's address, set **before the first boot** |
 | `REBASE_ADMIN_PASSWORD` | At least 12 characters |
 
-The last three are how this deployment gets an administrator at all: in
-production the first account to register is not promoted, so nothing else
-produces the first signed-in caller. See [Your first
-admin](/docs/getting-started/deployment/#your-first-admin).
+The last three are how this deployment gets an administrator at all: in production the first account to register is not promoted, so nothing else produces the first signed-in caller. See [Your first admin](/docs/getting-started/deployment/#your-first-admin). Put the secrets in AWS Secrets Manager and reference them rather than typing them into the console form.
 
-6. (Optional) If your RDS instance is strictly private, configure **Custom VPC** networking in App Runner so the container can securely talk to the database.
-7. Click **Create & deploy**.
+7. (Optional) If your RDS instance is strictly private, configure **Custom VPC** networking in App Runner so the container can reach the database.
+8. Click **Create & deploy**.
 
-AWS will handle TLS termination (providing an `https` URL out of the box) and spin up the Rebase server.
+AWS handles TLS termination, giving you an `https` URL out of the box.
 
-### Create the Database Schema
+### 4. The schema
 
-The service is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+**The runtime creates missing tables at boot, including your collections'.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty RDS instance comes up serving your collections.
+
+What `ensure` never does is change something that already exists: it does not alter a column type, drop anything, or edit an existing enum's labels, because a container restart must not reshape a schema as a side effect of a deploy.
+
+Two things therefore still need the CLI, run from a checkout or a CI job with `DATABASE_URL` pointed at RDS:
 
 ```bash
-pnpm run db:push
+rebase db push
 ```
 
-Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your RDS endpoint. If the instance is private, run it from CI or a bastion host inside the same VPC. The deployed image doesn't include the CLI, so this doesn't run inside the App Runner container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
+- **Junction-table RLS** for many-to-many relations.
+- **Any change that is not purely additive** — a renamed column, a narrowed type, a removed field.
+
+If the instance is private, run it from CI or a bastion host inside the same VPC. The runtime image ships without the CLI, so this never runs inside the App Runner container. For versioned migrations, commit migration files with `rebase db generate` and run `rebase db migrate` as a release step instead.
+
+### File storage
+
+App Runner instances have no durable disk, so local file storage is silent data loss and the runtime refuses it in production. Create an S3 bucket in the same region and set `STORAGE_TYPE=s3` with its bucket and credentials — see [Storage](/docs/backend/storage).
+
+### Next steps
+
+- [Deployment](/docs/getting-started/deployment) — the production checklist, and the first-admin rules every platform shares.
+- [Configuration](/docs/getting-started/configuration) — every environment variable the runtime reads.
 
 ## Deploying Rebase on Google Cloud Platform
 
-Google Cloud Platform (GCP) offers an incredibly seamless developer experience for containerized applications. For a robust production setup, we leverage **Cloud SQL** for the database and **Cloud Run** for the serverless container backbone.
+Google Cloud Platform (GCP) offers a seamless developer experience for containerized applications. For a robust production setup, use **Cloud SQL** for the database and **Cloud Run** for the runtime.
 
-To maintain strict European data compliance, ensure you operate entirely within an EU region, such as **europe-west3 (Frankfurt)**, **europe-west9 (Paris)**, or **europe-west1 (Belgium)**.
+To maintain strict European data compliance, operate entirely within an EU region such as **europe-west3 (Frankfurt)**, **europe-west9 (Paris)**, or **europe-west1 (Belgium)**.
+
+Nothing on this page is GCP-specific about your project. A Rebase deployment is two separable pieces — the published runtime image, and the **bundle** that `rebase build` produces — and the same bundle runs under Docker Compose on a laptop, on Rebase Cloud, under the [Helm chart](/docs/deployment/kubernetes) and here.
 
 ### 1. Provision Cloud SQL (PostgreSQL)
 
 1. Navigate to the **Cloud SQL** console in your preferred EU region.
 2. Click **Create Instance** and select **PostgreSQL**.
-3. Set your Instance ID and generate a secure built-in password for the `postgres` user.
-4. Expand the **Configuration Options** to allocate the correct Machine Type (a standard 2 vCPU machine is a great start).
-5. Ensure the database is configured for Private IP or Authorized Public IP networks, depending on your VCP setup with Cloud Run.
+3. Set your Instance ID and generate a secure password for the `postgres` user.
+4. Expand **Configuration Options** to choose a machine type (two vCPUs is a good start).
+5. Configure Private IP or an authorized public network, depending on how Cloud Run will reach it.
 6. Assemble your connection URI:
    `postgresql://postgres:YOUR_PASSWORD@YOUR_IP:5432/postgres`
 
-### 2. Build and Deploy to Cloud Run
+If your collections declare a `vector` property, enable the extension once: `CREATE EXTENSION vector;` against the database.
 
-Cloud Run scales the Rebase Node.js backend automatically down to zero (if desired) and handles TLS out of the box. You can build and deploy the application in a single CLI motion from your local workspace using Google Cloud Build.
+### 2. Build the bundle and bake it into an image
 
-Ensure you have the `gcloud` CLI installed and authenticated:
+There is **no application image to build from your source**. `rebase build` produces a `dist-bundle` directory with your compiled collections, functions, crons and — if your project declares a static app — your built frontend. The published runtime image runs it:
+
+```bash
+rebase build
+```
+
+Cloud Run pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
 
 ```bash
 # Set your active GCP project
@@ -18734,79 +18778,115 @@ gcloud artifacts repositories create rebase --repository-format=docker --locatio
 # Authenticate Docker to Artifact Registry (one-time)
 gcloud auth configure-docker europe-west3-docker.pkg.dev
 
-# Build from the PROJECT ROOT — the backend Dockerfile needs the whole
-# workspace as its build context (pnpm-workspace.yaml, backend/, config/),
-# so a ./backend context will fail. Then push.
-docker build -f backend/Dockerfile -t europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest .
+# Build from the project root and push
+docker build -t europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest .
 docker push europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest
+```
 
-# Deploy the image to Cloud Run
+Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched.
+
+### 3. Deploy to Cloud Run
+
+```bash
 gcloud run deploy rebase-backend \
   --image europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest \
   --region europe-west3 \
-  --port 3001 \
-  --set-env-vars DATABASE_URL="postgresql://...",JWT_SECRET="YOUR_SECURE_RANDOM_STRING",REBASE_SERVICE_KEY="YOUR_SERVICE_KEY",NODE_ENV="production",CORS_ORIGINS="https://yourdomain.com",FRONTEND_URL="https://yourdomain.com",DISABLE_SELF_REGISTRATION="true",REBASE_ADMIN_EMAIL="you@yourdomain.com",REBASE_ADMIN_PASSWORD="AT_LEAST_TWELVE_CHARS" \
+  --set-env-vars NODE_ENV="production",CORS_ORIGINS="https://yourdomain.com",FRONTEND_URL="https://yourdomain.com",DISABLE_SELF_REGISTRATION="true",REBASE_ADMIN_EMAIL="you@yourdomain.com" \
+  --set-secrets DATABASE_URL=rebase-database-url:latest,JWT_SECRET=rebase-jwt-secret:latest,REBASE_SERVICE_KEY=rebase-service-key:latest,REBASE_ADMIN_PASSWORD=rebase-admin-password:latest \
   --allow-unauthenticated
 ```
 
-`REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` are how this service gets an
-administrator at all: in production the first account to register is not
-promoted, so nothing else produces the first signed-in caller. Set them before
-the first revision serves traffic — see [Your first
-admin](/docs/getting-started/deployment/#your-first-admin). Put the password in
-Secret Manager rather than on the command line for a real deployment;
-`--set-secrets` mounts it the same way.
+Cloud Run injects `PORT` and the runtime binds to it, so there is no port to configure. Point the startup probe at `/livez` rather than `/health`: the second performs a database round-trip, so a liveness probe on it restarts a healthy revision during a brief database hiccup.
 
-### 3. Handle File Storage
-Since Cloud Run instances are strictly stateless and ephemeral, you cannot use local disk storage for Rebase File Uploads.
+`REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` are how this service gets an administrator at all: in production the first account to register is not promoted, so nothing else produces the first signed-in caller. Set them before the first revision serves traffic — see [Your first admin](/docs/getting-started/deployment/#your-first-admin).
 
-1. Navigate to **Google Cloud Storage** and create a new private bucket in your chosen EU region.
-2. Follow the [Rebase Storage Documentation](/docs/backend/storage) to configure Rebase to use the S3-compatible API provided by Google Cloud Storage instead of the local filesystem.
+`--set-env-vars` replaces the **whole** environment block on every deploy, so a later deploy that omits a variable silently unsets it. Keep the full list in your deploy script.
 
-Your Rebase instance is now fully serverless and highly scalable natively inside the EU!
+Reaching a private Cloud SQL instance needs `--add-cloudsql-instances YOUR_PROJECT:REGION:INSTANCE` and a socket-style `DATABASE_URL`; a public instance with an authorized network needs neither.
 
-### Create the Database Schema
+### 4. The schema
 
-The service is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+**The runtime creates missing tables at boot, including your collections'.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty instance comes up serving your collections.
+
+What `ensure` never does is change something that already exists: it does not alter a column type, drop anything, or edit an existing enum's labels, because a revision starting must not reshape a schema as a side effect of a deploy.
+
+Two things therefore still need the CLI, run from a checkout or a CI job:
 
 ```bash
-pnpm run db:push
+rebase db push
 ```
 
-Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Cloud SQL instance. From your machine, connect through the [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) and point `DATABASE_URL` at `localhost`. The deployed image doesn't include the CLI, so this doesn't run inside the Cloud Run container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
+- **Junction-table RLS** for many-to-many relations.
+- **Any change that is not purely additive** — a renamed column, a narrowed type, a removed field.
+
+From your machine, connect through the [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) and point `DATABASE_URL` at `localhost`. The runtime image ships without the CLI, so this never runs inside the Cloud Run container. For versioned migrations, commit migration files with `rebase db generate` and run `rebase db migrate` as a release step instead.
+
+### File storage
+
+Cloud Run instances are stateless and ephemeral, so local file storage is silent data loss and the runtime refuses it in production.
+
+1. Create a private Google Cloud Storage bucket in your chosen EU region.
+2. Set `STORAGE_TYPE=gcs` and its bucket — see [Storage](/docs/backend/storage). On Cloud Run the ambient service account supplies the credentials, so there is nothing else to set.
+
+:::caution
+Cloud Run scales to zero. If your project uses realtime subscriptions, set `--min-instances 1` — WebSocket connections are terminated when an instance is scaled down.
+:::
+
+### Next steps
+
+- [Deployment](/docs/getting-started/deployment) — the production checklist, and the first-admin rules every platform shares.
+- [Configuration](/docs/getting-started/configuration) — every environment variable the runtime reads.
 
 ## Deploying Rebase on Microsoft Azure
 
-Microsoft Azure offers tight integrations and enterprise compliance. The optimal architecture for running Rebase on Azure involves using **Azure Database for PostgreSQL - Flexible Server** for the data layer and **Azure Container Apps** for hosting the backend container.
+Microsoft Azure offers tight integrations and enterprise compliance. The optimal architecture for running Rebase on Azure uses **Azure Database for PostgreSQL – Flexible Server** for the data layer and **Azure Container Apps** for the runtime.
 
 To adhere to European data compliance and fast local response times, provision your resources in regions like **West Europe (Amsterdam)**, **North Europe (Ireland)**, or **France Central (Paris)**.
+
+Nothing on this page is Azure-specific about your project. A Rebase deployment is two separable pieces — the published runtime image, and the **bundle** that `rebase build` produces — and the same bundle runs under Docker Compose on a laptop, on Rebase Cloud, under the [Helm chart](/docs/deployment/kubernetes) and here.
 
 ### 1. Provision PostgreSQL Flexible Server
 
 1. From the Azure Portal, search for and select **Azure Database for PostgreSQL servers**.
 2. Click **Create** and select **Flexible Server**.
 3. Choose your Resource Group and set your preferred EU Region.
-4. Select your Compute size (e.g., General Purpose or Burstable `B2s` for smaller deployments).
-5. Setup the **Authentication** tab with an Admin username and a secure password.
+4. Select your Compute size (e.g., General Purpose, or Burstable `B2s` for smaller deployments).
+5. Set up the **Authentication** tab with an admin username and a secure password.
 6. Under **Networking**, ensure "Allow public access from any Azure service within Azure to this server" is checked so your Container App can connect, or configure a secure VNet.
-7. Note down your server name and assemble the connection URI:
+7. Note your server name and assemble the connection URI:
    `postgresql://your_admin:YOUR_PASSWORD@your-server-name.postgres.database.azure.com:5432/postgres`
 
-### 2. Build and Push to Azure Container Registry (ACR)
+If your collections declare a `vector` property, enable the extension once: Azure gates it behind the server parameter `azure.extensions`, then `CREATE EXTENSION vector;`.
 
-Azure Container Apps will pull your Docker image from ACR.
-1. Create a new **Container Registry** in your chosen EU region.
-2. Login from your CLI:
+### 2. Build the bundle and bake it into an image
+
+There is **no application image to build from your source**. `rebase build` produces a `dist-bundle` directory with your compiled collections, functions, crons and — if your project declares a static app — your built frontend. The published runtime image runs it:
+
+```bash
+rebase build
+```
+
+Container Apps pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+1. Create a **Container Registry** in your chosen EU region.
+2. Log in from your CLI:
    ```bash
    az acr login --name YourRegistryName
    ```
-3. Build and push the Rebase image **from the project root** — the backend Dockerfile needs the whole workspace as its build context (it copies `pnpm-workspace.yaml`, `backend/`, and `config/`), so `./backend` as the context will fail:
+3. Build and push, from the project root:
    ```bash
-   docker build -t yourregistryname.azurecr.io/rebase-backend:latest -f backend/Dockerfile .
+   docker build -t yourregistryname.azurecr.io/rebase-backend:latest .
    docker push yourregistryname.azurecr.io/rebase-backend:latest
    ```
 
-### 3. Deploy Azure Container App
+Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched.
+
+### 3. Deploy the Container App
 
 Azure Container Apps provides a serverless container environment with built-in HTTPS ingress.
 
@@ -18818,8 +18898,8 @@ Azure Container Apps provides a serverless container environment with built-in H
 | Name | Value |
 |------|-------|
 | `DATABASE_URL` | Your Azure Postgres connection string |
-| `JWT_SECRET` | A Secure random 32+ character string |
-| `REBASE_SERVICE_KEY` | A Secure random 32+ character string |
+| `JWT_SECRET` | A secure random 32+ character string |
+| `REBASE_SERVICE_KEY` | A secure random 32+ character string |
 | `NODE_ENV` | `production` |
 | `CORS_ORIGINS` | Your frontend domain (e.g., `https://yourdomain.com`) |
 | `FRONTEND_URL` | Your frontend URL (used for email links and CORS fallback) |
@@ -18827,24 +18907,38 @@ Azure Container Apps provides a serverless container environment with built-in H
 | `REBASE_ADMIN_EMAIL` | The first administrator's address, set **before the first boot** |
 | `REBASE_ADMIN_PASSWORD` | At least 12 characters |
 
-The last three are how this deployment gets an administrator at all: in
-production the first account to register is not promoted, so nothing else
-produces the first signed-in caller. See [Your first
-admin](/docs/getting-started/deployment/#your-first-admin).
+The last three are how this deployment gets an administrator at all: in production the first account to register is not promoted, so nothing else produces the first signed-in caller. See [Your first admin](/docs/getting-started/deployment/#your-first-admin). Store the secrets as Container Apps secrets and reference them, rather than as plain environment values.
 
-5. Under the **Ingress** tab, explicitly Enable Ingress.
-6. Set the Target Port to **3001**.
-7. Complete the creation. Azure will automatically provision the container and provide you an Application URL secured with TLS!
+5. Under the **Ingress** tab, enable ingress.
+6. Set the Target Port to **8080** — the port the runtime image listens on unless `PORT` says otherwise.
+7. Point the health probe at `/livez`. Not `/health`: that one performs a database round-trip, so a liveness probe on it restarts a healthy container during a brief database hiccup.
+8. Complete the creation. Azure provisions the container and gives you an Application URL secured with TLS.
 
-### Create the Database Schema
+### 4. The schema
 
-The container is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+**The runtime creates missing tables at boot, including your collections'.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty server comes up serving your collections.
+
+What `ensure` never does is change something that already exists: it does not alter a column type, drop anything, or edit an existing enum's labels, because a container restart must not reshape a schema as a side effect of a deploy.
+
+Two things therefore still need the CLI, run from a checkout or a CI job with `DATABASE_URL` pointed at your Flexible Server (add a firewall rule allowing your client IP if needed):
 
 ```bash
-pnpm run db:push
+rebase db push
 ```
 
-Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Azure Database for PostgreSQL connection string (add a firewall rule allowing your client IP if needed). The deployed image doesn't include the CLI, so this doesn't run inside the container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
+- **Junction-table RLS** for many-to-many relations.
+- **Any change that is not purely additive** — a renamed column, a narrowed type, a removed field.
+
+The runtime image ships without the CLI, so this never runs inside the container. For versioned migrations, commit migration files with `rebase db generate` and run `rebase db migrate` as a release step instead.
+
+### File storage
+
+Container Apps replicas have no durable disk, so local file storage is silent data loss and the runtime refuses it in production. Create an Azure Storage account and use its S3-compatible surface, or an S3-compatible bucket in the same region, with `STORAGE_TYPE=s3` — see [Storage](/docs/backend/storage).
+
+### Next steps
+
+- [Deployment](/docs/getting-started/deployment) — the production checklist, and the first-admin rules every platform shares.
+- [Configuration](/docs/getting-started/configuration) — every environment variable the runtime reads.
 
 ## Deploying Rebase on Hetzner Cloud
 
@@ -19015,49 +19109,57 @@ rebase db restore ./backups/<file>.dump
 
 ## Deploying Rebase on Scaleway
 
-Scaleway is a premier European cloud provider based in France with datacenters in Paris, Amsterdam, and Warsaw. It's an excellent choice for organizations prioritizing EU data sovereignty. 
+Scaleway is a European cloud provider based in France, with datacenters in Paris, Amsterdam and Warsaw — an excellent choice for organizations prioritizing EU data sovereignty.
 
-We recommend utilizing Scaleway's **Managed Database** for reliable Postgres backing and **Serverless Containers** to dynamically scale the Rebase Node.js application.
+Use Scaleway's **Managed Database** for Postgres and **Serverless Containers** for the runtime.
+
+Nothing on this page is Scaleway-specific about your project. A Rebase deployment is two separable pieces — the published runtime image, and the **bundle** that `rebase build` produces — and the same bundle runs under Docker Compose on a laptop, on Rebase Cloud, under the [Helm chart](/docs/deployment/kubernetes) and here.
 
 ### 1. Create a Managed Postgres Database
 
-Scaleway's Managed Databases offer automatic backups and high availability.
-
 1. In the Scaleway Console, go to **PostgreSQL**.
 2. Click **Create a Database Instance**.
-3. Choose a Region (e.g., Paris - `PAR1`).
-4. Select a Node Type (a standard **Play2-Pico** or **Pro2-XXS** works well).
-5. Add a database name (`rebase_db`) and define an incredibly secure user password.
-6. Once deployed, note down the **Connection string** (URI) from the dashboard. It will look like: 
+3. Choose a Region (e.g. Paris — `PAR1`).
+4. Select a Node Type (**Play2-Pico** or **Pro2-XXS** works well).
+5. Add a database name (`rebase_db`) and a strong user password.
+6. Once deployed, note the **Connection string** (URI) from the dashboard:
    `postgres://user:password@ip:port/rebase_db`
 
-### 2. Build and Push the Container
+If your collections declare a `vector` property, enable the extension once: `CREATE EXTENSION vector;` against the database.
 
-Scaleway Serverless Containers run standard Docker images. First, build the Rebase backend locally and push it to the Scaleway Container Registry.
+### 2. Build the bundle and bake it into an image
 
-1. Go to **Container Registry** in the Scaleway Console and create a Namespace (e.g., `rebase-apps`).
-2. Log in to the registry from your local terminal using the provided instructions.
-3. Build your Rebase app using the generated `Dockerfile`, **from the project root** — the backend Dockerfile needs the whole workspace as its build context (it copies `pnpm-workspace.yaml`, `backend/`, and `config/`), so `./backend` as the context will fail:
+There is **no application image to build from your source**. `rebase build` produces a `dist-bundle` directory with your compiled collections, functions, crons and — if your project declares a static app — your built frontend. The published runtime image runs it:
 
 ```bash
-docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f backend/Dockerfile .
+rebase build
 ```
 
-4. Push the image:
+Serverless Containers pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+1. Go to **Container Registry** in the Scaleway Console and create a namespace (e.g. `rebase-apps`).
+2. Log in to the registry from your terminal using the instructions it shows.
+3. Build and push, from the project root:
 
 ```bash
+docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest .
 docker push rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest
 ```
 
-### 3. Deploy Serverless Container
+Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched.
 
-Now deploy the image completely serverless without managing infrastructure.
+### 3. Deploy the Serverless Container
 
 1. Navigate to **Serverless Containers**.
 2. Click **Create a Container**.
-3. Choose the image you just pushed from the Container Registry.
-4. Set the Port to **3001**.
-5. Under Environment Variables, add the following securely:
+3. Choose the image you just pushed.
+4. Set the Port to **8080** — the port the runtime image listens on unless `PORT` says otherwise.
+5. Under Environment Variables, add:
 
 | Key | Value |
 |-----|-------|
@@ -19071,177 +19173,257 @@ Now deploy the image completely serverless without managing infrastructure.
 | `REBASE_ADMIN_EMAIL` | The first administrator's address, set **before the first boot** |
 | `REBASE_ADMIN_PASSWORD` | At least 12 characters |
 
-The last three are how this deployment gets an administrator at all: in
-production the first account to register is not promoted, so nothing else
-produces the first signed-in caller. See [Your first
-admin](/docs/getting-started/deployment/#your-first-admin).
+The last three are how this deployment gets an administrator at all: in production the first account to register is not promoted, so nothing else produces the first signed-in caller. See [Your first admin](/docs/getting-started/deployment/#your-first-admin). Mark the secrets as secret environment variables rather than plain ones.
 
-6. Click **Deploy Container**.
+6. Point the health check at `/livez`. Not `/health`: that one performs a database round-trip, so a liveness probe on it restarts a healthy container during a brief database hiccup.
+7. Click **Deploy Container**.
 
-Scaleway will immediately provision the container and provide you with a public endpoint URL (e.g., `https://rebase-backend-xxxx.functions.fnc.fr-par.scw.cloud`). 
+Scaleway provisions the container and gives you a public endpoint (e.g. `https://rebase-backend-xxxx.functions.fnc.fr-par.scw.cloud`).
 
-*Note: For strict data compliance, verify that your Scaleway Organization details reflect your European corporate entity.*
+*For strict data compliance, verify that your Scaleway Organization details reflect your European corporate entity.*
 
-### 4. Create the Database Schema
+### 4. The schema
 
-The container is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+**The runtime creates missing tables at boot, including your collections'.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty database comes up serving your collections.
+
+What `ensure` never does is change something that already exists: it does not alter a column type, drop anything, or edit an existing enum's labels, because a container restart must not reshape a schema as a side effect of a deploy.
+
+Two things therefore still need the CLI, run from a checkout or a CI job with `DATABASE_URL` pointed at your Managed Database:
 
 ```bash
-pnpm run db:push
+rebase db push
 ```
 
-Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Scaleway Managed Database connection string. The deployed image doesn't include the CLI, so this doesn't run inside the container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
+- **Junction-table RLS** for many-to-many relations.
+- **Any change that is not purely additive** — a renamed column, a narrowed type, a removed field.
+
+The runtime image ships without the CLI, so this never runs inside the container. For versioned migrations, commit migration files with `rebase db generate` and run `rebase db migrate` as a release step instead.
+
+### File storage
+
+Serverless Containers have no durable disk, so local file storage is silent data loss and the runtime refuses it in production. Scaleway Object Storage is S3-compatible and sits in the same datacenters:
+
+```env
+STORAGE_TYPE=s3
+S3_BUCKET=my-uploads
+S3_ENDPOINT=https://s3.fr-par.scw.cloud
+S3_REGION=fr-par
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+```
+
+See [Storage](/docs/backend/storage) for the full picture.
+
+### Next steps
+
+- [Deployment](/docs/getting-started/deployment) — the production checklist, and the first-admin rules every platform shares.
+- [Configuration](/docs/getting-started/configuration) — every environment variable the runtime reads.
 
 ## Deploying Rebase on Railway
 
-Railway is an incredibly popular modern PaaS (Platform as a Service) that takes the pain out of DevOps. It will automatically detect the Rebase Node framework and build it seamlessly. 
+Railway is a modern PaaS that takes the pain out of DevOps, and it supports European deployment regions (Amsterdam), so you keep regional hosting compliance.
 
-Additionally, Railway fully supports European deployment regions (Amsterdam), meaning you still enjoy strict regional hosting compliance.
+Nothing on this page is Railway-specific about your project. A Rebase deployment is two separable pieces — the published runtime image, and the **bundle** that `rebase build` produces — and the same bundle runs under Docker Compose on a laptop, on Rebase Cloud, under the [Helm chart](/docs/deployment/kubernetes) and here.
 
-### 1. Create a Project & EU Region
-1. Login to your [Railway Account](https://railway.app/).
+### 1. Create a project and an EU region
+
+1. Log in to your [Railway account](https://railway.app/).
 2. Click **New Project**.
-3. Go to **Settings -> Default Region**, and explicitly set it to **Europe (Amsterdam)**. (If you do this *after* creating services, you may need to manually migrate them).
+3. Go to **Settings → Default Region** and set it to **Europe (Amsterdam)**. Doing this *after* creating services means migrating them by hand.
 
 ### 2. Provision PostgreSQL
-1. Inside your project, click **New** -> **Database** -> **Add PostgreSQL**.
-2. Wait a few seconds for the database to provision.
-3. By default, Railway provides an internal `DATABASE_URL` variable. Click on the Postgres widget -> **Variables** to locate this connection string.
 
-### 3. Deploy Rebase Code
-1. Click **New** -> **GitHub Repo**.
-2. Select your Rebase repository.
-3. Railway will immediately detect the repository and look for a `Dockerfile`. Wait for the initial build to begin.
+1. Inside your project, click **New → Database → Add PostgreSQL**.
+2. Wait for it to provision.
+3. Railway exposes an internal `DATABASE_URL` variable on the Postgres widget's **Variables** tab.
 
-:::caution[Point Railway at the backend Dockerfile]
-The scaffold's Dockerfile lives at `backend/Dockerfile`, not the repo root, and its build context must be the **repo root** (it copies `pnpm-workspace.yaml`, `backend/`, and `config/`). In the service's **Settings → Build**, set the **Dockerfile Path** to `backend/Dockerfile` and leave the **Root Directory** at the repository root. Otherwise Railway won't find a Dockerfile — or will build with the wrong context and fail.
-:::
+If your collections declare a `vector` property, enable the extension once against that database: `CREATE EXTENSION vector;`.
 
-### 4. Set Environment Variables
-The initial build might fail because it is entirely missing configuration. Let's fix that.
+### 3. Build the bundle and bake it into an image
 
-1. Click on the new Rebase GitHub service card.
-2. Go to the **Variables** tab. 
-3. Click **New Variable** and add:
-   - `JWT_SECRET`: Generate a secure 32+ character random string.
-   - `REBASE_SERVICE_KEY`: Generate another secure 32+ character random string.
-   - `NODE_ENV`: Set to `production`
-   - `CORS_ORIGINS`: Your frontend domain (e.g., `https://your-app.up.railway.app`)
-   - `FRONTEND_URL`: Same as CORS_ORIGINS
+There is **no application image to build from your source**. `rebase build` produces a `dist-bundle` directory with your compiled collections, functions, crons and — if your project declares a static app — your built frontend. The published runtime image runs it:
+
+```bash
+rebase build
+```
+
+Commit a three-line `Dockerfile` at the repository root, so Railway's build step is a copy rather than a compilation:
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+Build the bundle in CI and commit or upload it as part of your release, or run `rebase build` before pushing. Either way the image Railway builds contains no toolchain and no source — upgrading Rebase later is a change to that `FROM` line, with your bundle untouched.
+
+Then: **New → GitHub Repo**, select your repository, and let Railway detect the Dockerfile at the root.
+
+### 4. Set environment variables
+
+1. Click the service card.
+2. Go to the **Variables** tab.
+3. Add:
+   - `JWT_SECRET`: a secure 32+ character random string.
+   - `REBASE_SERVICE_KEY`: another secure 32+ character random string.
+   - `NODE_ENV`: `production`
+   - `CORS_ORIGINS`: your frontend domain (e.g. `https://your-app.up.railway.app`)
+   - `FRONTEND_URL`: same as `CORS_ORIGINS`
    - `DISABLE_SELF_REGISTRATION`: `true`
    - `REBASE_ADMIN_EMAIL`: the first administrator's address
    - `REBASE_ADMIN_PASSWORD`: at least 12 characters
 
-   The last three are how this service gets an administrator at all: in
-   production the first account to register is not promoted, so nothing else
-   produces the first signed-in caller. Set them before the service first
-   serves traffic — see [Your first
-   admin](/docs/getting-started/deployment/#your-first-admin).
-4. Click **Reference Variable** and select `DATABASE_URL` from the PostgreSQL service you provisioned. Railway will securely inject the internal Postgres URL at runtime.
+   The last three are how this service gets an administrator at all: in production the first account to register is not promoted, so nothing else produces the first signed-in caller. Set them before the service first serves traffic — see [Your first admin](/docs/getting-started/deployment/#your-first-admin).
 
-### 5. Expose the Domain
-1. In the Rebase service card, navigate to the **Settings** tab.
-2. Scroll down to **Networking**.
-3. Under **Public Networking**, click **Generate Domain**. Railway will provide a `.up.railway.app` testing URL. You can also securely attach a Custom Domain here.
+4. Click **Reference Variable** and select `DATABASE_URL` from the PostgreSQL service. Railway injects the internal Postgres URL at runtime.
 
-Railway will automatically rebuild safely. Your EU-hosted platform is now entirely live!
+Railway sets `PORT` and the runtime binds to it, so there is no port to configure. Point the health check at `/livez` rather than `/health`: the second performs a database round-trip, so a liveness probe on it restarts a healthy container during a brief database hiccup.
 
-### 6. Create the Database Schema
+### 5. Expose the domain
 
-The app is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+1. In the service card, go to **Settings → Networking**.
+2. Under **Public Networking**, click **Generate Domain** for a `.up.railway.app` URL, or attach a custom domain.
+
+### 6. The schema
+
+**The runtime creates missing tables at boot, including your collections'.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty database comes up serving your collections.
+
+What `ensure` never does is change something that already exists: it does not alter a column type, drop anything, or edit an existing enum's labels, because a container restart must not reshape a schema as a side effect of a deploy.
+
+Two things therefore still need the CLI, run from a checkout or a CI job:
 
 ```bash
-pnpm run db:push
+rebase db push
 ```
 
-Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Postgres service's **public** connection string (found under the Postgres widget → **Connect**; the referenced internal `DATABASE_URL` is only reachable from inside Railway). The deployed image doesn't include the CLI, so this doesn't run inside the container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
+- **Junction-table RLS** for many-to-many relations.
+- **Any change that is not purely additive** — a renamed column, a narrowed type, a removed field.
+
+Point `DATABASE_URL` at your Postgres service's **public** connection string (Postgres widget → **Connect**); the referenced internal URL is only reachable from inside Railway. The runtime image ships without the CLI, so this never runs inside the container. For versioned migrations, commit migration files with `rebase db generate` and run `rebase db migrate` as a release step instead.
+
+### File storage
+
+Railway containers are replaced on every deploy, so local file storage is silent data loss and the runtime refuses it in production. Attach an S3-compatible bucket with `STORAGE_TYPE=s3` — see [Storage](/docs/backend/storage).
+
+### Next steps
+
+- [Deployment](/docs/getting-started/deployment) — the production checklist, and the first-admin rules every platform shares.
+- [Configuration](/docs/getting-started/configuration) — every environment variable the runtime reads.
 
 ## Deploying Rebase on Fly.io
 
-Fly.io allows you to host Docker containers close to your users via their global anycast network. Fly is highly configurable regarding data routing, making it an excellent choice for deploying Rebase applications with a strict European data focus.
+Fly.io runs Docker containers close to your users on a global anycast network, and is highly configurable about where data lives — a good fit for a Rebase deployment with a strict European focus. Fly has data centers in **Amsterdam (ams)**, **Frankfurt (fra)**, **Madrid (mad)** and **Paris (cdg)**.
 
-Fly.io features data centers in **Amsterdam (ams)**, **Frankfurt (fra)**, **Madrid (mad)**, and **Paris (cdg)**. 
+Nothing on this page is Fly-specific about your project. A Rebase deployment is two separable pieces — the published runtime image, and the **bundle** that `rebase build` produces — and the same bundle runs under Docker Compose on a laptop, on Rebase Cloud, under the [Helm chart](/docs/deployment/kubernetes) and here.
 
-### 1. Initialize the Fly App
-From your local Rebase repository, after ensuring the Fly CLI (`flyctl`) is installed, run:
+### 1. Initialize the Fly app
+
+With `flyctl` installed, from your project:
 
 ```bash
-fly launch
+fly launch --no-deploy
 ```
 
-1. **App Name:** `my-rebase-app`
-2. **Organization:** Personal or your corporate Org.
-3. **Region:** When prompted for a region, explicitly choose a European datacenter such as **Frankfurt (fra)** or **Paris (cdg)**.
-4. **Database:** When prompted to setup a Postgres database, say **Yes**. Fly will automatically create a Postgres cluster in the *same region* and securely inject the `DATABASE_URL` into your app.
-5. **Redis:** Say **No**.
+1. **App name:** `my-rebase-app`
+2. **Organization:** personal, or your corporate org.
+3. **Region:** choose a European datacenter — Frankfurt (`fra`) or Paris (`cdg`).
+4. **Database:** say **Yes** to a Postgres cluster. Fly creates it in the same region and injects `DATABASE_URL`.
+5. **Redis:** say **No**.
 
-*Do not deploy just yet when prompted.* We need to set a critical environment variable first.
+`--no-deploy` because the secrets and the bundle have to be in place first.
 
-### 2. Set Production Secrets
-Before your application spins up in production, you must inject the required secrets and configuration.
+If your collections declare a `vector` property, enable the extension once against that database: `CREATE EXTENSION vector;`.
 
-Run the following command locally:
+### 2. Build the bundle and point fly.toml at the runtime image
+
+There is **no application image to build from your source**. `rebase build` produces a `dist-bundle` directory with your compiled collections, functions, crons and — if your project declares a static app — your built frontend:
+
+```bash
+rebase build
+```
+
+Commit a three-line `Dockerfile` at the project root:
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+And point `fly.toml` at it:
+
+```toml title="fly.toml"
+app = "my-rebase-app"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  DISABLE_SELF_REGISTRATION = "true"
+
+[http_service]
+  internal_port = 8080          # the port the runtime image listens on
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1      # realtime subscriptions need a machine to stay up
+
+[[http_service.checks]]
+  path = "/livez"
+```
+
+`/livez` rather than `/health`: the second performs a database round-trip, so a liveness check on it restarts a healthy machine during a brief database hiccup.
+
+Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched.
+
+### 3. Set production secrets
+
 ```bash
 fly secrets set \
   JWT_SECRET=your_super_long_randomly_generated_secure_string \
   REBASE_SERVICE_KEY=another_super_long_randomly_generated_secure_string \
   CORS_ORIGINS=https://my-rebase-app.fly.dev \
   FRONTEND_URL=https://my-rebase-app.fly.dev \
-  DISABLE_SELF_REGISTRATION=true \
   REBASE_ADMIN_EMAIL=you@example.com \
   REBASE_ADMIN_PASSWORD=$(openssl rand -hex 12) \
   -a my-rebase-app
 ```
 
-The last three are how this app gets an administrator at all: in production the
-first account to register is not promoted, so nothing else produces the first
-signed-in caller. Set them before the first deploy serves traffic — see [Your
-first admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets
-list` shows only digests, so keep the generated password from this command —
-there is no way to read it back.
-
-### 3. Validate Internal Configuration
-Fly will have generated a `fly.toml` file at the root of your project. Verify that the internal port explicitly aligns with the Rebase default configuration (`3001`):
-
-```toml
-# fly.toml
-app = "my-rebase-app"
-primary_region = "fra"
-
-[build]
-  # The scaffold's Dockerfile lives at backend/Dockerfile, and its build
-  # context is the project root (where fly.toml sits) so it can copy
-  # pnpm-workspace.yaml, backend/, and config/. Pointing this at a bare
-  # "Dockerfile" (repo root) will fail — there is none there.
-  dockerfile = "backend/Dockerfile"
-
-[http_service]
-  internal_port = 3001 # Make sure this matches your Hono app port
-  force_https = true
-  auto_stop_machines = true
-  auto_start_machines = true
-  min_machines_running = 1
-```
+The last two are how this app gets an administrator at all: in production the first account to register is not promoted, so nothing else produces the first signed-in caller. Set them before the first deploy serves traffic — see [Your first admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` shows only digests, so keep the generated password from this command; there is no way to read it back.
 
 ### 4. Deploy
-
-Your data is localized, your database is provisioned, and your secrets are injected. Start the deployment:
 
 ```bash
 fly deploy
 ```
 
-Once parsing and uploading completes, your application will come online automatically. Run `fly open` to view your deployed app in the browser!
+Then `fly open`.
 
-### 5. Create the Database Schema
+### 5. The schema
 
-The app is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+**The runtime creates missing tables at boot, including your collections'.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty database comes up serving your collections.
+
+What `ensure` never does is change something that already exists: it does not alter a column type, drop anything, or edit an existing enum's labels, because a machine restarting must not reshape a schema as a side effect of a deploy.
+
+Two things therefore still need the CLI, run from a checkout or a CI job:
 
 ```bash
-pnpm run db:push
+rebase db push
 ```
 
-Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Postgres connection string. For a private Fly Postgres, open a tunnel first with `fly proxy 5432 -a <your-db-app>` and point `DATABASE_URL` at `localhost:5432`. The deployed image doesn't include the CLI, so this doesn't run inside the machine and a `release_command` can't call it either. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
+- **Junction-table RLS** for many-to-many relations.
+- **Any change that is not purely additive** — a renamed column, a narrowed type, a removed field.
+
+For a private Fly Postgres, open a tunnel with `fly proxy 5432 -a <your-db-app>` and point `DATABASE_URL` at `localhost:5432`. The runtime image ships without the CLI, so this never runs inside the machine and a `release_command` cannot call it either. For versioned migrations, commit migration files with `rebase db generate` and run `rebase db migrate` as a release step instead.
+
+### File storage
+
+A Fly machine's filesystem does not survive a deploy, so local file storage is silent data loss and the runtime refuses it in production. Attach an S3-compatible bucket — Tigris is the one Fly provisions — with `STORAGE_TYPE=s3`. See [Storage](/docs/backend/storage).
+
+### Next steps
+
+- [Deployment](/docs/getting-started/deployment) — the production checklist, and the first-admin rules every platform shares.
+- [Configuration](/docs/getting-started/configuration) — every environment variable the runtime reads.
 
 ## Recipe: Blog CMS
 

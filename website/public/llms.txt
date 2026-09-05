@@ -106,7 +106,7 @@
 - [Deploying Rebase on Microsoft Azure](https://rebase.pro/docs/deployment/azure): Deploy your Rebase instance securely on Azure using Azure Database for PostgreSQL and Azure Container Apps.
 - [Deploying Rebase on Hetzner Cloud](https://rebase.pro/docs/deployment/hetzner): Deploy Rebase on Hetzner Cloud with Terraform or Docker Compose, for excellent EU-based performance and data sovereignty.
 - [Deploying Rebase on Scaleway](https://rebase.pro/docs/deployment/scaleway): Learn how to deploy Rebase on Scaleway for secure, French-based cloud infrastructure using Serverless Containers.
-- [Deploying Rebase on Railway](https://rebase.pro/docs/deployment/railway): Deploy Rebase effortlessly with Railway natively supported Dockerfile parsing. Maintain EU focus.
+- [Deploying Rebase on Railway](https://rebase.pro/docs/deployment/railway): Deploy Rebase on Railway from the published runtime image and your project bundle. Maintain EU focus.
 - [Deploying Rebase on Fly.io](https://rebase.pro/docs/deployment/flyio): Learn how to deploy Rebase globally or restrict it to European data centers using Fly.io.
 - [Recipe: Blog CMS](https://rebase.pro/docs/recipes/blog-cms): Build a complete blog CMS with articles, authors, categories, rich text editing, and image uploads.
 - [Recipe: Custom Dashboard](https://rebase.pro/docs/recipes/custom-dashboard): Build a custom dashboard view with charts, stats, and data visualizations using Rebase hooks.
