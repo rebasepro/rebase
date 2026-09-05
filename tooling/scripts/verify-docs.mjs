@@ -43,6 +43,7 @@ import { checkAgentBundle } from "./docs-verify/check-agent-bundle.mjs";
 import { checkProseTypes } from "./docs-verify/check-prose-types.mjs";
 import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
+import { checkEnvReads } from "./docs-verify/check-env-reads.mjs";
 import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
 import { checkUnreleasedBadges } from "./docs-verify/check-unreleased-badges.mjs";
@@ -78,6 +79,7 @@ if (asJson) {
         out.proseTypes = checkProseTypes(ROOT).findings;
         out.versionPins = checkVersionPins(ROOT).findings;
         out.envReference = checkEnvReference(ROOT).findings;
+        out.envReads = checkEnvReads(ROOT).findings;
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
         out.unreleasedBadges = checkUnreleasedBadges(ROOT).findings;
         out.docsLinks = checkDocsLinks(ROOT).findings;
@@ -258,6 +260,26 @@ if (only === "both" || only === "names") {
         console.log(`${RED}✗ ${bad.length} validated variable(s) missing from the reference:${NC}`);
         for (const key of bad) console.log(`  ${RED}${key}${NC}`);
         console.log(`      ${DIM}That page promises it lists every variable the schema validates.${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Environment variables the code reads ━━━${NC}`);
+    const { findings: bad, dead, scanned, files } = checkEnvReads(ROOT);
+    console.log(`${DIM}Found ${scanned} distinct variable(s) read across ${files} source file(s).${NC}`);
+    if (!bad.length && !dead.length) {
+        console.log(`${GREEN}✓ Every variable the code reads is on the configuration page.${NC}`);
+    } else {
+        findings += bad.length + dead.length;
+        if (bad.length) {
+            console.log(`${RED}✗ ${bad.length} variable(s) the code reads and the page does not name:${NC}`);
+            for (const b of bad) {
+                console.log(`  ${RED}${b.name}${NC} ${DIM}${b.files.slice(0, 3).join(", ")}${NC}`);
+            }
+        }
+        for (const name of dead) {
+            console.log(`  ${RED}${name}${NC} ${DIM}is exempted in NOT_OURS but nothing reads it — delete the entry.${NC}`);
+        }
     }
 }
 
