@@ -849,6 +849,66 @@ function checkBoardConfig(
     }
 }
 
+/**
+ * A `type: "relation"` property has to name a link that exists.
+ *
+ * There are two legal ways to say which: the `relation` block on the property,
+ * or an entry in the collection's `relations` array whose `relationName` is the
+ * property's key. A property with neither names nothing.
+ *
+ * `CollectionRegistry.normalizeCollection` already noticed and answered with a
+ * `console.warn` — one line, on stdout, at the moment the panel builds its
+ * registry, which in a deployed backend nobody is reading. Everything downstream
+ * then behaved as if the field were not a relation: the form rendered no picker,
+ * the DDL generator emitted no foreign key, and `include()` answered nothing.
+ * The field existed everywhere and pointed nowhere.
+ *
+ * `relation` stays optional on the type, because the second form is real — the
+ * check is that *one* of the two is present, which is not a shape a single
+ * optional field can express.
+ */
+function checkRelationPropertiesResolve(
+    collection: Record<string, unknown>,
+    at: string,
+    collect: ProblemCollector
+): void {
+    const properties = collection.properties;
+    if (!isPlainObject(properties)) return;
+
+    const declaredNames = new Set<string>();
+    if (Array.isArray(collection.relations)) {
+        for (const relation of collection.relations) {
+            if (isPlainObject(relation) && typeof relation.relationName === "string") {
+                declaredNames.add(relation.relationName);
+            }
+        }
+    }
+
+    for (const [key, property] of Object.entries(properties)) {
+        // A builder function has nothing to inspect, as everywhere else here.
+        if (typeof property === "function") continue;
+        if (!isPlainObject(property) || property.type !== "relation") continue;
+        if (property.relation !== undefined) continue;
+        if (declaredNames.has(key)) continue;
+        // A pre-0.11 flat relation — `target` and `localKey` at the top of the
+        // property — names no `relation` block by construction, and every one of
+        // those keys already has its own message saying to move it inside one.
+        // Adding "this names no relation" on top would be a second, vaguer
+        // sentence about the same edit.
+        if (Object.keys(property).some(k => RELATION_PROPERTY_MIGRATIONS[k])) continue;
+
+        collect.error(
+            `${at}.properties.${key}`,
+            `\`${key}\` is a relation property that names no relation. Either give it a ` +
+            "`relation: { kind: …, target: … }` block, or add an entry to the collection's " +
+            `\`relations\` array with \`relationName: "${key}"\`. Without one the field is a ` +
+            "relation in name only: no picker in the form, no foreign key in the schema, and " +
+            "`include()` returns nothing for it.",
+            "incoherent"
+        );
+    }
+}
+
 function checkCollection(
     collection: unknown,
     index: number,
@@ -891,6 +951,7 @@ function checkCollection(
 
     if (isPlainObject(collection.properties)) {
         checkProperties(collection.properties, `${at}.properties`, collect);
+        checkRelationPropertiesResolve(collection, at, collect);
     } else if (collection.properties !== undefined) {
         collect.error(`${at}.properties`, "`properties` must be an object keyed by property name.");
     }

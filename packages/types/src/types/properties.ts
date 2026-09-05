@@ -761,6 +761,12 @@ export interface RelationProperty extends BaseProperty {
      *     relation: { kind: "manyToMany", target: () => tagsCollection }
      * }
      * ```
+     *
+     * Optional because there is a second way to say the same thing: an entry in
+     * the collection's `relations` array whose `relationName` is this
+     * property's key. One of the two is required, and boot refuses a
+     * `type: "relation"` property that has neither — a field with no link is a
+     * relation in name only.
      */
     relation?: Relation;
 

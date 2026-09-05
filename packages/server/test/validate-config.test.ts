@@ -541,6 +541,70 @@ describe("two collections claiming one identity", () => {
     });
 });
 
+/**
+ * A relation property that names no relation is a relation in name only.
+ *
+ * The registry noticed and answered with one `console.warn` on stdout, at the
+ * moment the panel builds its registry — which in a deployed backend nobody
+ * reads. Everything downstream then behaved as though the field were not a
+ * relation at all: no picker in the form, no foreign key in the schema, nothing
+ * from `include()`.
+ */
+describe("a relation property that names no relation", () => {
+    const withRelationProperty = (property: unknown, relations?: unknown[]) => {
+        const collection = valid();
+        return {
+            ...collection,
+            properties: { ...collection.properties, editor: property },
+            ...(relations ? { relations } : {})
+        };
+    };
+
+    it("errors, naming the property and both ways to fix it", () => {
+        const [problem] = errors([withRelationProperty({ name: "Editor", type: "relation" })]);
+
+        expect(problem.path).toBe("posts.properties.editor");
+        expect(problem.message).toContain("names no relation");
+        expect(problem.message).toContain("`relation: { kind: …, target: … }`");
+        expect(problem.message).toContain("relationName: \"editor\"");
+    });
+
+    it("refuses to boot on it", () => {
+        expect(() => assertCollectionConfigs([withRelationProperty({ name: "Editor", type: "relation" })]))
+            .toThrow(/names no relation/);
+    });
+
+    it("is an incoherent config, not an unknown key", () => {
+        // `REBASE_STRICT_COLLECTION_CONFIG` has no bearing on it, and offering
+        // that variable as the remedy would send somebody somewhere useless.
+        const [problem] = errors([withRelationProperty({ name: "Editor", type: "relation" })]);
+        expect(problem.kind).toBe("incoherent");
+    });
+
+    it("accepts the inline block", () => {
+        expect(errors([withRelationProperty({
+            name: "Editor",
+            type: "relation",
+            relation: { kind: "belongsTo", target: () => ({}) }
+        })])).toEqual([]);
+    });
+
+    it("accepts a `relations[]` entry the property key addresses", () => {
+        expect(errors([withRelationProperty(
+            { name: "Editor", type: "relation" },
+            [{ kind: "belongsTo", relationName: "editor", target: () => ({}) }]
+        )])).toEqual([]);
+    });
+
+    it("still errors when the `relations[]` entry is called something else", () => {
+        const found = errors([withRelationProperty(
+            { name: "Editor", type: "relation" },
+            [{ kind: "belongsTo", relationName: "reviewer", target: () => ({}) }]
+        )]);
+        expect(found.map(p => p.path)).toContain("posts.properties.editor");
+    });
+});
+
 describe("reporting", () => {
     it("reports every problem across every collection in one pass", () => {
         // A user migrating wants the whole list, not one boot per defect.
