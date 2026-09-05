@@ -407,17 +407,20 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
     "webhooks create": {
         command: "cloud webhooks create",
         usage:
-            "cloud webhooks create --name <name> --table <table> --url <url> [--events <list>]",
+            "cloud webhooks create --name <name> --table <table> --endpoint <url> [--events <list>]",
         summary: "Register an outbound webhook on a table's row changes.",
         flags: [
             ["--name <name>", "Required. What it is called in listings"],
             ["--table <table>", "Required. The table whose changes fire it"],
-            ["--url <url>", "Required. Where the POST goes"],
+            ["--endpoint <url>", "Required. Where the POST goes"],
             ["--events <list>", "Comma-separated: insert, update, delete. Default: all three"]
         ],
         examples: [
-            "rebase cloud webhooks create --name notify --table orders --url https://example.com/hook",
-            "rebase cloud webhooks create --name audit --table users --url https://example.com/hook --events insert,delete"
+            "rebase cloud webhooks create --name notify --table orders --endpoint https://example.com/hook",
+            "rebase cloud webhooks create --name audit --table users --endpoint https://example.com/hook --events insert,delete"
+        ],
+        notes: [
+            "`--endpoint`, not `--url`: every cloud command's `--url` names the control plane, and one written here would be authenticated against instead of called."
         ]
     },
 

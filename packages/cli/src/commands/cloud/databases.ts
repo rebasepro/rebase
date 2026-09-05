@@ -475,7 +475,11 @@ connectionString } : {})
  */
 export function resolveBackupArgs(rawArgs: string[]) {
     const { flags, positionals } = parseCloudArgs({
-        spec: { "--yes": Boolean },
+        // `--yes` is not declared here: `parseCloudArgs` merges the global spec
+        // in, and a per-command key that repeats a global one OVERRIDES it in
+        // that merge. Identical here, so it was harmless — but it is the same
+        // shape as `webhooks create --url`, which was not.
+        spec: {},
         rawArgs,
         commandWords: 3, // cloud db backup
         command: "cloud db backup",
@@ -632,8 +636,8 @@ async function pitrCommand(rawArgs: string[]): Promise<void> {
     // as the action, and a PITR action decides between reporting, staging a
     // recovered copy, and repointing the live app at one.
     const { flags: args, positionals } = parseCloudArgs({
-        spec: { "--target": String,
-"--yes": Boolean },
+        // `--yes` comes from the global spec — see `resolveBackupArgs`.
+        spec: { "--target": String },
         rawArgs,
         commandWords: 3, // cloud db pitr
         command: "cloud db pitr",

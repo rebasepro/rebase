@@ -406,6 +406,58 @@ pendingRedeploy: true }));
         expect(del).toHaveBeenCalledTimes(1);
         expect(del.mock.calls[0][0]).toBe("42");
     });
+
+    /**
+     * `webhooks create` names its destination `--endpoint`, and the reason is
+     * not taste.
+     *
+     * `--url` is a GLOBAL in this family: `resolveCloudUrl` reads it off the raw
+     * line, ahead of the env var and ahead of the link file, for every command.
+     * So the documented `webhooks create … --url https://example.com/hook` sent
+     * the customer's webhook endpoint to `requireClient` as the control plane to
+     * authenticate against — the one command whose whole argument is somebody
+     * else's URL. Both halves are asserted: the row gets the endpoint, and the
+     * control plane is still the control plane.
+     */
+    it("`webhooks create --endpoint <url>` does not retarget the control plane", async () => {
+        const created: Array<Record<string, unknown>> = [];
+        const client = {
+            functions: { invoke: vi.fn(async () => ({})) },
+            data: {
+                collection: () => ({
+                    find: async () => ({ data: [] }),
+                    findById: async () => undefined,
+                    update: async () => ({}),
+                    create: async (row: Record<string, unknown>) => {
+                        created.push(row);
+                        return { id: 7 };
+                    },
+                    delete: async () => ({})
+                })
+            }
+        };
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client,
+            url: "https://cp.example"
+        });
+
+        const line = argv(
+            "webhooks", "create",
+            "--name", "notify", "--table", "orders",
+            "--endpoint", "https://example.com/hook"
+        );
+
+        const log = vi.spyOn(console, "log").mockImplementation(() => {});
+        await webhooksCommand("create", line);
+        log.mockRestore();
+
+        expect(created).toHaveLength(1);
+        expect(created[0].url).toBe("https://example.com/hook");
+        // The half that was the bug. `resolveCloudUrl` is the real one — the
+        // module mock above leaves it alone — so this is the same read the
+        // client factory makes.
+        expect(context.resolveCloudUrl(line)).not.toBe("https://example.com/hook");
+    });
 });
 
 /**

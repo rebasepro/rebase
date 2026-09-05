@@ -38,8 +38,8 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "projects create": CREATE_PROJECT_FLAGS,
     "projects delete": {},
     "db create": CREATE_DATABASE_FLAGS,
-    "db backup": { "--yes": Boolean },
-    "db pitr": { "--target": String, "--yes": Boolean },
+    "db backup": {},
+    "db pitr": { "--target": String },
     deploy: DEPLOY_FLAGS,
     deployments: null,
     "deployments list": { "--limit": Number, "--all": Boolean },
@@ -57,7 +57,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
         "--force-path-style": Boolean
     },
     webhooks: null,
-    "webhooks create": { "--name": String, "--table": String, "--url": String, "--events": String },
+    "webhooks create": { "--name": String, "--table": String, "--endpoint": String, "--events": String },
     "webhooks delete": {},
     billing: {},
     logs: null,
@@ -131,6 +131,76 @@ function commandsThatParseTheirOwnLine(): string[] {
     }
     return [...found].sort();
 }
+
+/**
+ * Every flag declared in a `spec:` handed to `parseCloudArgs`, from the source.
+ *
+ * Only that property, and deliberately not every `arg({…})` in the family: a
+ * command that parses the raw line itself — `login`, `power`, `link` — MUST
+ * declare `--project`, `-p` and `--yes`, because `arg` only consumes a flag
+ * together with its value when the flag is in its spec, and an undeclared
+ * `--project acme` would leave `acme` as a positional. Those declarations are
+ * separate, permissive parses of the same line, not entries in a merge.
+ *
+ * A `spec:` is different. `parseCloudArgs` spreads it OVER the globals, so a key
+ * that repeats one silently replaces it.
+ */
+function specFlagsBySource(): Array<{ file: string; flag: string }> {
+    const found: Array<{ file: string; flag: string }> = [];
+    for (const file of fs.readdirSync(__dirname)) {
+        if (!file.endsWith(".ts") || file.includes(".test.")) continue;
+        // context.ts DECLARES the globals; it is the one file allowed to.
+        if (file === "context.ts") continue;
+        const source = fs.readFileSync(path.join(__dirname, file), "utf8");
+        for (const match of source.matchAll(/\bspec:\s*\{([^}]*)\}/g)) {
+            for (const flag of match[1].matchAll(/"(-{1,2}[A-Za-z][\w-]*)"\s*:/g)) {
+                found.push({ file,
+flag: flag[1] });
+            }
+        }
+    }
+    // The specs hoisted into named constants, which the regex above cannot see
+    // because they are not written at the call. `CREATE_DATABASE_FLAGS` is not
+    // here: `db create` parses with `arg` directly, so it is in the first
+    // category and has to declare `--project` for itself.
+    for (const [name, spec] of [
+        ["deploy.ts", DEPLOY_FLAGS],
+        ["projects.ts", CREATE_PROJECT_FLAGS],
+        ["env.ts", ENV_SET_FLAGS]
+    ] as const) {
+        for (const flag of Object.keys(spec)) found.push({ file: name,
+flag });
+    }
+    return found;
+}
+
+describe("no command's spec redeclares a global flag", () => {
+    /**
+     * `parseCloudArgs` merges `GLOBAL_CLOUD_FLAGS` UNDER the command's own spec,
+     * so a per-command key that repeats a global one wins the merge — and it
+     * does not shadow the global's other readers, which go on reading the raw
+     * line for themselves.
+     *
+     * `webhooks create --url` was the live instance. `resolveCloudUrl` reads
+     * `--url` off the raw line for every command in this family, so
+     * `webhooks create --name x --table y --url https://example.com/hook` sent
+     * the customer's webhook endpoint to `requireClient` as the control plane to
+     * authenticate against. The documented example could not create a webhook.
+     * The flag is `--endpoint` now; this is the sweep for the class.
+     */
+    it("finds the specs it is checking, so an empty sweep cannot pass", () => {
+        expect(specFlagsBySource().length).toBeGreaterThan(20);
+    });
+
+    it("declares no flag that GLOBAL_SPEC_KEYS already covers", () => {
+        const collisions = specFlagsBySource().filter(entry => GLOBAL_SPEC_KEYS.has(entry.flag));
+        expect(
+            collisions.map(c => `${c.file}: ${c.flag}`),
+            "a spec key with a global's spelling replaces the global in the merge, while the global's "
+            + "other readers keep reading the raw line — so the two disagree about what the value means."
+        ).toEqual([]);
+    });
+});
 
 describe("ACTION_HELP", () => {
     it("has a page for every command that parses its own line", () => {

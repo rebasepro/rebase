@@ -523,9 +523,21 @@ export async function webhooksCommand(subcommand: string | undefined, rawArgs: s
     // command has already started talking to the control plane.
     const create = subcommand === "create"
         ? parseCloudArgs({
+            // `--endpoint`, not `--url`.
+            //
+            // Every command in this family inherits a global `--url`, which
+            // names the CONTROL PLANE — `resolveCloudUrl` reads it straight off
+            // the raw line, before any per-command spec exists. A second
+            // `--url` here did not shadow it, because the two parses are
+            // independent: `webhooks create --url https://example.com/hook`
+            // sent the customer's webhook endpoint to `requireClient` as the
+            // control plane to authenticate against, so the documented example
+            // could not create a webhook. Renaming is the fix; a per-command
+            // flag cannot be a global's spelling, and `action-help.test.ts`
+            // now sweeps for the class.
             spec: { "--name": String,
 "--table": String,
-"--url": String,
+"--endpoint": String,
 "--events": String },
             rawArgs,
             commandWords: 3, // cloud webhooks create
@@ -546,7 +558,7 @@ export async function webhooksCommand(subcommand: string | undefined, rawArgs: s
             const args = create!;
             const name = args["--name"] || fail("--name is required.", undefined, "usage");
             const table = args["--table"] || fail("--table is required.", undefined, "usage");
-            const url = args["--url"] || fail("--url (endpoint) is required.", undefined, "usage");
+            const url = args["--endpoint"] || fail("--endpoint is required.", "Where the POST goes.", "usage");
             const events = (args["--events"] || "insert,update,delete").split(",").map((s) => s.trim());
 
             const created = (await client.data.collection("webhooks").create({
