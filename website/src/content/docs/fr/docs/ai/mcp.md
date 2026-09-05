@@ -240,10 +240,10 @@ sur l'interface de loopback.** La barrière est conçue comme une liste de ce qu
 n'*est pas* restreint, de sorte qu'un outil ajouté ultérieurement est protégé par
 défaut.
 
-- **Non restreint — lectures :** `rebase_schema_plan`, `rebase_schema_introspect`, `rebase_doctor`,
+- **Non restreint — lectures :** `rebase_schema_plan`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
-  `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
+  `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`.
 - **Non restreint — local uniquement :** `rebase_schema_generate`,
   `rebase_db_generate`, `rebase_generate_sdk`, les outils du serveur de développement
@@ -388,10 +388,10 @@ simplement considérés comme « additifs ».
 | Outil | Requis | Description |
 |---|---|---|
 | `storage_list_objects` | — | Lister les objets stockés |
-| `storage_get_metadata` | `key` | Métadonnées assorties d'une URL de téléchargement signée temporaire |
+| `storage_get_download_url` | `key` | Une URL de téléchargement signée temporaire et son expiration — pas des métadonnées d'objet |
 | `storage_delete_object` ⚠ | `key` | Supprimer un objet |
 
-`storage_get_metadata` est classé comme une lecture car il ne modifie pas
+`storage_get_download_url` est classé comme une lecture car il ne modifie pas
 l'environnement — mais l'URL signée qu'il génère est un droit d'accès porteur qui
 persiste au-delà de l'appel de l'outil.
 

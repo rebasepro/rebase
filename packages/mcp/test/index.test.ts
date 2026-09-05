@@ -16,7 +16,10 @@ import {
     LOCAL_ONLY_TOOLS,
     findBackendDir,
     findDevDir,
-    envDeclaredProject
+    envDeclaredProject,
+    explainToolError,
+    answerCliFlags,
+    lastLines
 } from "../src/index";
 import type { PackageManager } from "../src/index";
 import { spawn } from "node:child_process";
@@ -1262,5 +1265,84 @@ describe("showing a schema change before making it", () => {
         });
         expect(result.isError).toBeUndefined();
         expect(result.content[0].text).not.toContain("not yours to approve");
+    });
+});
+
+describe("error ergonomics", () => {
+    const handler = () => (server as any)._requestHandlers.get("tools/call");
+
+    it("turns `fetch failed` into the URL it tried and the tool that fixes it", () => {
+        const explained = explainToolError(new Error("fetch failed"), "http://localhost:3001");
+        expect(explained).toContain("http://localhost:3001");
+        expect(explained).toContain("rebase dev");
+        expect(explained).toContain("rebase_dev_start");
+        expect(explained).toContain("rebase_project_current");
+    });
+
+    it("leaves an error that is not a connection failure alone", () => {
+        // A validation message is already the answer; wrapping it in advice
+        // about starting a dev server would bury it.
+        expect(explainToolError(new Error("Collection \"posts\" not found"), "http://x"))
+            .toBe("Collection \"posts\" not found");
+    });
+
+    it("tells project_add about its own input rather than a CLI flag", async () => {
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "rebase_project_add", arguments: { name: "staging" } }
+        });
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("`baseUrl`");
+        expect(result.content[0].text).toContain("projectDir");
+        // `--baseUrl` is a CLI flag; this tool has no flags at all.
+        expect(result.content[0].text).not.toContain("--baseUrl");
+    });
+
+    it("answers --version and --help without opening a transport", () => {
+        const written: string[] = [];
+        const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: any) => {
+            written.push(String(chunk));
+            return true;
+        });
+        expect(answerCliFlags(["--version"])).toBe(true);
+        expect(written.join("")).toMatch(/^\d+\.\d+\.\d+/);
+        written.length = 0;
+        expect(answerCliFlags(["--help"])).toBe(true);
+        expect(written.join("")).toContain("npx -y @rebasepro/mcp");
+        written.length = 0;
+        expect(answerCliFlags([])).toBe(false);
+        expect(written.join("")).toBe("");
+        spy.mockRestore();
+    });
+
+    it("names the storage tool after what it returns", async () => {
+        const names = ALL_TOOLS.map((t) => t.name);
+        expect(names).toContain("storage_get_download_url");
+        // No back-compat alias: the old name described metadata it never returned.
+        expect(names).not.toContain("storage_get_metadata");
+
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "storage_get_download_url", arguments: { key: "file.png" } }
+        });
+        expect(result.content[0].text).toContain("http://tempurl");
+    });
+
+    it("classifies schema introspection by where its effect lands", () => {
+        // It reads the database and writes collection files here. The write is
+        // the half that matters, and it is local.
+        expect(READ_ONLY_TOOLS.has("rebase_schema_introspect")).toBe(false);
+        expect(LOCAL_ONLY_TOOLS.has("rebase_schema_introspect")).toBe(true);
+        expect(gatedTargetFor("rebase_schema_introspect")).toBeNull();
+    });
+
+    it("counts dev-server log lines, not stdout chunks", () => {
+        // One `data` event can carry a hundred lines. Slicing the chunk array
+        // returned an amount of output unrelated to the number asked for.
+        const output = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join("\n");
+        expect(lastLines(output, 3).split("\n")).toEqual(["line 198", "line 199", "line 200"]);
+        expect(lastLines(output, 1000).split("\n")).toHaveLength(200);
+        expect(lastLines("", 50)).toBe("");
+        expect(lastLines("only\n", 50)).toBe("only");
     });
 });

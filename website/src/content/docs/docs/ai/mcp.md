@@ -231,12 +231,12 @@ in between but the assistant's judgement about which project is active.
 on the loopback interface.** The gate is written as a list of what is *not*
 gated, so a tool added later arrives protected by default.
 
-- **Not gated — reads:** `rebase_schema_plan`, `rebase_schema_introspect`, `rebase_doctor`,
+- **Not gated — reads:** `rebase_schema_plan`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
-  `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
+  `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`.
-- **Not gated — local only:** `rebase_schema_generate`, `rebase_db_generate`,
+- **Not gated — local only:** `rebase_schema_introspect`, `rebase_schema_generate`, `rebase_db_generate`,
   `rebase_generate_sdk`, the dev-server tools and the project-registry tools.
   These write local files or local state and have no remote target to check.
 - **Gated against `DATABASE_URL`:** the remaining CLI tools — `rebase_db_push`,
@@ -372,10 +372,10 @@ admin. That is why they are gated rather than treated as merely "additive".
 | Tool | Required | Description |
 |---|---|---|
 | `storage_list_objects` | — | List stored objects |
-| `storage_get_metadata` | `key` | Metadata plus a temporary signed download URL |
+| `storage_get_download_url` | `key` | A temporary signed download URL and its expiry — not object metadata |
 | `storage_delete_object` ⚠ | `key` | Delete an object |
 
-`storage_get_metadata` is classified as a read because it does not change the
+`storage_get_download_url` is classified as a read because it does not change the
 environment — but the signed URL it mints is a bearer capability that outlives
 the tool call.
 

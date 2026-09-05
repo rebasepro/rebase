@@ -236,10 +236,10 @@ ese destino esté en la interfaz loopback.** La compuerta está diseñada como u
 lista de lo que *no* está bloqueado, por lo que una herramienta agregada más
 adelante estará protegida por defecto.
 
-- **No bloqueadas — lecturas:** `rebase_schema_plan`, `rebase_schema_introspect`, `rebase_doctor`,
+- **No bloqueadas — lecturas:** `rebase_schema_plan`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
-  `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
+  `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`.
 - **No bloqueadas — solo locales:** `rebase_schema_generate`, `rebase_db_generate`,
   `rebase_generate_sdk`, las herramientas del servidor de desarrollo y las herramientas
@@ -380,10 +380,10 @@ meramente "aditivas".
 | Herramienta | Requerido | Descripción |
 |---|---|---|
 | `storage_list_objects` | — | Lista objetos almacenados |
-| `storage_get_metadata` | `key` | Metadatos más una URL temporal firmada de descarga |
+| `storage_get_download_url` | `key` | Una URL de descarga firmada temporal y su caducidad — no metadatos del objeto |
 | `storage_delete_object` ⚠ | `key` | Elimina un objeto |
 
-`storage_get_metadata` está clasificada como lectura porque no cambia el entorno,
+`storage_get_download_url` se clasifica como lectura porque no cambia
 pero la URL firmada que genera es una capacidad al portador que sobrevive a la
 llamada de la herramienta.
 

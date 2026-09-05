@@ -544,7 +544,6 @@ export const READ_ONLY_TOOLS = new Set<string>([
     // precisely so that "show me what would happen" does not change anything
     // on the way.
     "rebase_schema_plan",
-    "rebase_schema_introspect",
     "rebase_doctor",
     "rebase_db_branch_list",
     "rebase_db_branch_info",
@@ -554,11 +553,11 @@ export const READ_ONLY_TOOLS = new Set<string>([
     // Admin
     "list_users",
     "list_roles",
-    // Storage. `storage_get_metadata` mints a signed URL, which is a bearer
+    // Storage. `storage_get_download_url` mints a signed URL, which is a bearer
     // capability rather than a plain read — see L2 in the unit-67 audit — but
     // it does not change the environment, so it belongs here.
     "storage_list_objects",
-    "storage_get_metadata",
+    "storage_get_download_url",
     // Cron
     "cron_list_jobs",
     "cron_get_job",
@@ -578,6 +577,12 @@ export const READ_ONLY_TOOLS = new Set<string>([
  * open question 2).
  */
 export const LOCAL_ONLY_TOOLS = new Set<string>([
+    // `rebase_schema_introspect` reads the database and *writes collection
+    // definition files* into the project. It was classified as a read, which is
+    // half true and the wrong half: the half that matters lands on this machine,
+    // overwriting hand-written collection files with generated ones. Local-only
+    // is what it is.
+    "rebase_schema_introspect",
     "rebase_schema_generate",
     "rebase_db_generate",
     "rebase_generate_sdk",
@@ -1144,8 +1149,8 @@ const STORAGE_TOOLS: ToolDef[] = [
         }
     },
     {
-        name: "storage_get_metadata",
-        description: "Get metadata and a temporary signed download URL for a file in Rebase storage.",
+        name: "storage_get_download_url",
+        description: "Mint a temporary signed download URL for a file in Rebase storage. It returns the URL and its expiry, not object metadata — the URL is a bearer capability that outlives the tool call.",
         inputSchema: {
             type: "object",
             properties: {
@@ -1364,6 +1369,13 @@ let devProcess: ChildProcess | null = null;
 const devLogs: string[] = [];
 const MAX_DEV_LOG_LINES = 500;
 
+/** The last `count` lines of a blob of output, without its trailing blank. */
+export function lastLines(text: string, count: number): string {
+    if (!text) return "";
+    const lines = text.replace(/\n$/, "").split("\n");
+    return lines.slice(-Math.max(1, count)).join("\n");
+}
+
 function appendDevLog(line: string) {
     devLogs.push(line);
     if (devLogs.length > MAX_DEV_LOG_LINES) {
@@ -1403,6 +1415,41 @@ export function untrustedEnvelope(source: string, body: string): string {
 /** JSON from the target environment, marked as untrusted. */
 function untrustedJsonResult(source: string, data: unknown) {
     return textResult(untrustedEnvelope(source, JSON.stringify(data, null, 2)));
+}
+
+/**
+ * A tool error with the two facts a caller needs to act on it.
+ *
+ * `fetch failed` is what Node says when nothing is listening, and on its own it
+ * is the least useful sentence in this file: it names no host, no port and no
+ * next step. The agent's actual situation — nine times out of ten — is that
+ * `rebase dev` is not running, and it holds the tool that starts it.
+ *
+ * The URL matters as much as the remedy. The active project is sticky and lives
+ * outside the repository, so "which backend did it even try?" is a real
+ * question, and answering it is how somebody notices they are pointed at the
+ * wrong project rather than at a stopped one.
+ */
+export function explainToolError(err: unknown, baseUrl?: string): string {
+    const msg = err instanceof Error ? err.message : String(err);
+    const url = baseUrl ?? safeActiveBaseUrl();
+    const networkish = /fetch failed|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network error/i;
+    if (!networkish.test(msg)) return msg;
+    const where = url ? ` while calling ${url}` : "";
+    return (
+        `${msg}${where}. Nothing answered there — is \`rebase dev\` running? ` +
+        "Start it with `rebase_dev_start`, or check `rebase_project_current`: " +
+        "the active project is sticky and lives outside your repository."
+    );
+}
+
+/** The active project's baseUrl, or undefined if even that cannot be resolved. */
+function safeActiveBaseUrl(): string | undefined {
+    try {
+        return getActiveProject().baseUrl;
+    } catch {
+        return undefined;
+    }
 }
 
 /** Raw text from the target environment (CLI stdout, dev-server logs), marked as untrusted. */
@@ -1501,7 +1548,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
 
             if (!baseUrl) {
-                return textResult("Error: Could not determine baseUrl. Provide --baseUrl or ensure the dev server is running in the project directory.");
+                // `--baseUrl` is a CLI flag, and this is not a CLI. The
+                // model was being told to pass an option this tool has no
+                // notion of, in a message it could not act on.
+                return {
+                    ...textResult(
+                        `Cannot register "${projectName}": no baseUrl. Pass \`baseUrl\` ` +
+                        '(for example "http://localhost:3001"), or pass a `projectDir` ' +
+                        "where `rebase dev` is running so it can be discovered from " +
+                        "`.rebase/state.json`."
+                    ),
+                    isError: true
+                };
             }
 
             registry.projects[projectName] = {
@@ -1718,7 +1776,7 @@ roles });
             return textResult(`Deleted object "${key}" successfully.`);
         }
 
-        case "storage_get_metadata": {
+        case "storage_get_download_url": {
             const argsObj = args as { key: string; bucket?: string };
             const { key, bucket } = argsObj;
             const result = await client.storage.getSignedUrl(key, bucket);
@@ -1800,11 +1858,16 @@ roles });
         case "rebase_dev_logs": {
             const argsObj = args as { lines?: number } | undefined;
             const lineCount = argsObj?.lines ?? 50;
-            const recent = devLogs.slice(-lineCount);
-            if (recent.length === 0) {
+            // `devLogs` holds stdout *chunks*, not lines: one `data` event can
+            // carry a hundred lines or half of one. Slicing the chunk array by
+            // `lines` therefore returned an amount of output unrelated to the
+            // number asked for — usually far more — while the tool description
+            // and the docs both promised lines.
+            const recent = lastLines(devLogs.join(""), lineCount);
+            if (!recent) {
                 return textResult(devProcess ? "No output captured yet." : "Dev server is not running.");
             }
-            return untrustedTextResult("the dev server's output", recent.join(""));
+            return untrustedTextResult("the dev server's output", recent);
         }
 
         case "rebase_dev_stop": {
@@ -1819,11 +1882,10 @@ roles });
             throw new Error(`Unknown tool: ${name}`);
         }
     } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
         return {
             content: [{
                 type: "text" as const,
-                text: `Error: ${msg}`
+                text: `Error: ${explainToolError(err)}`
             }],
             isError: true
         };
@@ -1969,7 +2031,42 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 
 // ── Start ───────────────────────────────────────────────────────────────────
 
+/**
+ * `--help` and `--version`, answered before anything connects.
+ *
+ * A stdio MCP server run by hand is the normal way to check that a config block
+ * works, and this one answered `--version` by opening a transport and waiting
+ * for a client that was never coming — a hang with no output, which reads as a
+ * broken install rather than as a server doing exactly what it was told.
+ *
+ * @returns true when the process has answered and should exit.
+ */
+export function answerCliFlags(argv: string[] = process.argv.slice(2)): boolean {
+    if (argv.includes("--version") || argv.includes("-v")) {
+        process.stdout.write(`${MCP_SERVER_VERSION}\n`);
+        return true;
+    }
+    if (argv.includes("--help") || argv.includes("-h")) {
+        process.stdout.write(
+            "rebase-mcp — the Rebase MCP server\n\n" +
+            "It speaks MCP over stdio and has no other interface: an MCP client\n" +
+            "spawns it, and there is nothing to run interactively.\n\n" +
+            "  npx -y @rebasepro/mcp\n\n" +
+            "Environment\n" +
+            "  REBASE_PROJECT_DIR                the directory holding rebase.json\n" +
+            "  REBASE_BASE_URL                   backend URL (default http://localhost:3001)\n" +
+            "  REBASE_API_TOKEN                  a scoped rk_ API key, or a service key\n" +
+            "  REBASE_MCP_ALLOW_REMOTE_WRITES    allow write tools off the loopback interface\n\n" +
+            "Setup blocks for Claude Code, Cursor, Gemini CLI, Codex and Kiro:\n" +
+            "  https://rebase.pro/docs/ai/mcp\n"
+        );
+        return true;
+    }
+    return false;
+}
+
 async function main() {
+    if (answerCliFlags()) return;
     const transport = new StdioServerTransport();
     await server.connect(transport);
 }

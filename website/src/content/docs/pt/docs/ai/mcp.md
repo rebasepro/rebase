@@ -230,10 +230,10 @@ no meio além do julgamento do assistente sobre qual projeto está ativo.
 na interface de loopback.** A proteção é escrita como uma lista do que *não* é
 protegido, portanto, uma ferramenta adicionada posteriormente já chega protegida por padrão.
 
-- **Não protegidas — leituras:** `rebase_schema_plan`, `rebase_schema_introspect`, `rebase_doctor`,
+- **Não protegidas — leituras:** `rebase_schema_plan`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
-  `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
+  `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`.
 - **Não protegidas — somente locais:** `rebase_schema_generate`, `rebase_db_generate`,
   `rebase_generate_sdk`, as ferramentas do servidor de desenvolvimento e as ferramentas de registro de projeto.
@@ -372,10 +372,10 @@ de administrador. É por isso que eles são protegidos pela barreira em vez de s
 | Ferramenta | Obrigatório | Descrição |
 |---|---|---|
 | `storage_list_objects` | — | Listar objetos armazenados |
-| `storage_get_metadata` | `key` | Metadados mais uma URL de download assinada temporária |
+| `storage_get_download_url` | `key` | Uma URL de download assinada temporária e sua expiração — não metadados do objeto |
 | `storage_delete_object` ⚠ | `key` | Excluir um objeto |
 
-`storage_get_metadata` é classificado como leitura porque não altera o
+`storage_get_download_url` é classificado como leitura porque não altera o
 ambiente — mas a URL assinada que ele gera é uma capacidade de portador (*bearer capability*) que sobrevive
 além da chamada da ferramenta.
 

@@ -246,10 +246,10 @@ dieses Ziel befindet sich auf der Loopback-Schnittstelle.** Das Gate ist als
 Liste derjenigen Tools formuliert, die *nicht* reguliert werden, sodass ein
 später hinzugefügtes Tool standardmäßig geschützt ist.
 
-- **Nicht reguliert – Lesezugriffe:** `rebase_schema_plan`, `rebase_schema_introspect`, `rebase_doctor`,
+- **Nicht reguliert – Lesezugriffe:** `rebase_schema_plan`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
-  `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
+  `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`.
 - **Nicht reguliert – nur lokal:** `rebase_schema_generate`, `rebase_db_generate`,
   `rebase_generate_sdk`, die Dev-Server-Tools und die Projekt-Registry-Tools.
@@ -394,10 +394,10 @@ nicht bloß als „additiv“ behandelt.
 | Tool | Erforderlich | Beschreibung |
 |---|---|---|
 | `storage_list_objects` | — | Gespeicherte Objekte auflisten |
-| `storage_get_metadata` | `key` | Metadaten plus eine temporäre signierte Download-URL |
+| `storage_get_download_url` | `key` | Eine temporäre signierte Download-URL und ihr Ablauf – keine Objekt-Metadaten |
 | `storage_delete_object` ⚠ | `key` | Ein Objekt löschen |
 
-`storage_get_metadata` wird als Lesezugriff klassifiziert, da es die Umgebung
+`storage_get_download_url` wird als Lesezugriff klassifiziert, da es die Umgebung
 nicht verändert – aber die signierte URL, die es erzeugt, ist eine
 Inhaberberechtigung (Bearer Capability), die den Tool-Aufruf überdauert.
 

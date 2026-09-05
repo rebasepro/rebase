@@ -129,7 +129,7 @@ CRUD over a collection through `@rebasepro/client`.
 |---|---|---|
 | `storage_list_objects` | — | List files/objects stored in Rebase storage |
 | `storage_delete_object` ⚠ | `key` | Delete an object/file from Rebase storage |
-| `storage_get_metadata` | `key` | Get metadata and a temporary signed download URL for a file in Rebase storage |
+| `storage_get_download_url` | `key` | Mint a temporary signed download URL for a file in Rebase storage |
 
 ### Cron (5)
 

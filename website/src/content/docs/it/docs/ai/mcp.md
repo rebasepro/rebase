@@ -230,10 +230,10 @@ frapposto se non la valutazione dell'assistente su quale progetto sia attivo.
 trovi sull'interfaccia di loopback.** Il gate è strutturato come un elenco di ciò che *non* è
 sottoposto a restrizione; pertanto, qualsiasi strumento aggiunto successivamente sarà protetto per impostazione predefinita.
 
-- **Non soggetti a restrizioni — letture:** `rebase_schema_plan`, `rebase_schema_introspect`, `rebase_doctor`,
+- **Non soggetti a restrizioni — letture:** `rebase_schema_plan`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
-  `storage_get_metadata`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
+  `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`.
 - **Non soggetti a restrizioni — solo locali:** `rebase_schema_generate`, `rebase_db_generate`,
   `rebase_generate_sdk`, gli strumenti del server di sviluppo e gli strumenti del registro dei progetti.
@@ -371,10 +371,10 @@ amministratore. Per questo motivo sono soggetti a restrizioni anziché essere co
 | Strumento | Richiesto | Descrizione |
 |---|---|---|
 | `storage_list_objects` | — | Elenca gli oggetti archiviati |
-| `storage_get_metadata` | `key` | Metadati e un URL di download firmato temporaneo |
+| `storage_get_download_url` | `key` | Un URL di download firmato temporaneo e la sua scadenza — non i metadati dell'oggetto |
 | `storage_delete_object` ⚠ | `key` | Elimina un oggetto |
 
-`storage_get_metadata` è classificato come lettura perché non modifica
+`storage_get_download_url` è classificato come lettura perché non modifica
 l'ambiente, ma l'URL firmato generato è una capability al portatore che sopravvive
 alla chiamata dello strumento.
 
