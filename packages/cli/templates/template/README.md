@@ -136,7 +136,7 @@ Collections are defined once in `config/collections/` and used by both the front
 
 All configuration is managed through a single `.env` file in the project root. Both the backend and frontend read from this file:
 
-- **Backend**: loads via `dotenv` from `../../.env` (relative to `backend/src/`)
+- **Backend**: the runtime loads the project root's `.env` before it boots
 - **Frontend**: Vite reads `VITE_*` variables via `envDir` pointing to the project root
 - **Scripts**: load via `dotenv` from the project root
 

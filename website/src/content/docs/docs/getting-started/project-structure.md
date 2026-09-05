@@ -52,26 +52,68 @@ file that builds them. See [Custom Server Integration](/docs/backend/custom-serv
 The frontend is a standard **Vite + React + TypeScript** application. The key file is `App.tsx`, which wires together all Rebase controllers:
 
 ```typescript title="frontend/src/App.tsx"
+import React from "react";
+
+import "@fontsource/jetbrains-mono";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/instrument-sans";
+
 import { Rebase, RebaseAuth, useRebaseAuthController } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import { ErrorBoundary } from "@rebasepro/ui";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
 
-// `rebase dev` injects VITE_API_URL with the port it actually bound, so this
-// needs no hardcoded localhost — and a deployed build serves the admin from the
-// same origin as the API, where an empty value is what you want.
-const rebaseClient = createRebaseClient({
-    baseUrl: import.meta.env.VITE_API_URL,
-    auth: { authFlowMode: "cookie" }
-});
+// `rebase dev` injects VITE_API_URL with the port it actually bound, and that
+// port is derived from this project's path rather than fixed — so a
+// `http://localhost:3001` fallback here names a port nothing is listening on.
+// A deployed build serves the admin from the same origin as the API, where an
+// empty value is exactly what you want.
+const API_URL = import.meta.env.VITE_API_URL;
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+export function App() {
+    const rebaseClient = React.useMemo(() => createRebaseClient({
+        baseUrl: API_URL,
+        // Store the refresh token in an httpOnly cookie (XSS-safe) rather than
+        // localStorage. The backend issues it via `auth.cookieAuth`.
+        auth: { authFlowMode: "cookie" }
+    }), []);
+
+    const authController = useRebaseAuthController({
+        client: rebaseClient,
+        googleClientId: GOOGLE_CLIENT_ID
+    });
+
+    return (
+        <ErrorBoundary fullPage>
+            <Rebase
+                client={rebaseClient}
+                authController={authController}
+            >
+                <RebaseAuth />
+                <RebaseCMS
+                    collections={collections}
+                />
+                <RebaseStudio/>
+                <RebaseShell title="Rebase"/>
+            </Rebase>
+        </ErrorBoundary>
+    );
+}
 ```
+
+`main.tsx` mounts it under a `react-router` `basename` taken from
+`import.meta.env.BASE_URL`, which `rebase build` sets from the `path` this app
+declares in `rebase.json` — so the assets, the router and the server agree on
+one value without it being written down three times.
 
 ### Key Concepts
 
 - **`createRebaseClient`** — Creates the SDK client that handles HTTP requests, WebSocket connections, and auth token management
 - **`virtual:rebase-collections`** — A Vite plugin that auto-imports your shared collections at build time
-- **Controllers** — `useBuildNavigationStateController`, `useBuildCollectionRegistryController`, etc. — these configure routing, collection resolution, and UI configuration
+- **`useRebaseAuthController`** — Holds the signed-in user and the token lifecycle, and is what `<Rebase>` distributes to everything below it
 
 ## Backend (`backend/`)
 
@@ -110,7 +152,7 @@ Collections are the **single source of truth** for your data model. They are def
 ```typescript title="config/collections/products.ts"
 import { defineCollection } from "@rebasepro/cms-types";
 
-export const productsCollection = defineCollection({
+const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     properties: {
@@ -118,6 +160,10 @@ export const productsCollection = defineCollection({
         price: { type: "number", name: "Price" }
     }
 });
+
+// The default export is what the registry picks up — every collection in the
+// scaffold is written this way.
+export default productsCollection;
 ```
 
 The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api/data/products`), and the PostgreSQL table name defaults to it. Add `table` only when they differ.
@@ -129,7 +175,10 @@ The `slug` becomes the URL path in the admin UI and the REST API endpoint (`/api
 3. **The frontend** reads them (via Vite plugin) to render tables, forms, and navigation
 4. **The CLI** reads them to generate migration files with `rebase schema generate`
 
-Changes to collections propagate everywhere automatically.
+While `rebase dev` is running, saving a file under `config/collections/`
+regenerates `backend/src/schema.generated.ts` and restarts the backend, and boot
+creates the tables and columns that are missing. Outside `rebase dev` the same
+step is `rebase schema generate`.
 
 ## Next Steps
 
