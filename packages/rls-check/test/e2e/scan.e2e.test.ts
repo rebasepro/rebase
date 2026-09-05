@@ -94,6 +94,10 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
     let full: ScanResult;
     let publicOnly: ScanResult;
 
+    /** The same database, connected as the SELECT-only app role from the fixture. */
+    const readonlyConnectionString = (): string =>
+        `postgresql://readonly_reports:readonly-reports-e2e@localhost:${container.port}/rlscheck?sslmode=disable`;
+
     beforeAll(async () => {
         container = await startPgContainer();
         await applySql(container.connectionString, readFileSync(new URL("./fixture.sql", import.meta.url), "utf8"));
@@ -361,6 +365,89 @@ describe.skipIf(!dockerAvailable)("rls-check against a real PostgreSQL", () => {
             );
             expect(stillFound, `--role dropped the default finding ${id} on ${object}`).toBe(true);
         }
+    });
+
+    it("names a SELECT-only unrecognised role, because an RLS-disabled table hands it every row", () => {
+        // The caveat used to filter on write privileges, which reads the risk
+        // backwards: the finding this tool exists for is `rls-disabled`, and
+        // what that hands a SELECT-only reporting role is the whole table.
+        expect(full.diagnostics.unrecognizedGrantees).toContain("readonly_reports");
+    });
+
+    it("refuses a --role that is not in pg_roles instead of quietly narrowing the scan", async () => {
+        await expect(
+            scan({ connectionString: container.connectionString, roles: ["app_usr"] })
+        ).rejects.toThrow(/app_usr/);
+
+        const err: string[] = [];
+        const io: CliIo = {
+            stdout: () => {},
+            stderr: (text) => err.push(text),
+            env: {},
+            cwd: process.cwd(),
+            isTty: false,
+            columns: 88
+        };
+
+        // Exit 2, not 0 and not 1: same reasoning as an unknown --skip id. A
+        // typo that matches no role silently removes coverage, and the run then
+        // prints a clean report of a database nobody looked at.
+        expect(await runCli([container.connectionString, "--role", "app_usr"], io)).toBe(2);
+        expect(err.join("")).toContain("app_usr");
+    });
+
+    it("still accepts a --role that exists", async () => {
+        const scoped = await scan({ connectionString: container.connectionString, roles: ["app_user"] });
+        expect(scoped.exposedRoles).toContain("app_user");
+    });
+
+    // -----------------------------------------------------------------------
+    // Scanning as the application's own role
+    //
+    // The way anyone without the superuser password runs this tool. The
+    // connecting role was not part of the exposed set, so a scan as
+    // `readonly_reports` reported nothing at all about the table
+    // `readonly_reports` can read in full.
+    // -----------------------------------------------------------------------
+
+    it("treats an unprivileged connecting role as exposed, and reports what it reaches", async () => {
+        const asApp = await scan({ connectionString: readonlyConnectionString() });
+
+        expect(asApp.scannerIsPrivileged).toBe(false);
+        expect(asApp.exposedRoles).toContain("readonly_reports");
+        expect(asApp.diagnostics.scanningAsExposedRole).toBe("readonly_reports");
+
+        const hits = asApp.findings.filter(
+            (finding) => finding.id === "rls-disabled" && objectName(finding) === "select_only_table"
+        );
+        expect(
+            hits.length,
+            "scanning as a SELECT-only app role must report the RLS-disabled table it can read"
+        ).toBe(1);
+    });
+
+    it("says in the report that the connecting role was treated as exposed", async () => {
+        const asApp = await scan({ connectionString: readonlyConnectionString() });
+        const rendered = renderReport(asApp, { color: false, quiet: false, failOn: "high", width: 100 });
+
+        expect(rendered).toContain("readonly_reports");
+        expect(rendered).toContain("row-level security does constrain");
+    });
+
+    it("does not treat the connecting role as exposed when RLS cannot constrain it", () => {
+        // The container superuser: `scannerIsPrivileged` already says nothing
+        // below describes this connection, and adding it to the exposed set
+        // would flag every table in the database.
+        expect(full.exposedRoles).not.toContain("rlscheck");
+        expect(full.diagnostics.scanningAsExposedRole ?? null).toBeNull();
+    });
+
+    it("names the exposed roles in the report header", () => {
+        const rendered = renderReport(full, { color: false, quiet: false, failOn: "high", width: 100 });
+
+        // Every check gates on this set. A reader who cannot see it cannot tell
+        // whether "No findings" covered their API role.
+        expect(rendered).toMatch(/Exposed\s+PUBLIC, anon, authenticated \(add yours with --role\)/);
     });
 
     it("honours --role from the command line", async () => {

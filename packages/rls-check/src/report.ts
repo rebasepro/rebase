@@ -266,6 +266,16 @@ export function renderReport(result: ScanResult, options: RenderOptions): string
         out.push("");
     }
 
+    // The other half of the same disclosure: when the scan came in as a role RLS
+    // does constrain, that role was added to the exposed set, which changes
+    // which findings appear. Two runs of the same database as different roles
+    // are allowed to disagree, and the report has to say why.
+    const scanningAs = result.diagnostics?.scanningAsExposedRole;
+    if (scanningAs) {
+        out.push(...renderConnectingRoleNote(scanningAs, style, width));
+        out.push("");
+    }
+
     // Same reasoning as the privilege caveat above, and it survives --quiet for
     // the same reason: a check whose catalogue read failed returns no findings,
     // which is indistinguishable in the output from a check that found nothing.
@@ -339,10 +349,17 @@ function renderHeader(result: ScanResult, style: Style, width: number, options: 
         ? `PostgreSQL ${result.serverVersion}`
         : result.serverVersion;
 
+    // Every check gates on this set: a table is only "exposed" when one of these
+    // roles can reach it. Printing it in the header is the difference between a
+    // reader taking "No findings" at face value and noticing their own API role
+    // is not in the list.
+    const exposed = result.exposedRoles ?? [];
+
     const rows: [string, string][] = [
         ["Database", `${endpoint}/${result.database.name}`],
         ["Server", serverVersion],
         ["Platform", PLATFORM_LABEL[result.platform]],
+        ["Exposed", `${exposed.length > 0 ? exposed.join(", ") : "PUBLIC"} (add yours with --role)`],
         [
             "Scanned",
             [
@@ -379,6 +396,31 @@ function renderPrivilegeCaveat(style: Style, width: number): string[] {
 }
 
 /**
+ * The scan connected as a role row-level security constrains, so that role was
+ * treated as exposed.
+ *
+ * The counterpart to {@link renderPrivilegeCaveat}: one says "nothing below
+ * describes this connection", the other says "this connection is one of the
+ * things below". Both are disclosures about what the exposed set contains,
+ * which is the only reason any of the findings say what they say.
+ */
+function renderConnectingRoleNote(role: string, style: Style, width: number): string[] {
+    const body = wrap(
+        `This scan connected as "${role}", which row-level security does constrain — no superuser, ` +
+            "no BYPASSRLS, no ownership of the scanned tables. It has therefore been treated as a role " +
+            "an untrusted caller can arrive as, and the findings below include what it reaches. " +
+            "Scanning the same database as a privileged role will report a different set.",
+        width - 8
+    );
+
+    const out: string[] = [];
+    out.push(`${style.yellow("Note")}  ${body[0] ?? ""}`);
+    for (const line of body.slice(1)) out.push(`      ${line}`);
+
+    return out;
+}
+
+/**
  * The caveat that keeps a false negative from reading as a pass.
  *
  * Deliberately not a finding: the scan has no evidence that any of these roles
@@ -392,7 +434,7 @@ function renderUnrecognizedRolesCaveat(roles: string[], style: Style, width: num
     const list = shown.map((r) => `"${r}"`).join(", ") + (rest > 0 ? `, and ${rest} more` : "");
 
     const body = wrap(
-        `${list} ${plural(roles.length, "holds", "hold")} write privileges here, and ` +
+        `${list} can read or write scanned tables here, and ` +
             "this scan does not know whether requests arrive as " +
             `${plural(roles.length, "it", "them")}. The checks only report a table as exposed when an ` +
             "exposed role can reach it, so anything served through " +

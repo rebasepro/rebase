@@ -23,7 +23,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { CHECKS, runChecks } from "./checks";
-import { introspectWithDiagnostics, unsupportedConnectionKeywords } from "./introspect";
+import { introspectWithDiagnostics, UnknownRoleError, unsupportedConnectionKeywords } from "./introspect";
 import { formatEndpoint, isLoopbackEndpoint, parseConnectionString, redactSecrets } from "./redact";
 import { exceedsThreshold, renderCheckCatalog, renderJson, renderReport } from "./report";
 import { renderHtml } from "./report-html";
@@ -152,6 +152,7 @@ function buildScanResult(
         serverVersion: snapshot.serverVersion,
         platform: snapshot.platform,
         scannerIsPrivileged: snapshot.scannerIsPrivileged,
+        exposedRoles: snapshot.exposedRoles,
         stats: {
             schemas: snapshot.schemas.length,
             tables: tables.length,
@@ -903,6 +904,22 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
                 statementTimeoutMs: options.timeoutMs
             });
         } catch (error) {
+            // A typo in `--role` is the user's mistake, not the database's, and
+            // `explainError` would bury it under "the scan failed".
+            if (error instanceof UnknownRoleError) {
+                io.stderr(
+                    formatFriendlyError(
+                        {
+                            headline: `No such role on this database: ${error.roles.join(", ")}.`,
+                            hint: "Check the spelling against `SELECT rolname FROM pg_roles`. This is an error rather than a warning for the same reason an unknown --skip id is: a name that matches nothing silently narrows the scan, and the run then prints a clean report of a database nobody looked at."
+                        },
+                        color
+                    )
+                );
+
+                return EXIT_ERROR;
+            }
+
             io.stderr(
                 formatFriendlyError(explainError(error, { endpoint, timeoutMs: options.timeoutMs, connectionString }), color)
             );

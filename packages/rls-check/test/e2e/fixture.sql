@@ -420,3 +420,30 @@ CREATE TABLE public.custom_role_table (
     secret    text
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.custom_role_table TO app_user;
+
+-- ---------------------------------------------------------------------------
+-- A SELECT-only role, and the scan that arrives as it.
+--
+-- `readonly_reports` holds nothing but SELECT, which the unrecognised-grantee
+-- caveat used to filter out as "a normal, deliberate grant on a reference
+-- table". Read the risk the other way round: `select_only_table` has RLS off,
+-- so what SELECT hands this role is every row in it — the exact shape of
+-- `rls-disabled`, skipped by the one caveat that exists to stop a false
+-- negative.
+--
+-- It also LOGINs, because the second half of the same problem is the scan run
+-- as the application's own role. That is how anyone without the superuser
+-- password runs this tool, and the connecting role used not to be part of the
+-- exposed set: scanning as `readonly_reports` reported nothing about the very
+-- table `readonly_reports` can read in full.
+-- ---------------------------------------------------------------------------
+
+CREATE ROLE readonly_reports LOGIN PASSWORD 'readonly-reports-e2e';
+GRANT USAGE ON SCHEMA public TO readonly_reports;
+
+CREATE TABLE public.select_only_table (
+    id        bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    owner_id  uuid,
+    salary    numeric
+);
+GRANT SELECT ON public.select_only_table TO readonly_reports;
