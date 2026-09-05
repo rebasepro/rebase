@@ -22,7 +22,7 @@ import { CHROMA, FONT, INK, TRACKING } from "../theme";
  * two examples; showing them together reads as one fact.
  */
 
-const QUERY = "await client.data.orders.find()";
+export const QUERY = "await client.data.orders.find()";
 
 interface Row {
     id: string;
@@ -30,12 +30,12 @@ interface Row {
     amount: string;
 }
 
-const MINE: Row[] = [
+export const MINE: Row[] = [
     { id: "ORD-2026-0162", who: "Robert Lopez", amount: "$1,857.79" },
     { id: "ORD-2026-0074", who: "Robert Lopez", amount: "$475.33" },
 ];
 
-const ALL: Row[] = [
+export const ALL: Row[] = [
     { id: "ORD-2026-0162", who: "Robert Lopez", amount: "$1,857.79" },
     { id: "ORD-2026-0129", who: "Jennifer Taylor", amount: "$112.67" },
     { id: "ORD-2026-0006", who: "Charles Wilson", amount: "$266.82" },
@@ -44,19 +44,21 @@ const ALL: Row[] = [
     { id: "ORD-2026-0074", who: "Robert Lopez", amount: "$475.33" },
 ];
 
-const PANEL = { w: 740, h: 470, y: 400 };
+export const PANEL = { w: 740, h: 470, y: 400 };
 const LEFT = 200;
 const RIGHT = 980;
 
-const Side: React.FC<{
+export const Side: React.FC<{
     x: number;
+    /** Vertical position; defaults to the reel's own. */
+    y?: number;
     accent: string;
     who: string;
     role: string;
     count: string;
     rows: Row[];
     delay: number;
-}> = ({ x, accent, who, role, count, rows, delay }) => {
+}> = ({ x, y = PANEL.y, accent, who, role, count, rows, delay }) => {
     const frame = useCurrentFrame();
     const up = ramp(frame, delay, 20);
     return (
@@ -64,7 +66,7 @@ const Side: React.FC<{
             style={{
                 position: "absolute",
                 left: x,
-                top: PANEL.y,
+                top: y,
                 width: PANEL.w,
                 height: PANEL.h,
                 borderRadius: 16,

@@ -3,7 +3,7 @@ import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } fr
 import { NeatCanvas, NeatTravel } from "./gradient/NeatCanvas";
 import { GLIDE, SCENES, STARTS } from "./film";
 import { OVERLAP, slideMotion } from "./transitions";
-import { GROUND, TONE } from "./theme";
+import { GROUND, TONE, type Tone } from "./theme";
 
 /**
  * The plane, the route through it, and the ground painted over it.
@@ -180,10 +180,15 @@ export const StationContext = createContext<{ index: number; start: number; lead
     lead: 0,
 });
 
+/** A window on the desk (src/desk) sits on no scene, so it names the ground
+ *  it was composed for here instead. Null everywhere else. */
+export const ToneOverride = createContext<Tone | null>(null);
+
 /** The ink set for whatever ground the current scene sits on. */
-export function useTone() {
+export function useTone(): Tone {
+    const override = useContext(ToneOverride);
     const { index } = useContext(StationContext);
-    return TONE[SCENES[index].ground];
+    return override ?? TONE[SCENES[index].ground];
 }
 
 /** The slide's own motion: authored per cut, not inherited from the camera. */

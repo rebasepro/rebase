@@ -105,6 +105,10 @@ export interface Step {
     /** Frames of nothing after the last output line, before the next prompt.
      *  A person reads what a command printed before typing the next one. */
     pause?: number;
+    /** Pin this step to a frame instead of chaining it after the previous
+     *  one. The desk film types two commands in one beat and the third in a
+     *  later one, in the same window, with a minute of story in between. */
+    at?: number;
 }
 
 /**
@@ -128,6 +132,7 @@ export const Session: React.FC<{
     const starts: number[] = [];
     let at = delay;
     for (const step of steps) {
+        if (step.at !== undefined) at = step.at;
         starts.push(at);
         const typed = step.command.length * rate;
         const last = step.output?.length ? Math.max(...step.output.map((l) => l.at)) : 0;

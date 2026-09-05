@@ -3,6 +3,8 @@ import React from "react";
 import { Composition, Series } from "remotion";
 import { loadFonts } from "./fonts";
 import { RebaseIntro, RebaseIntroVO, STANDALONE } from "./Intro";
+import { RebaseDesk, RebaseDeskVO } from "./desk/DeskFilm";
+import { DESK_DURATION } from "./desk/beats";
 import { INTRO_DURATION, SCENES } from "./film";
 import { OVERLAP } from "./transitions";
 import { HeroIntro } from "./components/HeroIntro";
@@ -51,6 +53,24 @@ const HEIGHT = 1080;
 
 export const RemotionRoot: React.FC = () => (
     <>
+        {/* THE DESK — one workspace, a camera, no cuts. See src/desk/beats.ts. */}
+        <Composition
+            id="RebaseDesk"
+            component={RebaseDesk}
+            durationInFrames={DESK_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+        <Composition
+            id="RebaseDesk-VO"
+            component={RebaseDeskVO}
+            durationInFrames={DESK_DURATION}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
+
         <Composition
             id="RebaseIntro"
             component={RebaseIntro}

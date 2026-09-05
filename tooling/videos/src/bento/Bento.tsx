@@ -109,7 +109,8 @@ const Cell: React.FC<{
     travel: number;
     lift: number;
     duration: number;
-}> = ({ tile, rect, travel, lift, duration }) => {
+    hold: number;
+}> = ({ tile, rect, travel, lift, duration, hold }) => {
     const frame = useCurrentFrame();
     const t = ramp(frame, tile.delay, ENTRY, ENTER);
     const away = 1 - t;
@@ -140,7 +141,7 @@ const Cell: React.FC<{
             {/* Own clock per tile. An OffthreadVideo with no Sequence plays
                 against the COMPOSITION's frame, so `at` would count from the
                 wrong zero — see the note in S06_Panel. */}
-            <Sequence from={0} durationInFrames={duration} layout="none">
+            <Sequence from={0} durationInFrames={duration + hold} layout="none">
                 <OffthreadVideo
                     src={staticFile(`demo/bento/b_${tile.file}.mp4`)}
                     startFrom={startAt}
@@ -155,12 +156,18 @@ const Cell: React.FC<{
 
 export const BentoTiles: React.FC<{
     box?: Box;
+    /** The window the tiles are composed for — it picks each clip's offset,
+     *  so the action lands inside it. */
     duration?: number;
+    /** Frames the clips stay mounted PAST that window. The desk keeps every
+     *  tile on screen for the pull-back at the end; a clip past its own
+     *  length holds its last frame, which is what a mosaic wants. */
+    hold?: number;
     /** How far a tile starts from its resting place. The film scene arrives
      *  with a push of its own, so it asks for much less than the standalone. */
     travel?: number;
     lift?: number;
-}> = ({ box = FULL, duration = BENTO_DURATION, travel = 240, lift = 44 }) => {
+}> = ({ box = FULL, duration = BENTO_DURATION, hold = 0, travel = 240, lift = 44 }) => {
     const rects = bentoRects(box);
     return (
         <>
@@ -172,6 +179,7 @@ export const BentoTiles: React.FC<{
                     travel={travel}
                     lift={lift}
                     duration={duration}
+                    hold={hold}
                 />
             ))}
         </>

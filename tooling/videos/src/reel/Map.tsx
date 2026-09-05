@@ -70,8 +70,12 @@ const EDGES: Edge[] = [
     { from: "customers", to: "users", kind: "belongs to" },
 ];
 
-const NODE_AT = (i: number) => 14 + i * 7;
-const EDGE_AT = (i: number) => 92 + i * 13;
+/** The reel's pace: tables land, then relations are drawn one at a time.
+ *  The desk visits the schema for four seconds, so it asks for `quick`. */
+const TEMPO = {
+    reel: { node: (i: number) => 14 + i * 7, edge: (i: number) => 92 + i * 13 },
+    quick: { node: (i: number) => 6 + i * 4, edge: (i: number) => 42 + i * 8 },
+};
 
 /** Nearest edge-centres, so a line never crosses the card it starts from. */
 function anchors(a: Node, b: Node) {
@@ -82,9 +86,16 @@ function anchors(a: Node, b: Node) {
     return { from, to };
 }
 
-export const Map: React.FC = () => {
+export const Map: React.FC<{
+    /** When the line under the diagram lands. The reel waits for the last
+     *  relation; the desk has a shorter beat. */
+    captionAt?: number;
+    tempo?: keyof typeof TEMPO;
+}> = ({ captionAt = 178, tempo = "reel" }) => {
     const frame = useCurrentFrame();
     const { fps } = useVideoConfig();
+    const NODE_AT = TEMPO[tempo].node;
+    const EDGE_AT = TEMPO[tempo].edge;
 
     return (
         <AbsoluteFill>
@@ -205,7 +216,7 @@ export const Map: React.FC = () => {
                 the film's measure — this and the wire both ran a 46px one-off
                 fourteen pixels off the inset every other scene uses. */}
             <div style={{ position: "absolute", left: STAGE_INSET, top: 846, width: 1500 }}>
-                <DisplayLine size={DISPLAY.split} delay={178}>
+                <DisplayLine size={DISPLAY.split} delay={captionAt}>
                     Your schema, as it actually is.
                 </DisplayLine>
             </div>
