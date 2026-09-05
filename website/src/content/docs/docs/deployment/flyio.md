@@ -79,3 +79,9 @@ pnpm run db:push
 ```
 
 Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Postgres connection string. For a private Fly Postgres, open a tunnel first with `fly proxy 5432 -a <your-db-app>` and point `DATABASE_URL` at `localhost:5432`. The deployed image doesn't include the CLI, so this doesn't run inside the machine and a `release_command` can't call it either. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
+
+## Related
+
+- [Deployment Guide](/docs/getting-started/deployment/) — the build, the artifacts and the boot sequence every platform shares
+- [Environment & Configuration](/docs/getting-started/configuration/) — every variable the runtime reads, and which ones production refuses to start without
+- [Self-Hosting](/docs/deployment/self-hosting/) — running it on a machine you own

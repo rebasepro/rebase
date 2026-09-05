@@ -46,6 +46,7 @@ import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
 import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
 import { checkUnreleasedBadges } from "./docs-verify/check-unreleased-badges.mjs";
+import { checkDocsLinks } from "./docs-verify/check-docs-links.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -78,6 +79,7 @@ if (asJson) {
         out.envReference = checkEnvReference(ROOT).findings;
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
         out.unreleasedBadges = checkUnreleasedBadges(ROOT).findings;
+        out.docsLinks = checkDocsLinks(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -178,6 +180,22 @@ if (only === "both" || only === "names") {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} stated count(s) disagree with the tool:${NC}`);
         for (const b of bad) console.log(`  ${RED}${b.file}:${b.line}${NC}\n      ${DIM}${b.message}${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Documentation link graph ━━━${NC}`);
+    const { findings: bad, scanned, links } = checkDocsLinks(ROOT);
+    console.log(`${DIM}Resolved ${links} internal link(s) across ${scanned} English docs page(s).${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every link resolves, and every page leads somewhere.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} broken or dead-end page(s):${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
     }
 }
 

@@ -39,6 +39,7 @@
 - [Environment & Configuration](https://rebase.pro/docs/getting-started/configuration): All environment variables and configuration options for Rebase projects.
 - [Upgrading](https://rebase.pro/docs/upgrading): What breaks when you move an existing app to the current release, and what to do about each one.
 - [Compatibility](https://rebase.pro/docs/compatibility): What Rebase promises across versions and what it does not — the six versioned contracts, how each one fails, and what may still change in a minor.
+- [Changelog](https://rebase.pro/docs/changelog): Every released change to Rebase — new features, fixes, and the breaking changes each version asks you to migrate.
 - [Backend only (headless)](https://rebase.pro/docs/getting-started/headless): Run Rebase as a headless Backend-as-a-Service over your own PostgreSQL — a REST API, auth, storage and realtime, with no admin panel and no collection files.
 - [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
 - [Client SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.

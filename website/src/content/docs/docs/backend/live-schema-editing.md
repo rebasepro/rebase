@@ -323,3 +323,9 @@ working in:
   mints one through Atlas with the integrity hash Atlas requires.
 - Postgres only. The capability is detected on the driver, and other engines
   answer `SCHEMA_EDITING_UNSUPPORTED`.
+
+## Related
+
+- [Schema Generation](/docs/cli/schema/) — the same edits from the command line
+- [Defining Collections](/docs/collections/) — what the editor is rewriting
+- [Studio](/docs/studio/) — the panel these routes are behind

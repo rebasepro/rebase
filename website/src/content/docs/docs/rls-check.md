@@ -439,3 +439,6 @@ worse than none.
 
 - [Security Rules (RLS)](/docs/collections/security-rules) — defining row-level security in
   Rebase collections, which compiles to the policies this tool audits.
+- [Backend only](/docs/getting-started/headless/) — why a table with no policy is not
+  served at all in a headless project.
+- [REST API](/docs/backend/api/) — the surface a permissive policy exposes.

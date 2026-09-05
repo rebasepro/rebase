@@ -265,3 +265,9 @@ for (const article of articles) {
 }
 ```
 
+
+## Related
+
+- [Defining Collections](/docs/collections/) — the collection API this recipe uses
+- [Relations](/docs/collections/relations/) — the author and tag links, in full
+- [Security Rules (RLS)](/docs/collections/security-rules/) — publishing without exposing drafts

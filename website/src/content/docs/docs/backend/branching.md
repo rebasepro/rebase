@@ -250,3 +250,9 @@ When deploying behind pgBouncer or connection poolers, ensure the pooler support
 ### Cross-Database Queries
 Because branches are separate PostgreSQL databases, you cannot perform SQL `JOIN` statements across branch boundaries. All relations must be contained within the scope of the single active branch database.
 
+
+## Related
+
+- [CLI Commands](/docs/cli/) — `rebase db branch` and its flags
+- [Schema Generation](/docs/cli/schema/) — how the schema a branch copies is produced
+- [Environment & Configuration](/docs/getting-started/configuration/) — `DATABASE_URL`, and what a switched branch outranks

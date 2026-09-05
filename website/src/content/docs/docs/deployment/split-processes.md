@@ -272,3 +272,9 @@ Unchanged: every process runs the same published image, so an upgrade is the sam
 tag change on each of them. Roll the `api` last if you want the schema
 provisioning to happen against the new version first — though in practice the
 order does not matter, because the schema step is additive and idempotent.
+
+## Related
+
+- [Deployment Guide](/docs/getting-started/deployment/) — the single-process deployment this splits
+- [Environment & Configuration](/docs/getting-started/configuration/) — `REBASE_ROLE`, `REBASE_CRON_SCHEDULER` and `REBASE_MIGRATE_ON_BOOT`
+- [Kubernetes](/docs/deployment/kubernetes/) — one deployment per role

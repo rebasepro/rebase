@@ -66,3 +66,9 @@ pnpm run db:push
 ```
 
 Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Cloud SQL instance. From your machine, connect through the [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) and point `DATABASE_URL` at `localhost`. The deployed image doesn't include the CLI, so this doesn't run inside the Cloud Run container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
+
+## Related
+
+- [Deployment Guide](/docs/getting-started/deployment/) — the build, the artifacts and the boot sequence every platform shares
+- [Environment & Configuration](/docs/getting-started/configuration/) — every variable the runtime reads, and which ones production refuses to start without
+- [Storage Configuration](/docs/backend/storage/) — pointing uploads at a bucket rather than a disk

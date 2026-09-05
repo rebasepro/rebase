@@ -260,3 +260,9 @@ large one, plan it like any other rewrite.
 The `search` block is Postgres-only, and is rejected at boot on other engines
 rather than silently ignored. MongoDB collections keep their regex-based
 matching; Firestore collections use the external text-search controller.
+
+## Related
+
+- [REST API](/docs/backend/api/) — the query parameters a search reaches the server as
+- [Indexes](/docs/backend/indexes/) — what the search block creates, and what it costs
+- [Querying Data](/docs/sdk/querying/) — searching from the client SDK

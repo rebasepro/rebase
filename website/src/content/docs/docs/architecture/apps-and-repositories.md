@@ -189,3 +189,9 @@ Prints what a client needs to reach the project. It never prints a secret: the
 API URL and an app's publishable identity are meant to ship inside a client
 bundle, and anything that is not safe there does not belong in output that will
 end up in a committed `.env`.
+
+## Related
+
+- [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) — what `rebase build` produces and what boots it
+- [Split Processes](/docs/deployment/split-processes/) — running one bundle as several processes
+- [CLI Commands](/docs/cli/) — `rebase apps` and the rest
