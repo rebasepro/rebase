@@ -1105,6 +1105,24 @@ export function resolveRuntimeImageTag(cliVersion: string): { tag: string; note?
     return { tag: cliVersion };
 }
 
+/**
+ * Set `KEY=value` in a .env body, whether the key ships set, commented out or
+ * missing entirely.
+ *
+ * The missing case is not hypothetical: `configureEnvFile` runs against
+ * whatever `.env.example` is in the target directory, which for a project
+ * scaffolded from an older template — or from one somebody edited — may not
+ * carry a key this version of `init` is expected to write. Silently skipping it
+ * produces a `.env` that satisfies no `${VAR:?…}` in the compose file, which
+ * surfaces as a stack that refuses to interpolate rather than as anything
+ * pointing back here.
+ */
+function setEnvValue(content: string, key: string, value: string, header?: string): string {
+    const line = new RegExp(`^#?\\s*${key}=.*$`, "m");
+    if (line.test(content)) return content.replace(line, `${key}=${value}`);
+    return `${content.trimEnd()}\n\n${header ? `${header}\n` : ""}${key}=${value}\n`;
+}
+
 export async function configureEnvFile(targetDirectory: string, databaseUrl?: string) {
     const envExamplePath = path.join(targetDirectory, ".env.example");
     const envPath = path.join(targetDirectory, ".env");
@@ -1125,6 +1143,13 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
         const jwtSecret = crypto.randomBytes(32).toString("hex");
         const dbPassword = crypto.randomBytes(16).toString("hex");
         const serviceKey = crypto.randomBytes(48).toString("base64");
+        // base64url rather than base64 or hex: 24 characters, comfortably past
+        // the runtime's 12-character floor, and every character it can produce
+        // is one dotenv and Compose interpolation read back unchanged. `+`, `/`
+        // and `=` are fine in a .env value but not obviously so to a reader
+        // about to paste one into a shell, and `#` — which hex cannot produce
+        // but a passphrase generator might — would truncate the line.
+        const adminPassword = crypto.randomBytes(18).toString("base64url");
 
         let envContent = fs.readFileSync(envPath, "utf-8");
 
@@ -1181,6 +1206,39 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             /^#\s*CORS_ORIGINS=.*$/m,
             `CORS_ORIGINS=http://localhost:${composeApiPort}`
         );
+
+        // The first admin, named rather than raced for.
+        //
+        // `docker-compose.yml` runs the api service with NODE_ENV=production,
+        // and in production the first-registration-becomes-admin window is
+        // shut — deliberately, because the compose stack is serving before its
+        // operator has typed anything and whoever found the sign-up form first
+        // would own it. A closed window needs a way in that is not a race, and
+        // this is it: the account is named in the same file that already holds
+        // the JWT secret and the database password.
+        //
+        // Written by `init` rather than left for the reader, because the
+        // compose file declares both with `${VAR:?…}`: unset, `docker compose
+        // up` does not produce a deployment without an admin, it produces a
+        // file that refuses to interpolate — and it refuses for `docker compose
+        // up -d db` too, which is step 1 of the "Next steps" printed below.
+        //
+        // The address is a placeholder the login route accepts. Not
+        // `admin@localhost`: `POST /auth/login` parses its body with
+        // `z.string().email()`, which rejects a domain with no dot, so that
+        // address seeds an account and then 400s on every attempt to use it.
+        // The runtime now refuses it at boot; this default is one it accepts.
+        envContent = setEnvValue(
+            envContent,
+            "REBASE_ADMIN_EMAIL",
+            "admin@example.com",
+            "# ── The first admin account ─────────────────────────────────────────\n" +
+            "# In production the first account to register is NOT promoted to admin,\n" +
+            "# so the operator names it here instead. Created once, while the user\n" +
+            "# table is empty. Change the email to yours, sign in, and change the\n" +
+            "# password below."
+        );
+        envContent = setEnvValue(envContent, "REBASE_ADMIN_PASSWORD", adminPassword);
 
         // Blank the build-time API URL rather than shipping `http://localhost:3001`.
         //

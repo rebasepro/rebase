@@ -940,6 +940,64 @@ describe(".env.example", () => {
         }
     });
 
+    it("configureEnvFile names the first admin, with a password the runtime will accept", async () => {
+        /*
+         * The compose stack runs with NODE_ENV=production, where the
+         * first-registration-becomes-admin window is closed. Without these two
+         * values the stack comes up with an empty user table and no way to
+         * produce the first authenticated caller — and, because the compose
+         * file declares them `${VAR:?…}`, it does not even get that far.
+         *
+         * Two properties, both of which have been broken in shipped artifacts:
+         * the password must clear the runtime's 12-character floor (below it
+         * `seedInitialAdmin` refuses and the deployment has no admin), and the
+         * address must be one `POST /auth/login` accepts — `admin@localhost`
+         * seeds fine and 400s on every sign-in.
+         */
+        const targetDir = await simulateInit("env-first-admin-app");
+        await configureEnvFile(targetDir);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+
+        const email = envContent.match(/^REBASE_ADMIN_EMAIL=(.+)$/m)?.[1];
+        expect(email).toBeTruthy();
+        // The same shape `z.string().email()` insists on: a dot in the domain.
+        expect(email).toMatch(/^[^@\s]+@[^@\s]+\.[^@\s]+$/);
+
+        const password = envContent.match(/^REBASE_ADMIN_PASSWORD=(.+)$/m)?.[1];
+        expect(password!.length).toBeGreaterThanOrEqual(16);
+        // Nothing dotenv or Compose would read back as something else: a `#`
+        // truncates the line, and whitespace ends the value.
+        expect(password).toMatch(/^[A-Za-z0-9_-]+$/);
+
+        // Two runs must not produce the same password.
+        const other = await simulateInit("env-first-admin-app-2");
+        await configureEnvFile(other);
+        const otherPassword = fs.readFileSync(path.join(other, ".env"), "utf-8")
+            .match(/^REBASE_ADMIN_PASSWORD=(.+)$/m)?.[1];
+        expect(otherPassword).not.toBe(password);
+    });
+
+    it("writes the admin credentials even when .env.example predates them", async () => {
+        // A project scaffolded from an older template, or one whose .env.example
+        // somebody edited. Skipping the keys there produces a .env that cannot
+        // satisfy the compose file's `${VAR:?…}`, with nothing pointing back at
+        // the omission.
+        const targetDir = await simulateInit("env-first-admin-legacy-app");
+        const examplePath = path.join(targetDir, ".env.example");
+        fs.writeFileSync(
+            examplePath,
+            fs.readFileSync(examplePath, "utf-8")
+                .replace(/^REBASE_ADMIN_EMAIL=.*$/m, "")
+                .replace(/^REBASE_ADMIN_PASSWORD=.*$/m, "")
+        );
+        await configureEnvFile(targetDir);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+        expect(envContent).toMatch(/^REBASE_ADMIN_EMAIL=.+$/m);
+        expect(envContent).toMatch(/^REBASE_ADMIN_PASSWORD=.+$/m);
+    });
+
     it("configureEnvFile correctly uses provided databaseUrl, pinned to public", async () => {
         const targetDir = await simulateInit("env-custom-db-app");
         const customDbUrl = "postgresql://user:pass@remote:5432/db";

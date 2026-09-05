@@ -808,10 +808,16 @@ jobs:
       # non-default ports, and fetches from OUTSIDE the container: the SPA, a
       # 401 on an unauthenticated collection read, the collections served to a
       # service key (which is how boot-time provisioning proves it happened),
-      # and first-run reporting that it needs setup. Then it restarts the api,
+      # and a seeded admin who can actually sign in. Then it restarts the api,
       # because provisioning runs on every boot and the second one is where a
       # non-idempotent step surfaces — otherwise as a crash loop on somebody's
       # server days after they deployed.
+      #
+      # It then does the whole thing again with the compose file `rebase init`
+      # generates, whose environment contract is a different one answered by a
+      # different writer (`configureEnvFile`, called here rather than
+      # transcribed). Both halves have shipped broken independently, and from a
+      # terminal each looks like the other's fault.
       #
       # `always()` for the same reason as its neighbours.
       - name: Self-host container acceptance

@@ -38,10 +38,14 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const COMPOSE_FILE = path.join(ROOT, "infra", "docker", "docker-compose.selfhost.yml");
 const PROJECT = "rebase-selfhost-verify";
+const TEMPLATE_DIR = path.join(ROOT, "packages", "cli", "templates", "template");
+const SCAFFOLD_PROJECT = "rebase-scaffold-verify";
 
 /** Host ports, chosen away from the defaults so a running dev stack is untouched. */
 const HTTP_PORT = Number(process.env.VERIFY_HTTP_PORT ?? 18080);
 const PG_PORT = Number(process.env.VERIFY_PG_PORT ?? 15432);
+/** The scaffold stack runs after the first one is torn down, on its own port. */
+const SCAFFOLD_HTTP_PORT = Number(process.env.VERIFY_SCAFFOLD_HTTP_PORT ?? 18081);
 
 let failures = 0;
 function check(label: string, ok: boolean, detail = ""): void {
@@ -63,6 +67,14 @@ function run(command: string, args: string[], options: { cwd?: string; env?: Nod
 const envFile = path.join(os.tmpdir(), `rebase-selfhost-verify-${process.pid}.env`);
 const secret = (): string => crypto.randomBytes(32).toString("hex");
 let composeUp = false;
+let scaffoldUp = false;
+// The scaffold's compose file is copied *into* `app/` rather than run from a
+// temporary directory: it mounts `./dist-bundle`, which Compose resolves
+// against the compose file's own directory, and that is where the bundle this
+// script built already sits. Both files are removed by `teardown`.
+const scaffoldComposeFile = path.join(ROOT, "app", `docker-compose.scaffold-verify-${process.pid}.yml`);
+const scaffoldOverrideFile = path.join(ROOT, "app", `docker-compose.scaffold-verify-${process.pid}.override.yml`);
+const scaffoldDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-scaffold-verify-"));
 // Created up front rather than at its point of use: `teardown` is registered
 // as an exit handler below and removes it, and an early exit (no Docker
 // Compose, a failed image build) fires that handler before the stub tree
@@ -74,6 +86,16 @@ function compose(args: string[], quiet = false) {
     return run("docker", ["compose", "-p", PROJECT, "-f", COMPOSE_FILE, "--env-file", envFile, ...args], { quiet });
 }
 
+function scaffoldCompose(args: string[], quiet = false) {
+    return run("docker", [
+        "compose", "-p", SCAFFOLD_PROJECT,
+        "-f", scaffoldComposeFile,
+        "-f", scaffoldOverrideFile,
+        "--env-file", path.join(scaffoldDir, ".env"),
+        ...args
+    ], { quiet });
+}
+
 function teardown(): void {
     if (composeUp) {
         console.log("\n[1m▸ Tearing down[0m");
@@ -81,9 +103,20 @@ function teardown(): void {
         // empty database. A retained volume would let a broken provisioning
         // step pass on the strength of the previous run's tables.
         compose(["down", "-v", "--remove-orphans"], true);
+        composeUp = false;
+    }
+    if (scaffoldUp) {
+        console.log("\n\x1b[1m▸ Tearing down the scaffold stack\x1b[0m");
+        scaffoldCompose(["down", "-v", "--remove-orphans"], true);
+        scaffoldUp = false;
     }
     fs.rmSync(envFile, { force: true });
     fs.rmSync(stubs, { recursive: true, force: true });
+    fs.rmSync(scaffoldDir, { recursive: true, force: true });
+    // These two live inside the repository, so leaving them behind would dirty
+    // the working tree of whoever ran the script.
+    fs.rmSync(scaffoldComposeFile, { force: true });
+    fs.rmSync(scaffoldOverrideFile, { force: true });
 }
 
 process.on("exit", teardown);
@@ -372,9 +405,177 @@ if (backUp) {
     check("and still serves the collections", again.status === 200, `${again.status}`);
 }
 
+// The logs belong to the stack that produced them, so they are printed before
+// it is torn down rather than at the end of the run.
 if (failures > 0) {
-    console.log("\n[2m--- api logs ---[0m");
+    console.log("\n\x1b[2m--- api logs (self-host stack) ---\x1b[0m");
     console.log(compose(["logs", "--tail", "60", "api"], true).stdout ?? "");
+}
+const failuresBeforeScaffold = failures;
+
+// ── The scaffold's own compose ───────────────────────────────────────────────
+//
+// `rebase init` generates a docker-compose.yml of its own, and nothing had ever
+// booted it. It is a different file from the one above with a different
+// environment contract: its own set of `${VAR:?…}` requirements, answered by the
+// `.env` that `rebase init` writes rather than by `quickstart.sh`. Both halves
+// have shipped broken independently — a compose file that could not interpolate
+// at all, and a `.env` missing the value it asked for — and each looks like the
+// other's fault from the terminal.
+//
+// The part that most needs a container to observe is the first admin. The api
+// service runs with NODE_ENV=production, where the first-registration-becomes-
+// admin window is closed, so a stack that comes up without a seeded account is
+// not "waiting for setup", it is a deployment nobody can ever sign in to.
+//
+// The `.env` is produced by calling `configureEnvFile` — the function `rebase
+// init` calls, not a transcription of it — so what boots here is the project
+// that command would have written.
+console.log("\n\x1b[1m▸ Tearing down the self-host stack\x1b[0m");
+compose(["down", "-v", "--remove-orphans"], true);
+composeUp = false;
+
+console.log("\n\x1b[1m▸ The scaffold's own compose\x1b[0m");
+
+fs.copyFileSync(path.join(TEMPLATE_DIR, ".env.example"), path.join(scaffoldDir, ".env.example"));
+fs.writeFileSync(
+    path.join(scaffoldDir, "docker-compose.yml"),
+    fs.readFileSync(path.join(TEMPLATE_DIR, "docker-compose.yml"), "utf8")
+        .replace(/\{\{PROJECT_NAME\}\}/g, SCAFFOLD_PROJECT)
+);
+// Set before generating, not after: `configureEnvFile` reads PORT back out of
+// the file to derive CORS_ORIGINS, so editing it afterwards would leave the two
+// disagreeing — which is exactly the bug that pairing exists to prevent.
+fs.writeFileSync(
+    path.join(scaffoldDir, ".env.example"),
+    fs.readFileSync(path.join(scaffoldDir, ".env.example"), "utf8")
+        .replace(/^PORT=.*$/m, `PORT=${SCAFFOLD_HTTP_PORT}`)
+);
+
+const { configureEnvFile } = await import(`${ROOT}/packages/cli/src/commands/init.ts`);
+await configureEnvFile(scaffoldDir);
+
+const scaffoldEnvPath = path.join(scaffoldDir, ".env");
+let scaffoldEnv = fs.readFileSync(scaffoldEnvPath, "utf8");
+const readEnv = (key: string): string =>
+    scaffoldEnv.match(new RegExp(`^${key}=(.*)$`, "m"))?.[1] ?? "";
+
+check("init wrote REBASE_ADMIN_EMAIL", readEnv("REBASE_ADMIN_EMAIL").length > 0);
+check(
+    "init wrote a REBASE_ADMIN_PASSWORD the runtime will accept",
+    readEnv("REBASE_ADMIN_PASSWORD").length >= 12,
+    `${readEnv("REBASE_ADMIN_PASSWORD").length} chars`
+);
+
+// The generated .env pins whatever runtime version the CLI resolves; this run
+// is about the image under test.
+scaffoldEnv = scaffoldEnv.replace(
+    /^REBASE_VERSION=.*$/m,
+    `REBASE_VERSION=${image.split(":").slice(1).join(":") || "latest"}`
+);
+fs.writeFileSync(scaffoldEnvPath, scaffoldEnv, { mode: 0o600 });
+
+const SCAFFOLD_ADMIN_EMAIL = readEnv("REBASE_ADMIN_EMAIL");
+const SCAFFOLD_ADMIN_PASSWORD = readEnv("REBASE_ADMIN_PASSWORD");
+const SCAFFOLD_SERVICE_KEY = readEnv("REBASE_SERVICE_KEY");
+
+fs.copyFileSync(path.join(scaffoldDir, "docker-compose.yml"), scaffoldComposeFile);
+// The one difference between this repository's reference app and a scaffolded
+// project, patched over rather than papered over: the scaffold ships
+// `config/storage.ts` exporting a `storageAuthorize` hook, and `app/` does not.
+// The scaffold's compose sets FORCE_LOCAL_STORAGE, so a storage controller
+// survives into production — and the boot guard then refuses a deployment with
+// no access-control model at all, correctly. An override file states the
+// missing intent without editing the shipped compose, whose interpolation is
+// the thing under test.
+fs.writeFileSync(scaffoldOverrideFile, [
+    "services:",
+    "  api:",
+    "    environment:",
+    "      STORAGE_ALLOW_ANY_AUTHENTICATED: \"true\"",
+    ""
+].join("\n"));
+
+// Every `${VAR:?…}` in the generated file must be answerable from the generated
+// `.env`. Asserted on its own because the failure is total — Compose
+// interpolates the whole file before selecting services, so an unanswered
+// variable stops `docker compose up -d db` too.
+const scaffoldConfig = scaffoldCompose(["config"], true);
+check(
+    "the generated .env answers every required variable in the generated compose",
+    scaffoldConfig.status === 0,
+    (scaffoldConfig.stderr ?? "").trim().split("\n")[0] ?? ""
+);
+
+const scaffoldUpResult = scaffoldCompose(["up", "-d"]);
+check("the scaffold's compose starts both services", scaffoldUpResult.status === 0);
+scaffoldUp = true;
+
+if (scaffoldUpResult.status === 0) {
+    const scaffoldBase = `http://localhost:${SCAFFOLD_HTTP_PORT}`;
+    const scaffoldDeadline = Date.now() + 180_000;
+    let scaffoldReady = false;
+    while (Date.now() < scaffoldDeadline) {
+        try {
+            const res = await fetch(`${scaffoldBase}/health`);
+            if (res.ok) { scaffoldReady = true; break; }
+        } catch { /* not up yet */ }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    check("GET /health answers 200 within 180s", scaffoldReady);
+
+    if (scaffoldReady) {
+        const authConfigRes = await fetch(`${scaffoldBase}/api/auth/config`);
+        const authConfigBody = await authConfigRes.text();
+        check(
+            "the scaffold's stack does not need setup",
+            /"needsSetup"\s*:\s*false/.test(authConfigBody),
+            authConfigBody.slice(0, 90)
+        );
+
+        const scaffoldLogin = await fetch(`${scaffoldBase}/api/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: SCAFFOLD_ADMIN_EMAIL, password: SCAFFOLD_ADMIN_PASSWORD })
+        });
+        const scaffoldLoginBody = await scaffoldLogin.text();
+        check(
+            "the credentials `rebase init` generated sign in",
+            scaffoldLogin.status === 200 && /"(access_?[Tt]oken|token)"\s*:/.test(scaffoldLoginBody),
+            `${scaffoldLogin.status}`
+        );
+
+        // And nobody else can claim it. `DISABLE_SELF_REGISTRATION` defaults to
+        // true in the generated compose, which is the half of the fix that
+        // makes the seeded account exclusive rather than merely first.
+        const claim = await fetch(`${scaffoldBase}/api/auth/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: "stranger@example.com", password: crypto.randomBytes(16).toString("hex") })
+        });
+        check(
+            "a stranger cannot register into the deployment",
+            claim.status >= 400,
+            `${claim.status}`
+        );
+
+        const scaffoldAnon = await fetch(`${scaffoldBase}/api/data/posts?limit=1`);
+        check("GET /api/data/posts unauthenticated is refused", scaffoldAnon.status === 401, `${scaffoldAnon.status}`);
+
+        const scaffoldService = await fetch(`${scaffoldBase}/api/data/posts?limit=1`, {
+            headers: { authorization: `Bearer ${SCAFFOLD_SERVICE_KEY}` }
+        });
+        check(
+            "boot provisioned the collection tables",
+            scaffoldService.status === 200,
+            `${scaffoldService.status}`
+        );
+    }
+}
+
+if (failures > failuresBeforeScaffold) {
+    console.log("\n\x1b[2m--- api logs (scaffold stack) ---\x1b[0m");
+    console.log(scaffoldCompose(["logs", "--tail", "60", "api"], true).stdout ?? "");
 }
 
 console.log(failures === 0
