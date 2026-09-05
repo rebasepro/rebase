@@ -131,12 +131,39 @@ export type UnknownPropertyKey<K extends PropertyKey> = {
 };
 
 /**
+ * A relation checked against the concrete member of the union its own `kind`
+ * selects, rather than against the union as a whole.
+ *
+ * `Relation` is closed — `BelongsToRelation` has `localKey` and no
+ * `foreignKeyOnTarget`, `HasManyRelation` the reverse — but excess-property
+ * checking against a *union* passes any key that any member declares. So
+ * `{ kind: "belongsTo", foreignKeyOnTarget: "author_id" }` typechecked, and
+ * described a link that cannot exist: the generator reads `localKey`, defaults
+ * it to `<relationName>_id`, and the column the author actually named is never
+ * looked at. The relation resolves to a different link than the one written.
+ *
+ * The runtime already refuses this — `validate-config` rejects a link field that
+ * does not belong to the kind — so this is the same rule one stage earlier,
+ * where it costs a red squiggle instead of a failed boot.
+ */
+type StrictRelation<R> = R extends { kind: infer K }
+    ? R & {
+        [Key in Exclude<keyof R, keyof Extract<Relation, { kind: K }>>]: UnknownPropertyKey<Key>;
+    }
+    : R;
+
+/**
  * `V`, plus every key it carries that `Shape` does not declare, typed so it
  * cannot be satisfied.
+ *
+ * The `relation` block is descended into, because it is the one nested shape
+ * that is a closed union rather than a single interface — see
+ * {@link StrictRelation}. The rest (`array.of`, `map.properties`, the `admin`
+ * options) are left to the weak-type check and the boot validator.
  */
 type ExactProperty<V, Shape> = V & {
     [K in Exclude<keyof V, keyof Shape>]: UnknownPropertyKey<K>;
-};
+} & (V extends { relation: infer R } ? { relation: StrictRelation<R> } : unknown);
 
 /**
  * A property map in which each value is checked against the *concrete* member of

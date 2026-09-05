@@ -518,3 +518,110 @@ describe("property keys are checked against the property's own type", () => {
         });
     });
 });
+
+/**
+ * A relation may not carry a link field its own `kind` does not have.
+ *
+ * `Relation` is a closed union — `belongsTo` owns `localKey`, `hasOne` and
+ * `hasMany` own `foreignKeyOnTarget`, `manyToMany` owns `through`, `via` owns
+ * `joinPath` — but excess-property checking against a *union* admits any key any
+ * member declares. So `{ kind: "belongsTo", foreignKeyOnTarget: … }` compiled,
+ * and meant something other than what it said: the generator reads `localKey`,
+ * defaults it to `<relationName>_id`, and the column the author named is never
+ * looked at.
+ *
+ * The boot validator has always refused these. This is the same rule one stage
+ * earlier, where it costs a squiggle instead of a failed deploy — and, like the
+ * block above, one bad key per call, or overload resolution collapses the two
+ * into a single error and leaves an `@ts-expect-error` unused.
+ */
+describe("a relation is checked against the member its `kind` selects", () => {
+    const authors = {
+        name: "Authors",
+        slug: "authors",
+        table: "authors",
+        properties: { name: { name: "Name", type: "string" } }
+    } as const;
+
+    const base = { name: "Posts", slug: "posts", table: "posts" } as const;
+
+    it("accepts each kind with its own link field", () => {
+        const ok = defineCollection({
+            ...base,
+            properties: {
+                author: {
+                    name: "Author",
+                    type: "relation",
+                    relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" }
+                },
+                editors: {
+                    name: "Editors",
+                    type: "relation",
+                    relation: { kind: "hasMany", target: () => authors, foreignKeyOnTarget: "post_id" }
+                },
+                reviewers: {
+                    name: "Reviewers",
+                    type: "relation",
+                    relation: { kind: "manyToMany", target: () => authors, through: { table: "post_reviewers" } }
+                }
+            }
+        });
+        expect(Object.keys(ok.properties)).toHaveLength(3);
+    });
+
+    it("rejects `foreignKeyOnTarget` on a `belongsTo`", () => {
+        // @ts-expect-error — a `belongsTo` holds the key itself; the field is `localKey`
+        defineCollection({
+            ...base,
+            properties: {
+                author: {
+                    name: "Author",
+                    type: "relation",
+                    relation: { kind: "belongsTo", target: () => authors, foreignKeyOnTarget: "author_id" }
+                }
+            }
+        });
+    });
+
+    it("rejects `localKey` on a `hasMany`", () => {
+        // @ts-expect-error — the key is on the target; the field is `foreignKeyOnTarget`
+        defineCollection({
+            ...base,
+            properties: {
+                posts: {
+                    name: "Posts",
+                    type: "relation",
+                    relation: { kind: "hasMany", target: () => authors, localKey: "author_id" }
+                }
+            }
+        });
+    });
+
+    it("rejects `through` on a `belongsTo`", () => {
+        // @ts-expect-error — `through` is a junction table, which only `manyToMany` has
+        defineCollection({
+            ...base,
+            properties: {
+                author: {
+                    name: "Author",
+                    type: "relation",
+                    relation: { kind: "belongsTo", target: () => authors, through: { table: "x" } }
+                }
+            }
+        });
+    });
+
+    it("rejects a relation-level `validation`, which moved to the property", () => {
+        // @ts-expect-error — `required` is the property's `validation`, not the relation's
+        defineCollection({
+            ...base,
+            properties: {
+                author: {
+                    name: "Author",
+                    type: "relation",
+                    relation: { kind: "belongsTo", target: () => authors, validation: { required: true } }
+                }
+            }
+        });
+    });
+});

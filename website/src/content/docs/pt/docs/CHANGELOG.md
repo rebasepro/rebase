@@ -13,6 +13,19 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ### Breaking
 
+- **`defineCollection` now checks a relation against the member its `kind`
+  selects.** `Relation` has been a closed union since 0.11 — `belongsTo` owns
+  `localKey`, `hasOne`/`hasMany` own `foreignKeyOnTarget`, `manyToMany` owns
+  `through`, `via` owns `joinPath` — but TypeScript's excess-property check runs
+  against a *union* as a whole, so `{ kind: "belongsTo", foreignKeyOnTarget:
+  "author_id" }` compiled. It also meant something else: the generator reads
+  `localKey`, defaults it to `<relationName>_id`, and never looks at the column
+  the author named, so the relation resolved to a different link than the one
+  written. The boot validator already refused these; the type now refuses them
+  too, which moves the report from a failed deploy to a red squiggle. Code that
+  carried a link field belonging to another kind stops compiling — it was already
+  failing at boot.
+
 - **A relation no longer carries its own `validation`. `required` lives on the
   property.** There were two places to write it and they were read by different
   generators: the Postgres DDL asked the *property* (so the foreign-key column
