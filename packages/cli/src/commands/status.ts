@@ -25,6 +25,9 @@ import { readEnvFile, requireProjectRoot } from "../utils/project";
 import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
 import { deriveOptionsFor, deriveResourceGraph, RESOURCE_GRAPH_FILENAME, readResourceGraphFile, serializeResourceGraph } from "../resources/derive";
 import { computeStatus, type ResourceStatus } from "../resources/status";
+import { findRunningDaemon, managedUrl } from "../dev-db/daemon";
+import { resolveActiveBranch, resolveComposeUrl } from "../dev-db/prepare";
+import { resolveDevDatabase } from "../dev-db/resolve";
 import type { RebaseBackendAppConfig } from "@rebasepro/types";
 
 function usage(): void {
@@ -146,13 +149,35 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
     // developer happens to be standing in is not that.
     const env = readEnvFile(projectRoot);
 
+    // Which database this project is on, decided by the same ordered rule
+    // `rebase dev` and `rebase db url` use — and read from the same `.env`, not
+    // from this shell, for the reason above.
+    //
+    // Nothing is started. `status` is a question, and a question that boots a
+    // 180 MB Postgres to answer itself is a different command. So a managed
+    // database that is not running is reported as exactly that, rather than as
+    // a project with no database — which is what this view used to say while
+    // `rebase db url` printed a working connection string for it.
+    const production = env.NODE_ENV === "production";
+    const database = resolveDevDatabase({
+        env: {},
+        envFile: env,
+        branch: resolveActiveBranch(projectRoot, env),
+        composeUrl: resolveComposeUrl(projectRoot, env)
+    });
+    const daemon = database.kind === "managed" ? await findRunningDaemon(projectRoot) : null;
+    const managedDatabase = !production && database.kind === "managed"
+        ? { url: daemon ? managedUrl(daemon.port) : null }
+        : undefined;
+
     const server = await import("@rebasepro/server");
     const { resources, blocked } = computeStatus(graph, env, {
         resolverFor: server.resourceResolver as never,
         resolveDataSources: server.resolveDataSources as never,
         // Judged as production when the .env says so; a stand-in local
         // directory for an unbound bucket is only ever offered to development.
-        production: env.NODE_ENV === "production"
+        production,
+        ...(managedDatabase ? { managedDatabase } : {})
     });
 
     if (flags["--json"]) {

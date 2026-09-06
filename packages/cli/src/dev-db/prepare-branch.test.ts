@@ -77,7 +77,10 @@ describe("prepareDatabaseEnv with a branch active", () => {
 
         const prepared = await prepareDatabaseEnv(root, { flagUrl: "postgresql://h/explicit" });
 
-        expect(prepared.env).toEqual({});
+        // The flag is exported, because it exists nowhere the child can look —
+        // but it is the flag's database, not the branch's. A switch made
+        // yesterday must not redirect a URL typed on this command line.
+        expect(prepared.env).toEqual({ DATABASE_URL: "postgresql://h/explicit" });
         expect(prepared.database).toMatchObject({ source: "flag" });
     });
 });

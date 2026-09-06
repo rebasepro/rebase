@@ -88,6 +88,12 @@ const NOT_OURS = new Map([
     ["REBASE_RESET_EMAIL", "a test hook for `rebase auth reset-password`"],
     ["REBASE_RESET_PASSWORD", "a test hook for `rebase auth reset-password`"],
     ["REBASE_DEV_PROJECT_ROOT", "set by `rebase dev` for the child process it spawns"],
+    // The CLI resolves which database this project is on — a pure decision, no
+    // daemon started — and tells the driver, so the driver's own text can stop
+    // recommending `rebase db generate` on a database that refuses it. Nobody
+    // sets it; a reader who did would only be lying to the driver about which
+    // database they are on.
+    ["REBASE_DEV_DATABASE_KIND", "set by the CLI for the driver child it spawns"],
     ["REBASE_JSON", "set by the CLI for its own subprocesses"],
     // Only in the frozen 0.17.3 `bucket` literal in resource_kinds.ts; the
     // runtime binds from the amendment, which the page documents.

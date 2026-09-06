@@ -17,8 +17,12 @@ import {
     dependenciesNotInstalled
 } from "../utils/project";
 import { reportSpawnFailure } from "../utils/spawn-error";
+import { parseCommandArgs } from "../utils/args";
+import { unknownCommand } from "../utils/unknown-command";
 import { argsFromCommand, commandWords } from "../utils/command-words";
 import { recordEvent } from "../telemetry";
+import { DEV_DATABASE_KIND_ENV, devDatabaseKind } from "../dev-db/prepare";
+import { type DevDatabase } from "../dev-db/resolve";
 
 /**
  * A destination that names a remote store rather than a local path.
@@ -147,6 +151,37 @@ function readFlagValue(rawArgs: readonly string[], flag: string): string | null 
 const ATLAS_BACKED_SUBCOMMANDS = new Set(["push", "generate", "migrate"]);
 
 /**
+ * A managed-database refusal, raised so the caller decides what it costs.
+ *
+ * These two guards used to `process.exit(1)` where they stood. That is right
+ * for `rebase db push`, typed by a person, and catastrophic for the same code
+ * reached from inside `rebase dev`: the dev server's first-boot schema push
+ * runs in-process, so an exit there took the whole dev server down — with a
+ * `try/catch` around it written expressly to prevent that, which could never
+ * run. The first `rebase dev --docker` of every scaffold died this way.
+ *
+ * So the refusal is a value now. It carries the block it wants printed rather
+ * than printing it, because who prints (and whether printing is even right) is
+ * the caller's question: `dbCommand` prints it and exits 1, and `rebase dev`
+ * keeps serving.
+ */
+export class ManagedDatabaseRefusal extends Error {
+    /** The lines to print, in order, already coloured. */
+    readonly lines: readonly string[];
+
+    constructor(summary: string, lines: readonly string[]) {
+        super(summary);
+        this.name = "ManagedDatabaseRefusal";
+        this.lines = lines;
+    }
+}
+
+/** Print a refusal exactly as the guards used to print it themselves. */
+export function printManagedDatabaseRefusal(refusal: ManagedDatabaseRefusal): void {
+    for (const line of refusal.lines) console.error(line);
+}
+
+/**
  * Stop an Atlas-backed subcommand before it fails inside Atlas on the managed
  * development database.
  *
@@ -175,19 +210,22 @@ export function refuseAtlasOnManagedDatabase(rawArgs: string[], kind: string): v
     const [domain, subcommand] = commandWords(rawArgs, "db");
     if (domain !== "db" || !ATLAS_BACKED_SUBCOMMANDS.has(subcommand ?? "")) return;
 
-    console.error("");
-    console.error(chalk.red(`  ✗ rebase db ${subcommand} does not work on the managed development database.`));
-    console.error("");
-    console.error(chalk.gray("  It plans changes with Atlas, which needs a second empty database to"));
-    console.error(chalk.gray("  compare against. The managed database is PGlite, which serves exactly one."));
-    console.error("");
-    console.error(chalk.gray("  You almost certainly do not need this command:"));
-    console.error(chalk.gray(`  ${chalk.cyan("rebase dev")} already applies your collections to it at boot, additively.`));
-    console.error("");
-    console.error(chalk.gray("  For migrations, or to drop and rename columns, point the project at a real"));
-    console.error(chalk.gray("  Postgres — uncomment DATABASE_URL in .env — and run this command again."));
-    console.error("");
-    process.exit(1);
+    const summary = `rebase db ${subcommand} does not work on the managed development database.`;
+
+    throw new ManagedDatabaseRefusal(summary, [
+        "",
+        chalk.red(`  ✗ ${summary}`),
+        "",
+        chalk.gray("  It plans changes with Atlas, which needs a second empty database to"),
+        chalk.gray("  compare against. The managed database is PGlite, which serves exactly one."),
+        "",
+        chalk.gray("  You almost certainly do not need this command:"),
+        chalk.gray(`  ${chalk.cyan("rebase dev")} already applies your collections to it at boot, additively.`),
+        "",
+        chalk.gray("  For migrations, or to drop and rename columns, point the project at a real"),
+        chalk.gray("  Postgres — uncomment DATABASE_URL in .env — and run this command again."),
+        ""
+    ]);
 }
 
 /**
@@ -227,18 +265,21 @@ export function refuseBranchOnManagedDatabase(rawArgs: string[], kind: string): 
     const [domain, subcommand] = commandWords(rawArgs, "db");
     if (domain !== "db" || subcommand !== "branch") return;
 
-    console.error("");
-    console.error(chalk.red("  ✗ rebase db branch does not work on the managed development database."));
-    console.error("");
-    console.error(chalk.gray("  Branching copies a database with CREATE DATABASE ... TEMPLATE. The managed"));
-    console.error(chalk.gray("  database is PGlite, which serves exactly one — the copy would be the"));
-    console.error(chalk.gray("  original, and every write you meant to sandbox would land in it."));
-    console.error("");
-    console.error(chalk.gray("  Branching needs a real Postgres. Either:"));
-    console.error(chalk.gray(`  ${chalk.cyan("rebase dev --docker")}    starts one, and branches work against it`));
-    console.error(chalk.gray("  or uncomment DATABASE_URL in .env to point at your own."));
-    console.error("");
-    process.exit(1);
+    const summary = "rebase db branch does not work on the managed development database.";
+
+    throw new ManagedDatabaseRefusal(summary, [
+        "",
+        chalk.red(`  ✗ ${summary}`),
+        "",
+        chalk.gray("  Branching copies a database with CREATE DATABASE ... TEMPLATE. The managed"),
+        chalk.gray("  database is PGlite, which serves exactly one — the copy would be the"),
+        chalk.gray("  original, and every write you meant to sandbox would land in it."),
+        "",
+        chalk.gray("  Branching needs a real Postgres. Either:"),
+        chalk.gray(`  ${chalk.cyan("rebase dev --docker")}    starts one, and branches work against it`),
+        chalk.gray("  or uncomment DATABASE_URL in .env to point at your own."),
+        ""
+    ]);
 }
 
 /**
@@ -274,6 +315,8 @@ async function resolveDriverCli(): Promise<{
     if (envFile) {
         env.DOTENV_CONFIG_PATH = envFile;
     }
+    env[DEV_DATABASE_KIND_ENV] = devDatabaseKind(projectRoot) ?? "";
+
     return { projectRoot, backendDir, pluginCli, env };
 }
 
@@ -337,6 +380,7 @@ export async function runDriverDbCommand(
     if (envFile) {
         env.DOTENV_CONFIG_PATH = envFile;
     }
+    env[DEV_DATABASE_KIND_ENV] = devDatabaseKind(projectRoot) ?? "";
 
     // Every `db` subcommand reaches Postgres through the driver plugin, which
     // reads DATABASE_URL from this environment — so resolving the database once
@@ -415,6 +459,22 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         return;
     }
 
+    // A typo is answered here, not by the driver, and not after a database has
+    // been started for it.
+    //
+    // `rebase db psh` used to reach `runDriverDbCommand`, which resolves the
+    // database first — so it **booted the managed PGlite**, a 180 MB daemon,
+    // in order to hand the driver an argv it then rejected with `Unknown db
+    // command. Valid: push, generate, migrate, branch, backup, restore,
+    // backups`: a list missing `url`, `pull`, `stop` and `reset`, all four of
+    // which `rebase db --help` lists and this CLI implements itself. The driver
+    // cannot know about them, which is exactly why the answer does not belong
+    // to the driver.
+    //
+    // The set comes from the help table, so the list a typo is measured against
+    // and the list `--help` prints cannot drift apart.
+    if (!DB_ACTION_HELP[subcommand]) unknownCommand(subcommand, Object.keys(DB_ACTION_HELP), "db");
+
     const projectRoot = requireProjectRoot();
 
     // Fire-and-forget, and a no-op unless the developer opted in. Never awaited:
@@ -459,6 +519,14 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         await runDriverDbCommand(rawArgs);
         await forgetDeletedBranch(projectRoot, rawArgs);
     } catch (error) {
+        // The CLI entry point is where a managed-database refusal becomes an
+        // exit code. The guards raise it instead of exiting so that `rebase dev`,
+        // which runs `db push` in-process, survives one; here, where a person
+        // typed the command, it is exactly as fatal as it always was.
+        if (error instanceof ManagedDatabaseRefusal) {
+            printManagedDatabaseRefusal(error);
+            process.exit(1);
+        }
         // A child that exited non-zero already printed its diagnostics through
         // inherited stdio; only the errors raised above have a message worth
         // adding here.
@@ -487,6 +555,22 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
  * string for a database nobody is serving is not an answer.
  */
 async function printDatabaseUrl(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
+    // Strict about its flags, like every other command.
+    //
+    // The `db` family's strictness lives in the driver, and `url` is answered
+    // here, before the driver is ever spawned — so it accepted anything.
+    // `rebase db url --bogus` printed the URL and exited 0, and so did
+    // `rebase db url --json`, which is worse: a flag that looks like it asks
+    // for a different output format, silently ignored, hands a script a bare
+    // string it will try to parse as JSON.
+    parseCommandArgs({
+        spec: { "--database-url": String, "--docker": Boolean },
+        rawArgs: [...rawArgs],
+        commandWords: 2,
+        command: "db url",
+        maxPositionals: 0
+    });
+
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
     const { readEnvFile } = await import("../utils/project");
 
@@ -823,6 +907,8 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     const { branchDatabaseName, clearActiveBranch, databaseNameOf, readActiveBranch, writeActiveBranch } =
         await import("../dev-db/branch-pointer");
     const { readEnvFile } = await import("../utils/project");
+    const { resolveDevDatabase } = await import("../dev-db/resolve");
+    const { resolveComposeUrl } = await import("../dev-db/prepare");
 
     // Read as a flag rather than as the name in the third position, so
     // `switch --off` and `switch feature --off` mean the same thing. The doc
@@ -834,7 +920,28 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     // ["db", "branch", "switch", <name>], with any flags taken back out —
     // `rebase --debug db branch switch feature` read the name as "switch".
     const name = commandWords(rawArgs, "db")[3];
-    const base = readEnvFile(projectRoot).DATABASE_URL?.trim();
+
+    // The database to branch from, resolved by the ordered rule every sibling
+    // uses. This read `readEnvFile(projectRoot).DATABASE_URL` and nothing else,
+    // so `export DATABASE_URL=…; rebase db branch create x` created a branch and
+    // `rebase db branch switch x` then answered "This project has no
+    // DATABASE_URL, so there is no database to branch from" — about a project
+    // that had one, in the shell, where `branching.md` documents it as rule (2)
+    // and `create` had just read it.
+    //
+    // `branch: null`, deliberately: this command is what sets the pointer, and
+    // the pointer that exists must never become the base of the next switch —
+    // that is how a branch of a branch of a branch happens by accident.
+    const envFile = readEnvFile(projectRoot);
+    const resolved = resolveDevDatabase({
+        flagUrl: readFlagValue(rawArgs, "--database-url"),
+        flagDocker: rawArgs.includes("--docker"),
+        env: process.env,
+        envFile,
+        branch: null,
+        composeUrl: resolveComposeUrl(projectRoot, envFile)
+    });
+    const base = (resolved.kind === "managed" ? null : resolved.url)?.trim() || undefined;
 
     // `switch` with no argument reports rather than changes. "Which branch am I
     // on" is asked far more often than "move me", and answering it should not
@@ -868,9 +975,12 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     }
 
     if (!base) {
-        console.error(chalk.red("✗ This project has no DATABASE_URL, so there is no database to branch from."));
-        console.error(chalk.gray("  Branching needs a real Postgres — the managed development database serves"));
-        console.error(chalk.gray("  exactly one. Set DATABASE_URL in .env, or run `rebase dev --docker`."));
+        console.error(chalk.red("✗ There is no database to branch from."));
+        console.error(chalk.gray(resolved.kind === "managed"
+            ? "  This project is on the managed development database, which serves exactly one —"
+            : "  --docker needs a docker-compose.yml with a db service, and this project has none —"));
+        console.error(chalk.gray("  and branching copies a database. Set DATABASE_URL in .env or in your"));
+        console.error(chalk.gray("  shell, or run `rebase dev --docker`."));
         process.exit(1);
     }
 
@@ -1027,7 +1137,41 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("backups")}    List stored backups (db backup list is the same)
 
 ${chalk.green.bold("Examples")}
-  ${chalk.gray("# Quick development workflow")}
+${dbExamples(devDatabaseKind())}
+  ${chalk.gray("# Back up to a local directory, then to object storage")}
+  rebase db backup --out ./backups
+  rebase db backup --out s3://my-private-bucket/backups
+
+  ${chalk.gray("# Restore into a fresh database (safe: does not touch the live one)")}
+  rebase db restore ./backups/rebase-app-20260714T030000Z.dump --create-db --target-db app_restored
+`);
+}
+
+/**
+ * The examples, which are not the same on the managed development database.
+ *
+ * Every one of the four the help used to lead with — `db push`, `db generate`,
+ * `db migrate`, `db branch` — is refused there, by guards in this same file
+ * that explain exactly why. So on the project the CLI had just scaffolded, the
+ * first thing `rebase db --help` offered was a command that answers with a
+ * refusal, and the reader's most likely conclusion is that their install is
+ * broken.
+ *
+ * Exported for its test.
+ */
+export function dbExamples(kind: DevDatabase["kind"] | null): string {
+    if (kind === "managed") {
+        return `  ${chalk.gray("# Quick development workflow (this project is on the managed database)")}
+  rebase schema generate
+  rebase dev                        ${chalk.gray("# boot applies your collections to it, additively")}
+
+  ${chalk.gray("# push, generate, migrate and branch need a Postgres of your own")}
+  rebase dev --docker               ${chalk.gray("# starts one; or uncomment DATABASE_URL in .env")}
+
+`;
+    }
+
+    return `  ${chalk.gray("# Quick development workflow")}
   rebase schema generate && rebase db push
 
   ${chalk.gray("# Production migration workflow")}
@@ -1039,11 +1183,5 @@ ${chalk.green.bold("Examples")}
   rebase db branch switch feature_auth
   rebase db branch switch --off
 
-  ${chalk.gray("# Back up to a local directory, then to object storage")}
-  rebase db backup --out ./backups
-  rebase db backup --out s3://my-private-bucket/backups
-
-  ${chalk.gray("# Restore into a fresh database (safe: does not touch the live one)")}
-  rebase db restore ./backups/rebase-app-20260714T030000Z.dump --create-db --target-db app_restored
-`);
+`;
 }

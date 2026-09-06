@@ -262,6 +262,13 @@ export interface EnsureDevDatabaseOptions {
     hasCollections: boolean;
     /** Runs `rebase db push` for this project. Injected so tests need no database. */
     pushSchema: () => Promise<void>;
+    /**
+     * Brings the compose `db` service up. Injected for the same reason
+     * `pushSchema` is: what happens *after* a start — a push that fails without
+     * taking the dev server with it — is the part worth asserting, and it was
+     * untestable while the only way in was a real `docker compose up`.
+     */
+    startDatabase?: (projectRoot: string) => Promise<void>;
     log?: (message: string) => void;
 }
 
@@ -302,8 +309,12 @@ export async function ensureDevDatabase(options: EnsureDevDatabaseOptions): Prom
     log("");
     log(`  ${chalk.gray("Database not running — starting it…")}`);
 
+    const startDatabase = options.startDatabase ?? (async (root: string) => {
+        await execa("docker", ["compose", "up", "-d", "db"], { cwd: root, stdio: "pipe" });
+    });
+
     try {
-        await execa("docker", ["compose", "up", "-d", "db"], { cwd: projectRoot, stdio: "pipe" });
+        await startDatabase(projectRoot);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         // Two very different failures land here and the reader needs to know

@@ -26,6 +26,7 @@
  * held to `envBases` by `resource-env-bases.test.ts`. A kind this view has
  * never heard of is judged by whatever resolver its package registered.
  */
+import { withImplicitDefaults } from "./derive";
 import {
     DEFAULT_RESOURCE_KEY,
     envBasesForResource,
@@ -120,51 +121,28 @@ export function bindingsFor(
 }
 
 /**
- * Add the resources a project has without declaring them.
+ * What the managed development database covers, when a project is on it.
  *
- * A backend has a database whether or not anyone said so, and a project that
- * declares no buckets still gets one default storage source from the plain
- * unsuffixed variables. Both are load-bearing defaults and both are invisible
- * in the graph, so a status view built only from declarations would show an
- * empty screen to the majority of projects — the ones that most need to be told
- * which variable their one database reads.
+ * `rebase init` leaves `DATABASE_URL` commented out on purpose and the managed
+ * PGlite fills the vacuum — the documented first-run state. Judging that state
+ * by the environment alone produced `○ (default) postgres · DATABASE_URL not
+ * set` and the remedy "set DATABASE_URL", at the same moment `rebase db url`
+ * was printing a working connection string for the same project and
+ * `rebase dev` was serving from it. The status view was reading the one place
+ * the answer deliberately is not.
+ *
+ * Resolved by the caller, because deciding it needs the project's `.env`, its
+ * branch pointer and its compose file, and this module stays free of all three.
  */
-export function withImplicitDefaults(graph: ResourceGraph): {
-    declaration: ResourceDeclaration;
-    implicit: boolean;
-}[] {
-    const entries = graph.resources.map(declaration => ({ declaration, implicit: false }));
-    const has = (kind: string) => graph.resources.some(r => r.kind === kind);
-
-    if (!has("database")) {
-        entries.unshift({
-            declaration: {
-                kind: "database",
-                key: DEFAULT_RESOURCE_KEY,
-                engine: "postgres",
-                transport: "server",
-                options: {}
-            },
-            implicit: true
-        });
-    }
-    if (!has("bucket")) {
-        entries.push({
-            declaration: {
-                kind: "bucket",
-                key: DEFAULT_RESOURCE_KEY,
-                // `local` is what an unconfigured default source resolves to,
-                // and naming it here keeps the row honest about what a project
-                // with no S3 variables actually gets: a directory that a
-                // container erases on restart, which production then drops.
-                engine: "local",
-                transport: "server",
-                options: {}
-            },
-            implicit: true
-        });
-    }
-    return entries;
+export interface ManagedDatabaseStatus {
+    /**
+     * The daemon's connection string, or null when it is not running.
+     *
+     * Null is not an error: the managed database exists per project and starts
+     * on demand. It only means there is nothing to run the whole-set check
+     * against, and the row says so rather than implying a misconfiguration.
+     */
+    url: string | null;
 }
 
 /**
@@ -188,6 +166,38 @@ export interface StatusResolvers {
     resolveDataSources: (env: EnvBag, definitions: unknown) => unknown;
     /** Whether the process being judged is production. Status judges for development by default. */
     production?: boolean;
+    /**
+     * Set when this project runs on the managed development database.
+     *
+     * Absent for a project that named its own connection string, and absent in
+     * production — where an unset `DATABASE_URL` is the failure it has always
+     * been.
+     */
+    managedDatabase?: ManagedDatabaseStatus;
+}
+
+/**
+ * The environment plus the managed database's URL, for the whole-set check.
+ *
+ * A copy: the bindings a reader sees are computed against the real `.env`, so
+ * nothing here can make the view claim a variable is set that is not. This is
+ * only what `resolveDataSources` is handed, and it is handed it so the check
+ * judges the environment the runtime would actually get rather than throwing
+ * "Data source "(default)" has no connection string" about a database that is
+ * running and reachable.
+ */
+function withManagedUrls(env: EnvBag, graph: ResourceGraph, url: string): EnvBag {
+    const filled: EnvBag = { ...env };
+    const keys = [
+        DEFAULT_RESOURCE_KEY,
+        ...graph.resources.filter(r => r.kind === "database").map(r => r.key)
+    ];
+    for (const key of keys) {
+        const name = `DATABASE_URL${resourceEnvSuffix(key)}`;
+        if (!isSet(filled, name)) filled[name] = url;
+    }
+
+    return filled;
 }
 
 /**
@@ -211,6 +221,9 @@ export function computeStatus(
 ): { resources: ResourceStatus[]; blocked?: string } {
     const resources: ResourceStatus[] = [];
     const production = resolvers.production ?? false;
+    const managed = resolvers.managedDatabase;
+    /** Database rows the managed database answered for, so `blocked` can skip them. */
+    let managedCovered = 0;
 
     for (const { declaration, implicit } of withImplicitDefaults(graph)) {
         const resolver = resolvers.resolverFor(declaration.kind);
@@ -234,6 +247,25 @@ export function computeStatus(
                 state: "broken",
                 detail: `this runtime has no resolver for a "${declaration.kind}" — boot refuses it by name. ` +
                     "Upgrade @rebasepro/server, or remove the declaration."
+            });
+            continue;
+        }
+
+        // Answered before the resolver, because the resolver reads the
+        // environment and the whole point of the managed database is that the
+        // environment is deliberately empty. Only for a database nobody bound:
+        // a developer who set `DATABASE_URL__ANALYTICS` to a warehouse of their
+        // own has said which database that is, and the managed one fills a
+        // vacuum, never a choice.
+        if (managed && declaration.kind === "database" && bindings.every(b => !b.set && !b.fallback?.set)) {
+            managedCovered += 1;
+            resources.push({
+                ...base,
+                state: "ready",
+                detail: managed.url
+                    ? "the managed development database (PGlite), this project only"
+                    : "the managed development database (PGlite), this project only — "
+                        + "not running; start it with `rebase dev`"
             });
             continue;
         }
@@ -272,10 +304,17 @@ export function computeStatus(
     // above teaches nothing — what it is here for is the failure no row models,
     // such as a custom engine whose driver package cannot be resolved.
     let blocked: string | undefined;
-    if (resources.every(r => r.state === "ready")) {
+    // Not run when the managed database answered for a row and is not running:
+    // there is no connection string to check the set against, and inventing one
+    // to keep the check formally "run" is how a green tick gets printed for
+    // work nobody did. The row says the daemon is down; that is the finding.
+    const managedSetUnknown = managedCovered > 0 && !managed?.url;
+    if (resources.every(r => r.state === "ready") && !managedSetUnknown) {
         try {
             resolvers.resolveDataSources(
-                env,
+                // The managed URL for the rows it answered for, so the whole-set
+                // check judges the same environment the runtime would get.
+                managed?.url ? withManagedUrls(env, graph, managed.url) : env,
                 graph.resources.filter(r => r.kind === "database").map(resourceToDataSource)
             );
         } catch (err) {

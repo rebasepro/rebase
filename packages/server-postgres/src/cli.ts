@@ -1323,45 +1323,45 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
     const outputPath = argsList["--output"] || path.join("src", "schema.generated.ts");
     const schemaFile = path.resolve(process.cwd(), outputPath);
 
-    // No generated schema yet is not staleness — a fresh project has not run the
-    // generator, and saying "stale" about a file that does not exist would send
-    // the reader looking for something to fix.
-    if (!fs.existsSync(schemaFile)) return;
+    const fix = Boolean(argsList["--fix"]);
+    const generatedExists = fs.existsSync(schemaFile);
 
     const { loadCollections } = await import("./schema/doctor");
-    const { findLegacyForeignKeyNames, describeLegacyForeignKeyNames } =
+    const { findLegacyForeignKeyNames, staleVerdict } =
         await import("./schema/generated-schema-staleness");
 
-    let stale;
-    try {
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
-        stale = findLegacyForeignKeyNames(fs.readFileSync(schemaFile, "utf8"), collections);
-    } catch (err) {
-        // Best-effort by design: a collections directory that will not load is a
-        // real error, but it is one the boot reports far better than this does.
-        logger.debug(`schema stale: skipped (${err instanceof Error ? err.message : String(err)})`);
-        return;
+    let stale: ReturnType<typeof findLegacyForeignKeyNames> = [];
+    let unreadable: string | undefined;
+    if (generatedExists) {
+        try {
+            const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+            stale = findLegacyForeignKeyNames(fs.readFileSync(schemaFile, "utf8"), collections);
+        } catch (err) {
+            // Best-effort by design: a collections directory that will not load
+            // is a real error, but it is one the boot reports far better than
+            // this does. Said out loud all the same — this command used to exit
+            // 0 in silence here, which is indistinguishable from a clean run.
+            unreadable = err instanceof Error ? err.message : String(err);
+            logger.debug(`schema stale: skipped (${unreadable})`);
+        }
     }
 
-    if (stale.length === 0) return;
+    // The decision lives in `generated-schema-staleness.ts` so it can be tested:
+    // this file uses `import.meta`, which the driver's jest suite cannot load,
+    // and three of this command's four paths were silent because of it.
+    const verdict = staleVerdict({ outputPath, generatedExists, stale, unreadable, fix });
 
-    out("");
-    outWarn(chalk.yellow(
-        `  ⚠️  ${outputPath} names ${stale.length} foreign key(s) the way an earlier release did:`
-    ));
-    out(chalk.gray(describeLegacyForeignKeyNames(stale)));
-    out("");
-
-    if (!argsList["--fix"]) {
-        outError(chalk.red(
-            "  The database column has already been renamed at boot, so the generated schema no " +
-            "longer matches it and the server will refuse to start."
-        ));
-        outError(chalk.red("  Run `rebase schema generate` to regenerate it."));
-        process.exit(1);
+    for (const line of verdict.lines) {
+        if (!line) out("");
+        else if (line.includes("⚠️")) outWarn(chalk.yellow(line));
+        else if (verdict.exitCode !== 0) outError(chalk.red(line));
+        else if (line.includes("✓")) out(chalk.green(line));
+        else out(chalk.gray(line));
     }
 
-    out(chalk.gray("  Regenerating the Drizzle schema so it matches..."));
+    if (verdict.exitCode !== 0) process.exit(verdict.exitCode);
+    if (!verdict.regenerate) return;
+
     await schemaCommand("generate", ["schema", "generate", `--collections=${collectionsPath}`, `--output=${outputPath}`]);
 }
 

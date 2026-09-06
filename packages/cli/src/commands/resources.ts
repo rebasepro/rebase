@@ -17,41 +17,49 @@ import { parseCommandArgs, wantsHelp } from "../utils/args";
 import {
     RESOURCE_GRAPH_FILENAME,
     deriveOptionsFor, deriveResourceGraph,
+    projectResourceGraph,
     readResourceGraphFile,
     serializeResourceGraph,
-    writeResourceGraphFile
+    writeResourceGraphFile,
+    type ProjectedResource
 } from "../resources/derive";
-import { declaredSubscriptions, type RebaseBackendAppConfig, type ResourceGraph } from "@rebasepro/types";
+import { declaredSubscriptions, type RebaseBackendAppConfig } from "@rebasepro/types";
 
 function usage(): void {
     console.log(`
-${chalk.bold("rebase resources")} — what this project declares it needs
+${chalk.bold("rebase resources")} — what this project needs
 
-  ${chalk.blue("rebase resources")}            List the declared resources
+  ${chalk.blue("rebase resources")}            List them, declared and implicit
   ${chalk.blue("rebase resources --write")}    Regenerate ${RESOURCE_GRAPH_FILENAME}
   ${chalk.blue("rebase resources --check")}    Fail if the committed graph is stale
-  ${chalk.blue("rebase resources --json")}     The graph, machine-readable
+  ${chalk.blue("rebase resources --json")}     The same set, machine-readable
 
 A resource is declared in config code — ${chalk.gray('database("analytics"), bucket("media"), topic("signups")')} —
 and never in ${RESOURCE_GRAPH_FILENAME}, which is generated from those declarations so a host
-can read what a project needs without building it.
+can read what a project needs without building it. A backend also has a default
+database and a default storage source nobody declared; both are listed here,
+marked ${chalk.gray("implicit")}, and neither is written to that file — the host supplies them.
 `);
 }
 
-/** Render the graph the way somebody reads it: grouped by kind, key first. */
-function print(graph: ResourceGraph): void {
-    if (graph.resources.length === 0) {
-        console.log(chalk.gray("\n  No resources declared. A backend still has its default database.\n"));
-        return;
-    }
+/**
+ * Render the projection the way somebody reads it: grouped by kind, key first.
+ *
+ * The projection, not the raw graph. `rebase status` has always included the
+ * implicit default database and bucket and this listing did not, so the two
+ * commands answered "what does this project need" differently on the same stock
+ * scaffold. There is no "no resources declared" case any more: a backend has a
+ * database and a storage source whether or not anyone wrote them down.
+ */
+function print(resources: ProjectedResource[]): void {
     // Infrastructure first, then code: what needs binding is what a reader
     // is here to check.
     const order = ["database", "bucket", "topic", "queue", "cron", "function"];
-    const kinds = [...new Set(graph.resources.map(r => r.kind))]
+    const kinds = [...new Set(resources.map(r => r.kind))]
         .sort((a, b) => (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b)));
     for (const kind of kinds) {
         console.log(`\n  ${chalk.bold(kind)}`);
-        for (const r of graph.resources.filter(x => x.kind === kind)) {
+        for (const r of resources.filter(x => x.kind === kind)) {
             const bits: string[] = [];
             if (kind === "cron") {
                 bits.push(chalk.cyan(String(r.options.schedule)));
@@ -64,6 +72,10 @@ function print(graph: ResourceGraph): void {
                 if (r.transport !== "server") bits.push(chalk.yellow(r.transport));
                 for (const [k, v] of Object.entries(r.options)) bits.push(chalk.gray(`${k}=${String(v)}`));
             }
+            // Marked, not hidden: a declared resource is recorded in
+            // `rebase.resources.json` for a host to provision, and an implicit
+            // one is a default the runtime supplies regardless.
+            if (r.implicit) bits.push(chalk.gray("implicit"));
             console.log(`    ${r.key.padEnd(24)} ${bits.join(" · ")}`);
             if (kind === "topic") {
                 for (const sub of declaredSubscriptions(r.key)) {
@@ -126,7 +138,10 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
     }
 
     if (flags["--json"]) {
-        console.log(JSON.stringify(graph, null, 2));
+        // The projection, so this and `rebase status --json` describe the same
+        // set. `version` is kept so a reader of either can tell them apart from
+        // a future shape.
+        console.log(JSON.stringify({ version: graph.version, resources: projectResourceGraph(graph) }, null, 2));
         return;
     }
 
@@ -168,5 +183,5 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
         return;
     }
 
-    print(graph);
+    print(projectResourceGraph(graph));
 }

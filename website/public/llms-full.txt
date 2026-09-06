@@ -28476,6 +28476,11 @@ under `backend/crons` or `backend/functions`, and never written by hand in
 read what a project needs without building it. Each entry records who uses it
 (`collection:events`, `property:posts.cover`, `function:report`).
 
+A backend also has a default database and a default storage source that nobody
+declares. Both are listed here, marked `implicit`, and neither is written to
+`rebase.resources.json` — the host supplies them, so recording them would ask
+for something to be provisioned that nobody asked for.
+
 To see what the platform holds for a project against what its code declares,
 and to remove a provisioned database the code no longer names, see
 `rebase cloud resources` below.
