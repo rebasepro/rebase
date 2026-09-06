@@ -72,6 +72,7 @@ this list, in this order.
 | `check:types-headless` | The type-level counterpart, source half: core sources and manifests, where `@types/react` as a devDependency satisfied the monorepo and no consumer. | — |
 | `check:browser-deps` | The other direction: a browser-facing package pulling a server framework into `node_modules` through an auto-installed peer, which neither headless guard sees. | — |
 | `check:baas-types` | A real BaaS project typechecked with `react` mapped to a stub: a React type reached through an alias. | — |
+| `check:ts-expect-error-coverage` | Every file carrying a `@ts-expect-error` is in a tsc program. A directive in a file no program reads is a comment, and the file usually claims the opposite. | Add the file to `tsconfig.tests.json` |
 | `check:runtime-image` | Every container image the shipped files name has a workflow that publishes it. | — |
 | `check:runtime-deps` | The packages the runtime image promises to supply are installed there, at a compatible version, with their own dependencies and peers. | — |
 | `check:chart` | The Helm chart lints, renders its three documented topologies, and every refusal in `_validate.tpl` is still reachable. Needs Helm. | — |

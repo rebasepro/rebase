@@ -26,6 +26,7 @@
     "rls:check": "node --import tsx tooling/scripts/rls-scan.mts",
     "check:headless": "node tooling/scripts/headless-guard/check.mjs",
     "check:types-headless": "node tooling/scripts/headless-guard/check-types.mjs --src",
+    "check:ts-expect-error-coverage": "node tooling/scripts/check-ts-expect-error-coverage.mjs",
     "check:types-headless:dts": "node tooling/scripts/headless-guard/check-types.mjs --dts",
     "check:browser-deps": "node tooling/scripts/headless-guard/check-browser-deps.mjs",
     "check:core-types": "tsc --noEmit -p tsconfig.core.json",

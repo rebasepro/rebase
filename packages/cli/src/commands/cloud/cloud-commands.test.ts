@@ -23,7 +23,6 @@ import { buildSettingsPatch } from "./settings";
 function captureStdout(): { output: () => string; restore: () => void } {
     const chunks: string[] = [];
     const orig = process.stdout.write.bind(process.stdout);
-    // @ts-expect-error test shim
     process.stdout.write = (s: string) => {
         chunks.push(typeof s === "string" ? s : String(s));
         return true;
@@ -329,10 +328,10 @@ find: async () => ({ data: rows }) }));
     });
 
     it("without an id, targets the most recent successful+image deploy (with --yes)", async () => {
-        const invoke = vi.fn(async (_n: string, body: { deploymentId?: string }) => ({
+        const invoke = vi.fn(async (_n: string, body: unknown) => ({
             success: true,
             deployment: { id: "d4" },
-            rolledBackTo: body.deploymentId,
+            rolledBackTo: (body as { deploymentId?: string }).deploymentId,
             imageUrl: "img:2"
         }));
         useClient(fakeClient({ invoke,

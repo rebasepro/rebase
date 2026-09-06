@@ -100,6 +100,22 @@ that stands in for its absence. Catches a React type reached through an
 alias, which a text scan cannot see.`
     },
     {
+        run: "check:ts-expect-error-coverage",
+        why: `A \`@ts-expect-error\` is a test written in the type system, and \`tsc\` is
+the only thing that runs it. Jest and vitest strip types without checking
+them, so in a file no program reads the directive is a comment — and the
+file usually says the opposite in its own docblock:
+\`packages/server/test/auth-config-types.test.ts\` opened with "the real value
+is that tsc validates the @ts-expect-error annotations" and was in neither
+program. Ten directives across eight files were in that state; adding them
+found four that had gone stale, one written a line above the error it meant
+to suppress, and three assertions that were tuple-index errors.
+
+It also holds the include list in \`tsconfig.tests.json\`, which is otherwise
+a hand-maintained ratchet nothing stops you from shortening to make
+\`pnpm typecheck\` green.`
+    },
+    {
         run: "check:runtime-image",
         why: `The scaffold hands every new project a compose file naming a container
 image. 0.13.0 shipped with that image published nowhere, so the first
