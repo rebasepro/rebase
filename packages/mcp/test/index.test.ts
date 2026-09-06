@@ -1397,7 +1397,7 @@ describe("showing a schema change before making it", () => {
         writeFileSync(join(project, "backend", "src", "schema.generated.ts"), "// hand-written\n");
         const before = snapshot(project);
 
-        const fetchSpy = vi.fn(async () => new Response(
+        const fetchSpy = vi.fn(async (_url: unknown, _init?: unknown) => new Response(
             JSON.stringify({
                 applicable: true,
                 verdict: "applicable",
