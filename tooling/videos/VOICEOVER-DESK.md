@@ -6,9 +6,11 @@ you would say it to one person across a desk.
 **Every line is a sentence** — a subject, a verb, and the thing the verb is
 about. Nothing here needs to be read twice to parse.
 
-**It opens on you, with a question.** "You can build a backend in an
-afternoon now. But can you trust it?" — to camera, before any evidence. Then
-the evidence: an agent built this one, and a scan found three security holes.
+**It opens on you, already talking.** No logo, no pause: you are on screen
+from the first frame and the question starts half a second in. "You can
+build a backend in an afternoon now. But can you trust it?" — to camera,
+before any evidence. Then the evidence: an agent built this one, and a scan
+found three security holes.
 
 **No slogans.** You are explaining what just happened, not selling it. The
 last thing said is a practical next step — scan your own database — not a
@@ -22,34 +24,34 @@ that file; you push it, so the same scan finds nothing; you run it, so the
 API answers Robert, Dana and an agent, and your team gets the panel. "Three
 commands" at the end is a count of what you watched.
 
-Total: **2727 frames = 90.9 seconds** at 30fps · 226 words · speech is
-87% of the running time.
+Total: **2642 frames = 88.1 seconds** at 30fps · 226 words · speech is
+90% of the running time.
 
 ## The script
 
 | # | Beat | Starts | Words | Line | Join |
 |---|------|--------|-------|------|------|
-| 00 | Cold open | 0.0s | — | *(silent — the mark assembles)* | — |
-| 01 | You, to camera | 3.1s | 14 | You can build a backend in an afternoon now. But can you trust it? | 0.5s beat |
-| 02 | The evidence | 8.5s | 14 | An agent built this one. It works. A ten-second scan found three security holes. | 2.6s **pause** |
-| 03 | Point Rebase at it | 15.9s | 20 | So you point Rebase at the same database. It reads the tables and writes one file for each of them. | 0.6s beat |
-| 04 | The rule | 23.4s | 25 | The access rules go in that file. This one says customers can only see their own orders. Postgres enforces it. Your code doesn't have to. | 0.1s flow |
-| 05 | Push, and the same scan | 32.2s | 13 | You push it, and you run the same scan again. It finds nothing. | 0.2s flow |
-| 06 | Run it | 37.0s | 4 | Then you run it. | 2.1s **pause** — the terminal prints the ports |
-| 07 | Two people | 40.3s | 25 | Two people send the same request. Robert is a customer, so he sees his own orders. Dana works in support, so she sees every order. | 0.0s flow |
-| 08 | The agent | 49.1s | 18 | An agent works the same way. It gets a key with permissions, and it can't get around them. | 0.4s flow |
-| 09 | The panel | 55.7s | 19 | Your team also gets an admin panel. It is generated from the same files, so the same rules apply. | 2.6s **pause** — the montage plays |
-| 10 | Every view | 64.9s | 11 | Every collection gets its own views: boards, tables, cards and forms. | 0.0s flow |
-| 11 | The schema | 68.8s | 13 | The schema is read from the database, so it matches what is there. | 0.0s flow |
-| 12 | Studio | 73.3s | 11 | And you can edit the database itself from the same app. | 0.1s flow |
-| 13 | The whole desk | 77.2s | 39 | That was three commands. It is open source, and you can run it on your laptop, on your own servers, or on any cloud. The scan runs on any Postgres, so you can start by scanning your own database. | — |
+| 01 | You, to camera | 0.5s | 14 | You can build a backend in an afternoon now. But can you trust it? | 0.5s beat |
+| 02 | The evidence | 5.9s | 14 | An agent built this one. It works. A ten-second scan found three security holes. | 2.6s **pause** |
+| 03 | Point Rebase at it | 13.0s | 20 | So you point Rebase at the same database. It reads the tables and writes one file for each of them. | 0.6s beat |
+| 04 | The rule | 20.6s | 25 | The access rules go in that file. This one says customers can only see their own orders. Postgres enforces it. Your code doesn't have to. | 0.1s flow |
+| 05 | Push, and the same scan | 29.4s | 13 | You push it, and you run the same scan again. It finds nothing. | 0.2s flow |
+| 06 | Run it | 34.2s | 4 | Then you run it. | 2.1s **pause** — the terminal prints the ports |
+| 07 | Two people | 37.5s | 25 | Two people send the same request. Robert is a customer, so he sees his own orders. Dana works in support, so she sees every order. | 0.0s flow |
+| 08 | The agent | 46.3s | 18 | An agent works the same way. It gets a key with permissions, and it can't get around them. | 0.4s flow |
+| 09 | The panel | 52.9s | 19 | Your team also gets an admin panel. It is generated from the same files, so the same rules apply. | 2.6s **pause** — the montage plays |
+| 10 | Every view | 62.1s | 11 | Every collection gets its own views: boards, tables, cards and forms. | 0.0s flow |
+| 11 | The schema | 65.9s | 13 | The schema is read from the database, so it matches what is there. | 0.0s flow |
+| 12 | Studio | 70.5s | 11 | And you can edit the database itself from the same app. | 0.1s flow |
+| 13 | The whole desk | 74.3s | 39 | That was three commands. It is open source, and you can run it on your laptop, on your own servers, or on any cloud. The scan runs on any Postgres, so you can start by scanning your own database. | — |
 
 ## The presenter
 
 You are on screen. Three places, one video element (`src/desk/Presenter.tsx`):
 
-- **Open** — large and centred over the ribbon for the question. Then the
-  window flies to the corner while the evidence arrives behind it.
+- **Open** — large and centred over the ribbon, from the first frame, for
+  the question. Then the window flies to the corner while the evidence
+  arrives behind it.
 - **Corner** — a 260px rounded square, bottom right, for the whole demo.
   Every desk composition keeps that corner clear of text.
 - **Close** — you grow out of the corner into the left column as the desk

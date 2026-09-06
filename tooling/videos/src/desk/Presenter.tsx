@@ -49,12 +49,14 @@ export const CLOSE: Box = { x: 200, y: 240, w: 680, h: 600 };
 
 const ALL = beat("all");
 
-/** Frames of the presenter's own timeline, absolute. The open runs through
- *  the question — "You can build a backend in an afternoon now. But can you
- *  trust it?", fourteen words to camera — then the window flies to the
- *  corner while the evidence arrives on the desk behind it. */
-export const PRESENTER_IN = 52;
-export const FLY_TO_CORNER = tempo(92) + Math.round(14 * 10 * TEMPO) + 5;
+/** Frames of the presenter's own timeline, absolute. The presenter is on
+ *  screen from the first frame and speaking from the fifteenth — a person
+ *  who appears and then waits is a person with nothing to say. The open
+ *  runs through the question — "You can build a backend in an afternoon
+ *  now. But can you trust it?", fourteen words to camera — then the window
+ *  flies to the corner while the evidence arrives on the desk behind it. */
+export const PRESENTER_IN = 0;
+export const FLY_TO_CORNER = tempo(14) + Math.round(14 * 10 * TEMPO) + 5;
 const FLY = 36;
 /** Lifts off the corner as the camera lifts off the desk. */
 export const FLY_TO_CLOSE = ALL.start + 4;
@@ -78,7 +80,7 @@ export type Stage = "open" | "corner" | "close";
 /** Where the window is at this frame, how visible, and which of the three
  *  places it is at or heading to. */
 export function presenterAt(frame: number): Box & { opacity: number; stage: Stage } {
-    const opacity = interpolate(frame, [PRESENTER_IN, PRESENTER_IN + 16], [0, 1], {
+    const opacity = interpolate(frame, [PRESENTER_IN, PRESENTER_IN + 10], [0, 1], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
     });

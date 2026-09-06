@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { DeskPlane } from "./DeskPlane";
 import { Desk } from "./Desk";
 import { beat, DESK_DURATION } from "./beats";
@@ -9,18 +9,19 @@ import { FONT, FRAME, INK } from "../theme";
 import { Narration } from "../Narration";
 import { DESK_FRAMES_PER_WORD, DESK_NARRATION } from "./script";
 import { Presenter } from "./Presenter";
-import { CLOSE, FLY_TO_CLOSE, PRESENTER_IN } from "./Presenter";
+import { CLOSE, FLY_TO_CLOSE } from "./Presenter";
 
 /**
  * The film: the ribbon, the desk on it, and two things in SCREEN space that
- * are not on the desk — the mark that opens it and the address that closes
- * it. Everything between those two is a place on the desk the camera goes.
+ * are not on the desk — the presenter, and the address that closes it. It
+ * opens on the presenter, already talking; there is no logo pre-roll (the
+ * mark is at the close). Everything else is a place on the desk the camera
+ * goes.
  */
 export const RebaseDesk: React.FC = () => (
     <AbsoluteFill style={{ background: "#000" }}>
         <DeskPlane />
         <Desk />
-        <ColdOpen />
         <Close />
         <Presenter />
     </AbsoluteFill>
@@ -36,47 +37,6 @@ export const RebaseDeskVO: React.FC = () => (
 );
 
 const HOOK = beat("hook");
-
-/** Black, then the mark building facet by facet, then the name. It fades as
- *  the presenter fades in over the ribbon where it stood. */
-const ColdOpen: React.FC = () => {
-    const frame = useCurrentFrame();
-    const up = ramp(frame, 0, 22, SHIFT);
-    const out = 1 - ramp(frame, PRESENTER_IN - 8, 14, SHIFT);
-    if (out <= 0) return null;
-    const word = ramp(frame, 28, 20);
-    const push = interpolate(frame, [0, HOOK.start], [1, 1.03], { extrapolateRight: "clamp" });
-    return (
-        <AbsoluteFill style={{ opacity: out }}>
-            <AbsoluteFill style={{ background: "#000", opacity: 1 - up }} />
-            <AbsoluteFill
-                style={{
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transform: `translateY(-46px) scale(${push})`,
-                }}
-            >
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 34 }}>
-                    <Mark size={214} delay={6} spread={22} />
-                    <div style={{ overflow: "hidden", paddingBottom: "0.12em", marginBottom: "-0.12em" }}>
-                        <div
-                            style={{
-                                fontFamily: FONT.display,
-                                fontWeight: 600,
-                                fontSize: 76,
-                                letterSpacing: "-0.03em",
-                                color: INK.high,
-                                transform: `translateY(${(1 - word) * 108}%)`,
-                            }}
-                        >
-                            rebase
-                        </div>
-                    </div>
-                </div>
-            </AbsoluteFill>
-        </AbsoluteFill>
-    );
-};
 
 const ALL = beat("all");
 

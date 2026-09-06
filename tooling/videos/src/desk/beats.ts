@@ -71,9 +71,8 @@ const cell = (col: number, row: number): View => ({ x: col * CELL.w, y: row * CE
  * the product did not get slower.
  */
 export const TEMPO = 1.05;
-const COLD_OPEN = 66;
 /** A frame from the original sheet, on the stretched timeline. */
-export const tempo = (raw: number): number => COLD_OPEN + Math.round((raw - COLD_OPEN) * TEMPO);
+export const tempo = (raw: number): number => Math.round(raw * TEMPO);
 
 /** The whole desk, framed on its content rather than its edges: the windows
  *  span roughly 200..5680 by 180..3160, and a 0.34 zoom from (150, 120) puts
@@ -109,23 +108,27 @@ const TERMINAL: View = { x: 0, y: 420, zoom: 1 };
  * both had already run. It was a tour with a story stapled to the front.
  */
 export const BEATS: Beat[] = [
-    { id: "hook", start: tempo(66), view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.3 },
-    { id: "init", start: tempo(460), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "rule", start: tempo(680), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
-    { id: "push", start: tempo(920), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.3 },
-    { id: "users", start: tempo(1160), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
-    { id: "agent", start: tempo(1400), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
-    { id: "panel", start: tempo(1600), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "views", start: tempo(1860), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
-    { id: "schema", start: tempo(1970), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
-    { id: "studio", start: tempo(2090), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
-    { id: "all", start: tempo(2200), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
+    /* No cold open. The film opens on the presenter, already talking; the
+       ribbon fades up behind them over the first frames. A logo pre-roll
+       here left a person on camera for over a second with nothing to say. */
+    { id: "hook", start: tempo(12), view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.3 },
+    { id: "init", start: tempo(376), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "rule", start: tempo(596), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
+    { id: "push", start: tempo(836), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.3 },
+    { id: "users", start: tempo(1076), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
+    { id: "agent", start: tempo(1316), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
+    { id: "panel", start: tempo(1516), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "views", start: tempo(1776), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "schema", start: tempo(1886), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
+    { id: "studio", start: tempo(2006), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
+    { id: "all", start: tempo(2116), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
 ];
 
-/** The cold open holds the camera on the hook before anything is on it. */
+/** Where the camera starts: on the hook, which is where it stays until the
+ *  first move. */
 export const OPENING: View = cell(0, 0);
 
-export const DESK_DURATION = tempo(2600);
+export const DESK_DURATION = tempo(2516);
 
 export const beat = (id: string): Beat => {
     const b = BEATS.find((x) => x.id === id);

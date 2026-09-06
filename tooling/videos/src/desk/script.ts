@@ -36,30 +36,30 @@ export const DESK_FRAMES_PER_WORD = 10 * TEMPO;
 
 export const DESK_NARRATION: { at: number; words: string[] }[] = [
     // the question, to camera
-    { at: tempo(92), words: ["You", "can", "build", "a", "backend", "in", "an", "afternoon", "now.", "But", "can", "you", "trust", "it?"] },
+    { at: tempo(14), words: ["You", "can", "build", "a", "backend", "in", "an", "afternoon", "now.", "But", "can", "you", "trust", "it?"] },
     // the evidence
-    { at: tempo(245), words: ["An", "agent", "built", "this", "one.", "It", "works.", "A", "ten-second", "scan", "found", "three", "security", "holes."] },
+    { at: tempo(170), words: ["An", "agent", "built", "this", "one.", "It", "works.", "A", "ten-second", "scan", "found", "three", "security", "holes."] },
     // init
-    { at: tempo(456), words: ["So", "you", "point", "Rebase", "at", "the", "same", "database.", "It", "reads", "the", "tables", "and", "writes", "one", "file", "for", "each", "of", "them."] },
+    { at: tempo(372), words: ["So", "you", "point", "Rebase", "at", "the", "same", "database.", "It", "reads", "the", "tables", "and", "writes", "one", "file", "for", "each", "of", "them."] },
     // rule
-    { at: tempo(672), words: ["The", "access", "rules", "go", "in", "that", "file.", "This", "one", "says", "customers", "can", "only", "see", "their", "own", "orders.", "Postgres", "enforces", "it.", "Your", "code", "doesn't", "have", "to."] },
+    { at: tempo(588), words: ["The", "access", "rules", "go", "in", "that", "file.", "This", "one", "says", "customers", "can", "only", "see", "their", "own", "orders.", "Postgres", "enforces", "it.", "Your", "code", "doesn't", "have", "to."] },
     // push + rescan
-    { at: tempo(924), words: ["You", "push", "it,", "and", "you", "run", "the", "same", "scan", "again.", "It", "finds", "nothing."] },
+    { at: tempo(840), words: ["You", "push", "it,", "and", "you", "run", "the", "same", "scan", "again.", "It", "finds", "nothing."] },
     // run
-    { at: tempo(1060), words: ["Then", "you", "run", "it."] },
+    { at: tempo(976), words: ["Then", "you", "run", "it."] },
     // users
-    { at: tempo(1156), words: ["Two", "people", "send", "the", "same", "request.", "Robert", "is", "a", "customer,", "so", "he", "sees", "his", "own", "orders.", "Dana", "works", "in", "support,", "so", "she", "sees", "every", "order."] },
+    { at: tempo(1072), words: ["Two", "people", "send", "the", "same", "request.", "Robert", "is", "a", "customer,", "so", "he", "sees", "his", "own", "orders.", "Dana", "works", "in", "support,", "so", "she", "sees", "every", "order."] },
     // agent
-    { at: tempo(1406), words: ["An", "agent", "works", "the", "same", "way.", "It", "gets", "a", "key", "with", "permissions,", "and", "it", "can't", "get", "around", "them."] },
+    { at: tempo(1322), words: ["An", "agent", "works", "the", "same", "way.", "It", "gets", "a", "key", "with", "permissions,", "and", "it", "can't", "get", "around", "them."] },
     // panel
-    { at: tempo(1596), words: ["Your", "team", "also", "gets", "an", "admin", "panel.", "It", "is", "generated", "from", "the", "same", "files,", "so", "the", "same", "rules", "apply."] },
+    { at: tempo(1512), words: ["Your", "team", "also", "gets", "an", "admin", "panel.", "It", "is", "generated", "from", "the", "same", "files,", "so", "the", "same", "rules", "apply."] },
     // views
-    { at: tempo(1858), words: ["Every", "collection", "gets", "its", "own", "views:", "boards,", "tables,", "cards", "and", "forms."] },
+    { at: tempo(1774), words: ["Every", "collection", "gets", "its", "own", "views:", "boards,", "tables,", "cards", "and", "forms."] },
     // schema
-    { at: tempo(1968), words: ["The", "schema", "is", "read", "from", "the", "database,", "so", "it", "matches", "what", "is", "there."] },
+    { at: tempo(1884), words: ["The", "schema", "is", "read", "from", "the", "database,", "so", "it", "matches", "what", "is", "there."] },
     // studio
-    { at: tempo(2098), words: ["And", "you", "can", "edit", "the", "database", "itself", "from", "the", "same", "app."] },
+    { at: tempo(2014), words: ["And", "you", "can", "edit", "the", "database", "itself", "from", "the", "same", "app."] },
     // all
     // "the scan is free" implied the rest was not. It is all MIT.
-    { at: tempo(2208), words: ["That", "was", "three", "commands.", "It", "is", "open", "source,", "and", "you", "can", "run", "it", "on", "your", "laptop,", "on", "your", "own", "servers,", "or", "on", "any", "cloud.", "The", "scan", "runs", "on", "any", "Postgres,", "so", "you", "can", "start", "by", "scanning", "your", "own", "database."] },
+    { at: tempo(2124), words: ["That", "was", "three", "commands.", "It", "is", "open", "source,", "and", "you", "can", "run", "it", "on", "your", "laptop,", "on", "your", "own", "servers,", "or", "on", "any", "cloud.", "The", "scan", "runs", "on", "any", "Postgres,", "so", "you", "can", "start", "by", "scanning", "your", "own", "database."] },
 ];
