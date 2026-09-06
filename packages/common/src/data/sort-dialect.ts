@@ -185,10 +185,18 @@ direction })));
 /**
  * Deserialize a wire-format `"field:direction"` string into an {@link OrderByTuple}.
  *
- * Lenient parsing (matches existing server behaviour):
+ * Lenient parsing:
  * - Bare field name (no colon): `"name"` → `["name", "asc"]`
  * - Unknown direction: `"name:foo"` → `["name", "asc"]`
  * - Empty / falsy input, or a blank field name: → `undefined`
+ *
+ * The leniency is this end's alone; the *server* refuses the same value. This
+ * used to say "matches existing server behaviour", and it stopped being true
+ * when `parseOrderByParam` grew a strict direction check: `?orderBy=name:foo`
+ * now answers `400 INVALID_ORDER_BY` ("entry 0 has direction 'foo'"). The split
+ * is deliberate — see {@link parseOrderBySpecStrict} — because a value this
+ * function is handed was produced by {@link serializeOrderBy} a moment earlier,
+ * and one that reaches the server came from a stranger.
  *
  * A blank field is `undefined` rather than `[" ", "asc"]`: whitespace is not a
  * field name, and the tuple it used to produce could not be re-encoded — the
