@@ -21,8 +21,39 @@ import { parseCommandArgs } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 import { argsFromCommand, commandWords } from "../utils/command-words";
 import { recordEvent } from "../telemetry";
-import { DEV_DATABASE_KIND_ENV, devDatabaseKind } from "../dev-db/prepare";
+import { DEV_DATABASE_KIND_ENV, devDatabaseKind, type PreparedDatabase } from "../dev-db/prepare";
 import { type DevDatabase } from "../dev-db/resolve";
+
+/**
+ * The connection string a prepared database actually answers on.
+ *
+ * One function, because `db url` and `db pull` disagreed about it and the
+ * disagreement was a dead command: `prepareDatabaseEnv` returns `env: {}` for a
+ * plain external database — the connection string is already somewhere the
+ * child looks — so `db pull`'s `prepared.env.DATABASE_URL ?? process.env
+ * .DATABASE_URL` was empty for the standard `.env` configuration and answered
+ * `✗ No local database to pull into.` on a project whose `rebase db url` had
+ * just printed one. Exporting the same URL in the shell made it work, which is
+ * the shape of a bug nobody reports as one.
+ *
+ * `readEnvFile` is passed in rather than imported: this module loads
+ * `../utils/project` dynamically everywhere else, and the callers already have
+ * it open.
+ */
+export function databaseUrlOf(
+    prepared: Pick<PreparedDatabase, "env" | "database">,
+    envFile: Record<string, string>
+): string | undefined {
+    // An empty string is "nothing named a database", not "the database is the
+    // empty string" — `docker` resolves to `url: null` when the compose file
+    // declares no usable db service.
+    const named = (value: string | null | undefined) => (value && value.trim() ? value : undefined);
+
+    return named(prepared.env.DATABASE_URL)
+        ?? named(prepared.database.kind === "managed" ? undefined : prepared.database.url)
+        ?? named(envFile.DATABASE_URL)
+        ?? named(process.env.DATABASE_URL);
+}
 
 /**
  * A destination that names a remote store rather than a local path.
@@ -590,9 +621,7 @@ async function printDatabaseUrl(projectRoot: string, rawArgs: readonly string[])
         onProgress: message => console.error(chalk.gray(`  ${message}`))
     });
 
-    const url = prepared.env.DATABASE_URL
-        ?? readEnvFile(projectRoot).DATABASE_URL
-        ?? process.env.DATABASE_URL;
+    const url = databaseUrlOf(prepared, readEnvFile(projectRoot));
     if (!url) {
         console.error(chalk.red("  ✗ This project has no database URL to print."));
         console.error(chalk.gray("    Set DATABASE_URL in .env, or run `rebase dev` to start the managed one."));
@@ -674,6 +703,7 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
     const { anonymizeStatements, describeTarget, dumpArgs, findPgDump, restoreArgs } =
         await import("../dev-db/pull");
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
+    const { readEnvFile } = await import("../utils/project");
 
     const source = readFlagValue(rawArgs, "--from");
     if (!source) {
@@ -730,9 +760,13 @@ async function pullIntoLocal(projectRoot: string, rawArgs: readonly string[]): P
         flagDocker: rawArgs.includes("--docker"),
         onProgress: (message) => console.log(chalk.gray(`  ${message}`))
     });
-    const target = prepared.env.DATABASE_URL ?? process.env.DATABASE_URL ?? "";
+    // The database `rebase db url` prints, resolved the one way — see
+    // `databaseUrlOf`. Reading only `prepared.env` missed the commonest
+    // configuration there is: `DATABASE_URL` in `.env` and nowhere else.
+    const target = databaseUrlOf(prepared, readEnvFile(projectRoot)) ?? "";
     if (!target) {
         console.error(chalk.red("✗ No local database to pull into."));
+        console.error(chalk.gray("  Set DATABASE_URL in .env, or run `rebase dev` to start the managed one."));
         process.exit(1);
     }
 

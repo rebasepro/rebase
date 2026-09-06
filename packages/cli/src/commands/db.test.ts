@@ -10,6 +10,7 @@ import { describe, it, expect, vi } from "vitest";
 import path from "path";
 import {
     absolutizeLocalPathArgs,
+    databaseUrlOf,
     dbExamples,
     ManagedDatabaseRefusal,
     refuseAtlasOnManagedDatabase,
@@ -272,5 +273,46 @@ describe("the examples in `rebase db --help`", () => {
     it.each(["external", "docker", null] as const)("keeps the full workflow for %s", (kind) => {
         const examples = plain(kind);
         for (const command of REFUSED_ON_MANAGED) expect(examples).toContain(command);
+    });
+});
+
+/**
+ * `db pull` and `db url` answer the same question about the same project.
+ *
+ * They did not. `prepareDatabaseEnv` returns `env: {}` for a plain external
+ * database — the connection string is already in a place the child reads — so
+ * `db pull`, which read only `prepared.env.DATABASE_URL ?? process.env
+ * .DATABASE_URL`, answered `✗ No local database to pull into.` on the standard
+ * configuration: `DATABASE_URL` in `.env` and nowhere else. `rebase db url` on
+ * the same project printed the URL. Exporting it in the shell made the pull
+ * work, which is how a broken command comes to look like a user error.
+ */
+describe("databaseUrlOf", () => {
+    const external = (url: string) => ({ kind: "external", url, source: "env-file" } as const);
+
+    it("finds the URL that is only in .env", () => {
+        expect(databaseUrlOf(
+            { env: {}, database: external("postgres://u@h/app") },
+            { DATABASE_URL: "postgres://u@h/app" }
+        )).toBe("postgres://u@h/app");
+    });
+
+    it("prefers the prepared environment, which is where a branch URL lives", () => {
+        expect(databaseUrlOf(
+            { env: { DATABASE_URL: "postgres://u@h/rb_feature" }, database: external("postgres://u@h/app") },
+            { DATABASE_URL: "postgres://u@h/app" }
+        )).toBe("postgres://u@h/rb_feature");
+    });
+
+    it("does not invent a URL for the managed database", () => {
+        // The managed variant carries no `url` at all: it is served by a daemon
+        // the caller may not have started. `prepareDatabaseEnv` puts the real
+        // one in `env` when it does start it.
+        expect(databaseUrlOf({ env: {}, database: { kind: "managed", source: "managed" } }, {}))
+            .toBeUndefined();
+    });
+
+    it("still answers for a project that configured nothing anywhere", () => {
+        expect(databaseUrlOf({ env: {}, database: external("") }, {})).toBeUndefined();
     });
 });
