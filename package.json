@@ -70,6 +70,7 @@
     "check:test-scripts": "node tooling/scripts/check-test-scripts.mjs",
     "check:control-chars": "node tooling/scripts/check-control-chars.mjs",
     "check:untranslated": "node tooling/scripts/check-untranslated.mjs",
+    "check:locale-parity": "node tooling/scripts/check-locale-parity.mjs",
     "check:jsdoc-coverage": "node tooling/scripts/check-jsdoc-coverage.mjs",
     "check:rebase-props": "node tooling/scripts/check-rebase-props-table.mjs",
     "check:property-options": "node tooling/scripts/check-property-options-table.mjs",

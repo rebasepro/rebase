@@ -69,7 +69,7 @@ const instance = await initializeRebaseBackend({
 2. Registrar cada exportação padrão como uma tarefa cron
 3. Criar automaticamente a tabela `rebase.cron_logs` no PostgreSQL (se o driver suportar SQL)
 4. Iniciar o agendador e preencher contadores a partir de logs de DB existentes
-5. Montar rotas REST de administração em `/api/cron`
+5. Montar rotas REST de administração em `/api/admin/cron`
 
 ## Sintaxe de Agendamento
 
@@ -153,18 +153,18 @@ Todas as rotas cron exigem **autenticação de administrador** (`requireAuth` + 
 
 | Método | Caminho | Descrição |
 |--------|------|-------------|
-| `GET` | `/api/cron` | Listar todas as tarefas cron registradas |
-| `GET` | `/api/cron/:id` | Obter o status de uma única tarefa |
-| `POST` | `/api/cron/:id/trigger` | Acionar uma tarefa manualmente |
-| `GET` | `/api/cron/:id/logs` | Obter histórico de execução (`?limit=N`) |
-| `PUT` | `/api/cron/:id` | Habilitar/desabilitar uma tarefa (`{ "enabled": true }`) |
+| `GET` | `/api/admin/cron` | Listar todas as tarefas cron registradas |
+| `GET` | `/api/admin/cron/:id` | Obter o status de uma única tarefa |
+| `POST` | `/api/admin/cron/:id/trigger` | Acionar uma tarefa manualmente |
+| `GET` | `/api/admin/cron/:id/logs` | Obter histórico de execução (`?limit=N`) |
+| `PUT` | `/api/admin/cron/:id` | Habilitar/desabilitar uma tarefa (`{ "enabled": true }`) |
 
 ### Exemplo: Listar Todas as Tarefas
 
 `$TOKEN` é um token de acesso de administrador: inicie sessão e use o `accessToken` que a resposta de login devolve. `$API_URL` é o URL que o `rebase dev` imprimiu — a porta é derivada do projeto e não é fixa.
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"
+curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/admin/cron"
 ```
 
 ```json
@@ -190,7 +190,7 @@ curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    "$API_URL/api/cron/health-check/trigger"
+    "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
 ## SDK do Cliente
@@ -237,7 +237,7 @@ Quando o driver do banco de dados suporta SQL (por exemplo, PostgreSQL), os logs
 
 - O histórico de execução **sobrevive a reinicializações** de servidor e implantações
 - Os contadores `totalRuns` e `totalFailures` são **preenchidos a partir do banco de dados** na inicialização
-- O endpoint `/api/cron/:id/logs` consulta o banco de dados, não apenas a memória
+- O endpoint `/api/admin/cron/:id/logs` consulta o banco de dados, não apenas a memória
 - Múltiplas instâncias de servidor compartilham o mesmo histórico de execução
 
 A tabela é criada automaticamente na primeira inicialização — sem necessidade de migrações.

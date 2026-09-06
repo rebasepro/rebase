@@ -145,6 +145,8 @@ export const en: RebaseTranslations = {
     reference_not_set: "Reference not set",
     reference_does_not_exist: "Reference does not exist",
     entity_not_found: "Entity not found",
+    entity_not_found_body: "This record does not exist, or it may be hidden from you by row-level security.",
+    back_to_collection: "Back to {{name}}",
     file_not_found: "File not found",
     unsaved_changes_in_entity: "You have unsaved changes in this entity.",
     delete_this_role: "Delete this role",
@@ -826,6 +828,8 @@ export const en: RebaseTranslations = {
     studio_sql_sidebar_no_history: "No history",
     studio_sql_sidebar_history_hint: "Executed queries will appear here.",
     studio_sql_sidebar_delete_snippet: "Delete snippet",
+    studio_sql_close_tab: "Close this query tab",
+    studio_sql_new_tab: "New query tab",
 
     // ─── Studio: Schema Browser ──────────────────────────────────
     studio_schema_tables: "Tables",
@@ -1016,6 +1020,12 @@ export const en: RebaseTranslations = {
     history_no_more: "No more history",
 
     // ─── Studio: tools, groups and empty states ─────────────────
+    // The admin's own three groups, read by `useNavigationGroupLabel` the same
+    // way as the Studio ones below — the group *name* is an identifier the
+    // ordering and the icons key off, and only the heading is translated.
+    studio_group_views: "Views",
+    studio_group_admin: "Admin",
+    studio_group_settings: "Settings",
     studio_group_database: "Database",
     studio_group_compute: "Compute",
     studio_group_storage: "Storage",

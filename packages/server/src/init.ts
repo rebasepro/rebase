@@ -44,9 +44,9 @@ import { createAuthMiddleware } from "./auth/middleware";
 import { createAdapterAuthMiddleware } from "./auth/adapter-middleware";
 import { scopeDataDriver, SERVICE_IDENTITY } from "./auth/rls-scope";
 import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
-import { errorHandler } from "./api/errors";
+import { ApiError, errorHandler } from "./api/errors";
 import { createSchemaDriftDetector } from "./api/schema-drift";
-import { installRootErrorHandler } from "./api/root-error-handler";
+import { installRootErrorHandler, installUnmatchedApiEnvelope } from "./api/root-error-handler";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HonoEnv } from "./api/types";
@@ -1058,6 +1058,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // reads one. An app that already has its own handler keeps it — see
     // `installRootErrorHandler`.
     installRootErrorHandler(config.app);
+
+    // The other half of it: a path under `basePath` that matches no route is not
+    // a throw, so `onError` never sees it and it came back `404 Not Found` as
+    // `text/plain` — the one shape no caller handles, on the 404 a typo'd
+    // collection or function name produces.
+    installUnmatchedApiEnvelope(config.app, basePath);
 
     // Configure Hono middlewares (Request ID, body limit, CSRF, CORS warning, logging)
     configureMiddlewares(config.app, basePath, isProduction, config);
@@ -2072,6 +2078,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
             liveSchemaRouter.route("/", createLiveSchemaRoutes({
                 commitPaths,
+                // The reason source editing is off, when it is — carried across
+                // rather than inferred.
+                //
+                // The two aliases of this status disagreed, and the admin calls
+                // both on every page load: `/api/schema-editor/status` said
+                // `SCHEMA_EDITOR_DISABLED` while `/api/admin/schema/status`
+                // said `SCHEMA_EDITOR_MISSING_DEPENDENCY` and named `ts-morph`
+                // — on a server where `ts-morph` resolves. `writeSource` is
+                // only set when the editor routes were built, which is skipped
+                // for *every* `schemaEditorOff` reason, so all of them were
+                // reported as the missing dependency. One reason, the true one.
+                sourceEditingOff: schemaEditorOff,
                 // Only answerable for a project on this machine. A deployment
                 // committing to a remote repository is a built bundle, which is
                 // provisioned by boot-ensure rather than by replaying
@@ -2311,14 +2329,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // Apply a permissive body limit specifically for the upload endpoint
         storageRouter.use("/upload", bodyLimit({
             maxSize: storageMaxSize,
-            onError: (c) => {
-                return c.json({
-                    error: {
-                        message: `File too large. Maximum upload size is ${Math.round(storageMaxSize / 1024 / 1024)}MB.`,
-                        code: "PAYLOAD_TOO_LARGE"
-                    }
-                }, 413);
-            }
+            onError: (c) => errorHandler(
+                new ApiError(
+                    413,
+                    "PAYLOAD_TOO_LARGE",
+                    `File too large. Maximum upload size is ${Math.round(storageMaxSize / 1024 / 1024)}MB.`
+                ),
+                c
+            ) as Response
         }));
 
         storageRouter.route("/", storageRoutes);
@@ -2833,7 +2851,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }));
         }
 
-        const fnRoutes = createFunctionRoutes(loadedFunctions, problems.length, `${basePath}/functions`);
+        const fnRoutes = createFunctionRoutes(loadedFunctions, problems, `${basePath}/functions`);
         functionsRouter.route("/", fnRoutes);
         config.app.route(`${basePath}/functions`, functionsRouter);
 
@@ -2879,14 +2897,23 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // that is neither does not even load the job files — importing them runs
     // whatever the author put at module scope.
     let cronScheduler: import("./cron").CronScheduler | undefined;
-    if (config.cronsDir && (surfaces.cron || ownership.cronScheduler)) {
+    // Whether the surface is *served* does not depend on there being a
+    // directory to serve from. `cronsDir` resolves only if the directory
+    // exists, and a scaffold ships `backend/functions/` and no `backend/crons/`
+    // — so the whole surface was never mounted, `GET /api/cron` answered 404,
+    // and Studio's Cron Jobs pane dead-ended on "Not Found" with a "Try again"
+    // that could never succeed. The argument three paragraphs down — mounted
+    // for the directory, not for the jobs in it, because an empty list is the
+    // honest answer — just stopped one level too early.
+    if (surfaces.cron || (config.cronsDir && ownership.cronScheduler)) {
         const { loadCronJobsWithDiagnostics } = await import("./cron/cron-loader");
         const { CronScheduler } = await import("./cron/cron-scheduler");
         const { createCronRoutes } = await import("./cron/cron-routes");
         const { createCronStore } = await import("./cron/cron-store");
 
-        const { jobs: loadedCronJobs, problems: cronProblems } =
-            await loadCronJobsWithDiagnostics(config.cronsDir);
+        const { jobs: loadedCronJobs, problems: cronProblems } = config.cronsDir
+            ? await loadCronJobsWithDiagnostics(config.cronsDir)
+            : { jobs: [], problems: [] };
 
         cronScheduler = new CronScheduler();
 
@@ -2942,12 +2969,19 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 count: loadedCronJobs.length,
                 path: `${basePath}/admin/cron`
             });
-        } else {
+        } else if (config.cronsDir) {
             logger.warn(
                 `Cron routes mounted at ${basePath}/admin/cron, but no jobs loaded from ${config.cronsDir}. ` +
                 (cronProblems.length > 0
                     ? `Nothing is scheduled — ${cronProblems.length} file(s) were skipped, see the messages above.`
                     : "The directory holds no .ts/.js cron files, so nothing is scheduled.")
+            );
+        } else {
+            // Not a warning: a project with no cron jobs is an ordinary
+            // project, and it is the common one on a fresh scaffold.
+            logger.debug(
+                `Cron routes mounted at ${basePath}/admin/cron. This project has no crons directory, `
+                + "so the list is empty."
             );
         }
     }

@@ -35,6 +35,7 @@ import { createAuthSchema } from "./schema/auth-schema";
 import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
+import { patchPgNumericToNumber } from "./utils/pg-numeric-number-patch";
 import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./schema/introspect-runtime";
 import { buildDrizzleTablesFromSchema, buildDrizzleRelationsFromSchema } from "./schema/dynamic-tables";
 import { detectConnectionPosture, ensureAppRole, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
@@ -546,6 +547,10 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             // when a native array column (text[], integer[], etc.) contains NULL.
             if (schemaTables) {
                 patchPgArrayNullSafety(schemaTables as Record<string, unknown>);
+                // A `number` property is a `numeric` column unless it declared
+                // itself integral, and Postgres sends `numeric` as text. Cast it
+                // back here, where every read path goes through.
+                patchPgNumericToNumber(schemaTables as Record<string, unknown>);
             }
 
             // Build schema-aware Drizzle connection

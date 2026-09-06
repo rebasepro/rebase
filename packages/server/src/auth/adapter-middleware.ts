@@ -26,6 +26,8 @@ import { scopeDataDriver } from "./rls-scope";
 import { validateApiKey } from "./api-keys/api-key-middleware";
 import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
+import { ApiError } from "../api/errors";
+import { refuse } from "./middleware";
 
 export interface AdapterAuthMiddlewareOptions {
     /** The auth adapter to delegate verification to. */
@@ -77,8 +79,7 @@ driver });
             authenticatedUser = await adapter.verifyRequest(c.req.raw);
         } catch (error) {
             // adapter.verifyRequest() threw — reject the request (fail closed)
-            return c.json({ error: { message: "Unauthorized",
-code: "UNAUTHORIZED" } }, 401);
+            return refuse(c, ApiError.unauthenticated("Unauthorized"));
         }
 
         if (authenticatedUser) {
@@ -100,8 +101,7 @@ code: "UNAUTHORIZED" } }, 401);
                 }));
             } catch (error) {
                 logger.error("[AUTH-ADAPTER] RLS scoping failed for authenticated user", { error: error });
-                return c.json({ error: { message: "Internal authentication error",
-code: "INTERNAL_ERROR" } }, 500);
+                return refuse(c, ApiError.internal("Internal authentication error"));
             }
         } else {
             // Token present but invalid — always reject, regardless of
@@ -121,8 +121,7 @@ code: "INTERNAL_ERROR" } }, 500);
             // may authenticate by cookie, and "no credential" is not "a bad
             // credential".
             if (presentedToken !== undefined) {
-                return c.json({ error: { message: "Invalid or expired token",
-code: "UNAUTHORIZED" } }, 401);
+                return refuse(c, ApiError.unauthenticated("Invalid or expired token"));
             }
 
             // Not authenticated — scope as anon for RLS evaluation
@@ -131,8 +130,7 @@ code: "UNAUTHORIZED" } }, 401);
 roles: ["anon"] }));
             } catch (error) {
                 logger.error("[AUTH-ADAPTER] Failed to create anon-scoped driver", { error: error });
-                return c.json({ error: { message: "Server configuration error",
-code: "INTERNAL_ERROR" } }, 500);
+                return refuse(c, ApiError.internal("Server configuration error"));
             }
         }
 
@@ -141,15 +139,11 @@ code: "INTERNAL_ERROR" } }, 500);
         // whose author wrote `access: "public"` reads as broken RLS, and the two
         // paths must not explain the same gate differently.
         if (enforceAuth && !c.get("user")) {
-            return c.json({
-                error: {
-                    message:
-                        "Unauthorized: Authentication required. This is the API-level gate, not a row " +
-                        "rule — a collection granting public reads still needs a caller. Set " +
-                        "AUTH_REQUIRE=false (or `auth.requireAuth: false`) to let RLS alone decide.",
-                    code: "UNAUTHORIZED"
-                }
-            }, 401);
+            return refuse(c, ApiError.unauthenticated(
+                "Unauthorized: Authentication required. This is the API-level gate, not a row " +
+                "rule — a collection granting public reads still needs a caller. Set " +
+                "AUTH_REQUIRE=false (or `auth.requireAuth: false`) to let RLS alone decide."
+            ));
         }
 
         return next();

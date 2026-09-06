@@ -82,6 +82,54 @@ export class DatabasePoolManager {
         return this.pools.has(databaseName);
     }
 
+    /**
+     * Does this server serve exactly one database?
+     *
+     * The managed development database is PGlite, and PGlite serves exactly
+     * one. `CREATE DATABASE "rb_feature" TEMPLATE "postgres"` there writes a
+     * `pg_database` catalogue row and nothing else: nothing errors, the row is
+     * listable, `pg_database_size` answers — and connecting to the "branch"
+     * lands you in the parent. Every write made in the belief that it is
+     * sandboxed goes to the developer's real development database.
+     *
+     * The CLI already refuses `rebase db branch` on this ground, but it does it
+     * by parsing argv, so Studio — which reaches `BranchService` over the
+     * websocket — walked straight past it. The connection is the only thing
+     * both callers share, so the answer belongs here.
+     *
+     * Measured, not assumed: `select version()` over the PGlite socket returns
+     * `PostgreSQL 18.3 (PGlite 0.5.6) on wasm32-…`, which is how a wasm build
+     * announces itself and what `dev-db/constraints.ts` documents. A real
+     * Postgres never carries `(PGlite `.
+     *
+     * Cached, because a live connection cannot change engine underneath us, and
+     * a `PostgresBackendDriver` — which builds a `BranchService` — is
+     * constructed per transaction.
+     */
+    public servesOneDatabase(): Promise<boolean> {
+        this.oneDatabaseProbe ??= this.probeOneDatabase();
+        return this.oneDatabaseProbe;
+    }
+
+    private oneDatabaseProbe?: Promise<boolean>;
+
+    private async probeOneDatabase(): Promise<boolean> {
+        try {
+            const result = await this.getPool(this.defaultDatabaseName)
+                .query<{ version: string }>("SELECT version() AS version");
+            return /\(PGlite\b/i.test(result.rows[0]?.version ?? "");
+        } catch (err) {
+            // Fail open, and do not cache the failure. The cost of a wrong
+            // "yes" is refusing branching on a real Postgres that momentarily
+            // could not answer; the cost of a wrong "no" is one fake branch,
+            // which is what this exists to prevent — but a server that cannot
+            // run `select version()` is not one we can conclude anything about.
+            this.oneDatabaseProbe = undefined;
+            logger.warn("[DatabasePoolManager] Could not read the server version", { error: err });
+            return false;
+        }
+    }
+
     public async shutdown(): Promise<void> {
         const promises = [];
         for (const [dbName, pool] of this.pools.entries()) {

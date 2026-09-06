@@ -1,5 +1,5 @@
 ---
-sourceHash: f3023e081dcc3e4a
+sourceHash: 6bc50ef7860bac7d
 title: Sincronización Offline y Local-First
 sidebar_label: Offline
 description: Active el motor de sincronización local-first del SDK del Cliente de Rebase — una base de datos local de filas, escrituras offline instantáneas con reversión y consultas en vivo reactivas.
@@ -68,7 +68,9 @@ const post = await client.data.posts.create({ title: "Draft", status: "draft" })
 const drafts = await client.data.posts.where("status", "==", "draft").find();
 ```
 
-Las filas creadas offline reciben un id generado por el cliente. Si el servidor asigna el suyo al reproducirlas, la fila local y cualquier escritura en cola que aún apunte al id temporal se trasladan al id real.
+Las filas creadas offline reciben un id generado por el cliente, del tipo que ya tienen los ids de la colección: un **entero negativo** donde son números, una cadena UUID donde son cadenas. El signo es la señal — una clave real nunca es negativa —, así que una fila que aún no ha llegado al servidor se reconoce sin consultar nada, e `id` sigue siendo lo que dice el tipo `Row` generado. En una colección que este dispositivo nunca ha leído no hay nada local de donde deducir el tipo, y el id es un UUID.
+
+Si el servidor asigna el suyo al reproducirlas, la fila local y cualquier escritura en cola que aún apunte al id temporal se trasladan al id real. Hasta entonces, no guarde un id temporal fuera de la base de datos offline: una clave foránea o una URL guardada que lo contenga apunta a una fila que está a punto de renumerarse.
 
 Las escrituras se reproducen en el orden en que las hizo, entre colecciones — así que una creación en una colección sigue llegando antes que la fila de otra que la referencia.
 

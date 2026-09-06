@@ -11011,8 +11011,9 @@ the ID you got. Read the response header.
 | `INVALID_CREDENTIALS` | 401 | Wrong email or password — deliberately not saying which. | Retry, or reset the password. |
 | `INVALID_TOKEN` | 400 | A verification, reset or magic-link token is malformed or unknown. | Request a fresh link. |
 | `LAST_ADMIN` | 403 | The change would leave the project with no admin. | Promote someone else first. |
-| `NOT_ANONYMOUS` | 400 | An upgrade-from-anonymous route was called by a real account. | Nothing to upgrade. |
+| `MFA_REQUIRED` | 401 | The password was right and the account has a verified second factor, so sign-in is only half done. `details` carries a short-lived token scoped to the MFA challenge — it is not a session. | Open a challenge and answer it; the challenge response issues the session. |
 | `NO_SESSION` | 401 | No session cookie or refresh token was presented. Normal on a first page load. | Sign in. |
+| `NOT_ANONYMOUS` | 400 | An upgrade-from-anonymous route was called by a real account. | Nothing to upgrade. |
 | `OAUTH_ERROR` | 401 | The OAuth provider refused, or returned an error. | Retry the flow; the message carries the provider's reason. |
 | `RATE_LIMITED` | 429 | Too many attempts from this caller. | Back off; the message says for how long. |
 | `REDIRECT_URI_NOT_ALLOWED` | 400 | The redirect target is not on the allow-list. | Add it to the provider configuration. |
@@ -11034,27 +11035,77 @@ the ID you got. Read the response header.
 | `AGGREGATE_NOT_SUPPORTED` | 501 | This driver cannot compute the requested aggregate. | Use a driver that can, or compute it in the client. |
 | `BULK_TOO_LARGE` | 400 | The bulk body exceeds the configured item limit. | Split the request. |
 | `BULK_UNSUPPORTED` | 400 | This collection or driver does not support bulk writes. | Write the rows one at a time. |
+| `CALLBACK_REJECTED` | 400 | A collection callback refused the write. A `throw` from `beforeSave`/`beforeDelete`/`after*` is a 400 carrying the author's own message; a `beforeDelete` that returns `false` is a 403. `details.stage` names which callback, `details.path` the collection. | Read the message — it was written by this project, not by Rebase. |
 | `DB_PERMISSION_DENIED` | 500 | Postgres refused the statement (`42501`): either a row-level-security policy denying this role, or a missing `GRANT`. | See [Troubleshooting](/docs/troubleshooting/). |
 | `IDEMPOTENCY_KEY_IN_PROGRESS` | 409 | An earlier request with the same `Idempotency-Key` is still running. | Retry once it finishes. |
 | `IDEMPOTENCY_KEY_REUSED` | 422 | The same `Idempotency-Key` arrived with a different body. | Use a new key, or send the original body. |
+| `INVALID_AGGREGATE_FUNCTION` | 400 | `?select=` named a function that is not `count`, `sum`, `avg`, `min` or `max`. | Use one of those; the message lists them. |
+| `INVALID_AGGREGATE_SELECT` | 400 | An `?select=` entry is not `fn(field)`, or a function other than `count()` was given no field. | Write `sum(total)`, `count()`, `avg(score)`. |
 | `INVALID_BULK_BODY` | 400 | The bulk body is not the expected shape. | Send the documented `items` array. |
 | `INVALID_FILTER_FIELD` | 400 | The filter names a property this collection does not have. | Check the spelling against the collection. |
 | `INVALID_FILTER_OPERATOR` | 400 | The operator is not one this property type supports. | See [Querying data](/docs/sdk/querying/). |
+| `INVALID_FILTER_VALUE` | 400 | A filter value cannot be read as the type of the column it was compared against: `?id=eq.abc` on an integer key, a label that is not in the enum, a timestamp that is not one, a number past the type's range. `details.dbCode` carries the SQLSTATE. | Send a value of the column's type. |
 | `INVALID_INPUT` | 400 | The body failed validation. | See the message. |
 | `INVALID_LIMIT` | — | A realtime subscription asked for a limit outside the allowed range. Delivered as a WebSocket `ERROR` frame, not an HTTP response. | Lower the limit. |
+| `INVALID_LOGICAL_GROUP` | 400 | An `?or=` / `?and=` group is malformed or nested past the allowed depth. | See the message; it shows the flattening rule. |
+| `INVALID_OFFSET` | 400 | `?offset=` is not a whole number of 0 or more. | Send a non-negative integer. |
+| `INVALID_ORDER_BY` | 400 | `?orderBy=` is not `field`, `field:desc`, or a JSON array of `{ field, direction }`. | See the message; it shows all three spellings. |
+| `INVALID_PAGE` | 400 | `?page=` is not a whole number of 1 or more. Pages are 1-based, so `?page=0` is a mistake rather than the first page. | Send `1` or higher, or use `?offset=`. |
 | `INVALID_PARAM` | 400 | A query parameter is malformed. | See the message. |
-| `NOT_FOUND` | 404 | No row with that id in that collection — or one that row-level security hides from this caller. | Check the id, then the collection's `securityRules`. |
+| `INVALID_VECTOR` | 400 | `?vector=` is not a JSON array of numbers. | Send `[0.1,0.2,0.3]`. |
+| `INVALID_VECTOR_DISTANCE` | 400 | `?vector_distance=` is not `cosine`, `l2` or `inner_product`. | Use one of those three. |
+| `INVALID_VECTOR_THRESHOLD` | 400 | `?vector_threshold=` is not a number. | Send a number. |
+| `INVALID_WHERE` | 400 | `?where=` is not a JSON object mapping fields to conditions. | Send `{"status":["==","active"]}`. |
+| `MISSING_AGGREGATE_SELECT` | 400 | The aggregate route was called with no `?select=`. | Add one, e.g. `?select=count()`. |
 | `NO_COLLECTIONS` | 404 | The project serves no collections: none declared in code, and no tables to derive them from. | Create tables — a migration, SQL, or a collection file plus `rebase db push` — and restart. |
+| `NOT_FOUND` | 404 | No row with that id in that collection — or one that row-level security hides from this caller. | Check the id, then the collection's `securityRules`. |
 | `ORDER_BY_FIELD_NOT_SORTABLE` | 400 | The sort names a property that is not sortable. | Sort on a column-backed property. |
 | `PAYLOAD_TOO_LARGE` | 413 | The body exceeds the configured limit. | Send less, or raise the limit. |
 | `READ_ONLY_TRANSACTION` | 409 | An `afterRead` callback tried to write. A request-scoped read runs in a `READ ONLY` transaction, so neither the callback nor anything it calls may write. | Move the write out of the read: a background job, or `rebase.dataAsAdmin` from a cron job or a custom function. |
+| `RELATION_MISCONFIGURED` | 500 | A relation does not resolve against the registered schema. The operation is refused rather than skipped: dropping it would report success for a write that never happened, or emptiness for rows that exist. | Run `rebase schema generate` if the generated schema is older than the database. |
 | `RELATION_NOT_UNLINKABLE` | 400 | The relation cannot be unlinked from this side. | Write from the owning side. |
 | `RELATION_NOT_WRITABLE` | 400 | The nested path is not a writable relation. | See [Relations](/docs/collections/relations/). |
 | `RELATION_SOURCE_KEY_EMPTY` | 400 | A relation write had no source key to hang the link on. | Save the parent row first. |
 | `SCHEMA_DRIFT` | 500 | A table or column the code expects does not exist in the database. | `rebase db push` in development; redeploy on a managed tenant. |
+| `SCORE_CURSOR_UNSUPPORTED` | 400 | `startAfter` was combined with `orderBy: "_score"`. Relevance is computed per query rather than stored, so it cannot key a cursor. | Page relevance with `limit`/`offset`, or order by a column. |
+| `UNKNOWN_AGGREGATE_FIELD` | 400 | An aggregate or `groupBy` names a field the collection does not have. | Check the spelling; the message lists the valid fields. |
+| `UNKNOWN_FILTER_FIELD` | 400 | The filter names a field this collection — or a relation's target — does not have. | Check the spelling; the message lists the valid fields. |
+| `UNKNOWN_FILTER_OPERATOR` | 400 | The filter names an operator that does not exist. | The message lists every operator. |
+| `UNKNOWN_ORDER_BY_FIELD` | 400 | The sort names a field this collection does not have. | Check the spelling; the message lists the valid fields. |
+| `UNKNOWN_RESPONSE_FIELD` | 400 | `?fields=` asks for a field the collection does not have. | Check the spelling; the message lists the known fields. |
+| `UNKNOWN_VECTOR_PROPERTY` | 400 | A vector search named a property that is not a `vector` on this collection. | The message lists the collection's vector properties. |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | The `Content-Type` is not one this route accepts. | Send the type the route documents. |
+| `UNSUPPORTED_RELATION_FILTER` | 400 | The filter crosses a `via` relation, whose join path is authored one way only, so there is nothing to correlate a subquery back to. | Filter from the owning side. |
+| `UNSUPPORTED_RELATION_FILTER_OPERATOR` | 400 | The operator is not defined for that field: a relation with no column on this row is filtered by membership, and case-insensitive matching only applies to text. | See the message; it lists what the field accepts. |
+| `VALIDATION_CONSTRAINT` | 400 | A value broke a `validation` rule the property declares — a length, a range, a pattern, a required field. | See the message; it names each violation. |
+| `VALIDATION_EXCLUDED_FIELDS` | 400 | The body writes a column marked `excludeFromApi`. Those are the server's to set — a password hash, a verification token. | Remove the field. |
 | `VALIDATION_INVALID_VALUE` | 400 | A value does not fit its property type. | See the message; it names the property. |
+| `VALIDATION_UNKNOWN_FIELDS` | 400 | The body names a field the collection does not have — including an `id` argument on a collection keyed on something else. | Check the spelling; the message lists the known fields. |
 | `WRITE_DENIED` | 403 | A security rule or row-level-security policy refused the write. | Check the collection's `securityRules`. |
+
+### `PG_<SQLSTATE>` — a constraint the database refused
+
+A write that Postgres rejects for a reason that is *the caller's data* answers
+with the SQLSTATE in the code: `PG_23505`, `PG_23503`, and so on. That is a
+family, not a list — Postgres defines hundreds of SQLSTATEs — but only two
+classes ever reach it, because only those two are the caller's fault:
+
+- **class 23**, integrity constraint violation: a duplicate, a foreign key that
+  points at nothing, a NOT NULL column left empty;
+- **class 22**, data exception: a value the column's type cannot hold.
+
+Everything else — a dropped connection, a missing column, a privilege problem —
+is the server's, and stays a `500`. So `code.startsWith("PG_")` is a safe test
+for "the row I sent was wrong", and the four below are the ones a client
+actually meets. `details.dbCode` carries the same SQLSTATE for all of them, and
+the message names the constraint.
+
+| Code | Status | Means | Do |
+| --- | --- | --- | --- |
+| `PG_22P02` | 400 | A value could not be read as the column's type — the write-side twin of `INVALID_FILTER_VALUE`. | Send a value of the column's type. |
+| `PG_23502` | 400 | A `NOT NULL` column was left empty. | Send the field, or give the column a default. |
+| `PG_23503` | 400 | A foreign key points at a row that does not exist. | Create the target row first, or fix the id. |
+| `PG_23505` | 409 | A unique constraint was violated. The message names the constraint. | Use a different value, or update the existing row. |
 
 ### Storage
 
@@ -11067,12 +11118,13 @@ the ID you got. Read the response header.
 | `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | The storage source is declared but has no credentials here. | Set that source's environment variables. |
 | `STORAGE_WRITE_FAILED` | 502 | The storage backend refused or dropped the write. | Check its own logs and credentials. |
 | `TRANSFORM_OVERLOADED` | 503 | Too many image transforms are in flight. | Retry; consider a CDN in front. |
-| `UNKNOWN_STORAGE_SOURCE` | 400 | The request named a storage source this project does not declare. | Declare it in `config/resources.ts`. |
+| `UNKNOWN_STORAGE_SOURCE` | 400 | The request named a storage source (`?storageId=`) this project does not declare. A `bucket` this deployment does not serve is the same code at **404** — the store is what is missing, and `details` names the buckets and the sources that do exist. Both used to come back as "file not found", identical to a key that is simply absent. | Declare the source in `config/resources.ts`, or check `GET /api/storage/sources`. |
 
 ### Custom functions
 
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
+| `FUNCTION_NOT_FOUND` | 404 | No function of that name is served — or one is, and its own routes do not cover the path after it. A signed-in caller is also told what *is* served; an anonymous one is not, because that list is an inventory of every custom endpoint. When a file of that name failed to load, the message says so: that is the difference between a typo and a broken deploy. | Check the name against `GET /api/functions`, or the boot log for a file that did not load. |
 | `FUNCTION_TIMEOUT` | 504 | The handler exceeded its timeout. It is still running; it cannot be cancelled from here. | Give outbound calls an `AbortSignal`, or raise `REBASE_FUNCTIONS_TIMEOUT_MS`. |
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | This process proxies functions to another one, which did not answer. | Check that the functions unit is running. |
 
@@ -11088,12 +11140,14 @@ so a panel can grey the feature out instead of showing an error.
 | `CONTRACT_UNAVAILABLE` | 404 | The project contract is served only when authentication is configured — it describes every table and relation. | Configure auth. `/meta/schema-version` is always served. |
 | `DEV_MAILBOX_UNAVAILABLE` | 501 | No development mailbox is active. Mail is captured only when `SMTP_HOST` is unset and `NODE_ENV` is not production. | Unset `SMTP_HOST` in development, or read the real inbox. |
 | `INVALID_CHANGE` | 400 | The proposed schema change is not well-formed. | See the message. |
+| `SCHEMA_CHANGE_FAILED` | 400 | Applying a planned schema change failed for a reason more specific codes do not cover. | See the message; it is the underlying failure verbatim. |
 | `SCHEMA_CHANGE_UNAPPLICABLE` | 400 | The change is valid and cannot be applied to the schema as it stands. | See the message. |
+| `SCHEMA_EDIT_DIRTY_TREE` | 409 | The repository has uncommitted changes, so the edit could not be applied safely. | Commit or stash, then retry. |
+| `SCHEMA_EDIT_REFUSED` | 400 | The schema editor refused the edit. | See the message; it is the editor's own refusal. |
+| `SCHEMA_EDIT_REQUIRES_A_PERSON` | 403 | An API key or other machine principal tried to apply a schema change. | Sign in as a user, or set `liveSchema.allowMachineApply`. |
 | `SCHEMA_EDITING_NO_COLLECTIONS_DIR` | 501 | Live schema editing needs `collectionsDir` or `liveSchema.repository`, and this server was started with neither. | Configure one. |
 | `SCHEMA_EDITING_NO_REPOSITORY` | 503 | Planning works; there is no repository to commit the change to. | Configure `liveSchema.repository`. |
 | `SCHEMA_EDITING_UNSUPPORTED` | 503 | This driver cannot plan schema changes. | Live editing is available on Postgres. |
-| `SCHEMA_EDIT_DIRTY_TREE` | 409 | The repository has uncommitted changes, so the edit could not be applied safely. | Commit or stash, then retry. |
-| `SCHEMA_EDIT_REQUIRES_A_PERSON` | 403 | An API key or other machine principal tried to apply a schema change. | Sign in as a user, or set `liveSchema.allowMachineApply`. |
 | `SCHEMA_EDITOR_BAAS_MODE` | 501 | Collections are introspected from the database here, so there are no source files to edit. | Change the schema with a migration. |
 | `SCHEMA_EDITOR_DISABLED` | 501 | The schema editor is turned off for this server. | Turn it on with `schemaEditor`. |
 | `SCHEMA_EDITOR_MISSING_DEPENDENCY` | 501 | The schema editor needs `ts-morph`, which is not installed. | `pnpm add -D ts-morph@28.0.0`. |
@@ -11117,9 +11171,18 @@ A route uses one of these when nothing more specific applies.
 ### Keeping this page true
 
 `pnpm verify:docs` fails when a code the server can raise is missing from these
-tables, when a table lists a code nothing can raise, or when a stated status
-disagrees with the source. The stage is
+tables, when a table lists a code nothing can raise, when a stated status
+disagrees with the source, or when a code family like `PG_<SQLSTATE>` has no row
+for a SQLSTATE callers meet. The stage is
 `tooling/scripts/docs-verify/check-error-codes.mjs`.
+
+It checks itself first. The scan reads codes out of TypeScript rather than out of
+a running server, so its blind spots are silent by construction: it once could
+not see a code passed through a one-line wrapper, or one written after a message
+containing a `)`, and reported "every code the server can raise is documented"
+over a page missing seventeen of them. So the stage runs a fixture of exactly
+those shapes before it reads this page, and refuses to report anything if it
+cannot see them.
 
 ## Endpoint index
 
@@ -12190,7 +12253,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `GET` | `/api/auth/sessions` | List the caller's active sessions (refresh tokens) |
 | `DELETE` | `/api/auth/sessions` | Revoke every session, this one included — remote logout on every device |
 | `DELETE` | `/api/auth/sessions/:id` | Revoke one session |
-| `GET` | `/api/auth/jwks.json` | The public JWKS, when [asymmetric signing](#asymmetric-tokens-and-jwks) is configured |
+| `GET` | `/.well-known/jwks.json` | The public JWKS — mounted at the root, not under `basePath`, because that is where a verifier looks. Present when [asymmetric signing](#asymmetric-tokens-and-jwks) is configured |
 | `POST` | `/api/auth/mfa/enroll` | Start TOTP enrolment (returns the secret and recovery codes) |
 | `POST` | `/api/auth/mfa/verify` | Confirm an enrolment with a code from the authenticator |
 | `GET` | `/api/auth/mfa/factors` | List the caller's enrolled factors |
@@ -12824,14 +12887,45 @@ image: {
 |--------|------|-------------|
 | `POST` | `/api/storage/upload` | Direct file upload |
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload to a specific named backend |
-| `GET` | `/api/storage/files/:path` | Retrieve a file |
-| `GET` | `/api/storage/files/:path?storageId=<key>` | Retrieve a file from a specific backend |
-| `DELETE` | `/api/storage/files/:path` | Delete a file |
+| `GET` | `/api/storage/file/*` | Retrieve a file — everything after `/file/` is the object key |
+| `GET` | `/api/storage/file/*?storageId=<key>` | Retrieve a file from a specific backend |
+| `GET` | `/api/storage/metadata/*` | Size, content type and last modification of one object, without its bytes |
+| `DELETE` | `/api/storage/file/*` | Delete a file |
+| `GET` | `/api/storage/list` | List objects under a prefix (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`) |
+| `POST` | `/api/storage/folder` | Create an empty folder marker |
+| `GET` | `/api/storage/sources` | The storage sources this backend serves, by key |
 | `OPTIONS` | `/api/storage/tus` | Query supported TUS protocol capabilities |
 | `POST` | `/api/storage/tus` | Initiate a resumable TUS upload session |
 | `HEAD` | `/api/storage/tus/:id` | Check upload progress (byte offset) |
 | `PATCH` | `/api/storage/tus/:id` | Append data chunk to temporary file |
 | `DELETE` | `/api/storage/tus/:id` | Terminate/abort TUS upload session |
+
+**What they answer.** One envelope, the same one `/api/data` uses: the payload
+is under `data`, and a failure is `{ "error": { message, code, requestId } }`
+with the codes on the [error reference](/docs/backend/errors/). `/api/storage/file/*`
+is the exception, because its payload is the file — it answers the bytes, with
+`Content-Type`, `Content-Length` and the caching headers.
+
+```json
+// GET /api/storage/list?prefix=products/images/
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+```
+
+`POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }`
+of the stored object under `data`; `GET /api/storage/metadata/*` the object's
+metadata and, for a private object, the short-lived `token`;
+`GET /api/storage/sources` the array of configured sources.
+`DELETE /api/storage/file/*` and `POST /api/storage/folder` carry only a
+`message`, since there is nothing to return.
+
+**How a file read is authorized.** The read routes — `/api/storage/file/*` and
+`/api/storage/metadata/*` — take the short-lived signed token that
+[`getSignedUrl()`](/docs/sdk/storage) mints, passed as `?token=<token>` or as a
+`Bearer`. An ordinary access JWT is **refused** on `/file/*` with `401
+Unauthorized: Access JWT not allowed on file routes`: the token that works on
+every other route does not work there, on purpose, because a file URL is
+something you hand to a browser, a CDN or an `<img>` tag. Every other row above
+takes the access JWT as usual.
 
 ### On-the-Fly Image Transformations
 
@@ -12839,7 +12933,7 @@ Rebase includes a built-in image processing pipeline powered by **Sharp**. When 
 
 ```bash
 # Serve image scaled to 300px width in webp format
-GET /api/storage/files/products/laptop.jpg?width=300&format=webp
+GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 ```
 
 #### Supported Parameters
@@ -14112,7 +14206,7 @@ channel.onError((error) => {
 
 | Code | Means |
 |------|-------|
-| `CHANNEL_FORBIDDEN` | An authorizer refused the join, broadcast or history read |
+| `CHANNEL_FORBIDDEN` | You are not a member of the channel — join it before broadcasting or reading its history |
 | `RATE_LIMITED` | Past the channel frame budget above |
 | `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
 | `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
@@ -20143,10 +20237,21 @@ migrated to `"cms"` on read.
 
 A visual schema editor that lets you create and modify collections through a drag-and-drop UI. When you save changes, it uses [ts-morph](https://ts-morph.com/) to update your TypeScript source files via AST manipulation — preserving all existing code and custom logic. It is the screenshot at the top of this page.
 
+The editor is on wherever Studio is mounted — a scaffold's `<RebaseStudio/>` is
+enough, and there is no prop to add. `collectionEditor` tunes it rather than
+turning it on:
+
 ```tsx
 
-// The Collection Editor is automatically enabled when you provide the 
-// collectionEditor configuration to your RebaseCMS component
+// Studio is mounted, so the Collection Editor is available. Nothing else
+// is needed for it.
+<Rebase>
+    <RebaseCMS collections={collections}/>
+    <RebaseStudio/>
+</Rebase>
+
+// `collectionEditor` is for fine-tuning — a read-only editor, a different
+// token — not for opting in.
 <RebaseCMS
     collections={collections}
     collectionEditor={{
@@ -20154,6 +20259,12 @@ A visual schema editor that lets you create and modify collections through a dra
     }}
 />
 ```
+
+Whether a *save* lands is the server's decision, not the panel's: the editor
+rewrites collection source files, so it is off under `NODE_ENV=production`, in
+`baas` mode, and on a server with no `collectionsDir`. The panel asks
+`GET /api/schema-editor/status` and shows the reason it gets back beside the
+disabled button.
 
 #### Built-in tools
 
@@ -20200,11 +20311,11 @@ between replicas, and a restart empties it. For anything you need to keep, read
 the process's stdout, which carries the same lines and more.
 
 The **Collection Editor** is a Studio tool too, but it is not in this list because
-it is registered differently: `RebaseStudio` does not lazy-load it. The panel injects
-it when `RebaseCMS` is given a `collectionEditor` prop, because unlike the tools
-above it needs the project's collection source at hand to write back to. That is a
-difference in how it is mounted, not in what it is — it edits schema, and it belongs
-beside the SQL and RLS editors.
+it is registered differently: `RebaseStudio` does not lazy-load it. The panel mounts
+it wherever Studio is registered, because unlike the tools above it needs the
+project's collection source at hand to write back to. That is a difference in how it
+is mounted, not in what it is — it edits schema, and it belongs beside the SQL and
+RLS editors.
 
 ### Turning Studio on
 
@@ -27301,7 +27412,9 @@ const post = await client.data.posts.create({ title: "Draft", status: "draft" })
 const drafts = await client.data.posts.where("status", "==", "draft").find();
 ```
 
-Rows created offline get a client-generated id. If the server assigns its own on replay, the local row and any queued writes still pointing at the temporary id are moved to the real one.
+Rows created offline get a client-generated id, in the type the collection's ids already have: a **negative integer** where they are numbers, a UUID string where they are strings. The sign is the tell — a real key is never negative — so a row that has not reached the server yet is recognisable without a lookup, and `id` still typechecks as whatever the generated `Row` says it is. On a collection this device has never read there is nothing local to read the type off, and the id is a UUID.
+
+If the server assigns its own on replay, the local row and any queued writes still pointing at the temporary id are moved to the real one. Until then, do not persist a temporary id anywhere outside the offline database — a foreign key or a bookmarked URL holding one points at a row that is about to be renumbered.
 
 Writes replay in the order you made them, across collections — so a create in one collection still lands before the row in another that references it.
 
@@ -27483,7 +27596,7 @@ const result = await client.storage.putObject({
     }
 });
 
-// result: { key: string, url: string, ... }
+// result: { key: string; bucket: string; storageUrl: string }
 ```
 
 #### From a File Input

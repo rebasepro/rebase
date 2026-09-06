@@ -69,7 +69,7 @@ Questo è tutto. Rebase farà quanto segue:
 2. Registra ogni export di default come lavoro cron
 3. Crea automaticamente la tabella `rebase.cron_logs` in PostgreSQL (se il driver supporta SQL)
 4. Avvia lo scheduler e inizializza i contatori dai log DB esistenti
-5. Monta le rotte REST di amministrazione su `/api/cron`
+5. Monta le rotte REST di amministrazione su `/api/admin/cron`
 
 ## Sintassi della pianificazione
 
@@ -153,18 +153,18 @@ Tutte le rotte cron richiedono **autenticazione amministrativa** (`requireAuth` 
 
 | Metodo | Percorso | Descrizione |
 |---|---|---|
-| `GET` | `/api/cron` | Elenca tutti i lavori cron registrati |
-| `GET` | `/api/cron/:id` | Ottieni lo stato di un singolo lavoro |
-| `POST` | `/api/cron/:id/trigger` | Attiva manualmente un lavoro |
-| `GET` | `/api/cron/:id/logs` | Ottieni la cronologia di esecuzione (`?limit=N`) |
-| `PUT` | `/api/cron/:id` | Abilita/disabilita un lavoro (`{ "enabled": true }`) |
+| `GET` | `/api/admin/cron` | Elenca tutti i lavori cron registrati |
+| `GET` | `/api/admin/cron/:id` | Ottieni lo stato di un singolo lavoro |
+| `POST` | `/api/admin/cron/:id/trigger` | Attiva manualmente un lavoro |
+| `GET` | `/api/admin/cron/:id/logs` | Ottieni la cronologia di esecuzione (`?limit=N`) |
+| `PUT` | `/api/admin/cron/:id` | Abilita/disabilita un lavoro (`{ "enabled": true }`) |
 
 ### Esempio: Elenca tutti i lavori
 
 `$TOKEN` è un token di accesso amministratore: accedi e usa l'`accessToken` restituito dalla risposta di login. `$API_URL` è l'URL stampato da `rebase dev` — la porta è derivata dal progetto e non è fissa.
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"
+curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/admin/cron"
 ```
 
 ```json
@@ -190,7 +190,7 @@ curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    "$API_URL/api/cron/health-check/trigger"
+    "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
 ## SDK del client
@@ -237,7 +237,7 @@ Quando il driver del database supporta SQL (ad es. PostgreSQL), i log di esecuzi
 
 - La cronologia di esecuzione **sopravvive ai riavvii del server** e ai deploy
 - I contatori `totalRuns` e `totalFailures` vengono **inizializzati dal database** all'avvio
-- L'endpoint `/api/cron/:id/logs` interroga il database, non solo la memoria
+- L'endpoint `/api/admin/cron/:id/logs` interroga il database, non solo la memoria
 - Più istanze server condividono la stessa cronologia di esecuzione
 
 La tabella viene creata automaticamente al primo avvio — nessuna migrazione necessaria.

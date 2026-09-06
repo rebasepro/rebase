@@ -287,7 +287,7 @@ export function DrawerLogo({
             <Link
                 className="shrink-0 flex items-center justify-center w-[56px] h-[40px]"
                 to={logoDestination}
-                aria-label={t("home") || "Home"}
+                aria-label={t("home", { defaultValue: "Home" })}
             >
                 {logo
                     ? <img src={logo} alt="Logo" className="w-[28px] h-[28px] object-contain"/>
@@ -525,7 +525,7 @@ export function DrawerFooterActions({
                                 )}
                                 role="button"
                                 tabIndex={0}
-                                aria-label={t("user_menu") || "User menu"}
+                                aria-label={t("user_menu", { defaultValue: "User menu" })}
                             >
                                 {avatarComponent}
                             </div>
@@ -567,7 +567,7 @@ export function DrawerFooterActions({
                                 trigger={
                                     <IconButton
                                         color="inherit"
-                                        aria-label={t("toggle_theme") || "Toggle theme"}
+                                        aria-label={t("toggle_theme", { defaultValue: "Toggle theme" })}
                                         className="text-surface-500 dark:text-surface-400"
                                     >
                                         {mode === "dark"

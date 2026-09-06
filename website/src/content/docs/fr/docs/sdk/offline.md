@@ -1,5 +1,5 @@
 ---
-sourceHash: f3023e081dcc3e4a
+sourceHash: 6bc50ef7860bac7d
 title: Hors ligne et synchronisation local-first
 sidebar_label: Hors ligne
 description: Activez le moteur de synchronisation local-first du SDK Client de Rebase — une base de données locale de lignes, des écritures hors ligne instantanées avec annulation, et des requêtes en direct réactives.
@@ -68,7 +68,9 @@ const post = await client.data.posts.create({ title: "Draft", status: "draft" })
 const drafts = await client.data.posts.where("status", "==", "draft").find();
 ```
 
-Les lignes créées hors ligne reçoivent un id généré par le client. Si le serveur attribue le sien au moment du rejeu, la ligne locale et toutes les écritures en file d'attente qui pointent encore vers l'id temporaire sont basculées vers l'id réel.
+Les lignes créées hors ligne reçoivent un id généré par le client, dans le type que les ids de la collection ont déjà : un **entier négatif** là où ce sont des nombres, une chaîne UUID là où ce sont des chaînes. Le signe est l'indice — une vraie clé n'est jamais négative —, si bien qu'une ligne qui n'a pas encore atteint le serveur se reconnaît sans consultation, et `id` reste ce que le type `Row` généré annonce. Sur une collection que cet appareil n'a jamais lue, rien en local ne permet de déduire le type, et l'id est un UUID.
+
+Si le serveur attribue le sien au moment du rejeu, la ligne locale et toutes les écritures en file d'attente qui pointent encore vers l'id temporaire sont basculées vers l'id réel. D'ici là, ne conservez pas un id temporaire hors de la base hors ligne : une clé étrangère ou une URL mise en signet qui en contient un désigne une ligne sur le point d'être renumérotée.
 
 Les écritures sont rejouées dans l'ordre où vous les avez faites, toutes collections confondues — ainsi une création dans une collection arrive toujours avant la ligne d'une autre collection qui la référence.
 

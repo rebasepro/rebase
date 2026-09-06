@@ -22,11 +22,21 @@ Un editor di schema visuale che ti permette di creare e modificare collezioni tr
 
 ![Editor di collezioni](/img/collection_editor.png)
 
+L'editor è attivo ovunque sia montato Studio — il `<RebaseStudio/>` di uno scaffold basta, e non c'è alcuna prop da aggiungere. `collectionEditor` lo regola, non lo attiva:
+
 ```tsx
 import { RebaseCMS } from "@rebasepro/cms";
+import { RebaseStudio } from "@rebasepro/studio";
 
-// The Collection Editor is automatically enabled when you provide the 
-// collectionEditor configuration to your RebaseCMS component
+// Studio è montato, quindi l'editor delle collezioni è disponibile.
+// Non serve altro.
+<Rebase>
+    <RebaseCMS collections={collections}/>
+    <RebaseStudio/>
+</Rebase>
+
+// `collectionEditor` serve per la messa a punto — un editor in sola
+// lettura, un token diverso — non per attivarlo.
 <RebaseCMS
     collections={collections}
     collectionEditor={{
@@ -34,6 +44,8 @@ import { RebaseCMS } from "@rebasepro/cms";
     }}
 />
 ```
+
+Se un *salvataggio* vada a buon fine lo decide il server, non il pannello: l'editor riscrive i file sorgente delle collezioni, quindi è disattivato con `NODE_ENV=production`, in modalità `baas` e su un server senza `collectionsDir`. Il pannello interroga `GET /api/schema-editor/status` e mostra il motivo ricevuto accanto al pulsante disabilitato.
 
 ### Strumenti integrati
 

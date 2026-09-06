@@ -281,3 +281,86 @@ describe("when the editor cannot write, it says why", () => {
         expect(fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8")).toBe(before);
     }, BOOTS_A_BACKEND);
 });
+
+/**
+ * The admin panel calls both of these on every page load.
+ *
+ * `/api/schema-editor/status` is the source-editor's own status;
+ * `/api/admin/schema/status` is the live editor's, and it could only see that
+ * `writeSource` was unset — which is true for *every* reason the editor is off.
+ * So a server with `schemaEditor: false` told one caller "turned off for this
+ * server" and the other "needs `ts-morph`, which is not installed", on a server
+ * where `ts-morph` resolves. Two answers, one of them a wild-goose chase.
+ */
+describe("the two schema-editor statuses agree", () => {
+    /** A driver that can plan a schema change, which is what mounts the live routes. */
+    function planningBootstrapper(): BackendBootstrapper {
+        return {
+            type: "fake",
+            isDefault: true,
+            async initializeDriver(): Promise<InitializedDriver> {
+                return {
+                    driver: {
+                        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
+                        fetchEntity: async () => undefined,
+                        saveEntity: async () => ({}),
+                        deleteEntity: async () => undefined,
+                        countCollection: async () => 0,
+                        checkUniqueField: async () => true,
+                        healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
+                        // `isSchemaEditingAdmin` is structural: an admin that
+                        // can plan is one that has this method.
+                        admin: { planSchemaChange: async () => ({ verdict: "applies", statements: [] }) }
+                    },
+                    collections: undefined,
+                    internals: {}
+                } as unknown as InitializedDriver;
+            },
+            // `/api/admin/*` resolves roles from the auth repository on every
+            // request (a demoted admin must not keep an admin route), so the
+            // fake has to answer — unlike `/api/schema-editor`, which does not.
+            async initializeAuth() {
+                const authRepository = {
+                    getUserRoleIds: async (uid: string) => (uid === "admin-1" ? ["admin"] : []),
+                    getTokensValidAfter: async () => undefined
+                };
+                return { userService: authRepository, authRepository };
+            }
+        } as unknown as BackendBootstrapper;
+    }
+
+    async function liveStatus(app: Hono): Promise<Record<string, unknown>> {
+        const res = await app.request("/api/admin/schema/status", bearer(await adminToken()));
+        expect(res.status).toBe(200);
+        return await res.json() as Record<string, unknown>;
+    }
+
+    it("both say SCHEMA_EDITOR_DISABLED when the editor is turned off", async () => {
+        const app = await boot({
+            collectionsDir,
+            schemaEditor: false,
+            bootstrappers: [planningBootstrapper()]
+        });
+
+        expect((await status(app)).code).toBe("SCHEMA_EDITOR_DISABLED");
+
+        const live = await liveStatus(app);
+        expect(live.code).toBe("SCHEMA_EDITOR_DISABLED");
+        expect(String(live.reason)).toMatch(/turned off/);
+        // The regression: naming a dependency that is installed sends the
+        // reader to add a package they already have.
+        expect(String(live.reason)).not.toMatch(/ts-morph/);
+    }, BOOTS_A_BACKEND);
+
+    it("both name production when that is the reason", async () => {
+        process.env.NODE_ENV = "production";
+        const app = await boot({
+            collectionsDir,
+            bootstrappers: [planningBootstrapper()]
+        });
+
+        expect((await status(app)).code).toBe("SCHEMA_EDITOR_PRODUCTION");
+        expect((await liveStatus(app)).code).toBe("SCHEMA_EDITOR_PRODUCTION");
+    }, BOOTS_A_BACKEND);
+});
+

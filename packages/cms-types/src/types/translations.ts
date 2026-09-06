@@ -228,6 +228,10 @@ export interface RebaseTranslations {
     reference_not_set: string;
     reference_does_not_exist: string;
     entity_not_found: string;
+    /** Why a record the URL names is not there, without asserting it never was. */
+    entity_not_found_body?: string;
+    /** Way out of a record that does not exist. `{{name}}` is the collection. */
+    back_to_collection?: string;
     file_not_found: string;
     unsaved_changes_in_entity: string;
     delete_this_role: string;
@@ -893,6 +897,10 @@ export interface RebaseTranslations {
     studio_sql_sidebar_no_history?: string;
     studio_sql_sidebar_history_hint?: string;
     studio_sql_sidebar_delete_snippet?: string;
+    /** Accessible name for the ✕ on a query tab. */
+    studio_sql_close_tab?: string;
+    /** Accessible name for the + beside the query tabs. */
+    studio_sql_new_tab?: string;
 
     // ─── Studio: Schema Browser ──────────────────────────────────
     studio_schema_tables?: string;
@@ -1099,6 +1107,12 @@ export interface RebaseTranslations {
     history_no_more?: string;
 
     // ─── Studio: tools, groups and empty states ─────────────────
+    /** Heading for the admin's default navigation group. */
+    studio_group_views?: string;
+    /** Heading for the admin's `Admin` navigation group. */
+    studio_group_admin?: string;
+    /** Heading for the admin's `Settings` navigation group. */
+    studio_group_settings?: string;
     studio_group_database?: string;
     studio_group_compute?: string;
     studio_group_storage?: string;

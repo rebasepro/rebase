@@ -330,6 +330,15 @@ product card with a missing image said "File not found", and
 \`file_not_found\` is translated seven ways.`
     },
     {
+        run: "check:locale-parity",
+        why: `The other half of check:untranslated, and the half that was actually
+broken. 244 Studio strings were turned into keys, the keys were added to
+every locale file holding the English value, and check:untranslated stayed
+green because nothing in the components was wrong. Español showed "No API
+keys yet" and a reset-password dialog in English apart from "Cancelar".
+41 keys were missing outright, which i18next renders as the key.`
+    },
+    {
         run: "check:glued-code",
         why: `Astro and JSX drop the newline between a word and an adjacent tag rather
 than collapsing it to a space, so a paragraph broken across two source

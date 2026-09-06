@@ -36,7 +36,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `GET` | `/api/auth/sessions` | List the caller's active sessions (refresh tokens) |
 | `DELETE` | `/api/auth/sessions` | Revoke every session, this one included — remote logout on every device |
 | `DELETE` | `/api/auth/sessions/:id` | Revoke one session |
-| `GET` | `/api/auth/jwks.json` | The public JWKS, when [asymmetric signing](#asymmetric-tokens-and-jwks) is configured |
+| `GET` | `/.well-known/jwks.json` | The public JWKS — mounted at the root, not under `basePath`, because that is where a verifier looks. Present when [asymmetric signing](#asymmetric-tokens-and-jwks) is configured |
 | `POST` | `/api/auth/mfa/enroll` | Start TOTP enrolment (returns the secret and recovery codes) |
 | `POST` | `/api/auth/mfa/verify` | Confirm an enrolment with a code from the authenticator |
 | `GET` | `/api/auth/mfa/factors` | List the caller's enrolled factors |

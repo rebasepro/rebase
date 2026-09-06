@@ -4,6 +4,7 @@
 
 import type { S3Client as S3ClientType, } from "@aws-sdk/client-s3";
 import { DEFAULT_MAX_FILE_SIZE, S3StorageConfig, StorageController } from "./types";
+import { folderKey, listingPrefix } from "./keys";
 import {
     DownloadConfig,
     DownloadMetadata,
@@ -77,6 +78,17 @@ export class S3StorageController implements StorageController {
 
     getType(): "s3" {
         return "s3";
+    }
+
+    /**
+     * The configured bucket, and the logical `default` that maps to it.
+     *
+     * Any other name went straight to S3 as a bucket name, so the request
+     * parameter was a way to address *any* bucket the deployment's credentials
+     * can reach — and a mistyped one came back as "file not found".
+     */
+    knownBuckets(): string[] {
+        return ["default", this.config.bucket];
     }
 
     /**
@@ -323,7 +335,7 @@ export class S3StorageController implements StorageController {
 
         const command = new s3.ListObjectsV2Command({
             Bucket: resolvedBucket,
-            Prefix: prefix || undefined,
+            Prefix: listingPrefix(prefix),
             MaxKeys: options?.maxResults ?? 1000,
             ContinuationToken: options?.pageToken,
             Delimiter: "/" // This gives us folder-like behavior
@@ -340,14 +352,19 @@ export class S3StorageController implements StorageController {
             toString: () => `s3://${resolvedBucket}/${obj.Key}`
         }));
 
-        const prefixes: StorageReference[] = (response.CommonPrefixes || []).map(prefix => ({
-            bucket: resolvedBucket,
-            fullPath: prefix.Prefix || "",
-            name: (prefix.Prefix || "").replace(/\/$/, "").split("/").pop() || "",
-            parent: null as never,
-            root: null as never,
-            toString: () => `s3://${resolvedBucket}/${prefix.Prefix}`
-        }));
+        const prefixes: StorageReference[] = (response.CommonPrefixes || []).map(common => {
+            // Without the trailing slash S3 puts on a common prefix, so a
+            // `fullPath` from a listing is a key any controller accepts.
+            const folder = folderKey(common.Prefix || "");
+            return {
+                bucket: resolvedBucket,
+                fullPath: folder,
+                name: folder.split("/").pop() || "",
+                parent: null as never,
+                root: null as never,
+                toString: () => `s3://${resolvedBucket}/${folder}`
+            };
+        });
 
         return {
             items,

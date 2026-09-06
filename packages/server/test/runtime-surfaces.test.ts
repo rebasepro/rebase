@@ -144,7 +144,9 @@ const started: Boot[] = [];
 
 async function boot(
     surfaces?: Partial<Record<RuntimeSurface, boolean>>,
-    functionsSelection?: { only?: string[]; exclude?: string[] }
+    functionsSelection?: { only?: string[]; exclude?: string[] },
+    /** Config to override, for the shapes a scaffold actually has. */
+    overrides?: Record<string, unknown>
 ): Promise<Hono> {
     const app = new Hono();
     const backend = await initializeRebaseBackend({
@@ -158,7 +160,8 @@ async function boot(
         bootstrappers: [bootstrapper],
         auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
         ...(surfaces ? { surfaces } : {}),
-        ...(functionsSelection ? { functionsSelection } : {})
+        ...(functionsSelection ? { functionsSelection } : {}),
+        ...(overrides ?? {})
     } as never);
     const b: Boot = {
         app,
@@ -225,6 +228,23 @@ describe("runtime surfaces", () => {
         expect((await mounted(app)).sort()).toEqual(expected.sort());
     }
     );
+
+    /**
+     * A scaffold ships `backend/functions/` and no `backend/crons/`, and
+     * `cronsDir` resolves only if the directory exists — so the whole cron
+     * surface was never mounted and Studio's Cron Jobs pane dead-ended on
+     * "Could not read this project's cron jobs — Not Found", with a "Try again"
+     * that could never succeed. Whether the surface is served is a question
+     * about the process, not about what happens to be on disk.
+     */
+    it("mounts the cron surface, and answers an empty list, with no crons directory", async () => {
+        const app = await boot(undefined, undefined, { cronsDir: undefined });
+
+        const res = await app.request("/api/cron", asService);
+
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({ jobs: [] });
+    });
 
     it("attaches websockets and asks the driver to consume, by default", async () => {
         await boot();

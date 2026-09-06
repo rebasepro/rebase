@@ -113,6 +113,17 @@ describe("loadBundle", () => {
     it("explains a missing bundle directory", () => {
         expect(() => loadBundle(path.join(scratch, "nope"))).toThrow(/not found/);
     });
+
+    it("is not a source tree, whatever the manifest says it was built against", () => {
+        // `boot.ts` decides whether the schema editor may rewrite collection
+        // files from this flag. A manifest is written by a builder and can say
+        // anything; the flag says which of the two loaders produced the bundle.
+        writeManifest({ runtime: { range: "^1",
+builtAgainst: "source",
+contract: RUNTIME_CONTRACT_VERSION } });
+
+        expect(loadBundle(scratch).isSource).toBe(false);
+    });
 });
 
 describe("createSourceBundle declares only what the project has", () => {
@@ -159,6 +170,14 @@ describe("createSourceBundle declares only what the project has", () => {
         expect(bundle.manifest.entry?.collections).toBe(path.join("config", "collections"));
         expect(bundle.manifest.entry?.schema).toBe("backend/src/schema.generated.ts");
         expect(bundle.collectionsDir).toBe(collections);
+    });
+
+    it("says it is source, which is what makes the collection editor writable", () => {
+        // `rebase dev` boots through here. `boot.ts` passed `schemaEditor:
+        // false` unconditionally on the ground that "a bundle holds compiled
+        // output" — true of the other loader, false of this one, and the
+        // result was "Update (Read-only)" on every scaffolded dev server.
+        expect(createSourceBundle({ projectRoot: scratch }).isSource).toBe(true);
     });
 });
 

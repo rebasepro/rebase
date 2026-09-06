@@ -22,11 +22,21 @@ Un éditeur de schéma visuel qui vous permet de créer et de modifier des colle
 
 ![Éditeur de collection](/img/collection_editor.png)
 
+L'éditeur est actif partout où Studio est monté — le `<RebaseStudio/>` d'un scaffold suffit, et il n'y a aucune prop à ajouter. `collectionEditor` le règle, il ne l'active pas :
+
 ```tsx
 import { RebaseCMS } from "@rebasepro/cms";
+import { RebaseStudio } from "@rebasepro/studio";
 
-// The Collection Editor is automatically enabled when you provide the 
-// collectionEditor configuration to your RebaseCMS component
+// Studio est monté, donc l'éditeur de collections est disponible.
+// Rien d'autre n'est nécessaire.
+<Rebase>
+    <RebaseCMS collections={collections}/>
+    <RebaseStudio/>
+</Rebase>
+
+// `collectionEditor` sert au réglage — un éditeur en lecture seule,
+// un autre jeton — pas à l'activation.
 <RebaseCMS
     collections={collections}
     collectionEditor={{
@@ -34,6 +44,8 @@ import { RebaseCMS } from "@rebasepro/cms";
     }}
 />
 ```
+
+C'est le serveur, et non le panneau, qui décide si un *enregistrement* aboutit : l'éditeur réécrit les fichiers source des collections, il est donc désactivé sous `NODE_ENV=production`, en mode `baas` et sur un serveur sans `collectionsDir`. Le panneau interroge `GET /api/schema-editor/status` et affiche la raison reçue à côté du bouton désactivé.
 
 ### Outils intégrés
 

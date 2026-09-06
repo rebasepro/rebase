@@ -429,7 +429,7 @@ channel.onError((error) => {
 
 | Code | Means |
 |------|-------|
-| `CHANNEL_FORBIDDEN` | An authorizer refused the join, broadcast or history read |
+| `CHANNEL_FORBIDDEN` | You are not a member of the channel — join it before broadcasting or reading its history |
 | `RATE_LIMITED` | Past the channel frame budget above |
 | `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
 | `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |

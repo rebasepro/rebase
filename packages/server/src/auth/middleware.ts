@@ -97,7 +97,7 @@ export interface AuthMiddlewareOptions {
  * those callers. Calling the formatter directly gets the envelope with none of
  * that.
  */
-function refuse(c: Context<HonoEnv>, error: ApiError): Response {
+export function refuse(c: Context<HonoEnv>, error: ApiError): Response {
     return errorHandler(error, c) as Response;
 }
 

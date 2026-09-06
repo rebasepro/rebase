@@ -1,5 +1,5 @@
 ---
-sourceHash: 81774bf42418ed00
+sourceHash: c6ff4a9052df3362
 title: Speicherkonfiguration
 sidebar_label: Speicherkonfiguration
 description: Konfigurieren Sie lokale Dateisystem-, S3-kompatible oder GCS-/Firebase-Storage-Backends für Datei-Uploads, Bilder und Medien.
@@ -91,14 +91,45 @@ image: {
 |--------|------|-------------|
 | `POST` | `/api/storage/upload` | Direkter Datei-Upload |
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload zu einem bestimmten benannten Backend |
-| `GET` | `/api/storage/files/:path` | Eine Datei abrufen |
-| `GET` | `/api/storage/files/:path?storageId=<key>` | Eine Datei aus einem bestimmten Backend abrufen |
-| `DELETE` | `/api/storage/files/:path` | Eine Datei löschen |
+| `GET` | `/api/storage/file/*` | Eine Datei abrufen — alles nach `/file/` ist der Objektschlüssel |
+| `GET` | `/api/storage/file/*?storageId=<key>` | Eine Datei aus einem bestimmten Backend abrufen |
+| `GET` | `/api/storage/metadata/*` | Größe, Content-Type und letzte Änderung eines Objekts, ohne dessen Bytes |
+| `DELETE` | `/api/storage/file/*` | Eine Datei löschen |
+| `GET` | `/api/storage/list` | Objekte unter einem Präfix auflisten (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`) |
+| `POST` | `/api/storage/folder` | Einen leeren Ordner-Marker anlegen |
+| `GET` | `/api/storage/sources` | Die Speicherquellen, die dieses Backend bedient, nach Schlüssel |
 | `OPTIONS` | `/api/storage/tus` | Unterstützte Fähigkeiten des TUS-Protokolls abfragen |
 | `POST` | `/api/storage/tus` | Eine fortsetzbare TUS-Upload-Sitzung starten |
 | `HEAD` | `/api/storage/tus/:id` | Upload-Fortschritt prüfen (Byte-Offset) |
 | `PATCH` | `/api/storage/tus/:id` | Datenblock an temporäre Datei anhängen |
 | `DELETE` | `/api/storage/tus/:id` | TUS-Upload-Sitzung beenden/abbrechen |
+
+**Was sie antworten.** Ein Umschlag, derselbe wie bei `/api/data`: die Nutzlast
+liegt unter `data`, ein Fehler ist `{ "error": { message, code, requestId } }`
+mit den Codes aus der [Fehlerreferenz](/docs/backend/errors/). `/api/storage/file/*`
+ist die Ausnahme, denn seine Nutzlast ist die Datei — es antwortet mit den Bytes,
+samt `Content-Type`, `Content-Length` und den Caching-Headern.
+
+```json
+// GET /api/storage/list?prefix=products/images/
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+```
+
+`POST /api/storage/upload` antwortet mit `201` und dem `{ key, bucket, storageUrl }`
+des gespeicherten Objekts unter `data`; `GET /api/storage/metadata/*` mit den
+Metadaten des Objekts und, bei einem privaten Objekt, dem kurzlebigen `token`;
+`GET /api/storage/sources` mit dem Array der konfigurierten Quellen.
+`DELETE /api/storage/file/*` und `POST /api/storage/folder` tragen nur eine
+`message`, da es nichts zurückzugeben gibt.
+
+**Wie ein Dateizugriff autorisiert wird.** Die Leserouten — `/api/storage/file/*`
+und `/api/storage/metadata/*` — nehmen das kurzlebige signierte Token entgegen, das
+[`getSignedUrl()`](/docs/sdk/storage) ausstellt, übergeben als `?token=<token>` oder
+als `Bearer`. Ein gewöhnliches Access-JWT wird auf `/file/*` **abgelehnt**, mit `401
+Unauthorized: Access JWT not allowed on file routes`: das Token, das auf jeder anderen
+Route funktioniert, funktioniert hier absichtlich nicht — eine Datei-URL gibt man einem
+Browser, einem CDN oder einem `<img>`-Tag. Jede andere Zeile oben nimmt wie gewohnt das
+Access-JWT.
 
 ## Bildtransformationen im Handumdrehen
 
@@ -106,7 +137,7 @@ Rebase enthält eine integrierte Bildverarbeitungspipeline auf Basis von **Sharp
 
 ```bash
 # Serve image scaled to 300px width in webp format
-GET /api/storage/files/products/laptop.jpg?width=300&format=webp
+GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 ```
 
 ### Unterstützte Parameter

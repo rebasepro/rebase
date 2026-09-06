@@ -725,9 +725,10 @@ export function serializeLogicalCondition(
  *
  * So the operator is found rather than assumed: it is the first dot-separated
  * segment after the column that resolves to a real operator. Everything before
- * it is the column, everything after is the value. `version.eq.1.2.3` still
- * reads as `version >= "1.2.3"` because the scan stops at the first match, and
- * `metadata->>x.eq.5` never had dots in the column to begin with.
+ * it is the column, everything after is the value. `version.eq.1.2.3` reads as
+ * `version == "1.2.3"` because the scan stops at the first match — the `eq` at
+ * offset 1, not a later segment — and `metadata->>x.eq.5` never had dots in the
+ * column to begin with.
  *
  * Returns `undefined` when no segment resolves — `status.active`, an equality
  * written without an operator, which the caller handles.

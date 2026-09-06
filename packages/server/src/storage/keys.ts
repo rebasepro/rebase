@@ -255,3 +255,33 @@ export function canonicalStorageBucket(rawBucket: string | undefined | null): st
     }
     return rawBucket;
 }
+
+/**
+ * The prefix an object store's listing should be given for a caller's key, and
+ * the key a listing should hand back for a folder.
+ *
+ * The three controllers answer the same question in two different ways, and
+ * they used to disagree about the answer. `LocalStorageController` resolves a
+ * *directory* on disk, so `listObjects("products/images")` and
+ * `listObjects("products/images/")` both list what is inside it. An object
+ * store under `Delimiter: "/"` does not: `Prefix: "products/images"` matches
+ * `products/images.txt` and `productsomething/`, and returns none of the files
+ * inside `products/images/`. So the same call — the SDK's own documented one —
+ * answered one thing against local dev and another against the S3 bucket in
+ * production, which is the worst place for a divergence to live.
+ *
+ * `listingPrefix` is what to *send*: a trailing slash, always, because that is
+ * the only spelling that means "inside this folder" to a delimiter listing.
+ * `folderKey` is what to *return* for a common prefix: no trailing slash, the
+ * form the local controller has always used, so a `fullPath` from a listing is
+ * a key you can pass straight back to any of them.
+ */
+export function listingPrefix(rawPrefix: string): string | undefined {
+    const key = rawPrefix.replace(/^\/+/, "").replace(/\/+$/, "");
+    return key === "" ? undefined : `${key}/`;
+}
+
+/** @see listingPrefix */
+export function folderKey(rawPrefix: string): string {
+    return rawPrefix.replace(/^\/+/, "").replace(/\/+$/, "");
+}
