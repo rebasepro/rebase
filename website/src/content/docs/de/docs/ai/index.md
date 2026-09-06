@@ -1,5 +1,5 @@
 ---
-sourceHash: 29c1bcc39a3460e5
+sourceHash: c933db5cdbb2cfc2
 title: KI & Agenten
 sidebar_label: Übersicht
 description: Was Rebase für KI-Coding-Assistenten und autonome Agenten bereitstellt – ein MCP-Server, projektlokale Agent Skills, vorbereitete Anweisungsdateien und das Berechtigungsmodell, das bestimmt, worauf ein Agent tatsächlich zugreifen kann.

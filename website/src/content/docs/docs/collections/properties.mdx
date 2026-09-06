@@ -536,7 +536,7 @@ to scanning. `method` (`hnsw` or `ivfflat`), `distance` (one or several), `m`,
 can build neither index type, so the column is left unindexed and the boot says
 so.
 
-Query it with [`.vectorSearch()`](/docs/sdk/querying#vector-search), which also
+Query it with [`.vectorSearch()`](/docs/sdk/aggregates-and-search#vector-search), which also
 covers what pgvector needs to be installed and how to tune the index. For
 ordinary btree, GIN and BRIN indexes on any collection, see
 [Indexes](/docs/backend/indexes).
@@ -556,98 +556,8 @@ signature: {
 Large files belong in [storage](/docs/backend/storage), not in a column: a
 `bytea` is read and written whole, with the row.
 
-## Enum Values
-
-Used with string or number properties to render selects:
-
-```typescript no-verify
-// Simple array
-enum: ["draft", "published", "archived"]
-
-// With labels
-enum: [
-    { id: "draft", label: "Draft" },
-    { id: "published", label: "Published" },
-    { id: "archived", label: "Archived" }
-]
-
-// With colors (for Kanban columns and chips)
-enum: [
-    { id: "draft", label: "Draft", color: "grayDark" },
-    { id: "published", label: "Published", color: "greenDark" },
-    { id: "archived", label: "Archived", color: "orangeDark" }
-]
-```
-
-## Validation
-
-```typescript
-validation: {
-    required: true,             // Field is required
-    unique: true,               // Must be unique in the table
-    requiredMessage: "Custom error message",
-
-    // String-specific
-    min: 2,                     // Minimum length
-    max: 200,                   // Maximum length
-    matches: /^[a-z]+$/,       // Regex pattern
-    email: true,                // Email format
-    url: true,                  // URL format
-
-    // Number-specific
-    min: 0,                     // Minimum value
-    max: 1000,                  // Maximum value
-    integer: true,              // Must be integer
-
-    // Array-specific
-    min: 1,                     // Minimum items
-    max: 10,                    // Maximum items
-}
-```
-
-## Conditional Fields
-
-You can make fields dynamic so they react to the entity's values. There are two ways to do this:
-
-### 1. JSON Logic Conditions (Declarative)
-
-You can use the `conditions` property to define declarative JSON Logic rules that can be serialized and modified visually in the collection editor.
-
-```typescript
-price: {
-    type: "number",
-    name: "Price",
-    conditions: {
-        disabled: { "==": [{ "var": "values.is_free" }, true] },
-        required: { "!=": [{ "var": "values.is_free" }, true] },
-        min: 0,
-        clearOnDisabled: true // Set to null if field gets disabled
-    }
-}
-```
-
-The conditions object gives you access to:
-- `disabled`, `hidden`, `readOnly`
-- `required`, `min`, `max`
-- `defaultValue`
-- `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
-- `referencePath`, `referenceFilter`
-- `canAddElements`, `sortable` (for arrays)
-
-### 2. Property Builders (Programmatic)
-
-For complex behavior that can't be expressed via JSON Logic, you can use `dynamicProps` which evaluates a Javascript function.
-
-```typescript
-price: {
-    type: "number",
-    name: "Price",
-    dynamicProps: ({ values, user }) => ({
-        disabled: values.is_free === true || !user.roles.includes("admin"),
-        validation: values.is_free ? {} : { required: true, min: 0 }
-    })
-}
-```
+Enum values, validation rules and conditional fields have a page of their own:
+[Validation and conditions](/docs/collections/validation-and-conditions/).
 
 ## Next Steps
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 29c1bcc39a3460e5
+sourceHash: c933db5cdbb2cfc2
 title: IA y agentes
 sidebar_label: Información general
 description: "Lo que Rebase incluye para asistentes de programación con IA y agentes autónomos: un servidor MCP, skills de agentes locales del proyecto, archivos de instrucciones estructurados y el modelo de credenciales que decide a qué puede acceder realmente un agente."

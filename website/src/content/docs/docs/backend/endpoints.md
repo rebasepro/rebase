@@ -99,11 +99,11 @@ reaches none of this.
 | `DELETE` | `/api/admin/users/:uid` | admin | User management |
 | `POST` | `/api/admin/users/:uid/reset-password` | admin | Issues a temporary password |
 | `GET` | `/api/admin/roles` | admin | The roles the project declares |
-| `GET` | `/api/admin/api-keys` | admin | [API keys](/docs/backend/api/#api-keys) |
+| `GET` | `/api/admin/api-keys` | admin | [API keys](/docs/backend/api-keys/) |
 | `POST` | `/api/admin/api-keys` | admin | The plaintext key is returned once, on creation |
-| `GET` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api/#api-keys) |
-| `PUT` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api/#api-keys) |
-| `DELETE` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api/#api-keys) |
+| `GET` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
+| `PUT` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
+| `DELETE` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
 | `GET` | `/api/admin/cron` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `GET` | `/api/admin/cron/:id` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `PUT` | `/api/admin/cron/:id` | admin | Enable or disable a job |

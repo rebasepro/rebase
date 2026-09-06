@@ -6586,172 +6586,8 @@ Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ─�
 
 The OpenAPI spec is auto-generated from your collection definitions: it describes the list, read, create, update, delete and bulk endpoints of every collection the backend serves, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
 
-### API Keys
-
-API keys provide machine-to-machine authentication for agents, MCP servers, CI pipelines, and external integrations. They support per-collection permission scoping and optional full admin access.
-
-#### Creating an API Key
-
-```bash
-# Via CLI
-rebase api-keys create --name "My Integration" \
-  --permissions '[{"collection":"orders","operations":["read","write"]}]'
-
-# Via REST (requires admin auth)
-curl -X POST http://localhost:3000/api/admin/api-keys \
-  -H "Authorization: Bearer <service-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "My Integration",
-    "permissions": [{ "collection": "orders", "operations": ["read", "write"] }]
-  }'
-```
-
-The response includes the full plaintext key (`rk_live_...`) **exactly once** — store it immediately.
-
-#### Using an API Key
-
-```bash
-curl http://localhost:3000/api/data/orders \
-  -H "Authorization: Bearer rk_live_abc123..."
-```
-
-#### Permissions and RLS: two independent gates
-
-An API key's request passes through **two** authorization checks, and both must allow it:
-
-1. **The key's permission list** — collection × operation, checked at the route layer.
-2. **Row-Level Security** — API keys do *not* bypass RLS. A key runs as
-   `uid: "api-key:<id>"` with the `service` role (plus `admin` when
-   `admin: true`). Admin keys pass via the built-in admin policies; a
-   non-admin key only sees rows that a security rule explicitly grants to
-   the `service` role or to the public. Owner-style rules
-   (`owner_id = rebase.uid()`) never match an API key.
-
-So a non-admin key with `"*"` permissions can still get empty results — that's
-RLS working, not a bug. Either grant the `service` role in the relevant
-collections' security rules, or use an admin key.
-
-#### Custom Functions
-
-Function invocations are scoped like collections, under the `functions`
-namespace: `{"collection": "functions", "operations": ["write"]}` grants every
-function, `"functions/<name>"` grants one, and the global `"*"` wildcard grants
-all. A key without such an entry cannot invoke functions at all.
-
-#### Storage
-
-Storage works the same way, under the `storage` namespace:
-`{"collection": "storage", "operations": ["read", "write"]}` lets the key
-download/list (`read`), upload and create folders (`write`), and delete files
-(`delete`). The global `"*"` wildcard also grants storage. A key without such
-an entry cannot touch storage. TUS resumable-upload routes count as `write`
-for every step (including the offset check and cancel), so a write-scoped key
-can complete an upload on its own.
-
-#### Agents and MCP Servers
-
-An agent wants the *narrowest* key that does its job, not an admin one. Start
-scoped, and give it an expiry:
-
-```bash
-rebase api-keys create -n "My Agent" \
-  --permissions '[{"collection":"articles","operations":["read"]}]' \
-  --expires 30d
-```
-
-Operations are `read`, `write` and `delete`, derived from the HTTP method:
-`GET`/`HEAD`/`OPTIONS` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` →
-`delete`.
-
-##### A scoped key reads zero rows until a rule grants `service`
-
-This is the step that makes a correctly scoped key look broken. A non-admin key
-runs as `uid: "api-key:<id>"` with the roles `["service"]`, and the RLS policy
-injected into every collection by default compiles to:
-
-```sql
-rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
-```
-
-— the server context, or an admin. A non-admin key matches neither arm, so on a
-collection with no `securityRules` the request succeeds with an empty result set
-and no error explaining why. Grant the role explicitly:
-
-```ts
-securityRules: [
-    { operation: "select", roles: ["service"], using: "true" }
-]
-```
-
-Because `rebase.uid()` carries the key's id, a rule can also scope rows to one
-specific key:
-
-```ts
-securityRules: [
-    {
-        operation: "select",
-        condition: policy.compare(policy.authUid(), "eq", policy.literal("api-key:<id>"))
-    }
-]
-```
-
-##### Don't use `"*"` for a read-only key
-
-The `"*"` wildcard is not "every collection" — it also matches the `functions`
-namespace and `storage`. A `GET` counts as `read`, and a custom function's
-handler is arbitrary code that can write, so a wildcard "read-only" key can
-mutate through a function. Naming collections explicitly gives the key no
-function access at all.
-
-##### `--admin --full-access`: CI, migrations, first-party tooling
-
-`"admin": true` grants the key the admin role — `/api/admin/*` routes for schema
-management, user management, and more, plus cron, backups, and logs. Combined
-with `--full-access` (`{"collection": "*", "operations": ["read", "write",
-"delete"]}`) the key holds every collection plus all storage and every custom
-function. That is the right shape for CI, migrations, and trusted first-party
-tooling — not for agents.
-
-```bash
-# CLI
-rebase api-keys create -n "CI" --admin --full-access
-
-# REST
-curl -X POST http://localhost:3000/api/admin/api-keys \
-  -H "Authorization: Bearer <service-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "CI",
-    "admin": true,
-    "permissions": [{ "collection": "*", "operations": ["read", "write", "delete"] }]
-  }'
-```
-
-##### No realtime over API keys
-
-The realtime WebSocket does not parse `rk_` tokens — it accepts user JWTs and
-the service key only. An agent authenticated with an API key polls the REST
-endpoints instead of subscribing.
-
-#### Key Options
-
-| Field | Type | Description |
-|---|---|---|
-| `name` | `string` | Human-readable label |
-| `permissions` | `ApiKeyPermission[]` | Per-collection access (`"*"` = everything; `"functions/<name>"` = one function; `"storage"` = file storage) |
-| `admin` | `boolean` | Grant admin role — admin routes + RLS admin policies |
-| `rate_limit` | `number \| null` | Requests per 15-min window (`null` = the server default, 1000) |
-| `expires_at` | `string \| null` | ISO-8601 expiration timestamp |
-
-The CLI requires an explicit scope: pass `--permissions '<json>'` or opt into
-`--full-access` — there is no silent full-access default.
-
-Keys can be listed, updated, and revoked via `/api/admin/api-keys` or the
-`rebase api-keys` CLI commands — but not by an API key. Any request to
-`/api/admin/api-keys` authenticated with an `rk_` key is refused with `403
-API_KEY_SELF_MANAGEMENT_FORBIDDEN`, whatever its `admin` flag. Key management
-requires an admin user's session or the service key.
+Machine callers authenticate with a scoped key rather than a session:
+[API keys](/docs/backend/api-keys/).
 
 ### Schema Metadata
 
@@ -8273,7 +8109,7 @@ to scanning. `method` (`hnsw` or `ivfflat`), `distance` (one or several), `m`,
 can build neither index type, so the column is left unindexed and the boot says
 so.
 
-Query it with [`.vectorSearch()`](/docs/sdk/querying#vector-search), which also
+Query it with [`.vectorSearch()`](/docs/sdk/aggregates-and-search#vector-search), which also
 covers what pgvector needs to be installed and how to tune the index. For
 ordinary btree, GIN and BRIN indexes on any collection, see
 [Indexes](/docs/backend/indexes).
@@ -8292,6 +8128,17 @@ signature: {
 
 Large files belong in [storage](/docs/backend/storage), not in a column: a
 `bytea` is read and written whole, with the row.
+
+Enum values, validation rules and conditional fields have a page of their own:
+[Validation and conditions](/docs/collections/validation-and-conditions/).
+
+### Next Steps
+
+- **[Relations](/docs/collections/relations)** — Foreign keys and joins
+- **[Security Rules](/docs/collections/security-rules)** — Row Level Security
+- **[Custom Fields](/docs/frontend/custom-fields)** — Build custom field components
+
+## Validation and conditions
 
 ### Enum Values
 
@@ -8388,9 +8235,9 @@ price: {
 
 ### Next Steps
 
-- **[Relations](/docs/collections/relations)** — Foreign keys and joins
-- **[Security Rules](/docs/collections/security-rules)** — Row Level Security
-- **[Custom Fields](/docs/frontend/custom-fields)** — Build custom field components
+- [Properties](/docs/collections/properties/) — the property types these rules apply to
+- [Defining Collections](/docs/collections/) — where properties are declared
+- [Security Rules (RLS)](/docs/collections/security-rules/) — the rules the database enforces, which validation does not replace
 
 ## Relations
 
@@ -10631,6 +10478,40 @@ Request ──► beforeSave/beforeDelete (blocking) ──► DB Operation ─�
 
 The OpenAPI spec is auto-generated from your collection definitions: it describes the list, read, create, update, delete and bulk endpoints of every collection the backend serves, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
 
+Machine callers authenticate with a scoped key rather than a session:
+[API keys](/docs/backend/api-keys/).
+
+### Schema Metadata
+
+The project's full collection schema — every collection, property and relation —
+is served to an authenticated admin:
+
+```bash
+GET /api/meta/contract
+```
+
+It is **admin-only**, and on a deployment with no authentication configured it
+is not served at all (404 `CONTRACT_UNAVAILABLE`) rather than exposing the
+schema to anyone. Its sibling returns a version string that stands for the
+schema without describing it, and is deliberately reachable with no credential
+— which is what a CI job polls:
+
+```bash
+GET /api/meta/schema-version
+```
+
+For the shape of the endpoints rather than the schema behind them, the OpenAPI
+document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
+`enableSwagger` is on.
+
+### Next Steps
+
+- **[Client SDK](/docs/sdk)** — Type-safe client for the REST API
+- **[Collections](/docs/collections)** — Define your data schema
+- **[Security Rules (RLS)](/docs/collections/security-rules)** — Control access per row
+
+## API keys
+
 ### API Keys
 
 API keys provide machine-to-machine authentication for agents, MCP servers, CI pipelines, and external integrations. They support per-collection permission scoping and optional full admin access.
@@ -10798,34 +10679,11 @@ Keys can be listed, updated, and revoked via `/api/admin/api-keys` or the
 API_KEY_SELF_MANAGEMENT_FORBIDDEN`, whatever its `admin` flag. Key management
 requires an admin user's session or the service key.
 
-### Schema Metadata
-
-The project's full collection schema — every collection, property and relation —
-is served to an authenticated admin:
-
-```bash
-GET /api/meta/contract
-```
-
-It is **admin-only**, and on a deployment with no authentication configured it
-is not served at all (404 `CONTRACT_UNAVAILABLE`) rather than exposing the
-schema to anyone. Its sibling returns a version string that stands for the
-schema without describing it, and is deliberately reachable with no credential
-— which is what a CI job polls:
-
-```bash
-GET /api/meta/schema-version
-```
-
-For the shape of the endpoints rather than the schema behind them, the OpenAPI
-document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
-`enableSwagger` is on.
-
 ### Next Steps
 
-- **[Client SDK](/docs/sdk)** — Type-safe client for the REST API
-- **[Collections](/docs/collections)** — Define your data schema
-- **[Security Rules (RLS)](/docs/collections/security-rules)** — Control access per row
+- [REST API](/docs/backend/api/) — the endpoints a key calls
+- [Endpoint index](/docs/backend/endpoints/) — the gate on every route, keys included
+- [Security Rules (RLS)](/docs/collections/security-rules/) — what the database enforces on top of a key's scopes
 
 ## Error codes
 
@@ -11138,11 +10996,11 @@ reaches none of this.
 | `DELETE` | `/api/admin/users/:uid` | admin | User management |
 | `POST` | `/api/admin/users/:uid/reset-password` | admin | Issues a temporary password |
 | `GET` | `/api/admin/roles` | admin | The roles the project declares |
-| `GET` | `/api/admin/api-keys` | admin | [API keys](/docs/backend/api/#api-keys) |
+| `GET` | `/api/admin/api-keys` | admin | [API keys](/docs/backend/api-keys/) |
 | `POST` | `/api/admin/api-keys` | admin | The plaintext key is returned once, on creation |
-| `GET` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api/#api-keys) |
-| `PUT` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api/#api-keys) |
-| `DELETE` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api/#api-keys) |
+| `GET` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
+| `PUT` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
+| `DELETE` | `/api/admin/api-keys/:id` | admin | [API keys](/docs/backend/api-keys/) |
 | `GET` | `/api/admin/cron` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `GET` | `/api/admin/cron/:id` | admin | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `PUT` | `/api/admin/cron/:id` | admin | Enable or disable a job |
@@ -13914,6 +13772,103 @@ WebSocket subscriptions automatically respect Row-Level Security (RLS) policies.
 
 This means each user only receives updates for records they have permission to see.
 
+Running more than one instance — the LISTEN/NOTIFY bus, what presence does
+across processes, and writing your own transport — has a page of its own:
+[Realtime across instances](/docs/backend/realtime-transports/).
+
+### Database-Level Change Capture (CDC)
+
+**Change Data Capture is on by default.** Rebase captures changes at the database and emits realtime events for **every committed write, regardless of how it was made** — REST, SDK, Studio, `psql`, a cron job in another service, raw Drizzle/SQL, or Studio's **SQL editor**. This is the same model as Supabase Realtime tailing the write-ahead log.
+
+No configuration is required. On a database connection that supports it, CDC self-provisions at startup; on one that doesn't (e.g. a restricted role that can't create triggers), Rebase quietly uses application-level realtime instead — nothing to turn on, nothing that breaks.
+
+#### Configuration
+
+CDC is controlled by the `REALTIME_CDC` environment variable:
+
+| Value | Behavior |
+| --- | --- |
+| `auto` *(default)* | Enable database-level capture where the connection supports it; **silently fall back** to application-level realtime otherwise. Zero-config. |
+| `trigger` | Force trigger-based capture. Works on any PostgreSQL, including managed instances without logical replication. Warns (rather than silently falling back) if it can't provision. |
+| `wal` | Prefer WAL logical replication. Not yet bundled — degrades to `trigger` and logs the active mode. |
+| `off` | Application-level realtime only. Use this to avoid the per-write trigger overhead on write-heavy workloads. |
+
+On boot you'll see a log line stating the active mode, e.g.:
+
+```
+📡 [CDC] Realtime source = database-level change capture (mode: trigger).
+   All writes now emit realtime events regardless of origin.
+```
+
+If the connection can't support it, `auto` logs an informational line instead and continues with application-level realtime:
+
+```
+ℹ️ [CDC] Database-level change capture unavailable (likely insufficient
+   privileges to create triggers…) — using app-level realtime.
+```
+
+#### How It Works
+
+1. **Self-provisioning** — At startup (server/owner context), Rebase installs an idempotent `AFTER INSERT/UPDATE/DELETE` trigger on each managed table. The trigger emits a compact change notification on the `rebase_cdc` channel. A payload that would exceed PostgreSQL's 8&nbsp;KB `NOTIFY` limit falls back to an identity-only message, so CDC can never abort the triggering write.
+2. **Capture** — A dedicated, unpooled `LISTEN` client per instance consumes `rebase_cdc`, maps the changed table back to its collection, and feeds the change into the same `RealtimeService` pipeline used by API mutations. Like the cross-instance listener, it prefers `DATABASE_DIRECT_URL` and auto-reconnects.
+3. **RLS-safe delivery** — The raw row from the change stream is **never** forwarded to subscribers. The change is marked invalidated, and each subscription re-reads the row under its **own** auth context. Filtering is therefore per subscriber, never per publisher: a client only ever receives rows its RLS policies permit.
+4. **Cross-instance** — Because every instance observes every commit through the change stream, CDC also *is* the cross-instance channel; the legacy per-mutation `rebase_entity_changes` broadcast is not used while CDC is active.
+5. **De-duplication** — A mutation made through the Rebase API is delivered locally the instant it commits and is also echoed back through the change stream. The originating instance suppresses that echo (a short-lived record of its own emits), so subscribers never see an API write twice.
+
+#### Requirements & Notes
+
+- CDC requires a direct connection string (`DATABASE_DIRECT_URL` or the primary connection) for the `LISTEN` client — connection poolers in transaction mode do not support long-lived `LISTEN` sessions.
+- Triggers are installed only on tables backed by a registered collection. Writes to unmapped tables are ignored.
+- A collection whose table has not yet been migrated is skipped with a warning rather than blocking CDC for the rest.
+- Native WAL logical-replication streaming (`wal2json`/`pgoutput`) is planned; today `REALTIME_CDC=wal` degrades to the trigger-based path, which provides equivalent database-level coverage.
+
+### Pending Request Timeout
+
+To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as one-shot collection fetches `FETCH_COLLECTION`, single entity fetches `FETCH_ONE`, creating/updating `SAVE`, deletes `DELETE`, counts `COUNT`, and uniqueness checks `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds.
+
+If the server does not respond within this 30-second window, the client automatically deletes the pending request and rejects the promise with an `ApiError` with the message `"Request timed out"`.
+
+One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
+
+#### When a channel frame is refused
+
+A channel frame is fire-and-forget: `await channel.broadcast(...)` resolves when
+the frame is written to the socket, **not** when the server has accepted it. That
+is deliberate — a collaborative app broadcasts a cursor position sixty times a
+second, and waiting for an acknowledgement on each would make every one a round
+trip.
+
+So a refusal cannot be a rejected promise. It arrives on `onError`:
+
+```typescript
+const channel = client.realtime.channel("doc:42");
+
+channel.onError((error) => {
+    if (error.code === "CHANNEL_FORBIDDEN") showReadOnlyBanner();
+    if (error.code === "RATE_LIMITED") throttleCursorUpdates();
+});
+```
+
+| Code | Means |
+|------|-------|
+| `CHANNEL_FORBIDDEN` | An authorizer refused the join, broadcast or history read |
+| `RATE_LIMITED` | Past the channel frame budget above |
+| `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
+| `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
+| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | The broadcast reached this instance only — see [The 8 KB limit on the Postgres bus](#the-8-kb-limit-on-the-postgres-bus) |
+
+With no handler attached, these are logged as a warning. They used to be
+discarded entirely: there was no promise to reject and no channel to deliver to,
+so a forbidden broadcast was indistinguishable from a delivered one.
+
+### Next Steps
+
+- [Client SDK](/docs/sdk) — Full SDK reference including typed collection accessors.
+- [Authentication](/docs/backend/authentication) — Set up JWT auth and RLS policies.
+- [Backend Architecture](/docs/backend) — Overview of the Rebase server architecture.
+
+## Realtime across instances
+
 ### Cross-Instance Broadcasting & LISTEN/NOTIFY Architecture
 
 For multi-instance cluster environments (e.g., running inside Kubernetes or Docker containers behind a load balancer), Rebase relies on PostgreSQL `LISTEN/NOTIFY` to synchronize **row changes** across instances. Collection and entity subscriptions therefore span instances with no configuration — that is what this section describes.
@@ -14083,96 +14038,11 @@ The SDK heartbeats presence every ~20 seconds against a 30-second timeout. Rows 
 `LISTEN` is session state, so the Postgres bus needs a direct connection — not pgBouncer or any transaction-mode pooler. Rebase uses `DATABASE_DIRECT_URL` when it is set; behind a pooler, point it at the database service itself. Without a usable direct URL the bus logs a warning and stays in memory mode.
 :::
 
-### Database-Level Change Capture (CDC)
-
-**Change Data Capture is on by default.** Rebase captures changes at the database and emits realtime events for **every committed write, regardless of how it was made** — REST, SDK, Studio, `psql`, a cron job in another service, raw Drizzle/SQL, or Studio's **SQL editor**. This is the same model as Supabase Realtime tailing the write-ahead log.
-
-No configuration is required. On a database connection that supports it, CDC self-provisions at startup; on one that doesn't (e.g. a restricted role that can't create triggers), Rebase quietly uses application-level realtime instead — nothing to turn on, nothing that breaks.
-
-#### Configuration
-
-CDC is controlled by the `REALTIME_CDC` environment variable:
-
-| Value | Behavior |
-| --- | --- |
-| `auto` *(default)* | Enable database-level capture where the connection supports it; **silently fall back** to application-level realtime otherwise. Zero-config. |
-| `trigger` | Force trigger-based capture. Works on any PostgreSQL, including managed instances without logical replication. Warns (rather than silently falling back) if it can't provision. |
-| `wal` | Prefer WAL logical replication. Not yet bundled — degrades to `trigger` and logs the active mode. |
-| `off` | Application-level realtime only. Use this to avoid the per-write trigger overhead on write-heavy workloads. |
-
-On boot you'll see a log line stating the active mode, e.g.:
-
-```
-📡 [CDC] Realtime source = database-level change capture (mode: trigger).
-   All writes now emit realtime events regardless of origin.
-```
-
-If the connection can't support it, `auto` logs an informational line instead and continues with application-level realtime:
-
-```
-ℹ️ [CDC] Database-level change capture unavailable (likely insufficient
-   privileges to create triggers…) — using app-level realtime.
-```
-
-#### How It Works
-
-1. **Self-provisioning** — At startup (server/owner context), Rebase installs an idempotent `AFTER INSERT/UPDATE/DELETE` trigger on each managed table. The trigger emits a compact change notification on the `rebase_cdc` channel. A payload that would exceed PostgreSQL's 8&nbsp;KB `NOTIFY` limit falls back to an identity-only message, so CDC can never abort the triggering write.
-2. **Capture** — A dedicated, unpooled `LISTEN` client per instance consumes `rebase_cdc`, maps the changed table back to its collection, and feeds the change into the same `RealtimeService` pipeline used by API mutations. Like the cross-instance listener, it prefers `DATABASE_DIRECT_URL` and auto-reconnects.
-3. **RLS-safe delivery** — The raw row from the change stream is **never** forwarded to subscribers. The change is marked invalidated, and each subscription re-reads the row under its **own** auth context. Filtering is therefore per subscriber, never per publisher: a client only ever receives rows its RLS policies permit.
-4. **Cross-instance** — Because every instance observes every commit through the change stream, CDC also *is* the cross-instance channel; the legacy per-mutation `rebase_entity_changes` broadcast is not used while CDC is active.
-5. **De-duplication** — A mutation made through the Rebase API is delivered locally the instant it commits and is also echoed back through the change stream. The originating instance suppresses that echo (a short-lived record of its own emits), so subscribers never see an API write twice.
-
-#### Requirements & Notes
-
-- CDC requires a direct connection string (`DATABASE_DIRECT_URL` or the primary connection) for the `LISTEN` client — connection poolers in transaction mode do not support long-lived `LISTEN` sessions.
-- Triggers are installed only on tables backed by a registered collection. Writes to unmapped tables are ignored.
-- A collection whose table has not yet been migrated is skipped with a warning rather than blocking CDC for the rest.
-- Native WAL logical-replication streaming (`wal2json`/`pgoutput`) is planned; today `REALTIME_CDC=wal` degrades to the trigger-based path, which provides equivalent database-level coverage.
-
-### Pending Request Timeout
-
-To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as one-shot collection fetches `FETCH_COLLECTION`, single entity fetches `FETCH_ONE`, creating/updating `SAVE`, deletes `DELETE`, counts `COUNT`, and uniqueness checks `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds.
-
-If the server does not respond within this 30-second window, the client automatically deletes the pending request and rejects the promise with an `ApiError` with the message `"Request timed out"`.
-
-One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
-
-#### When a channel frame is refused
-
-A channel frame is fire-and-forget: `await channel.broadcast(...)` resolves when
-the frame is written to the socket, **not** when the server has accepted it. That
-is deliberate — a collaborative app broadcasts a cursor position sixty times a
-second, and waiting for an acknowledgement on each would make every one a round
-trip.
-
-So a refusal cannot be a rejected promise. It arrives on `onError`:
-
-```typescript
-const channel = client.realtime.channel("doc:42");
-
-channel.onError((error) => {
-    if (error.code === "CHANNEL_FORBIDDEN") showReadOnlyBanner();
-    if (error.code === "RATE_LIMITED") throttleCursorUpdates();
-});
-```
-
-| Code | Means |
-|------|-------|
-| `CHANNEL_FORBIDDEN` | An authorizer refused the join, broadcast or history read |
-| `RATE_LIMITED` | Past the channel frame budget above |
-| `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
-| `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
-| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | The broadcast reached this instance only — see [The 8 KB limit on the Postgres bus](#the-8-kb-limit-on-the-postgres-bus) |
-
-With no handler attached, these are logged as a warning. They used to be
-discarded entirely: there was no promise to reject and no channel to deliver to,
-so a forbidden broadcast was indistinguishable from a delivered one.
-
 ### Next Steps
 
-- [Client SDK](/docs/sdk) — Full SDK reference including typed collection accessors.
-- [Authentication](/docs/backend/authentication) — Set up JWT auth and RLS policies.
-- [Backend Architecture](/docs/backend) — Overview of the Rebase server architecture.
+- [Realtime & WebSocket](/docs/backend/realtime/) — subscriptions, channels and presence on one instance
+- [Split Processes](/docs/deployment/split-processes/) — the deployment shape this matters for
+- [Self-hosting](/docs/deployment/self-hosting/) — running the runtime yourself
 
 ## Search
 
@@ -14472,7 +14342,7 @@ silently ignored.
 The DDL generator has always emitted index statements for exactly two things,
 and both are structures a *feature* owns rather than queries you wrote: the GIN
 index behind a [`search` block](/docs/backend/search), and the ANN index behind
-a [`vector` property](/docs/sdk/querying#the-index). The plain case — the btree
+a [`vector` property](/docs/sdk/aggregates-and-search#the-index). The plain case — the btree
 behind a `where` clause — had no declaration site at all.
 
 So the only way to have one was to write it by hand. And:
@@ -14616,7 +14486,7 @@ restriction is what keeps the whole model on the Atlas path — `rebase db push`
 materialises the desired state in a bare scratch database to plan against, and
 `CREATE EXTENSION` cannot go in that file. **Trigram search is
 [`search:`](/docs/backend/search); ANN is a
-[`vector` property](/docs/sdk/querying#the-index).** An index needing
+[`vector` property](/docs/sdk/aggregates-and-search#the-index).** An index needing
 `gin_trgm_ops` or `vector_cosine_ops` is refused at build time rather than
 emitted to fail later against a database you have never seen.
 
@@ -14707,7 +14577,7 @@ removes:
 
 - [Search](/docs/backend/search) — ranked full-text, which builds its own GIN
   index over a generated `tsvector`
-- [Vector search](/docs/sdk/querying#vector-search) — the ANN index over an
+- [Vector search](/docs/sdk/aggregates-and-search#vector-search) — the ANN index over an
   embedding column, configured on the property
 - [Schema as code](/docs/architecture/schema-as-code) — how declarations reach
   the database, and what a derived name is
@@ -25779,6 +25649,54 @@ rather than answered wrongly:
   query rather than stored, so there is no value on the cursor row to compare
   the next page against.
 
+Aggregation, JSON filtering, full-text search and vector search have a page
+of their own: [Aggregates and search](/docs/sdk/aggregates-and-search/).
+
+Reading related entities — `include`, and the accessors that query through a
+relation — has a page of its own: [Querying relations](/docs/sdk/relations/).
+
+### Custom Endpoints
+
+Call custom server endpoints registered via the functions system:
+
+```typescript
+// Using client.functions.invoke()
+const result = await client.functions.invoke<{ summary: string }>(
+    "generate-summary",
+    { articleId: 42 }
+);
+
+// With options
+const result = await client.functions.invoke<{ status: string }>(
+    "process-order",
+    { orderId: 123 },
+    { method: "POST", path: "status/check" }
+);
+
+// Shorthand via client.call()
+const result = await client.call<{ summary: string }>(
+    "functions/generate-summary",
+    { articleId: 42 }
+);
+```
+
+Both return **the function's response body, verbatim**. Neither reaches into it
+for a `data` key, so a function that answers `{ data: [...] }` gives you that
+object and you read `.data` yourself.
+
+`call()` takes a full path and always POSTs; `invoke()` takes a function name
+and can take a method, a sub-path and headers. Use `invoke()` unless you are
+calling something that is not a function.
+
+### Next Steps
+
+- **[Authentication](/docs/sdk/authentication)** — Sign in, sign up, OAuth, sessions
+- **[Realtime Subscriptions](/docs/sdk/realtime)** — Live data with WebSockets
+- **[Storage & Files](/docs/sdk/storage)** — Upload, download, and manage files
+- **[Relations](/docs/collections/relations)** — Define relations between collections
+
+## Aggregates and search
+
 ### Aggregates
 
 `count`, `sum`, `avg`, `min` and `max` over the rows a filter selects, without
@@ -25978,6 +25896,14 @@ the boot says so — `vectorSearch` still answers, as an exact scan.
 `vectorSearch` is a query, not a subscription: `.listen()` on one is refused
 rather than served as a plain listing, because nothing recomputes distances on a
 write.
+
+### Next Steps
+
+- [Querying Data](/docs/sdk/querying/) — the query builder these run on top of
+- [Search](/docs/backend/search/) — how full-text and vector search are configured on the backend
+- [REST API](/docs/backend/api/) — the same queries over HTTP
+
+## Querying relations
 
 ### Fetching Relations
 
@@ -26184,45 +26110,11 @@ If a derived value is not an aggregate over a relation, put it in the database �
 a generated column, or a trigger-maintained one — and it becomes an ordinary
 property.
 
-### Custom Endpoints
-
-Call custom server endpoints registered via the functions system:
-
-```typescript
-// Using client.functions.invoke()
-const result = await client.functions.invoke<{ summary: string }>(
-    "generate-summary",
-    { articleId: 42 }
-);
-
-// With options
-const result = await client.functions.invoke<{ status: string }>(
-    "process-order",
-    { orderId: 123 },
-    { method: "POST", path: "status/check" }
-);
-
-// Shorthand via client.call()
-const result = await client.call<{ summary: string }>(
-    "functions/generate-summary",
-    { articleId: 42 }
-);
-```
-
-Both return **the function's response body, verbatim**. Neither reaches into it
-for a `data` key, so a function that answers `{ data: [...] }` gives you that
-object and you read `.data` yourself.
-
-`call()` takes a full path and always POSTs; `invoke()` takes a function name
-and can take a method, a sub-path and headers. Use `invoke()` unless you are
-calling something that is not a function.
-
 ### Next Steps
 
-- **[Authentication](/docs/sdk/authentication)** — Sign in, sign up, OAuth, sessions
-- **[Realtime Subscriptions](/docs/sdk/realtime)** — Live data with WebSockets
-- **[Storage & Files](/docs/sdk/storage)** — Upload, download, and manage files
-- **[Relations](/docs/collections/relations)** — Define relations between collections
+- [Querying Data](/docs/sdk/querying/) — the query builder these accessors return
+- [Relations](/docs/collections/relations/) — declaring the links this page reads
+- [REST API](/docs/backend/api/) — the same `include` over HTTP
 
 ## Authentication
 
@@ -27488,7 +27380,7 @@ problems. It is worth knowing which one you are reaching for:
 | [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 41 tools over your schema, data, users, storage, cron and dev server | An assistant, at runtime |
 | [**Agent skills**](/docs/ai/skills) | 21 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
-| [**API keys**](/docs/backend/api#api-keys) | Scoped machine credentials, per collection and per operation | Anything calling the HTTP API |
+| [**API keys**](/docs/backend/api-keys) | Scoped machine credentials, per collection and per operation | Anything calling the HTTP API |
 
 The first three are about giving an assistant *knowledge* and *tools*. The
 fourth is the only one that decides what it may actually do.
@@ -27520,7 +27412,7 @@ visibility, not about authentication. Granting it does not add a caller to the
 permission list, and withholding it does not stop one.
 
 The mechanics — creating keys, the permission JSON, rotation, expiry, rate
-limits — are covered in [REST API → API Keys](/docs/backend/api#api-keys).
+limits — are covered in [REST API → API Keys](/docs/backend/api-keys).
 Do not skip [Security Rules (RLS)](/docs/collections/security-rules) on the way
 past; the second gate is only as good as the policies you wrote.
 
@@ -27539,7 +27431,7 @@ Rebase has a first-class `vector` property type on Postgres and a
 `.vectorSearch()` query method with `cosine`, `l2` and `inner_product` distance.
 It is already documented, in two places rather than one:
 
-- [Querying Data → Vector Search](/docs/sdk/querying#vector-search) — the SDK
+- [Querying Data → Vector Search](/docs/sdk/aggregates-and-search#vector-search) — the SDK
   method, the `_distance` field it adds to each row, and the caveats
 - [REST API → Vector Search](/docs/backend/api#vector-search) — the
   `vector_search`, `vector`, `vector_distance` and `vector_threshold` query
@@ -27556,7 +27448,7 @@ way the server needs an image carrying the library and a role allowed to install
 it. And **every vector column gets an HNSW index for
 cosine distance**, because cosine is what `vectorSearch` measures with unless
 you pass `distance` — an index serves exactly one operator. Tune it, or turn it
-off, on the property: see [The index](/docs/sdk/querying#the-index).
+off, on the property: see [The index](/docs/sdk/aggregates-and-search#the-index).
 
 Vector queries also cannot be subscribed to; `.vectorSearch(...).listen()` is
 refused with `VECTOR_SEARCH_NOT_LIVE`.
@@ -27703,7 +27595,7 @@ function, and run DDL against whatever `DATABASE_URL` the project resolves.
 
 #### Giving it a narrow credential instead
 
-Register a scoped [API key](/docs/backend/api#api-keys) and the two-gate model
+Register a scoped [API key](/docs/backend/api-keys) and the two-gate model
 applies for real. A non-admin key runs with the roles `["service"]`, which the
 injected admin policies do **not** name — so RLS grants it nothing unless one of
 your own policies says otherwise, and the permission list narrows it further:
@@ -27750,7 +27642,7 @@ key does. On the data plane its reach is the service key's. What it adds is that
 it is **revocable, expirable and rate-limited per key**, none of which is true of
 the service key — rotating that means editing `.env` and restarting the server.
 
-See [Agents and MCP Servers](/docs/backend/api#agents-and-mcp-servers) for the
+See [Agents and MCP Servers](/docs/backend/api-keys#agents-and-mcp-servers) for the
 key-scoping guidance in full.
 
 #### Putting a collection out of reach entirely

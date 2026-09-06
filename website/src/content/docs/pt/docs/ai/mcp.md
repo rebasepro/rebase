@@ -1,5 +1,5 @@
 ---
-sourceHash: 24d65c28c1584227
+sourceHash: dcb903c511617dd5
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: Conecte o Claude Code, Cursor, Gemini CLI ou qualquer cliente MCP a um projeto Rebase — as 41 ferramentas que ele expõe, a credencial com a qual ele se autentica e a proteção de loopback que fica entre um agente e a produção.

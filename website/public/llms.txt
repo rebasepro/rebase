@@ -50,11 +50,13 @@
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Collections](https://rebase.pro/docs/collections): Collections are the core building block of Rebase — each collection maps to a database table and defines its schema, relations, security, and UI behavior.
 - [Properties](https://rebase.pro/docs/collections/properties): Property types define the data type, validation, and UI rendering for each field in a collection. Rebase supports string, number, boolean, date, array, map, reference, relation, and geopoint types.
+- [Validation and conditions](https://rebase.pro/docs/collections/validation-and-conditions): Enum values, per-property validation rules, and the conditional fields that make a property required, disabled or hidden based on the entity's own values.
 - [Relations](https://rebase.pro/docs/collections/relations): Define one-to-one, one-to-many, and many-to-many SQL relations between collections with foreign keys, junction tables, and multi-hop joins.
 - [Entity Callbacks](https://rebase.pro/docs/collections/callbacks): Use lifecycle callbacks to run custom logic when entities are created, updated, read, or deleted. Includes the context.data API for cross-collection operations.
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Backend Overview](https://rebase.pro/docs/backend): The Rebase backend provides a complete server with REST API, authentication, storage, WebSocket real-time, and entity history — all initialized with a single function call.
 - [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
+- [API keys](https://rebase.pro/docs/backend/api-keys): Scoped, revocable keys for machine callers: what a key can reach, how scopes compose with row-level security, and the admin endpoints that manage them.
 - [Error codes](https://rebase.pro/docs/backend/errors): Every error code a Rebase backend can return, with its HTTP status, what it means and what to do about it — plus the response envelope, X-Request-ID and the details rules.
 - [Endpoint index](https://rebase.pro/docs/backend/endpoints): Every HTTP route a Rebase backend mounts — data, auth, storage, admin, meta — with the gate on each one and the page that explains it.
 - [Live schema editing](https://rebase.pro/docs/backend/live-schema-editing): Create and alter collections against a running backend — committed to your repository first, then applied.
@@ -65,6 +67,7 @@
 - [Multiple Databases and Buckets](https://rebase.pro/docs/backend/multiple-sources): Route collections to different databases and properties to different storage buckets, and configure each one from the environment.
 - [MongoDB](https://rebase.pro/docs/backend/mongodb): @rebasepro/server-mongo runs Rebase on MongoDB: a complete data driver, change-stream realtime and snapshot history — and no row-level security.
 - [Realtime & WebSocket](https://rebase.pro/docs/backend/realtime): Real-time data synchronization, broadcast channels, and presence tracking via WebSocket.
+- [Realtime across instances](https://rebase.pro/docs/backend/realtime-transports): How broadcast channels and presence survive more than one server process: the LISTEN/NOTIFY bus, what each instance owns, and writing your own transport.
 - [Search](https://rebase.pro/docs/backend/search): How .search() behaves by default, and how to opt a Postgres collection in to ranked full-text search over the fields you name — including JSONB and array content.
 - [Indexes](https://rebase.pro/docs/backend/indexes): Declare ordinary Postgres indexes on a collection — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.
 - [Cron Jobs](https://rebase.pro/docs/backend/cron-jobs): Schedule recurring background tasks with Rebase's built-in cron job system. Define jobs as TypeScript files, monitor them in Studio, and manage them via the REST API.
@@ -194,6 +197,8 @@
 - [HandleIcon](https://rebase.pro/docs/ui/icons/HandleIcon): HandleIcon — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
 - [Client SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
 - [Querying Data](https://rebase.pro/docs/sdk/querying): CRUD operations, fluent query builder, filter operators, pagination, sorting, and relation fetching with the Rebase Client SDK.
+- [Aggregates and search](https://rebase.pro/docs/sdk/aggregates-and-search): Count, sum and group with the SDK, filter inside JSON columns, and run full-text and vector search from the client.
+- [Querying relations](https://rebase.pro/docs/sdk/relations): Include related entities in a query, and read a child collection through its parent with the SDK's relation accessors.
 - [Authentication](https://rebase.pro/docs/sdk/authentication): Client-side authentication with the Rebase SDK — email/password sign-in, OAuth providers, session management, and auth state listeners.
 - [Realtime Subscriptions](https://rebase.pro/docs/sdk/realtime): Subscribe to live data changes with the Rebase Client SDK using WebSocket-based realtime listeners.
 - [Offline & Local-First Sync](https://rebase.pro/docs/sdk/offline): Enable the Rebase Client SDK's local-first sync engine — a local row database, instant offline writes with rollback, and reactive live queries.
