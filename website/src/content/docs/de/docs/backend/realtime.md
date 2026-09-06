@@ -1,5 +1,5 @@
 ---
-sourceHash: 6fe5b7b2b7ed27d2
+sourceHash: 4f7a93fd3a8e67c8
 title: Echtzeit & WebSocket
 sidebar_label: Echtzeit
 description: Echtzeit-Datensynchronisation, Broadcast-Kanäle und Präsenz-Tracking über WebSocket.
@@ -144,15 +144,31 @@ Die Methode `.listen()` des Query-Builders ist nur verfügbar, wenn der `RebaseC
 
 ## Update-Zustellung: Sofort-Patch + Korrektheits-Refetch
 
-Rebase verwendet für Collection-Abonnements eine zweiphasige Update-Strategie, um extreme Geschwindigkeit mit absoluter Korrektheit zu verbinden:
+Eine Änderung erreicht einen Abonnenten nie als Daten. Sie erreicht ihn als die
+Tatsache, dass sich etwas geändert hat, und jedem Abonnenten wird anschließend
+durch eine als er ausgeführte Abfrage mitgeteilt, was *er* sehen darf:
 
-1. **Phase 1 — Sofortiger Entity-Patch:** Wenn sich eine einzelne Entität ändert (erstellt, aktualisiert, gelöscht), pusht der Server sofort eine leichtgewichtige `collection_patch`-Nachricht mit den geänderten Entitätswerten direkt an die Abonnenten. Der Client führt dies in seine zwischengespeicherten Collection-Daten zusammen, um nahezu sofortiges tabübergreifendes Feedback zu erzielen — und umgeht dabei die Datenbank vollständig für Sub-Millisekunden-wahrgenommene Updates.
+1. **Invalidierung.** Wenn sich eine Entität ändert (erstellt, aktualisiert,
+   gelöscht), markiert der Server die betroffenen Pfade. Die geschriebene Zeile
+   wird nicht weitergeleitet — sie wurde unter der Autorisierung des Schreibenden
+   gelesen, und die sagt nichts darüber aus, was ein Abonnent sehen darf.
 
-2. **Phase 2 — Entprellter RLS-Refetch:** Nach einer kurzen Verzögerung von **300 ms** (`REFETCH_DEBOUNCE_MS`) führt der Server einen autoritativen Datenbank-Refetch der Collection durch, der Ihren ursprünglichen Filtern und der Sortierreihenfolge entspricht. Dies ist entscheidend, da Feldmutationen die Sichtbarkeit der Entität ändern könnten (z. B. wenn sich ihr Status geändert hat und nicht mehr zu einem `where`-Filter passt).
+2. **Entprellter RLS-Refetch.** Nach **300 ms** (`REFETCH_DEBOUNCE_MS`) holt der
+   Server die Collection mit Ihren ursprünglichen Filtern und Ihrer
+   Sortierreihenfolge erneut. Die Abfrage läuft in einer Transaktion, die die
+   transaktionslokalen Werte `app.user_id` und `app.user_roles` aus dem
+   `SubscriptionAuthContext` des Abonnenten setzt, sodass Postgres Row-Level
+   Security unter der Identität dieses Clients auswertet und nur die Zeilen, die
+   er sehen darf, im `collection_update` gesendet werden. Die Entprellung fasst
+   außerdem einen Schwall von Schreibvorgängen zu einer einzigen Abfrage zusammen.
 
-   Um strenge Sicherheitsgrenzen aufrechtzuerhalten, wird diese Refetch-Abfrage innerhalb einer Transaktion ausgeführt, die die transaktionslokalen Variablen `app.userId` und `app.user_roles` setzt, die aus dem `SubscriptionAuthContext` des Abonnenten abgeleitet sind. Dies stellt sicher, dass die Row-Level-Security-Einschränkungen (RLS) von PostgreSQL unter der Auth-Sitzung des Clients korrekt ausgewertet werden und nur die Datensätze, die der Benutzer sehen darf, im finalen `collection_update` gesendet werden.
-
-Dieser Ansatz garantiert, dass Listenfilter und Zugriffsrichtlinien perfekt konsistent bleiben, während gleichzeitig eine hohe UI-Reaktionsfähigkeit erhalten bleibt.
+Frühere Versionen sendeten vor diesem Refetch sofort einen `collection_patch`
+mit der geschriebenen Zeile, für tabübergreifendes Feedback im
+Sub-Millisekundenbereich. Diese Zeile war im Geltungsbereich des Schreibenden
+gelesen worden, konnte also Abonnenten erreichen — und tat es —, deren eigene
+Richtlinien sie verweigert hätten, und auch der `where`-Filter des Abonnements
+wurde nicht auf sie angewendet. Der Patch wurde entfernt: Die wahrgenommene
+Latenz eines Updates ist jetzt das Entprellfenster.
 
 ## Broadcast-Kanäle
 
@@ -196,6 +212,13 @@ Wenn ein Client eine `broadcast`-Nachricht sendet, leitet der Server sie an **al
 Standardmäßig erreicht ein Broadcast die aktuell verbundenen Mitglieder und ist danach fort. Das ist der richtige Kompromiss für Benachrichtigungen und Cursor, und er kostet nichts.
 
 Für einen Operationsstrom — kollaboratives Bearbeiten, alles, wo eine stille Lücke zu Divergenz führt — kann ein Kanal so konfiguriert werden, dass er seine Nachrichten **aufbewahrt**. Aufbewahrte Broadcasts erhalten eine kanalweise Sequenznummer und werden gespeichert, sodass ein Client nach einer Wiederverbindung alles ab der zuletzt gesehenen Nachricht anfordern kann.
+
+:::caution[Wo das hingehört]
+**Managed Runtime: nirgendwo.** Kanal-Aufbewahrung und `realtime.bus` sind Teil
+des Datenbankadapters, den die Managed Runtime selbst konstruiert, und keines von
+beiden hat eine Form als Umgebungsvariable. Ejecten Sie, um sie zu konfigurieren.
+**Ejected:** `createPostgresAdapter({ realtime })` in `backend/src/index.ts`.
+:::
 
 Die Aufbewahrung ist optional und wird hier, auf dem Server, konfiguriert:
 
@@ -250,8 +273,9 @@ Bereinigt wird, während Nachrichten eintreffen, pro Kanal gedrosselt, sodass di
 - **Mindestens einmal beim Aufholen.** Ein Wiederholungsbereich kann Nachrichten enthalten, die ein Client bereits erhalten hat; das SDK verwirft die bereits zugestellten.
 
 :::caution[Der Verlauf hat dasselbe Zugriffsmodell wie der Kanal]
-Wer einem Kanal beitreten darf, darf auch dessen aufbewahrte Nachrichten wiederholen — einschließlich derer, die vor seiner Ankunft gesendet wurden. Die Aufbewahrung ist pro Kanalmuster optional. Sie auf einem öffentlich beitretbaren Kanal zu aktivieren macht dessen Vergangenheit daher für jeden Besucher lesbar.
+Ein Client, der einem Kanal beigetreten ist, darf dessen aufbewahrte Nachrichten wiederholen, einschließlich derer, die vor seiner Ankunft gesendet wurden — die Mitgliedschaft ist die einzige Prüfung, und beitreten kann jeder Client, der den Kanal benennen kann. Die Aufbewahrung ist pro Kanalmuster optional, sie zu aktivieren macht die Vergangenheit dieses Kanals also für jeden Besucher lesbar, der den Namen errät. Kanäle mit Aufbewahrung sind der Fall, in dem daraus etwas Dauerhaftes statt etwas Flüchtiges wird — behandeln Sie den Inhalt eines aufbewahrten Kanals deshalb als für Ihre Nutzer öffentlich.
 :::
+
 ## Präsenz-Tracking
 
 Präsenz verfolgt, welche Benutzer aktuell in einem Kanal online sind, und erlaubt jedem Benutzer, benutzerdefinierten Zustand zu teilen (z. B. Cursorposition, Status).
@@ -309,12 +333,14 @@ Das Client-SDK verbindet sich automatisch neu, wenn die WebSocket-Verbindung abb
 Sie können auf Ereignisse des Verbindungslebenszyklus lauschen:
 
 ```typescript
-const ws = client.ws; // Access the WebSocket client
-
-ws.on("connect", () => console.log("Connected"));
-ws.on("disconnect", () => console.log("Disconnected"));
-ws.on("reconnect", () => console.log("Reconnected"));
-ws.on("error", (error) => console.error("Error:", error));
+// `ws` is undefined on a client built without realtime, so narrow it once.
+const ws = client.ws;
+if (ws) {
+    ws.on("connect", () => console.log("Connected"));
+    ws.on("disconnect", () => console.log("Disconnected"));
+    ws.on("reconnect", () => console.log("Reconnected"));
+    ws.on("error", (error) => console.error("Error:", error));
+}
 ```
 
 ## Authentifizierung & RLS
@@ -322,37 +348,14 @@ ws.on("error", (error) => console.error("Error:", error));
 WebSocket-Abonnements respektieren automatisch Row-Level-Security-Richtlinien (RLS). Wenn der Client authentifiziert ist:
 
 1. Die WebSocket-Verbindung authentifiziert sich mit demselben JWT-Token wie die REST-API.
-2. Jeder Abonnement-Refetch läuft innerhalb einer PostgreSQL-Transaktion mit `set_config('app.userId', ...)` und `set_config('app.user_roles', ...)` — wodurch die RLS-Richtlinien durchgesetzt werden.
+2. Jeder Abonnement-Refetch läuft innerhalb einer PostgreSQL-Transaktion mit `set_config('app.user_id', ...)` und `set_config('app.user_roles', ...)` — wodurch die RLS-Richtlinien durchgesetzt werden.
 3. Wenn ein Token während einer aktiven Sitzung abläuft, authentifiziert sich der Client automatisch neu und abonniert erneut.
 
 Das bedeutet, dass jeder Benutzer nur Updates für Datensätze erhält, die er sehen darf.
 
-## Instanzübergreifendes Broadcasting & LISTEN/NOTIFY-Architektur
-
-Für Cluster-Umgebungen mit mehreren Instanzen (z. B. laufend in Kubernetes- oder Docker-Containern hinter einem Load Balancer) stützt sich Rebase auf `LISTEN/NOTIFY` von PostgreSQL, um mutierende Operationen und den Echtzeit-Zustand über Instanzen hinweg zu synchronisieren.
-
-### Umgehen von pgBouncer-Pools
-
-Da Connection-Pooler wie **pgBouncer** das persistente Verbindungsmodell, das für langlebige SQL-`LISTEN`-Sitzungen erforderlich ist, nicht unterstützen, öffnet der Echtzeit-Supervisor einen dedizierten, ungepoolten Postgres-Client (`PgClient`) direkt zur Datenbank. Diese direkte Verbindung nutzt die Umgebungsvariable `DATABASE_DIRECT_URL`, sofern konfiguriert, was Stabilität gewährleistet und Pool-Erschöpfung oder abrupte Abbrüche verhindert.
-
-### Benachrichtigungsmechanik & Payload-Layout
-
-Wenn eine Entität auf Instanz A geändert wird, sendet diese eine Benachrichtigung auf dem Kanal `rebase_entity_changes`. Um den Datenbank-Overhead und die Netzwerkbandbreite zu minimieren, wird das Benachrichtigungs-Payload extrem kompakt gehalten:
-
-```json
-{
-  "sid": "inst_7a9c1b",
-  "p": "posts",
-  "eid": "45",
-  "db": null
-}
-```
-
-*Hinweis: `sid` steht für die eindeutige zufällige Instanz-ID des Servers, die beim Start generiert wird, `p` ist der Collection-Slug (Pfad) und `eid` ist die Ziel-Entitäts-ID.*
-
-- **Selbstfilterung**: Beim Empfang einer Nachricht liest jede Instanz die `sid`. Stimmt sie mit ihrer eigenen Instanz-ID überein, verwirft der Server die Benachrichtigung, um unendliche Routing-Schleifen zu verhindern.
-- **Relay und Fan-out**: Stammt die Benachrichtigung von einer anderen Instanz, plant der Server einen entprellten Refetch und leitet das Update an seine lokal verbundenen WebSocket-Abonnenten weiter.
-- **Supervisor-Wiederverbindungsschleife**: Bricht die Datenbankverbindung ab, überwacht ein Hintergrund-Verbindungssupervisor den Zustand und löst nach einer festen Verzögerung von **3 Sekunden** eine automatische Wiederverbindungssequenz aus, wodurch die `LISTEN`-Schleife wiederhergestellt wird, ohne den Hauptlebenszyklus der Hono-Anwendung zu beeinträchtigen.
+Mehr als eine Instanz zu betreiben — der LISTEN/NOTIFY-Bus, was Präsenz
+prozessübergreifend tut, und das Schreiben eines eigenen Transports — hat eine
+eigene Seite: [Echtzeit über Instanzen hinweg](/docs/backend/realtime-transports/).
 
 ## Änderungserfassung auf Datenbankebene (CDC)
 
@@ -407,6 +410,39 @@ Um zu verhindern, dass Client-Anfragen unbegrenzt hängen bleiben, haben alle au
 Antwortet der Server nicht innerhalb dieses 30-Sekunden-Fensters, löscht der Client automatisch die ausstehende Anfrage und lehnt das Promise mit einem `ApiError` mit der Nachricht `"Request timed out"` ab.
 
 Einwegnachrichten, die keine Antwort erwarten (wie `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack` und `presence_state`), werden sofort bei der Übertragung aufgelöst und lösen keine Timeouts aus.
+
+### Wenn ein Kanal-Frame abgelehnt wird
+
+Ein Kanal-Frame ist Fire-and-Forget: `await channel.broadcast(...)` wird
+aufgelöst, sobald der Frame in den Socket geschrieben ist, **nicht**, wenn der
+Server ihn angenommen hat. Das ist Absicht — eine kollaborative Anwendung sendet
+sechzigmal pro Sekunde eine Cursorposition, und auf jede Bestätigung zu warten
+würde aus jeder einzelnen einen Roundtrip machen.
+
+Eine Ablehnung kann daher kein abgelehntes Promise sein. Sie kommt über
+`onError` an:
+
+```typescript
+const channel = client.realtime.channel("doc:42");
+
+channel.onError((error) => {
+    if (error.code === "CHANNEL_FORBIDDEN") showReadOnlyBanner();
+    if (error.code === "RATE_LIMITED") throttleCursorUpdates();
+});
+```
+
+| Code | Bedeutung |
+|------|-------|
+| `CHANNEL_FORBIDDEN` | Sie sind kein Mitglied des Kanals — treten Sie ihm bei, bevor Sie senden oder seinen Verlauf lesen |
+| `RATE_LIMITED` | Über dem oben genannten Budget für Kanal-Frames |
+| `CHANNEL_HISTORY_WRITE_FAILED` | Ein aufbewahrter Broadcast konnte nicht persistiert werden und wurde daher verworfen |
+| `CHANNEL_HISTORY_READ_FAILED` | Eine Aufhol-Anfrage konnte nicht bedient werden |
+| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | Der Broadcast hat nur diese Instanz erreicht — siehe [Das 8&nbsp;KB-Limit des Postgres-Bus](#the-8-kb-limit-on-the-postgres-bus) |
+
+Ohne angehängten Handler werden diese als Warnung protokolliert. Früher wurden
+sie vollständig verworfen: Es gab kein Promise, das abgelehnt werden konnte, und
+keinen Kanal, an den zugestellt werden konnte, sodass ein verbotener Broadcast
+nicht von einem zugestellten zu unterscheiden war.
 
 ## Nächste Schritte
 
