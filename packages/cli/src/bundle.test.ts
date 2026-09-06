@@ -4,6 +4,7 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     collectDeclaredDependencies,
+    detectDeclaredDepConflicts,
     detectFrameworkDepDrift,
     detectNativeDependencies,
     detectStorageAuthorize,
@@ -261,6 +262,27 @@ pg: "^8.0.0" }
         write("config/package.json", JSON.stringify({ dependencies: { dayjs: "^1.11.0" } }));
 
         expect(collectDeclaredDependencies(scratch)).toEqual({ dayjs: "^1.11.0" });
+    });
+
+    it("lets the backend's own range win over the project root's", () => {
+        // The root is a workspace root: it holds the scripts every workspace
+        // shares, and its ranges were never exercised by the code in the bundle.
+        // The backend's were — it is the app being packaged. The stock scaffold
+        // shipped `dotenv ^16` at the root and `^17.4.2` in `backend/`, and the
+        // root used to win, so every default project's bundle told the managed
+        // runtime to install a major the backend had never compiled against.
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "^17.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+
+        expect(collectDeclaredDependencies(scratch)).toEqual({ dotenv: "^17.4.2" });
+    });
+
+    it("refuses two ranges no single version satisfies, naming both files", () => {
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "^16.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+
+        expect(() => collectDeclaredDependencies(scratch))
+            .toThrow(/dotenv: \^16\.0\.0 \(package\.json\) vs \^17\.4\.2 \(backend\/package\.json\)/);
     });
 
     it("strips zod, which the image supplies", () => {
@@ -636,6 +658,68 @@ hono: "1.0.0" }
     it("survives an unparseable package.json rather than failing the build", () => {
         write("package.json", "{ not json");
         expect(() => detectFrameworkDepDrift(scratch, "0.12.0")).not.toThrow();
+    });
+
+    it("carries the third-party conflicts the build refuses on", () => {
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "^16.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+
+        const drift = detectFrameworkDepDrift(scratch, "0.12.0");
+        expect(drift.conflicting).toHaveLength(1);
+        expect(drift.conflicting[0].declarations.map(d => d.file))
+            .toEqual(["package.json", "backend/package.json"]);
+    });
+});
+
+/**
+ * A name declared twice at ranges nothing satisfies.
+ *
+ * Only one of the two reaches `deps.declared`, so the other half of the project
+ * was typechecked against a version the managed runtime will never install.
+ */
+describe("detectDeclaredDepConflicts", () => {
+    it("finds a disjoint pair across two manifests", () => {
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "^16.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+
+        const [conflict] = detectDeclaredDepConflicts(scratch);
+        expect(conflict.name).toBe("dotenv");
+        expect(conflict.declarations[0]).toEqual({ name: "dotenv",
+range: "^16.0.0",
+file: "package.json" });
+        expect(conflict.declarations[1].file).toBe("backend/package.json");
+    });
+
+    it("says nothing about ranges that overlap", () => {
+        // `^17.0.0` and `^17.4.2` are both satisfied by 17.4.2. A project with a
+        // reason to widen one of them is not making a mistake.
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "^17.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+
+        expect(detectDeclaredDepConflicts(scratch)).toEqual([]);
+    });
+
+    it("ignores names the runtime image supplies", () => {
+        // These are stripped from `deps.declared`, so a disagreement about them
+        // never reaches a bundle; `disagreeing` reports the framework ones.
+        write("package.json", JSON.stringify({ dependencies: { hono: "^3.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { hono: "^4.12.27" } }));
+
+        expect(detectDeclaredDepConflicts(scratch)).toEqual([]);
+    });
+
+    it("ignores a range it cannot parse rather than refusing the build", () => {
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "next" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+
+        expect(detectDeclaredDepConflicts(scratch)).toEqual([]);
+    });
+
+    it("ignores workspace specifiers, which every template uses", () => {
+        write("package.json", JSON.stringify({ dependencies: { "my-lib": "workspace:*" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { "my-lib": "^2.0.0" } }));
+
+        expect(detectDeclaredDepConflicts(scratch)).toEqual([]);
     });
 });
 

@@ -34,7 +34,8 @@ cpu: "x64",
 node: "22" } }
         })),
         detectFrameworkDepDrift: vi.fn(() => ({ behind: [],
-disagreeing: [] }))
+disagreeing: [],
+conflicting: [] }))
     };
 });
 
