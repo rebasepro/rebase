@@ -363,6 +363,65 @@ function checkResolutionMatchesShipped() {
     return problems;
 }
 
+/**
+ * `.env.example` is the file the docs call "a reference for the available
+ * variables". It must actually be one.
+ *
+ * Two producers write into a scaffold's `.env` and neither consults this file:
+ * `rebase init` (which generates secrets, a database password and the pinned
+ * runtime version) and `docker-compose.yml` (which interpolates `${VAR}` at
+ * `docker compose up`). Both had drifted from it — `DATABASE_PASSWORD` and
+ * `REBASE_VERSION` were in the generated `.env` and in compose and nowhere
+ * here, so a reader rebuilding a value from the reference landed on `changeme`
+ * and `latest`, silently.
+ *
+ * The `.env` `init` writes is not on disk when this runs, so the keys are read
+ * from `init.ts` itself — every `KEY=` it interpolates into the file, plus the
+ * ones it names in a `setEnvValue` call.
+ */
+function checkEnvExampleCoversWhatWritesIt() {
+    const problems = [];
+    const examplePath = path.join(templateRoot, ".env.example");
+    const composePath = path.join(templateRoot, "docker-compose.yml");
+    const initPath = path.join(repoRoot, "packages/cli/src/commands/init.ts");
+
+    if (!fs.existsSync(examplePath)) return [".env.example is missing from the template"];
+
+    const example = fs.readFileSync(examplePath, "utf8");
+    const documented = new Set(
+        [...example.matchAll(/^#?\s*([A-Z][A-Z0-9_]*)=/gm)].map(m => m[1])
+    );
+
+    /** `${VAR:-default}` and `${VAR:?message}` alike — both are read there. */
+    const composeVars = fs.existsSync(composePath)
+        ? [...fs.readFileSync(composePath, "utf8").matchAll(/\$\{([A-Z][A-Z0-9_]*)[:}]/g)].map(m => m[1])
+        : [];
+
+    // Comments stripped first: `setEnvValue`'s own docblock says "Set
+    // `KEY=value` in a .env body", and a scan that reads prose as code reports
+    // a variable named KEY.
+    const init = (fs.existsSync(initPath) ? fs.readFileSync(initPath, "utf8") : "")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
+    const initVars = [
+        // `envContent = setEnvValue(envContent, "KEY", …)` and the multi-line form.
+        ...[...init.matchAll(/setEnvValue\(\s*envContent,\s*\n?\s*"([A-Z][A-Z0-9_]*)"/g)].map(m => m[1]),
+        // Template literals and regexes that write the line directly.
+        ...[...init.matchAll(/[`"']#?\\?\^?#?\\?s?\*?([A-Z][A-Z0-9_]{2,})=/g)].map(m => m[1])
+    ];
+
+    for (const [source, names] of [["docker-compose.yml", composeVars], ["init.ts", initVars]]) {
+        for (const name of [...new Set(names)].sort()) {
+            if (documented.has(name)) continue;
+            problems.push(
+                `${name} is written or read by ${source} but appears nowhere in .env.example — `
+                + "a reader rebuilding that value from the reference gets the fallback, silently"
+            );
+        }
+    }
+    return problems;
+}
+
 function checkBaasHasNoAdminTypes() {
     const problems = [];
     const walk = (dir) => {
@@ -400,6 +459,15 @@ let failed = 0;
 // that cannot resolve its own imports. The compose half belongs to the release
 // gate — see check-template-pins.mjs — and is not run here.
 if (checkTemplatePins({ axes: ["imports"] }) !== 0) process.exit(1);
+
+const envProblems = checkEnvExampleCoversWhatWritesIt();
+if (envProblems.length > 0) {
+    failed++;
+    console.log("  FAIL .env.example documents every key written into .env");
+    for (const p of envProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   .env.example documents every key written into .env");
+}
 
 const baasProblems = checkBaasHasNoAdminTypes();
 if (baasProblems.length > 0) {
@@ -564,10 +632,13 @@ try {
 }
 
 if (failed > 0) {
+    // Counted separately: this file checks manifests and a reference file as
+    // well as compiling, and reporting a `.env.example` gap as "does not
+    // compile" sends the reader to look for a type error that is not there.
     console.error(
-        `\n${failed} variant(s) do not compile. These are the files every new project ` +
-            `starts from, so this fails the build.\n` +
-            `Presentation fields belong under \`admin\` — see ` +
+        `\n${failed} FAIL(s) above. These are the files every new project starts from, ` +
+            `so this fails the build.\n` +
+            `If a preset did not compile: presentation fields belong under \`admin\` — see ` +
             `tooling/scripts/codemod/collections-admin-block.mjs.`
     );
     process.exit(1);
