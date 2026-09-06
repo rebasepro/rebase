@@ -13,10 +13,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
+import net from "net";
 import os from "os";
 import path from "path";
 
-import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, devWatchIncludes, getProjectPort, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv } from "./dev";
+import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, devWatchIncludes, getProjectPort, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv } from "./dev";
 
 /**
  * `rebase dev` must notice a function or cron that did not exist when it
@@ -395,5 +396,57 @@ describe("schemaPushArgv", () => {
         // The driver slices the process argument vector, so the first two
         // entries are not decoration.
         expect(schemaPushArgv("postgres://u@127.0.0.1:5432/db").slice(0, 2)).toEqual(["node", "rebase"]);
+    });
+});
+
+describe("pinnedPortRefusal", () => {
+    /**
+     * `--port` used to be advice. `resolveStartPort` returned the number, the
+     * banner printed it, and the server walked past the collision to the next
+     * free port — so with a backend already on 3140, `rebase dev --port 3140`
+     * announced 3140, served on 3142, and a `curl localhost:3140` answered 200
+     * from the *other* project. Dev ports are derived per project, which is
+     * exactly why the number somebody types is so often another Rebase backend.
+     */
+    const servers: net.Server[] = [];
+
+    afterEach(async () => {
+        await Promise.all(servers.splice(0).map(s => new Promise<void>(r => s.close(() => r()))));
+    });
+
+    /** A listening server, and the port it took. */
+    async function occupy(): Promise<number> {
+        const server = net.createServer();
+        servers.push(server);
+        await new Promise<void>(r => server.listen(0, "127.0.0.1", r));
+        const address = server.address();
+        if (address === null || typeof address === "string") throw new Error("no port");
+        return address.port;
+    }
+
+    async function freePort(): Promise<number> {
+        const port = await occupy();
+        const server = servers.pop()!;
+        await new Promise<void>(r => server.close(() => r()));
+        return port;
+    }
+
+    it("refuses a pinned port something is answering on, and names it", async () => {
+        const occupied = await occupy();
+
+        const refusal = await pinnedPortRefusal(occupied, true);
+
+        expect(refusal).toContain(String(occupied));
+        expect(refusal).toContain("--port");
+    });
+
+    it("says nothing when the port was derived — that one still walks", async () => {
+        const occupied = await occupy();
+
+        expect(await pinnedPortRefusal(occupied, false)).toBeNull();
+    });
+
+    it("says nothing about a pinned port that is free", async () => {
+        expect(await pinnedPortRefusal(await freePort(), true)).toBeNull();
     });
 });

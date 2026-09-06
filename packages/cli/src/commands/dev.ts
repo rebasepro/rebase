@@ -327,6 +327,36 @@ export function resolveStartPort(projectRoot: string, explicitPort?: number): nu
 }
 
 /**
+ * Refuse a port the developer named and something else already answers on.
+ *
+ * `--port` used to be advice, not an instruction: `resolveStartPort` returned
+ * the number, the banner printed it, and the server then walked past the
+ * collision to 3141, 3142. Because dev ports are derived per project, the
+ * number typed into `--port` is very often *another Rebase backend*, so the
+ * curl that followed answered 200 from the wrong project rather than refusing
+ * — the one failure mode a port collision is supposed to rule out.
+ *
+ * Asked here as well as in the server (`listenWithPortRetry`'s `explicit`
+ * option, which `REBASE_DEV_PORT_EXPLICIT` below turns on) so the refusal
+ * arrives before a database is started and a schema is pushed, rather than a
+ * minute later underneath them.
+ *
+ * Both loopback addresses, because a listener on `::1` alone is the same
+ * collision and costs one more connect to rule out. Returns the sentence to
+ * print, or `null` when there is nothing to refuse.
+ *
+ * Exported for its test.
+ */
+export async function pinnedPortRefusal(port: number, pinned: boolean): Promise<string | null> {
+    if (!pinned) return null;
+    const taken = await Promise.all([probeTcp("127.0.0.1", port), probeTcp("::1", port)]);
+    if (!taken.some(Boolean)) return null;
+    return `Port ${port} is in use, and you asked for it with --port. ` +
+        `Stop whatever is listening on ${port}, or pass a different port. ` +
+        "(Without --port, dev derives a port for this project and walks past a collision.)";
+}
+
+/**
  * The frontend port for this project, derived the same way the backend's is.
  *
  * `rebase dev` used to leave this entirely to Vite, which takes 5173 and, when
@@ -596,6 +626,10 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // backend is told where the frontend will be and cannot be told later: its
     // environment is fixed when it spawns.
     const startPort = resolveStartPort(projectRoot, args["--port"]);
+    // Named, not derived — see `pinnedPortRefusal`. Only the flag counts: the
+    // .env's `PORT` is deliberately overridden by this command, and the shell's
+    // is what a test harness sets when it wants a port that may still move.
+    const portIsPinned = args["--port"] !== undefined;
     const pinnedFrontendPort = process.env.REBASE_FRONTEND_PORT;
     if (pinnedFrontendPort && !/^\d+$/.test(pinnedFrontendPort)) {
         throw new Error(`REBASE_FRONTEND_PORT must be a number, got ${JSON.stringify(pinnedFrontendPort)}.`);
@@ -603,6 +637,17 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     const frontendPort = pinnedFrontendPort
         ? Number(pinnedFrontendPort)
         : getProjectFrontendPort(projectRoot);
+
+    // Before the banner, and before anything is started: a pinned port that is
+    // already answering is a refusal, not a warning, and the developer should
+    // get it in the first second rather than after a database and a schema push.
+    if (!frontendOnly) {
+        const refusal = await pinnedPortRefusal(startPort, portIsPinned);
+        if (refusal) {
+            console.error(chalk.red(`  ✗ ${refusal}`));
+            process.exit(1);
+        }
+    }
 
     console.log("");
     console.log(chalk.bold("  🚀 Rebase Dev Server"));
@@ -942,6 +987,11 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // its hardcoded default (3001). This prevents cross-project collisions
         // when multiple Rebase instances run simultaneously.
         env.PORT = String(startPort);
+        // …and whether that number was typed or derived, which decides whether
+        // the server may walk past a collision. Always stated, never merely
+        // set: `env` starts as a copy of this process's, so leaving the key
+        // alone would let an inherited value pin a port nobody asked for.
+        env.REBASE_DEV_PORT_EXPLICIT = String(portIsPinned);
 
         // And where the frontend will be, for the same reason. `FRONTEND_URL`
         // is the base of every emailed link and one of the two things CORS is
