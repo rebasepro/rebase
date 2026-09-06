@@ -27,6 +27,9 @@
   "files": [
     "skills/"
   ],
+  "engines": {
+    "node": ">=22.22.0"
+  },
   "exports": {
     ".": "./package.json",
     "./package.json": "./package.json",

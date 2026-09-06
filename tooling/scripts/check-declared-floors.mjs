@@ -69,6 +69,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
+import { publishablePackages } from "./publishable-packages.mjs";
+
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 
 const nvmrcPath = path.join(root, ".nvmrc");
@@ -108,6 +110,9 @@ const roots = ["packages", "tooling", "app", "examples", "infra", "website"]
 
 const found = [path.join(root, "package.json"), ...roots.flatMap((d) => manifests(d))];
 
+/** The directories a release actually publishes, as repo-relative paths. */
+const publishableDirs = new Set(publishablePackages(root).map((p) => p.dir));
+
 const problems = [];
 
 for (const file of found) {
@@ -127,8 +132,13 @@ for (const file of found) {
 
     // Published packages must say something. Private workspace members may stay
     // silent — nobody installs them, so they inherit the repo's floor.
-    const isPublishablePackage = rel.startsWith("packages/") && rel.split("/").length === 3;
-    if (isPublishablePackage && manifest.private !== true && declared === undefined) {
+    //
+    // Derived from `publishablePackages()` rather than from the path, which
+    // used to be `rel.startsWith("packages/")`. That exempted the one
+    // publishable package outside that directory — `tooling/rebase-agent-skills`,
+    // the package `check:publishable-set` exists BECAUSE it kept falling out of
+    // things — so it shipped promising nothing at all.
+    if (publishableDirs.has(path.dirname(rel)) && manifest.private !== true && declared === undefined) {
         problems.push(`${rel}: no engines.node — a published package that promises nothing is installable on anything`);
     }
 }
