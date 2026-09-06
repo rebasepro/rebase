@@ -13,10 +13,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
+import net from "net";
 import os from "os";
 import path from "path";
 
-import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, devWatchIncludes, getProjectPort, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv } from "./dev";
+import { DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devWatchIncludes, getProjectPort, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv } from "./dev";
+import type { PreparedDatabase } from "../dev-db/prepare";
 
 /**
  * `rebase dev` must notice a function or cron that did not exist when it
@@ -395,5 +397,120 @@ describe("schemaPushArgv", () => {
         // The driver slices the process argument vector, so the first two
         // entries are not decoration.
         expect(schemaPushArgv("postgres://u@127.0.0.1:5432/db").slice(0, 2)).toEqual(["node", "rebase"]);
+    });
+});
+
+describe("the ↳ Database banner line", () => {
+    /**
+     * The boot this line introduces writes DDL. Until it named an address, the
+     * only output that ever did was a *failed* connection: a successful boot
+     * against `postgresql://app:pw@127.0.0.1:3141/appdb` mentioned neither 3141
+     * nor `appdb` anywhere in 126 lines.
+     */
+    const external = (url: string): PreparedDatabase => ({
+        database: { kind: "external", url, source: "environment" },
+        env: {},
+        description: "your database (DATABASE_URL in the environment)"
+    });
+
+    it("names the host, the port and the database for an external URL", () => {
+        const line = databaseBannerValue(external("postgresql://app:sweep14@127.0.0.1:3141/appdb"));
+
+        expect(line).toContain("127.0.0.1:3141/appdb");
+        // The one thing that must never be on a banner.
+        expect(line).not.toContain("sweep14");
+    });
+
+    it("omits a port the URL does not state", () => {
+        expect(databaseBannerValue(external("postgres://u@db.example.com/appdb")))
+            .toContain("db.example.com/appdb");
+    });
+
+    it("names the socket directory when the DSN has no host", () => {
+        expect(databaseBannerValue(external("postgresql:///appdb?host=/var/run/postgresql")))
+            .toContain("/var/run/postgresql/appdb");
+    });
+
+    it("names the daemon's port for the managed database", () => {
+        // The managed DSN is in the environment the child gets, not on the
+        // `DevDatabase` — which is why this line could not say where PGlite was.
+        const line = databaseBannerValue({
+            database: { kind: "managed", source: "managed" },
+            env: { DATABASE_URL: "postgresql://postgres@127.0.0.1:5433/postgres?sslmode=disable" },
+            description: "the managed development database (PGlite)"
+        });
+
+        expect(line).toContain("PGlite");
+        expect(line).toContain("127.0.0.1:5433");
+    });
+
+    it("says what --no-db left the backend with", () => {
+        expect(databaseBannerValue(null)).toContain("--no-db");
+    });
+
+    it("falls back to provenance alone when the DSN will not parse", () => {
+        // A wrong address is worse than a missing one.
+        expect(databaseBannerValue(external("not a url")))
+            .toBe("your database (DATABASE_URL in the environment)");
+    });
+
+    it("says nothing extra for a --docker project with no compose file", () => {
+        expect(databaseBannerValue({
+            database: { kind: "docker", source: "docker", url: null },
+            env: {},
+            description: "Postgres in Docker"
+        })).toBe("Postgres in Docker");
+    });
+});
+
+describe("pinnedPortRefusal", () => {
+    /**
+     * `--port` used to be advice. `resolveStartPort` returned the number, the
+     * banner printed it, and the server walked past the collision to the next
+     * free port — so with a backend already on 3140, `rebase dev --port 3140`
+     * announced 3140, served on 3142, and a `curl localhost:3140` answered 200
+     * from the *other* project. Dev ports are derived per project, which is
+     * exactly why the number somebody types is so often another Rebase backend.
+     */
+    const servers: net.Server[] = [];
+
+    afterEach(async () => {
+        await Promise.all(servers.splice(0).map(s => new Promise<void>(r => s.close(() => r()))));
+    });
+
+    /** A listening server, and the port it took. */
+    async function occupy(): Promise<number> {
+        const server = net.createServer();
+        servers.push(server);
+        await new Promise<void>(r => server.listen(0, "127.0.0.1", r));
+        const address = server.address();
+        if (address === null || typeof address === "string") throw new Error("no port");
+        return address.port;
+    }
+
+    async function freePort(): Promise<number> {
+        const port = await occupy();
+        const server = servers.pop()!;
+        await new Promise<void>(r => server.close(() => r()));
+        return port;
+    }
+
+    it("refuses a pinned port something is answering on, and names it", async () => {
+        const occupied = await occupy();
+
+        const refusal = await pinnedPortRefusal(occupied, true);
+
+        expect(refusal).toContain(String(occupied));
+        expect(refusal).toContain("--port");
+    });
+
+    it("says nothing when the port was derived — that one still walks", async () => {
+        const occupied = await occupy();
+
+        expect(await pinnedPortRefusal(occupied, false)).toBeNull();
+    });
+
+    it("says nothing about a pinned port that is free", async () => {
+        expect(await pinnedPortRefusal(await freePort(), true)).toBeNull();
     });
 });

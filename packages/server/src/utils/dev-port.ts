@@ -92,11 +92,30 @@ export function listenWithPortRetry(
         portFileDir?: string;
         /** Service key to include in the state file for MCP server auto-discovery. */
         serviceKey?: string;
+        /**
+         * The port was named, not derived — so bind it or fail.
+         *
+         * Walking is right for the port this project *computed* for itself: it
+         * is one hash of a path away from another project's, and moving to the
+         * next free one is invisible and harmless. It is wrong for a port a
+         * developer typed. `rebase dev --port 3140` with a backend already on
+         * 3140 announced `↳ PORT = 3140`, walked to 3142, and left a `curl
+         * localhost:3140` answering 200 from the *other* project — because dev
+         * ports are derived per project, the number you type is very often
+         * another Rebase backend, and the wrong-app answer looks exactly like
+         * the right one.
+         *
+         * Defaults from `REBASE_DEV_PORT_EXPLICIT`, which `rebase dev` sets on
+         * the backend it spawns: the CLI is where `--port` is known, and the
+         * child's environment is the only channel between them.
+         */
+        explicit?: boolean;
     }
 ): Promise<number> {
     const host = options?.host ?? "0.0.0.0";
     const maxAttempts = options?.maxAttempts ?? MAX_PORT_ATTEMPTS;
     const portFileDir = options?.portFileDir;
+    const explicit = options?.explicit ?? process.env.REBASE_DEV_PORT_EXPLICIT === "true";
 
     const isProd = process.env.NODE_ENV === "production";
     if (isProd) {
@@ -127,8 +146,12 @@ export function listenWithPortRetry(
     //
     // The e2e suite is what surfaced it: it assigns each backend a fresh free port,
     // and the second boot in a project ignored it and re-bound the first one.
+    //
+    // A named port has no affinity at all: the file records where the *last*
+    // run landed, and trying that first is the same silent substitution the
+    // walk below refuses.
     let affinityPort: number | null = null;
-    if (portFileDir) {
+    if (portFileDir && !explicit) {
         try {
             const portFile = path.join(portFileDir, DEV_PORT_FILENAME);
             if (fs.existsSync(portFile)) {
@@ -233,6 +256,18 @@ export function listenWithPortRetry(
              * bug.
              */
             const moveOn = () => {
+                // A named port does not move. See `options.explicit`: the walk
+                // is a convenience for a port nobody chose, and applying it to
+                // one somebody typed hands them another project's backend on
+                // the address they asked for.
+                if (explicit) {
+                    reject(new Error(
+                        `Port ${port} is in use, and it was requested explicitly — ` +
+                        "the dev server does not move to the next free port when the port was named. " +
+                        `Stop whatever is listening on ${port}, or ask for a different one.`
+                    ));
+                    return;
+                }
                 const next = portsToTry[index + 1];
                 logger.warn(next !== undefined
                     ? `Port ${port} is in use — trying ${next}.`

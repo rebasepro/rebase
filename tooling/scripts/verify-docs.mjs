@@ -41,6 +41,7 @@ import { checkMarketingSnippets } from "./docs-verify/check-marketing-snippets.m
 import { checkDocCommands } from "./docs-verify/check-doc-commands.mjs";
 import { checkAgentBundle } from "./docs-verify/check-agent-bundle.mjs";
 import { checkProseTypes } from "./docs-verify/check-prose-types.mjs";
+import { checkPortableImports } from "./docs-verify/check-portable-imports.mjs";
 import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
 import { checkEnvReads } from "./docs-verify/check-env-reads.mjs";
@@ -85,6 +86,7 @@ if (asJson) {
         out.docCommands = checkDocCommands(ROOT).findings;
         out.agentBundle = checkAgentBundle(ROOT).findings;
         out.proseTypes = checkProseTypes(ROOT).findings;
+        out.portableImports = checkPortableImports(ROOT).findings;
         out.versionPins = checkVersionPins(ROOT).findings;
         out.envReference = checkEnvReference(ROOT).findings;
         out.envReads = checkEnvReads(ROOT).findings;
@@ -481,6 +483,22 @@ if (only === "both" || only === "names") {
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} type name(s) that do not exist:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ defineFunction's entry point (all locales) ━━━${NC}`);
+    const { findings: bad, scanned } = checkPortableImports(ROOT);
+    console.log(`${DIM}Scanned ${scanned} page(s) that mention defineFunction.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every page imports defineFunction from @rebasepro/server/functions.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} page(s) teach defineFunction from the package root:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}:${b.line}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);

@@ -37,7 +37,11 @@ barrels are handled):
 
 Stage 1 also carries the checks that are textual rather than type-driven —
 deploy build contexts, **version pins** (below), marketing snippets, documented
-shell commands, MCP manifests, and type names claimed in prose.
+shell commands, MCP manifests, type names claimed in prose, and the entry point
+each page teaches `defineFunction` from (`check-portable-imports.mjs`). That
+last one is the class the export surface cannot catch: `@rebasepro/server` and
+`@rebasepro/server/functions` both resolve, so a page teaching the root is a
+page whose readers silently lose portability.
 
 **2. `snippets` — English + skills, deep.** Compiles each fenced ts/js block
 against workspace *source*. English only, because the other five locales are
