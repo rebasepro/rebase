@@ -21,12 +21,14 @@ Everything is initialized with a single function:
 :::note[Where this goes]
 The call below is what an **ejected** backend has, in `backend/src/index.ts`. On
 the **managed runtime** there is no such file: the runtime makes the call, and
-you configure it through environment variables and the four exports it reads
-from `config/index.ts` (`dataSources`, `storageSources`, `storageAuthorize`,
-`callbacks`). Every page in this section says which of the two applies to the
-option it documents, and names the ones that have no managed form. Export an
-option the runtime does not read and it warns you at boot rather than dropping
-it in silence.
+you configure it through environment variables, the resources you declare in
+`config/resources.ts` (`database()`, `bucket()`), and the two exports it reads
+from `config/index.ts` (`storageAuthorize`, `callbacks`). Every page in this
+section says which of the two applies to the option it documents, and names the
+ones that have no managed form. Export an option the runtime does not read and
+it warns you at boot rather than dropping it in silence; export one that a
+resource declaration replaced and boot refuses it by name, with the
+`config/resources.ts` line to write instead.
 :::
 
 ```typescript
@@ -67,9 +69,9 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 | `collections`, `collectionsDir` | the `config/collections/` directory, declared by `rebase.json` |
 | `functionsDir` | `backend/functions/` |
 | `cronsDir` | `backend/crons/` |
-| `bootstrappers`, `database` | `DATABASE_URL`, plus `export const dataSources` from `config/index.ts` |
+| `bootstrappers`, `database` | `DATABASE_URL`, plus a `database("<key>")` declaration in `config/resources.ts` for every database beyond the default |
 | `auth` | `JWT_SECRET`, the `OAUTH_*` variables, and `config/collections/users` |
-| `storage` | the `STORAGE_*` variables, plus `export const storageSources` from `config/index.ts` |
+| `storage` | the `STORAGE_*` variables, plus a `bucket("<key>")` declaration in `config/resources.ts` for every bucket beyond the default |
 | `storageAuthorize` | `export const storageAuthorize` from `config/index.ts` |
 | `storagePublicRead` | `STORAGE_PUBLIC_READ` |
 | `storageRenditionCache` | `STORAGE_RENDITION_CACHE` |

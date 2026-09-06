@@ -55,6 +55,7 @@ import { checkRlsCheckFlags } from "./docs-verify/check-rls-check-flags.mjs";
 import { checkUnreleasedBadges } from "./docs-verify/check-unreleased-badges.mjs";
 import { checkDocsLinks } from "./docs-verify/check-docs-links.mjs";
 import { checkTranslationFreshness } from "./docs-verify/check-translation-freshness.mjs";
+import { checkConfigExports } from "./docs-verify/check-config-exports.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -95,6 +96,7 @@ if (asJson) {
         out.unreleasedBadges = checkUnreleasedBadges(ROOT).findings;
         out.docsLinks = checkDocsLinks(ROOT).findings;
         out.translationFreshness = checkTranslationFreshness(ROOT).findings;
+        out.configExports = checkConfigExports(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -297,6 +299,22 @@ if (only === "both" || only === "names") {
         console.log(`${RED}✗ ${bad.length} validated variable(s) missing from the reference:${NC}`);
         for (const key of bad) console.log(`  ${RED}${key}${NC}`);
         console.log(`      ${DIM}That page promises it lists every variable the schema validates.${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Config-package exports (all locales) ━━━${NC}`);
+    const { findings: bad, read, cells, scanned } = checkConfigExports(ROOT);
+    console.log(`${DIM}Checked ${cells} documented \`config/index.ts\` export(s) across ${scanned} file(s); the runtime reads ${read.join(", ")}.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}\u2713 Every export a page puts in \`config/index.ts\` is one the runtime reads.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}\u2717 ${bad.length} documented export(s) the runtime does not read:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
     }
 }
 
