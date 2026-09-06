@@ -24,7 +24,7 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { installForAgent, loadSkills, renderSkillIndex } from "./skills";
+import { detectAgents, installForAgent, loadSkills, renderSkillIndex } from "./skills";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** The bundle in this repository — `packages/cli/src/commands` → root. */
@@ -151,6 +151,35 @@ describe("renderSkillIndex", () => {
         // skill name — never an empty cell.
         const index = renderSkillIndex(skills, "windsurf");
         expect(index).toContain("| `demo-skill` | demo skill |");
+    });
+});
+
+/**
+ * Detection guesses, and a wrong guess installs 21 files and reports success.
+ *
+ * `.github/` was Copilot's `detectDir`, and `rebase init` writes
+ * `.github/copilot-instructions.md` into every scaffold — so bare `rebase
+ * skills install` resolved to `[copilot]` in every project, and a Claude Code
+ * user got a green tick and nothing in `.claude/skills`. The rule is that a
+ * `detectDir` has to be evidence the *user* created.
+ */
+describe("detectAgents against a fresh scaffold", () => {
+    const TEMPLATE = path.resolve(HERE, "../../templates/template");
+
+    it("finds nothing in the scaffold rebase init writes", () => {
+        expect(fs.existsSync(TEMPLATE)).toBe(true);
+        expect(detectAgents(TEMPLATE)).toEqual([]);
+    });
+
+    it("finds an agent whose own directory the user made", () => {
+        fs.mkdirSync(path.join(scratch, ".claude"), { recursive: true });
+        expect(detectAgents(scratch)).toEqual(["claude"]);
+    });
+
+    it("never detects Copilot, whatever is in .github", () => {
+        fs.mkdirSync(path.join(scratch, ".github"), { recursive: true });
+        fs.writeFileSync(path.join(scratch, ".github", "copilot-instructions.md"), "# x\n");
+        expect(detectAgents(scratch)).toEqual([]);
     });
 });
 

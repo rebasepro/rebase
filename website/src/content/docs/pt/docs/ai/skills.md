@@ -55,8 +55,14 @@ O `gemini` cobre **tanto** o Gemini CLI quanto o Antigravity — eles leem o mes
 diretório `.agents/`, portanto não há um valor `antigravity` separado.
 
 Sem o `--agent`, o comando detecta quais assistentes um projeto já usa
-procurando por `.cursor/`, `.claude/`, `.windsurf/` e `.agents/`. Se não encontrar
-nenhum, ele solicitará que você escolha.
+procurando por `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` e
+`.kiro/`. Se não encontrar nenhum, ele solicitará que você escolha.
+
+**O GitHub Copilot nunca é detectado.** O diretório dele seria `.github/`, e
+`.github/` não é prova de que alguém use o Copilot: o `rebase init` escreve
+`.github/copilot-instructions.md` em todo projeto gerado, e a maioria dos
+repositórios tem um `.github/` para workflows. Instale-o com
+`--agent copilot`.
 
 :::note[Um projeto recém-criado sempre solicita confirmação]
 O `rebase init` cria `CLAUDE.md`, `.cursorrules` e afins, mas nenhum dos

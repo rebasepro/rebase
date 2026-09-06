@@ -23076,9 +23076,13 @@ bodies sit in per-skill subdirectories and are opened on demand.
 `.agents/` directory, so there is no separate `antigravity` value.
 
 With no `--agent`, the command detects which assistants a project already uses by
-looking for `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/`,
-`.kiro/` and `.github/`. If it finds
-none it prompts you to choose.
+looking for `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` and
+`.kiro/`. If it finds none it prompts you to choose.
+
+**GitHub Copilot is never detected.** Its directory would be `.github/`, and
+`.github/` is not evidence anyone uses Copilot: `rebase init` writes
+`.github/copilot-instructions.md` into every scaffold, and most repositories have
+a `.github/` for workflows. Install it with `--agent copilot`.
 
 :::note[A freshly scaffolded project always prompts]
 `rebase init` writes `CLAUDE.md`, `.cursorrules` and friends, but none of the
