@@ -374,7 +374,13 @@ export class LocalStorageController implements StorageController {
                     continue;
                 }
 
-                const entryPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+                // `normalizedPath`, not `prefix`. The raw argument still has
+                // whatever slashes the caller wrote, so listing
+                // `"products/images/"` — the form the docs' own example uses —
+                // handed back `"products/images//sdk04.txt"` while `putObject`
+                // had returned `"products/images/sdk04.txt"`. Locally that is a
+                // key you cannot pass back; on S3 it is a different object.
+                const entryPath = normalizedPath ? `${normalizedPath}/${entry.name}` : entry.name;
                 const bucket = options?.bucket ?? DEFAULT_BUCKET;
 
                 const ref: StorageReference = {
