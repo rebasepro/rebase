@@ -246,14 +246,39 @@ export function renderSkillIndex(skills: LoadedSkill[], agentKey: AgentKey): str
 }
 
 /**
+ * The body of a YAML block scalar, given the offset of its `description:` line.
+ *
+ * Everything indented more than the key belongs to the value; the first line
+ * that is not blank and not indented ends it.
+ */
+function blockScalarBody(frontMatter: string, keyOffset: number): string {
+    const lines = frontMatter.slice(keyOffset).split("\n").slice(1);
+    const body: string[] = [];
+    for (const line of lines) {
+        if (line.trim() === "") { body.push(""); continue; }
+        if (!/^[ \t]/.test(line)) break;
+        body.push(line.trim());
+    }
+    return body.join(" ");
+}
+
+/**
  * A skill's one-line summary, from its own front matter.
  *
  * Read rather than written here so a new skill needs no edit in this file, and
  * truncated because the index is only worth having while it stays short.
  */
 function describe(skill: LoadedSkill): string {
-    const described = /^description:\s*(.+)$/m.exec(skill.content.split("---")[1] ?? "");
-    const text = (described?.[1] ?? "").trim().replace(/\|/g, "\\|");
+    const frontMatter = skill.content.split("---")[1] ?? "";
+    const described = /^description:[ \t]*(.*)$/m.exec(frontMatter);
+    // `description: |` (or `>`) is a YAML block scalar: the value is the
+    // indented lines that follow, and capturing the line itself captured the
+    // `|`. That rendered an empty "Covers" cell for `rebase-design-language`,
+    // the one skill whose description says agents MUST read it.
+    const raw = /^[|>][-+]?$/.test((described?.[1] ?? "").trim())
+        ? blockScalarBody(frontMatter, described?.index ?? 0)
+        : (described?.[1] ?? "");
+    const text = raw.trim().replace(/\s+/g, " ").replace(/\|/g, "\\|");
     const firstSentence = /^.*?\.(?:\s|$)/.exec(text)?.[0]?.trim() ?? text;
     const fallback = skill.name.replace(/^rebase-/, "").replace(/-/g, " ");
     if (!firstSentence) return fallback;

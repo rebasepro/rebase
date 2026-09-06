@@ -152,6 +152,25 @@ describe("renderSkillIndex", () => {
         const index = renderSkillIndex(skills, "windsurf");
         expect(index).toContain("| `demo-skill` | demo skill |");
     });
+
+    it("reads a description written as a YAML block scalar", () => {
+        // `description: |` puts the value on the *following* indented lines.
+        // Capturing the key's own line captured the `|`, so the one skill whose
+        // description says agents MUST read it got an empty "Covers" cell.
+        const skills = loadSkills(BUNDLE_SKILLS);
+        const index = renderSkillIndex(skills, "cursor");
+        for (const line of index.split("\n")) {
+            const cells = line.split("|");
+            if (cells.length < 4 || !/^\s*`rebase-/.test(cells[1] ?? "")) continue;
+            const covers = (cells[2] ?? "").trim();
+            const name = (cells[1] ?? "").trim().replace(/`/g, "");
+            // The `fallback` branch is the shortest legitimate cell: the skill
+            // name with `rebase-` stripped and hyphens turned into spaces.
+            expect(covers.length, `empty "Covers" for ${name}`).toBeGreaterThanOrEqual(
+                name.replace(/^rebase-/, "").replace(/-/g, " ").length
+            );
+        }
+    });
 });
 
 /**
