@@ -1,7 +1,7 @@
 ---
 title: KI-Instruktionsdateien
 sidebar_label: KI-Instruktionsdateien
-description: Jedes erstellte Rebase-Projekt enthält ai-instructions.md sowie einzeilige Pointer-Dateien für Claude, Cursor, Windsurf, Copilot und AGENTS.md – eine Single Source of Truth, viele Dateinamen.
+description: Jedes erstellte Rebase-Projekt enthält ai-instructions.md sowie dreizeilige Pointer-Dateien für Claude, Cursor, Windsurf, Copilot und AGENTS.md – eine Single Source of Truth, viele Dateinamen.
 ---
 
 Jeder Assistent erwartet seine Regeln in einer anderen Datei. Claude Code liest
@@ -24,15 +24,18 @@ your-project/
     └── copilot-instructions.md   ← pointer
 ```
 
-Jede Pointer-Datei besteht aus zwei Zeilen:
+Jede Pointer-Datei besteht aus drei Zeilen:
 
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
+Install the Rebase skills for this assistant: `rebase skills install --agent claude`.
 ```
 
-`.github/copilot-instructions.md` ist bis auf den relativen Pfad
-(`../ai-instructions.md`) identisch.
+Die übrigen unterscheiden sich nur im letzten Wort der dritten Zeile —
+`--agent cursor`, `--agent windsurf`, `--agent codex`, `--agent copilot` — und im
+relativen Pfad, der in `.github/copilot-instructions.md` `../ai-instructions.md`
+und in `AGENTS.md` `ai-instructions.md` lautet.
 
 Dies geschieht bei jedem `rebase init`, für jedes Preset einschließlich `--headless`.
 Es gibt kein Flag und keine Eingabeaufforderung.
@@ -42,20 +45,29 @@ anderen MCP-Client auf den [Rebase-MCP-Server](/de/docs/ai/mcp) richtet:
 
 ```json title=".mcp.json"
 {
-  "mcpServers": {
-    "rebase": { "command": "npx", "args": ["-y", "@rebasepro/mcp"] }
-  }
+    "mcpServers": {
+        "rebase": {
+            "command": "npx",
+            "args": ["-y", "@rebasepro/mcp"],
+            "env": {
+                "REBASE_PROJECT_DIR": "."
+            }
+        }
+    }
 }
 ```
 
-Ein `REBASE_PROJECT_DIR` steht bewusst nicht darin: Der Client startet den Server
-im Projektstamm, und ein absoluter Pfad ist die eine Zeile dieser Datei, die sich
-nicht committen lässt.
+`REBASE_PROJECT_DIR` ist `"."` und kein absoluter Pfad: Der Client startet den
+Server im Projektstamm, und ein absoluter Pfad ist die eine Zeile dieser Datei,
+die sich nicht committen lässt. Es steht dort, weil `~/.rebase/projects.json`
+rechnerweit gilt — ein Projekt, das kein eigenes Verzeichnis nennt, fällt auf das
+zurück, was zuletzt irgendein Projekt auf diesem Rechner gespeichert hat. Siehe
+[die Rangfolge](/de/docs/ai/mcp#auf-welches-verzeichnis-er-wirkt).
 
 ## Warum ein Pointer statt einer Kopie
 
 Die Pointer-Dateien sind bewusst frei von Inhalten. Assistenten folgen relativen
-Markdown-Links, sodass eine zweizeilige Datei, die auf die eigentliche Datei
+Markdown-Links, sodass eine dreizeilige Datei, die auf die eigentliche Datei
 verweist, dasselbe Ergebnis erzielt wie eine Kopie – und sie bietet Vorteile, die
 eine Kopie nicht hat:
 
@@ -64,7 +76,7 @@ eine Kopie nicht hat:
 - **Nur ein Diff zu prüfen.** Eine Änderung an den Projektkonventionen ist eine
   Änderung an einer einzigen Datei und nicht an fünf identischen Dateien, die ein
   Reviewer vergleichen muss.
-- **Das Hinzufügen eines Assistenten erfordert nur zwei Zeilen.** Ein neues Tool
+- **Das Hinzufügen eines Assistenten erfordert nur drei Zeilen.** Ein neues Tool
   mit einem neuen Dateinamen erhält einen Pointer und keine sechste Kopie Ihrer
   Konventionen.
 
@@ -82,9 +94,13 @@ Sitzung zu wiederholen:
 1. **Schema as Code.** Collections werden in `config/collections/` definiert.
    Bearbeiten Sie niemals das generierte Drizzle-Schema oder die Postgres-Tabellen
    manuell – siehe [Schema as Code](/docs/architecture/schema-as-code).
-2. **Migrationen bestehen aus zwei Schritten.** `rebase schema generate`, dann
-   `rebase db push` in der Entwicklung oder `rebase db generate && rebase db migrate`
-   für die Produktion.
+2. **Wie eine Collection-Änderung ankommt, hängt von der Datenbank ab.** Während
+   `pnpm dev` läuft, ist das Speichern der Collection-Datei der ganze Schritt: Der
+   Boot generiert das Drizzle-Schema neu und legt die fehlenden Tabellen und
+   Spalten an. `pnpm db:push` ist nur für das, was der Boot bewusst auslässt — eine
+   umbenannte Spalte, ein verengter Typ, ein entferntes Feld, RLS auf
+   Junction-Tabellen — und es braucht Ihr eigenes PostgreSQL, nicht die verwaltete
+   Entwicklungsdatenbank. Produktion ist `rebase db generate && rebase db migrate`.
 3. **Nutzen Sie das SDK.** Gehen Sie über `rebase.dataAsAdmin.<slug>` für Arbeit
    unter der Dienstidentität oder über `getDriver(c)` innerhalb einer Function,
    wenn der Lesezugriff als Aufrufer laufen soll. Auf dem Server hat der Client keinen
