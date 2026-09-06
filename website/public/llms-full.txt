@@ -22888,16 +22888,15 @@ it accordingly.
 
 ### Tool reference
 
-41 tools, in eight groups. Tools marked ⚠ are refused against non-local targets
+41 tools, in nine groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
-#### Schema & database (12)
+#### Schema & database (11)
 
 Spawn the Rebase CLI in the active project directory.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_schema_plan` | — | Show the SQL `rebase_db_push` would run, without running any of it |
 | `rebase_schema_generate` | — | Generate Drizzle schema from collection definitions |
 | `rebase_db_push` ⚠ | — | Apply the schema directly to the database (dev shortcut) |
 | `rebase_schema_introspect` | — | Introspect the live database into collection definitions |
@@ -22909,6 +22908,16 @@ Spawn the Rebase CLI in the active project directory.
 | `rebase_db_branch_list` | — | List database branches (admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete a database branch (admins only) |
 | `rebase_db_branch_info` | `name` | Branch information and status (admins only) |
+
+#### Schema planning (1)
+
+Asks the backend what a change would do, over `POST /api/admin/schema/plan`. No
+CLI, and nothing written to disk — it works on the managed development database,
+which the Atlas-backed commands cannot.
+
+| Tool | Required | Description |
+|---|---|---|
+| `rebase_schema_plan` | `collectionId`, `collection` | The SQL one collection's change would run, and which statements destroy data |
 
 #### Documents (5)
 

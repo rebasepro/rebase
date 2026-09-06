@@ -350,16 +350,15 @@ com o devido cuidado.
 
 ## Referência de ferramentas
 
-41 ferramentas, em oito grupos. As ferramentas marcadas com ⚠ são recusadas contra destinos
+41 ferramentas, em nove grupos. As ferramentas marcadas com ⚠ são recusadas contra destinos
 não locais, a menos que você desative a proteção.
 
-### Schema e banco de dados (12)
+### Schema e banco de dados (11)
 
 Executam a CLI do Rebase no diretório do projeto ativo.
 
 | Ferramenta | Obrigatório | Descrição |
 |---|---|---|
-| `rebase_schema_plan` | — | Mostra o SQL que o `rebase_db_push` executaria, sem executar nada |
 | `rebase_schema_generate` | — | Gerar schema do Drizzle a partir das definições de coleções |
 | `rebase_db_push` ⚠ | — | Aplicar o schema diretamente ao banco de dados (atalho de desenvolvimento) |
 | `rebase_schema_introspect` | — | Fazer a introspecção do banco de dados ativo para definições de coleções |
@@ -371,6 +370,16 @@ Executam a CLI do Rebase no diretório do projeto ativo.
 | `rebase_db_branch_list` | — | Listar branches de banco de dados (apenas administradores) |
 | `rebase_db_branch_delete` ⚠ | `name` | Excluir um branch de banco de dados (apenas administradores) |
 | `rebase_db_branch_info` | `name` | Informações e status do branch (apenas administradores) |
+
+### Planeamento de schema (1)
+
+Pergunta ao backend o que uma alteração faria, via `POST /api/admin/schema/plan`.
+Sem CLI e sem nada escrito em disco — funciona na base de dados de desenvolvimento
+gerida, onde os comandos apoiados no Atlas não conseguem.
+
+| Ferramenta | Obrigatório | Descrição |
+|---|---|---|
+| `rebase_schema_plan` | `collectionId`, `collection` | O SQL que a alteração de uma coleção executaria, e que instruções destroem dados |
 
 ### Documentos (5)
 

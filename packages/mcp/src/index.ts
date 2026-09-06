@@ -654,12 +654,13 @@ function clearClientCache(): void {
  * auditable at a glance and a new tool now arrives protected.
  */
 export const READ_ONLY_TOOLS = new Set<string>([
-    // CLI tools that only inspect the database. `rebase_schema_plan` is
-    // `db push --dry-run`: it reads the live schema, prints the diff, and
-    // applies nothing — including the auth-schema step, which is skipped
-    // precisely so that "show me what would happen" does not change anything
-    // on the way.
+    // `rebase_schema_plan` posts to `/api/admin/schema/plan`, the live schema
+    // editor's planner: it computes the statements and returns them, and
+    // `apply` is a different route. It used to be `db push --dry-run`, which
+    // was a read of the database and a *write* of three generated files into
+    // the repository — the half that made "applies nothing" untrue.
     "rebase_schema_plan",
+    // CLI tools that only inspect the database.
     "rebase_doctor",
     "rebase_db_branch_list",
     "rebase_db_branch_info",
@@ -958,13 +959,6 @@ const CLI_TOOLS: (ToolDef & { cmd: string[] })[] = [
         inputSchema: { type: "object",
 properties: {} },
         cmd: ["schema", "generate"]
-    },
-    {
-        name: "rebase_schema_plan",
-        description: "Show the SQL that rebase_db_push would run, without running any of it. Read this before proposing a schema change: it names every statement, and marks the ones that destroy data.",
-        inputSchema: { type: "object",
-properties: {} },
-        cmd: ["db", "push", "--dry-run"]
     },
     {
         name: "rebase_db_push",
@@ -1332,6 +1326,53 @@ const CRON_TOOLS: ToolDef[] = [
     }
 ];
 
+/**
+ * Showing a schema change before making it.
+ *
+ * This was `rebase db push --dry-run`, and that was wrong twice over. `db push`
+ * runs `schema generate` first, so a tool documented as "applies nothing" wrote
+ * `backend/drizzle/schema.sql`, `backend/drizzle/policies.sql` and a rewritten
+ * `backend/src/schema.generated.ts` into the repository on every call. And
+ * `db push` plans with Atlas, which needs a second empty database — the managed
+ * development database serves exactly one, so on the default scaffold the tool
+ * that `rebase_db_push`'s own refusal points at exited 1.
+ *
+ * `POST /api/admin/schema/plan` is the live schema editor's planner: it builds
+ * the statements with `generateSchemaCommit`, not Atlas, so it answers on
+ * PGlite; it has no side effects by construction (the route's own comment says
+ * so, and `apply` is a separate route); and it works over the backend the other
+ * HTTP tools already talk to, so there is no project checkout to write into.
+ *
+ * The cost is that a plan now needs a subject. That is honest: `db push
+ * --dry-run` diffed whatever the working tree happened to contain, which is not
+ * a question an agent asked.
+ */
+const SCHEMA_TOOLS: ToolDef[] = [
+    {
+        name: "rebase_schema_plan",
+        description:
+            "Show the SQL a collection change would run, without running any of it. Posts to " +
+            "/api/admin/schema/plan — it changes nothing, writes no files, and works on the " +
+            "managed development database. Read this before proposing a schema change: it names " +
+            "every statement and marks the ones that destroy data.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                collectionId: {
+                    type: "string",
+                    description: "The collection's id — the filename under config/collections/, without the extension."
+                },
+                collection: {
+                    type: "object",
+                    description: "The whole collection as it should be AFTER the edit, in the shape defineCollection takes.",
+                    additionalProperties: true
+                }
+            },
+            required: ["collectionId", "collection"]
+        }
+    }
+];
+
 const FUNCTION_TOOLS: ToolDef[] = [
     {
         name: "invoke_function",
@@ -1405,6 +1446,7 @@ const PROJECT_TOOLS: ToolDef[] = [
 
 export const ALL_TOOLS: ToolDef[] = [
     ...CLI_TOOLS.map(({ cmd: _c, ...rest }) => rest),
+    ...SCHEMA_TOOLS,
     ...DATA_TOOLS,
     ...ADMIN_TOOLS,
     ...DEV_TOOLS,
@@ -1473,7 +1515,8 @@ function destructiveRefusalHint(toolName: string, output: string): string | null
     if (!/destructive changes require confirmation|--allow-destructive/.test(output)) return null;
     return (
         "\n\nThis push was refused because it destroys data, and that is not yours to approve. " +
-        "Show the planned SQL above (rebase_schema_plan prints it without running anything), " +
+        "Show the planned SQL above (rebase_schema_plan prints one collection's statements " +
+        "without running anything), " +
         "say which statements drop data, and ask the person you are working with to run:\n\n" +
         "    rebase db backup\n" +
         "    rebase db push --allow-destructive\n"
@@ -1611,6 +1654,44 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     // ── Project management tools ────────────────────────────────────────
     switch (name) {
+        case "rebase_schema_plan": {
+            const argsObj = args as { collectionId: string; collection: Record<string, unknown> };
+            const project = getActiveProject();
+            const res = await fetch(`${project.baseUrl}/api/admin/schema/plan`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(project.token ? { Authorization: `Bearer ${project.token}` } : {})
+                },
+                body: JSON.stringify({
+                    collectionId: argsObj.collectionId,
+                    collection: argsObj.collection
+                })
+            });
+            const body = await res.text();
+            if (!res.ok) {
+                // 501 is the one refusal worth translating: the surface is
+                // mounted but the server was started without a collections
+                // directory or a repository, so there is nothing to plan
+                // against. Every other status carries the server's own message,
+                // which is written for a person.
+                const hint = res.status === 501
+                    ? "\n\nThis backend was started without `collectionsDir` or `liveSchema.repository`, " +
+                      "so it has no collection source to plan against. `rebase dev` supplies one; a " +
+                      "deployment running from a built bundle does not."
+                    : "";
+                return untrustedTextResult(
+                    `POST ${project.baseUrl}/api/admin/schema/plan`,
+                    `HTTP ${res.status}\n${body}${hint}`,
+                    true
+                );
+            }
+            return untrustedJsonResult(
+                `POST ${project.baseUrl}/api/admin/schema/plan`,
+                JSON.parse(body)
+            );
+        }
+
         case "rebase_project_list": {
             const projects = Object.values(registry.projects).map((p) => ({
                 name: p.name,

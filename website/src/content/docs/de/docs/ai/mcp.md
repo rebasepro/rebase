@@ -371,16 +371,15 @@ registrierte Projekt enthält; behandeln Sie sie entsprechend.
 
 ## Tool-Referenz
 
-41 Tools in acht Gruppen. Mit ⚠ markierte Tools werden bei nicht-lokalen Zielen
+41 Tools in neun Gruppen. Mit ⚠ markierte Tools werden bei nicht-lokalen Zielen
 verweigert, sofern Sie dies nicht explizit erlauben.
 
-### Schema & Datenbank (12)
+### Schema & Datenbank (11)
 
 Starten die Rebase CLI im aktiven Projektverzeichnis.
 
 | Tool | Erforderlich | Beschreibung |
 |---|---|---|
-| `rebase_schema_plan` | — | Zeigt das SQL, das `rebase_db_push` ausführen würde, ohne etwas davon auszuführen |
 | `rebase_schema_generate` | — | Drizzle-Schema aus Collection-Definitionen generieren |
 | `rebase_db_push` ⚠ | — | Schema direkt auf die Datenbank anwenden (Dev-Abkürzung) |
 | `rebase_schema_introspect` | — | Live-Datenbank in Collection-Definitionen introspektieren |
@@ -392,6 +391,16 @@ Starten die Rebase CLI im aktiven Projektverzeichnis.
 | `rebase_db_branch_list` | — | Datenbank-Branches auflisten (nur Admins) |
 | `rebase_db_branch_delete` ⚠ | `name` | Einen Datenbank-Branch löschen (nur Admins) |
 | `rebase_db_branch_info` | `name` | Branch-Informationen und -Status (nur Admins) |
+
+### Schema-Planung (1)
+
+Fragt das Backend über `POST /api/admin/schema/plan`, was eine Änderung tun würde.
+Keine CLI und nichts, was auf die Platte geschrieben wird — es funktioniert auf der
+verwalteten Entwicklungsdatenbank, auf der die Atlas-gestützten Befehle scheitern.
+
+| Tool | Erforderlich | Beschreibung |
+|---|---|---|
+| `rebase_schema_plan` | `collectionId`, `collection` | Das SQL, das die Änderung einer Collection ausführen würde, und welche Statements Daten zerstören |
 
 ### Dokumente (5)
 

@@ -24,7 +24,7 @@ import {
 } from "../src/index";
 import type { PackageManager } from "../src/index";
 import { spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync, readFileSync, realpathSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -1333,6 +1333,20 @@ describe("local discovery fills gaps only", () => {
 describe("showing a schema change before making it", () => {
     const handler = () => (server as any)._requestHandlers.get("tools/call");
 
+    /** Every file under a directory, with its contents. */
+    function snapshot(dir: string): Record<string, string> {
+        const out: Record<string, string> = {};
+        const walk = (d: string, prefix: string) => {
+            for (const entry of readdirSync(d, { withFileTypes: true })) {
+                const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+                if (entry.isDirectory()) walk(join(d, entry.name), rel);
+                else out[rel] = readFileSync(join(d, entry.name), "utf8");
+            }
+        };
+        walk(dir, "");
+        return out;
+    }
+
     /** Drive the mocked `spawn` to a chosen exit code and output. */
     function cliReturns(output: string, code: number) {
         (mockSpawn.stdout.on as any).mockImplementation((event: string, cb: (b: Buffer) => void) => {
@@ -1356,8 +1370,10 @@ describe("showing a schema change before making it", () => {
         vi.clearAllMocks();
     });
 
-    it("registers a plan tool that runs a dry push", () => {
+    it("registers a plan tool that asks the backend", () => {
         expect(ALL_TOOLS.map((t) => t.name)).toContain("rebase_schema_plan");
+        const tool = ALL_TOOLS.find((t) => t.name === "rebase_schema_plan")!;
+        expect(tool.inputSchema.required).toEqual(["collectionId", "collection"]);
     });
 
     it("plans without touching the environment, so the gate lets it through", () => {
@@ -1367,16 +1383,70 @@ describe("showing a schema change before making it", () => {
         expect(gatedTargetFor("rebase_db_push")).toBe("db");
     });
 
-    it("passes --dry-run, not a bare push", async () => {
-        cliReturns("Planned changes:\n  ALTER TABLE posts ADD COLUMN subtitle text", 0);
-        const result = await handler()({
-            method: "tools/call",
-            params: { name: "rebase_schema_plan", arguments: {} }
-        });
-        const argv = (spawn as any).mock.calls.at(-1)[1] as string[];
-        expect(argv).toEqual(expect.arrayContaining(["rebase", "db", "push", "--dry-run"]));
-        expect(result.content[0].text).toContain("ALTER TABLE posts ADD COLUMN subtitle");
-        expect(result.isError).toBeUndefined();
+    /**
+     * The whole point of moving off `db push --dry-run`: that command runs
+     * `schema generate` first, so a tool documented as "applies nothing" wrote
+     * `backend/drizzle/{schema,policies}.sql` and `backend/src/schema.generated.ts`
+     * into the repository on every call — and then, on the managed database,
+     * exited 1.
+     */
+    it("spawns no CLI and leaves the project directory byte-identical", async () => {
+        const project = mkdtempSync(join(tmpdir(), "rebase-mcp-plan-"));
+        mkdirSync(join(project, "backend", "src"), { recursive: true });
+        writeFileSync(join(project, "backend", "src", "schema.generated.ts"), "// hand-written\n");
+        const before = snapshot(project);
+
+        const fetchSpy = vi.fn(async () => new Response(
+            JSON.stringify({
+                applicable: true,
+                verdict: "applicable",
+                changes: [],
+                statements: ["ALTER TABLE posts ADD COLUMN subtitle text"],
+                files: ["config/collections/posts.ts"],
+                message: "1 statement",
+                withheldConstraints: [],
+                followUp: []
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+        ));
+        vi.stubGlobal("fetch", fetchSpy);
+        try {
+            const result = await handler()({
+                method: "tools/call",
+                params: {
+                    name: "rebase_schema_plan",
+                    arguments: { collectionId: "posts", collection: { slug: "posts", table: "posts" } }
+                }
+            });
+            expect(spawn).not.toHaveBeenCalled();
+            expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/admin/schema/plan");
+            expect(result.content[0].text).toContain("ALTER TABLE posts ADD COLUMN subtitle");
+            expect(result.isError).toBeUndefined();
+            expect(snapshot(project)).toEqual(before);
+        } finally {
+            vi.unstubAllGlobals();
+            rmSync(project, { recursive: true, force: true });
+        }
+    });
+
+    it("translates a 501 into the reason the backend cannot plan", async () => {
+        vi.stubGlobal("fetch", vi.fn(async () => new Response(
+            JSON.stringify({ error: { code: "SCHEMA_EDITING_NO_COLLECTIONS_DIR" } }),
+            { status: 501, headers: { "content-type": "application/json" } }
+        )));
+        try {
+            const result = await handler()({
+                method: "tools/call",
+                params: {
+                    name: "rebase_schema_plan",
+                    arguments: { collectionId: "posts", collection: {} }
+                }
+            });
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toContain("collectionsDir");
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 
     it("marks a non-zero CLI exit as an error rather than describing one", async () => {

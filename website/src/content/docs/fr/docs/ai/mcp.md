@@ -366,16 +366,15 @@ projet que vous avez enregistré ; traitez-le en conséquence.
 
 ## Référence des outils
 
-41 outils, répartis en huit groupes. Les outils marqués d'un ⚠ sont refusés sur les
+41 outils, répartis en neuf groupes. Les outils marqués d'un ⚠ sont refusés sur les
 cibles non locales, sauf si vous désactivez cette restriction.
 
-### Schéma & base de données (12)
+### Schéma & base de données (11)
 
 Lance la CLI Rebase dans le répertoire du projet actif.
 
 | Outil | Requis | Description |
 |---|---|---|
-| `rebase_schema_plan` | — | Affiche le SQL que `rebase_db_push` exécuterait, sans rien exécuter |
 | `rebase_schema_generate` | — | Générer le schéma Drizzle à partir des définitions de collection |
 | `rebase_db_push` ⚠ | — | Appliquer le schéma directement à la base de données (raccourci de développement) |
 | `rebase_schema_introspect` | — | Introspecter la base de données active pour générer les définitions de collection |
@@ -387,6 +386,16 @@ Lance la CLI Rebase dans le répertoire du projet actif.
 | `rebase_db_branch_list` | — | Lister les branches de base de données (administrateurs uniquement) |
 | `rebase_db_branch_delete` ⚠ | `name` | Supprimer une branche de base de données (administrateurs uniquement) |
 | `rebase_db_branch_info` | `name` | Informations et état de la branche (administrateurs uniquement) |
+
+### Planification de schéma (1)
+
+Demande au backend ce qu'un changement ferait, via `POST /api/admin/schema/plan`.
+Pas de CLI et rien d'écrit sur le disque — cela fonctionne sur la base de données
+de développement gérée, ce dont les commandes appuyées sur Atlas sont incapables.
+
+| Outil | Requis | Description |
+|---|---|---|
+| `rebase_schema_plan` | `collectionId`, `collection` | Le SQL qu'exécuterait le changement d'une collection, et quelles instructions détruisent des données |
 
 ### Documents (5)
 
