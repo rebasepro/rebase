@@ -8283,6 +8283,8 @@ client: {
 }
 ```
 
+On Postgres a `reference` is a foreign key like any other, so it follows the same `ON DELETE` rule as a `belongsTo` relation: optional is `SET NULL`, required is `RESTRICT`. See [Relations](/docs/collections/relations).
+
 #### Reference & Relation Options
 
 These apply to both `reference` and `relation` properties.

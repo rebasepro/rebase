@@ -457,6 +457,8 @@ client: {
 
 <FieldWidgetPreview client:only="react" variant="reference" />
 
+Sur Postgres, une `reference` est une clé étrangère comme une autre : elle suit donc la même règle `ON DELETE` qu'une relation `belongsTo` — facultative c'est `SET NULL`, obligatoire c'est `RESTRICT`. Voir [Relations](/docs/collections/relations).
+
 
 ### Options de référence et de relation
 
