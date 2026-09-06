@@ -132,6 +132,7 @@ this list, in this order.
 |---|---|---|
 | `test` | Every package's unit suite, serialized (`--workspace-concurrency=1`). | — |
 | `test:harness` | The agent harness's own tests. | — |
+| `test:saas-console` | The Cloud console's suite, run from **this** repository. The console resolves `@rebasepro/*` to this checkout, so a change here can break it — and did: a hook that grew an `i18n` member turned the control plane's CI red for three runs, from a commit made here. Needs `saas/` checked out beside this repo (it is part of this workspace); CI skips the step when it has no credential for that repository. | — |
 | `verify:selfhost` | A self-hosted deploy, built and booted from the repository. | — |
 | `verify:selfhost:docker` | The same, through the shipped compose file and image. | — |
 | `verify:corpus` | A corpus of bundles still loads under the current runtime contract. | — |

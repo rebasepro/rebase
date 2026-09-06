@@ -85,6 +85,7 @@
     "harness:preflight": "node tooling/scripts/harness/harness.mjs preflight",
     "harness:eval": "node tooling/scripts/harness/harness.mjs eval",
     "test:harness": "node --test tooling/scripts/harness/test/harness.test.mjs",
+    "test:saas-console": "pnpm --filter rebase-saas-frontend test",
     "test:gates": "node --test tooling/scripts/test/api-surface.test.mjs tooling/scripts/test/release-bump.test.mjs tooling/scripts/test/add-dts-extensions.test.mjs tooling/scripts/test/dts-resolution.test.mjs tooling/scripts/test/runtime-provided.test.mjs tooling/scripts/test/publishable-set.test.mjs tooling/scripts/test/ui-docs-props.test.mjs tooling/scripts/test/template-pins.test.mjs",
     "clean": "pnpm -r run clean",
     "release": "./tooling/scripts/release.sh",
