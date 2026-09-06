@@ -1,5 +1,5 @@
 ---
-sourceHash: d328f67c3165d3ef
+sourceHash: f52b1c720e31b72e
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto é vinculado e implantado, e o que a beta privada ainda não inclui.
@@ -90,6 +90,13 @@ deploys twice, say — point at the directory instead of rebuilding:
 rebase build
 rebase cloud deploy --bundle-dir dist-bundle
 ```
+
+Leaving the managed runtime is its own flag, `--eject`, and nothing else asks
+for it: a build that would move a managed project onto a container image it then
+owns is refused until you say so. `--force` used to mean this, which put the
+least reversible thing the CLI can do under the same word as "overwrite this
+file"; it is an unknown option now rather than an alias, so a script carrying it
+stops instead.
 
 Watch it:
 

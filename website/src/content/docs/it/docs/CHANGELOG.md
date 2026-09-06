@@ -308,6 +308,19 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 ### Changed
 
+- **`rebase cloud deploy --force` is now `--eject`, with no alias.** `--force`
+  means four different things across this CLI — overwrite a file (`schema
+  introspect`, `apps`, `eject`), disconnect other Postgres sessions (`db
+  branch`), set a build-time key anyway (`cloud env set`) — and three of them
+  are recoverable in a minute. The fourth moved a live project off the managed
+  runtime onto a container image it now owns, which is the least reversible
+  thing the CLI can be asked to do, under the same word as "overwrite this
+  file". It has its own name now, and `--force` on `cloud deploy` is an unknown
+  option rather than an alias: a script carrying the old spelling stops instead
+  of ejecting a project on a word it no longer means. What the flag does is
+  unchanged — it is still the only way to build a container image for a managed
+  project, for the bare form and for `--source` alike.
+
 - **A collection's `callbacks` runs on the server, and only there. The panel's
   own callbacks are `admin.browserCallbacks`.** The Vite plugin has always
   stripped that block's bodies out of the admin bundle, so a `beforeSave`

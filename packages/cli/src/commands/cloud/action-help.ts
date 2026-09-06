@@ -159,7 +159,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--bundle-dir <path>", "Deploy a bundle that is already built"],
             ["--source <path>", "Upload this directory and build a container image from it"],
             ["--skip-type-check", "Compile without type checking, as `rebase build` does"],
-            ["--force", "Leave the managed runtime on purpose (ejects to a container image)"]
+            ["--eject", "Leave the managed runtime on purpose (ejects to a container image)"]
         ],
         examples: [
             "rebase cloud deploy",
