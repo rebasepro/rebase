@@ -56,6 +56,7 @@ import { checkUnreleasedBadges } from "./docs-verify/check-unreleased-badges.mjs
 import { checkDocsLinks } from "./docs-verify/check-docs-links.mjs";
 import { checkTranslationFreshness } from "./docs-verify/check-translation-freshness.mjs";
 import { checkConfigExports } from "./docs-verify/check-config-exports.mjs";
+import { checkChangelogSections } from "./docs-verify/check-changelog-sections.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -97,6 +98,7 @@ if (asJson) {
         out.docsLinks = checkDocsLinks(ROOT).findings;
         out.translationFreshness = checkTranslationFreshness(ROOT, { strict }).findings;
         out.configExports = checkConfigExports(ROOT).findings;
+        out.changelogSections = checkChangelogSections(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -300,6 +302,22 @@ if (only === "both" || only === "names") {
         console.log(`${RED}✗ ${bad.length} validated variable(s) missing from the reference:${NC}`);
         for (const key of bad) console.log(`  ${RED}${key}${NC}`);
         console.log(`      ${DIM}That page promises it lists every variable the schema validates.${NC}`);
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Changelog sections ━━━${NC}`);
+    const { findings: bad, sections } = checkChangelogSections(ROOT);
+    console.log(`${DIM}## [Unreleased]: ${sections.join(", ") || "(no sections)"}.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}\u2713 One section per heading, in order.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}\u2717 ${bad.length} changelog section problem(s):${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
     }
 }
 
