@@ -19,6 +19,8 @@ import {
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand, commandWords } from "../utils/command-words";
 import { recordEvent } from "../telemetry";
+import { DEV_DATABASE_KIND_ENV, devDatabaseKind } from "../dev-db/prepare";
+import { type DevDatabase } from "../dev-db/resolve";
 
 /**
  * A destination that names a remote store rather than a local path.
@@ -311,6 +313,8 @@ async function resolveDriverCli(): Promise<{
     if (envFile) {
         env.DOTENV_CONFIG_PATH = envFile;
     }
+    env[DEV_DATABASE_KIND_ENV] = devDatabaseKind(projectRoot) ?? "";
+
     return { projectRoot, backendDir, pluginCli, env };
 }
 
@@ -374,6 +378,7 @@ export async function runDriverDbCommand(
     if (envFile) {
         env.DOTENV_CONFIG_PATH = envFile;
     }
+    env[DEV_DATABASE_KIND_ENV] = devDatabaseKind(projectRoot) ?? "";
 
     // Every `db` subcommand reaches Postgres through the driver plugin, which
     // reads DATABASE_URL from this environment — so resolving the database once
@@ -1072,7 +1077,41 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("backups")}    List stored backups (db backup list is the same)
 
 ${chalk.green.bold("Examples")}
-  ${chalk.gray("# Quick development workflow")}
+${dbExamples(devDatabaseKind())}
+  ${chalk.gray("# Back up to a local directory, then to object storage")}
+  rebase db backup --out ./backups
+  rebase db backup --out s3://my-private-bucket/backups
+
+  ${chalk.gray("# Restore into a fresh database (safe: does not touch the live one)")}
+  rebase db restore ./backups/rebase-app-20260714T030000Z.dump --create-db --target-db app_restored
+`);
+}
+
+/**
+ * The examples, which are not the same on the managed development database.
+ *
+ * Every one of the four the help used to lead with — `db push`, `db generate`,
+ * `db migrate`, `db branch` — is refused there, by guards in this same file
+ * that explain exactly why. So on the project the CLI had just scaffolded, the
+ * first thing `rebase db --help` offered was a command that answers with a
+ * refusal, and the reader's most likely conclusion is that their install is
+ * broken.
+ *
+ * Exported for its test.
+ */
+export function dbExamples(kind: DevDatabase["kind"] | null): string {
+    if (kind === "managed") {
+        return `  ${chalk.gray("# Quick development workflow (this project is on the managed database)")}
+  rebase schema generate
+  rebase dev                        ${chalk.gray("# boot applies your collections to it, additively")}
+
+  ${chalk.gray("# push, generate, migrate and branch need a Postgres of your own")}
+  rebase dev --docker               ${chalk.gray("# starts one; or uncomment DATABASE_URL in .env")}
+
+`;
+    }
+
+    return `  ${chalk.gray("# Quick development workflow")}
   rebase schema generate && rebase db push
 
   ${chalk.gray("# Production migration workflow")}
@@ -1084,11 +1123,5 @@ ${chalk.green.bold("Examples")}
   rebase db branch switch feature_auth
   rebase db branch switch --off
 
-  ${chalk.gray("# Back up to a local directory, then to object storage")}
-  rebase db backup --out ./backups
-  rebase db backup --out s3://my-private-bucket/backups
-
-  ${chalk.gray("# Restore into a fresh database (safe: does not touch the live one)")}
-  rebase db restore ./backups/rebase-app-20260714T030000Z.dump --create-db --target-db app_restored
-`);
+`;
 }

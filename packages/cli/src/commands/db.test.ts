@@ -10,6 +10,7 @@ import { describe, it, expect, vi } from "vitest";
 import path from "path";
 import {
     absolutizeLocalPathArgs,
+    dbExamples,
     ManagedDatabaseRefusal,
     refuseAtlasOnManagedDatabase,
     refuseBranchOnManagedDatabase
@@ -214,5 +215,44 @@ describe("refuseBranchOnManagedDatabase", () => {
         for (const sub of ["push", "backup", "restore", "pull"]) {
             expect(call(["node", "rebase", "db", sub], "managed").refused).toBe(false);
         }
+    });
+});
+
+describe("the examples in `rebase db --help`", () => {
+    /**
+     * Every command the help used to lead with — `db push`, `db generate`,
+     * `db migrate`, `db branch` — is refused on the managed development
+     * database, by the two guards above, in this same file. So on the project
+     * the CLI had just scaffolded, the first thing `rebase db --help` offered
+     * was a command that answers with a refusal.
+     */
+    // eslint-disable-next-line no-control-regex
+    const plain = (kind: Parameters<typeof dbExamples>[0]) => dbExamples(kind).replace(/\x1b\[[0-9;]*m/g, "");
+
+    const REFUSED_ON_MANAGED = ["rebase db push", "rebase db generate", "rebase db migrate", "rebase db branch"];
+
+    it("offers nothing the managed database refuses", () => {
+        const examples = plain("managed");
+        for (const command of REFUSED_ON_MANAGED) {
+            expect(examples, `${command} is refused on the managed database`).not.toContain(command);
+        }
+    });
+
+    it("leads with something that works there", () => {
+        const first = plain("managed").split("\n").find(l => l.trim() && !l.trim().startsWith("#"))!;
+        expect(first).toContain("rebase schema generate");
+    });
+
+    it("names how to get a database those commands do work on", () => {
+        // Declining without naming the alternative is how a reader concludes
+        // their install is broken.
+        const examples = plain("managed");
+        expect(examples).toContain("rebase dev --docker");
+        expect(examples).toContain("DATABASE_URL");
+    });
+
+    it.each(["external", "docker", null] as const)("keeps the full workflow for %s", (kind) => {
+        const examples = plain(kind);
+        for (const command of REFUSED_ON_MANAGED) expect(examples).toContain(command);
     });
 });

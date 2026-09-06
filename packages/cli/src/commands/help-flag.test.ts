@@ -84,7 +84,14 @@ vi.mock("../dev-db/prepare", () => ({
         database: { kind: "external" as const, url: "postgresql://u@127.0.0.1:5432/db", source: "env-file" as const },
         description: "the configured database"
     })),
-    managedNotices: () => []
+    managedNotices: () => [],
+    // The same "external", said the pure way: `devDatabaseKind` decides without
+    // starting anything, and every command that spawns the driver passes the
+    // answer down so the driver's own text can branch on it.
+    DEV_DATABASE_KIND_ENV: "REBASE_DEV_DATABASE_KIND",
+    devDatabaseKind: () => "external" as const,
+    resolveActiveBranch: () => null,
+    resolveComposeUrl: () => null
 }));
 
 import { apiKeysCommand } from "./api-keys";

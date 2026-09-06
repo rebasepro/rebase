@@ -49,7 +49,11 @@ vi.mock("../dev-db/prepare", () => ({
         database: { kind: "url" as const },
         description: "the configured database"
     })),
-    managedNotices: () => []
+    managedNotices: () => [],
+    DEV_DATABASE_KIND_ENV: "REBASE_DEV_DATABASE_KIND",
+    devDatabaseKind: () => "external" as const,
+    resolveActiveBranch: () => null,
+    resolveComposeUrl: () => null
 }));
 
 import { dbCommand } from "./db";

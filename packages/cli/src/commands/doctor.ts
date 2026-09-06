@@ -23,6 +23,7 @@ import { analyseFunctionsDirectory, summarisePortability } from "../function-por
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
 import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
+import { DEV_DATABASE_KIND_ENV, devDatabaseKind, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
 import {
     checkDuplicateSlugs,
     checkEnvSanity,
@@ -333,6 +334,7 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     if (envFile) {
         env.DOTENV_CONFIG_PATH = envFile;
     }
+    env[DEV_DATABASE_KIND_ENV] = devDatabaseKind(projectRoot) ?? "";
 
     // Reported before the plugin runs: this one needs no database, and if the
     // URL is the problem then anything that tries to connect with it first will
@@ -373,7 +375,6 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     // continues; the driver then reports its two database phases as skipped,
     // which is the truth.
     try {
-        const { prepareDatabaseEnv, managedNotices } = await import("../dev-db/prepare");
         const prepared = await prepareDatabaseEnv(projectRoot, {
             onProgress: (message) => console.log(chalk.gray(`  ${message}`))
         });

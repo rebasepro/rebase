@@ -16,6 +16,7 @@ import { recordEvent } from "../telemetry";
 import { wantsHelp } from "../utils/args";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
+import { DEV_DATABASE_KIND_ENV, devDatabaseKind } from "../dev-db/prepare";
 
 export async function schemaCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
     // `--help` is answered here, before `requireProjectRoot` and before the
@@ -62,6 +63,12 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     if (envFile) {
         env.DOTENV_CONFIG_PATH = envFile;
     }
+    // Which database this project is on, so the driver's closing line does not
+    // recommend a command that database refuses. A pure decision — nothing is
+    // started, which matters here above all: `schema generate` reads collection
+    // files and writes one file, and booting a database to run it would be a
+    // side effect nobody asked for.
+    env[DEV_DATABASE_KIND_ENV] = devDatabaseKind(projectRoot) ?? "";
 
     try {
         const isTs = pluginCli.endsWith(".ts");
