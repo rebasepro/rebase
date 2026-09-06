@@ -111,6 +111,24 @@ image: {
 | `PATCH` | `/api/storage/tus/:id` | Append data chunk to temporary file |
 | `DELETE` | `/api/storage/tus/:id` | Terminate/abort TUS upload session |
 
+**What they answer.** One envelope, the same one `/api/data` uses: the payload
+is under `data`, and a failure is `{ "error": { message, code, requestId } }`
+with the codes on the [error reference](/docs/backend/errors/). `/api/storage/file/*`
+is the exception, because its payload is the file — it answers the bytes, with
+`Content-Type`, `Content-Length` and the caching headers.
+
+```json
+// GET /api/storage/list?prefix=products/images/
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+```
+
+`POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }`
+of the stored object under `data`; `GET /api/storage/metadata/*` the object's
+metadata and, for a private object, the short-lived `token`;
+`GET /api/storage/sources` the array of configured sources.
+`DELETE /api/storage/file/*` and `POST /api/storage/folder` carry only a
+`message`, since there is nothing to return.
+
 **How a file read is authorized.** The read routes — `/api/storage/file/*` and
 `/api/storage/metadata/*` — take the short-lived signed token that
 [`getSignedUrl()`](/docs/sdk/storage) mints, passed as `?token=<token>` or as a

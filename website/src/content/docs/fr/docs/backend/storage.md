@@ -1,5 +1,5 @@
 ---
-sourceHash: cf5bb8719ad9f47d
+sourceHash: c6ff4a9052df3362
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez des backends de stockage sur le système de fichiers local, compatibles S3 ou GCS/Firebase Storage pour les téléversements de fichiers, images et médias.
@@ -103,6 +103,24 @@ image: {
 | `HEAD` | `/api/storage/tus/:id` | Vérifier la progression du téléversement (offset en octets) |
 | `PATCH` | `/api/storage/tus/:id` | Ajouter un bloc de données au fichier temporaire |
 | `DELETE` | `/api/storage/tus/:id` | Terminer/annuler la session de téléversement TUS |
+
+**Ce qu'ils répondent.** Une seule enveloppe, celle de `/api/data` : la charge
+utile est sous `data`, et un échec est `{ "error": { message, code, requestId } }`
+avec les codes de la [référence des erreurs](/docs/backend/errors/).
+`/api/storage/file/*` fait exception, car sa charge utile est le fichier — il
+répond les octets, avec `Content-Type`, `Content-Length` et les en-têtes de cache.
+
+```json
+// GET /api/storage/list?prefix=products/images/
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+```
+
+`POST /api/storage/upload` répond `201` avec le `{ key, bucket, storageUrl }` de
+l'objet stocké sous `data` ; `GET /api/storage/metadata/*` les métadonnées de
+l'objet et, pour un objet privé, le `token` de courte durée ;
+`GET /api/storage/sources` le tableau des sources configurées.
+`DELETE /api/storage/file/*` et `POST /api/storage/folder` ne portent qu'un
+`message`, puisqu'il n'y a rien à renvoyer.
 
 **Comment la lecture d'un fichier est autorisée.** Les routes de lecture —
 `/api/storage/file/*` et `/api/storage/metadata/*` — acceptent le jeton signé et de

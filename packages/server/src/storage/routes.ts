@@ -675,10 +675,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             at: new Date().toISOString()
         });
 
-        return c.json({
-            success: true,
-            data: result
-        }, 201);
+        return c.json({ data: result }, 201);
     });
 
     /**
@@ -912,11 +909,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     router.get("/metadata/*", fileTokenAuth, publicObjectAuth, readAuthMiddleware, async (c) => {
         const rawPath = extractWildcardPath(c);
         if (!rawPath) {
-            return c.json({
-                success: true,
-                data: null,
-                fileNotFound: true
-            }, 404);
+            return c.json({ data: null, fileNotFound: true }, 404);
         }
 
         const filePath = decodeURIComponent(rawPath);
@@ -972,10 +965,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             }
         }
 
-        return c.json({
-            success: true,
-            data: downloadConfig.metadata
-        });
+        return c.json({ data: downloadConfig.metadata });
     });
 
     /**
@@ -984,8 +974,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     router.delete("/file/*", writeAuthMiddleware, async (c) => {
         const rawPath = extractWildcardPath(c);
         if (!rawPath) {
-            return c.json({ success: true,
-message: "No file to delete" });
+            return c.json({ message: "No file to delete" });
         }
 
         const filePath = decodeURIComponent(rawPath);
@@ -1006,10 +995,7 @@ message: "No file to delete" });
             at: new Date().toISOString()
         });
 
-        return c.json({
-            success: true,
-            message: "File deleted"
-        });
+        return c.json({ message: "File deleted" });
     });
 
     /**
@@ -1044,10 +1030,7 @@ message: "No file to delete" });
             }
         );
 
-        return c.json({
-            success: true,
-            data: result
-        });
+        return c.json({ data: result });
     });
 
     /**
@@ -1106,10 +1089,7 @@ message: "No file to delete" });
             });
         }
 
-        return c.json({
-            success: true,
-            message: "Folder created"
-        }, 201);
+        return c.json({ message: "Folder created" }, 201);
     });
 
     // -----------------------------------------------------------------------
@@ -1204,7 +1184,7 @@ message: "No file to delete" });
             });
         }
 
-        return c.json({ success: true, data: Array.from(byKey.values()) });
+        return c.json({ data: Array.from(byKey.values()) });
     });
 
     return router;

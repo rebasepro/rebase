@@ -1,5 +1,5 @@
 ---
-sourceHash: cf5bb8719ad9f47d
+sourceHash: c6ff4a9052df3362
 title: Configuração de Armazenamento
 sidebar_label: Configuração de Armazenamento
 description: Configure backends de armazenamento em sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -103,6 +103,24 @@ image: {
 | `HEAD` | `/api/storage/tus/:id` | Verificar o progresso do upload (offset de bytes) |
 | `PATCH` | `/api/storage/tus/:id` | Anexar um bloco de dados ao arquivo temporário |
 | `DELETE` | `/api/storage/tus/:id` | Encerrar/abortar a sessão de upload TUS |
+
+**O que respondem.** Um envelope, o mesmo que `/api/data` usa: a carga útil fica
+sob `data`, e uma falha é `{ "error": { message, code, requestId } }` com os
+códigos da [referência de erros](/docs/backend/errors/). `/api/storage/file/*` é a
+exceção, porque a sua carga útil é o ficheiro — responde com os bytes, com
+`Content-Type`, `Content-Length` e os cabeçalhos de cache.
+
+```json
+// GET /api/storage/list?prefix=products/images/
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+```
+
+`POST /api/storage/upload` responde `201` com o `{ key, bucket, storageUrl }` do
+objeto guardado sob `data`; `GET /api/storage/metadata/*` os metadados do objeto
+e, para um objeto privado, o `token` de curta duração;
+`GET /api/storage/sources` o array das fontes configuradas.
+`DELETE /api/storage/file/*` e `POST /api/storage/folder` transportam apenas uma
+`message`, porque não há nada a devolver.
 
 **Como a leitura de um arquivo é autorizada.** As rotas de leitura —
 `/api/storage/file/*` e `/api/storage/metadata/*` — aceitam o token assinado e de curta

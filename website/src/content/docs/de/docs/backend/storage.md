@@ -1,5 +1,5 @@
 ---
-sourceHash: cf5bb8719ad9f47d
+sourceHash: c6ff4a9052df3362
 title: Speicherkonfiguration
 sidebar_label: Speicherkonfiguration
 description: Konfigurieren Sie lokale Dateisystem-, S3-kompatible oder GCS-/Firebase-Storage-Backends für Datei-Uploads, Bilder und Medien.
@@ -103,6 +103,24 @@ image: {
 | `HEAD` | `/api/storage/tus/:id` | Upload-Fortschritt prüfen (Byte-Offset) |
 | `PATCH` | `/api/storage/tus/:id` | Datenblock an temporäre Datei anhängen |
 | `DELETE` | `/api/storage/tus/:id` | TUS-Upload-Sitzung beenden/abbrechen |
+
+**Was sie antworten.** Ein Umschlag, derselbe wie bei `/api/data`: die Nutzlast
+liegt unter `data`, ein Fehler ist `{ "error": { message, code, requestId } }`
+mit den Codes aus der [Fehlerreferenz](/docs/backend/errors/). `/api/storage/file/*`
+ist die Ausnahme, denn seine Nutzlast ist die Datei — es antwortet mit den Bytes,
+samt `Content-Type`, `Content-Length` und den Caching-Headern.
+
+```json
+// GET /api/storage/list?prefix=products/images/
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+```
+
+`POST /api/storage/upload` antwortet mit `201` und dem `{ key, bucket, storageUrl }`
+des gespeicherten Objekts unter `data`; `GET /api/storage/metadata/*` mit den
+Metadaten des Objekts und, bei einem privaten Objekt, dem kurzlebigen `token`;
+`GET /api/storage/sources` mit dem Array der konfigurierten Quellen.
+`DELETE /api/storage/file/*` und `POST /api/storage/folder` tragen nur eine
+`message`, da es nichts zurückzugeben gibt.
 
 **Wie ein Dateizugriff autorisiert wird.** Die Leserouten — `/api/storage/file/*`
 und `/api/storage/metadata/*` — nehmen das kurzlebige signierte Token entgegen, das
