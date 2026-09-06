@@ -302,6 +302,14 @@ root files. The website's pages are \`verify:docs\`, which knows its routing
 and its locales.`
     },
     {
+        run: "check:bug-classes",
+        why: `docs/bug-classes.md is cited by number — "class 4 in its purest form" —
+and it had two \`## 50.\` sections, added months apart, one of which referred
+to the other as class 49. A duplicate heading breaks no link and fails no
+test, so nothing said so. This holds uniqueness and contiguity: a gap means
+an entry was deleted, and a deleted class is a sweep nobody runs again.`
+    },
+    {
         run: "check:untranslated",
         why: `The admin ships seven non-English locales and 200-odd strings that have
 a translation key are also written out as English literals, where no
