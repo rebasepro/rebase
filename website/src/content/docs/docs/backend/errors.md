@@ -128,6 +128,7 @@ the ID you got. Read the response header.
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
 | `AGGREGATE_NOT_SUPPORTED` | 501 | This driver cannot compute the requested aggregate. | Use a driver that can, or compute it in the client. |
+| `BRANCHING_UNSUPPORTED` | — | A database branch was requested over the Studio websocket on the managed development database (PGlite), where a branch *is* the parent and nothing would be isolated. The refusal is the same one `rebase db branch` prints. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one) and branch there. |
 | `BULK_TOO_LARGE` | 400 | The bulk body exceeds the configured item limit. | Split the request. |
 | `BULK_UNSUPPORTED` | 400 | This collection or driver does not support bulk writes. | Write the rows one at a time. |
 | `CALLBACK_REJECTED` | 400 | A collection callback refused the write. A `throw` from `beforeSave`/`beforeDelete`/`after*` is a 400 carrying the author's own message; a `beforeDelete` that returns `false` is a 403. `details.stage` names which callback, `details.path` the collection. | Read the message — it was written by this project, not by Rebase. |
