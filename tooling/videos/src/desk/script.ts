@@ -21,7 +21,9 @@ import { tempo, TEMPO } from "./beats";
  * three security holes.
  *
  * NO SLOGANS. The facts stay — open source, runs where you want, three
- * commands — and the last thing said is a practical offer, not a tagline.
+ * commands — and the last thing said is a practical next step, not a
+ * tagline. Not "the scan is free", either: the whole product is, and
+ * singling the scan out made the rest sound like it was not.
  *
  * EVERY LINE IS CAUSED BY THE ONE BEFORE, and the line follows the camera:
  * it starts a few frames before the move so the words are already going
@@ -58,5 +60,6 @@ export const DESK_NARRATION: { at: number; words: string[] }[] = [
     // studio
     { at: tempo(2098), words: ["And", "you", "can", "edit", "the", "database", "itself", "from", "the", "same", "app."] },
     // all
-    { at: tempo(2208), words: ["That", "was", "three", "commands.", "It", "is", "open", "source,", "and", "you", "can", "run", "it", "on", "your", "laptop,", "on", "your", "own", "servers,", "or", "on", "any", "cloud.", "If", "you", "want", "to", "know", "where", "your", "own", "database", "stands,", "the", "scan", "is", "free."] },
+    // "the scan is free" implied the rest was not. It is all MIT.
+    { at: tempo(2208), words: ["That", "was", "three", "commands.", "It", "is", "open", "source,", "and", "you", "can", "run", "it", "on", "your", "laptop,", "on", "your", "own", "servers,", "or", "on", "any", "cloud.", "The", "scan", "runs", "on", "any", "Postgres,", "so", "you", "can", "start", "by", "scanning", "your", "own", "database."] },
 ];

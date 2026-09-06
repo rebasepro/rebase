@@ -11,8 +11,9 @@ afternoon now. But can you trust it?" — to camera, before any evidence. Then
 the evidence: an agent built this one, and a scan found three security holes.
 
 **No slogans.** You are explaining what just happened, not selling it. The
-last thing said is a practical offer — the scan is free, run it on your own
-database — not a tagline.
+last thing said is a practical next step — scan your own database — not a
+tagline. Not "the scan is free", either: all of it is, and singling the scan
+out made the rest sound like it was not.
 
 **One story, one desk, in the order it happens.** There are no cuts. Every
 line is caused by the one before: the scan finds three holes, so you point
@@ -21,7 +22,7 @@ that file; you push it, so the same scan finds nothing; you run it, so the
 API answers Robert, Dana and an agent, and your team gets the panel. "Three
 commands" at the end is a count of what you watched.
 
-Total: **2727 frames = 90.9 seconds** at 30fps · 225 words · speech is
+Total: **2727 frames = 90.9 seconds** at 30fps · 226 words · speech is
 87% of the running time.
 
 ## The script
@@ -41,7 +42,7 @@ Total: **2727 frames = 90.9 seconds** at 30fps · 225 words · speech is
 | 10 | Every view | 64.9s | 11 | Every collection gets its own views: boards, tables, cards and forms. | 0.0s flow |
 | 11 | The schema | 68.8s | 13 | The schema is read from the database, so it matches what is there. | 0.0s flow |
 | 12 | Studio | 73.3s | 11 | And you can edit the database itself from the same app. | 0.1s flow |
-| 13 | The whole desk | 77.2s | 38 | That was three commands. It is open source, and you can run it on your laptop, on your own servers, or on any cloud. If you want to know where your own database stands, the scan is free. | — |
+| 13 | The whole desk | 77.2s | 39 | That was three commands. It is open source, and you can run it on your laptop, on your own servers, or on any cloud. The scan runs on any Postgres, so you can start by scanning your own database. | — |
 
 ## The presenter
 

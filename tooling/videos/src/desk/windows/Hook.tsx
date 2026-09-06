@@ -211,7 +211,7 @@ export const ScanNote: React.FC<{ x: number; y: number; at: number }> = ({ x, y,
                 opacity: ramp(frame, at, 20),
             }}
         >
-            Free · no signup · nothing leaves your machine
+            Read-only · no signup · nothing leaves your machine
         </div>
     );
 };
