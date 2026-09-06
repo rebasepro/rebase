@@ -42,9 +42,13 @@ DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
 npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 
-If your password contains `@`, `:`, `/`, `?` or `#`, percent-encode it. That is by far the
-most common cause of an authentication failure here, and `rls-check` will say so rather
-than letting you guess.
+If your password contains `/`, `?` or `#`, percent-encode it. Those three end the URL's
+authority section, so the split lands inside the credential — rather than print fragments of
+a password, `rls-check` refuses the string and says so.
+
+`@` and `:` need no encoding: the userinfo is split at the **last** `@` and the user at the
+**first** `:`, which is what `pg` does too, so `postgres://user:pa@ss@host:5432/db` connects
+to `host` with the password `pa@ss`. Encoding them anyway is never wrong.
 
 ### Options
 

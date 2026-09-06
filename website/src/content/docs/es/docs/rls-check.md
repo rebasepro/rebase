@@ -1,5 +1,5 @@
 ---
-sourceHash: 8443765eb7147143
+sourceHash: 45912133a3586b34
 slug: es/docs/rls-check
 title: rls-check
 description: "Audita la seguridad a nivel de fila (RLS) en cualquier base de datos PostgreSQL: Supabase, Neon, RDS o tu propio servidor. Solo lectura, sin registro, sin necesidad de Rebase."
@@ -42,9 +42,13 @@ DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
 npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 
-Si tu contraseña contiene `@`, `:`, `/`, `?` o `#`, codifícala en formato percent-encoding. Esa es, con diferencia,
-la causa más común de fallos de autenticación aquí, y `rls-check` lo indicará claramente en lugar de
-dejarte adivinar.
+Si tu contraseña contiene `/`, `?` o `#`, codifícala en formato percent-encoding. Esos tres caracteres
+terminan la sección de autoridad de la URL, así que la división cae dentro de la credencial: en lugar de
+imprimir fragmentos de una contraseña, `rls-check` rechaza la cadena y lo dice.
+
+`@` y `:` no necesitan codificación: la userinfo se divide en la **última** `@` y el usuario en el
+**primer** `:`, que es lo que hace también `pg`, de modo que `postgres://user:pa@ss@host:5432/db` conecta
+con `host` usando la contraseña `pa@ss`. Codificarlos de todos modos nunca está mal.
 
 ### Opciones
 
