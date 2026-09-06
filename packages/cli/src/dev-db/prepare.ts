@@ -142,13 +142,15 @@ export async function prepareDatabaseEnv(
 
     const description = describeDevDatabase(database);
 
-    if (database.kind === "external" && database.source === "branch") {
-        // The one external case that MUST be exported. Every other connection
-        // string is already somewhere the child will look — `.env` via
-        // DOTENV_CONFIG_PATH, or the shell it inherits — but a branch URL is
-        // derived here and exists nowhere else. Without this the pointer
-        // resolves correctly and then changes nothing: `rebase db backup` on a
-        // switched checkout still reported `Database: leadgen`.
+    if (database.kind === "external" && (database.source === "branch" || database.source === "flag")) {
+        // The two external cases that MUST be exported. `environment` and
+        // `env-file` are already somewhere the child will look — the shell it
+        // inherits, or `.env` via DOTENV_CONFIG_PATH — but a branch URL is
+        // derived here and exists nowhere else, and `--database-url` lives only
+        // in this process's argv. Without this the pointer resolves correctly
+        // and then changes nothing: `rebase db backup` on a switched checkout
+        // still reported `Database: leadgen`, and `rebase dev --database-url …`
+        // announced the database and then died on `DATABASE_URL: is required`.
         //
         // Safe to set: `dotenv` does not overwrite a variable that is already
         // in the environment, so the child's own `.env` load cannot undo it.
@@ -172,8 +174,8 @@ export async function prepareDatabaseEnv(
     }
 
     if (database.kind !== "managed") {
-        // An explicit connection string. The child's environment is already
-        // correct and this adds nothing to it.
+        // `environment` or `env-file`: the connection string is already in a
+        // place the child reads for itself, so this adds nothing to it.
         return { database, env: {}, description };
     }
 
