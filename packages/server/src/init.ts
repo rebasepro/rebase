@@ -2891,14 +2891,23 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // that is neither does not even load the job files — importing them runs
     // whatever the author put at module scope.
     let cronScheduler: import("./cron").CronScheduler | undefined;
-    if (config.cronsDir && (surfaces.cron || ownership.cronScheduler)) {
+    // Whether the surface is *served* does not depend on there being a
+    // directory to serve from. `cronsDir` resolves only if the directory
+    // exists, and a scaffold ships `backend/functions/` and no `backend/crons/`
+    // — so the whole surface was never mounted, `GET /api/cron` answered 404,
+    // and Studio's Cron Jobs pane dead-ended on "Not Found" with a "Try again"
+    // that could never succeed. The argument three paragraphs down — mounted
+    // for the directory, not for the jobs in it, because an empty list is the
+    // honest answer — just stopped one level too early.
+    if (surfaces.cron || (config.cronsDir && ownership.cronScheduler)) {
         const { loadCronJobsWithDiagnostics } = await import("./cron/cron-loader");
         const { CronScheduler } = await import("./cron/cron-scheduler");
         const { createCronRoutes } = await import("./cron/cron-routes");
         const { createCronStore } = await import("./cron/cron-store");
 
-        const { jobs: loadedCronJobs, problems: cronProblems } =
-            await loadCronJobsWithDiagnostics(config.cronsDir);
+        const { jobs: loadedCronJobs, problems: cronProblems } = config.cronsDir
+            ? await loadCronJobsWithDiagnostics(config.cronsDir)
+            : { jobs: [], problems: [] };
 
         cronScheduler = new CronScheduler();
 
@@ -2954,12 +2963,19 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 count: loadedCronJobs.length,
                 path: `${basePath}/admin/cron`
             });
-        } else {
+        } else if (config.cronsDir) {
             logger.warn(
                 `Cron routes mounted at ${basePath}/admin/cron, but no jobs loaded from ${config.cronsDir}. ` +
                 (cronProblems.length > 0
                     ? `Nothing is scheduled — ${cronProblems.length} file(s) were skipped, see the messages above.`
                     : "The directory holds no .ts/.js cron files, so nothing is scheduled.")
+            );
+        } else {
+            // Not a warning: a project with no cron jobs is an ordinary
+            // project, and it is the common one on a fresh scaffold.
+            logger.debug(
+                `Cron routes mounted at ${basePath}/admin/cron. This project has no crons directory, `
+                + "so the list is empty."
             );
         }
     }
