@@ -253,15 +253,41 @@ describe("kinds are registered, not hardcoded", () => {
             }
         } as const;
 
-        it("registering the 0.17.3 literal of each built-in kind neither throws nor warns", () => {
+        /**
+         * `database` is deliberately not in here.
+         *
+         * A freeze holds only where ONE literal ever shipped, and `database` has
+         * two: 0.17.2 edited it before the rule existed, so 0.17.0/0.17.1 drivers
+         * and 0.17.2/0.17.3 drivers inline different objects. Pinning the current
+         * literal to either one throws at the other — which is what happened, for
+         * six and a half days, to two tenants whose bundles predated 0.17.2. It
+         * carries a `revision` instead, and `shipped-kinds.test.ts` is the gate
+         * that every published spec can still meet it.
+         */
+        const frozen = { bucket: shippedAt0173.bucket, topic: shippedAt0173.topic };
+
+        it("registering the shipped literal of a frozen kind neither throws nor warns", () => {
             // Exactly what an inlined 0.17.3 copy does at driver load, after the
             // runtime's copy registered first.
             const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
             try {
-                for (const literal of Object.values(shippedAt0173)) {
+                for (const literal of Object.values(frozen)) {
                     expect(() => registerResourceKind(JSON.parse(JSON.stringify(literal)))).not.toThrow();
                 }
                 expect(warn).not.toHaveBeenCalled();
+            } finally {
+                warn.mockRestore();
+            }
+        });
+
+        it("registering a shipped database literal warns rather than throwing", () => {
+            const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+            try {
+                expect(() =>
+                    registerResourceKind(JSON.parse(JSON.stringify(shippedAt0173.database)))
+                ).not.toThrow();
+                expect(warn).toHaveBeenCalledTimes(1);
+                expect(warn.mock.calls[0][0]).toMatch(/revisions 0 and 1; keeping revision 1/);
             } finally {
                 warn.mockRestore();
             }
@@ -278,14 +304,23 @@ describe("kinds are registered, not hardcoded", () => {
             expect(resourceKind("bucket")?.envBasesByEngine?.local).toEqual(["STORAGE_TYPE", "STORAGE_PATH"]);
         });
 
-        it("the shared registry holds the shipped literal, byte for byte", () => {
+        it("the shared registry holds a frozen kind's shipped literal, byte for byte", () => {
             // What the old copy compares: the raw entry, not the amended view.
             const shared = (globalThis as Record<symbol, { kinds: Map<string, unknown> }>)[
                 Symbol.for("@rebasepro/types.resourceRegistry")
             ];
-            for (const [kind, literal] of Object.entries(shippedAt0173)) {
+            for (const [kind, literal] of Object.entries(frozen)) {
                 expect(JSON.stringify(shared.kinds.get(kind))).toBe(JSON.stringify(literal));
             }
+        });
+
+        it("holds the database literal at a revision above every published one", () => {
+            const shared = (globalThis as Record<symbol, { kinds: Map<string, { revision?: number }> }>)[
+                Symbol.for("@rebasepro/types.resourceRegistry")
+            ];
+            // The literal itself may move now — that is what the revision buys —
+            // but it may never sit at 0 again, because both published copies do.
+            expect(shared.kinds.get("database")?.revision ?? 0).toBeGreaterThan(0);
         });
     });
 });

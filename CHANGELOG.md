@@ -162,6 +162,23 @@
 
 ### Fixed
 
+- **The `database` resource kind could not load beside a driver published before
+  0.17.2.** `optionKeys` gained `"extensions"` in the literal itself, and a kind
+  literal that has shipped is a wire contract: every published driver inlines
+  this package and compares the shared registry's entry against its own copy at
+  load. So a runtime from 0.17.2 onward met a 0.17.0/0.17.1 driver, found two
+  differing specs at the same revision, threw `Resource kind "database" is
+  already registered with a different definition`, and refused to boot. The
+  freeze that was later added to prevent exactly this froze the *newer* literal,
+  which does not make the older one go away — there were already two in the
+  field, and no single literal can equal both.
+
+  `database` now carries `revision: 1`, so a copy holding either published
+  literal loses to the current definition with a warning instead of throwing.
+  `shipped-kinds.test.ts` holds every spec this package has published and asserts
+  each one can still meet the current one; removing the revision fails it with
+  the 0.17.0 literal, which is the crash.
+
 - **A tenant whose pods could not boot reported healthy for six and a half
   days.** Tenant Deployments run `maxUnavailable: 0`, so a failed move surges a
   new pod and leaves the previous ReplicaSet serving. `Available` stays `True`

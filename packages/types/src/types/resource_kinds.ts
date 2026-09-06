@@ -27,9 +27,21 @@ import { DEFAULT_STORAGE_SOURCE_KEY, type StorageSourceDefinition } from "./stor
 // ── database ─────────────────────────────────────────────────────────────────
 
 registerResourceKind({
-    // FROZEN at the 0.17.3 literal — every published driver up to 0.17.3
-    // inlines this package and compares the shared registry's entry against
-    // this exact object at load. Corrections go in the amendment below.
+    // There is no single frozen literal for this kind, which is why it carries a
+    // revision. 0.17.0 and 0.17.1 shipped `optionKeys: ["databaseId",
+    // "migrations"]`; 0.17.2 added "extensions" to the literal itself, before the
+    // rule against that existed. So two different objects are inlined in drivers
+    // that are in the field, and no choice of literal can equal both: a runtime
+    // that matched one threw `already registered with a different definition` at
+    // the other and refused to boot. Two tenants crash-looped for six and a half
+    // days on exactly that.
+    //
+    // `revision` is what resolves it. An older copy — whichever literal it
+    // carries — is at revision 0, loses to this one, and warns instead of
+    // throwing. Corrections still go in the amendment below; this number moves
+    // only when the literal itself has to, and every published copy predating the
+    // move is thereby handled.
+    revision: 1,
     kind: "database",
     engines: ["postgres", "mongodb", "firestore", "sqlite"],
     defaultEngine: "postgres",
