@@ -201,7 +201,7 @@ Kanäle sind leichtgewichtig und ephemer — sie existieren, solange mindestens 
 
 Ein Kanal kann so konfiguriert werden, dass er seine Broadcasts aufbewahrt. Ein Client, der sich neu verbindet, holt dann das Verpasste nach, statt von vorn zu synchronisieren. Das macht Kanäle als Transport für kollaboratives Bearbeiten überhaupt erst brauchbar.
 
-Die Aufbewahrung wird **auf dem Server** konfiguriert, pro Kanalmuster — siehe [Realtime-Backend](/docs/backend/realtime#kanal-aufbewahrung). Ein Client kann sie nicht selbst einschalten: Ein Kanal entsteht dadurch, dass jemand ihn benennt, und eine vom Client gewählte Verlaufstiefe würde jedem Besucher erlauben, Ihr Backend auf unbegrenzten Speicher festzulegen.
+Die Aufbewahrung wird **auf dem Server** konfiguriert, pro Kanalmuster — siehe [Realtime-Backend](/de/docs/backend/realtime#kanal-aufbewahrung). Ein Client kann sie nicht selbst einschalten: Ein Kanal entsteht dadurch, dass jemand ihn benennt, und eine vom Client gewählte Verlaufstiefe würde jedem Besucher erlauben, Ihr Backend auf unbegrenzten Speicher festzulegen.
 
 Übergeben Sie bei einem Kanal mit Aufbewahrung `{ history: true }` — den Rest erledigt das SDK:
 

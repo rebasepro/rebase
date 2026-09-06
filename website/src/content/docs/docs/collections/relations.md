@@ -193,11 +193,7 @@ properties: {
 }
 ```
 
-![Relation field in form](/img/features/relation-form-field.png)
-
-When rendering a preview (like in a table cell or a reference chip), Rebase handles hydration automatically:
-
-![Relation preview in table](/img/features/relation-table-preview.png)
+When rendering a preview (like in a table cell or a reference chip), Rebase handles hydration automatically.
 
 ### To-one gets a picker, many gets a tab
 

@@ -74,6 +74,23 @@ const FORBIDDEN = [
     }
 ];
 
+/**
+ * The dev ports nobody has.
+ *
+ * `rebase dev` derives both from a hash of the project path
+ * (`packages/cli/src/commands/dev.ts`: `3001 + |hash| % 999` and
+ * `5173 + |hash| % 200`), so `localhost:3001` is the one URL a reader is
+ * guaranteed NOT to be served on. The docs say so outright; the home terminal
+ * was corrected on 2026-09-04 and `/cli` and three demos were not, because
+ * nothing read them.
+ *
+ * The carve-out is a line that says the port is derived. A page may show a
+ * sample port as long as it says in the same breath that the number is
+ * per-project.
+ */
+const DEV_PORTS = /\blocalhost:(?:3001|5173)\b|:(?:3001|5173)\b/;
+const DERIVED = /derive/i;
+
 /** Turn syntax-highlighted HTML back into something resembling source. */
 function decode(source) {
     return source
@@ -136,7 +153,20 @@ export function checkMarketingSnippets(root) {
                 }
             }
 
-            // 3. CLI commands shown to a reader must actually dispatch.
+            // 3. No fixed dev port, unless the same line says it is derived.
+            text.split("\n").forEach((line, index) => {
+                if (!DEV_PORTS.test(line) || DERIVED.test(line)) return;
+                findings.push({
+                    file: rel,
+                    line: index + 1,
+                    message:
+                        "`rebase dev` derives its ports from the project path — no reader is " +
+                        "served on :3001 or :5173. Show a sample port and say it is derived, " +
+                        "or read the URL the command printed."
+                });
+            });
+
+            // 4. CLI commands shown to a reader must actually dispatch.
             const reported = new Set();
             for (const re of CLI_INVOCATIONS) {
                 for (const m of text.matchAll(re)) {

@@ -18,16 +18,40 @@
  *      who arrives from a search engine has the sidebar or the back button. That
  *      is the shape of documentation nobody reads twice.
  *
- * English only. The other five locales are machine-translated from these, links
- * included, and a locale-relative check would report the same finding six times.
+ *   3. **An image that 404s.** Six `<img>` in `view-modes.md` and `relations.md`
+ *      pointed at `/img/features/*.png`, a directory that has never existed —
+ *      36 broken images once the locales are counted, each one a console error
+ *      on a page about how good the UI looks. Nothing read image targets.
+ *
+ * This used to be English-only, "because the other five locales are
+ * machine-translated from these, links included". They are — once. The
+ * translator skips a file that already exists, so a translated page is frozen
+ * at the English it was made from, and the docblock's own motivating example
+ * outlived its fix in five locales: `/docs/backend/database/` was dead in
+ * `de`, `es`, `fr`, `it` and `pt` for as long as this check said the tree was
+ * clean. Links and images are now resolved in every locale, against the routes
+ * that locale actually has.
+ *
+ * The outbound-link *minimum* stays English-only. It is a claim about how a
+ * page is written, the translations are the same pages, and reporting the same
+ * editorial finding six times is how a check gets ignored.
  */
-import { readFileSync, globSync } from "node:fs";
+import { readFileSync, existsSync, statSync, globSync } from "node:fs";
 import path from "node:path";
+
+const LOCALES = ["de", "es", "fr", "it", "pt"];
 
 const DOC_GLOBS = [
     "website/src/content/docs/docs/**/*.md",
-    "website/src/content/docs/docs/**/*.mdx"
+    "website/src/content/docs/docs/**/*.mdx",
+    ...LOCALES.flatMap(l => [
+        `website/src/content/docs/${l}/docs/**/*.md`,
+        `website/src/content/docs/${l}/docs/**/*.mdx`
+    ])
 ];
+
+/** Static assets a page can point at. Everything under here is served at `/`. */
+const PUBLIC_DIR = "website/public";
 
 /**
  * Generated trees, exempt from the outbound-link rule only.
@@ -66,16 +90,22 @@ function routeOf(file) {
 
 /**
  * Close enough to github-slugger for headings this site writes: lowercase, drop
- * anything that is not a word character, space or dash, collapse runs of
+ * anything that is not a letter, number, mark, space or dash, collapse runs of
  * whitespace to single dashes. Inline code fences and the "Since" badge span
  * are stripped first, since both appear in headings here.
+ *
+ * The character class is Unicode-aware on purpose. `\w` is ASCII, so
+ * "Retención de Canales" slugged to `retencin-de-canales` here while Starlight
+ * emitted `id="retención-de-canales"` — a mismatch that could only appear once
+ * the five translated locales were scanned, and that would have reported every
+ * accented anchor in them as dead.
  */
 function headingSlug(text) {
     return text
         .replace(/<[^>]*>/g, "")
         .replace(/`/g, "")
         .toLowerCase()
-        .replace(/[^\w\s-]/g, "")
+        .replace(/[^\p{L}\p{N}\p{M}_\s-]/gu, "")
         .trim()
         .replace(/\s+/g, "-");
 }
@@ -104,17 +134,29 @@ export function checkDocsLinks(root) {
         const text = raw.replace(/^(\s*)(`{3,}|~{3,})[\s\S]*?\n\1\2\s*$/gm, "");
         let outbound = 0;
 
-        for (const m of text.matchAll(/\]\((\/docs[^)\s]*)\)/g)) {
+        for (const m of text.matchAll(/\]\((\/(?:docs|de|es|fr|it|pt)\/[^)\s]*|\/docs[^)\s]*)\)/g)) {
             outbound++;
             links++;
             const [target, anchor] = m[1].split("#");
-            const route = (target.replace(/\/$/, "") || "/docs").toLowerCase();
+            const written = target.replace(/\/$/, "") || "/docs";
+            const route = written.toLowerCase();
             const line = text.slice(0, m.index).split("\n").length;
 
             if (!routes.has(route)) {
                 findings.push({
                     file, line,
                     message: `${m[1]} — no page is served at ${route}`
+                });
+                continue;
+            }
+            // Astro lowercases the slug, so `/docs/ui/components/Card` 404s on
+            // the host and 301s at best. It passed every check here because
+            // both sides were lowercased before comparing, and passed
+            // `check_site.mjs` because macOS does not care about case.
+            if (written !== route) {
+                findings.push({
+                    file, line,
+                    message: `${m[1]} — the page is served at ${route}; this link's casing 404s`
                 });
                 continue;
             }
@@ -126,6 +168,25 @@ export function checkDocsLinks(root) {
             }
         }
 
+        // Images. `![alt](/img/x.png)` and `<img src="/img/x.png">` are served
+        // out of `website/public`, and nothing has ever resolved one.
+        for (const m of [
+            ...text.matchAll(/!\[[^\]]*\]\((\/[^)\s]*)\)/g),
+            ...text.matchAll(/<img\b[^>]*\bsrc="(\/[^"]*)"/g)
+        ]) {
+            const target = m[1].split("#")[0].split("?")[0];
+            const asset = path.join(root, PUBLIC_DIR, target.replace(/^\//, ""));
+            if (existsSync(asset) && statSync(asset).isFile()) continue;
+            findings.push({
+                file,
+                line: text.slice(0, m.index).split("\n").length,
+                message: `${m[1]} — no file at ${PUBLIC_DIR}${target}`
+            });
+        }
+
+        // The outbound minimum is a claim about English editorial, not about
+        // five machine translations of it.
+        if (!file.startsWith("website/src/content/docs/docs/")) continue;
         if (NO_OUTBOUND_RULE.some(re => re.test(file))) continue;
         if (outbound < MIN_OUTBOUND) {
             findings.push({

@@ -146,11 +146,7 @@ properties: {
 }
 ```
 
-![Relationsfeld im Formular](/img/features/relation-form-field.png)
-
-Beim Rendern einer Vorschau (z. B. in einer Tabellenzelle oder einem Referenz-Chip) übernimmt Rebase die Hydration automatisch:
-
-![Relationsvorschau in Tabelle](/img/features/relation-table-preview.png)
+Beim Rendern einer Vorschau (z. B. in einer Tabellenzelle oder einem Referenz-Chip) übernimmt Rebase die Hydration automatisch.
 
 ## Multi-Hop-Joins
 

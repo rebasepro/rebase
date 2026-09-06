@@ -146,11 +146,7 @@ properties: {
 }
 ```
 
-![Campo de relação no formulário](/img/features/relation-form-field.png)
-
-Ao renderizar uma pré-visualização (como em uma célula de tabela ou um chip de referência), o Rebase lida com a hidratação automaticamente:
-
-![Pré-visualização de relação na tabela](/img/features/relation-table-preview.png)
+Ao renderizar uma pré-visualização (como em uma célula de tabela ou um chip de referência), o Rebase lida com a hidratação automaticamente.
 
 ## Junções Multi-Salto
 

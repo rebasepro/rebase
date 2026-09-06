@@ -37,13 +37,9 @@ const productsCollection = defineCollection({
 
 ## Vista de Lista
 
-![Marcador de posición de la captura de pantalla de la Vista de Lista](/img/features/list-view.png)
-
 La vista de lista es el modo de vista predeterminado clásico y limpio del CMS, que muestra las entidades en un formato de lista directo sin la densidad de una hoja de cálculo.
 
 ## Vista de Tabla
-
-![Marcador de posición de la captura de pantalla de la Vista de Tabla](/img/features/table-view.png)
 
 La vista predeterminada es una hoja de cálculo virtualizada de alto rendimiento con:
 
@@ -68,8 +64,6 @@ Controle la altura de la fila con `defaultSize`:
 | `"xl"` | 260 | Previsualizaciones de contenido enriquecido |
 
 ## Vista Kanban
-
-![Marcador de posición de la captura de pantalla de la Vista Kanban](/img/features/kanban-view.png)
 
 Configure un tablero Kanban especificando qué propiedad de enumeración usar como columnas:
 
@@ -172,8 +166,6 @@ await tasks.create({
 ```
 
 ## Vista de Tarjetas
-
-![Marcador de posición de la captura de pantalla de la Vista de Tarjetas](/img/features/cards-view.png)
 
 Las tarjetas muestran las entidades como tarjetas visuales — útiles para contenido con muchas imágenes:
 

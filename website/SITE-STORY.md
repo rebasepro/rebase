@@ -578,6 +578,25 @@ long after the backend grew email/password, magic links, OTP, TOTP MFA, scoped
 API keys, twelve OAuth/OIDC providers and custom adapters. The same
 understatement is still in the **docs**, and from there in `llms-full.txt`.
 
+**The security page speaks Kubernetes, on purpose.** Decided 2026-09-06.
+`saas/backend/src/utils/tenancy-vocabulary.test.ts` forbids "pod", "namespace",
+"GKE", "Autopilot", "CloudNativePG", "container" and a dozen more in
+customer-facing strings, with one exception — "cluster", for a customer
+connecting their own. Its argument is that operating the cluster is the
+product, so how we run it is ours to know, the way a hosting company's
+hypervisor is not on its pricing page. `/security` breaks that rule in
+`securitypage.57`, `.61` and `.63`, and it is the one page where breaking it is
+right: an isolation claim a reader cannot check is marketing. "One database per
+tenant" means nothing without naming what the databases sit on; "network
+isolation" means nothing without naming the object that enforces it. A reader
+of `/security` came to audit us, and a mechanism they can look up is the point.
+
+The carve-out is `/security` **only**, and only where a named mechanism is what
+makes a promise falsifiable. Pricing, the console, the deployment copy and every
+generated string keep the rule: `/pricing` sells capacity and isolation, not
+node pools. If a sentence would still be true after deleting the mechanism, the
+mechanism does not belong in it.
+
 **Still English, on purpose** — the reasons are in `PRODUCT.md`:
 `src/data/rls-checks.ts` (verbatim from the tool), `/pitch` (`lang="en"`), and
 demos that mock product UI. A demo that *argues* is page prose and is

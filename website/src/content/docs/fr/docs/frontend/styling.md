@@ -39,7 +39,7 @@ export function DashboardView() {
 }
 ```
 
-Chaque composant du kit est répertorié sous [Composants UI](/docs/ui/components/Card) avec ses véritables props, générées à partir du code source. Vérifiez-y avant de développer vous-même : `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` et une quarantaine d'autres existent déjà.
+Chaque composant du kit est répertorié sous [Composants UI](/docs/ui/components/card/) avec ses véritables props, générées à partir du code source. Vérifiez-y avant de développer vous-même : `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` et une quarantaine d'autres existent déjà.
 
 ## Couleur : utilisez des jetons, jamais de valeurs littérales
 
