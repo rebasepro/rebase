@@ -1028,6 +1028,7 @@ export const en = {
   "comparepage.axis.leaving.rebase": "The database keeps working — policies, constraints and data exactly where they were. The panel was a dependency you can delete.",
   "comparepage.axis.leaving.others": "Depends how deep the tool went into your schema. If it created the tables, leaving means a migration.",
   "comparepage.meta.title": "Rebase compared — Supabase, Directus, Strapi, Retool and the rest",
+  "comparepage.meta.description": "An honest side-by-side: where Rebase wins, where a competitor is the better call, and what the trade-offs actually are.",
 
   // ── devpage ─────────────────────────────────────────────────────
   "devpage.00": "TypeScript · Postgres · your editor",

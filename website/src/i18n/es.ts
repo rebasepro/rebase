@@ -929,6 +929,7 @@ export const es = {
   "comparepage.axis.leaving.rebase": "La base de datos sigue funcionando: políticas, restricciones y datos exactamente donde estaban. El panel era una dependencia que puedes borrar.",
   "comparepage.axis.leaving.others": "Depende de cuánto se metió la herramienta en tu esquema. Si creó las tablas, irse significa una migración.",
   "comparepage.meta.title": "Rebase comparado — Supabase, Directus, Strapi, Retool y los demás",
+  "comparepage.meta.description": "Una comparación honesta: dónde gana Rebase, dónde la competencia es la mejor opción y cuáles son de verdad las concesiones.",
 
   // ── devpage ─────────────────────────────────────────────────────
   "devpage.00": "TypeScript · Postgres · tu editor",

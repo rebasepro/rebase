@@ -145,18 +145,30 @@ for (const [route, file] of [...pages].sort()) {
 }
 
 /* 6. The locale fan-out: a string that is identical in every locale is a
-      string that was never translated. Only checked on <title>, which every
-      page sets deliberately. */
+      string that was never translated. Checked on the two strings every page
+      sets deliberately and a search result shows: <title>, and the meta
+      description — `/compare` hardcoded its description as an English literal
+      while taking its title from the i18n file next to it, and shipped the
+      same English sentence to German, Spanish and French readers.
+
+      The three-word carve-out is the same on both: a short string is often a
+      proper noun that is the same in every language. */
+const META = [
+    ["untranslated-title", /<title>([\s\S]*?)<\/title>/],
+    ["untranslated-description", /<meta\s+name="description"\s+content="([^"]*)"/]
+];
 for (const [route, file] of pages) {
     if (!/^\/(es|de|fr)\//.test(route)) continue;
     // Pages kept out of the index are not localisation surfaces (`/pitch`).
     if (/noindex/i.test(readFileSync(file, "utf8"))) continue;
     const en = pages.get(route.replace(/^\/(es|de|fr)/, "") || "/");
     if (!en) continue;
-    const t = (f) => readFileSync(f, "utf8").match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim();
-    const got = t(file);
-    if (got && got === t(en) && got.replace("— Rebase", "").trim().split(/\s+/).length > 2)
-        fail(route, "untranslated-title", got);
+    for (const [check, re] of META) {
+        const read = (f) => readFileSync(f, "utf8").match(re)?.[1]?.trim();
+        const got = read(file);
+        if (got && got === read(en) && got.replace("— Rebase", "").trim().split(/\s+/).length > 2)
+            fail(route, check, got);
+    }
 }
 
 /* 7. Every English marketing route has a `.md` mirror.
