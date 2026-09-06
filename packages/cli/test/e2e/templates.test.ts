@@ -315,6 +315,11 @@ describe.each(BAAS_PRESETS)("baas template: %s", (preset) => {
         await client.connect();
         // baas has no db:push; the auth schema is created by the server at boot.
         backend = await startBackend(projectDir, env);
+        // The first registered account, which is the admin — and the one the
+        // RLS test below signs in as after a restart. Nothing else creates it:
+        // `REBASE_ADMIN_*` in the scaffold's `.env` belongs to the production
+        // boot and is ignored here, which is the whole point of that change.
+        await claimFirstAdmin(backend.baseUrl);
     }, 600_000);
 
     afterAll(async () => {
