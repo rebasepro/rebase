@@ -18,6 +18,7 @@ import {
     findDevDir,
     envDeclaredProject,
     autoDiscoverLocal,
+    describeForeignDevServer,
     explainToolError,
     answerCliFlags,
     lastLines
@@ -1526,6 +1527,52 @@ describe("error ergonomics", () => {
     it("leaves a 404 alone for a tool whose surface is always mounted", () => {
         const notFound = Object.assign(new Error("Not Found"), { status: 404 });
         expect(explainToolError(notFound, "http://x", "get_document")).toBe("Not Found");
+    });
+
+    it("names a dev server it did not spawn, in both dev tools", async () => {
+        const state = { baseUrl: "http://localhost:3070", serviceKey: "k", pid: process.pid };
+        expect(describeForeignDevServer("logs", state)).toContain("http://localhost:3070");
+        expect(describeForeignDevServer("logs", state)).toContain("did not start it");
+        expect(describeForeignDevServer("stop", state)).toContain("Ctrl-C");
+        expect(describeForeignDevServer("logs", null)).toBeNull();
+    });
+
+    it("reads a live .rebase/state.json rather than only its own child", async () => {
+        const project = mkdtempSync(join(tmpdir(), "rebase-mcp-devstate-"));
+        mkdirSync(join(project, ".rebase"), { recursive: true });
+        writeFileSync(
+            join(project, ".rebase", "state.json"),
+            JSON.stringify({ baseUrl: "http://localhost:3070", serviceKey: "k".repeat(40), pid: process.pid })
+        );
+        const home = join(tmpdir(), "rebase-mcp-test-home");
+        const registryPath = join(home, ".rebase", "projects.json");
+        mkdirSync(join(home, ".rebase"), { recursive: true });
+        const saved = existsSync(registryPath) ? readFileSync(registryPath, "utf8") : null;
+        writeFileSync(registryPath, JSON.stringify({
+            activeProject: "default",
+            projects: {
+                default: {
+                    name: "default", projectDir: project, baseUrl: "", token: "",
+                    addedAt: "2020-01-01T00:00:00.000Z"
+                }
+            }
+        }));
+        vi.resetModules();
+        try {
+            const mod = await import("../src/index");
+            const call = (mod.server as any)._requestHandlers.get("tools/call");
+            const result = await call({
+                method: "tools/call",
+                params: { name: "rebase_dev_logs", arguments: { lines: 5 } }
+            });
+            expect(result.content[0].text).toContain("http://localhost:3070");
+            expect(result.content[0].text).not.toBe("Dev server is not running.");
+        } finally {
+            if (saved === null) rmSync(registryPath, { force: true });
+            else writeFileSync(registryPath, saved);
+            rmSync(project, { recursive: true, force: true });
+            vi.resetModules();
+        }
     });
 
     it("leaves an error that is not a connection failure alone", () => {

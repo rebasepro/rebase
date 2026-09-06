@@ -1535,6 +1535,42 @@ export function lastLines(text: string, count: number): string {
     return lines.slice(-Math.max(1, count)).join("\n");
 }
 
+/**
+ * A dev server this process did not spawn, named rather than denied.
+ *
+ * `devProcess` is only the child `rebase_dev_start` made, so "Dev server is not
+ * running." was what `rebase_dev_logs` and `rebase_dev_stop` answered while one
+ * was running in a terminal — in the same session where
+ * `rebase_project_current` was reporting that server's URL, discovered from the
+ * same `.rebase/state.json` these two never read. The output belongs to the
+ * terminal that started it, and so does the decision to stop it.
+ *
+ * @returns The sentence to answer with, or `null` when nothing is running.
+ */
+export function describeForeignDevServer(
+    action: "logs" | "stop",
+    state: ReturnType<typeof readDevState> | undefined = undefined
+): string | null {
+    const project = (() => {
+        try {
+            return getActiveProject();
+        } catch {
+            return null;
+        }
+    })();
+    const dir = project?.projectDir;
+    const found = state !== undefined ? state : dir ? readDevState(dir) : null;
+    if (!found) return null;
+    const where = `${found.baseUrl}${found.pid ? ` (PID ${found.pid})` : ""}`;
+    return action === "logs"
+        ? `A dev server is running at ${where}, but this session did not start it — ` +
+          "its output goes to the terminal that did. Only a server started with " +
+          "`rebase_dev_start` has logs here."
+        : `A dev server is running at ${where}, but this session did not start it. ` +
+          "Stop it in the terminal that did (Ctrl-C); this tool only stops a server " +
+          "`rebase_dev_start` spawned.";
+}
+
 function appendDevLog(line: string) {
     devLogs.push(line);
     if (devLogs.length > MAX_DEV_LOG_LINES) {
@@ -2109,14 +2145,15 @@ roles });
             // and the docs both promised lines.
             const recent = lastLines(devLogs.join(""), lineCount);
             if (!recent) {
-                return textResult(devProcess ? "No output captured yet." : "Dev server is not running.");
+                if (devProcess) return textResult("No output captured yet.");
+                return textResult(describeForeignDevServer("logs") ?? "Dev server is not running.");
             }
             return untrustedTextResult("the dev server's output", recent);
         }
 
         case "rebase_dev_stop": {
             if (!devProcess || devProcess.killed) {
-                return textResult("Dev server is not running.");
+                return textResult(describeForeignDevServer("stop") ?? "Dev server is not running.");
             }
             devProcess.kill("SIGTERM");
             return textResult("Dev server stopped.");
