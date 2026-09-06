@@ -33,6 +33,57 @@ function schemaDriftCause(drift: { client: string; server: string } | undefined)
 /** Tracks whether we've already shown the doctor hint (once per process). */
 let _schemaDriftHinted = false;
 
+/**
+ * The schema-drift remedy, in the words that work on *this* database.
+ *
+ * The three copies of this message hard-coded `Run \`pnpm db:push\``, and on a
+ * stock scaffold — where the managed PGlite database is the default — that
+ * command answers `✗ rebase db push does not work on the managed development
+ * database.` and exits 1. So the one instruction the server gave when a
+ * developer's schema had drifted was a command their project refuses.
+ *
+ * Atlas plans a push by diffing against a second, empty database, and PGlite
+ * serves exactly one — which is why it cannot run there, and why the remedy
+ * has to know which database is under this run. There, boot applies additive
+ * changes, so restarting `rebase dev` *is* the fix.
+ *
+ * `REBASE_DEV_DATABASE_KIND` is set by the CLI from the database it resolved,
+ * the same variable `rebase schema generate`'s closing line already branches
+ * on. Absent — a deployed backend, a container, anything not started by
+ * `rebase dev` — the answer is the general one.
+ */
+export function schemaDriftRemedy(): { short: string; lines: string[] } {
+    if (hostEnv().REBASE_DEV_DATABASE_KIND === "managed") {
+        return {
+            short: "Restart `rebase dev` — boot applies additive schema changes to the managed database.",
+            lines: [
+                "  Quick fixes (managed development database):",
+                "    restart `rebase dev`   boot applies additive changes",
+                "    rebase doctor          full 3-way drift report",
+                "",
+                "  `rebase db push` does not run here: Atlas plans against a",
+                "  second, empty database and PGlite serves one. For a change",
+                "  boot leaves alone, use your own Postgres (DATABASE_URL)",
+                "  or `rebase dev --docker`."
+            ]
+        };
+    }
+
+    return {
+        short: "Run `rebase db push` to sync your schema, or `rebase db migrate` to apply pending migrations.",
+        lines: [
+            "  Quick fixes (local dev, against DATABASE_URL):",
+            "    rebase db push        sync schema to database (dev)",
+            "    rebase db migrate     apply pending migrations (prod)",
+            "    rebase doctor         full 3-way drift report",
+            "",
+            "  Managed cloud: the runtime applies schema + RLS at boot",
+            "  (REBASE_MIGRATE_ON_BOOT); redeploy rather than db push,",
+            "  which cannot reach the tenant database."
+        ]
+    };
+}
+
 /** Shape of Postgres / network errors with diagnostic codes */
 interface PgLikeError {
     code?: string;
@@ -353,7 +404,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         code = "SCHEMA_DRIFT";
         const issue = dbError.code === "42703" ? "column" : "table";
         const identifier = dbError.table || dbError.column || extractMissingIdentifier(dbError.message) || "unknown";
-        logMessage = `Schema drift: ${issue} "${identifier}" does not exist in the database. Run \`pnpm db:push\` to sync your schema, or \`pnpm db:migrate\` to apply pending migrations.`;
+        logMessage = `Schema drift: ${issue} "${identifier}" does not exist in the database. ${schemaDriftRemedy().short}`;
     } else if (dbError) {
         const parts = [`[PG ${dbError.code}] ${dbError.message}`];
         if (dbError.detail) parts.push(`Detail: ${dbError.detail}`);
@@ -398,20 +449,20 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         // In dev mode, show a one-time hint to run `rebase doctor`
         if (!_schemaDriftHinted && hostEnv().NODE_ENV !== "production") {
             _schemaDriftHinted = true;
+            // Drawn rather than hand-aligned: the remedy inside it now varies
+            // with the database, and a box whose rows were padded by hand
+            // stayed straight only for the text it was written around.
+            const WIDTH = 62;
+            const row = (text: string) => `│${text.padEnd(WIDTH).slice(0, WIDTH)}│`;
             logger.warn([
                 "",
-                "┌──────────────────────────────────────────────────────────────┐",
-                "│  💡 TIP: Run `rebase doctor` for full schema diagnostics    │",
-                "│                                                             │",
-                "│  Quick fixes (local dev, against DATABASE_URL):             │",
-                "│    pnpm db:push      sync schema to database (dev)          │",
-                "│    pnpm db:migrate   generate + apply migration (prod)      │",
-                "│    rebase doctor     full 3-way drift report                │",
-                "│                                                             │",
-                "│  Managed cloud: the runtime applies schema + RLS at boot    │",
-                "│  (REBASE_MIGRATE_ON_BOOT); redeploy rather than db:push,    │",
-                "│  which cannot reach the tenant database.                    │",
-                "└──────────────────────────────────────────────────────────────┘",
+                `┌${"─".repeat(WIDTH)}┐`,
+                // One space short, deliberately: the emoji occupies two columns
+                // in a terminal and one in `String.length`.
+                `│${"  💡 TIP: Run `rebase doctor` for full schema diagnostics".padEnd(WIDTH - 1)}│`,
+                row(""),
+                ...schemaDriftRemedy().lines.map(row),
+                `└${"─".repeat(WIDTH)}┘`,
                 ""
             ].join("\n"));
         }
@@ -467,7 +518,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         const pgErr = dbError || (error as PgLikeError);
         const issue = pgErr.code === "42703" ? "column" : "table";
         const identifier = pgErr.table || pgErr.column || extractMissingIdentifier(pgErr.message || error.message) || "unknown";
-        clientMessage = `Schema drift: ${issue} "${identifier}" does not exist. Run \`pnpm db:push\` to sync your schema.`;
+        clientMessage = `Schema drift: ${issue} "${identifier}" does not exist. ${schemaDriftRemedy().short}`;
     } else if (code === "DB_PERMISSION_DENIED") {
         clientMessage = `Permission denied by the database${dbError?.table ? ` on "${dbError.table}"` : ""} (row-level security). Check the RLS policies for this table.`;
     } else if (code === "INTERNAL_ERROR") {
