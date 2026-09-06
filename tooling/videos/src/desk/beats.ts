@@ -124,7 +124,7 @@ export const BEATS: Beat[] = [
 /** The cold open holds the camera on the hook before anything is on it. */
 export const OPENING: View = cell(0, 0);
 
-export const DESK_DURATION = tempo(2580);
+export const DESK_DURATION = tempo(2600);
 
 export const beat = (id: string): Beat => {
     const b = BEATS.find((x) => x.id === id);

@@ -1,26 +1,28 @@
 # Rebase intro — the desk cut — voice-over script
 
 Read at **164 words per minute** (11 frames a word at 30fps). Say it the way
-you would say it to one person across a desk. Short sentences. "You".
+you would say it to one person across a desk.
+
+**Every line is a sentence** — a subject, a verb, and the thing the verb is
+about. Nothing here needs to be read twice to parse.
 
 **It opens on you, with a question.** "You can build a backend in an
 afternoon now. But can you trust it?" — to camera, before any evidence. Then
-the evidence: this one, built by an agent, three ways in.
+the evidence: an agent built this one, and a scan found three security holes.
 
 **No slogans.** You are explaining what just happened, not selling it. The
-facts stay; the flourishes go. The last thing said is a practical offer —
-the scan is free, run it on your own database — not a tagline.
+last thing said is a practical offer — the scan is free, run it on your own
+database — not a tagline.
 
 **One story, one desk, in the order it happens.** There are no cuts. Every
-line is caused by the one before: the scan finds three ways in, so you point
-Rebase at that same database; it writes a file per table, so the rule goes in
-that file; you push it, so the same scan comes back clean; you run it, so the
+line is caused by the one before: the scan finds three holes, so you point
+Rebase at the same database; it writes a file per table, so the rule goes in
+that file; you push it, so the same scan finds nothing; you run it, so the
 API answers Robert, Dana and an agent, and your team gets the panel. "Three
 commands" at the end is a count of what you watched.
 
-Total: **2831 frames = 94.4 seconds** at 30fps · 209 words · speech is
-82% of the running time. The climax is the quietest part: two short
-lines with the terminal doing the talking between them.
+Total: **2853 frames = 95.1 seconds** at 30fps · 225 words · speech is
+87% of the running time.
 
 ## The script
 
@@ -28,18 +30,18 @@ lines with the terminal doing the talking between them.
 |---|------|--------|-------|------|------|
 | 00 | Cold open | 0.0s | — | *(silent — the mark assembles)* | — |
 | 01 | You, to camera | 3.2s | 14 | You can build a backend in an afternoon now. But can you trust it? | 0.5s beat |
-| 02 | The evidence | 8.8s | 16 | This one was built by an agent. It works. A ten-second scan found three ways in. | 1.5s **pause** |
-| 03 | Point Rebase at it | 16.5s | 18 | So you point Rebase at that same database. It reads the tables, and writes one file per table. | 1.3s beat |
-| 04 | The rule | 24.4s | 22 | Who can see what goes in that file. Here, customers only see their own orders. And Postgres enforces it, not your code. | 0.9s beat |
-| 05 | Push, and the same scan | 33.4s | 10 | Push it, and run the same scan again. Nothing found. | 1.2s beat |
-| 06 | Run it | 38.3s | 3 | Then run it. | 2.8s **pause** — the terminal prints the ports |
-| 07 | Two people | 42.2s | 23 | The same request, from two different people, gets two different answers. Robert sees his own orders. Dana, on support, sees all of them. | 0.4s flow |
-| 08 | The agent | 51.0s | 18 | An agent works the same way. It gets a key with permissions, and it can't get around them. | 1.1s beat |
-| 09 | The panel | 58.3s | 19 | And there's an admin panel for your team, generated from the same files. The same rules apply there too. | 3.0s **pause** — the montage plays |
-| 10 | Every view | 67.9s | 9 | Boards, tables, cards and forms, depending on the collection. | 0.4s flow |
-| 11 | The schema | 71.9s | 12 | The schema, read from the database, so it matches what's actually there. | 0.1s flow |
-| 12 | Studio | 76.4s | 10 | And you can work on the database itself, right there. | 0.2s flow |
-| 13 | The whole desk | 80.3s | 35 | That was three commands. It's open source, and you run it wherever you want — your laptop, your servers, any cloud. If you want to know where your own database stands, the scan is free. | — |
+| 02 | The evidence | 8.8s | 14 | An agent built this one. It works. A ten-second scan found three security holes. | 2.6s **pause** |
+| 03 | Point Rebase at it | 16.5s | 20 | So you point Rebase at the same database. It reads the tables and writes one file for each of them. | 0.6s beat |
+| 04 | The rule | 24.4s | 25 | The access rules go in that file. This one says customers can only see their own orders. Postgres enforces it. Your code doesn't have to. | 0.1s flow |
+| 05 | Push, and the same scan | 33.7s | 13 | You push it, and you run the same scan again. It finds nothing. | 0.2s flow |
+| 06 | Run it | 38.6s | 4 | Then you run it. | 2.1s **pause** — the terminal prints the ports |
+| 07 | Two people | 42.2s | 25 | Two people send the same request. Robert is a customer, so he sees his own orders. Dana works in support, so she sees every order. | 0.0s flow |
+| 08 | The agent | 51.3s | 18 | An agent works the same way. It gets a key with permissions, and it can't get around them. | 0.4s flow |
+| 09 | The panel | 58.3s | 19 | Your team also gets an admin panel. It is generated from the same files, so the same rules apply. | 2.6s **pause** — the montage plays |
+| 10 | Every view | 67.9s | 11 | Every collection gets its own views: boards, tables, cards and forms. | 0.0s flow |
+| 11 | The schema | 71.9s | 13 | The schema is read from the database, so it matches what is there. | 0.0s flow |
+| 12 | Studio | 76.7s | 11 | And you can edit the database itself from the same app. | 0.1s flow |
+| 13 | The whole desk | 80.7s | 38 | That was three commands. It is open source, and you can run it on your laptop, on your own servers, or on any cloud. If you want to know where your own database stands, the scan is free. | — |
 
 ## The presenter
 
@@ -52,9 +54,9 @@ You are on screen. Three places, one video element (`src/desk/Presenter.tsx`):
 - **Close** — you grow out of the corner into the left column as the desk
   recedes; the address lands beside you. The last line is to camera.
 
-**At the climax, look at the scan.** "Push it, and run the same scan again.
-Nothing found." — glance left toward the terminal as the green line prints,
-then back to the lens for "Then run it." The silence there is yours.
+**At the climax, look at the scan.** "You push it, and you run the same scan
+again. It finds nothing." — glance left toward the terminal as the green
+line prints, then back to the lens for "Then you run it."
 
 ### Shooting
 
@@ -82,8 +84,6 @@ then back to the lens for "Then run it." The silence there is yours.
   for the picture.
 - "The same scan" means it: the window from the opening re-runs, same
   command, same database. Say it like something you watched happen.
-- "Nothing found." is its own sentence. Stop after it; the green line lands
-  under the silence.
 - The three tour lines (every view, the schema, Studio) are one breath split
   three ways. Do not stop between them.
 - Every terminal line is what the tools print. Numbers are checked against
