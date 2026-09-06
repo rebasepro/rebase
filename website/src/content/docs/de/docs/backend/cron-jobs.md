@@ -98,6 +98,9 @@ Schrittwerte (`*/n`), Bereiche (`a-b`) und Listen (`a,b,c`) werden alle unterst�
 
 ## CronJobDefinition Referenz
 
+`timezone` ist neu <span class="since-badge" data-since="0.18">Since 0.18</span> — in 0.17.3 wird ein Zeitplan immer in der Zone des
+Hosts gelesen. Alles Übrige an dieser Schnittstelle ist bereits ausgeliefert.
+
 ```typescript
 interface CronJobDefinition {
     // Cron-Zeitplan-Ausdruck (5-Feld-Format)

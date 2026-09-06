@@ -98,6 +98,9 @@ Valores de passo (`*/n`), intervalos (`a-b`) e listas (`a,b,c`) são todos supor
 
 ## Referência de CronJobDefinition
 
+`timezone` é novo <span class="since-badge" data-since="0.18">Since 0.18</span> — em 0.17.3 um agendamento é sempre lido no fuso do
+anfitrião. Todo o resto desta interface já foi lançado.
+
 ```typescript
 interface CronJobDefinition {
     // Cron schedule expression (5-field format)

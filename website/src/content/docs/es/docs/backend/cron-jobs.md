@@ -98,6 +98,9 @@ Los valores de paso (`*/n`), rangos (`a-b`) y listas (`a,b,c`) son todos compati
 
 ## Referencia de CronJobDefinition
 
+`timezone` es nuevo <span class="since-badge" data-since="0.18">Since 0.18</span> — en 0.17.3 un horario siempre se lee en la zona del
+anfitrión. Todo lo demás de esta interfaz ya está publicado.
+
 ```typescript
 interface CronJobDefinition {
     // Cron schedule expression (5-field format)

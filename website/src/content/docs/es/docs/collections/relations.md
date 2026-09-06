@@ -227,6 +227,14 @@ relations: [
 
 ### Qué obtienes si no dices nada
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+El valor predeterminado de un `belongsTo` **obligatorio** ha cambiado. En 0.17.3
+es `ON DELETE CASCADE` — borrar un padre borra sus hijos — y a partir de 0.18 es
+`RESTRICT`, así que el borrado falla y nombra la restricción. El resto de esta
+sección no cambia, y `db push` planifica la reescritura de la restricción al
+actualizar.
+
 `onDelete` es opcional, así que la mayoría de las relaciones nunca lo nombran. El
 valor predeterminado depende de si la relación es obligatoria:
 

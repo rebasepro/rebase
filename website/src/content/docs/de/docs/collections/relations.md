@@ -227,6 +227,14 @@ relations: [
 
 ### Was gilt, wenn Sie nichts angeben
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+Der Standardwert für ein **erforderliches** `belongsTo` hat sich geändert. In
+0.17.3 ist er `ON DELETE CASCADE` — das Löschen eines Elternteils löscht seine
+Kinder — und ab 0.18 ist er `RESTRICT`: das Löschen schlägt fehl und nennt den
+Constraint. Alles Übrige in diesem Abschnitt ist unverändert, und `db push` plant
+die Constraint-Umschreibung beim Upgrade.
+
 `onDelete` ist optional, daher benennen die meisten Beziehungen nie eines. Der
 Standardwert hängt davon ab, ob die Beziehung erforderlich ist:
 

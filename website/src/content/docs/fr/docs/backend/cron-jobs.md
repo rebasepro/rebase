@@ -98,6 +98,9 @@ Les valeurs de pas (`*/n`), les plages (`a-b`) et les listes (`a,b,c`) sont tout
 
 ## Référence de CronJobDefinition
 
+`timezone` est nouveau <span class="since-badge" data-since="0.18">Since 0.18</span> — en 0.17.3, un planning est toujours lu dans le
+fuseau de l'hôte. Tout le reste de cette interface est déjà livré.
+
 ```typescript
 interface CronJobDefinition {
     // Cron schedule expression (5-field format)

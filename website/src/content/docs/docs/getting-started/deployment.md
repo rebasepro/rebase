@@ -88,6 +88,10 @@ volumes:
   postgres_data:
 ```
 
+The three `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` lines are new <span class="since-badge" data-since="0.18">Since 0.18</span>
+— on 0.17.3 the first account to register becomes the administrator, in
+production too. See [Your first admin](#your-first-admin) below.
+
 `rebase init` writes all of these into `.env` for you, including a generated
 admin password. Each is declared with `${VAR:?…}`, so a missing one stops the
 stack with a message naming it rather than starting something half-configured —

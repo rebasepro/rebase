@@ -227,6 +227,13 @@ relations: [
 
 ### O que você obtém se não disser nada
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+O padrão para um `belongsTo` **obrigatório** mudou. Em 0.17.3 é
+`ON DELETE CASCADE` — eliminar um pai elimina os seus filhos — e a partir de 0.18
+é `RESTRICT`: a eliminação falha e nomeia a restrição. Todo o resto desta secção
+não muda, e `db push` planeia a reescrita da restrição na atualização.
+
 `onDelete` é opcional, então a maioria das relações nunca nomeia um. O padrão
 depende de a relação ser obrigatória:
 

@@ -98,6 +98,9 @@ Sono supportati valori di passo (`*/n`), intervalli (`a-b`) ed elenchi (`a,b,c`)
 
 ## Riferimento CronJobDefinition
 
+`timezone` è nuovo <span class="since-badge" data-since="0.18">Since 0.18</span> — in 0.17.3 una pianificazione viene sempre letta nel
+fuso dell'host. Tutto il resto di questa interfaccia è già rilasciato.
+
 ```typescript
 interface CronJobDefinition {
     // Espressione di pianificazione Cron (formato a 5 campi)

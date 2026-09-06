@@ -159,6 +159,9 @@ rebase db branch info feature_auth
 rebase db branch delete feature_auth
 ```
 
+`rebase db branch switch` (and `switch --off`) and `rebase db branch prune`
+are new <span class="since-badge" data-since="0.18">Since 0.18</span>. `create`, `list`, `info` and `delete` shipped in 0.17.
+
 Each branch is a full copy of the database made with `CREATE DATABASE ... TEMPLATE`,
 so it needs a real PostgreSQL server and it costs the same disk as its source.
 
