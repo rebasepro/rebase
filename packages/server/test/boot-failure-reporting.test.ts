@@ -3,6 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import { reportBootFailure } from "../src/boot/boot";
 import { BundleError } from "../src/boot/bundle";
 import { CollectionConfigError } from "../src/collections/validate-config";
+import { logger } from "../src/utils/logger";
 
 /**
  * What a boot that will not start prints.
@@ -81,10 +82,76 @@ describe("reportBootFailure", () => {
         const cause = new Error("connect ECONNREFUSED 10.0.0.4:5432");
         const err = new Error("Driver failed to initialize", { cause });
 
-        reportBootFailure(err, log);
+        reportBootFailure(err, log, { NODE_ENV: "development" });
 
         const errors = lines.filter(l => l.level === "error").map(l => l.message);
         expect(errors[0]).toBe("Failed to start the Rebase runtime");
         expect(errors.join("\n")).toContain("connect ECONNREFUSED 10.0.0.4:5432");
+    });
+
+    // The diagnosis box the connect failure prints names the host, the port and
+    // `docker compose up -d db`. In development the boot then appended the whole
+    // error as one `JSON.stringify` — 3 KB with `\n`-escaped stack frames —
+    // directly under it, which is enough to scroll the box out of a terminal.
+    it("keeps the structured payload out of the development transcript", () => {
+        const { lines, log } = capture();
+        const cause = new Error("connect ECONNREFUSED 10.0.0.4:5432");
+
+        reportBootFailure(new Error("Driver failed to initialize", { cause }), log,
+            { NODE_ENV: "development" });
+
+        for (const line of lines.filter(l => l.level === "error")) {
+            expect(line.data).toBeUndefined();
+        }
+        // Not thrown away — moved to where the reader who wants it can ask.
+        expect(lines.filter(l => l.level === "debug" && l.data?.error)).toHaveLength(1);
+    });
+
+    // Through the real logger, because the length is a property of what it
+    // renders: development formats the data bag as one `JSON.stringify` glued
+    // to the end of the headline, so the payload is not one long *entry*, it is
+    // one long *line*.
+    it("leaves no line long enough to scroll the diagnosis box away", () => {
+        const written: string[] = [];
+        const original = console.error;
+        console.error = (...args: unknown[]) => { written.push(String(args[0])); };
+        try {
+            const cause = Object.assign(
+                new Error("connect ECONNREFUSED 10.0.0.4:5432"),
+                { code: "ECONNREFUSED", address: "10.0.0.4", port: 5432 }
+            );
+            reportBootFailure(
+                new Error(
+                    "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                    "  ❌  Cannot connect to PostgreSQL at 10.0.0.4:5432\n" +
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                    "  The driver said: connect ECONNREFUSED 10.0.0.4:5432\n",
+                    { cause }
+                ),
+                logger,
+                { NODE_ENV: "development" }
+            );
+        } finally {
+            console.error = original;
+        }
+
+        const longest = written.flatMap(entry => entry.split("\n"))
+            .reduce((max, line) => Math.max(max, line.length), 0);
+        expect(longest).toBeLessThan(500);
+        expect(written.join("\n")).toContain("caused by: connect ECONNREFUSED 10.0.0.4:5432");
+    });
+
+    it("keeps the structured payload in production, where a machine reads it", () => {
+        const { lines, log } = capture();
+        const cause = new Error("connect ECONNREFUSED 10.0.0.4:5432");
+
+        reportBootFailure(new Error("Driver failed to initialize", { cause }), log,
+            { NODE_ENV: "production" });
+
+        // `troubleshooting.md` tells operators the chain is under `error.cause`
+        // in JSON logs, so it has to be on the line there.
+        const headline = lines.find(l => l.message === "Failed to start the Rebase runtime");
+        expect(headline?.level).toBe("error");
+        expect((headline?.data?.error as Error).cause).toBe(cause);
     });
 });

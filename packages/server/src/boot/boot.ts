@@ -839,7 +839,11 @@ function isConfigurationFailure(err: unknown): err is Error & { hint?: string } 
  * assertCollectionConfigs (…/dist/index.es.js:727:8) …"}}`: the answer,
  * `\n`-escaped, inside 3 KB of framework frames.
  */
-export function reportBootFailure(err: unknown, log: BootFailureLog = logger): void {
+export function reportBootFailure(
+    err: unknown,
+    log: BootFailureLog = logger,
+    env: { NODE_ENV?: string } = process.env
+): void {
     if (isConfigurationFailure(err)) {
         log.error(err.message);
         if (err.hint) log.error(err.hint);
@@ -849,9 +853,22 @@ export function reportBootFailure(err: unknown, log: BootFailureLog = logger): v
         return;
     }
 
-    log.error("Failed to start the Rebase runtime", {
-        error: err instanceof Error ? err : new Error(String(err))
-    });
+    const failure = err instanceof Error ? err : new Error(String(err));
+    // The structured payload goes to whichever reader can use it, and only
+    // there. In production these logs are JSON and a machine parses them, so
+    // the whole error — including `error.cause`, which `troubleshooting.md`
+    // tells operators to look under — belongs on the line. In development the
+    // same object is rendered as one `JSON.stringify` at the end of the
+    // headline: a diagnosis box that carefully names the host, the port and
+    // `docker compose up -d db`, immediately followed by 3 KB of the same
+    // error with `\n`-escaped stack frames. Nobody reads that; it buries the
+    // box above it. Development gets it at `debug`.
+    if (env.NODE_ENV === "production") {
+        log.error("Failed to start the Rebase runtime", { error: failure });
+    } else {
+        log.error("Failed to start the Rebase runtime");
+        log.debug("Failed to start the Rebase runtime", { error: failure });
+    }
     // The reason is almost never in the headline. Everything a driver
     // rethrows is a wrapper, so the sentence that says what is wrong —
     // `connect ECONNREFUSED 10.0.0.4:5432` — is a `.cause` two links
