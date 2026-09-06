@@ -242,13 +242,25 @@ docker compose -f app/backend/docker-compose.yml up -d db
 
 The build is not optional for any of them: the CLI suite scaffolds a project
 that consumes every package as built output and refuses to start otherwise, and
-the Vitest suites import `dist` directly. Then:
+the Vitest suites import `dist` directly. Then, and this is all of them — CI
+runs no e2e suite that is not on this list:
 
 ```bash
-pnpm e2e                                    # the Playwright admin-panel suite
-pnpm exec tsx tests/e2e/tests/cli-init-e2e.ts
-pnpm --filter @rebasepro/server-postgres test:e2e
+pnpm e2e                                          # the Playwright admin-panel suite
+pnpm exec tsx tests/e2e/tests/cli-init-e2e.ts     # scaffold, install, boot
+pnpm exec tsx tests/e2e/tests/cli-init-baas-e2e.ts   # the same for the BaaS preset
+pnpm exec tsx tests/e2e/tests/client-sdk-e2e.ts   # the SDK as a browser drives it
+pnpm --filter @rebasepro/server-postgres test:e2e # RLS enforcement, policy agreement
+pnpm --filter @rebasepro/cli test:e2e             # the CLI against a real database
+pnpm --filter @rebasepro/rls-check test:e2e       # the scanner's own fixture
 ```
+
+Four more run in CI's e2e jobs and are gates rather than suites —
+`verify:selfhost`, `verify:selfhost:docker`, `verify:corpus` and `rls:check`.
+They are in **[docs/gates.md](docs/gates.md)** with what each protects.
+`pnpm check:gates-doc` reads the workflow's e2e jobs and fails when a suite it
+runs is named in neither this list nor that file, so neither can quietly fall
+behind the pipeline.
 
 ## Compatibility
 

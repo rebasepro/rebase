@@ -13,7 +13,9 @@
  *     tell a contributor to run something that is gone;
  *   - a gate whose name breaks the `check:` / `verify:` / `test:` rule fails;
  *   - a gate listed under a job's section and absent from that job's runner
- *     fails, so a section cannot describe a list nothing runs.
+ *     fails, so a section cannot describe a list nothing runs;
+ *   - an end-to-end suite the workflow invokes and neither CONTRIBUTING nor
+ *     this table names fails, so a suite cannot run in CI and be in no register.
  *
  * The third has three named exceptions, each carrying its reason in this file
  * rather than slipping past a regular expression — so a fourth still fails, and
@@ -47,6 +49,18 @@ const DOC = "docs/gates.md";
  * it has to be a real script that `ci:static` actually runs. Prose still drifts;
  * a sentence naming a command nobody runs no longer can.
  */
+/**
+ * The workflow, and the two files allowed to be a suite's register.
+ *
+ * The e2e jobs invoke suites as `pnpm exec tsx tests/e2e/tests/…` and as
+ * `--filter <pkg> test:e2e`, neither of which is a root `package.json` script —
+ * so until now they were in no register at all. CONTRIBUTING listed three of
+ * the six, and `client-sdk-e2e` (end-user auth, RLS, storage, realtime over a
+ * real socket) was in nothing a contributor reads.
+ */
+const WORKFLOW = ".github/workflows/verify.yml";
+const REGISTERS = ["CONTRIBUTING.md", "docs/gates.md"];
+
 const VERIFIER_README = "tooling/scripts/docs-verify/README.md";
 const VERIFIER_README_SECTION = /<!-- gates:start -->([\s\S]*?)<!-- gates:end -->/;
 
@@ -186,6 +200,53 @@ for (const { heading, runner, command } of JOB_SECTIONS) {
     }
 }
 
+/**
+ * Every end-to-end suite `verify.yml` runs, and whether a contributor can find
+ * it written down. Two shapes, because that is how the jobs invoke them: a
+ * script path handed to `tsx`, and a `test:e2e` run against one or more
+ * workspace filters.
+ */
+const unregistered = [];
+{
+    const workflowPath = path.join(ROOT, WORKFLOW);
+    if (!fs.existsSync(workflowPath)) {
+        unregistered.push(`${WORKFLOW} is missing — it is where the e2e suites are invoked.`);
+    } else {
+        const workflow = fs.readFileSync(workflowPath, "utf8");
+        const registers = REGISTERS.map((rel) => ({
+            rel,
+            text: fs.existsSync(path.join(ROOT, rel)) ? fs.readFileSync(path.join(ROOT, rel), "utf8") : ""
+        }));
+
+        const suiteFiles = new Set(
+            [...workflow.matchAll(/tests\/e2e\/tests\/[\w.-]+\.ts/g)].map((m) => m[0])
+        );
+        for (const suite of suiteFiles) {
+            if (!registers.some(({ text }) => text.includes(suite))) {
+                unregistered.push(
+                    `\`${suite}\` runs in ${WORKFLOW} and is named in neither ${REGISTERS.join(" nor ")}.`
+                );
+            }
+        }
+
+        // `pnpm --filter @rebasepro/a --filter @rebasepro/b … test:e2e` — one
+        // step, several packages, and CI ran three where CONTRIBUTING named one.
+        for (const line of workflow.split("\n")) {
+            if (!line.includes("test:e2e")) continue;
+            for (const [, pkg] of line.matchAll(/--filter (@rebasepro\/[\w-]+)/g)) {
+                const named = registers.some(({ text }) =>
+                    text.split("\n").some((row) => row.includes(pkg) && row.includes("test:e2e")));
+                if (!named) {
+                    unregistered.push(
+                        `\`${pkg}\`'s \`test:e2e\` runs in ${WORKFLOW} and no single line of ` +
+                        `${REGISTERS.join(" or ")} names both.`
+                    );
+                }
+            }
+        }
+    }
+}
+
 /** Script names the verifier README's "Where it blocks" section claims. */
 const readmeProblems = [];
 {
@@ -231,13 +292,14 @@ const readmeProblems = [];
 }
 
 const problems = undocumented.length + phantom.length + misnamed.length
-    + writersAsGates.length + readmeProblems.length + unrun.length;
+    + writersAsGates.length + readmeProblems.length + unrun.length + unregistered.length;
 
 if (problems === 0) {
     console.log(green(
         `✓ ${gates.length} gate(s), every one with a row in ${DOC}` +
         ` (${Object.keys(NAMED_EXCEPTIONS).length} named naming-rule exceptions),` +
         ` every row under a job heading in the runner that job calls,` +
+        ` every e2e suite ${WORKFLOW} runs in a register,` +
         ` and ${VERIFIER_README} says where it blocks.`
     ));
     process.exit(0);
@@ -278,6 +340,18 @@ if (misnamed.length > 0) {
         `\n    A gate is named \`check:\`, \`verify:\` or \`test:\`. If this one genuinely\n` +
         "    cannot be, add it to NAMED_EXCEPTIONS in this script with the reason —\n" +
         "    which is a thing you have to write down, not a regex it slips past.\n"
+    ));
+}
+
+if (unregistered.length > 0) {
+    console.error(red(`  ${unregistered.length} end-to-end suite(s) in no register:`));
+    for (const message of unregistered) console.error(`    ${message}`);
+    console.error(dim(
+        "\n    A suite invoked as `pnpm exec tsx …` or as `--filter <pkg> test:e2e` is\n" +
+        "    not a root package.json script, so nothing else in this check can see it.\n" +
+        "    Name it in CONTRIBUTING's end-to-end block, or give it a row in\n" +
+        "    docs/gates.md — otherwise it runs on every pull request and a contributor\n" +
+        "    has no way to run it before opening one.\n"
     ));
 }
 
