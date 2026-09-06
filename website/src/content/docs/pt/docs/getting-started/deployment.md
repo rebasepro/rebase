@@ -1,5 +1,5 @@
 ---
-sourceHash: 17245c4fecea02de
+sourceHash: 215da7d8e962efb0
 title: Implantação
 sidebar_label: Implantação
 description: Implante seu projeto Rebase em produção usando Docker, plataformas de nuvem ou configurações manuais.
@@ -66,6 +66,12 @@ volumes:
 rebase build
 docker compose up -d
 ```
+
+O bundle é montado em modo apenas-leitura. O `rebase build` instala as
+dependências declaradas do projeto em `dist-bundle`, a não ser que passe
+`--no-vendor` — nesse caso o runtime instala-as em cada arranque e a montagem tem
+de ser gravável: retire então o `:ro`. Veja
+[Auto-alojamento](/docs/deployment/self-hosting/).
 
 ## Criar o Esquema do Banco de Dados
 

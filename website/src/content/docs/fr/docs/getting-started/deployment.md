@@ -1,5 +1,5 @@
 ---
-sourceHash: 17245c4fecea02de
+sourceHash: 215da7d8e962efb0
 title: Déploiement
 sidebar_label: Déploiement
 description: Déployez votre projet Rebase en production à l'aide de Docker, de plateformes cloud ou de configurations manuelles.
@@ -60,6 +60,12 @@ volumes:
 rebase build
 docker compose up -d
 ```
+
+Le bundle est monté en lecture seule. `rebase build` installe les dépendances
+déclarées du projet dans `dist-bundle`, sauf si vous passez `--no-vendor` — dans
+ce cas le runtime les installe à chaque démarrage et le montage doit être
+accessible en écriture : retirez alors le `:ro`. Voir
+[Auto-hébergement](/docs/deployment/self-hosting/).
 
 ### Créer le schéma de base de données
 

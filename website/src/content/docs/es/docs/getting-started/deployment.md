@@ -1,5 +1,5 @@
 ---
-sourceHash: 17245c4fecea02de
+sourceHash: 215da7d8e962efb0
 title: Despliegue
 sidebar_label: Despliegue
 description: Despliega tu proyecto Rebase a producción usando Docker, plataformas en la nube o configuraciones manuales.
@@ -66,6 +66,12 @@ volumes:
 rebase build
 docker compose up -d
 ```
+
+El bundle se monta en solo lectura. `rebase build` instala las dependencias
+declaradas del proyecto en `dist-bundle` salvo que pases `--no-vendor`, en cuyo
+caso el runtime las instala en cada arranque y el montaje tiene que ser
+escribible: quita entonces el `:ro`. Consulta
+[Autoalojamiento](/docs/deployment/self-hosting/).
 
 :::note
 El `docker-compose.yml` generado por Rebase es la fuente de verdad; el ejemplo anterior solo lo reproduce. No construye ninguna imagen a partir de tu código: arranca la imagen de runtime publicada y monta el `dist-bundle` que produjo `rebase build`.

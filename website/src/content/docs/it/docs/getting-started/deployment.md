@@ -1,5 +1,5 @@
 ---
-sourceHash: 17245c4fecea02de
+sourceHash: 215da7d8e962efb0
 title: Distribuzione
 sidebar_label: Distribuzione
 description: Distribuisci il tuo progetto Rebase in produzione utilizzando Docker, piattaforme cloud o configurazioni manuali.
@@ -66,6 +66,12 @@ volumes:
 rebase build
 docker compose up -d
 ```
+
+Il bundle è montato in sola lettura. `rebase build` installa le dipendenze
+dichiarate del progetto in `dist-bundle`, a meno che tu non passi `--no-vendor`:
+in quel caso il runtime le installa a ogni avvio e il mount deve essere
+scrivibile, quindi togli il `:ro`. Vedi
+[Self-hosting](/docs/deployment/self-hosting/).
 
 ## Crea lo Schema del Database
 

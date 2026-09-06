@@ -1,5 +1,5 @@
 ---
-sourceHash: 17245c4fecea02de
+sourceHash: 215da7d8e962efb0
 title: Bereitstellung
 sidebar_label: Bereitstellung
 description: Stellen Sie Ihr Rebase-Projekt mit Docker, Cloud-Plattformen oder manuellen Setups in der Produktion bereit.
@@ -66,6 +66,12 @@ volumes:
 rebase build          # erzeugt ./dist-bundle
 docker compose up -d
 ```
+
+Das Bundle wird schreibgeschützt eingehängt. `rebase build` installiert die
+deklarierten Abhängigkeiten des Projekts in `dist-bundle`, sofern Sie nicht
+`--no-vendor` übergeben — in dem Fall installiert die Runtime sie bei jedem Start
+und die Einhängung muss beschreibbar sein: lassen Sie dann das `:ro` weg. Siehe
+[Self-Hosting](/docs/deployment/self-hosting/).
 
 Das oben gezeigte YAML ist illustrativ — die im Projekt generierte `docker-compose.yml` ist die maßgebliche Quelle. Sie baut kein Image aus Ihrem Quellcode: sie startet das veröffentlichte Runtime-Image und hängt das `dist-bundle` ein, das `rebase build` erzeugt hat.
 
