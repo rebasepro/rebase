@@ -75,6 +75,7 @@
     "check:subpath-imports": "node tooling/scripts/check-subpath-imports.mjs",
     "check:studio-tools": "node tooling/scripts/check-studio-tools-table.mjs",
     "check:ui-string-paths": "node tooling/scripts/check-ui-string-paths.mjs",
+    "check:doc-links": "node tooling/scripts/check-doc-links.mjs",
     "check:lint": "eslint . --quiet",
     "ci:static": "node tooling/scripts/ci-static.mjs",
     "ci:build-gates": "node tooling/scripts/ci-build-gates.mjs",

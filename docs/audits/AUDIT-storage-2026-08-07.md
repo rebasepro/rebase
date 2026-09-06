@@ -33,7 +33,7 @@ Everything marked CONFIRMED below was reproduced against the real
 > `packages/server/test/storage-key-canonicalization.test.ts` (42 tests).
 
 
-`sanitizeStorageKey` ([routes.ts:104](../packages/server/src/storage/routes.ts:104))
+`sanitizeStorageKey` ([routes.ts:104](../../packages/server/src/storage/routes.ts#L104))
 is a single-pass strip:
 
 ```ts
@@ -63,7 +63,7 @@ Same shape applies to `DELETE /file/*` and to `GET /list?prefix=users/alice/....
 enumeration being the exact thing the boot guard exists to prevent).
 
 Note the minted token: `checkAuthorized` deliberately early-returns for the
-`download-token` principal ([routes.ts:208](../packages/server/src/storage/routes.ts:208)),
+`download-token` principal ([routes.ts:208](../../packages/server/src/storage/routes.ts#L208)),
 so once minted it is unconditionally honoured. The 403 above is not just delayed,
 it is converted into a shareable capability.
 
@@ -78,7 +78,7 @@ model actually has.
 controller, and the token, and assert they are the same value. Stripping is wrong
 independent of the bypass: it silently stores an object at a path the caller did
 not ask for. `isPublicStoragePath` already got this right — it rejects any path
-containing a `..` segment outright ([controllers/storage.ts](../packages/types/src/controllers/storage.ts)).
+containing a `..` segment outright ([controllers/storage.ts](../../packages/types/src/controllers/storage.ts)).
 Same rule, one layer up.
 
 ## P0 — TUS authorizes one key and writes another — **FIXED**
@@ -93,7 +93,7 @@ Same rule, one layer up.
 
 `TusHandler.create` gates on `sanitizeStorageKey(metadata.key)`, but `finalize`
 calls `putObject({ key: upload.key })` — the **raw** `Upload-Metadata` value
-([tus-handler.ts:326](../packages/server/src/storage/tus-handler.ts:326)).
+([tus-handler.ts:326](../../packages/server/src/storage/tus-handler.ts#L326)).
 
 These are different strings by construction, so this survives even a correct
 sanitizer. The resumable path is a second way to write an object; the hook must
@@ -115,7 +115,7 @@ an object is overwritten in place.
 
 ## P1 — download tokens are not scoped to a storage source — **FIXED**
 
-The token payload is `${bucket}/${resolvedPath}` ([routes.ts:469](../packages/server/src/storage/routes.ts:469)),
+The token payload is `${bucket}/${resolvedPath}` ([routes.ts:469](../../packages/server/src/storage/routes.ts#L469)),
 `fileTokenAuth` matches on that path only, and `/file/*` still resolves its
 controller from `?storageId`. Mint a token on a source you may read, replay it
 against a source you may not, same key. Put the source key in the token payload
@@ -198,7 +198,7 @@ fails 1.
 ## P1 — a `%` in a key makes the object permanently unreadable — CONFIRMED
 
 The client builds `/storage/file/${filePath}` with no encoding
-([client/src/storage.ts](../packages/client/src/storage.ts)); the server always
+([client/src/storage.ts](../../packages/client/src/storage.ts)); the server always
 `decodeURIComponent`s. `decodeURIComponent("100%.png")` throws `URIError`, which
 reaches `errorHandler` as an unknown error: **500**. Uploading `100%.png` succeeds
 and the file can never be read back. `#` and `?` in keys are broken the same way,

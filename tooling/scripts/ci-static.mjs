@@ -288,6 +288,20 @@ not in the reader's project, so following it finds nothing and there is
 no way to discover where the page actually is.`
     },
     {
+        run: "check:doc-links",
+        why: `A relative link is resolved against the directory of the file it is
+written in, and nothing checked that the result was a file. 62 links under
+\`docs/plans/\` and \`docs/audits/\` wrote \`../packages/…\` from one level too
+deep, so every one of them resolved to \`docs/packages/…\` and pointed at
+nothing — a reader following a citation to a 404 with nothing to search
+for. \`docs/README.md\` names this exact hazard ("70 of them moved the last
+time this was reorganised") and naming it was all anyone had done.
+
+Scope is the markdown a contributor reads — docs, .agent, .github, the two
+root files. The website's pages are \`verify:docs\`, which knows its routing
+and its locales.`
+    },
+    {
         run: "check:untranslated",
         why: `The admin ships seven non-English locales and 200-odd strings that have
 a translation key are also written out as English literals, where no

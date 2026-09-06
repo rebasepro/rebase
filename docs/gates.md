@@ -86,6 +86,7 @@ this list, in this order.
 | `check:unused` | A ratchet over values computed and discarded — where the bugs are, not the tidiness. | `pnpm check:unused --update` |
 | `check:test-scripts` | Every package declares `test` and `test:watch`. A package without one is not reported as skipped; it is not reported at all. | `KNOWN_WITHOUT_TESTS` in the script |
 | `check:control-chars` | A literal NUL in a source file, which makes grep classify it as binary and skip it in silence. | — |
+| `check:doc-links` | Every relative link in `docs/**`, `.agent/**`, `.github/**` and the two root markdown files resolves to a file. 62 of them did not, all off by one directory level. | — |
 | `check:untranslated` | A ratchet over admin strings written as English literals beside a translation key that already exists. | `pnpm check:untranslated --update` |
 | `check:floors` | Every manifest's declared `engines.node` and React peer floor against `.nvmrc` and what the packages actually require. pnpm enforces `engines`, so an understated floor moves the failure into a dependency. | — |
 | `check:jsdoc-coverage` | Every public field on the hand-authored property and relation types has a doc comment — for most of them the editor hover is the only explanation anywhere. | — |
