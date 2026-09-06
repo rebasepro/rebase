@@ -6,6 +6,7 @@ import chalk from "chalk";
 import inquirer from "inquirer";
 import {
     resolveCloudUrl,
+    refuseDirectLink,
     createCloudClient,
     requireClient,
     setCurrentContext,
@@ -66,6 +67,10 @@ export function passwordOnTheCommandLine(args: { "--password"?: string }): boole
 export async function loginCommand(rawArgs: string[]): Promise<void> {
     const args = arg(LOGIN_FLAGS, { argv: rawArgs.slice(3),
 permissive: true });
+    // `login` builds its own client, so it does not pass through
+    // `requireClient`'s guard — and it is the one command where getting this
+    // wrong sends a password somewhere it should never go.
+    refuseDirectLink(rawArgs);
     const url = resolveCloudUrl(rawArgs);
 
     noteBlank();

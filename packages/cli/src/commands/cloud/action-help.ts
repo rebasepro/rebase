@@ -656,6 +656,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ],
         notes: [
             "A positional URL is verified before it is written: an address that does not answer is still linked, but you are told.",
+            "A direct link is one backend, not a control plane. The rest of the `cloud` family refuses in a directory linked that way — unlink first, or pass `--project` — so that `login` can never send your control-plane password to the linked host.",
             ".rebase/cloud.json is not a secret and is not your credentials — those live in ~/.rebase/credentials.json."
         ]
     },
