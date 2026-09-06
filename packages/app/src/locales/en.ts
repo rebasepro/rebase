@@ -145,6 +145,8 @@ export const en: RebaseTranslations = {
     reference_not_set: "Reference not set",
     reference_does_not_exist: "Reference does not exist",
     entity_not_found: "Entity not found",
+    entity_not_found_body: "This record does not exist, or it may be hidden from you by row-level security.",
+    back_to_collection: "Back to {{name}}",
     file_not_found: "File not found",
     unsaved_changes_in_entity: "You have unsaved changes in this entity.",
     delete_this_role: "Delete this role",

@@ -228,6 +228,10 @@ export interface RebaseTranslations {
     reference_not_set: string;
     reference_does_not_exist: string;
     entity_not_found: string;
+    /** Why a record the URL names is not there, without asserting it never was. */
+    entity_not_found_body?: string;
+    /** Way out of a record that does not exist. `{{name}}` is the collection. */
+    back_to_collection?: string;
     file_not_found: string;
     unsaved_changes_in_entity: string;
     delete_this_role: string;

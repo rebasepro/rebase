@@ -142,6 +142,8 @@ export const pt: RebaseTranslations = {
     reference_not_set: "Referência não definida",
     reference_does_not_exist: "A referência não existe",
     entity_not_found: "Entidade não encontrada",
+    entity_not_found_body: "Este registo não existe, ou pode estar-lhe oculto pela segurança ao nível da linha.",
+    back_to_collection: "Voltar a {{name}}",
     file_not_found: "Ficheiro não encontrado",
     unsaved_changes_in_entity: "Tem alterações não guardadas nesta entidade.",
     delete_this_role: "Eliminar esta função",

@@ -137,6 +137,8 @@ export const hi: RebaseTranslations = {
     reference_not_set: "संदर्भ सेट नहीं है",
     reference_does_not_exist: "संदर्भ मौजूद नहीं है",
     entity_not_found: "इकाई नहीं मिली",
+    entity_not_found_body: "यह रिकॉर्ड मौजूद नहीं है, या पंक्ति-स्तरीय सुरक्षा के कारण आपसे छिपा हो सकता है।",
+    back_to_collection: "{{name}} पर वापस जाएँ",
     file_not_found: "फ़ाइल नहीं मिली",
     unsaved_changes_in_entity: "आपके पास इस इकाई में सहेजे नहीं गए परिवर्तन हैं।",
     delete_this_role: "यह भूमिका हटाएं",
