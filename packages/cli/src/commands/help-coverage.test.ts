@@ -233,3 +233,105 @@ describe("every command the dispatch answers appears in a help page", () => {
         }
     });
 });
+
+/**
+ * A dispatched command with no strict flag parser accepts a typo and runs.
+ *
+ * `arg(..., { permissive: true })` — and the hand-rolled `filter(a =>
+ * !a.startsWith("-"))` that `telemetry` used — do not relax parsing: they turn
+ * an undeclared flag into a positional, or drop it entirely. So `rebase
+ * telemetry --frobnicate` exited 0 with the status page, and `rebase skills
+ * install --frobnicate --agent claude` exited 0 after writing 21 skill files.
+ * `utils/args.ts` states the rule the whole CLI is supposed to follow, and this
+ * derives the list it applies to from the **dispatch**, not from a list somebody
+ * remembered to update.
+ */
+describe("every command the dispatch answers parses its flags strictly", () => {
+    /**
+     * Families whose refusal is not yet `parseCommandArgs`, with the task that
+     * lands it. Not a skip: an entry here is a named, dated debt, and the test
+     * below fails if one of them starts parsing strictly and the entry is left
+     * behind.
+     *
+     * `cloud` — W8-12 of the 2026-09-06 DX sweep. Its actions that never call
+     * `parseCloudArgs` (`whoami`, `orgs`, `clusters`, `logout`, `projects list`)
+     * exit 0 on an unknown flag.
+     */
+    const PENDING: Record<string, string> = {
+        cloud: "W8-12 (2026-09-06 DX sweep) routes the cloud family through parseCloudArgs"
+    };
+
+    /** Where each dispatched command's line is parsed. */
+    const PARSER_FILE: Record<string, string> = {
+        init: "init.ts",
+        schema: "schema.ts",
+        db: "db.ts",
+        dev: "dev.ts",
+        build: "build.ts",
+        start: "start.ts",
+        auth: "auth.ts",
+        doctor: "doctor.ts",
+        skills: "skills.ts",
+        "api-keys": "api-keys.ts",
+        apps: "apps.ts",
+        eject: "eject.ts",
+        "generate-sdk": "../cli.ts",
+        telemetry: "telemetry.ts",
+        resources: "resources.ts",
+        status: "status.ts"
+    };
+
+    /**
+     * `schema` and `db` relay the user's line to the driver rather than reading
+     * it, so their gate is the driver's `assertKnownFlags` — one validation, at
+     * the entry point, against the spec for the command that was named. See
+     * `server-postgres/src/cli-flags.ts` for why it cannot live in the parsers.
+     */
+    const GATED_BY_DRIVER = new Set(["schema", "db"]);
+
+    it("has a parser named for every dispatched command", () => {
+        const source = fs.readFileSync(path.join(here, "..", "cli.ts"), "utf8");
+        const declared = source.match(/const namespacedCommands = \[([^\]]+)\]/);
+        expect(declared).not.toBeNull();
+        const commands = [...declared![1].matchAll(/"([^"]+)"/g)].map(m => m[1]);
+
+        for (const command of commands) {
+            expect(
+                PARSER_FILE[command] ?? PENDING[command],
+                `"${command}" is dispatched but this test does not say where its flags are parsed`
+            ).toBeTruthy();
+        }
+    });
+
+    it("rejects an unknown flag, or names the task that will", () => {
+        const driverSource = fs.readFileSync(
+            path.join(here, "..", "..", "..", "server-postgres", "src", "cli.ts"),
+            "utf8"
+        );
+
+        for (const [command, file] of Object.entries(PARSER_FILE)) {
+            if (PENDING[command]) continue;
+            const source = fs.readFileSync(path.join(here, file), "utf8");
+            const strict = source.includes("parseCommandArgs(");
+            const relayed = GATED_BY_DRIVER.has(command) && driverSource.includes("assertKnownFlags(");
+            expect(
+                strict || relayed,
+                `rebase ${command} does not parse its flags strictly — an unknown flag is accepted and ignored`
+            ).toBe(true);
+        }
+    });
+
+    it("still has the debt PENDING claims, so the entry is not decoration", () => {
+        // The other direction. An entry that outlives its fix turns the whole
+        // check into a comment, so the debt has to be observable: these four
+        // `cloud` actions take `rawArgs` and never hand it to `parseCloudArgs`,
+        // which is why `rebase cloud whoami --frobnicate` exits 0 with the
+        // session JSON. When W8-12 lands, this fails and PENDING loses its row.
+        expect(Object.keys(PENDING)).toEqual(["cloud"]);
+        const auth = fs.readFileSync(path.join(here, "cloud", "auth.ts"), "utf8");
+        expect(
+            auth.includes("parseCloudArgs("),
+            `cloud/auth.ts parses strictly now — drop "cloud" from PENDING (${PENDING.cloud})`
+        ).toBe(false);
+    });
+});
