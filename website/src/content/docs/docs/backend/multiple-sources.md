@@ -41,6 +41,10 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
+`queue()` is new <span class="since-badge" data-since="0.18">Since 0.18</span>. `database()`, `bucket()` and `topic()`
+have been declarable since 0.17, so a project on the released version declares
+those three and reaches background work through `jobs.tasks` instead.
+
 Then point a collection at one, by handle — the same name, spelled once:
 
 ```ts
@@ -242,7 +246,8 @@ await signups.publish({ userId });
 ```
 
 A queue is the other shape of background work: a work list with **one
-handler**, where the caller holds the job's id.
+handler**, where the caller holds the job's id. Queues are new
+<span class="since-badge" data-since="0.18">Since 0.18</span> — topics shipped in 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");

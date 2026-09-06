@@ -1,5 +1,5 @@
 ---
-sourceHash: b2263faa9ec92398
+sourceHash: bf0f225501043030
 title: Múltiples bases de datos y buckets
 sidebar_label: Múltiples fuentes
 description: Enruta colecciones a diferentes bases de datos y propiedades a diferentes buckets de almacenamiento, y configura cada uno desde el entorno.
