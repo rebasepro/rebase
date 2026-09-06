@@ -6,6 +6,10 @@ Audit Row-Level Security on any PostgreSQL database. One command, no configurati
 npx @rebasepro/rls-check
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build. It is a command, so that
+matters only if you import it — `require()` of it resolves on Node 22.12+,
+which supports `require(esm)`.
+
 Run it in your project directory and it finds the database itself: `DATABASE_URL`, then `POSTGRES_URL`, then a `.env` beside you. Point it somewhere else with `DATABASE_URL="postgresql://user:password@host:5432/database" npx @rebasepro/rls-check`.
 
 It also takes the connection string as an argument, but prefer not to: npm echoes the command line before the program starts and your shell records it, so the password lands in two places `rls-check` cannot redact. Writing `$DATABASE_URL` there does not help — the shell expands it before npm sees it.

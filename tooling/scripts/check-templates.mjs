@@ -515,6 +515,60 @@ function checkPgliteStackIsPinned() {
         ));
 }
 
+/**
+ * The three manifests a bundle reads must not declare one name twice.
+ *
+ * `collectDeclaredDependencies` reads root → config → backend and lets the last
+ * one win, so exactly one of two disagreeing ranges reaches `deps.declared` and
+ * the managed runtime installs it. The stock scaffold shipped that
+ * disagreement — `dotenv ^16.0.0` at the root, `^17.4.2` in `backend/` — so
+ * every bundle built from a default project asked the runtime for dotenv 16
+ * while the backend had been compiled against 17.
+ *
+ * `rebase build` refuses on a *disjoint* pair, because refusing on a merely
+ * different one would break projects that have a reason. A template has no such
+ * reason: it is the file every new project starts from, and two ranges for one
+ * name in it are a mistake whether or not they overlap. So this is the stricter
+ * rule, and it is stricter on purpose.
+ */
+function checkScaffoldDeclaresEachDepOnce() {
+    const problems = [];
+    // The manifests `collectDeclaredDependencies` reads, in its order.
+    const MANIFESTS = ["package.json", "config/package.json", "backend/package.json"];
+
+    for (const [label, root] of [["template", templateRoot], ["baas overlay", baasOverlay]]) {
+        const seen = new Map();
+        for (const relative of MANIFESTS) {
+            const manifestPath = path.join(root, relative);
+            if (!fs.existsSync(manifestPath)) continue;
+            let deps;
+            try {
+                deps = JSON.parse(fs.readFileSync(manifestPath, "utf8")).dependencies ?? {};
+            } catch {
+                continue; // another check reports an unparseable manifest
+            }
+            for (const [name, range] of Object.entries(deps)) {
+                // `workspace:*` is how every template names an in-repo package;
+                // it never reaches the bundle and is identical everywhere.
+                if (typeof range !== "string" || range.startsWith("workspace:")) continue;
+                const first = seen.get(name);
+                if (!first) {
+                    seen.set(name, { range, file: relative });
+                    continue;
+                }
+                if (first.range === range) continue;
+                problems.push(
+                    `${label}: ${name} is declared as "${first.range}" in ${first.file} and `
+                    + `"${range}" in ${relative}. A bundle carries one of the two — declare it `
+                    + "once, in the workspace that uses it."
+                );
+            }
+        }
+    }
+
+    return problems;
+}
+
 function checkBaasHasNoAdminTypes() {
     const problems = [];
     const walk = (dir) => {
@@ -664,6 +718,15 @@ if (allowlistProblems.length > 0) {
     for (const p of allowlistProblems) console.error(`    ${p}`);
 } else {
     console.log("  ok   every package pnpm may build is allowed under npm, or excused");
+}
+
+const duplicateDepProblems = checkScaffoldDeclaresEachDepOnce();
+if (duplicateDepProblems.length > 0) {
+    failed++;
+    console.log("  FAIL no dependency is declared twice at different ranges in a scaffold");
+    for (const p of duplicateDepProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   no dependency is declared twice at different ranges in a scaffold");
 }
 
 const pgliteProblems = checkPgliteStackIsPinned();

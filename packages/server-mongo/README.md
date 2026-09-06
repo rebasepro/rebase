@@ -8,6 +8,10 @@ MongoDB database driver for Rebase.
 pnpm add @rebasepro/server-mongo
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 ## What This Package Does
 
 Implements the Rebase `BackendBootstrapper` and backend interfaces for MongoDB. Provides a complete data driver, change-stream-based realtime, snapshot history, auth repositories, and WebSocket support. Plug it into `@rebasepro/server` via `createMongoBootstrapper()`, or use the standalone `createMongoBackend()` factory for direct access.

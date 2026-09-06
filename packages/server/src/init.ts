@@ -16,6 +16,7 @@ import {
     RealtimeProvider,
     SecurityRule,
     buildResourceGraph,
+    computeSchemaVersion,
     resourceKeyOf
 } from "@rebasepro/types";
 import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, getEffectiveSecurityRules } from "@rebasepro/common";
@@ -44,6 +45,7 @@ import { createAdapterAuthMiddleware } from "./auth/adapter-middleware";
 import { scopeDataDriver, SERVICE_IDENTITY } from "./auth/rls-scope";
 import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
 import { errorHandler } from "./api/errors";
+import { createSchemaDriftDetector } from "./api/schema-drift";
 import { installRootErrorHandler } from "./api/root-error-handler";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -2360,6 +2362,21 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     if (activeCollections.length > 0) {
         const dataRouter = new Hono<HonoEnv>();
         dataRouter.onError(errorHandler);
+
+        // Read `x-rebase-schema`, which a generated SDK has been sending for a
+        // while and nothing has ever read. It refuses nothing — see
+        // `createSchemaDriftDetector` — it only lets the error handler say
+        // "this client was generated against an older schema" on a 400 or 404
+        // that was going to be returned regardless. Registered before
+        // `route("/")`, because a `use()` added after the routes never runs.
+        //
+        // `config.schemaVersion` is what the bundle recorded at build time and
+        // is what `/api/meta/contract` serves; a `baas` project has none, so the
+        // stamp is computed from the collections introspection found — the same
+        // input and the same function the contract route uses, so the two
+        // cannot answer differently.
+        dataRouter.use("/*", createSchemaDriftDetector(() =>
+            config.schemaVersion ?? computeSchemaVersion(collectionRegistry.getRawCollections())));
 
         // Secure by default: require auth when auth is configured.
         // Developers who intentionally want public data access (relying

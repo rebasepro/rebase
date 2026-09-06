@@ -8,6 +8,10 @@ React component library and design system for the Rebase ecosystem. Built on Rad
 pnpm add @rebasepro/ui
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 ### Peer Dependencies
 
 - `react` >= 19.0.0

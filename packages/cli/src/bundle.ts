@@ -612,6 +612,42 @@ function resolvesToWorkspacePackage(projectRoot: string, name: string): boolean 
 }
 
 /**
+ * The manifests a bundle's declared dependencies come from, least specific first.
+ *
+ * Order is the whole point. `collectDeclaredDependencies` lets a later manifest
+ * win, and the app — `backend/` — is the one whose code was written and
+ * typechecked against the range it names. The project root is a workspace root:
+ * it exists to hold scripts and the tooling every workspace shares, and its
+ * ranges were never exercised by the code that ends up in the bundle. It used to
+ * be read last, so a scaffold declaring `dotenv ^16` at the root and `^17.4.2`
+ * in the backend shipped a manifest telling the managed runtime to install 16.
+ */
+const BUNDLE_DEP_MANIFESTS = ["package.json", "config/package.json", "backend/package.json"];
+
+/**
+ * Specifiers the registry the managed runtime installs from cannot resolve.
+ *
+ * `workspace:` is handled separately (it is normal and expected inside this
+ * repo's own projects); everything here is a specifier that works on the
+ * developer's disk and nowhere else. The runtime installs `deps.declared` from
+ * npm with no access to the machine the bundle was built on, so a `file:` or a
+ * `git+` range is a deploy-time install failure — the worst place to find out.
+ */
+const NON_REGISTRY_PROTOCOLS = ["file:", "link:", "portal:", "git+", "git:", "github:"];
+
+/** Whether a range names something npm could not install from the registry. */
+function nonRegistrySpecifier(version: string): string | null {
+    const trimmed = version.trim();
+    for (const protocol of NON_REGISTRY_PROTOCOLS) {
+        if (trimmed.startsWith(protocol)) return protocol;
+    }
+    // A bare path — `../shared`, `./vendor/lib`, `/opt/lib` — which npm accepts
+    // as a local directory and the registry has never heard of.
+    if (/^\.{0,2}\//.test(trimmed)) return "a filesystem path";
+    return null;
+}
+
+/**
  * Collect the runtime dependencies a bundle needs installed beside it.
  *
  * Packages the runtime image already provides are excluded — reinstalling a
@@ -619,41 +655,79 @@ function resolvesToWorkspacePackage(projectRoot: string, name: string): boolean 
  * wasted space and at worst a version conflict. Workspace packages are excluded
  * too: they are not on the registry the runtime installs from, and the project's
  * own config package already travels inside the bundle.
+ *
+ * Throws when a declared range is not something the registry can resolve, or
+ * when two manifests declare a name at ranges nothing satisfies. The
+ * alternative is a bundle that builds green and fails at the deploy's install
+ * step, minutes later and on a machine the developer cannot see. `rebase build`
+ * reports both in its own words first; this is the backstop for every other
+ * caller, `rebase cloud deploy` included.
  */
 export function collectDeclaredDependencies(projectRoot: string): Record<string, string> {
     const declared: Record<string, string> = {};
 
-    for (const relative of ["backend/package.json", "config/package.json", "package.json"]) {
+    const conflicts = detectDeclaredDepConflicts(projectRoot);
+    if (conflicts.length > 0) {
+        const described = conflicts
+            .map(c => {
+                const [a, b] = c.declarations;
+                return `${c.name}: ${a.range} (${a.file}) vs ${b.range} (${b.file})`;
+            })
+            .join("; ");
+        throw new Error(
+            `No single version satisfies every range this project declares — ${described}. `
+            + "The bundle installs one of them and the rest of the project was built against "
+            + "the other. Declare one range, in the app that uses it."
+        );
+    }
+
+    for (const relative of BUNDLE_DEP_MANIFESTS) {
         const file = path.join(projectRoot, relative);
         if (!fs.existsSync(file)) continue;
+        let pkg: { dependencies?: Record<string, string> };
         try {
-            const pkg = JSON.parse(fs.readFileSync(file, "utf8")) as {
-                dependencies?: Record<string, string>;
-            };
-            for (const [name, version] of Object.entries(pkg.dependencies ?? {})) {
-                if (RUNTIME_PROVIDED.has(name)) continue;
-                // A workspace protocol means nothing outside this repository.
-                if (typeof version === "string" && version.startsWith("workspace:")) continue;
-                // A plain range that nonetheless resolves to an in-repo workspace
-                // package (e.g. `"config": "*"` symlinked to `../../config`) —
-                // the runtime cannot install it from the registry.
-                if (resolvesToWorkspacePackage(projectRoot, name)) continue;
-                declared[name] = version;
-            }
+            pkg = JSON.parse(fs.readFileSync(file, "utf8")) as typeof pkg;
         } catch {
             // Unparseable package.json: nothing to declare from it.
+            continue;
+        }
+        for (const [name, version] of Object.entries(pkg.dependencies ?? {})) {
+            if (RUNTIME_PROVIDED.has(name)) continue;
+            // A workspace protocol means nothing outside this repository.
+            if (typeof version === "string" && version.startsWith("workspace:")) continue;
+            // A plain range that nonetheless resolves to an in-repo workspace
+            // package (e.g. `"config": "*"` symlinked to `../../config`) —
+            // the runtime cannot install it from the registry.
+            if (resolvesToWorkspacePackage(projectRoot, name)) continue;
+            const protocol = typeof version === "string" ? nonRegistrySpecifier(version) : null;
+            if (protocol) {
+                throw new Error(
+                    `${relative} declares "${name}": "${version}", which the managed runtime `
+                    + `cannot install — ${protocol} resolves only on this machine. Publish the `
+                    + "package to a registry and depend on it by version, or vendor its source "
+                    + "into the backend."
+                );
+            }
+            declared[name] = version;
         }
     }
 
     return declared;
 }
 
-/** One `@rebasepro/*` dependency as some package.json in the project declares it. */
+/** One dependency as some package.json in the project declares it. */
 export interface DeclaredFrameworkDep {
     name: string;
     range: string;
     /** Project-relative package.json it was declared in. */
     file: string;
+}
+
+/** One name two of the bundle's manifests declare at ranges nothing satisfies. */
+export interface DeclaredDepConflict {
+    name: string;
+    /** The two declarations, in manifest order. */
+    declarations: [DeclaredFrameworkDep, DeclaredFrameworkDep];
 }
 
 export interface FrameworkDepDrift {
@@ -665,6 +739,12 @@ export interface FrameworkDepDrift {
      * packages against each other.
      */
     disagreeing: string[];
+    /**
+     * Third-party names two bundle manifests declare at ranges no single version
+     * satisfies. One of the two wins in `deps.declared` and the loser's code was
+     * typechecked against a version the runtime will never install.
+     */
+    conflicting: DeclaredDepConflict[];
 }
 
 /**
@@ -726,6 +806,75 @@ function canReach(range: string, target: string): boolean | null {
 }
 
 /**
+ * Whether no single published version can satisfy both ranges.
+ *
+ * Only a provable disagreement counts. Anything this tiny grammar cannot read —
+ * a tag, an `||`, a `*` — returns false, because a build refused over a range
+ * the CLI merely failed to parse is worse than the drift it was looking for.
+ */
+function rangesDisjoint(a: string, b: string): boolean {
+    const loA = lowerBoundOf(a);
+    const loB = lowerBoundOf(b);
+    if (!loA || !loB) return false;
+    const hiA = upperBoundOf(a);
+    const hiB = upperBoundOf(b);
+    if (hiA && compareTriples(hiA, loB) <= 0) return true;
+    if (hiB && compareTriples(hiB, loA) <= 0) return true;
+    return false;
+}
+
+/**
+ * Names two of the bundle's manifests declare at ranges nothing satisfies.
+ *
+ * `collectDeclaredDependencies` has to pick one — the app's — and the loser is
+ * silent: the bundle tells the managed runtime to install a version the other
+ * half of the project was never compiled against. The stock scaffold shipped
+ * exactly that (`dotenv ^16` at the root, `^17.4.2` in `backend/`), so every
+ * bundle built from a default project asked for dotenv 16.
+ *
+ * Scoped to the three manifests that feed `deps.declared`, and to their
+ * `dependencies`: a `frontend/` that wants a different major of a build tool is
+ * not this problem, and `devDependencies` never reach the bundle.
+ */
+export function detectDeclaredDepConflicts(projectRoot: string): DeclaredDepConflict[] {
+    const seen = new Map<string, DeclaredFrameworkDep>();
+    const conflicts: DeclaredDepConflict[] = [];
+
+    for (const relative of BUNDLE_DEP_MANIFESTS) {
+        const file = path.join(projectRoot, relative);
+        if (!fs.existsSync(file)) continue;
+        let pkg: { dependencies?: Record<string, string> };
+        try {
+            pkg = JSON.parse(fs.readFileSync(file, "utf8")) as typeof pkg;
+        } catch {
+            continue;
+        }
+        for (const [name, range] of Object.entries(pkg.dependencies ?? {})) {
+            if (typeof range !== "string") continue;
+            // The image supplies these; a disagreement about them never reaches
+            // the manifest, and `disagreeing` already reports the framework ones.
+            if (RUNTIME_PROVIDED.has(name)) continue;
+            if (range.startsWith("workspace:")) continue;
+            const first = seen.get(name);
+            if (!first) {
+                seen.set(name, { name,
+range,
+file: relative });
+                continue;
+            }
+            if (first.range === range) continue;
+            if (!rangesDisjoint(first.range, range)) continue;
+            conflicts.push({ name,
+declarations: [first, { name,
+range,
+file: relative }] });
+        }
+    }
+
+    return conflicts;
+}
+
+/**
  * Find `@rebasepro/*` dependencies pinned to a version older than this CLI.
  *
  * This is the only place a developer can be told. In development, every
@@ -784,7 +933,8 @@ file: relative });
     );
 
     return { behind,
-disagreeing: bounds.size > 1 ? [...bounds].sort() : [] };
+disagreeing: bounds.size > 1 ? [...bounds].sort() : [],
+conflicting: detectDeclaredDepConflicts(projectRoot) };
 }
 
 /**

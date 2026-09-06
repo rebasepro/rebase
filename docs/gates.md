@@ -78,7 +78,7 @@ this list, in this order.
 | `check:chart` | The Helm chart lints, renders its three documented topologies, and every refusal in `_validate.tpl` is still reachable. Needs Helm. | — |
 | `check:runtime-image:boots` | The image actually starts, both ways a bundle can arrive, and still refuses when given neither. Needs Docker. | — |
 | `check:names` | A package rename leaking into a bare string, a `.astro` file, an `.env.example` or a Tailwind `@source` path. | — |
-| `check:deps` | Every published package declares what it imports, so it resolves under pnpm's isolated layout and not only under hoisting. | — |
+| `check:deps` | Every published package declares what it imports, so it resolves under pnpm's isolated layout and not only under hoisting — and no two of them ask for majors of one dependency that a user cannot install together (chalk 4 and chalk 5 both reached a real install). | — |
 | `check:publishable-set` | The release derives its own package set from the workspace instead of enumerating it. | — |
 | `check:package-contents` | What each published tarball actually contains — tests shipped by accident, sources shipped on purpose. | — |
 | `check:lint` | ESLint errors (`--quiet`) over `packages/`, `app/`, `tests/` and `tooling/scripts/`, which no pipeline ran at all until one sat on main. `website/`, `examples/` and `tooling/videos/` are ignored, each with its reason and its measured error count in `eslint.config.mjs`. | — |
@@ -89,7 +89,8 @@ this list, in this order.
 | `check:doc-links` | Every relative link in `docs/**`, `.agent/**`, `.github/**` and the two root markdown files resolves to a file. 62 of them did not, all off by one directory level. | — |
 | `check:bug-classes` | `docs/bug-classes.md`'s class numbers are unique and contiguous. The file is cited by number, and it had two `## 50.` sections. | — |
 | `check:untranslated` | A ratchet over admin strings written as English literals beside a translation key that already exists. | `pnpm check:untranslated --update` |
-| `check:floors` | Every manifest's declared `engines.node` and React peer floor against `.nvmrc` and what the packages actually require. pnpm enforces `engines`, so an understated floor moves the failure into a dependency. | — |
+| `check:floors` | Every manifest's declared `engines.node` and React peer floor against `.nvmrc` and what the packages actually require. Neither package manager enforces `engines` on its own; `bin/rebase.js`'s floor check and the scaffold's `engineStrict` do, and both read the declaration this keeps honest. | — |
+| `check:pnpm-settings` | Every setting `pnpm-workspace.yaml` declares comes back from `pnpm config`, with the value declared, and no `.npmrc` key duplicates one or is dead. pnpm 11 stopped reading `.npmrc` silently, leaving eight settings — the supply-chain release-age floor among them — doing nothing. | — |
 | `check:jsdoc-coverage` | Every public field on the hand-authored property and relation types has a doc comment — for most of them the editor hover is the only explanation anywhere. | — |
 | `check:rebase-props` | The `<Rebase>` props table against `RebaseProps` and what `Rebase.tsx` reads, so the table cannot document ten of twenty-four. | — |
 | `check:property-options` | The properties page against every `Admin*Options` interface, so a per-property `admin` option cannot exist in the type and nowhere else. | — |

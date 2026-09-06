@@ -244,9 +244,21 @@ search anyone ran, and an empty result reads exactly like "no matches".`
         why: `Six manifests said Node 20, four said 20.10, one said 20, seven said
 nothing, the dogfood app said 18 and five translated quickstarts told
 readers 18+ — while .nvmrc, which is what everyone installs, said
-22.22.0. pnpm enforces \`engines\` on install, so an understated floor is
-not cosmetic: it lets someone through on Node 20 and moves the failure
-into a transitive dependency. The React peer floor decayed the same way.`
+22.22.0. Neither manager enforces \`engines\` on its own (pnpm installs a
+\`>=99.0.0\` project and exits 0), so what makes the number load-bearing is
+\`bin/rebase.js\`'s own floor check and the scaffold's \`engineStrict\` —
+both of which read the declaration this gate keeps honest. The React peer
+floor decayed the same way.`
+    },
+    {
+        run: "check:pnpm-settings",
+        why: `pnpm 11 stopped reading its settings from \`.npmrc\` and said nothing. Eight
+were dead at once, including the three-day \`minimum-release-age\` floor whose
+own comment explains what it bounds — so the tree resolved with pnpm's
+defaults, in the isolated node_modules layout despite \`node-linker=hoisted\`,
+with no supply-chain window at all. This asks pnpm rather than reading the
+file: every setting declared in pnpm-workspace.yaml must come back from
+\`pnpm config\`, with the value declared.`
     },
     {
         run: "check:jsdoc-coverage",

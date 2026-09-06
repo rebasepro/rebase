@@ -181,6 +181,34 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
             // project needs. `rebase resources --check` is what keeps it honest.
             writeResourceGraphFile(projectRoot, resourceGraph);
 
+            /* Two of this project's manifests want versions of one package that
+               no single release satisfies.
+
+               Fatal, and fatal *before* the build, because the bundle can only
+               carry one of them: whichever manifest is read last wins, and the
+               other half of the project was compiled against something the
+               managed runtime will never install. There is no correct bundle to
+               produce here, so producing one — and then warning — would ship the
+               disagreement instead of surfacing it. */
+            const drift = detectFrameworkDepDrift(projectRoot, cliVersion());
+            if (drift.conflicting.length > 0) {
+                console.error(chalk.red(
+                    `\n  ✗ ${drift.conflicting.length} dependency range(s) no single version satisfies:\n`));
+                for (const conflict of drift.conflicting) {
+                    const [first, second] = conflict.declarations;
+                    console.error(`    ${chalk.bold(conflict.name)}`);
+                    console.error(chalk.dim(`      ${first.range}  (${first.file})`));
+                    console.error(chalk.dim(`      ${second.range}  (${second.file})`));
+                }
+                console.error("");
+                console.error(chalk.dim(
+                    "    The bundle installs one range; the other half of the project was built"));
+                console.error(chalk.dim(
+                    "    against the other. Declare one range, in the app that uses it.\n"));
+                process.exitCode = 1;
+                return;
+            }
+
             const result = await buildBundle({
                 projectRoot,
                 appName: name,
@@ -246,8 +274,8 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
 
                A warning rather than a hard failure: the CLI cannot know that a
                newer package has actually been published, and refusing to build
-               over a guess would be worse than saying it out loud. */
-            const drift = detectFrameworkDepDrift(projectRoot, cliVersion());
+               over a guess would be worse than saying it out loud. (`drift` is
+               the same object the conflict check above read, before the build.) */
             if (drift.behind.length > 0) {
                 console.log(chalk.yellow(`    ⚠ framework dependencies older than this CLI (${cliVersion()}):`));
                 for (const dep of drift.behind) {

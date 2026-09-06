@@ -4,11 +4,20 @@
  * `publish.yml` takes the bump as a free-text `workflow_dispatch` input
  * defaulting to `"patch"`, and nothing correlates that input with the diff. So a
  * release that removed an export from `@rebasepro/server` ships as 0.13.1, and
- * every consumer pinned `"@rebasepro/server": "^0.13.0"` — the range `rebase init`
- * scaffolds — resolves it on their next install. `^0.13.0` is
- * `>=0.13.0 <0.14.0`: a breaking change auto-installs. Under 0.x the *minor* is
- * the breaking position, and until this file nothing enforced that a breaking
- * change reached it.
+ * the number tells every reader it is safe to take.
+ *
+ * That number is the only signal there is. `rebase init` writes EXACT pins —
+ * `"@rebasepro/server": "0.17.3"`, one version for all ten packages, since the
+ * lockstep set has to move together — so nothing auto-installs and nothing
+ * warns: a project upgrades when a person edits the version, and what that
+ * person has to go on is the digit that changed and the changelog entry behind
+ * it. A patch that removed an export is a lie told at exactly the moment
+ * somebody is deciding whether to trust it. (This file used to argue from
+ * `^0.13.0` auto-resolving on the next install, which stopped being true when
+ * `init` moved to exact pins; the conclusion did not change, only the reason.)
+ *
+ * Under 0.x the *minor* is the breaking position, and until this file nothing
+ * enforced that a breaking change reached it.
  *
  * The three axes with a committed artifact can answer for themselves, so they do:
  *
@@ -306,13 +315,12 @@ export function checkReleaseBump({
         const declared = readNow(CHANGELOG);
         const declaredSection = declared === null ? null : unreleasedSection(declared);
         if (level === "patch" && declaredSection !== null && /^###\s+Breaking\b/m.test(declaredSection)) {
-            const range = `^${previous.split(".").slice(0, 2).join(".")}.0`;
             console.error(red("✗ The changelog declares a breaking change and the bump is a PATCH.\n"));
             console.error(red(
                 `  ✗ ${CHANGELOG}'s [Unreleased] section has a "### Breaking" heading, so this release\n` +
-                `    breaks something. Every consumer on "${range}" — the range \`rebase init\` scaffolds —\n` +
-                `    installs ${version} on their next install. Under 0.x the minor is the breaking\n` +
-                "    position: release this as a minor.\n"
+                `    breaks something. \`rebase init\` writes exact pins ("${previous}"), so nobody takes\n` +
+                `    ${version} by accident — they take it by reading the number, and a patch says it is\n` +
+                "    safe. Under 0.x the minor is the breaking position: release this as a minor.\n"
             ));
             return 1;
         }
@@ -352,11 +360,11 @@ export function checkReleaseBump({
 
     const problems = [];
     if (level === "patch") {
-        const range = `^${previous.split(".").slice(0, 2).join(".")}.0`;
         problems.push(
-            `The bump is a PATCH. Every consumer on "${range}" — the range \`rebase init\` scaffolds —\n` +
-            `    installs ${version} on their next install. Under 0.x the minor is the breaking\n` +
-            "    position: release this as a minor."
+            `The bump is a PATCH. \`rebase init\` writes exact pins ("${previous}"), so the version\n` +
+            `    number is the whole signal: somebody deciding whether to move to ${version} reads the\n` +
+            "    digit that changed. Under 0.x the minor is the breaking position: release this as a\n" +
+            "    minor."
         );
     }
     const changelog = readNow(CHANGELOG);

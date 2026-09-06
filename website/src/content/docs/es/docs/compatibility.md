@@ -1,5 +1,5 @@
 ---
-sourceHash: 5de8d85cb2d31896
+sourceHash: 64da41d7e9319170
 slug: es/docs/compatibility
 title: Compatibilidad
 description: Qué promete Rebase entre versiones y qué no — los seis contratos versionados, cómo falla cada uno y qué puede seguir cambiando en una versión menor.
@@ -150,6 +150,30 @@ del bundle y replicado por un SDK generado en el encabezado `x-rebase-schema`
 (`SCHEMA_VERSION_HEADER`). Existe para que la plataforma pueda indicar «esta
 aplicación se compiló contra un esquema más antiguo» en lugar de fallar
 misteriosamente en la primera petición.
+
+El backend lee ese encabezado en cada petición de datos. La deriva nunca rechaza
+una llamada —un SDK con un esquema de retraso suele seguir siendo compatible, y
+desplegar el backend antes que el frontend es el orden habitual—, pero cuando una
+petición falla con un 400 o un 404, el error lleva la deriva como su causa:
+
+```json
+{
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "Unknown field \"authorName\" on collection \"posts\"",
+    "cause": {
+      "code": "SCHEMA_DRIFT",
+      "clientSchema": "v1:0e1c…",
+      "serverSchema": "v1:9ab4…",
+      "message": "This client was generated against schema v1:0e1c…; this backend serves v1:9ab4…"
+    }
+  }
+}
+```
+
+Así, una columna renombrada se lee como «tu SDK está obsoleto, vuelve a
+generarlo» y no como un campo que tus propios tipos aseguran que existe. A una
+petición que funciona nunca se le dice nada.
 
 Cubre **únicamente colecciones**. La edición de un hook o una función no cambia
 el contrato de un cliente y no debe invalidar todos los SDK generados.

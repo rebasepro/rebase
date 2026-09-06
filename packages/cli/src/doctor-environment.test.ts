@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+    checkAtlasBinary,
     checkDuplicateSlugs,
     checkEnvSanity,
     checkNodeVersion,
@@ -161,5 +162,50 @@ describe("version skew", () => {
             { file: "package.json", name: "@rebasepro/server", range: "^0.17.3" },
             { file: "backend/package.json", name: "@rebasepro/server", range: "^0.17.3" }
         ])).toEqual([]);
+    });
+});
+
+/**
+ * The atlas binary, which `db push`, `db generate` and `db migrate` shell out
+ * to and whose absence is invisible until one of them runs.
+ *
+ * Three states with three different remedies — and the one that used to be
+ * conflated is the third: a binary on disk with no `.bin` shim is not a blocked
+ * build script, and telling that reader to approve builds sends them to a
+ * command that does nothing.
+ */
+describe("atlas binary", () => {
+    const base = { onPath: false,
+packageInstalled: true,
+binaryOnDisk: true,
+manager: "pnpm" };
+
+    it("says nothing when the binary is on PATH", () => {
+        expect(checkAtlasBinary({ ...base, onPath: true })).toEqual([]);
+    });
+
+    it("says nothing when the state could not be read", () => {
+        expect(checkAtlasBinary(null)).toEqual([]);
+    });
+
+    it("tells an uninstalled project to install it, in its own package manager", () => {
+        const [finding] = checkAtlasBinary({ ...base, packageInstalled: false, manager: "npm" });
+        expect(finding.check).toBe("atlas");
+        expect(finding.message).toContain("not installed");
+        expect(finding.fix).toContain("npm add -D @ariga/atlas");
+    });
+
+    it("names the allowlist when the package is there and the binary is not", () => {
+        const [finding] = checkAtlasBinary({ ...base, binaryOnDisk: false });
+        expect(finding.message).toContain("preinstall");
+        expect(finding.fix).toContain("allowBuilds");
+    });
+
+    it("asks for a re-install, not an allowlist, when only the .bin link is gone", () => {
+        const [finding] = checkAtlasBinary(base);
+        expect(finding.message).toContain("node_modules/.bin/atlas");
+        expect(finding.fix).toContain("--force");
+        // The wrong advice for this state, and the advice it used to give.
+        expect(finding.fix).not.toContain("approve-builds");
     });
 });
