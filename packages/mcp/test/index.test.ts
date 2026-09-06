@@ -1529,6 +1529,52 @@ describe("error ergonomics", () => {
         expect(explainToolError(notFound, "http://x", "get_document")).toBe("Not Found");
     });
 
+    it("can switch to a branch it just made", async () => {
+        // create/delete/info/list without switch left an agent able to make a
+        // branch and unable to use it: the only route onto one was hand-editing
+        // DATABASE_URL.
+        expect(ALL_TOOLS.map((t) => t.name)).toContain("rebase_db_branch_switch");
+        // A local pointer under `.rebase/`, never `.env` and never the database.
+        expect(LOCAL_ONLY_TOOLS.has("rebase_db_branch_switch")).toBe(true);
+        expect(gatedTargetFor("rebase_db_branch_switch")).toBeNull();
+
+        (mockSpawn.stdout.on as any).mockImplementation((event: string, cb: (b: Buffer) => void) => {
+            if (event === "data") cb(Buffer.from("On branch feature_auth"));
+            return mockSpawn.stdout;
+        });
+        (mockSpawn.stderr.on as any).mockImplementation(() => mockSpawn.stderr);
+        (mockSpawn.on as any).mockImplementation((event: string, cb: (c: number) => void) => {
+            if (event === "close") cb(0);
+            return mockSpawn;
+        });
+
+        await handler()({
+            method: "tools/call",
+            params: { name: "rebase_db_branch_switch", arguments: { name: "feature_auth" } }
+        });
+        expect((spawn as any).mock.calls.at(-1)[1]).toEqual(
+            expect.arrayContaining(["db", "branch", "switch", "feature_auth"])
+        );
+
+        await handler()({
+            method: "tools/call",
+            params: { name: "rebase_db_branch_switch", arguments: { off: true } }
+        });
+        expect((spawn as any).mock.calls.at(-1)[1]).toEqual(
+            expect.arrayContaining(["db", "branch", "switch", "--off"])
+        );
+
+        // No name and no `--off` reports the active branch rather than moving.
+        await handler()({
+            method: "tools/call",
+            params: { name: "rebase_db_branch_switch", arguments: {} }
+        });
+        const bare = (spawn as any).mock.calls.at(-1)[1] as string[];
+        expect(bare).toEqual(expect.arrayContaining(["db", "branch", "switch"]));
+        expect(bare).not.toContain("--off");
+        vi.clearAllMocks();
+    });
+
     it("names a dev server it did not spawn, in both dev tools", async () => {
         const state = { baseUrl: "http://localhost:3070", serviceKey: "k", pid: process.pid };
         expect(describeForeignDevServer("logs", state)).toContain("http://localhost:3070");

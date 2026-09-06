@@ -1,7 +1,7 @@
 ---
 title: MCP-Server
 sidebar_label: MCP-Server
-description: Verbinden Sie Claude Code, Cursor, die Gemini CLI oder einen beliebigen MCP-Client mit einem Rebase-Projekt – die 41 bereitgestellten Tools, die Anmeldedaten für die Authentifizierung und das Loopback-Gate, das zwischen einem Agenten und der Produktion steht.
+description: Verbinden Sie Claude Code, Cursor, die Gemini CLI oder einen beliebigen MCP-Client mit einem Rebase-Projekt – die 42 bereitgestellten Tools, die Anmeldedaten für die Authentifizierung und das Loopback-Gate, das zwischen einem Agenten und der Produktion steht.
 ---
 
 `@rebasepro/mcp` ist ein [Model Context Protocol](https://modelcontextprotocol.io)-Server,
@@ -371,10 +371,10 @@ registrierte Projekt enthält; behandeln Sie sie entsprechend.
 
 ## Tool-Referenz
 
-41 Tools in neun Gruppen. Mit ⚠ markierte Tools werden bei nicht-lokalen Zielen
+42 Tools in neun Gruppen. Mit ⚠ markierte Tools werden bei nicht-lokalen Zielen
 verweigert, sofern Sie dies nicht explizit erlauben.
 
-### Schema & Datenbank (11)
+### Schema & Datenbank (12)
 
 Starten die Rebase CLI im aktiven Projektverzeichnis.
 
@@ -391,6 +391,7 @@ Starten die Rebase CLI im aktiven Projektverzeichnis.
 | `rebase_db_branch_list` | — | Datenbank-Branches auflisten (nur Admins) |
 | `rebase_db_branch_delete` ⚠ | `name` | Einen Datenbank-Branch löschen (nur Admins) |
 | `rebase_db_branch_info` | `name` | Branch-Informationen und -Status (nur Admins) |
+| `rebase_db_branch_switch` | — | Richtet diesen Checkout auf einen Branch oder zurück auf die Hauptdatenbank (nur Admins) |
 
 ### Schema-Planung (1)
 

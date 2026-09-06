@@ -700,6 +700,10 @@ export const LOCAL_ONLY_TOOLS = new Set<string>([
     // overwriting hand-written collection files with generated ones. Local-only
     // is what it is.
     "rebase_schema_introspect",
+    // `rebase_db_branch_switch` writes a branch pointer under `.rebase/` and
+    // never touches `.env` or the database. Like `rebase_project_switch`, it
+    // retargets everything else rather than acting on a target itself.
+    "rebase_db_branch_switch",
     "rebase_schema_generate",
     "rebase_db_generate",
     "rebase_generate_sdk",
@@ -1043,6 +1047,23 @@ properties: {} },
             required: ["name"]
         },
         cmd: ["db", "branch", "info"]
+    },
+    {
+        // create/delete/info/list without switch meant an agent could make a
+        // branch it had no way to use: the only route onto one was hand-editing
+        // `DATABASE_URL`, which is not a thing to ask an assistant to do.
+        name: "rebase_db_branch_switch",
+        description:
+            "Point this checkout at a database branch, or back at the main database (Admins only). " +
+            "With no name, reports which branch is active. Writes a local pointer, never `.env`.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "Branch to switch to. Omit to report the active branch." },
+                off: { type: "boolean", description: "Switch back to the main database instead of a branch." }
+            }
+        },
+        cmd: ["db", "branch", "switch"]
     }
 ];
 
@@ -1718,6 +1739,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         } else if (name === "rebase_db_branch_delete" || name === "rebase_db_branch_info") {
             const argsObj = args as { name: string };
             cmdArgs.push(assertValidBranchName(argsObj.name, "name"));
+        } else if (name === "rebase_db_branch_switch") {
+            // Both optional, and mutually exclusive in effect: with neither the
+            // command reports the active branch, which is the question asked
+            // most often.
+            const argsObj = args as { name?: string; off?: boolean };
+            if (argsObj.off) cmdArgs.push("--off");
+            else if (argsObj.name) cmdArgs.push(assertValidBranchName(argsObj.name, "name"));
         }
 
         const { output, code } = await runRebaseCmd(cmdArgs);
