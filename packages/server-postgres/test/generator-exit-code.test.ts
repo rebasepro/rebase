@@ -19,7 +19,7 @@ import os from "os";
 import path from "path";
 
 const packageRoot = path.resolve(__dirname, "..");
-const fixture = path.join(packageRoot, "test", "fixtures", "broken-resources");
+const fixtures = path.join(packageRoot, "test", "fixtures");
 
 /** The workspace's tsx, found the way `resolveLocalBin` finds it. */
 function tsxBin(): string {
@@ -34,22 +34,28 @@ function tsxBin(): string {
     throw new Error("tsx not found — the generators cannot run without it");
 }
 
-function runGenerator(script: string, outputPath: string) {
+function runGenerator(script: string, fixture: string, outputPath: string) {
     return spawnSync(
         tsxBin(),
         [
             path.join(packageRoot, "src", "schema", script),
-            `--collections=${path.join(fixture, "collections")}`,
+            `--collections=${path.join(fixtures, fixture, "collections")}`,
             `--output=${outputPath}`
         ],
         { cwd: packageRoot, encoding: "utf8", env: { ...process.env, DOTENV_CONFIG_QUIET: "true" } }
     );
 }
 
+// The DDL generator evaluates the project's `resources.ts` (for the declared
+// database extensions) and the Drizzle generator does not — it reads the
+// collections and nothing else. So each is handed the module that can fail
+// for it: a resources module that throws for the first, a collection module
+// that throws for the second. The property under test is the same — step 1
+// of `rebase db push` raised, so the generator must not exit 0.
 describe.each([
-    ["generate-postgres-ddl.ts", "schema.sql", "Error generating DDL schema"],
-    ["generate-drizzle-schema.ts", "schema.generated.ts", "Error generating schema"]
-])("%s", (script, outputName, errorPrefix) => {
+    ["generate-postgres-ddl.ts", "broken-resources", "schema.sql", "Error generating DDL schema"],
+    ["generate-drizzle-schema.ts", "broken-collection", "schema.generated.ts", "Error generating schema"]
+])("%s", (script, fixture, outputName, errorPrefix) => {
     let outputDir: string;
 
     beforeEach(() => {
@@ -61,7 +67,7 @@ describe.each([
     });
 
     it("exits non-zero when the resources module throws", () => {
-        const result = runGenerator(script, path.join(outputDir, outputName));
+        const result = runGenerator(script, fixture, path.join(outputDir, outputName));
 
         expect(result.status).not.toBe(0);
         expect(`${result.stderr}${result.stdout}`).toContain(errorPrefix);
@@ -70,7 +76,7 @@ describe.each([
     it("writes nothing when the resources module throws", () => {
         // The push commits `drizzle/schema.sql` and `src/schema.generated.ts`;
         // a half-written pair is worse than no run at all.
-        runGenerator(script, path.join(outputDir, outputName));
+        runGenerator(script, fixture, path.join(outputDir, outputName));
 
         expect(fs.existsSync(path.join(outputDir, outputName))).toBe(false);
     }, 60_000);
@@ -78,11 +84,21 @@ describe.each([
 
 describe("the fixture", () => {
     it("is only broken in `resources.ts`", () => {
-        // Guards the test above from passing for the wrong reason: if the
-        // collection file itself stopped loading, both generators would fail
-        // whatever the resources module did.
-        expect(fs.existsSync(path.join(fixture, "collections", "tags.ts"))).toBe(true);
+        // Guards the DDL test above from passing for the wrong reason: if the
+        // collection file itself stopped loading, the generator would fail
+        // whatever the resources module did. The collection must load — and
+        // load from a package server-postgres declares, or pnpm's isolated
+        // layout is what makes it fail.
+        const fixture = path.join(fixtures, "broken-resources");
+        const collection = fs.readFileSync(path.join(fixture, "collections", "tags.ts"), "utf8");
+        expect(collection).toContain('from "@rebasepro/common"');
         expect(fs.readFileSync(path.join(fixture, "resources.ts"), "utf8")).toContain("throw new Error");
+    });
+
+    it("is only broken in the collection, for the generator that reads nothing else", () => {
+        const fixture = path.join(fixtures, "broken-collection");
+        expect(fs.readFileSync(path.join(fixture, "collections", "tags.ts"), "utf8")).toContain("throw new Error");
+        expect(fs.existsSync(path.join(fixture, "resources.ts"))).toBe(false);
     });
 
     it("has a tsx to run", () => {

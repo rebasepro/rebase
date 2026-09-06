@@ -1,4 +1,4 @@
-import { defineCollection } from "@rebasepro/cms-types";
+import { defineCollection } from "@rebasepro/common";
 
 /** One valid collection, so the only thing wrong is the sibling `resources.ts`. */
 const tagsCollection = defineCollection({

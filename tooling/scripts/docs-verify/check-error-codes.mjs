@@ -106,7 +106,6 @@ const FACTORY_STATUS = {
 };
 
 const CODE = "[A-Z][A-Z0-9_]{2,}";
-const CODE_RE = new RegExp(`^${CODE}$`);
 
 function walk(dir, out = []) {
     if (!fs.existsSync(dir)) return out;
