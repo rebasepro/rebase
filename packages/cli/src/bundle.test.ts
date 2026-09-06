@@ -285,6 +285,24 @@ pg: "^8.0.0" }
             .toThrow(/dotenv: \^16\.0\.0 \(package\.json\) vs \^17\.4\.2 \(backend\/package\.json\)/);
     });
 
+    it.each([
+        ["file:", "file:../vendorlib"],
+        ["link:", "link:../vendorlib"],
+        ["portal:", "portal:../vendorlib"],
+        ["git+", "git+https://example.com/a/b.git"],
+        ["a bare relative path", "../vendorlib"]
+    ])("refuses a %s specifier the runtime cannot install", (_label, specifier) => {
+        // These resolve on the machine that built the bundle and nowhere else.
+        // Left in `deps.declared` they fail at the deploy's install step —
+        // minutes later, in a pod, with nobody watching.
+        write("backend/package.json", JSON.stringify({
+            dependencies: { "my-shared": specifier }
+        }));
+
+        expect(() => collectDeclaredDependencies(scratch))
+            .toThrow(/backend\/package\.json declares "my-shared"/);
+    });
+
     it("strips zod, which the image supplies", () => {
         // A project declaring zod is completely ordinary — it is how you extend
         // `loadEnv`. Carrying it into the bundle is what breaks: the schema is

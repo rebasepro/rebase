@@ -625,6 +625,29 @@ function resolvesToWorkspacePackage(projectRoot: string, name: string): boolean 
 const BUNDLE_DEP_MANIFESTS = ["package.json", "config/package.json", "backend/package.json"];
 
 /**
+ * Specifiers the registry the managed runtime installs from cannot resolve.
+ *
+ * `workspace:` is handled separately (it is normal and expected inside this
+ * repo's own projects); everything here is a specifier that works on the
+ * developer's disk and nowhere else. The runtime installs `deps.declared` from
+ * npm with no access to the machine the bundle was built on, so a `file:` or a
+ * `git+` range is a deploy-time install failure — the worst place to find out.
+ */
+const NON_REGISTRY_PROTOCOLS = ["file:", "link:", "portal:", "git+", "git:", "github:"];
+
+/** Whether a range names something npm could not install from the registry. */
+function nonRegistrySpecifier(version: string): string | null {
+    const trimmed = version.trim();
+    for (const protocol of NON_REGISTRY_PROTOCOLS) {
+        if (trimmed.startsWith(protocol)) return protocol;
+    }
+    // A bare path — `../shared`, `./vendor/lib`, `/opt/lib` — which npm accepts
+    // as a local directory and the registry has never heard of.
+    if (/^\.{0,2}\//.test(trimmed)) return "a filesystem path";
+    return null;
+}
+
+/**
  * Collect the runtime dependencies a bundle needs installed beside it.
  *
  * Packages the runtime image already provides are excluded — reinstalling a
@@ -633,9 +656,12 @@ const BUNDLE_DEP_MANIFESTS = ["package.json", "config/package.json", "backend/pa
  * too: they are not on the registry the runtime installs from, and the project's
  * own config package already travels inside the bundle.
  *
- * Throws when two manifests declare a name at ranges nothing satisfies.
- * `rebase build` reports that in its own words first; this is the backstop for
- * every other caller, `rebase cloud deploy` included.
+ * Throws when a declared range is not something the registry can resolve, or
+ * when two manifests declare a name at ranges nothing satisfies. The
+ * alternative is a bundle that builds green and fails at the deploy's install
+ * step, minutes later and on a machine the developer cannot see. `rebase build`
+ * reports both in its own words first; this is the backstop for every other
+ * caller, `rebase cloud deploy` included.
  */
 export function collectDeclaredDependencies(projectRoot: string): Record<string, string> {
     const declared: Record<string, string> = {};
@@ -673,6 +699,15 @@ export function collectDeclaredDependencies(projectRoot: string): Record<string,
             // package (e.g. `"config": "*"` symlinked to `../../config`) —
             // the runtime cannot install it from the registry.
             if (resolvesToWorkspacePackage(projectRoot, name)) continue;
+            const protocol = typeof version === "string" ? nonRegistrySpecifier(version) : null;
+            if (protocol) {
+                throw new Error(
+                    `${relative} declares "${name}": "${version}", which the managed runtime `
+                    + `cannot install — ${protocol} resolves only on this machine. Publish the `
+                    + "package to a registry and depend on it by version, or vendor its source "
+                    + "into the backend."
+                );
+            }
             declared[name] = version;
         }
     }
