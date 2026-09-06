@@ -259,9 +259,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "Drop a platform-provisioned database that this project's code no longer declares. "
             + "A deploy never removes one — it keeps, binds and bills it — so this is where it goes. "
             + "Only a database: a bucket and its files are removed in the project's storage settings.",
-        flags: [["--yes", "Skip the confirmation. Off a terminal it refuses rather than assuming."]],
+        flags: [],
         examples: ["rebase cloud resources prune database analytics --yes"],
         notes: [
+            "`--yes` is the global flag, listed below. Off a terminal this command refuses rather than assuming it.",
             "Refused while the code still declares the database, and for one the platform never made.",
             "Its connection string leaves the running backend at the next deploy."
         ]
@@ -284,7 +285,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         summary:
             "Take, list, inspect, download and restore this project's database backups. "
             + "`list` is the default when no action is given.",
-        flags: [["--yes", "Skip the confirmation on `restore`, which overwrites the live database"]],
+        flags: [],
         examples: [
             "rebase cloud db backup",
             "rebase cloud db backup create",
@@ -293,7 +294,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "rebase cloud db backup download base-20260831"
         ],
         notes: [
-            "`restore` replaces the live database. Nothing about it is undoable from here.",
+            "`restore` replaces the live database. Nothing about it is undoable from here — `--yes`, the global flag listed below, is what skips that confirmation.",
             "A managed database on the shared pool is backed up with the pool, not per project."
         ]
     },
@@ -306,8 +307,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             + "recovered copy beside the live database; `cutover` repoints the app at that copy; "
             + "`discard` throws it away. `status` is the default.",
         flags: [
-            ["--target <timestamp>", "The instant to recover to, ISO-8601. Defaults to the latest recoverable point"],
-            ["--yes", "Skip the confirmation on `restore` and `cutover`"]
+            ["--target <timestamp>", "The instant to recover to, ISO-8601. Defaults to the latest recoverable point"]
         ],
         examples: [
             "rebase cloud db pitr",
@@ -316,7 +316,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "rebase cloud db pitr discard"
         ],
         notes: [
-            "`restore` does not touch the live database — `cutover` is the step that does.",
+            "`restore` does not touch the live database — `cutover` is the step that does. `--yes`, the global flag listed below, skips the confirmation on both.",
             "Recovery is only possible inside the window `status` reports. Check it first."
         ]
     },

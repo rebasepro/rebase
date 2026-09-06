@@ -380,6 +380,35 @@ describe("no command's spec redeclares a global flag", () => {
             + "other readers keep reading the raw line — so the two disagree about what the value means."
         ).toEqual([]);
     });
+
+    /**
+     * …and no PAGE declares one either.
+     *
+     * The renderer appends the globals under every page's own flag list, so a
+     * page that also declares one prints it twice, with two descriptions that do
+     * not have to agree — and did not: `rebase cloud resources prune --help`
+     * showed `"--yes": "Skip the confirmation. Off a terminal it refuses rather
+     * than assuming."` followed by `"--yes, -y": "Skip confirmation prompts"`,
+     * and `db backup` and `db pitr` each had a third wording of their own.
+     *
+     * What a command DOES with a global belongs in its notes, where it reads as
+     * a fact about that command rather than as a competing definition of the
+     * flag.
+     */
+    it("no page redeclares a global flag either", () => {
+        const collisions: string[] = [];
+        for (const [command, page] of Object.entries(ACTION_HELP)) {
+            for (const [flag] of page.flags ?? []) {
+                // Pages spell a flag with its metavariable — `--target <timestamp>`.
+                const name = flag.split(/[\s,]/)[0];
+                if (GLOBAL_SPEC_KEYS.has(name)) collisions.push(`${command}: ${flag}`);
+            }
+        }
+        expect(
+            collisions,
+            "the renderer appends the globals to every page, so a page declaring one prints it twice"
+        ).toEqual([]);
+    });
 });
 
 describe("ACTION_HELP", () => {
