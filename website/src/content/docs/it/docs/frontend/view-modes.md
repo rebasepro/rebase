@@ -1,5 +1,5 @@
 ---
-sourceHash: 2cf8f0e1f2cb33d7
+sourceHash: 480ba165906124fe
 title: Modalità di Visualizzazione
 sidebar_label: Modalità di Visualizzazione
 description: Configura le visualizzazioni tabella, schede e bacheca Kanban per le tue collezioni.
@@ -20,10 +20,20 @@ Ogni collezione può essere visualizzata in quattro modalità:
 import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
-    properties: { /* … */ },
+    // `orderProperty` e `kanban.columnProperty` sono verificati rispetto a queste
+    // chiavi — con un blocco `properties` vuoto si restringono a `never`.
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        status: { name: "Status", type: "string" },
+        // La chiave di ordinamento. Una *stringa*, mai un numero — vedi «Ordinamento» più sotto.
+        __order: {
+            name: "Order",
+            type: "string",
+            admin: { disabled: true, hideFromCollection: true }
+        }
+    },
     name: "Products",
     table: "products",
-    // ...
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
@@ -142,8 +152,10 @@ board, deve assegnare la chiave da sé, con lo stesso alfabeto usato dall'admin:
 import { generateKeyBetween } from "fractional-indexing";
 
 // Base36, minuscolo. Ordina Postgres, la cui collation predefinita non è
-// l'ordinamento per byte: omettere questo terzo argomento produce chiavi base62
-// come "a0" che la board rifiuta.
+// l'ordinamento per byte, quindi l'alfabeto base62 predefinito della libreria —
+// che mescola maiuscole e minuscole — si ordina nel database in modo diverso che
+// nella chiave. Omettere questo terzo argomento produce chiavi come "a0" che la
+// board rifiuta.
 const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 const tasks = client.data.collection("tasks");
@@ -160,9 +172,18 @@ const { data: last } = await tasks.find({
 await tasks.create({
     title,
     status,
-    __order: generateKeyBetween(last[0]?.__order ?? null, null, ORDER_KEY_DIGITS)
+    __order: generateKeyBetween(
+        (last[0]?.__order as string | undefined) ?? null,
+        null,
+        ORDER_KEY_DIGITS
+    )
 });
 ```
+
+Anche le righe create dal form dell'admin arrivano senza chiave — la differenza è
+solo che vedi la barra nel momento in cui ne aggiungi una. Lì **Initialize** è la
+soluzione; su una board alimentata da un backend è una soluzione che si annulla da
+sola a ogni esecuzione.
 
 ## Visualizzazione Schede
 

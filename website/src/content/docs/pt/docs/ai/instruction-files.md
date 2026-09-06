@@ -1,5 +1,5 @@
 ---
-sourceHash: ba0337fd764eebaa
+sourceHash: 3c25626150027572
 title: Arquivos de Instruções de IA
 sidebar_label: Arquivos de Instruções de IA
 description: Todo projeto Rebase estruturado inclui ai-instructions.md mais arquivos de ponteiro de três linhas para Claude, Cursor, Windsurf, Copilot e AGENTS.md — uma única fonte de verdade, muitos nomes de arquivo.
@@ -98,7 +98,7 @@ sessão:
    paz — uma coluna renomeada, um tipo mais estreito, um campo removido, a RLS de
    uma tabela de junção — e exige o seu próprio PostgreSQL, não o banco de dados
    de desenvolvimento gerenciado. Em produção o par é
-   `rebase db generate && rebase db migrate`.
+   `pnpm db:generate` e depois `pnpm db:migrate`.
 3. **Use o SDK.** Acesse via `rebase.dataAsAdmin.<slug>` para trabalho feito com a
    identidade do serviço, ou `getDriver(c)` dentro de uma função quando a leitura
    deve rodar como o chamador. No servidor o cliente não expõe um acessor `data` simples. SQL puro e chamadas diretas do Drizzle

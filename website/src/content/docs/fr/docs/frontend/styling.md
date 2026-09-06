@@ -1,5 +1,5 @@
 ---
-sourceHash: 29a546b753005a42
+sourceHash: 8721ee795ebd8dce
 title: Styliser l'UI personnalisée
 sidebar_label: Styliser l'UI personnalisée
 description: Créez des vues personnalisées, des pages d'accueil et des actions à partir des mêmes composants et jetons de thème que le reste de l'administration, afin qu'elles paraissent natives et respectent le thème.

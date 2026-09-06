@@ -1,5 +1,5 @@
 ---
-sourceHash: ba0337fd764eebaa
+sourceHash: 3c25626150027572
 title: KI-Instruktionsdateien
 sidebar_label: KI-Instruktionsdateien
 description: Jedes erstellte Rebase-Projekt enthält ai-instructions.md sowie dreizeilige Pointer-Dateien für Claude, Cursor, Windsurf, Copilot und AGENTS.md – eine Single Source of Truth, viele Dateinamen.
@@ -101,7 +101,7 @@ Sitzung zu wiederholen:
    Spalten an. `pnpm db:push` ist nur für das, was der Boot bewusst auslässt — eine
    umbenannte Spalte, ein verengter Typ, ein entferntes Feld, RLS auf
    Junction-Tabellen — und es braucht Ihr eigenes PostgreSQL, nicht die verwaltete
-   Entwicklungsdatenbank. Produktion ist `rebase db generate && rebase db migrate`.
+   Entwicklungsdatenbank. Produktion ist `pnpm db:generate`, danach `pnpm db:migrate`.
 3. **Nutzen Sie das SDK.** Gehen Sie über `rebase.dataAsAdmin.<slug>` für Arbeit
    unter der Dienstidentität oder über `getDriver(c)` innerhalb einer Function,
    wenn der Lesezugriff als Aufrufer laufen soll. Auf dem Server hat der Client keinen

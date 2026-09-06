@@ -1,5 +1,5 @@
 ---
-sourceHash: 29a546b753005a42
+sourceHash: 8721ee795ebd8dce
 title: Estilizar UI personalizada
 sidebar_label: Estilizar UI personalizada
 description: Construye vistas personalizadas, páginas de inicio y acciones con los mismos componentes y tokens de tema que el resto del panel de administración, para que se vean nativos y sigan el tema.

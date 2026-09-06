@@ -1,5 +1,5 @@
 ---
-sourceHash: 2cf8f0e1f2cb33d7
+sourceHash: 480ba165906124fe
 title: Modes d'affichage
 sidebar_label: Modes d'affichage
 description: Configurez les vues tableau, cartes et Kanban pour vos collections.
@@ -20,10 +20,20 @@ Chaque collection peut être affichée selon quatre modes d'affichage :
 import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
-    properties: { /* … */ },
+    // `orderProperty` et `kanban.columnProperty` sont vérifiés par rapport à ces
+    // clés — avec un bloc `properties` vide, ils se réduisent à `never`.
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        status: { name: "Status", type: "string" },
+        // La clé d'ordre. Une *chaîne*, jamais un nombre — voir « Ordonnancement » plus bas.
+        __order: {
+            name: "Order",
+            type: "string",
+            admin: { disabled: true, hideFromCollection: true }
+        }
+    },
     name: "Products",
     table: "products",
-    // ...
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
@@ -144,8 +154,10 @@ l'admin :
 import { generateKeyBetween } from "fractional-indexing";
 
 // Base36, minuscules. C'est Postgres qui trie, et sa collation par défaut n'est
-// pas l'ordre des octets : omettre ce troisième argument produit des clés base62
-// comme "a0" que le tableau rejette.
+// pas l'ordre des octets : l'alphabet base62 par défaut de la bibliothèque — qui
+// mélange les casses — se trie donc autrement dans la base que dans la clé.
+// Omettre ce troisième argument produit des clés comme "a0" que le tableau
+// rejette.
 const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 const tasks = client.data.collection("tasks");
@@ -162,9 +174,18 @@ const { data: last } = await tasks.find({
 await tasks.create({
     title,
     status,
-    __order: generateKeyBetween(last[0]?.__order ?? null, null, ORDER_KEY_DIGITS)
+    __order: generateKeyBetween(
+        (last[0]?.__order as string | undefined) ?? null,
+        null,
+        ORDER_KEY_DIGITS
+    )
 });
 ```
+
+Les lignes créées depuis le formulaire de l'admin arrivent elles aussi sans clé —
+la seule différence est que vous voyez la bannière au moment où vous en ajoutez
+une. **Initialize** est le correctif dans ce cas ; sur un tableau alimenté par un
+backend, c'est un correctif qui s'annule à chaque exécution.
 
 ## Vue Cartes
 

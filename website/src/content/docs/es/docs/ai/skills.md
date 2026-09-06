@@ -1,5 +1,5 @@
 ---
-sourceHash: 961bf86d4efda8bf
+sourceHash: 771019609412b5b6
 title: Agent Skills
 sidebar_label: Agent Skills
 description: rebase skills install escribe 21 habilidades de referencia de Rebase en tu repositorio, en la estructura que espera tu asistente de IA — Cursor, Claude Code, Windsurf, Gemini CLI y Antigravity.
@@ -53,7 +53,7 @@ proyecto buscando `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` y
 `.kiro/`. Si no encuentra ninguno, te solicitará que elijas uno.
 
 **GitHub Copilot nunca se detecta.** Su directorio sería `.github/`, y
-`.github/` no es prueba de que nadie use Copilot: `rebase init` escribe
+`.github/` no es prueba de que alguien use Copilot: `rebase init` escribe
 `.github/copilot-instructions.md` en cada proyecto generado, y la mayoría de los
 repositorios tienen un `.github/` para sus workflows. Instálalo con
 `--agent copilot`.
