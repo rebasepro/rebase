@@ -348,9 +348,13 @@ export function rewritePackagesToTarballs(projectPath: string, packageTarballs: 
                         return regex.test(f);
                     });
                     if (tarballFile) {
-                        // Use relative paths to ensure resolution inside Docker builds
-                        const relPath = isRoot ? `./tarballs/${tarballFile}` : `../tarballs/${tarballFile}`;
-                        deps[name] = `file:${relPath}`;
+                        // The specifier stays a version — the one the tarball was
+                        // packed with — and the root `pnpm.overrides` below is what
+                        // points every importer at the tarball. A `file:` here would
+                        // install just as well, but `rebase build` refuses it on
+                        // purpose: the managed runtime cannot install a path, and
+                        // this scaffold is meant to build the way a real one does.
+                        deps[name] = tarballFile.replace(new RegExp(`^rebasepro-${pkgName}-`), "").replace(/\.tgz$/, "");
                     } else {
                         console.warn(`⚠️ Warning: could not find tarball for ${name}`);
                     }
@@ -389,7 +393,10 @@ export function rewritePackagesToTarballs(projectPath: string, packageTarballs: 
             }
             pkg.devDependencies["hono"] = "^4.12.10";
             pkg.devDependencies["drizzle-orm"] = "^0.44.4";
-            pkg.devDependencies["@rebasepro/cli"] = rootOverrides["@rebasepro/cli"];
+            const cliTarball = fs.readdirSync(tarballsDir).find(f => /^rebasepro-cli-\d/.test(f));
+            pkg.devDependencies["@rebasepro/cli"] = cliTarball
+                ? cliTarball.replace(/^rebasepro-cli-/, "").replace(/\.tgz$/, "")
+                : rootOverrides["@rebasepro/cli"];
         }
 
         fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 4), "utf-8");
