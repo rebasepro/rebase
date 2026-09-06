@@ -1499,6 +1499,35 @@ describe("error ergonomics", () => {
         expect(explained).toContain("rebase_project_current");
     });
 
+    it("turns a cron 404 into the file that would create the surface", async () => {
+        // `surfaces.cron` gates the mount, so a project with no cron jobs — every
+        // fresh scaffold — answers 404 and the client raised a bare `Not Found`.
+        const notFound = Object.assign(new Error("Not Found"), { status: 404 });
+        mockClient.cron.listJobs.mockRejectedValueOnce(notFound);
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "cron_list_jobs", arguments: {} }
+        });
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("backend/crons/");
+        expect(result.content[0].text).not.toBe("Error: Not Found");
+    });
+
+    it("says the same thing when the surface answers an empty list", async () => {
+        mockClient.cron.listJobs.mockResolvedValueOnce({ jobs: [] });
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "cron_list_jobs", arguments: {} }
+        });
+        expect(result.isError).toBeUndefined();
+        expect(result.content[0].text).toContain("backend/crons/");
+    });
+
+    it("leaves a 404 alone for a tool whose surface is always mounted", () => {
+        const notFound = Object.assign(new Error("Not Found"), { status: 404 });
+        expect(explainToolError(notFound, "http://x", "get_document")).toBe("Not Found");
+    });
+
     it("leaves an error that is not a connection failure alone", () => {
         // A validation message is already the answer; wrapping it in advice
         // about starting a dev server would bury it.

@@ -1589,9 +1589,11 @@ function untrustedJsonResult(source: string, data: unknown) {
  * question, and answering it is how somebody notices they are pointed at the
  * wrong project rather than at a stopped one.
  */
-export function explainToolError(err: unknown, baseUrl?: string): string {
+export function explainToolError(err: unknown, baseUrl?: string, toolName?: string): string {
     const msg = err instanceof Error ? err.message : String(err);
     const url = baseUrl ?? safeActiveBaseUrl();
+    const surface = toolName ? surfaceNotMounted(err, toolName) : null;
+    if (surface) return surface;
     const networkish = /fetch failed|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network error/i;
     if (!networkish.test(msg)) return msg;
     const where = url ? ` while calling ${url}` : "";
@@ -1600,6 +1602,41 @@ export function explainToolError(err: unknown, baseUrl?: string): string {
         "Start it with `rebase_dev_start`, or check `rebase_project_current`: " +
         "the active project is sticky and lives outside your repository."
     );
+}
+
+/**
+ * A whole API surface a project never turned on, told apart from a missing row.
+ *
+ * `surfaces.cron` gates the mount, so on a project with no cron jobs — which is
+ * every fresh scaffold — `/api/admin/cron` does not exist and the client raises
+ * a bare `Not Found`. Passed through, that is the least useful sentence
+ * available: no URL, no cause, and nothing an agent can do next except guess
+ * that a *job* is missing and go looking for one. What is missing is the
+ * surface, and the way to get it is a file.
+ *
+ * Keyed by tool prefix rather than by URL because the client raises the error,
+ * not this process, and the prefix is the one fact that is certainly here.
+ */
+const SURFACE_BY_TOOL_PREFIX: Array<{ prefix: string; message: string }> = [
+    {
+        prefix: "cron_",
+        message:
+            "this project declares no cron jobs, so the cron surface is not mounted — " +
+            "`/api/admin/cron` does not exist on this backend. Add a job at " +
+            "`backend/crons/<name>.ts`, default-exporting a `CronJobDefinition`, and restart " +
+            "`rebase dev`. (An older backend answers 404 here even when jobs exist; a current " +
+            "one answers with an empty list.)"
+    }
+];
+
+function surfaceNotMounted(err: unknown, toolName: string): string | null {
+    const status = (err as { status?: number } | undefined)?.status;
+    const msg = err instanceof Error ? err.message : String(err);
+    // `status` when the client supplied one; the message is the fallback for a
+    // client old enough not to carry it.
+    if (status !== 404 && !/^not found$/i.test(msg.trim())) return null;
+    const surface = SURFACE_BY_TOOL_PREFIX.find((s) => toolName.startsWith(s.prefix));
+    return surface ? surface.message : null;
 }
 
 /** The active project's baseUrl, or undefined if even that cannot be resolved. */
@@ -1983,6 +2020,16 @@ roles });
         // ── Cron Tools ─────────────────────────────────────────────────────
         case "cron_list_jobs": {
             const result = await client.cron.listJobs();
+            // An empty list is the same situation as an unmounted surface, and
+            // `{ "jobs": [] }` on its own reads as a failure to an agent that
+            // asked what runs on a schedule. Say what a job is made of.
+            if (!result?.jobs?.length) {
+                return textResult(
+                    "This project declares no cron jobs. Add one at `backend/crons/<name>.ts`, " +
+                    "default-exporting a `CronJobDefinition`, and restart `rebase dev` — the " +
+                    "filename becomes the job id."
+                );
+            }
             return untrustedJsonResult("the cron scheduler", result);
         }
 
@@ -2082,7 +2129,7 @@ roles });
         return {
             content: [{
                 type: "text" as const,
-                text: `Error: ${explainToolError(err)}`
+                text: `Error: ${explainToolError(err, undefined, request.params.name)}`
             }],
             isError: true
         };
