@@ -27364,7 +27364,9 @@ const post = await client.data.posts.create({ title: "Draft", status: "draft" })
 const drafts = await client.data.posts.where("status", "==", "draft").find();
 ```
 
-Rows created offline get a client-generated id. If the server assigns its own on replay, the local row and any queued writes still pointing at the temporary id are moved to the real one.
+Rows created offline get a client-generated id, in the type the collection's ids already have: a **negative integer** where they are numbers, a UUID string where they are strings. The sign is the tell — a real key is never negative — so a row that has not reached the server yet is recognisable without a lookup, and `id` still typechecks as whatever the generated `Row` says it is. On a collection this device has never read there is nothing local to read the type off, and the id is a UUID.
+
+If the server assigns its own on replay, the local row and any queued writes still pointing at the temporary id are moved to the real one. Until then, do not persist a temporary id anywhere outside the offline database — a foreign key or a bookmarked URL holding one points at a row that is about to be renumbered.
 
 Writes replay in the order you made them, across collections — so a create in one collection still lands before the row in another that references it.
 
