@@ -554,9 +554,18 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         return;
     }
 
+    // The other two branch actions that need to know where this checkout is
+    // standing, for reasons the driver — a child process with no idea a pointer
+    // exists — cannot answer.
+    let driverArgs = rawArgs;
+    if (subcommand === "branch") {
+        const action = commandWords(rawArgs, "db")[2];
+        if (action === "delete") await refuseDeletingActiveBranch(projectRoot, rawArgs);
+        if (action === "list") driverArgs = await listFromParentDatabase(projectRoot, rawArgs);
+    }
+
     try {
-        await runDriverDbCommand(rawArgs);
-        await forgetDeletedBranch(projectRoot, rawArgs);
+        await runDriverDbCommand(driverArgs);
     } catch (error) {
         // The CLI entry point is where a managed-database refusal becomes an
         // exit code. The guards raise it instead of exiting so that `rebase dev`,
@@ -899,26 +908,81 @@ async function restoreAppRole(target: string): Promise<void> {
 }
 
 /**
- * Stop pointing at a branch that was just deleted.
+ * You cannot delete the branch you are standing on.
  *
- * Without this, `branch delete` succeeds and leaves the checkout aimed at a
- * database that no longer exists — so the next `rebase dev` fails to connect,
- * naming a database the developer has already forgotten about. The delete is
- * the driver's, and the pointer is the CLI's, so this is the seam where the two
- * have to agree.
+ * Not a new rule — it was always refused, by a message about a database the
+ * developer had never named. After `switch feature_x` the resolved DSN *is*
+ * `rb_feature_x`, so `BranchService.deleteBranch` compared it against the
+ * connected database, found them equal, and answered `✗ Cannot delete the main
+ * database.` The main database is precisely what the developer was not on.
  *
- * Only when the deleted branch is the active one; deleting a different branch
- * is none of this function's business.
+ * Answered here because the pointer is the CLI's: the driver runs as a child
+ * process that has never heard of it, and cannot tell "the branch you are on"
+ * from "the main database" — those are the same connection string to it.
  */
-async function forgetDeletedBranch(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
-    const [domain, subcommand, action, name] = commandWords(rawArgs, "db");
-    if (domain !== "db" || subcommand !== "branch" || action !== "delete" || !name) return;
+async function refuseDeletingActiveBranch(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
+    const [, , , name] = commandWords(rawArgs, "db");
+    if (!name) return;
 
-    const { clearActiveBranch, readActiveBranch } = await import("../dev-db/branch-pointer");
-    if (readActiveBranch(projectRoot)?.name !== name) return;
+    const { readActiveBranch } = await import("../dev-db/branch-pointer");
+    const active = readActiveBranch(projectRoot);
+    if (active?.name !== name) return;
 
-    clearActiveBranch(projectRoot);
-    console.log(chalk.gray("  ↩ That was the branch this checkout was on — back on the main database."));
+    console.error("");
+    console.error(chalk.red(`✗ You are on branch "${name}" — leave it before deleting it.`));
+    console.error("");
+    console.error(chalk.gray(`  Every database command in this checkout is pointed at ${active.database}, `));
+    console.error(chalk.gray("  including this one, so the delete would be asking that database to drop"));
+    console.error(chalk.gray("  itself."));
+    console.error("");
+    console.error(`  ${chalk.cyan("rebase db branch switch --off")}    back to the main database`);
+    console.error(`  ${chalk.cyan(`rebase db branch delete ${name}`)}${" ".repeat(Math.max(1, 20 - name.length))}then this works`);
+    console.error("");
+    process.exit(1);
+}
+
+/**
+ * `branch list` reads the branch registry, which lives in the parent.
+ *
+ * `rebase.branches` is written in the database branches are made *from*, and a
+ * branch is a `CREATE DATABASE … TEMPLATE` copy — so the copy carries a
+ * snapshot of that table taken at branch time, and every branch made since is
+ * missing from it. After `switch feature_x`, `branch list` connected to
+ * `rb_feature_x` and answered `No branches found. Create one with: rebase db
+ * branch create <name>` while `branch switch` with no argument, one command
+ * earlier, had said `● On branch feature_x`.
+ *
+ * Resolved with `branch: null` — the same rule `switch` uses to find what to
+ * branch *from* — and relayed as `--database-url`, which the driver honours
+ * over anything it would resolve for itself.
+ */
+async function listFromParentDatabase(projectRoot: string, rawArgs: string[]): Promise<string[]> {
+    // An explicit `--database-url` is the developer naming the database; this
+    // never overrides one.
+    if (readFlagValue(rawArgs, "--database-url") !== null) return rawArgs;
+
+    const { readActiveBranch } = await import("../dev-db/branch-pointer");
+    const active = readActiveBranch(projectRoot);
+    if (!active) return rawArgs;
+
+    const { readEnvFile } = await import("../utils/project");
+    const { resolveDevDatabase } = await import("../dev-db/resolve");
+    const { resolveComposeUrl } = await import("../dev-db/prepare");
+
+    const envFile = readEnvFile(projectRoot);
+    const parent = resolveDevDatabase({
+        flagDocker: rawArgs.includes("--docker"),
+        env: process.env,
+        envFile,
+        branch: null,
+        composeUrl: resolveComposeUrl(projectRoot, envFile)
+    });
+    const url = (parent.kind === "managed" ? null : parent.url)?.trim();
+    if (!url) return rawArgs;
+
+    console.log(chalk.gray(`  ● On branch ${active.name} — listing from the main database, where the registry lives.`));
+
+    return [...rawArgs, "--database-url", url];
 }
 
 /**
