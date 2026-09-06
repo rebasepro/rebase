@@ -33,12 +33,22 @@
  *   * BUNDLE_FORMAT_VERSION,         — either constant moving is a coordinated
  *     RUNTIME_CONTRACT_VERSION         release by definition.
  *
- * A fourth axis asks a different question — not "what did this release break"
+ * A fourth axis has no committed artifact behind it and is diffed from the
+ * manifests directly:
+ *
+ *   * `engines.node` in every         — a floor that MOVED. Nothing generates
+ *     publishable package               this field and nothing diffed it, so it
+ *                                       went `>=20` → `>=22.22.0` across 21
+ *                                       packages with no release note at all,
+ *                                       and `pnpm install` answers a mismatch
+ *                                       with a warning rather than a failure.
+ *
+ * A fifth axis asks a different question — not "what did this release break"
  * but "is this release self-consistent". `rebase init` pins every `@rebasepro`
  * dependency, and the scaffold's compose image tag, to the CLI's own version, so
  * a release that ships a template naming something it does not publish produces
  * projects that cannot boot. `check-template-pins.mjs` holds it; unlike the
- * three above there is no deliberate version of it, so it refuses outright
+ * four above there is no deliberate version of it, so it refuses outright
  * rather than asking for a minor and a note.
  *
  * Then two things must be true or the release stops: the bump is at least a
@@ -70,6 +80,7 @@ import { fileURLToPath } from "node:url";
 
 import { classify } from "./check-api-surface.mjs";
 import { checkTemplatePins } from "./check-template-pins.mjs";
+import { publishablePackages } from "./publishable-packages.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -182,6 +193,37 @@ export function contractConstants(text) {
     };
 }
 
+/** `engines.node` as a manifest declares it, or null when it declares none. */
+export function enginesNode(text) {
+    if (text === null || text === undefined) return null;
+    try {
+        return JSON.parse(text)?.engines?.node ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Does the `[Unreleased]` section say the Node floor moved?
+ *
+ * The floor went from `>=20` to `>=22.22.0` on 21 published packages between
+ * 0.17.3 and this commit, and `grep -ciE "engines|Node 22|22\.22"` over the
+ * whole section returned 0. `pnpm install` only *warns* on an engines mismatch
+ * (`[WARN] Unsupported engine`), so the failure lands later, somewhere else,
+ * and the release note is the only place it could have been named.
+ *
+ * "Mentions `engines`" or "quotes the new floor" — either is enough. Asking for
+ * a particular wording would be asking for a sentence that gets pasted rather
+ * than written.
+ */
+export function mentionsEngines(section, floor) {
+    if (!section) return false;
+    if (/\bengines\b/i.test(section)) return true;
+    if (/\bnode\s*(?:>=|≥)?\s*\d+/i.test(section)) return true;
+    if (floor && section.includes(floor)) return true;
+    return false;
+}
+
 /** The `[Unreleased]` section, which is what a release promotes. */
 export function unreleasedSection(text) {
     const start = text.indexOf("## [Unreleased]");
@@ -204,7 +246,8 @@ export function checkReleaseBump({
         const abs = path.join(ROOT, file);
         return fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
     },
-    templatePins = v => checkTemplatePins({ releasedAs: v })
+    templatePins = v => checkTemplatePins({ releasedAs: v }),
+    manifests = () => publishablePackages(ROOT).map(p => `${p.dir}/package.json`)
 } = {}) {
     if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
         console.error("usage: node tooling/scripts/check-release-bump.mjs <version> [--from <tag>] [--allow-unguarded]");
@@ -267,7 +310,39 @@ export function checkReleaseBump({
         }
     }
 
-    // ── Axis 4: what the scaffold this release ships can import ─
+    // ── Axis 4: the Node floor the published tarballs declare ───
+    //
+    // `engines.node` is the one breaking change with no committed contract
+    // behind it: nothing generates it, nothing diffs it, and `pnpm install`
+    // answers a mismatch with `[WARN] Unsupported engine` and carries on. So the
+    // floor moved from `>=20` to `>=22.22.0` across 21 published packages in one
+    // commit, the release notes said nothing, and the first person to find out
+    // would have been a user on Node 20 whose build failed somewhere with no
+    // mention of Node in it.
+    //
+    // A package that did not exist at the tag is skipped: a first release cannot
+    // raise a floor nobody was on.
+    const engineChanges = [];
+    for (const file of manifests()) {
+        const before = readAtTag(file);
+        if (before === null) continue;
+        const now = readNow(file);
+        if (now === null) continue;              // deleted; axis 1 owns that
+        const was = enginesNode(before);
+        const is = enginesNode(now);
+        if (was !== is) engineChanges.push({ file, was, is });
+    }
+    if (engineChanges.length) {
+        const { was, is } = engineChanges[0];
+        const also = engineChanges.length > 1 ? ` (and ${engineChanges.length - 1} more)` : "";
+        breaks.push(
+            `engines.node: ${was ?? "(unset)"} → ${is ?? "(unset)"} in ${engineChanges.length} `
+            + `publishable package(s) — ${engineChanges[0].file}${also}. An install on the old floor `
+            + "stops working, and pnpm only warns."
+        );
+    }
+
+    // ── Axis 5: what the scaffold this release ships can import ─
     //
     // Not a diff between two baselines like the three above — a consistency
     // question about the release itself. `rebase init` pins every `@rebasepro/*`
@@ -376,6 +451,15 @@ export function checkReleaseBump({
             `${CHANGELOG}'s [Unreleased] section has no "### Breaking" heading. The release notes and\n` +
             "    the upgrade guide are built from it, and a breaking release whose notes do not say so\n" +
             "    is the version of this that reaches users."
+        );
+    }
+    if (engineChanges.length && !mentionsEngines(section, engineChanges[0].is)) {
+        problems.push(
+            `${CHANGELOG}'s [Unreleased] section never mentions \`engines\` or a Node version, and this\n` +
+            `    release moves the floor to ${engineChanges[0].is ?? "(unset)"} in ${engineChanges.length} publishable package(s).\n` +
+            "    `pnpm install` answers an engines mismatch with a warning and keeps going, so the\n" +
+            "    failure lands later and elsewhere. Name the floor and where it comes from (`.nvmrc`)\n" +
+            "    in a `### Breaking` bullet."
         );
     }
 

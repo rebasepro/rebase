@@ -1,11 +1,13 @@
 ---
-sourceHash: fecca84778b25475
+sourceHash: da0835832ae0b7c2
 slug: fr/docs/upgrading
 title: Mise à niveau
 description: Ce qui cesse de fonctionner lorsque vous migrez une application existante vers la version actuelle, et comment y remédier.
 ---
 
 # Mise à niveau d'une application existante
+
+Déjà en 0.17 ? Le saut suivant n'est pas encore publié, mais il est déjà décrit : [0.17 → prochaine](/fr/docs/upgrading/0-17-to-next/).
 
 Cette version supprime le schéma `auth`, renomme des paquets, modifie la signification de `id`, abandonne le CJS, déplace le panneau d'administration vers react-router 8 et — plus important encore — **corrige trois façons dont des accès pouvaient être accordés sans que vous ne le demandiez** : une règle de sécurité silencieusement permissive et deux sur le socket temps réel. Lisez les trois premières sections avant toute autre chose. La section 0 est celle qui modifie le SQL que vous avez pu écrire à la main ; les sections 1 et 2 modifient qui peut lire vos données, et aucune d'entre elles ne se manifeste de manière explicite.
 

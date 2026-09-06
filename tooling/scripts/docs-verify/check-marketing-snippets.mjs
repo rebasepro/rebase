@@ -35,7 +35,15 @@ import path from "node:path";
 import { loadSdkExports } from "./sdk-exports.mjs";
 import { CLI_INVOCATIONS, loadCliCommands } from "./cli-commands.mjs";
 
-const MARKETING_GLOBS = ["website/src/components/**/*.{astro,tsx}", "website/src/pages/**/*.{astro,tsx}"];
+const MARKETING_GLOBS = [
+    "website/src/components/**/*.{astro,tsx}",
+    "website/src/pages/**/*.{astro,tsx}",
+    // The snippets a marketing page renders are not always written in the page.
+    // `src/data/collection-sample.ts` holds the home page's and `/product`'s
+    // SDK sample as highlighted HTML, and kept `localhost:3001` through the
+    // sweep that removed it from every component.
+    "website/src/data/**/*.ts"
+];
 
 /**
  * Subpath specifiers that resolve for real but have no entry in

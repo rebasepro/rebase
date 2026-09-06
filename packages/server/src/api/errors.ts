@@ -440,7 +440,14 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // logged) are covered too.
     const suppressStack = isDbSchemaMismatch || dbError !== null || (statusCode < 500 && code === "BAD_REQUEST");
     if (!suppressStack) {
-        logger.error(String(error.stack || error));
+        // The error goes in as a value, not as `String(error.stack)`. A string
+        // is a leaf to the logger: `serialiseError` — the `.cause`/
+        // `AggregateError` walker the boot path relies on — never runs on one,
+        // so the request path used to print the outer wrapper's stack and drop
+        // the sentence that says what actually failed (`connect ECONNRESET`,
+        // sitting two `.cause` links down). Structured, it walks the chain and
+        // redacts each link on the way.
+        logger.error("unhandled request error", { error });
     }
 
     // Sanitize the message for the client to prevent leaking sensitive details

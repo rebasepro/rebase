@@ -309,6 +309,25 @@ function readDeclaredRebaseDeps(projectRoot: string): DeclaredDependency[] {
 }
 
 /**
+ * Does this project declare its collections in code?
+ *
+ * `resolveBackendPaths` answers it against the manifest's own `config` path
+ * rather than the convention, because a project may move the directory. A
+ * project with no manifest, or one shaped differently, is treated as declaring
+ * them: the wrong answer there would silently skip the drift report, which is
+ * the reason the command exists.
+ */
+export function hasDeclaredCollections(projectRoot: string): boolean {
+    try {
+        const backend = findBackendApp(loadManifest(projectRoot).manifest);
+        if (!backend) return true;
+        return resolveBackendPaths(backend.app, projectRoot).hasCollections;
+    } catch {
+        return true;
+    }
+}
+
+/**
  * Every `slug:` a collection file declares, read as text.
  *
  * Deliberately not by importing them: a collection file may import anything the
@@ -509,6 +528,23 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
         console.error(chalk.yellow(`  ⚠ Could not resolve this project's database: ${
             error instanceof Error ? error.message : String(error)}`));
         console.error(chalk.gray("    The checks that need one are reported below as not run."));
+    }
+
+    // A headless project has no `config/collections` by design — its API is
+    // introspected from the live database at boot — and the driver's doctor
+    // opens by loading them, finds none, and exits 1. So `rebase doctor` failed
+    // on the documented headless path, in 0.17.3 and on main, while every check
+    // above it had just passed. Its three phases all compare *against* declared
+    // collections, so there is nothing for them to do here; the environment
+    // findings are the whole report.
+    if (!hasDeclaredCollections(projectRoot)) {
+        console.log("");
+        console.log(chalk.gray(
+            "  ○ Schema drift not checked: this project derives its API from the database — "
+            + "run `rebase schema introspect` first."
+        ));
+        if (environmentFailed) process.exit(1);
+        return;
     }
 
     try {

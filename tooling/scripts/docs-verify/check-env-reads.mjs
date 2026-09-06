@@ -88,6 +88,11 @@ const NOT_OURS = new Map([
     ["REBASE_RESET_EMAIL", "a test hook for `rebase auth reset-password`"],
     ["REBASE_RESET_PASSWORD", "a test hook for `rebase auth reset-password`"],
     ["REBASE_DEV_PROJECT_ROOT", "set by `rebase dev` for the child process it spawns"],
+    // `--port` is known in the CLI and needed in the server, and the child's
+    // environment is the only channel between them. Nobody sets it by hand; a
+    // reader who did would be telling the server a port was named when it was
+    // derived, and turning a harmless walk into a boot failure.
+    ["REBASE_DEV_PORT_EXPLICIT", "set by `rebase dev` for the backend it spawns"],
     // The CLI resolves which database this project is on — a pure decision, no
     // daemon started — and tells the driver, so the driver's own text can stop
     // recommending `rebase db generate` on a database that refuses it. Nobody

@@ -34,6 +34,15 @@
  */
 import { readFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const DEFAULT_ROOT = path.resolve(HERE, "..", "..", "..");
+
+const GREEN = "[0;32m";
+const RED = "[0;31m";
+const DIM = "[2m";
+const NC = "[0m";
 
 /** English docs only — the other locales are generated from these. */
 const DOC_GLOBS = [
@@ -87,6 +96,37 @@ const SHAPES = [
     // `rebase db branch switch`, `rebase db pull --database-url`
     /^rebase [a-z][a-z0-9-]*(?:[ ][A-Za-z0-9.\-]+)*$/
 ];
+
+/**
+ * The identifiers an `import { … } from "@rebasepro/*"` names.
+ *
+ * {@link SHAPES} reads one backticked span at a time, and an import statement is
+ * not an identifier — so `import { z } from "@rebasepro/server"` yielded no
+ * token at all, and the docs page teaching that exact line went unbadged while
+ * npm `latest` had no `z` to import. Same for `queue`, for `amendResourceKind`,
+ * and for the two `@rebasepro/common` helpers the Breaking notes tell readers to
+ * migrate *to*: every one of them is a bare exported name, which is the shape a
+ * docs snippet imports and the shape the released tarball is missing.
+ *
+ * This reads the whole `## [Unreleased]` section rather than only the bold
+ * lead-ins. A lead-in is one sentence naming the change; the import that proves
+ * what the change is called is written below it, in the entry's own example. The
+ * "absent from every released section" rule still does the filtering, and the
+ * specifier has to be a `@rebasepro/*` one — an `import { z } from "zod"` in a
+ * note is a third-party name nobody here releases.
+ */
+export function importedIdentifiers(text) {
+    const names = new Set();
+    const IMPORT = /\bimport\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["'](@rebasepro\/[^"']+)["']/g;
+    for (const [, clause] of text.matchAll(IMPORT)) {
+        for (const part of clause.split(",")) {
+            // `type Foo`, `foo as bar` — the exported name is what npm has to carry.
+            const name = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim();
+            if (/^[A-Za-z_$][\w$]*$/.test(name)) names.add(name);
+        }
+    }
+    return names;
+}
 
 /**
  * Tokens the "absent from every released section" rule calls new and that are
@@ -172,7 +212,7 @@ function releasedVersions(released) {
     return [...released.matchAll(/^## \[(\d+\.\d+\.\d+)\]/gm)].map(m => m[1]);
 }
 
-export function checkUnreleasedBadges(root) {
+export function checkUnreleasedBadges(root = DEFAULT_ROOT) {
     const findings = [];
     const changelogPath = path.join(root, "CHANGELOG.md");
     if (!existsSync(changelogPath)) return { findings, tokens: [], scanned: 0 };
@@ -200,6 +240,22 @@ export function checkUnreleasedBadges(root) {
     }
     for (const t of EXTRA_TOKENS.keys()) {
         if (!released.includes(`\`${t}\``)) tokens.add(t);
+    }
+
+    // Names an Unreleased entry imports from `@rebasepro/*`. Old when a released
+    // note imported the same name from the same scope — and *only* then. The
+    // backticked-in-a-released-section rule the lead-in tokens use is wrong
+    // here: a released note lists `cache`, `queue` or `search` as kinds someone
+    // might register one day, which is not evidence that `queue` was ever an
+    // export, and it filtered out the export the docs teach today.
+    const releasedImports = importedIdentifiers(released);
+    /** The subset of {@link tokens} that came from an import, matched differently below. */
+    const imported = new Set();
+    for (const name of importedIdentifiers(unreleased)) {
+        if (releasedImports.has(name)) continue;
+        if (NOT_NEW.has(name)) { suppressed.add(name); continue; }
+        tokens.add(name);
+        imported.add(name);
     }
 
     // A `NOT_NEW` entry nothing suppressed this run is dead weight, and a dead
@@ -291,15 +347,24 @@ export function checkUnreleasedBadges(root) {
                 const scope = SCOPED.get(token);
                 if (scope && !scope.pattern.test(`/${file}`)) continue;
                 const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                const inFencedCode = imported.has(token)
+                    // An imported name is short and often an ordinary English
+                    // word: `queue` is "the job queue" in four pages of prose
+                    // that happen to sit in a fence, and `z` is the `z` of
+                    // `/^[a-z]+$/`. So an import token counts in a fence only
+                    // where it is used as the export it is — imported by name,
+                    // or called.
+                    ? importedIdentifiers(fenced).has(token)
+                        || new RegExp(`(^|[^\\w$.])${escaped}\\s*[<(]`).test(fenced)
+                    // A reference page documents an option by putting it in
+                    // an interface fence, not in backticked prose:
+                    // `cron-jobs.md` names `timezone` exactly once, on the
+                    // `timezone?: string;` line of `CronJobDefinition`. A
+                    // token seen only there is still a section teaching it.
+                    : new RegExp(`(^|[^\\w$.])${escaped}\\b`).test(fenced);
                 const mentioned = token.includes("(")
                     ? body.includes(`\`${token}\``)
-                    : new RegExp(`\`${escaped}\``).test(body)
-                        // A reference page documents an option by putting it in
-                        // an interface fence, not in backticked prose:
-                        // `cron-jobs.md` names `timezone` exactly once, on the
-                        // `timezone?: string;` line of `CronJobDefinition`. A
-                        // token seen only there is still a section teaching it.
-                        || new RegExp(`(^|[^\\w$.])${escaped}\\b`).test(fenced);
+                    : new RegExp(`\`${escaped}\``).test(body) || inFencedCode;
                 if (!mentioned) continue;
                 const heading = lines[start]?.trim().replace(/^#+\s*/, "") || "(page intro)";
                 findings.push({
@@ -315,4 +380,24 @@ export function checkUnreleasedBadges(root) {
     }
 
     return { findings, tokens: [...tokens].sort(), scanned: files.length };
+}
+
+// `verify:docs` runs this as one stage of many; running the file on its own is
+// how you check a single edit without waiting for the other twenty.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    const { findings, tokens, scanned } = checkUnreleasedBadges();
+    console.log(
+        `${DIM}${tokens.length} unreleased feature name(s) across ${scanned} English docs page(s)`
+        + (tokens.length ? `: ${tokens.join(", ")}` : "") + `.${NC}`
+    );
+    if (!findings.length) {
+        console.log(`${GREEN}✓ Every page describing an unreleased feature says so.${NC}`);
+        process.exit(0);
+    }
+    console.error(`${RED}✗ ${findings.length} section(s) a reader on the released version cannot use:${NC}\n`);
+    for (const f of findings) {
+        console.error(`  ${RED}${f.file}:${f.line}${NC}`);
+        console.error(`      ${DIM}${f.message}${NC}`);
+    }
+    process.exit(1);
 }

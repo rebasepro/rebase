@@ -39,6 +39,7 @@
 - [Environment & Configuration](https://rebase.pro/docs/getting-started/configuration): All environment variables and configuration options for Rebase projects.
 - [Troubleshooting](https://rebase.pro/docs/troubleshooting): The failures that stop a Rebase backend from starting or serving — an unreachable database, wrong credentials, a missing extension, an RLS refusal, schema drift, a busy port, a function that will not load — and what each one looks like.
 - [Upgrading](https://rebase.pro/docs/upgrading): What breaks when you move an existing app to the current release, and what to do about each one.
+- [Upgrading 0.17 to the next release](https://rebase.pro/docs/upgrading/0-17-to-next): The breaking changes already merged on main and live in these docs, before the release that carries them exists.
 - [Upgrading 0.14 to 0.17](https://rebase.pro/docs/upgrading/0-14-to-0-17): The admin package renames, declared resources, and the bundle format change that stops an older build booting on a current runtime.
 - [Upgrading 0.13 to 0.14](https://rebase.pro/docs/upgrading/0-13-to-0-14): Every wire key becomes camelCase, anonymous sign-in becomes opt-in, and one package is removed.
 - [Upgrading 0.12 to 0.13](https://rebase.pro/docs/upgrading/0-12-to-0-13): The auth schema removal, the package renames, and the three ways access could be granted that you did not ask for.

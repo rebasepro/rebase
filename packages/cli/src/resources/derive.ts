@@ -51,6 +51,7 @@ import {
 } from "@rebasepro/types";
 import { analyseFunctionsDirectory } from "../function-portability";
 import { resolveBackendPaths } from "../manifest";
+import { cliVersion } from "../utils/version";
 
 /** The committed, generated record of what a project needs. */
 export const RESOURCE_GRAPH_FILENAME = "rebase.resources.json";
@@ -59,6 +60,91 @@ export const RESOURCE_GRAPH_FILENAME = "rebase.resources.json";
 export interface ResourceIssue {
     path: string;
     message: string;
+}
+
+/**
+ * Which `@rebasepro/*` package a module error is about, when it is about one.
+ *
+ * Both directions of a version skew arrive as an error about the *user's* file:
+ * `resources.ts  The requested module '@rebasepro/types' does not provide an
+ * export named 'queue'`. Nothing in that says which copy of `@rebasepro/types`
+ * is installed, what version this CLI is, or that the two disagree — so the
+ * reader goes looking for a typo in code they just copied out of the docs.
+ *
+ * Two shapes, because the two directions produce different errors: a named
+ * export the installed copy is too old for, and a package the installed tree
+ * does not have at all.
+ */
+const NAMED_EXPORT_MISSING = /does not provide an export named ['"]([^'"]+)['"]/;
+const SPECIFIER = /(@rebasepro\/[a-z0-9-]+)/;
+
+/** The version of a package as resolved from the project, or null. */
+function installedVersion(specifier: string, from: string): string | null {
+    try {
+        const require = createRequire(path.join(from, "noop.js"));
+        const manifest = require.resolve(`${specifier}/package.json`);
+        const version: unknown = JSON.parse(fs.readFileSync(manifest, "utf-8")).version;
+        return typeof version === "string" ? version : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The message an issue carries, with the skew named when there is one.
+ *
+ * `main` runs 497 commits ahead of npm `latest` and the docs site publishes from
+ * `main`, so the shape this exists for is routine: a scaffold pinned to the
+ * published version, config code written against today's documentation, and an
+ * error about the config file. The fix is one command and the error named none
+ * of it — the same failure as `404 No PUT route on collection 'projects'`, one
+ * layer down.
+ *
+ * Says nothing extra when the two versions agree, or when either is unreadable:
+ * a sentence naming one version twice is worse than no sentence.
+ */
+export function describeIssue(err: unknown, projectRoot: string, ownVersion = cliVersion()): string {
+    const message = err instanceof Error ? err.message : String(err);
+    const code = (err as { code?: unknown } | null)?.code;
+    const missingExport = NAMED_EXPORT_MISSING.exec(message);
+    const isSkewShaped = missingExport !== null || code === "ERR_MODULE_NOT_FOUND";
+    if (!isSkewShaped) return message;
+
+    const specifier = SPECIFIER.exec(message)?.[1];
+    if (!specifier) return message;
+
+    // One line, not two: every caller renders an issue as `path  message` on a
+    // single row, so a newline here would land the useful half unindented under
+    // the file name.
+    const lead = /[.!?]$/.test(message.trim()) ? message.trim() : `${message.trim()}.`;
+
+    const installed = installedVersion(specifier, projectRoot);
+    if (installed === null) {
+        return `${lead} ${specifier} is not installed in this project; this CLI is ${ownVersion}. `
+            + `Run pnpm add ${specifier}@${ownVersion}`;
+    }
+    if (ownVersion === "unknown" || installed === ownVersion) return message;
+
+    // Which side to move is the question the reader actually has, and it has a
+    // right answer: the CLI is what evaluates this file, so the packages follow
+    // it — unless the CLI is the older one, in which case following it would
+    // move the project backwards.
+    const cliIsNewer = compareVersions(ownVersion, installed) > 0;
+    return cliIsNewer
+        ? `${lead} ${specifier} ${installed} is installed; this CLI is ${ownVersion}. `
+            + `Run pnpm add ${specifier}@${ownVersion}`
+        : `${lead} ${specifier} ${installed} is installed; this CLI is ${ownVersion}, which is older. `
+            + `Update the CLI to ${installed}, or pin ${specifier} back to ${ownVersion}`;
+}
+
+/** -1 / 0 / 1 on the numeric parts, ignoring any prerelease tail. */
+function compareVersions(a: string, b: string): number {
+    const parts = (v: string): number[] => v.split("-")[0].split(".").map(n => Number(n) || 0);
+    const [x, y] = [parts(a), parts(b)];
+    for (let i = 0; i < 3; i++) {
+        if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) < (y[i] ?? 0) ? -1 : 1;
+    }
+    return 0;
 }
 
 /** Files that declare resources, in the order they are loaded. */
@@ -295,7 +381,7 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
                 if (isResourceHandle(value)) handleExports.set(exportName, resourceId(value.kind, value.key));
             }
         } catch (err) {
-            issues.push({ path: path.relative(configDir, candidate), message: err instanceof Error ? err.message : String(err) });
+            issues.push({ path: path.relative(configDir, candidate), message: describeIssue(err, projectRoot) });
         }
         break;
     }
@@ -314,7 +400,7 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
                 // it sends somebody reading every module in the directory.
                 issues.push({
                     path: path.relative(configDir, entry),
-                    message: err instanceof Error ? err.message : String(err)
+                    message: describeIssue(err, projectRoot)
                 });
             }
         }
@@ -372,7 +458,7 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
                     ...(requires.length > 0 ? { requires } : {})
                 });
             } catch (err) {
-                issues.push({ path: report.file, message: err instanceof Error ? err.message : String(err) });
+                issues.push({ path: report.file, message: describeIssue(err, projectRoot) });
             }
             for (const imported of report.resourceImports) {
                 const resource = handleExports.get(imported);

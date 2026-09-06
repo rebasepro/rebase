@@ -1,5 +1,5 @@
 ---
-sourceHash: 25ae48f967fcc90a
+sourceHash: aeb69aa6164eafbc
 title: Intégration d'un Serveur Personnalisé
 sidebar_label: Serveur Personnalisé (Express)
 description: Comment intégrer les services Rebase Database et Realtime dans votre propre backend Node.js sans utiliser Hono ou le coordinateur Rebase.
@@ -36,6 +36,11 @@ export const env = loadEnv({
 // env.SMTP_HOST  → string | undefined  (entièrement typé)
 // env.STRIPE_SECRET_KEY → string        (validé, requis)
 ```
+
+Importer `z` depuis `@rebasepro/server` est nouveau <span class="since-badge" data-since="0.18">Since 0.18</span>. En 0.17
+et avant, le paquet n'exportait aucun `z` : importez-le depuis `zod`, en
+reprenant la version majeure utilisée par le runtime, et laissez votre bundler
+dédupliquer les deux copies.
 
 **Comportements clés :**
 - Génère automatiquement des secrets temporaires `JWT_SECRET` et `REBASE_SERVICE_KEY` en développement pour vous permettre de démarrer sans configuration manuelle.
