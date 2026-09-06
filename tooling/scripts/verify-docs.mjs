@@ -449,12 +449,15 @@ if (only === "both" || only === "names") {
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Cloud surface table ━━━${NC}`);
     const { findings: bad, scanned } = checkCloudSurface(ROOT);
-    console.log(`${DIM}Compared deployment/cloud.md's surface table against ${scanned} CLOUD_GROUPS entries.${NC}`);
+    console.log(
+        `${DIM}Compared deployment/cloud.md's surface table, and every \`rebase cloud …\` line on that ` +
+            `page and the CLI reference, against ${scanned} CLOUD_GROUPS entries and their --help pages.${NC}`
+    );
     if (!bad.length) {
-        console.log(`${GREEN}✓ Every group \`rebase cloud\` dispatches has exactly one row on the cloud page.${NC}`);
+        console.log(`${GREEN}✓ Every group \`rebase cloud\` dispatches has exactly one row, and every documented line is one the CLI answers.${NC}`);
     } else {
         findings += bad.length;
-        console.log(`${RED}✗ ${bad.length} group(s) the cloud page and the CLI disagree about:${NC}`);
+        console.log(`${RED}✗ ${bad.length} thing(s) the cloud docs and the CLI disagree about:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);
