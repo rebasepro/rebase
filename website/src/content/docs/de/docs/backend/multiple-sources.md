@@ -1,5 +1,5 @@
 ---
-sourceHash: bf0f225501043030
+sourceHash: 7dadf2d57e6bfecf
 title: Mehrere Datenbanken und Buckets
 sidebar_label: Mehrere Quellen
 description: Leiten Sie Collections an verschiedene Datenbanken und Properties an verschiedene Storage-Buckets weiter und konfigurieren Sie jede einzelne über die Umgebung.
@@ -46,6 +46,53 @@ entscheiden, was bereitzustellen ist, *bevor* irgendetwas ausgeführt wird.
 Eine unbekannte Engine wird an der Aufrufstelle abgelehnt, nicht später. Für
 eine, die dieser Build nicht kennt, schreibt man `custom:` — etwa
 `bucket("objects", { engine: "custom:minio" })`.
+
+### Eine bereits ausgelieferte Kind-Definition korrigieren
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+Für Treiber-Autoren. Die registrierte Definition einer Ressourcen-Kind ist
+**eingefroren**, sobald ein Paket damit veröffentlicht wurde: jeder
+veröffentlichte Treiber trägt eine eigene Kopie von `@rebasepro/types` in sich,
+und diese Kopie vergleicht den Eintrag der gemeinsamen Registry mit ihrem
+eigenen Literal und wirft bei jeder Abweichung. Das Literal zu ändern tötet
+also jedes Bundle, das mit einem älteren Treiber gebaut wurde, beim Laden des
+Treibers.
+
+`amendResourceKind` korrigiert, woran eine Kind *bindet* — ihre
+Umgebungs-Basisnamen, ihre Options-Schlüssel — ohne das Literal anzufassen, das
+eine ältere Kopie vergleicht:
+
+```ts
+import { amendResourceKind } from "@rebasepro/types";
+
+amendResourceKind("database", {
+    envBases: ["DATABASE_URL", "DATABASE_READ_URL", "ADMIN_CONNECTION_STRING"]
+});
+```
+
+Die Korrektur gilt nur für Lesezugriffe über diese Kopie, ein älterer Treiber
+bindet also weiter so wie zum Zeitpunkt seiner Veröffentlichung. Verwenden Sie
+sie für jede Korrektur an einer ausgelieferten Kind; `registerResourceKind` nur
+für eine Kind, die noch niemand veröffentlicht hat.
+
+### Welcher Bucket einen unqualifizierten Upload erhält
+
+Eine Storage-Eigenschaft, die keine `storageSource` nennt, schreibt in den
+**Standard**-Bucket, und ein Projekt mit benannten Buckets muss sagen, welcher
+das ist. Entweder deklarieren Sie den Standard-Bucket — `export const uploads =
+bucket();` — oder markieren einen der benannten:
+
+```ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+Der Start wird verweigert, wenn ein Projekt benannte Buckets und keinen Standard
+hat, und nennt beide Auswege. Früher wurde der zuerst deklarierte gewählt, mit
+einer Warnung: das entschied anhand der Deklarationsreihenfolge, wo die Dateien
+eines Nutzers landen, und es fiel dies- und jenseits eines Deploys
+unterschiedlich aus, weil der lokale Bucket, mit dem die Entwicklung einspringt,
+in der Produktion entfällt — die Beförderung aber nicht.
 
 Richten Sie dann eine Collection auf eine davon aus:
 

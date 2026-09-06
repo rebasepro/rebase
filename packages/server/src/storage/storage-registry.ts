@@ -144,18 +144,20 @@ export class DefaultStorageRegistry implements StorageRegistry {
                     registry.register(id, controller);
                 }
             }
-            // Ensure there's a default if not explicitly provided
-            if (!registry.has(DEFAULT_STORAGE_ID) && registry.size() > 0) {
-                // If no explicit "(default)", use the first one as default
-                const firstId = Object.keys(input).find(k => isStorageController(input[k]));
-                if (firstId) {
-                    logger.warn(
-                        `[StorageRegistry] No "${DEFAULT_STORAGE_ID}" storage provided. ` +
-                        `Using "${firstId}" as the default.`
-                    );
-                    registry.register(DEFAULT_STORAGE_ID, input[firstId]);
-                }
-            }
+            // Deliberately no promotion. This used to register whichever
+            // backend came first under `(default)` with a warning — where a
+            // user's uploaded files land, decided by declaration order — and
+            // the answer differed either side of a deploy, because the
+            // synthesized local default is dropped in production and the
+            // promotion was not. A project declaring only `bucket("media")`
+            // therefore wrote to local disk in development and to the media
+            // bucket in production, with nothing failing in either.
+            //
+            // The refusal lives at the declaration, in `resolveStorageSources`,
+            // where the project's own buckets can be named. Here there may
+            // legitimately be no default: in production a `local` default is
+            // dropped so the rest of the app keeps serving, and uploads answer
+            // `STORAGE_NOT_CONFIGURED` rather than crash-looping the rollout.
         }
 
         return registry;
@@ -171,9 +173,15 @@ export class DefaultStorageRegistry implements StorageRegistry {
     getDefault(): StorageController {
         const controller = this.controllers.get(DEFAULT_STORAGE_ID);
         if (!controller) {
+            const others = this.list();
             throw new Error(
-                "[StorageRegistry] No default storage registered. " +
-                `Register one with id "${DEFAULT_STORAGE_ID}" or pass a single StorageController.`
+                "[StorageRegistry] No default storage registered, so an upload that names no " +
+                "`storageSource` has nowhere to go." +
+                (others.length > 0
+                    ? ` This process has ${others.map(k => `"${k}"`).join(", ")}. In \`config/resources.ts\`, ` +
+                      `either mark one — bucket("${others[0]}", { default: true }) — or declare the default ` +
+                      "bucket alongside them: export const uploads = bucket();"
+                    : ` Register one with id "${DEFAULT_STORAGE_ID}" or pass a single StorageController.`)
             );
         }
         return controller;

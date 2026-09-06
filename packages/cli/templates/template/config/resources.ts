@@ -43,6 +43,13 @@ export const main = database();
  * export const files = bucket({ engine: "s3" });
  * export const media = bucket("media", { engine: "s3" });
  *
+ * One of them has to be the one an upload reaches when the property names no
+ * `storageSource` — the default-keyed `bucket()` above, or a named bucket
+ * marked `bucket("media", { engine: "s3", default: true })`. A project of named
+ * buckets with no default refuses to boot rather than have one chosen for it:
+ * that choice used to be made by declaration order, and it came out differently
+ * in development and in production.
+ *
  * Point a property at it by handle — the same name, spelled once:
  *
  * import { media } from "../resources";
@@ -52,7 +59,7 @@ export const main = database();
  *
  * Name an `account` and they share one credential set instead of repeating it:
  *
- * export const media   = bucket("media",   { engine: "s3", account: "minio" });
+ * export const media   = bucket("media",   { engine: "s3", account: "minio", default: true });
  * export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
  *
  * That reads `S3_BUCKET__MEDIA` and `S3_BUCKET__AVATARS` — each bucket keeps its

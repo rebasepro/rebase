@@ -141,7 +141,12 @@ definition });
                 const message =
                     err instanceof Error ? err.message : String(err);
                 problems.push(`${file} (threw: ${message})`);
-                logger.error(`[cron] Failed to load ${file}: ${message}`);
+                // At `debug`: the aggregate warning below lists every problem
+                // by file, so this line was the same text a second time — and
+                // when the throw is a Zod error, that text is ten lines of
+                // serialised issues. The reader met it twice before reaching
+                // the sentence that says what to do.
+                logger.debug(`[cron] Failed to load ${file}: ${message}`);
             }
         }
     }

@@ -81,9 +81,28 @@ export async function initializeStorage(
 
     if (Object.keys(controllers).length > 0) {
         const storageRegistry = DefaultStorageRegistry.create(controllers);
-        const storageController = storageRegistry.getDefault();
         logger.info("Initialized storage backends", { count: Object.keys(controllers).length });
-        return { storageRegistry, storageController };
+        // A missing default is not fatal here, and deliberately so. The one way
+        // to reach this state from a declared project is the branch above:
+        // production drops a `local` default so the rest of the app keeps
+        // serving rather than crash-looping, and the named buckets survive it.
+        // Nothing is promoted into the gap — that promotion is what made a
+        // project write to local disk in development and into its media bucket
+        // in production — so uploads that name no source answer
+        // `STORAGE_NOT_CONFIGURED` until the project says which bucket they
+        // belong in. `resolveStorageSources` refuses a project that never said.
+        if (!storageRegistry.has(DEFAULT_STORAGE_ID)) {
+            const named = storageRegistry.list();
+            logger.error(
+                `No default storage source: this process serves ${named.map(k => `"${k}"`).join(", ")} and ` +
+                "none of them receives an upload that names no `storageSource`, so those uploads are " +
+                "refused. In `config/resources.ts`, either mark one — " +
+                `bucket("${named[0]}", { default: true }) — or declare the default bucket alongside them: ` +
+                "export const uploads = bucket();"
+            );
+            return { storageRegistry };
+        }
+        return { storageRegistry, storageController: storageRegistry.getDefault() };
     }
 
     return {};

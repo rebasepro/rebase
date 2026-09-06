@@ -60,8 +60,8 @@ describe("initializeStorage", () => {
 
     it("keeps the durable backends when only one entry is local", async () => {
         // Dropping the ephemeral entry must not take the rest of the map with
-        // it: a project with a real bucket plus a stray local entry still gets
-        // working storage, promoted to the default.
+        // it: a project with a real bucket plus a stray local entry keeps the
+        // real bucket.
         const s3 = {
             type: "s3" as const,
             bucket: "media",
@@ -70,14 +70,47 @@ describe("initializeStorage", () => {
             secretAccessKey: "secret"
         };
 
-        const { storageRegistry, storageController } = await initializeStorage(
+        const { storageRegistry } = await initializeStorage(
             { scratch: local(), media: s3 },
             true
         );
 
         expect(storageRegistry?.list()).toContain("media");
         expect(storageRegistry?.has("scratch")).toBe(false);
-        expect(storageController?.getType()).toBe("s3");
+    });
+
+    it("promotes nothing into a missing default, and says which bucket to name", async () => {
+        // The survivor is NOT made the default. That promotion is what made a
+        // project with `bucket("media")` write to local disk in development —
+        // where the synthesized local default survives — and into the media
+        // bucket in production, where it is dropped. Uploads that name no
+        // source are refused instead, and the rest of the app keeps serving.
+        const errors: string[] = [];
+        const original = console.error;
+        console.error = (...args: unknown[]) => { errors.push(String(args[0])); };
+        let result;
+        try {
+            result = await initializeStorage(
+                {
+                    scratch: local(),
+                    media: {
+                        type: "s3" as const,
+                        bucket: "media",
+                        region: "auto",
+                        accessKeyId: "key",
+                        secretAccessKey: "secret"
+                    }
+                },
+                true
+            );
+        } finally {
+            console.error = original;
+        }
+
+        expect(result.storageController).toBeUndefined();
+        expect(result.storageRegistry?.list()).toEqual(["media"]);
+        expect(errors.join("\n")).toContain('bucket("media", { default: true })');
+        expect(errors.join("\n")).toContain("export const uploads = bucket();");
     });
 
     it("leaves a pre-built controller alone", async () => {

@@ -1,5 +1,5 @@
 ---
-sourceHash: b31e802b38b86689
+sourceHash: f6312cfcb6187cea
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.

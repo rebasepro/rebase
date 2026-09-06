@@ -1,5 +1,5 @@
 ---
-sourceHash: bf0f225501043030
+sourceHash: 7dadf2d57e6bfecf
 title: Múltiples bases de datos y buckets
 sidebar_label: Múltiples fuentes
 description: Enruta colecciones a diferentes bases de datos y propiedades a diferentes buckets de almacenamiento, y configura cada uno desde el entorno.
@@ -45,6 +45,52 @@ aprovisionar *antes* de ejecutar nada.
 Un motor desconocido se rechaza en el punto de llamada, no más tarde. Para uno
 que esta build no conoce se escribe `custom:` — por ejemplo
 `bucket("objects", { engine: "custom:minio" })`.
+
+### Corregir un kind que ya se ha publicado
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+Para autores de drivers. La definición registrada de un kind de recurso queda
+**congelada** en cuanto se publica un paquete que la lleva: cada driver
+publicado incorpora su propia copia de `@rebasepro/types`, y esa copia compara
+la entrada del registro compartido con su propio literal y lanza un error ante
+cualquier diferencia. Editar el literal mata, por tanto, todo bundle construido
+con un driver más antiguo al cargar el driver.
+
+`amendResourceKind` corrige a qué se *vincula* un kind — sus bases de variables
+de entorno, sus claves de opciones — sin tocar el literal que compara cualquier
+copia más antigua:
+
+```ts
+import { amendResourceKind } from "@rebasepro/types";
+
+amendResourceKind("database", {
+    envBases: ["DATABASE_URL", "DATABASE_READ_URL", "ADMIN_CONNECTION_STRING"]
+});
+```
+
+La corrección solo se aplica a las lecturas a través de esta copia, así que un
+driver antiguo sigue vinculando como lo hacía cuando se publicó. Úsala para
+cualquier corrección a un kind ya publicado; usa `registerResourceKind` solo
+para un kind que nadie ha publicado.
+
+### Qué bucket recibe una subida sin cualificar
+
+Una propiedad de almacenamiento que no nombra ninguna `storageSource` escribe en
+el bucket **por defecto**, y un proyecto con buckets nombrados tiene que decir
+cuál es. O declaras el bucket por defecto — `export const uploads = bucket();` —
+o marcas uno de los nombrados:
+
+```ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+El arranque rechaza un proyecto con buckets nombrados y sin ninguno por defecto,
+y nombra las dos soluciones. Antes elegía el primero declarado, con un aviso:
+eso decidía dónde acaban los archivos de un usuario por orden de declaración, y
+daba respuestas distintas a cada lado de un despliegue, porque el bucket local
+con el que el desarrollo hace de suplente se descarta en producción y la
+promoción no.
 
 Luego, apunta una colección a una de ellas:
 

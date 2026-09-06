@@ -1,5 +1,5 @@
 ---
-sourceHash: bf0f225501043030
+sourceHash: 7dadf2d57e6bfecf
 title: Database e Bucket Multipli
 sidebar_label: Origini Multiple
 description: Instrada le collezioni verso database diversi e le proprietà verso bucket di archiviazione diversi, e configura ciascuno di essi dall'ambiente.
@@ -42,6 +42,52 @@ approvvigionare *prima* di eseguire qualsiasi cosa.
 Un motore sconosciuto viene rifiutato al punto di chiamata, non più tardi. Per
 uno che questa build non conosce si usa `custom:` — ad esempio
 `bucket("objects", { engine: "custom:minio" })`.
+
+### Correggere un kind già pubblicato
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+Per gli autori di driver. La definizione registrata di un kind di risorsa è
+**congelata** nel momento in cui viene pubblicato un pacchetto che la contiene:
+ogni driver pubblicato incorpora la propria copia di `@rebasepro/types`, e
+quella copia confronta la voce del registro condiviso con il proprio literal e
+solleva un errore a ogni differenza. Modificare il literal uccide quindi ogni
+bundle costruito con un driver più vecchio, al caricamento del driver.
+
+`amendResourceKind` corregge ciò a cui un kind *si lega* — le sue basi di
+variabili d'ambiente, le sue chiavi di opzione — senza toccare il literal che
+una copia più vecchia confronta:
+
+```ts
+import { amendResourceKind } from "@rebasepro/types";
+
+amendResourceKind("database", {
+    envBases: ["DATABASE_URL", "DATABASE_READ_URL", "ADMIN_CONNECTION_STRING"]
+});
+```
+
+La correzione vale solo per le letture attraverso questa copia, quindi un driver
+più vecchio continua a legarsi come faceva quando è stato pubblicato. Usala per
+ogni correzione a un kind già pubblicato; usa `registerResourceKind` solo per un
+kind che nessuno ha pubblicato.
+
+### Quale bucket riceve un caricamento non qualificato
+
+Una proprietà di storage che non nomina alcuna `storageSource` scrive nel bucket
+**predefinito**, e un progetto con bucket nominati deve dire quale sia. O
+dichiari il bucket predefinito — `export const uploads = bucket();` — oppure
+contrassegni uno di quelli nominati:
+
+```ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+L'avvio rifiuta un progetto con bucket nominati e nessun predefinito, e nomina
+entrambe le soluzioni. Prima veniva scelto il primo dichiarato, con un
+avvertimento: così l'ordine di dichiarazione decideva dove finiscono i file di un
+utente, e la risposta cambiava ai due lati di un deploy, perché il bucket locale
+con cui lo sviluppo fa da sostituto viene scartato in produzione e la promozione
+no.
 
 Quindi indirizza una collezione verso una di esse:
 

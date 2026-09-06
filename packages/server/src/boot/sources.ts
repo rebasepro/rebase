@@ -487,9 +487,42 @@ export function resolveStorageSources(
     // in development and in the media bucket in production. Two different
     // destinations either side of a deploy is worse than having no default
     // bucket, which at least fails the same way in both.
-    const effective: { key: string; engine?: string; account?: string }[] = declared.length === 0
+    const effective: { key: string; engine?: string; account?: string; default?: boolean }[] = declared.length === 0
         ? [{ key: DEFAULT_STORAGE_SOURCE_KEY, engine: undefined }]
         : serverSide;
+
+    // ── Which bucket receives an unqualified upload? ─────────────────────────
+    //
+    // The author's decision, and boot refuses without one. The registry used to
+    // take it: no `(default)` storage meant "promote whichever came first", with
+    // a warning. That is where a user's files land, chosen by declaration order
+    // — and it gave *different answers either side of a deploy*, because a
+    // synthesized local default is dropped in production and the promotion was
+    // not. A project declaring only `bucket("media")` wrote to local disk in
+    // development and into the media bucket in production, and nothing failed.
+    //
+    // Only when this process actually serves storage: a project whose buckets
+    // are all `transport: "direct"` has nothing here to be the default of.
+    const claimants = serverSide.filter(d => d.default === true);
+    if (claimants.length > 1) {
+        throw new BundleError(
+            `${claimants.length} storage sources declare \`default: true\`: ` +
+            `${claimants.map(d => `"${d.key}"`).join(", ")}.`,
+            "Exactly one bucket serves uploads that name no `storageSource`. Remove the flag from all but one."
+        );
+    }
+    if (serverSide.length > 0
+        && claimants.length === 0
+        && !serverSide.some(d => d.key === DEFAULT_STORAGE_SOURCE_KEY)) {
+        const named = serverSide.map(d => `"${d.key}"`).join(", ");
+        throw new BundleError(
+            `This project declares ${named}, and none of them is the default bucket — so an upload ` +
+            "from a storage property that names no `storageSource` has nowhere to go.",
+            "In `config/resources.ts`, either mark one of them — " +
+            `bucket("${serverSide[0].key}", { default: true }) — or declare the default bucket ` +
+            "alongside them: export const uploads = bucket();"
+        );
+    }
 
     const result: Record<string, BackendStorageConfig> = {};
     for (const definition of effective) {
@@ -501,7 +534,15 @@ export function resolveStorageSources(
             definition.account,
             options
         );
-        if (config) result[definition.key] = config;
+        if (!config) continue;
+        result[definition.key] = config;
+        // `default: true` binds the same backend under the default key as well,
+        // so an unqualified upload reaches it. Registered rather than renamed:
+        // the source keeps its own key, its own `__SUFFIX` variables and its own
+        // place in the graph, and only gains a second name.
+        if (definition.default === true && definition.key !== DEFAULT_STORAGE_SOURCE_KEY) {
+            result[DEFAULT_STORAGE_SOURCE_KEY] = config;
+        }
     }
 
     return Object.keys(result).length > 0 ? result : undefined;
