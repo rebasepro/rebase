@@ -31,7 +31,19 @@ const repoRoot = path.resolve(here, "..", "..", "..");
 registerTsx();
 register(pathToFileURL(path.join(here, "forbid-ui-hook.mjs")));
 
-const COLLECTION_DIRS = [path.join(repoRoot, "app", "config", "collections")];
+/**
+ * Every directory of collection files this repository ships.
+ *
+ * The template is here because it is the one nobody was checking, and it is the
+ * one that reaches users: `rebase init` copies it verbatim, so a UI import in a
+ * scaffolded collection file breaks the first `rebase dev` of every new project
+ * rather than a build in this repo. The example app is checked for the same
+ * reason it always was — it is the shape the docs point at.
+ */
+const COLLECTION_DIRS = [
+    path.join(repoRoot, "app", "config", "collections"),
+    path.join(repoRoot, "packages", "cli", "templates", "template", "config", "collections")
+];
 
 // Checked via their source entry points rather than bare specifiers: workspace
 // packages aren't linked into the root node_modules, and this way the guard
@@ -40,7 +52,13 @@ const SERVER_PACKAGES = [
     "packages/server/src/index.ts",
     "packages/server-postgres/src/index.ts",
     "packages/server-mongo/src/index.ts",
-    "packages/client/src/index.ts"
+    "packages/client/src/index.ts",
+    // Not a server package — the type surface a collection file imports
+    // `defineCollection` from. It is checked here rather than banned by name,
+    // because banning it by name refused the way this project documents
+    // authoring a collection while proving nothing about React. If a value
+    // import of React ever lands in its graph, this line fails that day.
+    "packages/cms-types/src/index.ts"
 ];
 
 /** Mirrors the filter in packages/server/src/collections/loader.ts. */

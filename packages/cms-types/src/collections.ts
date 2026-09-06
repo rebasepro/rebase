@@ -12,7 +12,14 @@
  * That is what made them safe to lift: they were never part of the BaaS surface,
  * only stored next to it.
  */
-import React, { Dispatch, SetStateAction } from "react";
+// `import type`, and it matters: this module is reachable from the package
+// barrel, which a collection file imports `defineCollection` from, and a
+// collection file is loaded by the backend. `React` appears here only in type
+// position (`React.ReactNode`), so a value import would have been elided
+// anyway — by esbuild's rules, silently, and only for as long as nobody added a
+// value use. Written as a type import it is the compiler's job instead of a
+// bundler's habit. `check:headless` loads this graph and proves it.
+import type React from "react";
 import type { Entity, EntityStatus, FilterValues, OrderByTuple, Property, User } from "@rebasepro/types";
 
 import type { RebaseContext } from "./rebase_context";
