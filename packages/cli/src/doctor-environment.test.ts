@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { readAtlasBinaryState } from "./commands/doctor";
 import {
     checkAtlasBinary,
     checkDuplicateSlugs,
@@ -207,5 +211,42 @@ manager: "pnpm" };
         expect(finding.fix).toContain("--force");
         // The wrong advice for this state, and the advice it used to give.
         expect(finding.fix).not.toContain("approve-builds");
+    });
+});
+
+describe("atlas binary state on disk", () => {
+    /**
+     * pnpm's isolated layout — the scaffold default. `@ariga/atlas` is a
+     * dependency of the driver, not of the project, so it lives under `.pnpm/`
+     * and only the driver's own `node_modules` links to it. A directory walk
+     * from the project root never sees it; the doctor once told a healthy
+     * scaffold the binary was missing.
+     */
+    it("finds the binary through the driver under pnpm's isolated layout", () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "doctor-atlas-"));
+        const store = path.join(root, "node_modules", ".pnpm");
+        const atlasDir = path.join(store, "@ariga+atlas@1.0.0", "node_modules", "@ariga", "atlas");
+        const driverDir = path.join(store, "@rebasepro+server-postgres@0.0.0", "node_modules", "@rebasepro", "server-postgres");
+        fs.mkdirSync(atlasDir, { recursive: true });
+        fs.mkdirSync(driverDir, { recursive: true });
+        fs.writeFileSync(path.join(atlasDir, "package.json"), JSON.stringify({ name: "@ariga/atlas", version: "1.0.0", bin: { atlas: "atlas" } }));
+        fs.writeFileSync(path.join(atlasDir, "atlas"), "#!/bin/sh\n");
+        fs.writeFileSync(path.join(driverDir, "package.json"), JSON.stringify({ name: "@rebasepro/server-postgres", version: "0.0.0", dependencies: { "@ariga/atlas": "1.0.0" } }));
+        // The driver's own node_modules links to atlas, and carries the .bin shim.
+        fs.mkdirSync(path.join(driverDir, "node_modules", "@ariga"), { recursive: true });
+        fs.symlinkSync(atlasDir, path.join(driverDir, "node_modules", "@ariga", "atlas"));
+        fs.mkdirSync(path.join(driverDir, "node_modules", ".bin"), { recursive: true });
+        fs.writeFileSync(path.join(driverDir, "node_modules", ".bin", "atlas"), "#!/bin/sh\n");
+        // The project depends on the driver only.
+        fs.mkdirSync(path.join(root, "node_modules", "@rebasepro"), { recursive: true });
+        fs.symlinkSync(driverDir, path.join(root, "node_modules", "@rebasepro", "server-postgres"));
+        fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "app", dependencies: { "@rebasepro/server-postgres": "0.0.0" } }));
+
+        const state = readAtlasBinaryState(root);
+        expect(state).not.toBeNull();
+        expect(state!.packageInstalled).toBe(true);
+        expect(state!.binaryOnDisk).toBe(true);
+        expect(state!.onPath).toBe(true);
+        fs.rmSync(root, { recursive: true, force: true });
     });
 });

@@ -67,7 +67,10 @@ function declaredSettings() {
     const found = [];
     const lines = fs.readFileSync(workspaceFile, "utf8").split("\n");
     for (const [index, line] of lines.entries()) {
-        const match = /^([A-Za-z][A-Za-z0-9_]*):(.*)$/.exec(line);
+        // A hyphen is allowed by the regex on purpose: a kebab-case key here is
+        // exactly the mistake this gate exists to catch (pnpm reads camelCase
+        // from this file), so it must be seen, then reported below.
+        const match = /^([A-Za-z][A-Za-z0-9_-]*):(.*)$/.exec(line);
         if (!match) continue;
         const [, key, rest] = match;
         const inline = rest.trim().replace(/\s+#.*$/, "");
@@ -105,6 +108,14 @@ try {
 let checked = 0;
 for (const { key, value, line } of declaredSettings()) {
     checked++;
+    if (key.includes("-")) {
+        problems.push(
+            `pnpm-workspace.yaml:${line} declares \`${key}\` in kebab-case — pnpm reads this file `
+            + "in camelCase, so the setting does nothing; spell it "
+            + `\`${key.replace(/-([a-z])/g, (_, c) => c.toUpperCase())}\``
+        );
+        continue;
+    }
     if (!(key in config)) {
         problems.push(
             `pnpm-workspace.yaml:${line} declares \`${key}\` and \`pnpm config get ${key}\` `

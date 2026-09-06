@@ -17,7 +17,8 @@ import {
     findEnvFile,
     exitDependenciesNotInstalled
 } from "../utils/project";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
+import { createRequire } from "module";
 import { scanTextForLibpqUrls, type LibpqUrlFinding } from "../utils/libpq-url";
 import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
 import { reportSpawnFailure } from "../utils/spawn-error";
@@ -210,11 +211,11 @@ export function collectEnvironmentFindings(
  * because `db push` runs from `backend/` and the install may be hoisted to the
  * root.
  */
-function readAtlasBinaryState(projectRoot: string): AtlasBinaryState | null {
+export function readAtlasBinaryState(projectRoot: string): AtlasBinaryState | null {
     const roots = [projectRoot, path.join(projectRoot, "backend"), path.join(projectRoot, "config")];
 
-    const findUpwards = (relative: string): string | null => {
-        for (const start of roots) {
+    const findUpwards = (starts: string[], relative: string): string | null => {
+        for (const start of starts) {
             let dir = start;
             for (let i = 0; i < 8; i++) {
                 const candidate = path.join(dir, "node_modules", relative);
@@ -227,8 +228,36 @@ function readAtlasBinaryState(projectRoot: string): AtlasBinaryState | null {
         return null;
     };
 
-    const manifest = findUpwards(path.join("@ariga", "atlas", "package.json"));
-    const onPath = findUpwards(path.join(".bin", "atlas")) !== null;
+    // `@ariga/atlas` is a dependency of `@rebasepro/server-postgres`, not of the
+    // project, so under pnpm's isolated layout — the scaffold default — it lives
+    // in `.pnpm/` and a directory walk over `node_modules/` never sees it.
+    // Resolve through the module graph the way the driver itself does.
+    const resolveFrom = (from: string, request: string): string | null => {
+        try {
+            return createRequire(pathToFileURL(from)).resolve(request);
+        } catch {
+            return null;
+        }
+    };
+    const bases = roots.map(dir => path.join(dir, "package.json")).filter(file => fs.existsSync(file));
+    const driverManifests = bases
+        .map(base => resolveFrom(base, "@rebasepro/server-postgres/package.json"))
+        .filter((file): file is string => file !== null);
+
+    let manifest: string | null = findUpwards(roots, path.join("@ariga", "atlas", "package.json"));
+    if (!manifest) {
+        for (const base of [...bases, ...driverManifests]) {
+            manifest = resolveFrom(base, "@ariga/atlas/package.json");
+            if (manifest) break;
+        }
+    }
+
+    // The `.bin` shim is written beside whichever package declared the
+    // dependency, so the driver's own directory is a search root too.
+    const onPath = findUpwards(
+        [...roots, ...driverManifests.map(file => path.dirname(file))],
+        path.join(".bin", "atlas")
+    ) !== null;
 
     let binaryOnDisk = false;
     if (manifest) {

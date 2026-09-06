@@ -24,11 +24,15 @@ saveExact: true
 # Switching linkers is its own decision, made on purpose, with a full reinstall.
 nodeLinker: isolated
 hoist: true
-# Types hoisted to the root so every workspace compiles against one copy;
-# express because its types are resolved by name from several packages.
-publicHoistPattern:
-  - '@types/*'
-  - express
+# `.npmrc` also asked for `@types/*` and `express` to be public-hoisted, and
+# pnpm 11 never read that either: the root has two `@types` packages and no
+# `express`, and every workspace compiles against that. Turning the pattern on
+# changes type resolution for all thirty members in the same change that moved
+# the keys, so it stays off; enable it on purpose, with a full reinstall and a
+# typecheck of every member.
+# publicHoistPattern:
+#   - '@types/*'
+#   - express
 # How new a version may be before this repo will install it, in minutes.
 #
 # Three days. The attack this bounds is the one that actually happens to npm: a
