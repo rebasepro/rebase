@@ -74,6 +74,17 @@ export interface LiveSchemaRoutesConfig {
      */
     writeSource?: (change: ProposedChange) => Promise<{ path: string; contents: string }[]>;
     /**
+     * Why {@link writeSource} is absent, when the caller knows.
+     *
+     * `writeSource` being undefined has several causes — the editor turned off,
+     * `baas` mode, no `collectionsDir`, `NODE_ENV=production`, `ts-morph` not
+     * installed — and this route could see only that the field was unset, so it
+     * reported the last of them for all of them. The admin panel calls this
+     * *and* `/api/schema-editor/status` on every page load and got two
+     * different answers, one of which named a dependency that was installed.
+     */
+    sourceEditingOff?: { code: string; message: string };
+    /**
      * Which paths {@link writeSource} will touch, without touching them.
      *
      * The dirty-tree check needs them *before* the write, or it reads the
@@ -289,11 +300,16 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             });
         }
         if (!config.writeSource) {
+            // The caller's reason wins, because it is the one that is true.
+            // The dependency message is the fallback for a caller that supplies
+            // `writeSource` conditionally and says nothing about why.
+            const off = config.sourceEditingOff;
             return c.json({
                 enabled: false,
                 canPlan: true,
-                code: "SCHEMA_EDITOR_MISSING_DEPENDENCY",
-                reason: "Rewriting collection source needs `ts-morph`, which is not installed " +
+                code: off?.code ?? "SCHEMA_EDITOR_MISSING_DEPENDENCY",
+                reason: off?.message
+                    ?? "Rewriting collection source needs `ts-morph`, which is not installed " +
                     "on this server. Run `pnpm add -D ts-morph@28.0.0` to enable it."
             });
         }

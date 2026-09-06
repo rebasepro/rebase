@@ -37,6 +37,17 @@ export interface LoadedBundle {
      * warning, so a partially-built bundle still boots its API.
      */
     staticApps: LoadedStaticApp[];
+    /**
+     * True when this "bundle" is a view over the project's own source tree —
+     * what `rebase dev` boots — rather than a built one.
+     *
+     * The difference matters to anything that would write a file back: the
+     * schema editor rewrites collection *source*, which exists on one of these
+     * paths and not the other. Read it from here rather than from
+     * `manifest.runtime.builtAgainst === "source"`: the manifest is what a
+     * build wrote down, and a bundle can carry any string a builder put there.
+     */
+    isSource: boolean;
 }
 
 /** One built static app inside a loaded bundle, with an absolute directory. */
@@ -228,6 +239,7 @@ export function loadBundle(bundleDir: string): LoadedBundle {
     return {
         dir,
         manifest,
+        isSource: false,
         collectionsDir,
         functionsDir: resolveEntry(entry.functions, "functions"),
         cronsDir: resolveEntry(entry.crons, "crons"),
@@ -358,6 +370,7 @@ createdAt: new Date().toISOString() }
     return {
         dir,
         manifest,
+        isSource: true,
         collectionsDir: resolve(collectionsDir),
         functionsDir: resolve(options.functions),
         cronsDir: resolve(options.crons),

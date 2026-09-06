@@ -2072,6 +2072,18 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
             liveSchemaRouter.route("/", createLiveSchemaRoutes({
                 commitPaths,
+                // The reason source editing is off, when it is — carried across
+                // rather than inferred.
+                //
+                // The two aliases of this status disagreed, and the admin calls
+                // both on every page load: `/api/schema-editor/status` said
+                // `SCHEMA_EDITOR_DISABLED` while `/api/admin/schema/status`
+                // said `SCHEMA_EDITOR_MISSING_DEPENDENCY` and named `ts-morph`
+                // — on a server where `ts-morph` resolves. `writeSource` is
+                // only set when the editor routes were built, which is skipped
+                // for *every* `schemaEditorOff` reason, so all of them were
+                // reported as the missing dependency. One reason, the true one.
+                sourceEditingOff: schemaEditorOff,
                 // Only answerable for a project on this machine. A deployment
                 // committing to a remote repository is a built bundle, which is
                 // provisioned by boot-ensure rather than by replaying

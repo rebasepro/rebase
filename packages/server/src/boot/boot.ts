@@ -389,7 +389,15 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // The schema editor rewrites collection *source* files. A bundle holds
         // compiled output, so there is nothing it could meaningfully edit —
         // and a running deployment is the last place that should be possible.
-        schemaEditor: false
+        //
+        // But this same call also serves the *source* boot that `rebase dev`
+        // runs, where the collection files are right there, and `false` there
+        // greyed out "Edit collections" on every scaffold — with no reason
+        // anywhere on screen, while the docs said the editor rewrites your
+        // TypeScript. `undefined` is not "on": it hands the decision back to
+        // `initializeRebaseBackend`, which already weighs `collectionsDir`,
+        // `baas` mode and `NODE_ENV`, and reports whichever of those said no.
+        schemaEditor: bundle.isSource ? undefined : false
     });
 
     // Restrict metric labels to collections that exist, now that they do.
