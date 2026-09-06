@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import matter from "gray-matter";
 import { createRequire } from "module";
+import { extractSidebarSlugs } from "./sidebar-slugs.js";
 
 // gray-matter's bundled engine calls yaml.safeLoad, which js-yaml 4 removed —
 // without this override every matter() call throws and llms.txt ends up empty.
@@ -169,28 +170,16 @@ async function extractSidebarIds(configFilePath) {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const absolutePath = path.resolve(__dirname, configFilePath);
+    const contentRoot = path.resolve("./src/content/docs");
 
-    // Read the config file as text instead of importing it
-    const configContent = fs.readFileSync(absolutePath, "utf-8");
-
-    // Extract the sidebar array from the config content
-    // Find the sidebar configuration using regex
-    const sidebarMatch = configContent.match(/sidebar:\s*\[([\s\S]*?)\],?\s*components:/);
-
-    if (!sidebarMatch) {
+    // Shared with generate_sitemap_md.js, and it expands
+    // `{ autogenerate: { directory } }` groups — a `slug:`-only scan cannot see
+    // them, which is how the whole UI component reference stayed out of both
+    // mirrors.
+    const slugs = extractSidebarSlugs(absolutePath, contentRoot);
+    if (slugs === null) {
         throw new Error("Could not find sidebar configuration in astro.config.mjs");
     }
-
-    const sidebarContent = sidebarMatch[1];
-    const slugs = [];
-
-    // Extract all slug values using regex
-    const slugPattern = /slug:\s*["']([^"']+)["']/g;
-    let match;
-    while ((match = slugPattern.exec(sidebarContent)) !== null) {
-        slugs.push(match[1]);
-    }
-
     return slugs;
 }
 

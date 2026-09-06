@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { extractSidebarSlugs } from "./sidebar-slugs.js";
 
 // This script generates website/public/sitemap.md alongside sitemap.xml
 // It lists all pages on the website in Markdown format for AI agents (Claude, GPT, Perplexity, etc.)
@@ -15,20 +16,19 @@ import { fileURLToPath } from "url";
     
     let slugs = [];
     try {
-        const configContent = fs.readFileSync(absoluteConfigPath, "utf-8");
-        
-        // Extract sidebar config
-        const sidebarMatch = configContent.match(/sidebar:\s*\[([\s\S]*?)\],?\s*components:/);
-        if (sidebarMatch) {
-            const sidebarContent = sidebarMatch[1];
-            const slugPattern = /slug:\s*["']([^"']+)["']/g;
-            let match;
-            while ((match = slugPattern.exec(sidebarContent)) !== null) {
-                slugs.push(match[1]);
-            }
-        } else {
+        // Shared with generate_llms_txt.js, and it expands
+        // `{ autogenerate: { directory } }` groups: a `slug:`-only scan misses
+        // every page Starlight lists that way, which was the whole UI component
+        // reference.
+        const found = extractSidebarSlugs(
+            absoluteConfigPath,
+            path.resolve(__dirname, "../src/content/docs")
+        );
+        if (found === null) {
             console.warn("Could not find sidebar config in astro.config.mjs, using default fallback slugs.");
             slugs = ["index", "getting-started/quickstart"];
+        } else {
+            slugs = found;
         }
     } catch (e) {
         console.error("Error reading astro.config.mjs:", e.message);

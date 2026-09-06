@@ -8682,6 +8682,14 @@ relations: [
 
 #### What you get when you say nothing
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+The default for a **required** `belongsTo` changed. On 0.17.3 it is
+`ON DELETE CASCADE` — deleting a parent deletes its children — and from 0.18 it
+is `RESTRICT`, so the delete fails and names the constraint. Everything else in
+this section is unchanged, and `db push` plans the constraint rewrite when you
+upgrade.
+
 `onDelete` is optional, so most relations never name one. The default depends on
 whether the relation is required:
 
@@ -9850,12 +9858,14 @@ Everything is initialized with a single function:
 :::note[Where this goes]
 The call below is what an **ejected** backend has, in `backend/src/index.ts`. On
 the **managed runtime** there is no such file: the runtime makes the call, and
-you configure it through environment variables and the four exports it reads
-from `config/index.ts` (`dataSources`, `storageSources`, `storageAuthorize`,
-`callbacks`). Every page in this section says which of the two applies to the
-option it documents, and names the ones that have no managed form. Export an
-option the runtime does not read and it warns you at boot rather than dropping
-it in silence.
+you configure it through environment variables, the resources you declare in
+`config/resources.ts` (`database()`, `bucket()`), and the two exports it reads
+from `config/index.ts` (`storageAuthorize`, `callbacks`). Every page in this
+section says which of the two applies to the option it documents, and names the
+ones that have no managed form. Export an option the runtime does not read and
+it warns you at boot rather than dropping it in silence; export one that a
+resource declaration replaced and boot refuses it by name, with the
+`config/resources.ts` line to write instead.
 :::
 
 ```typescript
@@ -9893,9 +9903,9 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 | `collections`, `collectionsDir` | the `config/collections/` directory, declared by `rebase.json` |
 | `functionsDir` | `backend/functions/` |
 | `cronsDir` | `backend/crons/` |
-| `bootstrappers`, `database` | `DATABASE_URL`, plus `export const dataSources` from `config/index.ts` |
+| `bootstrappers`, `database` | `DATABASE_URL`, plus a `database("<key>")` declaration in `config/resources.ts` for every database beyond the default |
 | `auth` | `JWT_SECRET`, the `OAUTH_*` variables, and `config/collections/users` |
-| `storage` | the `STORAGE_*` variables, plus `export const storageSources` from `config/index.ts` |
+| `storage` | the `STORAGE_*` variables, plus a `bucket("<key>")` declaration in `config/resources.ts` for every bucket beyond the default |
 | `storageAuthorize` | `export const storageAuthorize` from `config/index.ts` |
 | `storagePublicRead` | `STORAGE_PUBLIC_READ` |
 | `storageRenditionCache` | `STORAGE_RENDITION_CACHE` |
@@ -10104,21 +10114,28 @@ The REST API is auto-generated from your collections. Every collection gets thes
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/data/:slug` | List entities (with filter, sort, limit, search) |
+| `GET` | `/api/data/:slug` | List entities — filtering, sorting, paging and search are query parameters |
+| `GET` | `/api/data/:slug/count` | How many rows the same query matches |
+| `GET` | `/api/data/:slug/aggregate` | `count`/`sum`/`avg`/`min`/`max`, optionally grouped |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
 | `POST` | `/api/data/:slug` | Create a new entity |
+| `PATCH` | `/api/data/:slug/:id` | Update the fields you send |
 | `DELETE` | `/api/data/:slug/:id` | Delete a record |
+| `POST` | `/api/data/:slug/bulk` | Create many rows in one transaction |
+| `PATCH` | `/api/data/:slug/bulk` | Update many rows in one transaction |
+| `POST` | `/api/data/:slug/bulk/delete` | Delete many rows in one transaction |
 
-#### Query Parameters
+#### Query parameters
 
-| Param | Description | Example |
-|-------|-------------|---------|
-| `filter` | JSON-encoded filter conditions | `?filter={"active":["==",true]}` |
-| `orderBy` | Sort field | `?orderBy=createdAt` |
-| `order` | Sort direction | `?order=desc` |
-| `limit` | Page size | `?limit=25` |
-| `startAfter` | Cursor for pagination | `?startAfter=encodedCursor` |
-| `search` | Full-text search | `?search=laptop` |
+There is one reference for them and it is not this page. [REST
+API](/docs/backend/api/) documents both query dialects the server accepts — the
+PostgREST-style `?column=op.value` form and the JSON `?where=` form — along with
+`orderBy`, `limit`/`offset`, `include`, `fields`, `searchString` and vector
+search. [Endpoints](/docs/backend/endpoints/) is the index of every route the
+server mounts, generated ones included.
+
+A parameter the server does not reserve is read as a filter on the column of
+that name, so an invented one does not fail: it silently matches nothing.
 
 ### WebSocket
 
@@ -10172,8 +10189,6 @@ async function setPrice(id: string, price: number) {
 }
 ```
 
-If initialization fails (e.g., database connection error), the server still starts but returns 503 for all API requests, with a descriptive error message in the logs.
-
 ### Next Steps
 
 - **[Authentication](/docs/backend/authentication)** — JWT, OAuth and OIDC providers, MFA, API keys, user management
@@ -10183,6 +10198,7 @@ If initialization fails (e.g., database connection error), the server still star
 - **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints
 - **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks
 - **[Database Branching](/docs/backend/branching)** — Instant database copies for dev/staging
+- **[Deployment](/docs/getting-started/deployment)** — Take the backend to production
 
 ## REST API
 
@@ -12586,7 +12602,7 @@ Rebase supports three storage backends:
 ### Configuration
 
 :::note[Where this goes]
-**Managed runtime** — the `STORAGE_*` variables in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` or `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffix any of them `__<KEY>` for a named source), plus `export const storageSources` and `export const storageAuthorize` from `config/index.ts`. `storageAuthorize` has no environment form on purpose: no variable can express "this user may read this key".
+**Managed runtime** — the `STORAGE_*` variables in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` or `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffix any of them `__<KEY>` for a named source), plus a `bucket("<key>")` declaration in `config/resources.ts` for every bucket beyond the default, and `export const storageAuthorize` from `config/index.ts`. `storageAuthorize` has no environment form on purpose: no variable can express "this user may read this key".
 
 **Ejected** — the `storage` block on `initializeRebaseBackend({ … })`. `storagePolicies` and `storageTriggers` are ejected-only.
 
@@ -14779,6 +14795,9 @@ Cron expressions use the standard **5-field format**:
 Step values (`*/n`), ranges (`a-b`), and lists (`a,b,c`) are all supported.
 
 ### CronJobDefinition Reference
+
+`timezone` is new <span class="since-badge" data-since="0.18">Since 0.18</span> — on 0.17.3 a schedule is always read in the
+host's own zone. Everything else on this interface has shipped.
 
 ```typescript
 interface CronJobDefinition {
@@ -20111,6 +20130,4980 @@ re-render of the host does not tear down and remount whichever tool is on screen
 - **[Plugins](/docs/plugins)** — Extend the framework with plugins
 - **[Collections](/docs/collections)** — Collection configuration
 
+## Components
+
+84 components.
+
+- [Alert](/docs/ui/components/alert)
+- [Autocomplete](/docs/ui/components/autocomplete)
+- [AutocompleteItem](/docs/ui/components/autocompleteitem)
+- [Avatar](/docs/ui/components/avatar)
+- [Badge](/docs/ui/components/badge)
+- [BooleanSwitch](/docs/ui/components/booleanswitch)
+- [BooleanSwitchWithLabel](/docs/ui/components/booleanswitchwithlabel)
+- [Button](/docs/ui/components/button)
+- [Card](/docs/ui/components/card)
+- [CenteredView](/docs/ui/components/centeredview)
+- [Checkbox](/docs/ui/components/checkbox)
+- [Chip](/docs/ui/components/chip)
+- [CircularProgress](/docs/ui/components/circularprogress)
+- [CircularProgressCenter](/docs/ui/components/circularprogresscenter)
+- [Collapse](/docs/ui/components/collapse)
+- [ColorPicker](/docs/ui/components/colorpicker)
+- [Container](/docs/ui/components/container)
+- [DateTimeField](/docs/ui/components/datetimefield)
+- [DebouncedTextField](/docs/ui/components/debouncedtextfield)
+- [Dialog](/docs/ui/components/dialog)
+- [DialogActions](/docs/ui/components/dialogactions)
+- [DialogContent](/docs/ui/components/dialogcontent)
+- [DialogTitle](/docs/ui/components/dialogtitle)
+- [ErrorBoundary](/docs/ui/components/errorboundary)
+- [ExpandablePanel](/docs/ui/components/expandablepanel)
+- [FileUpload](/docs/ui/components/fileupload)
+- [FilterChip](/docs/ui/components/filterchip)
+- [IconButton](/docs/ui/components/iconbutton)
+- [InfoLabel](/docs/ui/components/infolabel)
+- [InputLabel](/docs/ui/components/inputlabel)
+- [Label](/docs/ui/components/label)
+- [LoadingButton](/docs/ui/components/loadingbutton)
+- [Markdown](/docs/ui/components/markdown)
+- [Menu](/docs/ui/components/menu)
+- [MenuItem](/docs/ui/components/menuitem)
+- [Menubar](/docs/ui/components/menubar)
+- [MenubarCheckboxItem](/docs/ui/components/menubarcheckboxitem)
+- [MenubarContent](/docs/ui/components/menubarcontent)
+- [MenubarItem](/docs/ui/components/menubaritem)
+- [MenubarItemIndicator](/docs/ui/components/menubaritemindicator)
+- [MenubarMenu](/docs/ui/components/menubarmenu)
+- [MenubarPortal](/docs/ui/components/menubarportal)
+- [MenubarRadioGroup](/docs/ui/components/menubarradiogroup)
+- [MenubarRadioItem](/docs/ui/components/menubarradioitem)
+- [MenubarSeparator](/docs/ui/components/menubarseparator)
+- [MenubarShortcut](/docs/ui/components/menubarshortcut)
+- [MenubarSub](/docs/ui/components/menubarsub)
+- [MenubarSubContent](/docs/ui/components/menubarsubcontent)
+- [MenubarSubTrigger](/docs/ui/components/menubarsubtrigger)
+- [MenubarSubTriggerIndicator](/docs/ui/components/menubarsubtriggerindicator)
+- [MenubarTrigger](/docs/ui/components/menubartrigger)
+- [MultiSelect](/docs/ui/components/multiselect)
+- [MultiSelectItem](/docs/ui/components/multiselectitem)
+- [Paper](/docs/ui/components/paper)
+- [Popover](/docs/ui/components/popover)
+- [PopoverPrimitive](/docs/ui/components/popoverprimitive)
+- [Portal](/docs/ui/components/portal)
+- [PortalContainerProvider](/docs/ui/components/portalcontainerprovider)
+- [RadioGroup](/docs/ui/components/radiogroup)
+- [RadioGroupItem](/docs/ui/components/radiogroupitem)
+- [ResizablePanels](/docs/ui/components/resizablepanels)
+- [SearchBar](/docs/ui/components/searchbar)
+- [Select](/docs/ui/components/select)
+- [SelectGroup](/docs/ui/components/selectgroup)
+- [SelectItem](/docs/ui/components/selectitem)
+- [Separator](/docs/ui/components/separator)
+- [Sheet](/docs/ui/components/sheet)
+- [Skeleton](/docs/ui/components/skeleton)
+- [Slider](/docs/ui/components/slider)
+- [Slot](/docs/ui/components/slot)
+- [Tab](/docs/ui/components/tab)
+- [Table](/docs/ui/components/table)
+- [TableBody](/docs/ui/components/tablebody)
+- [TableCell](/docs/ui/components/tablecell)
+- [TableHeader](/docs/ui/components/tableheader)
+- [TableRow](/docs/ui/components/tablerow)
+- [Tabs](/docs/ui/components/tabs)
+- [TextField](/docs/ui/components/textfield)
+- [TextareaAutosize](/docs/ui/components/textareaautosize)
+- [ToggleButtonGroup](/docs/ui/components/togglebuttongroup)
+- [Tooltip](/docs/ui/components/tooltip)
+- [Typography](/docs/ui/components/typography)
+- [VirtualTable](/docs/ui/components/virtualtable)
+- [VirtualTableSelectionProvider](/docs/ui/components/virtualtableselectionprovider)
+
+## Alert
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `onDismiss` | `() => void` | — |  |
+| `color` | `"base" \| "error" \| "warning" \| "info" \| "success"` | — |  |
+| `size` | `"small" \| "medium" \| "large"` | — |  |
+| `action` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `outerClassName` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Ported from UIReferenceView's "Chips & Alerts" section.
+export const Colors = () => (
+    <div className="flex flex-col gap-2 p-4 max-w-[520px]">
+        <Alert color="info">Info — informational message</Alert>
+        <Alert color="success">Success — operation completed</Alert>
+        <Alert color="warning">Warning — attention required</Alert>
+        <Alert color="error">Error — something went wrong</Alert>
+    </div>
+);
+```
+
+## Autocomplete
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `open` | `boolean` | yes |  |
+| `setOpen` | `(open: boolean) => void` | yes |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Autocomplete is a controlled dropdown surface (`open`/`setOpen`) meant to
+// sit directly under a text input, positioned via its own
+// `absolute top-full left-0 right-0` — the parent needs `position: relative`
+// and enough room below for the panel.
+export const TableSearch = () => (
+    <div className="p-4 h-[320px]">
+        <div className="relative w-[320px]">
+            <TextField label="Search tables" value="use" onChange={() => {}}/>
+            <Autocomplete open setOpen={() => {}}>
+                <AutocompleteItem>
+                    <div className="px-4">users</div>
+                </AutocompleteItem>
+                <AutocompleteItem>
+                    <div className="px-4">user_roles</div>
+                </AutocompleteItem>
+                <AutocompleteItem>
+                    <div className="px-4">user_sessions</div>
+                </AutocompleteItem>
+            </Autocomplete>
+        </div>
+    </div>
+);
+```
+
+## AutocompleteItem
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `onClick` | `() => void` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Basic = () => (
+    <div className="p-4 h-[320px]">
+        <div className="relative w-[320px]">
+            <TextField label="Search tables" value="use" onChange={() => {}}/>
+            <Autocomplete open setOpen={() => {}}>
+                <AutocompleteItem>
+                    <div className="px-4">users</div>
+                </AutocompleteItem>
+                <AutocompleteItem>
+                    <div className="px-4">user_roles</div>
+                </AutocompleteItem>
+                <AutocompleteItem>
+                    <div className="px-4">user_sessions</div>
+                </AutocompleteItem>
+            </Autocomplete>
+        </div>
+    </div>
+);
+```
+
+## Avatar
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `src` | `string` | — |  |
+| `alt` | `string` | — |  |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `outerClassName` | `string` | — |  |
+| `hover` | `boolean` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Initials = () => (
+    <div className="flex items-center gap-4 p-4">
+        <Avatar>A</Avatar>
+        <Avatar>MJ</Avatar>
+        <Avatar>RK</Avatar>
+    </div>
+);
+```
+
+## Badge
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `color` | `"error" \| "warning" \| "primary" \| "secondary"` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `invisible` | `boolean` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Colors = () => (
+    <div className="flex items-center gap-6 p-4">
+        <Badge color="primary"><Avatar>A</Avatar></Badge>
+        <Badge color="secondary"><Avatar>B</Avatar></Badge>
+        <Badge color="warning"><Avatar>C</Avatar></Badge>
+        <Badge color="error"><Avatar>D</Avatar></Badge>
+    </div>
+);
+```
+
+## BooleanSwitch
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `boolean` | yes |  |
+| `className` | `string` | — |  |
+| `disabled` | `boolean` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `allowIndeterminate` | `boolean` | — |  |
+| `onValueChange` | `((newValue: boolean \| null) => void) \| ((newValue: boolean) => void)` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Ported from UIReferenceView's "Form Inputs" section.
+export const States = () => (
+    <div className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-2"><BooleanSwitch value onValueChange={() => {}}/><span>On</span></div>
+        <div className="flex items-center gap-2"><BooleanSwitch value={false} onValueChange={() => {}}/><span>Off</span></div>
+        <div className="flex items-center gap-2"><BooleanSwitch value disabled/><span>Disabled</span></div>
+    </div>
+);
+```
+
+## BooleanSwitchWithLabel
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `boolean` | yes |  |
+| `className` | `string` | — |  |
+| `disabled` | `boolean` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `allowIndeterminate` | `boolean` | — |  |
+| `onValueChange` | `((newValue: boolean \| null) => void) \| ((newValue: boolean) => void)` | — |  |
+| `position` | `"end" \| "start"` | — |  |
+| `invisible` | `boolean` | — |  |
+| `label` | `React.ReactNode` | — |  |
+| `error` | `boolean` | — |  |
+| `autoFocus` | `boolean` | — |  |
+| `fullWidth` | `boolean` | — |  |
+| `inputClassName` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const States = () => (
+    <div className="flex flex-col gap-3 w-[340px] p-4">
+        <BooleanSwitchWithLabel value label="Enable row level security" onValueChange={() => {}}/>
+        <BooleanSwitchWithLabel value={false} label="Allow public sign-up" onValueChange={() => {}}/>
+        <BooleanSwitchWithLabel value disabled label="Managed by the platform" onValueChange={() => {}}/>
+        <BooleanSwitchWithLabel value={false} error label="Requires a valid encryption key" onValueChange={() => {}}/>
+    </div>
+);
+```
+
+## Button
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `variant` | `"text" \| "filled" \| "outlined"` | — |  |
+| `disabled` | `boolean` | — |  |
+| `color` | `"text" \| "error" \| "primary" \| "secondary" \| "neutral"` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large" \| "xl" \| "2xl"` | — |  |
+| `startIcon` | `React.ReactNode` | — |  |
+| `fullWidth` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `component` | `C` | — |  |
+| `onClick` | `React.MouseEventHandler<HTMLElement>` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Variant × color grid — ported from UIReferenceView's "Buttons" section,
+// extended with `outlined` (in ButtonProps but absent from the reference view).
+export const Variants = () => (
+    <div className="flex flex-col gap-5 p-4">
+        {(["filled", "outlined", "text"] as const).map(variant => (
+            <div key={variant}>
+                <div className="text-xs font-mono text-surface-500 mb-2">variant=&quot;{variant}&quot;</div>
+                <div className="flex flex-wrap gap-3 items-center">
+                    {(["primary", "secondary", "error", "neutral", "text"] as const).map(color => (
+                        <Button key={color} variant={variant} color={color}>
+                            {color.charAt(0).toUpperCase() + color.slice(1)}
+                        </Button>
+                    ))}
+                </div>
+            </div>
+        ))}
+    </div>
+);
+```
+
+## Card
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `style` | `React.CSSProperties` | — |  |
+| `onClick` | `((e?: React.MouseEvent) => void) & React.MouseEventHandler<HTMLDivElement>` | — |  |
+| `className` | `string` | — |  |
+| `id` | `string` | — |  |
+| `ref` | `React.Ref` | — | Allows getting a ref to the component instance. Once the component unmounts, React will set `ref.current` to `null` (or |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const ProjectCard = () => (
+    <div className="p-4 w-72">
+        <Card className="overflow-hidden">
+            <div className="relative h-20 bg-surface-100 dark:bg-surface-900 flex items-center justify-center">
+                <FolderKanbanIcon size={26} className="text-surface-400 dark:text-surface-500"/>
+                <div className="absolute top-2 right-2">
+                    <Chip colorScheme="orange" size="smallest" outlined>High</Chip>
+                </div>
+            </div>
+            <div className="p-3">
+                <Typography variant="caption" color="disabled" className="font-mono text-[10px] block">PRJ-104</Typography>
+                <Typography variant="body2" className="font-medium my-1">Q3 marketing site refresh</Typography>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                    <Chip colorScheme="blue" size="smallest">In progress</Chip>
+                    <Chip colorScheme="cyan" size="smallest">design</Chip>
+                </div>
+            </div>
+        </Card>
+    </div>
+);
+```
+
+## CenteredView
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `maxWidth` | `"xl" \| "2xl" \| "xs" \| "sm" \| "md" \| "lg" \| "3xl" \| "4xl" \| "5xl" \| "6xl" \| "7xl"` | — |  |
+| `outerClassName` | `string` | — |  |
+| `className` | `string` | — |  |
+| `fullScreen` | `boolean` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const CenteredMessage = () => (
+    <div className="h-64 border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden">
+        <CenteredView maxWidth="sm">
+            <div className="flex flex-col items-center gap-2 text-center">
+                <Typography variant="h6">No results found</Typography>
+                <Typography variant="body2" color="secondary">Try adjusting your filters or search terms.</Typography>
+            </div>
+        </CenteredView>
+    </div>
+);
+```
+
+## Checkbox
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `checked` | `boolean` | yes |  |
+| `id` | `string` | — |  |
+| `disabled` | `boolean` | — |  |
+| `indeterminate` | `boolean` | — |  |
+| `onCheckedChange` | `(checked: boolean) => void` | — |  |
+| `padding` | `boolean` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `color` | `"primary" \| "secondary"` | — |  |
+| `aria-label` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Ported from UIReferenceView's "Form Inputs" section.
+export const States = () => (
+    <div className="flex flex-col gap-3 p-4">
+        <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked onCheckedChange={() => {}}/><span>Checked</span></label>
+        <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={false} onCheckedChange={() => {}}/><span>Unchecked</span></label>
+        <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={false} indeterminate onCheckedChange={() => {}}/><span>Indeterminate</span></label>
+        <label className="flex items-center gap-2"><Checkbox checked disabled/><span>Disabled</span></label>
+    </div>
+);
+```
+
+## Chip
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `colorScheme` | `"blue" \| "teal" \| "yellow" \| "pink" \| "purple" \| "cyan" \| "orange" \| "green" \| "red" \| "gray" \| "indigo" \| "violet" \| "fuchsia" \| "rose" \| "emerald"` | — | One of the 15 CHIP_COLORS keys, or a full scheme object. |
+| `size` | `"smallest" \| "small" \| "medium" \| "large"` | — |  |
+| `outlined` | `boolean` | — |  |
+| `error` | `boolean` | — |  |
+| `icon` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `onClick` | `React.MouseEventHandler<HTMLDivElement>` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// The 15 real CHIP_COLORS keys. NOTE: UIReferenceView passes "purpleDark" /
+// "blueDark", which are NOT keys of CHIP_COLORS — those chips fall through to
+// the default scheme. Use the keys below.
+const SCHEMES = ["blue", "teal", "red", "green", "yellow", "orange", "purple",
+    "pink", "cyan", "indigo", "violet", "fuchsia", "rose", "emerald", "gray"] as const;
+
+export const ColorSchemes = () => (
+    <div className="flex flex-wrap gap-2 p-4 max-w-[520px]">
+        {SCHEMES.map(s => <Chip key={s} colorScheme={s}>{s}</Chip>)}
+    </div>
+);
+```
+
+## CircularProgress
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Sizes = () => (
+    <div className="flex gap-6 items-end p-4">
+        {(["smallest", "small", "medium", "large"] as const).map(s => (
+            <div key={s} className="flex flex-col items-center gap-1">
+                <CircularProgress size={s}/>
+                <Typography variant="caption" color="secondary">{s}</Typography>
+            </div>
+        ))}
+    </div>
+);
+```
+
+## CircularProgressCenter
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `className` | `string` | — |  |
+| `text` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// CircularProgressCenter's root element is hard-coded to h-screen (it's meant
+// to fill the viewport of a route while data loads), so it is rendered
+// un-clipped here rather than inside a short fixed-height wrapper — a
+// shorter overflow-hidden ancestor would crop the vertically-centered
+// content out of view.
+export const WithText = () => (
+    <CircularProgressCenter size="medium" text="Loading workspace…"/>
+);
+```
+
+## Collapse
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `in` | `boolean` | — |  |
+| `duration` | `number` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Ported from FavouritesView: a row of pinned-collection chips that collapses
+// away entirely when the list is empty.
+export const Expanded = () => (
+    <div className="p-4 w-72">
+        <Typography variant="caption" color="secondary" className="block mb-1">Favourites</Typography>
+        <Collapse in>
+            <div className="flex flex-row flex-wrap gap-2 pb-2 min-h-[32px]">
+                <Chip size="small" colorScheme="blue">Posts</Chip>
+                <Chip size="small" colorScheme="teal">Authors</Chip>
+                <Chip size="small" colorScheme="purple">Products</Chip>
+            </div>
+        </Collapse>
+    </div>
+);
+```
+
+## ColorPicker
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `"blue" \| "cyan" \| "teal" \| "green" \| "yellow" \| "orange" \| "red" \| "pink" \| "purple" \| "gray" \| "indigo" \| "violet" \| "fuchsia" \| "rose" \| "emerald" \| "blueLighter" \| (string & {}) /* +59 more */` | — | Currently selected color key |
+| `onChange` | `(colorKey: ChipColorKey \| undefined) => void` | yes | Callback when color selection changes. Passes undefined when "Auto" is selected. |
+| `size` | `"small" \| "medium"` | — | Size of the color swatches |
+| `allowClear` | `boolean` | — | Whether to show the "Auto" option that clears the selection |
+| `disabled` | `boolean` | — | Whether the picker is disabled |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Real props read from packages/ui/src/components/ColorPicker.tsx (the
+// emitted .d.ts leaves ChipColorKey unresolved):
+//   value?: string; onChange: (colorKey: string | undefined) => void;
+//   size?: "small" | "medium"; allowClear?: boolean; disabled?: boolean;
+export const SelectedAndAuto = () => (
+    <div className="flex gap-8 p-4">
+        <div>
+            <div className="text-xs font-mono text-surface-500 mb-2">selected = &quot;violet&quot;</div>
+            <ColorPicker value="violet" onChange={() => {}}/>
+        </div>
+        <div>
+            <div className="text-xs font-mono text-surface-500 mb-2">auto (no selection)</div>
+            <ColorPicker value={undefined} onChange={() => {}}/>
+        </div>
+    </div>
+);
+```
+
+## Container
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `style` | `React.CSSProperties` | — |  |
+| `className` | `string` | — |  |
+| `maxWidth` | `"xl" \| "2xl" \| "xs" \| "sm" \| "md" \| "lg" \| "3xl" \| "4xl" \| "5xl" \| "6xl" \| "7xl"` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const MaxWidths = () => (
+    <div className="flex flex-col gap-3 p-4 bg-surface-50 dark:bg-surface-900">
+        {(["sm", "md", "xl"] as const).map(w => (
+            <Container key={w} maxWidth={w} className="bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg py-2">
+                <Typography variant="caption" color="secondary" className="font-mono">maxWidth=&quot;{w}&quot;</Typography>
+            </Container>
+        ))}
+    </div>
+);
+```
+
+## DateTimeField
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `Date` | — |  |
+| `onChange` | `(date: Date \| null) => void` | — |  |
+| `mode` | `"date" \| "date_time"` | — |  |
+| `disabled` | `boolean` | — |  |
+| `clearable` | `boolean` | — |  |
+| `error` | `boolean` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `label` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `inputClassName` | `string` | — |  |
+| `invisible` | `boolean` | — |  |
+| `locale` | `string` | — |  |
+| `timezone` | `string` | — | IANA timezone string (e.g., "America/New_York", "Europe/London"). Used to display and input dates in the specified timez |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Modes = () => (
+    <div className="flex flex-col gap-3 w-[320px] p-4">
+        <DateTimeField mode="date" label="Published on" value={new Date("2026-07-31")} onChange={() => {}}/>
+        <DateTimeField mode="date_time" label="Scheduled for" value={new Date("2026-07-31T14:30:00")} onChange={() => {}}/>
+    </div>
+);
+```
+
+## DebouncedTextField
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `string \| number` | — | Same contract as TextField; commits its value on a debounce. |
+| `onChange` | `React.ChangeEventHandler<HTMLInputElement>` | — |  |
+| `label` | `React.ReactNode` | — |  |
+| `type` | `"text" \| "number" \| "search" \| "email" \| "url" \| "password" \| "date" \| "time" \| "datetime-local" \| "month" \| "week" \| "color" \| "phone"` | — |  |
+| `placeholder` | `string` | — |  |
+| `size` | `"smallest" \| "small" \| "medium" \| "large"` | — |  |
+| `multiline` | `boolean` | — |  |
+| `minRows` | `string \| number` | — |  |
+| `maxRows` | `string \| number` | — |  |
+| `disabled` | `boolean` | — |  |
+| `error` | `boolean` | — |  |
+| `invisible` | `boolean` | — |  |
+| `endAdornment` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `inputClassName` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Same contract as TextField (fixed shape from the orchestrator config —
+// generics dropped by the .d.ts extractor); commits its value on a debounce,
+// so it's typically used for live-filter/search inputs.
+export const LiveSearch = () => (
+    <div className="w-[320px] p-4">
+        <DebouncedTextField
+            label="Search records"
+            value="analytics"
+            onChange={() => {}}
+            placeholder="Type to filter…"
+        />
+    </div>
+);
+```
+
+## Dialog
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `open` | `boolean` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `className` | `string` | — |  |
+| `containerClassName` | `string` | — |  |
+| `fullWidth` | `boolean` | — |  |
+| `fullHeight` | `boolean` | — |  |
+| `fullScreen` | `boolean` | — |  |
+| `scrollable` | `boolean` | — |  |
+| `maxWidth` | `"xl" \| "2xl" \| "xs" \| "sm" \| "md" \| "lg" \| "3xl" \| "4xl" \| "5xl" \| "6xl" \| "7xl" \| "full"` | — |  |
+| `modal` | `boolean` | — |  |
+| `onOpenAutoFocus` | `(e: Event) => void` | — |  |
+| `onEscapeKeyDown` | `(e: KeyboardEvent) => void` | — |  |
+| `onPointerDownOutside` | `(e: Event) => void` | — |  |
+| `onInteractOutside` | `(e: Event) => void` | — |  |
+| `disableInitialFocus` | `boolean` | — | If `true`, the dialog will not focus the first focusable element when opened. |
+| `portalContainer` | `HTMLElement` | — |  |
+| `aria-describedby` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Dialog is a Radix portal — it renders `fixed inset-0`, so it always
+// escapes a grid card regardless of the wrapper below. Needs
+// cfg.overrides.Dialog = { cardMode: "single", primaryStory: "FormDialog" }.
+// `open` is the only prop the .d.ts exposes (no defaultOpen) — force it true.
+
+// Canonical layout ported from UIReferenceView's "Form Dialog" section:
+// title -> grid grid-cols-12 gap-4 body -> right-aligned actions.
+export const FormDialog = () => (
+    <div className="p-4 h-[320px]">
+        <Dialog open onOpenChange={() => {}} maxWidth="lg">
+            <DialogTitle>Edit collection</DialogTitle>
+            <DialogContent>
+                <div className="grid grid-cols-12 gap-4">
+                    <div className="col-span-12">
+                        <TextField name="name" required value="products" onChange={() => {}} label="Collection name"/>
+                    </div>
+                    <div className="col-span-12">
+                        <TextField name="path" value="products" onChange={() => {}} label="Database table"/>
+                    </div>
+                    <div className="col-span-12">
+                        <MultiSelect className="w-full" label="RLS policies" value={["read_authenticated"]} onValueChange={() => {}}>
+                            <MultiSelectItem value="read_authenticated">read_authenticated</MultiSelectItem>
+                            <MultiSelectItem value="write_owner">write_owner</MultiSelectItem>
+                            <MultiSelectItem value="admin_all">admin_all</MultiSelectItem>
+                        </MultiSelect>
+                    </div>
+                </div>
+            </DialogContent>
+            <DialogActions>
+                <Button variant="text">Cancel</Button>
+                <LoadingButton variant="filled" loading={false}>Save changes</LoadingButton>
+            </DialogActions>
+        </Dialog>
+    </div>
+);
+```
+
+## DialogActions
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `position` | `"sticky" \| "absolute"` | — |  |
+| `translucent` | `boolean` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// DialogActions is the sticky/absolute footer bar of a Dialog — only
+// renders meaningfully inside one. Same portal-escape issue as Dialog.
+// Needs cfg.overrides.DialogActions = { cardMode: "single", primaryStory: "Default" }.
+
+export const Default = () => (
+    <div className="p-4 h-[280px]">
+        <Dialog open onOpenChange={() => {}} maxWidth="sm">
+            <DialogTitle>Create API key</DialogTitle>
+            <DialogContent>Choose a name and scope for the new key.</DialogContent>
+            <DialogActions>
+                <Button variant="text">Cancel</Button>
+                <LoadingButton variant="filled" loading={false}>Create key</LoadingButton>
+            </DialogActions>
+        </Dialog>
+    </div>
+);
+```
+
+## DialogContent
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `align` | `"center" \| "inherit" \| "left" \| "right" \| "justify"` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `className` | `string` | — |  |
+| `component` | `"span"` | — |  |
+| `gutterBottom` | `boolean` | — |  |
+| `noWrap` | `boolean` | — |  |
+| `paragraph` | `boolean` | — |  |
+| `variant` | `"button" \| "caption" \| "h1" \| "h2" \| "h3" \| "h4" \| "h5" \| "h6" \| "label" \| "inherit" \| "subtitle1" \| "subtitle2" \| "body1" \| "body2"` | — |  |
+| `variantMapping` | `{ [key: string]: string; }` | — |  |
+| `color` | `"inherit" \| "disabled" \| "error" \| "primary" \| "secondary" \| "initial"` | — |  |
+| `onClick` | `React.ReactEventHandler<HTMLElement> & React.MouseEventHandler<HTMLSpanElement>` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `id` | `string` | — |  |
+| `includeMargin` | `boolean` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// DialogContent only makes sense inside an open Dialog — full parent
+// composition, same portal-escape issue. Needs cfg.overrides.DialogContent
+// = { cardMode: "single", primaryStory: "Default" }.
+
+export const Default = () => (
+    <div className="p-4 h-[320px]">
+        <Dialog open onOpenChange={() => {}} maxWidth="md">
+            <DialogTitle>Rotate encryption key</DialogTitle>
+            <DialogContent>
+                <Typography variant="body2" color="secondary">
+                    Rotating the cluster encryption key re-wraps every secret in the
+                    project. Existing deploys keep running; new ones use the new key.
+                </Typography>
+            </DialogContent>
+            <DialogActions>
+                <Button variant="text">Cancel</Button>
+                <Button variant="filled">Rotate key</Button>
+            </DialogActions>
+        </Dialog>
+    </div>
+);
+```
+
+## DialogTitle
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `align` | `"center" \| "inherit" \| "left" \| "right" \| "justify"` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `className` | `string` | — |  |
+| `component` | `"span"` | — |  |
+| `gutterBottom` | `boolean` | — |  |
+| `noWrap` | `boolean` | — |  |
+| `paragraph` | `boolean` | — |  |
+| `variant` | `"button" \| "caption" \| "h1" \| "h2" \| "h3" \| "h4" \| "h5" \| "h6" \| "label" \| "inherit" \| "subtitle1" \| "subtitle2" \| "body1" \| "body2"` | — |  |
+| `variantMapping` | `{ [key: string]: string; }` | — |  |
+| `color` | `"inherit" \| "disabled" \| "error" \| "primary" \| "secondary" \| "initial"` | — |  |
+| `onClick` | `React.ReactEventHandler<HTMLElement> & React.MouseEventHandler<HTMLSpanElement>` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `id` | `string` | — |  |
+| `includeMargin` | `boolean` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// DialogTitle only renders inside Dialog's Radix context (it wraps
+// DialogPrimitive.Title asChild) — these previews are the full parent
+// composition. Same portal-escape problem as Dialog: needs
+// cfg.overrides.DialogTitle = { cardMode: "single", primaryStory: "Default" }.
+
+// Default variant is "subtitle2" (component default) — smaller, dense title
+// used for compact dialogs (e.g. row-action confirmations).
+export const Default = () => (
+    <div className="p-4 h-[280px]">
+        <Dialog open onOpenChange={() => {}} maxWidth="sm">
+            <DialogTitle>Regenerate API key</DialogTitle>
+            <DialogContent>
+                A new secret will be issued. The old one keeps working for 24h.
+            </DialogContent>
+            <DialogActions>
+                <Button variant="text">Cancel</Button>
+                <Button variant="filled">Regenerate</Button>
+            </DialogActions>
+        </Dialog>
+    </div>
+);
+```
+
+## ErrorBoundary
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `fullPage` | `boolean` | — | When true, renders a full-page centered error screen instead of the compact inline error. Intended for wrapping top-leve |
+| `onReset` | `() => void` | — | Optional callback invoked when the user clicks "Try again". If provided, the boundary resets its error state and calls t |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const HealthyChild = () => (
+    <div className="p-4 w-80 border border-surface-200 dark:border-surface-700 rounded-lg">
+        <ErrorBoundary>
+            <Typography variant="body2">Dashboard content renders normally — the boundary is invisible until a child throws.</Typography>
+        </ErrorBoundary>
+    </div>
+);
+```
+
+## ExpandablePanel
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `title` | `React.ReactNode` | yes |  |
+| `invisible` | `boolean` | — |  |
+| `initiallyExpanded` | `boolean` | — |  |
+| `expanded` | `boolean` | — |  |
+| `onExpandedChange` | `(expanded: boolean) => void` | — |  |
+| `titleClassName` | `string` | — |  |
+| `asField` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `innerClassName` | `string` | — |  |
+| `children` | `React.ReactNode` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Ported from ValidationPanel: asField title with a leading icon, initially
+// expanded so the card shows the panel content rather than a bare header.
+export const Expanded = () => (
+    <div className="p-4 w-80">
+        <ExpandablePanel
+            asField
+            initiallyExpanded
+            innerClassName="p-4"
+            title={
+                <div className="flex flex-row items-center text-text-secondary dark:text-text-secondary-dark">
+                    <CheckSquareIcon size={18}/>
+                    <Typography variant="subtitle2" className="ml-4">Validation</Typography>
+                </div>
+            }>
+            <Typography variant="body2" color="secondary">Required, must be a valid email address, max 254 characters.</Typography>
+        </ExpandablePanel>
+    </div>
+);
+```
+
+## FileUpload
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `accept` | `Record<string, string[]>` | — |  |
+| `onFilesAdded` | `OnFilesUploadAdded` | yes |  |
+| `onFilesRejected` | `OnFileUploadRejected` | — |  |
+| `maxSize` | `number` | — |  |
+| `disabled` | `boolean` | — |  |
+| `maxFiles` | `number` | — |  |
+| `title` | `React.ReactNode` | — |  |
+| `uploadDescription` | `React.ReactNode` | — |  |
+| `preventDropOnDocument` | `boolean` | — |  |
+| `size` | `"small" \| "medium" \| "large"` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// FileUpload's .d.ts has no `children` prop (the source's PropsWithChildren
+// wrapper didn't survive extraction) — stick to `title`/`uploadDescription`,
+// the documented content slots, rather than porting a `children` usage.
+// It previously rendered blank on the floor card; the fix is giving it
+// real `uploadDescription`/`title` content and a non-zero footprint.
+
+export const Idle = () => (
+    <div className="p-4 w-full max-w-md">
+        <FileUpload
+            size="large"
+            accept={{ "text/csv": [".csv"], "application/json": [".json"] }}
+            maxFiles={1}
+            title="Import data"
+            uploadDescription={<><UploadCloudIcon size={18}/> Drag and drop a CSV or JSON file, or click to browse</>}
+            onFilesAdded={() => {}}
+        />
+    </div>
+);
+```
+
+## FilterChip
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes | The text label displayed on the chip. |
+| `active` | `boolean` | — | Whether the chip is currently in an active/selected state. |
+| `icon` | `React.ReactNode` | — | Optional icon rendered before the label. |
+| `size` | `"small" \| "medium"` | — | Size variant. |
+| `disabled` | `boolean` | — | Whether the chip is disabled. |
+| `style` | `React.CSSProperties` | — |  |
+| `className` | `string` | — |  |
+| `id` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const ActiveInactive = () => (
+    <div className="flex flex-wrap gap-2 items-center p-4">
+        <FilterChip active>Active</FilterChip>
+        <FilterChip>Inactive</FilterChip>
+        <FilterChip icon={<FilterIcon size={12}/>} active>With icon</FilterChip>
+    </div>
+);
+```
+
+## IconButton
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `variant` | `"filled" \| "ghost"` | — |  |
+| `shape` | `"circular" \| "square"` | — |  |
+| `disabled` | `boolean` | — |  |
+| `toggled` | `boolean` | — |  |
+| `component` | `C` | — |  |
+| `onClick` | `React.MouseEventHandler<any>` | — |  |
+| `aria-label` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Ported from UIReferenceView's "IconButton — sizes" section.
+export const Sizes = () => (
+    <div className="flex flex-wrap gap-3 items-center p-4">
+        {([
+            { s: "smallest" as const, size: 14 },
+            { s: "small" as const, size: 16 },
+            { s: "medium" as const, size: 20 },
+            { s: "large" as const, size: 24 }
+        ]).map(({ s, size }) => (
+            <div key={s} className="flex flex-col items-center gap-1">
+                <IconButton size={s} aria-label={`${s} edit`}><PencilIcon size={size}/></IconButton>
+                <span className="text-xs text-surface-500">{s}</span>
+            </div>
+        ))}
+    </div>
+);
+```
+
+## InfoLabel
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `mode` | `"info" \| "warn"` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Modes = () => (
+    <div className="flex flex-col gap-3 p-4 w-[420px]">
+        <InfoLabel mode="info">
+            Policies are evaluated per row, for every read and write.
+        </InfoLabel>
+        <InfoLabel mode="warn">
+            This action cannot be undone once the migration has run.
+        </InfoLabel>
+    </div>
+);
+```
+
+## InputLabel
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `shrink` | `boolean` | — |  |
+| `id` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// InputLabel is a headless floating label — TextField/DateTimeField position
+// it absolutely inside a relatively-positioned field box and toggle `shrink`
+// on focus/value. Reproduce that composition since InputLabel alone (a bare
+// <label>) does not demonstrate its purpose.
+export const FloatingStates = () => (
+    <div className="flex gap-6 p-4">
+        <div className="relative rounded-lg bg-surface-accent-200/50 dark:bg-white/[0.055] min-h-[44px] w-[180px]">
+            <InputLabel shrink className="absolute top-1 text-text-secondary dark:text-text-secondary-dark">
+                Shrink (focused)
+            </InputLabel>
+        </div>
+        <div className="relative rounded-lg bg-surface-accent-200/50 dark:bg-white/[0.055] min-h-[44px] w-[180px]">
+            <InputLabel className="absolute text-text-secondary dark:text-text-secondary-dark">
+                Expanded (empty)
+            </InputLabel>
+        </div>
+    </div>
+);
+```
+
+## Label
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `style` | `React.CSSProperties` | — |  |
+| `className` | `string` | — |  |
+| `id` | `string` | — |  |
+| `children` | `React.ReactNode` | — |  |
+| `asChild` | `boolean` | — |  |
+| `border` | `boolean` | — |  |
+| `ref` | `React.Ref` | — | Allows getting a ref to the component instance. Once the component unmounts, React will set `ref.current` to `null` (or |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Basic = () => (
+    <div className="flex flex-col gap-2 p-4">
+        <Label htmlFor="email-field">Email address</Label>
+        <Label htmlFor="role-field">Role</Label>
+    </div>
+);
+```
+
+## LoadingButton
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `variant` | `"text" \| "filled" \| "outlined"` | — |  |
+| `disabled` | `boolean` | — |  |
+| `color` | `"text" \| "error" \| "primary" \| "secondary" \| "neutral"` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large" \| "xl" \| "2xl"` | — |  |
+| `startIcon` | `React.ReactNode` | — |  |
+| `fullWidth` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `component` | `P` | — |  |
+| `onClick` | `React.MouseEventHandler<HTMLElement>` | — |  |
+| `loading` | `boolean` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Ported from UIReferenceView's "LoadingButton" section.
+export const States = () => (
+    <div className="flex flex-wrap gap-3 p-4">
+        <LoadingButton loading={true}>Saving…</LoadingButton>
+        <LoadingButton loading={false}>Idle</LoadingButton>
+        <LoadingButton disabled>Disabled</LoadingButton>
+    </div>
+);
+```
+
+## Markdown
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `source` | `string` | yes |  |
+| `size` | `"small" \| "medium" \| "large" \| "xl" \| "2xl"` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+const readme = `## Getting started
+
+Install the client and connect to your project:
+
+\`\`\`bash
+npm install @rebasepro/client
+\`\`\`
+
+- Works with **Postgres** and *SQLite*
+- Realtime subscriptions out of the box
+- [Read the docs](https://rebase.pro/docs)
+`;
+
+export const Basic = () => (
+    <div className="p-4 w-96">
+        <Markdown source={readme}/>
+    </div>
+);
+```
+
+## Menu
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `trigger` | `React.ReactNode` | yes |  |
+| `open` | `boolean` | — |  |
+| `defaultOpen` | `boolean` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `portalContainer` | `HTMLElement` | — |  |
+| `side` | `"left" \| "right" \| "top" \| "bottom"` | — |  |
+| `align` | `"center" \| "end" \| "start"` | — |  |
+| `sideOffset` | `number` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Open by default so the card shows the menu surface rather than a bare
+// trigger. Ported from UIReferenceView's App Bar section (DefaultAppBar).
+export const AccountMenu = () => (
+    <div className="p-4 h-[320px]">
+        <Menu defaultOpen align="start" trigger={<Avatar>A</Avatar>}>
+            <div className="px-4 py-2 mb-2">
+                <Typography variant="body1" color="secondary">Alice Johnson</Typography>
+                <Typography variant="body2" color="secondary">alice@example.com</Typography>
+            </div>
+            <MenuItem><SettingsIcon size={16}/> Account settings</MenuItem>
+            <MenuItem><LogOutIcon size={16}/> Log out</MenuItem>
+        </Menu>
+    </div>
+);
+```
+
+## Menubar
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `onSelect` | `(event: React.SyntheticEvent) => void` | — |  |
+| `value` | `string` | — | Value of the open menu, controlled. Pair with `onValueChange`. |
+| `defaultValue` | `string` | — | Value of the menu open on mount, uncontrolled. |
+| `onValueChange` | `(value: string) => void` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// A believable admin-console menu bar: File / Edit / View / Help over
+// tables, SQL queries and RLS policies.
+export const Closed = () => (
+    <div className="p-4">
+        <Menubar>
+            <MenubarMenu>
+                <MenubarTrigger>File</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>Edit</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>View</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>Help</MenubarTrigger>
+            </MenubarMenu>
+        </Menubar>
+    </div>
+);
+```
+
+## MenubarCheckboxItem
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `onSelect` | `(event: Event) => void` | — |  |
+| `checked` | `boolean` | — |  |
+| `onCheckedChange` | `() => void` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function useOpenMenu(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
+
+// A "View" menu toggling which panels are visible — the natural home for
+// checkbox items in an admin console menu bar.
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 1);
+    return (
+        <div ref={ref} className="p-4 h-[280px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>View</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarCheckboxItem checked onCheckedChange={() => {}}>
+                                <MenubarItemIndicator/>
+                                Table editor
+                            </MenubarCheckboxItem>
+                            <MenubarCheckboxItem checked onCheckedChange={() => {}}>
+                                <MenubarItemIndicator/>
+                                SQL console
+                            </MenubarCheckboxItem>
+                            <MenubarSeparator/>
+                            <MenubarCheckboxItem checked={false} onCheckedChange={() => {}}>
+                                <MenubarItemIndicator/>
+                                Query logs
+                            </MenubarCheckboxItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarContent
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `className` | `string` | — |  |
+| `onSelect` | `(event: React.SyntheticEvent) => void` | — |  |
+| `align` | `"center" \| "end" \| "start"` | — |  |
+| `sideOffset` | `number` | — |  |
+| `alignOffset` | `number` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function useOpenMenu(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
+
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[280px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem>New table<MenubarShortcut>⌘N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>New SQL query<MenubarShortcut>⌘⇧N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>Save<MenubarShortcut>⌘S</MenubarShortcut></MenubarItem>
+                            <MenubarSeparator/>
+                            <MenubarItem disabled>Close project</MenubarItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>Edit</MenubarTrigger>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarItem
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `onSelect` | `(event: Event) => void` | — |  |
+| `leftPadding` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `disabled` | `boolean` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function useOpenMenu(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
+
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[280px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem>New table<MenubarShortcut>⌘N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>New SQL query<MenubarShortcut>⌘⇧N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>Save<MenubarShortcut>⌘S</MenubarShortcut></MenubarItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>Edit</MenubarTrigger>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarItemIndicator
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function useOpenMenu(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
+
+// The check mark rendered by a checked checkbox item.
+export const OnCheckboxItem = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[220px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>View</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarCheckboxItem checked onCheckedChange={() => {}}>
+                                <MenubarItemIndicator/>
+                                Table editor
+                            </MenubarCheckboxItem>
+                            <MenubarCheckboxItem checked={false} onCheckedChange={() => {}}>
+                                <MenubarItemIndicator/>
+                                Query logs
+                            </MenubarCheckboxItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarMenu
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `value` | `string` | — | Identifies this menu to the parent Menubar's `value`/`defaultValue`. |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Closed = () => (
+    <div className="p-4">
+        <Menubar>
+            <MenubarMenu>
+                <MenubarTrigger>File</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>Edit</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>View</MenubarTrigger>
+            </MenubarMenu>
+        </Menubar>
+    </div>
+);
+```
+
+## MenubarPortal
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `portalContainer` | `HTMLElement` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function useOpenMenu(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
+
+// MenubarPortal has no visual identity of its own — it just moves its
+// MenubarContent child to the portal container (or document body) so it
+// escapes any clipping ancestor. The only honest way to show it is the
+// content it carries, rendered open.
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[280px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem>New table<MenubarShortcut>⌘N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>New SQL query<MenubarShortcut>⌘⇧N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>Save<MenubarShortcut>⌘S</MenubarShortcut></MenubarItem>
+                            <MenubarSeparator/>
+                            <MenubarItem disabled>Close project</MenubarItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>Edit</MenubarTrigger>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarRadioGroup
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `onSelect` | `(event: React.SyntheticEvent) => void` | — |  |
+| `value` | `string` | — |  |
+| `onValueChange` | `(value: string) => void` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function useOpenMenu(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
+
+// A single-select group inside the View menu — the console's theme picker.
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[300px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>View</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem disabled>Theme</MenubarItem>
+                            <MenubarSeparator/>
+                            <MenubarRadioGroup value="dark">
+                                <MenubarRadioItem value="light">
+                                    <MenubarItemIndicator/>
+                                    Light
+                                </MenubarRadioItem>
+                                <MenubarRadioItem value="dark">
+                                    <MenubarItemIndicator/>
+                                    Dark
+                                </MenubarRadioItem>
+                                <MenubarRadioItem value="system">
+                                    <MenubarItemIndicator/>
+                                    System
+                                </MenubarRadioItem>
+                            </MenubarRadioGroup>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarRadioItem
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `onSelect` | `(event: Event) => void` | — |  |
+| `value` | `string` | yes |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function useOpenMenu(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
+
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[260px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>View</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarRadioGroup value="dark">
+                                <MenubarRadioItem value="light">
+                                    <MenubarItemIndicator/>
+                                    Light
+                                </MenubarRadioItem>
+                                <MenubarRadioItem value="dark">
+                                    <MenubarItemIndicator/>
+                                    Dark
+                                </MenubarRadioItem>
+                                <MenubarRadioItem value="system">
+                                    <MenubarItemIndicator/>
+                                    System
+                                </MenubarRadioItem>
+                            </MenubarRadioGroup>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarSeparator
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function useOpenMenu(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
+
+// The File menu groups its items into three visually distinct clusters —
+// creation, export, and the destructive action — with a separator between
+// each, the clearest showcase of the divider's job.
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[320px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem>New table<MenubarShortcut>⌘N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>Save<MenubarShortcut>⌘S</MenubarShortcut></MenubarItem>
+                            <MenubarSeparator/>
+                            <MenubarSub>
+                                <MenubarSubTrigger>
+                                    Export
+                                    <MenubarSubTriggerIndicator/>
+                                </MenubarSubTrigger>
+                            </MenubarSub>
+                            <MenubarSeparator/>
+                            <MenubarItem disabled>Close project</MenubarItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>Edit</MenubarTrigger>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarShortcut
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function useOpenMenu(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
+
+export const FileShortcuts = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[280px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem>New table<MenubarShortcut>⌘N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>New SQL query<MenubarShortcut>⌘⇧N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>Save<MenubarShortcut>⌘S</MenubarShortcut></MenubarItem>
+                            <MenubarSeparator/>
+                            <MenubarItem>Search tables<MenubarShortcut>⌘K</MenubarShortcut></MenubarItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>Edit</MenubarTrigger>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarSub
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Opens the parent menu on mount (a real pointerdown, what Radix's trigger
+// itself listens for), then a tick later fires a real click on the
+// submenu's SubTrigger (what Radix's MenuSubTrigger listens for to open) —
+// once it has actually mounted into the now-open MenubarContent.
+function useOpenMenuWithSub(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+        const t = setTimeout(() => {
+            const subTrigger = document.querySelector('[data-radix-menubar-subtrigger]') as HTMLElement | null;
+            subTrigger?.click();
+        }, 60);
+        return () => clearTimeout(t);
+    }, [ref, triggerIndex]);
+}
+
+// A nested Export submenu off the File menu — the console's own use for a
+// two-level menu (SQL vs CSV export).
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenuWithSub(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[400px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem>New table<MenubarShortcut>⌘N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>Save<MenubarShortcut>⌘S</MenubarShortcut></MenubarItem>
+                            <MenubarSeparator/>
+                            <MenubarSub>
+                                <MenubarSubTrigger>
+                                    Export
+                                    <MenubarSubTriggerIndicator/>
+                                </MenubarSubTrigger>
+                                <MenubarPortal>
+                                    <MenubarSubContent>
+                                        <MenubarItem>Export as SQL</MenubarItem>
+                                        <MenubarItem>Export as CSV</MenubarItem>
+                                    </MenubarSubContent>
+                                </MenubarPortal>
+                            </MenubarSub>
+                            <MenubarSeparator/>
+                            <MenubarItem disabled>Close project</MenubarItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>Edit</MenubarTrigger>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarSubContent
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `onSelect` | `(event: React.SyntheticEvent) => void` | — |  |
+| `alignOffset` | `number` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function useOpenMenuWithSub(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+        const t = setTimeout(() => {
+            const subTrigger = document.querySelector('[data-radix-menubar-subtrigger]') as HTMLElement | null;
+            subTrigger?.click();
+        }, 60);
+        return () => clearTimeout(t);
+    }, [ref, triggerIndex]);
+}
+
+// The submenu's own popup surface — same paper/shadow as MenubarContent,
+// anchored to the right of its SubTrigger.
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenuWithSub(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[400px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem>New table<MenubarShortcut>⌘N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>Save<MenubarShortcut>⌘S</MenubarShortcut></MenubarItem>
+                            <MenubarSeparator/>
+                            <MenubarSub>
+                                <MenubarSubTrigger>
+                                    Export
+                                    <MenubarSubTriggerIndicator/>
+                                </MenubarSubTrigger>
+                                <MenubarPortal>
+                                    <MenubarSubContent>
+                                        <MenubarItem>Export as SQL</MenubarItem>
+                                        <MenubarItem>Export as CSV</MenubarItem>
+                                        <MenubarSeparator/>
+                                        <MenubarItem disabled>Export as Parquet</MenubarItem>
+                                    </MenubarSubContent>
+                                </MenubarPortal>
+                            </MenubarSub>
+                            <MenubarSeparator/>
+                            <MenubarItem disabled>Close project</MenubarItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>Edit</MenubarTrigger>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarSubTrigger
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `onSelect` | `(event: React.SyntheticEvent) => void` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function useOpenMenuWithSub(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+        const t = setTimeout(() => {
+            const subTrigger = document.querySelector('[data-radix-menubar-subtrigger]') as HTMLElement | null;
+            subTrigger?.click();
+        }, 60);
+        return () => clearTimeout(t);
+    }, [ref, triggerIndex]);
+}
+
+// The row that opens a submenu — highlighted (data-state="open") with its
+// chevron, sitting among the File menu's regular items.
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenuWithSub(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[400px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem>New table<MenubarShortcut>⌘N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>Save<MenubarShortcut>⌘S</MenubarShortcut></MenubarItem>
+                            <MenubarSeparator/>
+                            <MenubarSub>
+                                <MenubarSubTrigger>
+                                    Export
+                                    <MenubarSubTriggerIndicator/>
+                                </MenubarSubTrigger>
+                                <MenubarPortal>
+                                    <MenubarSubContent>
+                                        <MenubarItem>Export as SQL</MenubarItem>
+                                        <MenubarItem>Export as CSV</MenubarItem>
+                                    </MenubarSubContent>
+                                </MenubarPortal>
+                            </MenubarSub>
+                            <MenubarSeparator/>
+                            <MenubarItem disabled>Close project</MenubarItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>Edit</MenubarTrigger>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarSubTriggerIndicator
+
+```ts
+
+```
+
+> This component takes no documented props, or its type could not be flattened. See the source.
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function useOpenMenu(ref: React.RefObject<HTMLDivElement | null>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
+
+// The chevron glyph itself — a fixed `ChevronRightIcon`, rendered at the
+// end of a SubTrigger row to hint the row expands sideways.
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[280px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem>Save<MenubarShortcut>⌘S</MenubarShortcut></MenubarItem>
+                            <MenubarSeparator/>
+                            <MenubarSub>
+                                <MenubarSubTrigger>
+                                    Export
+                                    <MenubarSubTriggerIndicator/>
+                                </MenubarSubTrigger>
+                            </MenubarSub>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>Edit</MenubarTrigger>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```
+
+## MenubarTrigger
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `onSelect` | `(event: React.SyntheticEvent) => void` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Idle row — the trigger's resting style within a bar of menus.
+export const Idle = () => (
+    <div className="p-4">
+        <Menubar>
+            <MenubarMenu>
+                <MenubarTrigger>File</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>Edit</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>View</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>Help</MenubarTrigger>
+            </MenubarMenu>
+        </Menubar>
+    </div>
+);
+```
+
+## MenuItem
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `dense` | `boolean` | — |  |
+| `disabled` | `boolean` | — |  |
+| `onClick` | `(event: React.MouseEvent) => void` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// MenuItem only renders inside Menu's dropdown-menu portal — full parent
+// composition below, forced open via Menu's `defaultOpen` (Menu, unlike
+// Select/Popover, does expose it). Content escapes the grid card the same
+// way Menu's own preview does — needs cfg.overrides.MenuItem =
+// { cardMode: "single", primaryStory: "Default" }.
+
+export const Default = () => (
+    <div className="p-4 h-[280px]">
+        <Menu defaultOpen align="start" trigger={<IconButton size="small" aria-label="Row actions"><MoreVerticalIcon size={16}/></IconButton>}>
+            <MenuItem><KeyRoundIcon size={16}/> Rotate key</MenuItem>
+            <MenuItem><CopyIcon size={16}/> Copy ID</MenuItem>
+            <MenuItem disabled><Trash2Icon size={16}/> Revoke (owner only)</MenuItem>
+        </Menu>
+    </div>
+);
+```
+
+## MultiSelect
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `modalPopover` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `open` | `boolean` | — |  |
+| `name` | `string` | — |  |
+| `id` | `string` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `value` | `T[]` | — |  |
+| `inputClassName` | `string` | — |  |
+| `onChange` | `(event: React.ChangeEvent<HTMLSelectElement, Element>) => void` | — |  |
+| `onValueChange` | `(updatedValue: T[]) => void` | — |  |
+| `placeholder` | `React.ReactNode` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `useChips` | `boolean` | — |  |
+| `label` | `React.ReactNode` | — |  |
+| `disabled` | `boolean` | — |  |
+| `error` | `boolean` | — |  |
+| `position` | `"item-aligned" \| "popper"` | — |  |
+| `endAdornment` | `React.ReactNode` | — |  |
+| `multiple` | `boolean` | — |  |
+| `includeSelectAll` | `boolean` | — |  |
+| `includeClear` | `boolean` | — |  |
+| `inputRef` | `React.Ref` | — |  |
+| `padding` | `boolean` | — |  |
+| `invisible` | `boolean` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `renderValues` | `(values: T[]) => React.ReactNode` | — |  |
+| `portalContainer` | `HTMLElement` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Ported from UIReferenceView's "Form Inputs" and "Form Dialog" sections.
+export const Basic = () => (
+    <div className="w-[300px] p-4">
+        <MultiSelect label="Roles" value={["admin", "editor"]} onValueChange={() => {}}>
+            <MultiSelectItem value="admin">Admin</MultiSelectItem>
+            <MultiSelectItem value="editor">Editor</MultiSelectItem>
+            <MultiSelectItem value="viewer">Viewer</MultiSelectItem>
+        </MultiSelect>
+    </div>
+);
+```
+
+## MultiSelectItem
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `T` | yes |  |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// MultiSelectItem renders inside a MultiSelect's content surface — the parent
+// composition is the only true render.
+export const InMultiSelect = () => (
+    <div className="w-[300px] p-4">
+        <MultiSelect label="Roles" useChips value={["admin", "viewer"]} onValueChange={() => {}}>
+            <MultiSelectItem value="admin">Admin</MultiSelectItem>
+            <MultiSelectItem value="editor">Editor</MultiSelectItem>
+            <MultiSelectItem value="viewer">Viewer</MultiSelectItem>
+        </MultiSelect>
+    </div>
+);
+```
+
+## Paper
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `style` | `React.CSSProperties` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Basic = () => (
+    <div className="p-4 w-72">
+        <Paper className="p-4">
+            <Typography variant="body2" className="font-medium">Billing details</Typography>
+            <Typography variant="caption" color="secondary">Next invoice on Aug 1, 2026</Typography>
+        </Paper>
+    </div>
+);
+```
+
+## Popover
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `trigger` | `React.ReactNode` | yes |  |
+| `children` | `React.ReactNode` | yes |  |
+| `open` | `boolean` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `side` | `"left" \| "right" \| "top" \| "bottom"` | — |  |
+| `sideOffset` | `number` | — |  |
+| `align` | `"center" \| "end" \| "start"` | — |  |
+| `alignOffset` | `number` | — |  |
+| `arrowPadding` | `number` | — |  |
+| `sticky` | `"partial" \| "always"` | — |  |
+| `hideWhenDetached` | `boolean` | — |  |
+| `avoidCollisions` | `boolean` | — |  |
+| `enabled` | `boolean` | — |  |
+| `modal` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `portalContainer` | `HTMLElement` | — |  |
+| `onMouseEnter` | `React.MouseEventHandler<HTMLDivElement>` | — |  |
+| `onMouseLeave` | `React.MouseEventHandler<HTMLDivElement>` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Popover has no `defaultOpen` in the .d.ts, only controlled `open` — force
+// it with `open` + a no-op `onOpenChange`, same pattern as Select.
+// Content renders through a Radix portal and escapes the card, so this
+// needs cfg.overrides.Popover = { cardMode: "single", primaryStory: "FilterPopover" }.
+
+export const FilterPopover = () => (
+    <div className="p-4 h-[320px] flex items-center justify-center">
+        <Popover
+            open
+            onOpenChange={() => {}}
+            side="bottom"
+            align="start"
+            trigger={<Button variant="outlined" startIcon={<SearchIcon size={16}/>}>Filter rows</Button>}
+        >
+            <div className="w-64 p-3 flex flex-col gap-3">
+                <TextField label="Column" value="status" onChange={() => {}} size="small"/>
+                <div className="flex flex-wrap gap-1.5">
+                    <Chip colorScheme="green">published</Chip>
+                    <Chip colorScheme="gray" outlined>draft</Chip>
+                    <Chip colorScheme="gray" outlined>archived</Chip>
+                </div>
+            </div>
+        </Popover>
+    </div>
+);
+```
+
+## PopoverPrimitive
+
+```ts
+
+```
+
+> This component takes no documented props, or its type could not be flattened. See the source.
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// PopoverPrimitive is the raw @radix-ui/react-popover namespace re-exported
+// (Root/Trigger/Portal/Content/Arrow/...), unstyled by itself — the `Popover`
+// component wraps it with DS chrome. This is how internal DS consumers
+// (e.g. RelationSelector) build custom popover surfaces on top of it.
+// Root passes straight through to Radix, so `open` is a real controlled
+// prop even though PopoverPrimitiveProps is `{[key: string]: unknown}`.
+// Content still portals to <body> and escapes the card — needs
+// cfg.overrides.PopoverPrimitive = { cardMode: "single", primaryStory: "Default" }.
+
+export const Default = () => (
+    <div className="p-4 h-[320px] flex items-center justify-center">
+        <PopoverPrimitive.Root open onOpenChange={() => {}} modal={false}>
+            <PopoverPrimitive.Trigger asChild>
+                <button
+                    type="button"
+                    className={cls("px-3 py-1.5 text-sm rounded-md border bg-white dark:bg-surface-900", defaultBorderMixin)}
+                >
+                    Select table…
+                </button>
+            </PopoverPrimitive.Trigger>
+            <PopoverPrimitive.Content
+                align="start"
+                sideOffset={8}
+                className={cls("z-50 overflow-hidden border bg-white dark:bg-surface-900 rounded-lg w-64", defaultBorderMixin)}
+            >
+                <div className="p-2 border-b border-surface-200 dark:border-surface-700 flex items-center gap-2">
+                    <SearchIcon size={14} className="text-text-disabled dark:text-text-disabled-dark"/>
+                    <TextField invisible value="" onChange={() => {}} placeholder="Search tables…" size="small"/>
+                </div>
+                <div className="py-1">
+                    {["users", "orders", "products"].map(t => (
+                        <div key={t} className="px-3 py-1.5 text-sm cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900">
+                            {t}
+                        </div>
+                    ))}
+                </div>
+                <PopoverPrimitive.Arrow className="fill-white dark:fill-surface-900"/>
+            </PopoverPrimitive.Content>
+        </PopoverPrimitive.Root>
+    </div>
+);
+```
+
+## Portal
+
+```ts
+
+```
+
+> This component takes no documented props, or its type could not be flattened. See the source.
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Portal.Root teleports its children into another DOM node. To keep the
+// teleported content visible inside the preview card (instead of jumping to
+// document.body) we point it at a local container element, which mirrors how
+// consumers scope portals with an explicit `container`.
+export const TeleportedContent = () => {
+    const [container, setContainer] = React.useState<HTMLDivElement | null>(null);
+    return (
+        <div className="p-4 w-72">
+            <Typography variant="caption" color="secondary" className="block mb-2">Panel (rendered elsewhere in the tree)</Typography>
+            <div
+                ref={setContainer}
+                className="relative min-h-[64px] border border-dashed border-surface-300 dark:border-surface-700 rounded-lg p-3"
+            >
+                {container && (
+                    <Portal.Root container={container}>
+                        <div className="rounded-md bg-primary/10 text-primary dark:bg-primary/20 px-3 py-2 text-sm font-medium">
+                            Portaled node — mounted here via `container`
+                        </div>
+                    </Portal.Root>
+                )}
+            </div>
+        </div>
+    );
+};
+```
+
+## PortalContainerProvider
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `container` | `HTMLElement` | yes |  |
+| `children` | `React.ReactNode` | yes |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// A descendant that reads the container from context (exactly what Sheet and
+// Dialog do internally) and portals into it, instead of the default
+// document.body — this is the whole reason the provider exists: scoping
+// overlays to a specific DOM region (e.g. a modal's own content element).
+function ScopedBadge() {
+    const container = usePortalContainer();
+    if (!container) return null;
+    return (
+        <Portal.Root container={container}>
+            <div className="rounded-md bg-primary/10 text-primary dark:bg-primary/20 px-3 py-2 text-sm font-medium">
+                Rendered inside the provided container
+            </div>
+        </Portal.Root>
+    );
+}
+
+export const ScopedContainer = () => {
+    const [container, setContainer] = React.useState<HTMLDivElement | null>(null);
+    return (
+        <div className="p-4 w-80">
+            <Typography variant="caption" color="secondary" className="block mb-2">Modal content area</Typography>
+            <div
+                ref={setContainer}
+                className="relative min-h-[72px] border border-dashed border-surface-300 dark:border-surface-700 rounded-lg p-3"
+            >
+                {container && (
+                    <PortalContainerProvider container={container}>
+                        <ScopedBadge/>
+                    </PortalContainerProvider>
+                )}
+            </div>
+        </div>
+    );
+};
+```
+
+## RadioGroup
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `name` | `string` | — |  |
+| `required` | `boolean` | — |  |
+| `disabled` | `boolean` | — |  |
+| `loop` | `boolean` | — | Whether keyboard navigation should loop around |
+| `defaultValue` | `string` | — |  |
+| `value` | `string` | — |  |
+| `onValueChange` | `(value: string) => void` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// RadioGroupItem only renders inside a RadioGroup, and needs a paired Label
+// to be a plausible field — the canonical Radix composition.
+export const Basic = () => (
+    <RadioGroup value="pro" onValueChange={() => {}} className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-2">
+            <RadioGroupItem value="free" id="plan-free"/>
+            <Label htmlFor="plan-free">Free — 1 project</Label>
+        </div>
+        <div className="flex items-center gap-2">
+            <RadioGroupItem value="pro" id="plan-pro"/>
+            <Label htmlFor="plan-pro">Pro — unlimited projects</Label>
+        </div>
+        <div className="flex items-center gap-2">
+            <RadioGroupItem value="team" id="plan-team"/>
+            <Label htmlFor="plan-team">Team — shared workspaces</Label>
+        </div>
+    </RadioGroup>
+);
+```
+
+## RadioGroupItem
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | — |  |
+| `value` | `string` | yes |  |
+| `checked` | `boolean` | — |  |
+| `required` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `disabled` | `boolean` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// RadioGroupItem only renders inside a RadioGroup — full parent composition,
+// focused on item-level render states rather than group-level layout.
+export const CheckedAndUnchecked = () => (
+    <RadioGroup value="email" onValueChange={() => {}} className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-2">
+            <RadioGroupItem value="email" id="notify-email"/>
+            <Label htmlFor="notify-email">Email</Label>
+        </div>
+        <div className="flex items-center gap-2">
+            <RadioGroupItem value="sms" id="notify-sms"/>
+            <Label htmlFor="notify-sms">SMS</Label>
+        </div>
+    </RadioGroup>
+);
+```
+
+## ResizablePanels
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `firstPanel` | `React.ReactNode` | yes |  |
+| `secondPanel` | `React.ReactNode` | yes |  |
+| `showFirstPanel` | `boolean` | — | Whether the first panel is visible (e.g. Sidebar) |
+| `showSecondPanel` | `boolean` | — | Whether the second panel is visible (e.g. Results) |
+| `panelSizePercent` | `number` | yes | 0-100 representing the width/height of the first panel |
+| `onPanelSizeChange` | `(sizePercent: number) => void` | yes |  |
+| `minPanelSizePx` | `number` | — |  |
+| `orientation` | `"horizontal" \| "vertical"` | — |  |
+| `animateLayout` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `stacked` | `boolean` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Not portaled — renders inline via flex-basis, but it fills its container
+// (`w-full h-full`), so it needs an explicit-height wrapper to have
+// somewhere to land.
+
+const SidebarPanel = () => (
+    <div className={cls("h-full p-2 bg-surface-50 dark:bg-surface-900 border-r", defaultBorderMixin)}>
+        <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark px-2">Tables</Typography>
+        <div className="mt-1 flex flex-col gap-0.5">
+            {["users", "orders", "products"].map(t => (
+                <div key={t} className="px-2 py-1 text-xs rounded hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer">{t}</div>
+            ))}
+        </div>
+    </div>
+);
+
+const ContentPanel = () => (
+    <div className="h-full p-4 flex items-center justify-center">
+        <Typography variant="body2" color="secondary">SELECT * FROM orders LIMIT 50;</Typography>
+    </div>
+);
+
+// Sidebar + content split, the SQL/RLS editor layout.
+export const Horizontal = () => (
+    <div className={cls("h-[280px] w-full border rounded-lg overflow-hidden", defaultBorderMixin)}>
+        <ResizablePanels
+            orientation="horizontal"
+            firstPanel={<SidebarPanel/>}
+            secondPanel={<ContentPanel/>}
+            panelSizePercent={28}
+            onPanelSizeChange={() => {}}
+        />
+    </div>
+);
+```
+
+## SearchBar
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `onClick` | `() => void` | — |  |
+| `onTextSearch` | `(searchString?: string) => void` | — |  |
+| `placeholder` | `string` | — |  |
+| `expandable` | `boolean` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — | Size of the search bar. - "small": 32px height (matches TextField small) - "medium": 44px height (matches TextField medi |
+| `innerClassName` | `string` | — |  |
+| `className` | `string` | — |  |
+| `autoFocus` | `boolean` | — |  |
+| `disabled` | `boolean` | — |  |
+| `loading` | `boolean` | — |  |
+| `inputRef` | `React.Ref` | — |  |
+| `initialValue` | `string` | — | Optional initial value for the search input, e.g. from URL params. |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Ported from UIReferenceView's "Form Inputs" section.
+export const Basic = () => (
+    <div className="w-[380px] p-4">
+        <SearchBar placeholder="Search entities…"/>
+    </div>
+);
+```
+
+## Select
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `open` | `boolean` | — |  |
+| `name` | `string` | — |  |
+| `fullWidth` | `boolean` | — |  |
+| `id` | `string` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `value` | `T` | — |  |
+| `className` | `string` | — |  |
+| `inputClassName` | `string` | — |  |
+| `viewportClassName` | `string` | — |  |
+| `onChange` | `(event: React.ChangeEvent<HTMLSelectElement, Element>) => void` | — |  |
+| `onValueChange` | `(updatedValue: T) => void` | — |  |
+| `placeholder` | `React.ReactNode` | — |  |
+| `renderValue` | `(value: T) => React.ReactNode` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `label` | `React.ReactNode` | — |  |
+| `disabled` | `boolean` | — |  |
+| `error` | `boolean` | — |  |
+| `position` | `"item-aligned" \| "popper"` | — |  |
+| `endAdornment` | `React.ReactNode` | — |  |
+| `inputRef` | `React.Ref` | — |  |
+| `padding` | `boolean` | — |  |
+| `invisible` | `boolean` | — |  |
+| `children` | `React.ReactNode` | — |  |
+| `dataType` | `"string" \| "number" \| "boolean"` | — |  |
+| `portalContainer` | `HTMLElement` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Ported from UIReferenceView's "Form Inputs" section.
+export const Basic = () => (
+    <div className="w-[280px] p-4">
+        <Select label="Status" value="published" onValueChange={() => {}}>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="published">Published</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+        </Select>
+    </div>
+);
+```
+
+## SelectGroup
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `label` | `React.ReactNode` | yes |  |
+| `children` | `React.ReactNode` | yes |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// SelectGroup only renders inside an open Select's content surface — full
+// parent composition, controlled `open` (SelectProps has no `defaultOpen`).
+export const TwoGroups = () => (
+    <div className="w-[280px] p-4 h-[360px]">
+        <Select open label="Category" value="bug" onValueChange={() => {}} onOpenChange={() => {}}>
+            <SelectGroup label="Type">
+                <SelectItem value="bug">Bug</SelectItem>
+                <SelectItem value="feature">Feature</SelectItem>
+            </SelectGroup>
+            <SelectGroup label="Priority">
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+            </SelectGroup>
+        </Select>
+    </div>
+);
+```
+
+## SelectItem
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `T` | yes |  |
+| `children` | `React.ReactNode` | — |  |
+| `disabled` | `boolean` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// SelectItem only renders inside a Select's content surface, so the true
+// render is the parent composition with the menu open. `open` is the
+// controlled prop; SelectProps has no `defaultOpen`.
+export const InOpenSelect = () => (
+    <div className="w-[280px] p-4 h-[300px]">
+        <Select open label="Status" value="published" onValueChange={() => {}} onOpenChange={() => {}}>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="published">Published</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+            <SelectItem value="deleted" disabled>Deleted</SelectItem>
+        </Select>
+    </div>
+);
+```
+
+## Separator
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `orientation` | `"horizontal" \| "vertical"` | yes |  |
+| `decorative` | `boolean` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Horizontal = () => (
+    <div className="p-4 w-64">
+        <Typography variant="body2">Account</Typography>
+        <Separator orientation="horizontal"/>
+        <Typography variant="body2">Billing</Typography>
+    </div>
+);
+```
+
+## Sheet
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `open` | `boolean` | yes |  |
+| `title` | `string` | — |  |
+| `modal` | `boolean` | — |  |
+| `includeBackgroundOverlay` | `boolean` | — |  |
+| `side` | `"left" \| "right" \| "top" \| "bottom"` | — |  |
+| `darkBackground` | `boolean` | — |  |
+| `transparent` | `boolean` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `onPointerDownOutside` | `(e: Event) => void` | — |  |
+| `onInteractOutside` | `(e: Event) => void` | — |  |
+| `className` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `overlayClassName` | `string` | — |  |
+| `overlayZIndex` | `string` | — |  |
+| `overlayStyle` | `React.CSSProperties` | — |  |
+| `portalContainer` | `HTMLElement` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Sheet's `open` prop is required (not optional) — always pass it. It has
+// no visible header of its own (only a sr-only DialogPrimitive.Title), so
+// any header chrome is composed by the caller, as below. Content is a fixed
+// Radix Dialog portal (`fixed … right-0/left-0`), so it escapes the grid
+// card — needs cfg.overrides.Sheet = { cardMode: "single", primaryStory: "RightPanel" }.
+
+export const RightPanel = () => (
+    <div className="p-4 h-[320px]">
+        <Sheet open onOpenChange={() => {}} side="right" title="Edit user">
+            <div className="w-96 h-full flex flex-col">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200 dark:border-surface-800">
+                    <Typography variant="h5">Edit user</Typography>
+                    <IconButton size="small" aria-label="Close"><XIcon size={16}/></IconButton>
+                </div>
+                <div className="flex-grow p-6 flex flex-col gap-4 overflow-y-auto">
+                    <TextField label="Name" value="Alice Johnson" onChange={() => {}}/>
+                    <TextField label="Email" value="alice@example.com" onChange={() => {}}/>
+                    <MultiSelect label="Roles" value={["admin"]} onValueChange={() => {}}>
+                        <MultiSelectItem value="admin">Admin</MultiSelectItem>
+                        <MultiSelectItem value="editor">Editor</MultiSelectItem>
+                    </MultiSelect>
+                </div>
+                <div className="px-6 py-4 border-t border-surface-200 dark:border-surface-800 flex justify-end gap-2">
+                    <Button variant="text">Cancel</Button>
+                    <LoadingButton variant="filled" loading={false}>Save</LoadingButton>
+                </div>
+            </div>
+        </Sheet>
+    </div>
+);
+```
+
+## Skeleton
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `width` | `number` | — |  |
+| `height` | `number` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const RowLoading = () => (
+    <div className="flex items-center gap-4 p-4">
+        <Skeleton className="w-10 h-10 rounded-full"/>
+        <div className="flex flex-col gap-2">
+            <Skeleton className="w-48 h-4 rounded"/>
+            <Skeleton className="w-32 h-3 rounded"/>
+        </div>
+    </div>
+);
+```
+
+## Slider
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `className` | `string` | — |  |
+| `name` | `string` | — |  |
+| `disabled` | `boolean` | — |  |
+| `orientation` | `"horizontal" \| "vertical"` | — |  |
+| `dir` | `"ltr" \| "rtl"` | — |  |
+| `min` | `number` | — |  |
+| `max` | `number` | — |  |
+| `step` | `number` | — |  |
+| `minStepsBetweenThumbs` | `number` | — |  |
+| `value` | `number[]` | — |  |
+| `defaultValue` | `number[]` | — |  |
+| `onValueChange` | `(value: number[]) => void` | — |  |
+| `onValueCommit` | `(value: number[]) => void` | — |  |
+| `inverted` | `boolean` | — |  |
+| `form` | `string` | — |  |
+| `size` | `"small" \| "regular"` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Basic = () => (
+    <div className="w-[320px] p-6">
+        <Slider defaultValue={[60]} min={0} max={100} step={1}/>
+    </div>
+);
+```
+
+## Slot
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `className` | `string` | — |  |
+| `id` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `children` | `React.ReactNode` | — |  |
+| `ref` | `React.Ref` | — | Allows getting a ref to the component instance. Once the component unmounts, React will set `ref.current` to `null` (or |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Slot merges the props/classes given to it directly onto its single child
+// element instead of wrapping it in an extra node — the classic `asChild`
+// pattern, here turning a plain <a> into a styled button-like link.
+export const AsChildLink = () => (
+    <div className="flex items-center gap-3 p-4">
+        <Slot className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity">
+            <a href="https://rebase.pro/pricing">View pricing</a>
+        </Slot>
+        <Slot className="inline-flex items-center gap-2 rounded-lg border border-surface-200 dark:border-surface-700 px-4 py-2 text-sm font-medium">
+            <button type="button">Cancel</button>
+        </Slot>
+    </div>
+);
+```
+
+## Tab
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `string` | yes |  |
+| `className` | `string` | — |  |
+| `innerClassName` | `string` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `disabled` | `boolean` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Tab only renders as a child of Tabs (reads its `variant` from Tabs'
+// internal context) — full parent composition below. Tabs is not
+// portaled, so this renders inline and doesn't need cardMode overrides.
+
+// Standard variant with a disabled tab, sweeping the `disabled` prop.
+export const StandardWithDisabled = () => (
+    <div className="p-4">
+        <Tabs value="overview" onValueChange={() => {}}>
+            <Tab value="overview">Overview</Tab>
+            <Tab value="policies">Policies</Tab>
+            <Tab value="danger" disabled>Danger zone</Tab>
+        </Tabs>
+    </div>
+);
+```
+
+## Table
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `className` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `id` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+const USERS = [
+  { uid: "1", email: "maria.chen@rebase.pro", displayName: "Maria Chen", roles: [{ id: "admin", name: "Admin", isAdmin: true }] },
+  { uid: "2", email: "diego.alvarez@rebase.pro", displayName: "Diego Alvarez", roles: [{ id: "editor", name: "Editor", isAdmin: false }] },
+  { uid: "3", email: "priya.natarajan@rebase.pro", displayName: "Priya Natarajan", roles: [] },
+  { uid: "4", email: "sam.okafor@rebase.pro", displayName: "Sam Okafor", roles: [{ id: "editor", name: "Editor", isAdmin: false }] }
+];
+
+export function UsersTable() {
+  return (
+    <div className="flex flex-col gap-4 w-full">
+      <div className="flex items-center">
+        <Typography gutterBottom variant="h4" className="grow" component="h4">Users</Typography>
+        <Button startIcon={<PlusIcon/>}>Add user</Button>
+      </div>
+      <div className="overflow-x-auto">
+        <Table className="w-full">
+          <TableHeader>
+            <TableCell header className="w-16"></TableCell>
+            <TableCell header>Email</TableCell>
+            <TableCell header>Name</TableCell>
+            <TableCell header>Roles</TableCell>
+          </TableHeader>
+          <TableBody>
+            {USERS.map(user => (
+              <TableRow key={user.uid}>
+                <TableCell style={{ width: "64px" }}>
+                  <Tooltip asChild title="Delete this user">
+                    <IconButton size="small"><Trash2Icon/></IconButton>
+                  </Tooltip>
+                </TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell className="font-medium">{user.displayName}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-2">
+                    {user.roles.map(role => (
+                      <Chip key={role.id} colorScheme={role.isAdmin ? "purple" : "blue"} size="small">
+                        {role.name}
+                      </Chip>
+                    ))}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+```
+
+## TableBody
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `id` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+const USERS = [
+  { uid: "1", email: "maria.chen@rebase.pro", displayName: "Maria Chen", roles: [{ id: "admin", name: "Admin", isAdmin: true }] },
+  { uid: "2", email: "diego.alvarez@rebase.pro", displayName: "Diego Alvarez", roles: [{ id: "editor", name: "Editor", isAdmin: false }] },
+  { uid: "3", email: "priya.natarajan@rebase.pro", displayName: "Priya Natarajan", roles: [] },
+  { uid: "4", email: "sam.okafor@rebase.pro", displayName: "Sam Okafor", roles: [{ id: "editor", name: "Editor", isAdmin: false }] }
+];
+
+export function PopulatedBody() {
+  return (
+    <div className="overflow-x-auto w-full">
+      <Table className="w-full">
+        <TableHeader>
+          <TableCell header className="w-16"></TableCell>
+          <TableCell header>Email</TableCell>
+          <TableCell header>Name</TableCell>
+          <TableCell header>Roles</TableCell>
+        </TableHeader>
+        <TableBody>
+          {USERS.map(user => (
+            <TableRow key={user.uid}>
+              <TableCell style={{ width: "64px" }}>
+                <Tooltip asChild title="Delete this user">
+                  <IconButton size="small"><Trash2Icon/></IconButton>
+                </Tooltip>
+              </TableCell>
+              <TableCell>{user.email}</TableCell>
+              <TableCell className="font-medium">{user.displayName}</TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-2">
+                  {user.roles.map(role => (
+                    <Chip key={role.id} colorScheme={role.isAdmin ? "purple" : "blue"} size="small">
+                      {role.name}
+                    </Chip>
+                  ))}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+```
+
+## TableCell
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `header` | `boolean` | — |  |
+| `scope` | `string` | — |  |
+| `className` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `align` | `"center" \| "left" \| "right"` | — |  |
+| `colspan` | `number` | — |  |
+| `id` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+const COLLECTIONS = [
+  { id: "c1", name: "users", rows: "128,442", rls: true },
+  { id: "c2", name: "orders", rows: "54,910", rls: true },
+  { id: "c3", name: "audit_logs", rows: "2,004,331", rls: false }
+];
+
+export function AlignedCells() {
+  return (
+    <div className="overflow-x-auto w-full">
+      <Table className="w-full">
+        <TableHeader>
+          <TableCell header align="left">Name</TableCell>
+          <TableCell header align="center">RLS</TableCell>
+          <TableCell header align="right">Rows</TableCell>
+        </TableHeader>
+        <TableBody>
+          {COLLECTIONS.map(col => (
+            <TableRow key={col.id}>
+              <TableCell align="left" className="font-mono text-xs font-medium">{col.name}</TableCell>
+              <TableCell align="center">
+                <Chip size="small" colorScheme={col.rls ? "green" : "red"}>
+                  {col.rls ? "Enabled" : "Disabled"}
+                </Chip>
+              </TableCell>
+              <TableCell align="right">{col.rows}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+```
+
+## TableHeader
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `id` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+const USERS = [
+  { uid: "1", email: "maria.chen@rebase.pro", displayName: "Maria Chen", roles: [{ id: "admin", name: "Admin", isAdmin: true }] },
+  { uid: "2", email: "diego.alvarez@rebase.pro", displayName: "Diego Alvarez", roles: [{ id: "editor", name: "Editor", isAdmin: false }] },
+  { uid: "3", email: "priya.natarajan@rebase.pro", displayName: "Priya Natarajan", roles: [] }
+];
+
+export function UsersTableHeader() {
+  return (
+    <div className="overflow-x-auto w-full">
+      <Table className="w-full">
+        <TableHeader>
+          <TableCell header className="w-16"></TableCell>
+          <TableCell header>Email</TableCell>
+          <TableCell header>Name</TableCell>
+          <TableCell header>Roles</TableCell>
+        </TableHeader>
+        <TableBody>
+          {USERS.map(user => (
+            <TableRow key={user.uid}>
+              <TableCell style={{ width: "64px" }}>
+                <Tooltip asChild title="Delete this user">
+                  <IconButton size="small"><Trash2Icon/></IconButton>
+                </Tooltip>
+              </TableCell>
+              <TableCell>{user.email}</TableCell>
+              <TableCell className="font-medium">{user.displayName}</TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-2">
+                  {user.roles.map(role => (
+                    <Chip key={role.id} colorScheme={role.isAdmin ? "purple" : "blue"} size="small">
+                      {role.name}
+                    </Chip>
+                  ))}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+```
+
+## TableRow
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `onClick` | `React.MouseEventHandler<any> & React.MouseEventHandler<HTMLTableRowElement>` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `id` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+const COLLECTIONS = [
+  { id: "c1", name: "users", type: "table", rows: "128,442", rls: true },
+  { id: "c2", name: "orders", type: "table", rows: "54,910", rls: true },
+  { id: "c3", name: "audit_logs", type: "view", rows: "2,004,331", rls: false }
+];
+
+export function ClickableRows() {
+  return (
+    <div className="overflow-x-auto w-full">
+      <Table className="w-full">
+        <TableHeader>
+          <TableCell header>Name</TableCell>
+          <TableCell header>Type</TableCell>
+          <TableCell header align="right">Rows</TableCell>
+          <TableCell header align="center">RLS</TableCell>
+        </TableHeader>
+        <TableBody>
+          {COLLECTIONS.map(col => (
+            <TableRow key={col.id} onClick={() => {}}>
+              <TableCell className="font-mono text-xs font-medium">{col.name}</TableCell>
+              <TableCell className="text-text-secondary dark:text-text-secondary-dark">{col.type}</TableCell>
+              <TableCell align="right">{col.rows}</TableCell>
+              <TableCell align="center">
+                <Chip size="small" colorScheme={col.rls ? "green" : "red"}>
+                  {col.rls ? "Enabled" : "Disabled"}
+                </Chip>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+```
+
+## Tabs
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `string` | yes |  |
+| `children` | `React.ReactNode` | yes |  |
+| `innerClassName` | `string` | — |  |
+| `className` | `string` | — |  |
+| `variant` | `"standard" \| "boxy" \| "pill"` | — |  |
+| `onValueChange` | `(value: string) => void` | yes |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// The .d.ts only lists `variant?: "standard" | "boxy" | "pill"` — no
+// "default". UIReferenceView labels its first example "variant=\"default\""
+// but never actually passes that string; it just omits `variant`, which
+// defaults to "standard". Sweeping standard/boxy/pill below.
+
+export const Standard = () => (
+    <div className="p-4">
+        <Tabs value="schema" onValueChange={() => {}}>
+            <Tab value="schema">Schema</Tab>
+            <Tab value="snippets">Snippets</Tab>
+            <Tab value="history">History</Tab>
+        </Tabs>
+    </div>
+);
+```
+
+## TextareaAutosize
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `style` | `React.CSSProperties & object` | — |  |
+| `className` | `string` | — |  |
+| `id` | `string` | — |  |
+| `children` | `React.ReactNode` | — |  |
+| `shadowClassName` | `string` | — |  |
+| `maxRows` | `string \| number` | — | Maximum number of rows to display. |
+| `minRows` | `string \| number` | — | Minimum number of rows to display. |
+| `sizeRef` | `React.RefObject<HTMLDivElement>` | — |  |
+| `onResize` | `(state: State) => void` | — |  |
+| `ignoreBoxSizing` | `boolean` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// A headless autosizing primitive with no built-in field chrome (see
+// packages/ui/src/components/VirtualTable/fields/VirtualTableInput.tsx — the
+// real consumer supplies all styling via className/style). Wrap it in the
+// same field-box treatment TextField/DateTimeField use so the preview isn't
+// browser-default text.
+export const Basic = () => (
+    <div className="rounded-lg bg-surface-accent-200/50 dark:bg-white/[0.055] p-3 w-[320px] m-4">
+        <TextareaAutosize
+            className="w-full bg-transparent outline-none text-base resize-none"
+            minRows={2}
+            value={"Policies are evaluated per row, for every read and write."}
+            onChange={() => {}}
+        />
+    </div>
+);
+```
+
+## TextField
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `type` | `"number" \| "search" \| "time" \| "text" \| "color" \| "url" \| "email" \| "date" \| "phone" \| "password" \| "datetime-local" \| "month" \| "week"` | — |  |
+| `value` | `T` | — |  |
+| `onChange` | `((event: React.ChangeEvent<HTMLInputElement \| HTMLTextAreaElement>) => void) & React.ChangeEventHandler<HTMLInputElement, HTMLInputElement>` | — |  |
+| `label` | `React.ReactNode` | — |  |
+| `multiline` | `boolean` | — |  |
+| `disabled` | `boolean` | — |  |
+| `invisible` | `boolean` | — |  |
+| `error` | `boolean` | — |  |
+| `endAdornment` | `React.ReactNode` | — |  |
+| `autoFocus` | `boolean` | — |  |
+| `placeholder` | `string` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `className` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `inputClassName` | `string` | — |  |
+| `inputStyle` | `React.CSSProperties` | — |  |
+| `inputRef` | `((instance: any) => void) \| React.RefObject<any>` | — |  |
+| `maxRows` | `string \| number` | — | Maximum number of rows to display. |
+| `minRows` | `string \| number` | — | Minimum number of rows to display. |
+| `id` | `string` | — |  |
+| `children` | `React.ReactNode` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Ported from UIReferenceView's "Form Inputs" section.
+export const States = () => (
+    <div className="flex flex-col gap-3 w-[320px] p-4">
+        <TextField label="Default" placeholder="Type something…"/>
+        <TextField label="With value" value="Filled value" onChange={() => {}}/>
+        <TextField label="Error state" error value="Bad value" onChange={() => {}}/>
+        <TextField label="Disabled" disabled value="Read only" onChange={() => {}}/>
+    </div>
+);
+```
+
+## ToggleButtonGroup
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `string` | yes | Currently selected value |
+| `onValueChange` | `(value: string) => void` | yes | Callback when value changes |
+| `options` | `{ value: string; label: string; icon?: React.ReactNode; disabled?: boolean }[]` | yes | Options to display |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Contract fixed by the orchestrator (generics dropped by the .d.ts
+// extractor): { value, onValueChange, options: { value, label, icon?,
+// disabled? }[], className? }.
+export const Basic = () => (
+    <div className="p-4">
+        <ToggleButtonGroup
+            value="list"
+            onValueChange={() => {}}
+            options={[
+                { value: "list", label: "List" },
+                { value: "grid", label: "Grid" },
+                { value: "kanban", label: "Kanban" }
+            ]}
+        />
+    </div>
+);
+```
+
+## Tooltip
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `open` | `boolean` | — |  |
+| `defaultOpen` | `boolean` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `side` | `"left" \| "right" \| "top" \| "bottom"` | — |  |
+| `align` | `"center" \| "end" \| "start"` | — |  |
+| `sideOffset` | `number` | — |  |
+| `title` | `React.ReactNode` | — |  |
+| `delayDuration` | `number` | — |  |
+| `asChild` | `boolean` | — |  |
+| `tooltipClassName` | `string` | — |  |
+| `tooltipStyle` | `React.CSSProperties` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `className` | `string` | — |  |
+| `container` | `HTMLElement` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// Tooltip supports both `open` and `defaultOpen` per the .d.ts — use the
+// controlled `open` (+ no-op onOpenChange) to force the visible state, same
+// as Popover/Select. Content renders through a Radix portal, so it escapes
+// the grid card — needs cfg.overrides.Tooltip = { cardMode: "single", primaryStory: "Default" }.
+
+export const Default = () => (
+    <div className="p-4 h-[280px] flex items-center justify-center">
+        <Tooltip open onOpenChange={() => {}} title="Copy connection string" side="top">
+            <IconButton size="small" aria-label="Copy"><KeyIcon size={16}/></IconButton>
+        </Tooltip>
+    </div>
+);
+```
+
+## Typography
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `align` | `"center" \| "inherit" \| "left" \| "right" \| "justify"` | — |  |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `component` | `C` | — |  |
+| `gutterBottom` | `boolean` | — |  |
+| `noWrap` | `boolean` | — |  |
+| `paragraph` | `boolean` | — |  |
+| `variant` | `"button" \| "caption" \| "h1" \| "h2" \| "h3" \| "h4" \| "h5" \| "h6" \| "label" \| "inherit" \| "subtitle1" \| "subtitle2" \| "body1" \| "body2"` | — |  |
+| `variantMapping` | `{ [key: string]: string; }` | — |  |
+| `color` | `"inherit" \| "disabled" \| "error" \| "primary" \| "secondary" \| "initial"` | — |  |
+| `onClick` | `React.ReactEventHandler<HTMLElement>` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// The full type scale. Ported from UIReferenceView's "Typography" section —
+// the pangram is what makes the Instrument Sans / Inter split legible.
+export const Scale = () => (
+    <div className="flex flex-col gap-3 p-4">
+        {(["h1", "h2", "h3", "h4", "h5", "h6", "subtitle1", "subtitle2", "body1", "body2", "caption", "label", "button"] as const).map(v => (
+            <div key={v} className="flex items-baseline gap-4 border-b border-surface-200 dark:border-surface-700 pb-3 last:border-0">
+                <span className="w-20 shrink-0 text-xs text-surface-400 font-mono">{v}</span>
+                <Typography variant={v}>The quick brown fox jumps over the lazy dog</Typography>
+            </div>
+        ))}
+    </div>
+);
+```
+
+## VirtualTable
+
+```ts
+
+```
+
+> This component takes no documented props, or its type could not be flattened. See the source.
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+type UserRow = { id: string; name: string; role: string; status: string };
+
+const USER_COLUMNS: VirtualTableColumn[] = [
+  { key: "name", title: "Name", width: 150 },
+  { key: "role", title: "Role", width: 100 },
+  { key: "status", title: "Status", width: 110 }
+];
+
+const USER_ROWS: UserRow[] = [
+  { id: "1", name: "Maria Chen", role: "Admin", status: "active" },
+  { id: "2", name: "Diego Alvarez", role: "Editor", status: "active" },
+  { id: "3", name: "Priya Natarajan", role: "Viewer", status: "invited" },
+  { id: "4", name: "Sam Okafor", role: "Editor", status: "active" },
+  { id: "5", name: "Elena Petrova", role: "Viewer", status: "suspended" }
+];
+
+function statusColor(status: string) {
+  if (status === "active") return "green" as const;
+  if (status === "invited") return "blue" as const;
+  return "gray" as const;
+}
+
+function userCellRenderer({ column, rowData }: CellRendererParams<UserRow>) {
+  if (!rowData) return null;
+  if (column.key === "name") {
+    return <div className="flex items-center h-full px-3 font-medium truncate">{rowData.name}</div>;
+  }
+  if (column.key === "role") {
+    return <div className="flex items-center h-full px-3"><Chip size="small">{rowData.role}</Chip></div>;
+  }
+  if (column.key === "status") {
+    return <div className="flex items-center h-full px-3"><Chip size="small" colorScheme={statusColor(rowData.status)}>{rowData.status}</Chip></div>;
+  }
+  return null;
+}
+
+export function UsersVirtualTable() {
+  return (
+    <div style={{ width: 380, height: 296, border: "1px solid #e5e7eb", borderRadius: 8 }}>
+      <VirtualTable
+        data={USER_ROWS}
+        columns={USER_COLUMNS}
+        cellRenderer={userCellRenderer}
+        rowHeight={48}
+        headerHeight={40}
+      />
+    </div>
+  );
+}
+```
+
+## VirtualTableSelectionProvider
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `store` | `VirtualTableSelectionStore<T>` | yes |  |
+| `children` | `React.ReactNode` | yes |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+type Row = { id: string; name: string; status: string };
+
+const ROWS: Row[] = [
+  { id: "1", name: "Maria Chen", status: "Active" },
+  { id: "2", name: "Diego Alvarez", status: "Active" },
+  { id: "3", name: "Priya Natarajan", status: "Invited" }
+];
+
+function SelectableCell({
+  store,
+  columnKey,
+  id,
+  children
+}: {
+  store: VirtualTableSelectionStore<SelectedCell>;
+  columnKey: string;
+  id: string;
+  children: React.ReactNode;
+}) {
+  const selected = useVirtualTableCellSelected(store, columnKey, id);
+  const { select } = useVirtualTableSelection();
+  return (
+    <div
+      onClick={() => select({ columnKey, id })}
+      className={cls(
+        "flex items-center px-3 text-sm border-b border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900",
+        selected ? cardSelectedMixin : cardClickableMixin
+      )}
+      style={{ width: 150, height: 42 }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function SelectionGrid({ initialSelection }: { initialSelection?: SelectedCell }) {
+  const store = useMemo(() => createVirtualTableSelectionStore(), []);
+
+  useEffect(() => {
+    if (initialSelection) store.select(initialSelection);
+  }, [store]);
+
+  return (
+    <VirtualTableSelectionProvider store={store}>
+      <div className="inline-flex flex-col border border-surface-200 dark:border-surface-700 rounded-md overflow-hidden">
+        {ROWS.map(row => (
+          <div key={row.id} className="flex divide-x divide-surface-100 dark:divide-surface-700">
+            <SelectableCell store={store} columnKey="name" id={row.id}>{row.name}</SelectableCell>
+            <SelectableCell store={store} columnKey="status" id={row.id}>{row.status}</SelectableCell>
+          </div>
+        ))}
+      </div>
+    </VirtualTableSelectionProvider>
+  );
+}
+
+export function CellSelected() {
+  return <SelectionGrid initialSelection={{ columnKey: "status", id: "2" }}/>;
+}
+```
+
+## Data views
+
+4 components.
+
+- [CardView](/docs/ui/data-views/cardview)
+- [CollectionView](/docs/ui/data-views/collectionview)
+- [KanbanView](/docs/ui/data-views/kanbanview)
+- [ListView](/docs/ui/data-views/listview)
+
+## CardView
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `data` | `T[]` | yes | Virtualized card grid. Generic over the row type T. |
+| `renderCard` | `(item: T, extra: { selected: boolean; highlighted: boolean; onSelectionChange: (selected: boolean) => void; onClick: (e: React.MouseEvent) => void }) => React.ReactNode` | yes |  |
+| `dataLoading` | `boolean` | — |  |
+| `noMoreToLoad` | `boolean` | — |  |
+| `dataLoadingError` | `Error` | — |  |
+| `itemCount` | `number` | — |  |
+| `setItemCount` | `(itemCount: number) => void` | — |  |
+| `pageSize` | `number` | — |  |
+| `paginationEnabled` | `boolean` | — |  |
+| `onItemClick` | `(item: T) => void` | — |  |
+| `selectedIds` | `Set<string \| number>` | — |  |
+| `highlightedIds` | `Set<string \| number>` | — |  |
+| `selectionEnabled` | `boolean` | — |  |
+| `onSelectionChange` | `(item: T, selected: boolean) => void` | — |  |
+| `initialScroll` | `number` | — |  |
+| `size` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | — |  |
+| `emptyComponent` | `React.ReactNode` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+type ProjectStatus = "backlog" | "in_progress" | "in_review" | "done";
+
+type ProjectPriority = "low" | "medium" | "high" | "critical";
+
+interface SampleProject {
+    id: string;
+    name: string;
+    description: string;
+    status: ProjectStatus;
+    priority: ProjectPriority;
+    assignee: string;
+    tags: string[];
+    dueDate: string;
+    progress: number;
+}
+
+const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: ChipHue }> = {
+    backlog: { label: "Backlog", color: "gray" },
+    in_progress: { label: "In Progress", color: "blue" },
+    in_review: { label: "In Review", color: "purple" },
+    done: { label: "Done", color: "green" }
+};
+
+const PRIORITY_CONFIG: Record<ProjectPriority, { label: string; color: ChipHue }> = {
+    low: { label: "Low", color: "gray" },
+    medium: { label: "Medium", color: "yellow" },
+    high: { label: "High", color: "orange" },
+    critical: { label: "Critical", color: "red" }
+};
+
+const SAMPLE_PROJECTS: SampleProject[] = [
+    { id: "proj-1", name: "Website Redesign", description: "Complete overhaul of the marketing website with new brand guidelines", status: "in_progress", priority: "high", assignee: "Alice Johnson", tags: ["frontend", "design"], dueDate: "2026-08-07", progress: 65 },
+    { id: "proj-2", name: "API Rate Limiting", description: "Implement token-bucket rate limiting across all public endpoints", status: "in_review", priority: "critical", assignee: "Bob Smith", tags: ["backend", "security"], dueDate: "2026-08-02", progress: 90 },
+    { id: "proj-3", name: "Mobile Push Notifications", description: "Add support for push notifications on iOS and Android clients", status: "backlog", priority: "medium", assignee: "Carol White", tags: ["mobile", "backend"], dueDate: "2026-08-21", progress: 0 },
+    { id: "proj-4", name: "Dashboard Analytics", description: "Build real-time analytics dashboard with charts and KPI widgets", status: "in_progress", priority: "high", assignee: "David Brown", tags: ["frontend", "data"], dueDate: "2026-08-05", progress: 40 },
+    { id: "proj-5", name: "User Onboarding Flow", description: "Multi-step onboarding wizard with progress tracking and email triggers", status: "done", priority: "medium", assignee: "Eva Green", tags: ["frontend", "ux"], dueDate: "2026-07-29", progress: 100 },
+    { id: "proj-7", name: "SSO Integration", description: "SAML 2.0 and OIDC single sign-on for enterprise customers", status: "in_progress", priority: "critical", assignee: "Alice Johnson", tags: ["backend", "security", "enterprise"], dueDate: "2026-08-03", progress: 75 },
+    { id: "proj-8", name: "E2E Test Suite", description: "Playwright-based end-to-end tests covering critical user journeys", status: "in_review", priority: "medium", assignee: "Bob Smith", tags: ["testing", "devops"], dueDate: "2026-08-01", progress: 85 },
+    { id: "proj-9", name: "Billing System Upgrade", description: "Stripe integration upgrade with metered billing and invoice PDF generation", status: "done", priority: "high", assignee: "Carol White", tags: ["backend", "payments"], dueDate: "2026-07-26", progress: 100 }
+];
+
+function renderCard(
+    item: SampleProject,
+    extra: {
+        selected: boolean;
+        highlighted: boolean;
+        onSelectionChange: (selected: boolean) => void;
+        onClick: (e: React.MouseEvent) => void;
+    }
+) {
+    const statusCfg = STATUS_CONFIG[item.status];
+    const priorityCfg = PRIORITY_CONFIG[item.priority];
+    return (
+        <Card
+            onClick={(e) => { if (e) extra.onClick(e); }}
+            className={cls("overflow-hidden cursor-pointer", extra.selected && "ring-1 ring-primary")}
+        >
+            <div className="h-24 bg-surface-100 dark:bg-surface-900 flex items-center justify-center relative">
+                <FolderKanbanIcon size={24} className="text-surface-400" />
+                <div className="absolute top-2 right-2">
+                    <Chip colorScheme={priorityCfg.color} size="smallest" outlined>{priorityCfg.label}</Chip>
+                </div>
+            </div>
+            <div className="p-3">
+                <Typography variant="subtitle2" noWrap>{item.name}</Typography>
+                <Typography variant="caption" color="secondary" className="line-clamp-2">{item.description}</Typography>
+                <div className="flex items-center gap-2 flex-wrap mt-2">
+                    <Chip colorScheme={statusCfg.color} size="smallest">{statusCfg.label}</Chip>
+                    {item.tags.slice(0, 2).map(tag => (
+                        <Chip key={tag} size="smallest" colorScheme="cyan">{tag}</Chip>
+                    ))}
+                </div>
+            </div>
+        </Card>
+    );
+}
+
+export function ProjectGrid() {
+    return (
+        <div style={{ height: 480 }} className="w-full overflow-auto rounded-lg border border-surface-200 dark:border-surface-800">
+            <CardView<SampleProject>
+                data={SAMPLE_PROJECTS}
+                dataLoading={false}
+                noMoreToLoad={true}
+                paginationEnabled={false}
+                size="m"
+                selectionEnabled
+                renderCard={renderCard}
+            />
+        </div>
+    );
+}
+```
+
+## CollectionView
+
+```ts
+
+```
+
+> This component takes no documented props, or its type could not be flattened. See the source.
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+interface SampleProject extends Record<string, unknown> {
+    id: string;
+    name: string;
+    status: string;
+    priority: string;
+    assignee: string;
+    tags: string[];
+    dueDate: string;
+}
+
+const properties: Record<string, CollectionPropertyConfig> = {
+    name: { type: "string", name: "Name" },
+    status: {
+        type: "string",
+        name: "Status",
+        enum: {
+            backlog: { label: "Backlog", color: "gray" },
+            in_progress: { label: "In Progress", color: "blue" },
+            in_review: { label: "In Review", color: "purple" },
+            done: { label: "Done", color: "green" }
+        }
+    },
+    priority: {
+        type: "string",
+        name: "Priority",
+        enum: {
+            low: { label: "Low", color: "gray" },
+            medium: { label: "Medium", color: "yellow" },
+            high: { label: "High", color: "orange" },
+            critical: { label: "Critical", color: "red" }
+        }
+    },
+    assignee: { type: "string", name: "Assignee" },
+    tags: { type: "array", name: "Tags", of: { type: "string", name: "Tag" } },
+    dueDate: { type: "date", name: "Due Date" }
+};
+
+const SAMPLE_PROJECTS: SampleProject[] = [
+    { id: "proj-1", name: "Website Redesign", status: "in_progress", priority: "high", assignee: "Alice Johnson", tags: ["frontend", "design"], dueDate: "2026-08-07" },
+    { id: "proj-2", name: "API Rate Limiting", status: "in_review", priority: "critical", assignee: "Bob Smith", tags: ["backend", "security"], dueDate: "2026-08-02" },
+    { id: "proj-3", name: "Mobile Push Notifications", status: "backlog", priority: "medium", assignee: "Carol White", tags: ["mobile", "backend"], dueDate: "2026-08-21" },
+    { id: "proj-4", name: "Dashboard Analytics", status: "in_progress", priority: "high", assignee: "David Brown", tags: ["frontend", "data"], dueDate: "2026-08-05" },
+    { id: "proj-5", name: "User Onboarding Flow", status: "done", priority: "medium", assignee: "Eva Green", tags: ["frontend", "ux"], dueDate: "2026-07-29" },
+    { id: "proj-6", name: "Database Migration v3", status: "backlog", priority: "low", assignee: "Frank Miller", tags: ["backend", "infrastructure"], dueDate: "2026-08-30" },
+    { id: "proj-7", name: "SSO Integration", status: "in_progress", priority: "critical", assignee: "Alice Johnson", tags: ["backend", "security"], dueDate: "2026-08-03" },
+    { id: "proj-8", name: "E2E Test Suite", status: "in_review", priority: "medium", assignee: "Bob Smith", tags: ["testing", "devops"], dueDate: "2026-08-01" },
+    { id: "proj-9", name: "Billing System Upgrade", status: "done", priority: "high", assignee: "Carol White", tags: ["backend", "payments"], dueDate: "2026-07-26" },
+    { id: "proj-10", name: "Dark Mode Polish", status: "backlog", priority: "low", assignee: "David Brown", tags: ["frontend", "design"], dueDate: "2026-08-14" }
+];
+
+const dataController: CollectionDataController<SampleProject> = {
+    data: SAMPLE_PROJECTS,
+    loading: false,
+    noMoreToLoad: true
+};
+
+export function TableMode() {
+    return (
+        <div style={{ height: 460 }} className="w-full">
+            <CollectionView<SampleProject>
+                dataController={dataController}
+                properties={properties}
+                idProperty="id"
+                titleProperty="name"
+                defaultViewMode="table"
+                enabledViews={["list", "table", "cards", "kanban"]}
+            />
+        </div>
+    );
+}
+```
+
+## KanbanView
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `data` | `{ id: string; data: T }[]` | yes | Drag-and-drop board. T = card payload, COLUMN = the column key union. |
+| `columns` | `COLUMN[]` | yes |  |
+| `assignColumn` | `(item: { id: string; data: T }) => COLUMN` | yes |  |
+| `ItemComponent` | `React.ComponentType<{ item: { id: string; data: T }; isDragging: boolean; isClone?: boolean; isGroupedOver?: boolean; style?: React.CSSProperties; index?: number }>` | yes |  |
+| `columnLabels` | `Record<COLUMN, string>` | — |  |
+| `columnColors` | `Record<COLUMN, unknown>` | — |  |
+| `allowColumnReorder` | `boolean` | — |  |
+| `onColumnReorder` | `(columns: COLUMN[]) => void` | — |  |
+| `onItemsReorder` | `(items: { id: string; data: T }[], moveInfo?: { itemId: string; sourceColumn: COLUMN; targetColumn: COLUMN }) => void` | — |  |
+| `columnLoadingState` | `{ [columnKey: string]: { loading: boolean; hasMore: boolean; itemCount: number; totalCount?: number } }` | — |  |
+| `onLoadMoreColumn` | `(column: COLUMN) => void` | — |  |
+| `onAddItemToColumn` | `(column: COLUMN) => void` | — |  |
+| `AddColumnComponent` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+type ProjectStatus = "backlog" | "in_progress" | "in_review" | "done";
+
+type ProjectPriority = "low" | "medium" | "high" | "critical";
+
+interface SampleProject {
+    id: string;
+    name: string;
+    description: string;
+    status: ProjectStatus;
+    priority: ProjectPriority;
+    assignee: string;
+    tags: string[];
+    dueDate: string;
+}
+
+const PRIORITY_CONFIG: Record<ProjectPriority, { label: string; color: ChipHue }> = {
+    low: { label: "Low", color: "gray" },
+    medium: { label: "Medium", color: "yellow" },
+    high: { label: "High", color: "orange" },
+    critical: { label: "Critical", color: "red" }
+};
+
+const STATUS_COLUMNS: ProjectStatus[] = ["backlog", "in_progress", "in_review", "done"];
+
+const COLUMN_LABELS: Record<ProjectStatus, string> = { backlog: "Backlog", in_progress: "In Progress", in_review: "In Review", done: "Done" };
+
+const COLUMN_COLORS: Record<ProjectStatus, string> = { backlog: "#6b7280", in_progress: "#3b82f6", in_review: "#8b5cf6", done: "#22c55e" };
+
+const SAMPLE_PROJECTS: SampleProject[] = [
+    { id: "proj-1", name: "Website Redesign", description: "Complete overhaul of the marketing website with new brand guidelines", status: "in_progress", priority: "high", assignee: "Alice Johnson", tags: ["frontend", "design"], dueDate: "2026-08-07" },
+    { id: "proj-2", name: "API Rate Limiting", description: "Implement token-bucket rate limiting across all public endpoints", status: "in_review", priority: "critical", assignee: "Bob Smith", tags: ["backend", "security"], dueDate: "2026-08-02" },
+    { id: "proj-3", name: "Mobile Push Notifications", description: "Add support for push notifications on iOS and Android clients", status: "backlog", priority: "medium", assignee: "Carol White", tags: ["mobile", "backend"], dueDate: "2026-08-21" },
+    { id: "proj-4", name: "Dashboard Analytics", description: "Build real-time analytics dashboard with charts and KPI widgets", status: "in_progress", priority: "high", assignee: "David Brown", tags: ["frontend", "data"], dueDate: "2026-08-05" },
+    { id: "proj-5", name: "User Onboarding Flow", description: "Multi-step onboarding wizard with progress tracking and email triggers", status: "done", priority: "medium", assignee: "Eva Green", tags: ["frontend", "ux"], dueDate: "2026-07-29" },
+    { id: "proj-6", name: "Database Migration v3", description: "Migrate from PostgreSQL 14 to 16 with zero-downtime strategy", status: "backlog", priority: "low", assignee: "Frank Miller", tags: ["backend", "infrastructure"], dueDate: "2026-08-30" },
+    { id: "proj-7", name: "SSO Integration", description: "SAML 2.0 and OIDC single sign-on for enterprise customers", status: "in_progress", priority: "critical", assignee: "Alice Johnson", tags: ["backend", "security", "enterprise"], dueDate: "2026-08-03" },
+    { id: "proj-8", name: "E2E Test Suite", description: "Playwright-based end-to-end tests covering critical user journeys", status: "in_review", priority: "medium", assignee: "Bob Smith", tags: ["testing", "devops"], dueDate: "2026-08-01" },
+    { id: "proj-9", name: "Billing System Upgrade", description: "Stripe integration upgrade with metered billing and invoice PDF generation", status: "done", priority: "high", assignee: "Carol White", tags: ["backend", "payments"], dueDate: "2026-07-26" },
+    { id: "proj-10", name: "Dark Mode Polish", description: "Audit and fix all remaining dark mode inconsistencies across the app", status: "backlog", priority: "low", assignee: "David Brown", tags: ["frontend", "design"], dueDate: "2026-08-14" }
+];
+
+function KanbanProjectCard({ item, isDragging, isGroupedOver, style }: BoardItemViewProps<SampleProject>) {
+    const project = item.data;
+    const priorityCfg = PRIORITY_CONFIG[project.priority];
+
+    const backgroundColor = isDragging
+        ? "bg-surface-100 dark:bg-surface-800"
+        : isGroupedOver
+            ? "bg-surface-200 dark:bg-surface-700"
+            : "bg-white dark:bg-surface-800";
+
+    return (
+        <div style={style} className="py-1">
+            <div className={cls("p-2 flex items-start border rounded-lg border-surface-200 dark:border-surface-800", backgroundColor, isDragging && "ring-2 ring-primary")}>
+                <div className="w-10 h-10 rounded-md shrink-0 mr-2 bg-surface-100 dark:bg-surface-900 flex items-center justify-center">
+                    <FolderKanbanIcon size={16} className="text-surface-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <Typography variant="body2" className="font-medium line-clamp-2">{project.name}</Typography>
+                    <Typography variant="caption" color="secondary" className="line-clamp-2">{project.description}</Typography>
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        <Chip colorScheme={priorityCfg.color} size="smallest" outlined>{priorityCfg.label}</Chip>
+                        {project.tags.slice(0, 1).map(tag => (
+                            <Chip key={tag} size="smallest" colorScheme="cyan">{tag}</Chip>
+                        ))}
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                        <Typography variant="caption" color="secondary">{project.assignee}</Typography>
+                        <Typography variant="caption" color="secondary" className="font-mono">{project.dueDate}</Typography>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export function ProjectBoard() {
+    const [boardData, setBoardData] = useState<BoardItem<SampleProject>[]>(() => SAMPLE_PROJECTS.map(p => ({ id: p.id, data: p })));
+    const [columns, setColumns] = useState<ProjectStatus[]>(STATUS_COLUMNS);
+
+    const assignColumn = useCallback((item: BoardItem<SampleProject>): ProjectStatus => item.data.status, []);
+
+    const handleItemsReorder = useCallback((items: BoardItem<SampleProject>[], moveInfo?: { itemId: string; sourceColumn: ProjectStatus; targetColumn: ProjectStatus }) => {
+        const updatedItems = items.map(item => {
+            if (moveInfo && item.id === moveInfo.itemId && moveInfo.sourceColumn !== moveInfo.targetColumn) {
+                return { ...item, data: { ...item.data, status: moveInfo.targetColumn } };
+            }
+            return item;
+        });
+        setBoardData(updatedItems);
+    }, []);
+
+    const handleColumnReorder = useCallback((reordered: ProjectStatus[]) => setColumns(reordered), []);
+
+    const columnLoadingState = useMemo(() => {
+        const state: Record<string, { loading: boolean; hasMore: boolean; itemCount: number; totalCount: number }> = {};
+        for (const col of columns) {
+            const count = boardData.filter(item => item.data.status === col).length;
+            state[col] = { loading: false, hasMore: false, itemCount: count, totalCount: count };
+        }
+        return state;
+    }, [boardData, columns]);
+
+    return (
+        <div style={{ height: 480 }} className="w-full rounded-lg border border-surface-200 dark:border-surface-800 overflow-hidden">
+            <KanbanView<SampleProject, ProjectStatus>
+                data={boardData}
+                columns={columns}
+                columnLabels={COLUMN_LABELS}
+                columnColors={COLUMN_COLORS}
+                assignColumn={assignColumn}
+                allowColumnReorder={true}
+                onColumnReorder={handleColumnReorder}
+                onItemsReorder={handleItemsReorder}
+                ItemComponent={KanbanProjectCard}
+                columnLoadingState={columnLoadingState}
+            />
+        </div>
+    );
+}
+```
+
+## ListView
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `data` | `T[]` | yes | Virtualized list. Generic over the row type T. |
+| `renderRow` | `(params: { item: T; index: number; style: React.CSSProperties; className: string; selected: boolean; highlighted: boolean; isLast: boolean; onClick: (e: React.MouseEvent) => void; onSelectionChange: (selected: boolean) => void }) => React.ReactNode` | yes |  |
+| `dataLoading` | `boolean` | — |  |
+| `noMoreToLoad` | `boolean` | — |  |
+| `dataLoadingError` | `Error` | — |  |
+| `itemCount` | `number` | — |  |
+| `setItemCount` | `(itemCount: number) => void` | — |  |
+| `pageSize` | `number` | — |  |
+| `paginationEnabled` | `boolean` | — |  |
+| `onItemClick` | `(item: T) => void` | — |  |
+| `selectedIds` | `Set<string \| number>` | — |  |
+| `highlightedIds` | `Set<string \| number>` | — |  |
+| `selectedEntityId` | `string \| number` | — |  |
+| `selectionEnabled` | `boolean` | — |  |
+| `onSelectionChange` | `(item: T, selected: boolean) => void` | — |  |
+| `size` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | — |  |
+| `emptyComponent` | `React.ReactNode` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+type ProjectStatus = "backlog" | "in_progress" | "in_review" | "done";
+
+type ProjectPriority = "low" | "medium" | "high" | "critical";
+
+interface SampleProject {
+    id: string;
+    name: string;
+    description: string;
+    status: ProjectStatus;
+    priority: ProjectPriority;
+    assignee: string;
+    tags: string[];
+    dueDate: string;
+}
+
+const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: ChipHue }> = {
+    backlog: { label: "Backlog", color: "gray" },
+    in_progress: { label: "In Progress", color: "blue" },
+    in_review: { label: "In Review", color: "purple" },
+    done: { label: "Done", color: "green" }
+};
+
+const PRIORITY_CONFIG: Record<ProjectPriority, { label: string; color: ChipHue }> = {
+    low: { label: "Low", color: "gray" },
+    medium: { label: "Medium", color: "yellow" },
+    high: { label: "High", color: "orange" },
+    critical: { label: "Critical", color: "red" }
+};
+
+const SAMPLE_PROJECTS: SampleProject[] = [
+    { id: "proj-1", name: "Website Redesign", description: "Complete overhaul of the marketing website with new brand guidelines", status: "in_progress", priority: "high", assignee: "Alice Johnson", tags: ["frontend", "design"], dueDate: "2026-08-07" },
+    { id: "proj-2", name: "API Rate Limiting", description: "Implement token-bucket rate limiting across all public endpoints", status: "in_review", priority: "critical", assignee: "Bob Smith", tags: ["backend", "security"], dueDate: "2026-08-02" },
+    { id: "proj-3", name: "Mobile Push Notifications", description: "Add support for push notifications on iOS and Android clients", status: "backlog", priority: "medium", assignee: "Carol White", tags: ["mobile", "backend"], dueDate: "2026-08-21" },
+    { id: "proj-4", name: "Dashboard Analytics", description: "Build real-time analytics dashboard with charts and KPI widgets", status: "in_progress", priority: "high", assignee: "David Brown", tags: ["frontend", "data"], dueDate: "2026-08-05" },
+    { id: "proj-5", name: "User Onboarding Flow", description: "Multi-step onboarding wizard with progress tracking and email triggers", status: "done", priority: "medium", assignee: "Eva Green", tags: ["frontend", "ux"], dueDate: "2026-07-29" },
+    { id: "proj-6", name: "Database Migration v3", description: "Migrate from PostgreSQL 14 to 16 with zero-downtime strategy", status: "backlog", priority: "low", assignee: "Frank Miller", tags: ["backend", "infrastructure"], dueDate: "2026-08-30" },
+    { id: "proj-7", name: "SSO Integration", description: "SAML 2.0 and OIDC single sign-on for enterprise customers", status: "in_progress", priority: "critical", assignee: "Alice Johnson", tags: ["backend", "security", "enterprise"], dueDate: "2026-08-03" },
+    { id: "proj-8", name: "E2E Test Suite", description: "Playwright-based end-to-end tests covering critical user journeys", status: "in_review", priority: "medium", assignee: "Bob Smith", tags: ["testing", "devops"], dueDate: "2026-08-01" }
+];
+
+function renderRow(params: {
+    item: SampleProject;
+    index: number;
+    style: React.CSSProperties;
+    className: string;
+    selected: boolean;
+    highlighted: boolean;
+    isLast: boolean;
+    onClick: (e: React.MouseEvent) => void;
+    onSelectionChange: (selected: boolean) => void;
+}) {
+    const { item, style, className, selected, onClick } = params;
+    const statusCfg = STATUS_CONFIG[item.status];
+    const priorityCfg = PRIORITY_CONFIG[item.priority];
+    return (
+        <div
+            style={style}
+            className={cls(
+                "flex items-center gap-3 px-4 cursor-pointer",
+                selected && "ring-1 ring-primary",
+                className
+            )}
+            onClick={onClick}
+        >
+            <div className="flex-1 min-w-0 py-1">
+                <Typography variant="subtitle2" noWrap>{item.name}</Typography>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <Chip colorScheme={statusCfg.color} size="smallest">{statusCfg.label}</Chip>
+                    <Chip colorScheme={priorityCfg.color} size="smallest" outlined>{priorityCfg.label}</Chip>
+                    <Typography variant="caption" color="secondary">{item.assignee}</Typography>
+                </div>
+            </div>
+            <Typography variant="caption" color="secondary" className="font-mono">{item.dueDate}</Typography>
+        </div>
+    );
+}
+
+export function ProjectList() {
+    return (
+        <div style={{ height: 420 }} className="w-full overflow-auto">
+            <ListView<SampleProject>
+                data={SAMPLE_PROJECTS}
+                dataLoading={false}
+                noMoreToLoad={true}
+                paginationEnabled={false}
+                size="l"
+                renderRow={renderRow}
+            />
+        </div>
+    );
+}
+```
+
+## Table field editors
+
+5 components.
+
+- [VirtualTableDateField](/docs/ui/field-editors/virtualtabledatefield)
+- [VirtualTableInput](/docs/ui/field-editors/virtualtableinput)
+- [VirtualTableNumberInput](/docs/ui/field-editors/virtualtablenumberinput)
+- [VirtualTableSelect](/docs/ui/field-editors/virtualtableselect)
+- [VirtualTableSwitch](/docs/ui/field-editors/virtualtableswitch)
+
+## VirtualTableDateField
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | `string` | — |  |
+| `error` | `Error` | — |  |
+| `mode` | `"date" \| "date_time"` | — |  |
+| `timezone` | `string` | — |  |
+| `internalValue` | `Date` | yes |  |
+| `updateValue` | `(newValue: (Date \| null)) => void` | yes |  |
+| `focused` | `boolean` | yes |  |
+| `disabled` | `boolean` | yes |  |
+| `small` | `boolean` | — |  |
+| `locale` | `string` | — |  |
+| `onBlur` | `React.FocusEventHandler<HTMLInputElement \| HTMLTextAreaElement>` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function CellShell({
+  selected,
+  width = 200,
+  height = 44,
+  children
+}: {
+  selected?: boolean;
+  width?: number;
+  height?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-md" style={{ width, height }}>
+      <div
+        className={cls(
+          "flex relative h-full rounded-md border-4 p-1",
+          selected ? "border-primary bg-surface-accent-50 dark:bg-surface-accent-900" : "border-transparent"
+        )}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function DueDateCell() {
+  return (
+    <CellShell selected width={180} height={64}>
+      <VirtualTableDateField
+        mode="date"
+        internalValue={new Date(2026, 7, 15)}
+        focused
+        disabled={false}
+        updateValue={() => {}}
+      />
+    </CellShell>
+  );
+}
+```
+
+## VirtualTableInput
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `error` | `Error` | — |  |
+| `value` | `string` | yes |  |
+| `multiline` | `boolean` | — |  |
+| `focused` | `boolean` | yes |  |
+| `disabled` | `boolean` | yes |  |
+| `updateValue` | `(newValue: (string \| null)) => void` | yes |  |
+| `onBlur` | `() => void` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function CellShell({
+  selected,
+  width = 240,
+  height = 44,
+  children
+}: {
+  selected?: boolean;
+  width?: number;
+  height?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-md" style={{ width, height }}>
+      <div
+        className={cls(
+          "flex relative h-full rounded-md border-4 p-1",
+          selected ? "border-primary bg-surface-accent-50 dark:bg-surface-accent-900" : "border-transparent"
+        )}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function FocusedTextCell() {
+  return (
+    <CellShell selected width={260}>
+      <VirtualTableInput
+        value="Add authentication middleware to /api routes"
+        focused
+        disabled={false}
+        updateValue={() => {}}
+      />
+    </CellShell>
+  );
+}
+```
+
+## VirtualTableNumberInput
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `error` | `Error` | — |  |
+| `value` | `number` | yes |  |
+| `align` | `"center" \| "left" \| "right"` | — |  |
+| `updateValue` | `(newValue: (number \| null)) => void` | yes |  |
+| `focused` | `boolean` | yes |  |
+| `disabled` | `boolean` | yes |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function CellShell({
+  selected,
+  width = 160,
+  height = 44,
+  children
+}: {
+  selected?: boolean;
+  width?: number;
+  height?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-md" style={{ width, height }}>
+      <div
+        className={cls(
+          "flex relative h-full rounded-md border-4 p-1",
+          selected ? "border-primary bg-surface-accent-50 dark:bg-surface-accent-900" : "border-transparent"
+        )}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function RightAlignedCountCell() {
+  return (
+    <CellShell selected width={160}>
+      <VirtualTableNumberInput
+        value={128442}
+        align="right"
+        focused
+        disabled={false}
+        updateValue={() => {}}
+      />
+    </CellShell>
+  );
+}
+```
+
+## VirtualTableSelect
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `options` | `VirtualTableSelectOption[]` | yes |  |
+| `error` | `Error` | — |  |
+| `multiple` | `boolean` | — |  |
+| `disabled` | `boolean` | yes |  |
+| `small` | `boolean` | — |  |
+| `value` | `string \| number \| string[] \| number[]` | yes |  |
+| `updateValue` | `(newValue: (string \| number \| string[] \| number[] \| null)) => void` | yes |  |
+| `focused` | `boolean` | yes |  |
+| `onBlur` | `React.FocusEventHandler<HTMLInputElement \| HTMLTextAreaElement>` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function CellShell({
+  selected,
+  width = 220,
+  height = 44,
+  children
+}: {
+  selected?: boolean;
+  width?: number;
+  height?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-md" style={{ width, height }}>
+      <div
+        className={cls(
+          "flex relative h-full rounded-md border-4 p-1",
+          selected ? "border-primary bg-surface-accent-50 dark:bg-surface-accent-900" : "border-transparent"
+        )}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const STATUS_OPTIONS = [
+  { value: "active", label: "Active" },
+  { value: "invited", label: "Invited" },
+  { value: "suspended", label: "Suspended" }
+];
+
+export function SingleSelectCell() {
+  return (
+    <CellShell selected width={200}>
+      <VirtualTableSelect
+        options={STATUS_OPTIONS}
+        value="active"
+        multiple={false}
+        focused
+        disabled={false}
+        updateValue={() => {}}
+      />
+    </CellShell>
+  );
+}
+```
+
+## VirtualTableSwitch
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `error` | `Error` | — |  |
+| `internalValue` | `boolean` | — |  |
+| `focused` | `boolean` | yes |  |
+| `disabled` | `boolean` | yes |  |
+| `updateValue` | `(newValue: (boolean \| null)) => void` | yes |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+function CellShell({
+  selected,
+  width = 120,
+  height = 44,
+  children
+}: {
+  selected?: boolean;
+  width?: number;
+  height?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-md" style={{ width, height }}>
+      <div
+        className={cls(
+          "flex items-center relative h-full rounded-md border-4 p-1",
+          selected ? "border-primary bg-surface-accent-50 dark:bg-surface-accent-900" : "border-transparent"
+        )}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function EnabledToggleCell() {
+  return (
+    <CellShell selected>
+      <VirtualTableSwitch
+        internalValue
+        focused
+        disabled={false}
+        updateValue={() => {}}
+      />
+    </CellShell>
+  );
+}
+```
+
+## Icons
+
+2 components.
+
+- [GitHubIcon](/docs/ui/icons/githubicon)
+- [HandleIcon](/docs/ui/icons/handleicon)
+
+## GitHubIcon
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `size` | `number \| "small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `color` | `"inherit" \| "disabled" \| "error" \| "warning" \| "success" \| "primary" \| "secondary"` | — |  |
+| `className` | `string` | — |  |
+| `onClick` | `(e: React.SyntheticEvent) => void` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+const SIZES = [16, 24, 32, 48];
+
+const COLORS: { label: string; className: string }[] = [
+    { label: "default", className: "text-surface-900 dark:text-surface-50" },
+    { label: "primary", className: "text-primary" },
+    { label: "secondary", className: "text-surface-500" },
+    { label: "error", className: "text-red-500" }
+];
+
+export function SizesAndColors() {
+    return (
+        <div className="flex flex-col gap-4 w-full">
+            <div className="flex items-end gap-4">
+                {SIZES.map(size => (
+                    <div key={size} className="flex flex-col items-center gap-1">
+                        <GitHubIcon size={size} className="text-surface-900 dark:text-surface-50" />
+                        <Typography variant="caption" color="secondary" className="font-mono">{size}px</Typography>
+                    </div>
+                ))}
+            </div>
+            <div className="flex items-center gap-4">
+                {COLORS.map(({ label, className }) => (
+                    <div key={label} className="flex flex-col items-center gap-1">
+                        <GitHubIcon size={28} className={className} />
+                        <Typography variant="caption" color="secondary">{label}</Typography>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+```
+
+## HandleIcon
+
+```ts
+
+```
+
+### Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `size` | `number \| "small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `color` | `"inherit" \| "disabled" \| "error" \| "warning" \| "success" \| "primary" \| "secondary"` | — |  |
+| `className` | `string` | — |  |
+| `onClick` | `(e: React.SyntheticEvent) => void` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+### Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+// The DS's own drag-handle icon. Takes IconProps like GitHubIcon does:
+// `size` is a number or an iconSize keyword, plus color/className/style/onClick.
+const SIZES = ["smallest", "small", "medium", "large"] as const;
+
+export function Sizes() {
+    return (
+        <div className="flex items-end gap-4 p-4">
+            {SIZES.map(size => (
+                <div key={size} className="flex flex-col items-center gap-1">
+                    <HandleIcon size={size}/>
+                    <Typography variant="caption" color="secondary" className="font-mono">{size}</Typography>
+                </div>
+            ))}
+            <div className="flex flex-col items-center gap-1">
+                <HandleIcon size={40}/>
+                <Typography variant="caption" color="secondary" className="font-mono">40</Typography>
+            </div>
+        </div>
+    );
+}
+```
+
 ## Client SDK — Getting Started
 
 ### Overview
@@ -23563,6 +28556,9 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
+`rebase resources --check` is new <span class="since-badge" data-since="0.18">Since 0.18</span> — the flag a CI job uses to fail
+on a `rebase.resources.json` that no longer matches the config code.
+
 A resource is declared in config code — `database("analytics")`,
 `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — or is a file
 under `backend/crons` or `backend/functions`, and never written by hand in
@@ -23985,6 +28981,9 @@ rebase db branch switch --off
 rebase db branch info feature_auth
 rebase db branch delete feature_auth
 ```
+
+`rebase db branch switch` (and `switch --off`) and `rebase db branch prune`
+are new <span class="since-badge" data-since="0.18">Since 0.18</span>. `create`, `list`, `info` and `delete` shipped in 0.17.
 
 Each branch is a full copy of the database made with `CREATE DATABASE ... TEMPLATE`,
 so it needs a real PostgreSQL server and it costs the same disk as its source.
@@ -25215,6 +30214,10 @@ volumes:
   postgres_data:
 ```
 
+The three `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` lines are new <span class="since-badge" data-since="0.18">Since 0.18</span>
+— on 0.17.3 the first account to register becomes the administrator, in
+production too. See [Your first admin](#your-first-admin) below.
+
 `rebase init` writes all of these into `.env` for you, including a generated
 admin password. Each is declared with `${VAR:?…}`, so a missing one stops the
 stack with a message naming it rather than starting something half-configured —
@@ -25952,7 +30955,9 @@ npm install -g @rebasepro/server @rebasepro/server-postgres
 rebase-server /srv/myapp/dist-bundle
 ```
 
-`rebase-server --help` lists the variables it reads. Under systemd:
+`rebase-server --help` lists the variables it reads. Under systemd — the
+three admin lines are new <span class="since-badge" data-since="0.18">Since 0.18</span>, and on 0.17.3 the first account to
+register becomes the administrator instead:
 
 ```ini title="/etc/systemd/system/rebase.service"
 [Service]
@@ -26931,6 +31936,9 @@ REBASE_ADMIN_EMAIL=you@yourdomain.com
 REBASE_ADMIN_PASSWORD=at_least_twelve_characters
 ```
 
+`REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` are new <span class="since-badge" data-since="0.18">Since 0.18</span>: on 0.17.3
+the first account to register becomes the administrator, in production too.
+
 All six are required — the Compose file declares them with `${VAR:?…}` and
 refuses to interpolate without them.
 
@@ -27294,6 +32302,9 @@ primary_region = "fra"
 
 `/livez` rather than `/health`: the second performs a database round-trip, so a liveness check on it restarts a healthy machine during a brief database hiccup.
 
+`DISABLE_SELF_REGISTRATION` is new <span class="since-badge" data-since="0.18">Since 0.18</span>: on 0.17.3 there is no such
+switch, and the first account to register becomes the administrator.
+
 Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched.
 
 ### 3. Set production secrets
@@ -27309,7 +32320,7 @@ fly secrets set \
   -a my-rebase-app
 ```
 
-The last two are how this app gets an administrator at all: in production the first account to register is not promoted, so nothing else produces the first signed-in caller. Set them before the first deploy serves traffic — see [Your first admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` shows only digests, so keep the generated password from this command; there is no way to read it back.
+The last two are new <span class="since-badge" data-since="0.18">Since 0.18</span>, and are how this app gets an administrator at all: in production the first account to register is not promoted, so nothing else produces the first signed-in caller. Set them before the first deploy serves traffic — see [Your first admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` shows only digests, so keep the generated password from this command; there is no way to read it back.
 
 ### 4. Deploy
 

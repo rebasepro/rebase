@@ -104,6 +104,7 @@ this list, in this order.
 | `check:docs-imports` | Every identifier the docs import exists in the API-surface baseline. | `pnpm write:api-surface` |
 | `check:legacy-rls` | Whether the legacy RLS path is finally removable, so it does not outlive its reason. | — |
 | `check:generated` | `llms.txt`, `llms-full.txt`, `sitemap.md` and the per-locale changelog mirrors are current. | `pnpm -C website generate-all` |
+| `check:llms-coverage` | Every English docs page is *in* those mirrors — the direction the regenerate-and-diff above cannot see. Runs inside `check:generated`. | — |
 | `test:gates` | The gate scripts' own unit tests. | — |
 
 ## Tests and end to end
