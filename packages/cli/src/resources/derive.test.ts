@@ -19,6 +19,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+    describeIssue,
     deriveResourceGraph,
     parseResourceGraph,
     serializeResourceGraph,
@@ -278,5 +279,62 @@ describe("temp fixtures", () => {
         expect(path.dirname(root)).toBe(PACKAGE_ROOT);
         expect(root.startsWith(path.join(PACKAGE_ROOT, "src"))).toBe(false);
         expect(os.tmpdir()).toBeTruthy();
+    });
+});
+
+describe("a version skew is named as a version skew", () => {
+    // Both directions arrive as an error about the reader's own file —
+    // `resources.ts  The requested module '@rebasepro/types' does not provide an
+    // export named 'queue'` — with nothing in it about either version, so the
+    // reader goes looking for a typo in code they copied out of the docs. The
+    // project running this suite is the workspace, so `@rebasepro/types`
+    // resolves from it and the installed version is the workspace's own.
+    const installed = JSON.parse(
+        fs.readFileSync(path.join(PACKAGE_ROOT, "..", "types", "package.json"), "utf-8")
+    ).version as string;
+
+    const namedExport = new Error(
+        "The requested module '@rebasepro/types' does not provide an export named 'queue'"
+    );
+
+    it("names the installed package version and the CLI's own", () => {
+        const message = describeIssue(namedExport, PACKAGE_ROOT, "9.9.9");
+        expect(message).toContain(`@rebasepro/types ${installed} is installed`);
+        expect(message).toContain("this CLI is 9.9.9");
+        expect(message).toContain("Run pnpm add @rebasepro/types@9.9.9");
+        // The original error still leads: it says which file and which export.
+        expect(message.startsWith("The requested module")).toBe(true);
+        // One line, because every caller prints `path  message` on one row.
+        expect(message).not.toContain("\n");
+    });
+
+    it("points at the CLI when the CLI is the older half", () => {
+        const message = describeIssue(namedExport, PACKAGE_ROOT, "0.0.1");
+        expect(message).toContain("which is older");
+        expect(message).toContain(`Update the CLI to ${installed}`);
+    });
+
+    it("says nothing extra when the two agree", () => {
+        expect(describeIssue(namedExport, PACKAGE_ROOT, installed)).toBe(namedExport.message);
+    });
+
+    it("handles a package the project does not have at all", () => {
+        // A specifier nothing in the workspace provides, so the resolve really
+        // fails rather than finding a copy the test did not mean.
+        const missing = Object.assign(
+            new Error("Cannot find package '@rebasepro/not-a-real-package' imported from resources.ts"),
+            { code: "ERR_MODULE_NOT_FOUND" }
+        );
+        const message = describeIssue(missing, PACKAGE_ROOT, "9.9.9");
+        expect(message).toContain("@rebasepro/not-a-real-package is not installed in this project");
+        expect(message).toContain("Run pnpm add @rebasepro/not-a-real-package@9.9.9");
+    });
+
+    it("leaves an error that is not a skew alone", () => {
+        const other = new Error("Unexpected token '}'");
+        expect(describeIssue(other, PACKAGE_ROOT, "9.9.9")).toBe("Unexpected token '}'");
+        // A missing export from a package nobody here publishes is not our skew.
+        const foreign = new Error("The requested module 'zod' does not provide an export named 'z'");
+        expect(describeIssue(foreign, PACKAGE_ROOT, "9.9.9")).toBe(foreign.message);
     });
 });
