@@ -276,12 +276,25 @@ export function getProjectPort(projectRoot: string): number {
 }
 
 /**
- * Resolve the best starting port for this project:
- * 1. Explicit --port flag (highest priority)
- * 2. PORT env var
- * 3. Previously used port from .rebase-dev-port (port affinity across restarts)
- * 4. Deterministic hash from project path (unique per project)
+ * Which rung of the ladder below decided the port.
+ *
+ * Reported because the ladder is invisible from the outside and the two middle
+ * rungs look identical from where the developer stands: `PORT` in the shell
+ * wins, `PORT` in `.env` does not — `rebase dev` never reads the file for it —
+ * and a saved affinity port looks exactly like a derived one. A developer who
+ * sets `PORT=3001` in `.env`, sees 3774, and has nothing to read but the number
+ * concludes the setting is broken rather than out of scope.
  */
+export type StartPortSource = "--port" | "PORT" | "affinity" | "derived";
+
+/** What the banner says after the port, naming the rung. */
+export const START_PORT_SOURCE_LABELS: Record<StartPortSource, string> = {
+    "--port": "from --port",
+    PORT: "from PORT",
+    affinity: "kept from the last run",
+    derived: "derived"
+};
+
 /**
  * A TCP port, or `undefined` for anything that is not one.
  *
@@ -298,14 +311,27 @@ function parsePort(raw: string | undefined): number | undefined {
     return port;
 }
 
-export function resolveStartPort(projectRoot: string, explicitPort?: number): number {
+/**
+ * The port this project's backend starts on, and the rung that decided it:
+ * 1. `--port` (highest priority)
+ * 2. `PORT` **in the shell environment** — a `PORT` in `.env` is not read here
+ * 3. the port a previous run saved in `.rebase-dev-port` (affinity)
+ * 4. a port derived from the project path, unique per project
+ */
+export function resolveStartPort(
+    projectRoot: string,
+    explicitPort?: number
+): { port: number; source: StartPortSource } {
     // 1. Explicit flag
-    if (explicitPort) return explicitPort;
+    if (explicitPort) return { port: explicitPort, source: "--port" };
 
-    // 2. PORT env var
+    // 2. PORT env var. `process.env` only: the CLI does not load `.env` before
+    // resolving the port, so a `PORT=` line in that file never reaches here —
+    // it is handed to the child, which this then overrides. Both facts are in
+    // `getting-started/configuration.md` and in `rebase dev --help`.
     if (process.env.PORT) {
         const fromEnv = parsePort(process.env.PORT);
-        if (fromEnv !== undefined) return fromEnv;
+        if (fromEnv !== undefined) return { port: fromEnv, source: "PORT" };
         // Set deliberately and unusable: falling through silently would start a
         // server on a port nobody asked for and say nothing about why.
         console.warn(chalk.yellow(
@@ -318,12 +344,12 @@ export function resolveStartPort(projectRoot: string, explicitPort?: number): nu
         const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
         if (fs.existsSync(portFile)) {
             const saved = parsePort(fs.readFileSync(portFile, "utf-8"));
-            if (saved !== undefined) return saved;
+            if (saved !== undefined) return { port: saved, source: "affinity" };
         }
     } catch { /* ignore */ }
 
     // 4. Deterministic hash
-    return getProjectPort(projectRoot);
+    return { port: getProjectPort(projectRoot), source: "derived" };
 }
 
 /**
@@ -595,7 +621,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // Resolve the ports ONCE, before starting anything. Both, because the
     // backend is told where the frontend will be and cannot be told later: its
     // environment is fixed when it spawns.
-    const startPort = resolveStartPort(projectRoot, args["--port"]);
+    const { port: startPort, source: startPortSource } = resolveStartPort(projectRoot, args["--port"]);
     const pinnedFrontendPort = process.env.REBASE_FRONTEND_PORT;
     if (pinnedFrontendPort && !/^\d+$/.test(pinnedFrontendPort)) {
         throw new Error(`REBASE_FRONTEND_PORT must be a number, got ${JSON.stringify(pinnedFrontendPort)}.`);
@@ -954,7 +980,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         }
 
         console.log(`  ${chalk.cyan("▶")} Backend:  ${chalk.gray(backendDir)}`);
-        console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(String(startPort))}`);
+        console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(String(startPort))} ${chalk.gray(`(${START_PORT_SOURCE_LABELS[startPortSource]})`)}`);
         console.log(`  ${chalk.gray("↳ Database")} = ${chalk.white(
             prepared ? prepared.description : "none (--no-db) — the backend needs DATABASE_URL"
         )}`);
@@ -1496,6 +1522,19 @@ ${chalk.green.bold("Which database")}
   is left alone entirely. Pass ${chalk.blue("--no-db")}, or set REBASE_DEV_NO_DB=1, to
   start nothing — the backend then fails on the database it cannot reach,
   which is the point.
+
+${chalk.green.bold("Which port")}
+  Ordered like the database, and the order is the promise. The first of
+  these that says something wins, and the start banner names which one did:
+
+    1. ${chalk.blue("--port <n>")}              on this command line
+    2. ${chalk.gray("PORT")}                    in the shell environment
+    3. the port the last ${chalk.gray("rebase dev")} used ${chalk.gray("(.rebase-dev-port)")}
+    4. a port derived from this project's path
+
+  ${chalk.gray("PORT")} in the project's .env is ${chalk.bold("not")} read here: this command resolves
+  its port before .env is loaded and then sets ${chalk.gray("PORT")} for the backend from
+  what it resolved. Export it in your shell, or pass ${chalk.blue("--port")}.
 
 ${chalk.green.bold("Description")}
   Starts both the backend (tsx watch + Hono) and frontend (Vite)

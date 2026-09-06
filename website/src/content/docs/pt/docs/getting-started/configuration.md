@@ -1,5 +1,5 @@
 ---
-sourceHash: 2078e2f99041a59e
+sourceHash: 710f0740be4d1614
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -38,7 +38,7 @@ Toda a configuração é feita através de variáveis de ambiente no seu arquivo
 
 | Variável | Descrição | Padrão |
 |----------|-------------|---------|
-| `PORT` | Porta para o servidor HTTP de backend | `3001` |
+| `PORT` | Porta para o servidor HTTP de backend. Lida por `rebase start`. O `rebase dev` lê-a **apenas do ambiente da shell** — uma `PORT` no `.env` não é lida aí, porque a porta é resolvida antes de esse ficheiro ser carregado — e caso contrário usa uma porta derivada do caminho do projeto, para que vários projetos possam correr ao mesmo tempo. `rebase dev --port` prevalece sobre ambas, e o banner de arranque indica que nível usou. | `3001` |
 | `LOG_LEVEL` | Nível de verbosidade de log: `error`, `warn`, `info`, `debug` | `info` |
 | `NODE_ENV` | Ambiente: `development` ou `production` | `development` |
 
