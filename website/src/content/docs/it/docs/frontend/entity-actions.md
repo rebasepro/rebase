@@ -1,4 +1,5 @@
 ---
+sourceHash: 3bf8656e3408eede
 title: Azioni Entità
 sidebar_label: Azioni Entità
 description: Aggiungi pulsanti di azione personalizzati alle entità per archiviazione, pubblicazione, esportazione, clonazione e altro.

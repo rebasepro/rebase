@@ -1,4 +1,5 @@
 ---
+sourceHash: 04421ade309db1ce
 title: Recherche
 sidebar_label: Recherche
 description: Comment se comporte .search() par défaut, et comment configurer une collection Postgres pour utiliser la recherche plein texte classée sur les champs que vous nommez — y compris le contenu JSONB et tableau.

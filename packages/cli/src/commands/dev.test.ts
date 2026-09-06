@@ -13,10 +13,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
+import net from "net";
 import os from "os";
 import path from "path";
 
-import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, devWatchIncludes, getProjectPort, readEnvValue, resolveStartPort, SCAFFOLD_DEFAULT_PORT } from "./dev";
+import { DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devWatchIncludes, getProjectPort, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
+import type { PreparedDatabase } from "../dev-db/prepare";
 
 /**
  * `rebase dev` must notice a function or cron that did not exist when it
@@ -141,37 +143,37 @@ force: true });
         fs.writeFileSync(path.join(projectRoot, DEV_PORT_FILENAME), port, "utf-8");
 
     it("falls back to the project hash when nothing else says otherwise", () => {
-        expect(resolveStartPort(projectRoot)).toBe(getProjectPort(projectRoot));
+        expect(resolveStartPort(projectRoot)).toEqual({ port: getProjectPort(projectRoot), source: "derived" });
     });
 
     it("prefers the saved port file over the hash", () => {
         writePortFile("4321");
-        expect(resolveStartPort(projectRoot)).toBe(4321);
+        expect(resolveStartPort(projectRoot)).toEqual({ port: 4321, source: "affinity" });
     });
 
     it("prefers PORT over the saved port file", () => {
         writePortFile("4321");
         process.env.PORT = "5555";
-        expect(resolveStartPort(projectRoot)).toBe(5555);
+        expect(resolveStartPort(projectRoot)).toEqual({ port: 5555, source: "PORT" });
     });
 
     it("prefers the explicit flag over everything", () => {
         writePortFile("4321");
         process.env.PORT = "5555";
-        expect(resolveStartPort(projectRoot, 6006)).toBe(6006);
+        expect(resolveStartPort(projectRoot, 6006)).toEqual({ port: 6006, source: "--port" });
     });
 
     it("ignores a port file holding an out-of-range or unparseable value", () => {
         const hashed = getProjectPort(projectRoot);
         for (const bad of ["0", "-1", "65536", "999999", "not-a-port", ""]) {
             writePortFile(bad);
-            expect(resolveStartPort(projectRoot)).toBe(hashed);
+            expect(resolveStartPort(projectRoot)).toEqual({ port: hashed, source: "derived" });
         }
     });
 
     it("tolerates trailing whitespace in the port file", () => {
         writePortFile("4321\n");
-        expect(resolveStartPort(projectRoot)).toBe(4321);
+        expect(resolveStartPort(projectRoot)).toEqual({ port: 4321, source: "affinity" });
     });
 
     // The twin of the port-file case above. It was the branch without the
@@ -182,25 +184,25 @@ force: true });
         for (const bad of ["0", "-1", "65536", "999999", "not-a-port", "80.5", "  "]) {
             process.env.PORT = bad;
             const resolved = resolveStartPort(projectRoot);
-            expect(Number.isInteger(resolved)).toBe(true);
-            expect(resolved).toBe(hashed);
+            expect(Number.isInteger(resolved.port)).toBe(true);
+            expect(resolved).toEqual({ port: hashed, source: "derived" });
         }
     });
 
     it("falls back to the port file, not the hash, when PORT is unusable", () => {
         writePortFile("4321");
         process.env.PORT = "not-a-port";
-        expect(resolveStartPort(projectRoot)).toBe(4321);
+        expect(resolveStartPort(projectRoot)).toEqual({ port: 4321, source: "affinity" });
     });
 
     it("tolerates surrounding whitespace in PORT", () => {
         process.env.PORT = " 5555 ";
-        expect(resolveStartPort(projectRoot)).toBe(5555);
+        expect(resolveStartPort(projectRoot)).toEqual({ port: 5555, source: "PORT" });
     });
 
     it("falls back to the hash when the project directory does not exist", () => {
         const missing = path.join(projectRoot, "gone");
-        expect(resolveStartPort(missing)).toBe(getProjectPort(missing));
+        expect(resolveStartPort(missing)).toEqual({ port: getProjectPort(missing), source: "derived" });
     });
 });
 
@@ -318,6 +320,46 @@ describe("the dev help and the dev flag spec", () => {
         expect(source).toContain("const noDb =");
     });
 
+    it("names every rung of the port ladder, and which PORT is read", async () => {
+        // `getting-started/configuration.md` said `rebase dev` ignores `PORT`.
+        // It is precedence rung 2 — for a `PORT` in the *shell*; a `PORT` in
+        // `.env` really is ignored, because the port is resolved before the
+        // file is loaded. Neither the doc nor this page distinguished the two,
+        // so both readings of the sentence were available and one was wrong.
+        const printed: string[] = [];
+        const spy = vi.spyOn(console, "log").mockImplementation(message => {
+            printed.push(String(message));
+        });
+        try {
+            await devCommand(["node", "rebase", "dev", "--help"]);
+        } finally {
+            spy.mockRestore();
+        }
+
+        // eslint-disable-next-line no-control-regex
+        const help = printed.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+        expect(help).toContain("Which port");
+        expect(help).toContain("PORT");
+        expect(help).toContain("in the shell environment");
+        expect(help).toContain(".rebase-dev-port");
+        // The distinction the doc was missing, stated where the flag is read.
+        expect(help).toMatch(/PORT.* in the project's \.env is .*not.* read here/);
+    });
+
+    it("has a banner label for every rung the resolver can return", () => {
+        // The labels are what the start banner prints after the port. A rung
+        // added without one would print `undefined` next to the number.
+        const source = fs.readFileSync(path.join(import.meta.dirname, "dev.ts"), "utf8");
+        const declared = source.match(/export type StartPortSource = ([^;]+);/);
+        expect(declared).not.toBeNull();
+        const rungs = [...declared![1].matchAll(/"([^"]+)"/g)].map(match => match[1]);
+
+        expect(rungs).toEqual(expect.arrayContaining(["--port", "PORT", "derived"]));
+        for (const rung of rungs) {
+            expect(START_PORT_SOURCE_LABELS[rung as keyof typeof START_PORT_SOURCE_LABELS]).toBeTruthy();
+        }
+    });
+
     it("no longer claims a docker-compose db service is started first", async () => {
         // It is started only for `--docker`, or for a DATABASE_URL that already
         // points at this machine. A scaffolded project sets neither and runs on
@@ -337,5 +379,178 @@ describe("the dev help and the dev flag spec", () => {
         const help = printed.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
         expect(help).not.toContain("service is started first");
         expect(help).toContain("the managed development database");
+    });
+});
+
+describe("portMovedNotice", () => {
+    /**
+     * The banner prints `↳ PORT = 3014` before the server binds, because the
+     * backend's environment is fixed when it spawns. When the port is taken the
+     * server moves and says so — and the banner is then wrong, with the true
+     * number appearing in a `[backend]` line a hundred lines of DDL later.
+     */
+    it("reads both ports out of the backend's own warning", () => {
+        expect(portMovedNotice("⚠️ [WARN] Port 4017 is in use — trying 4018."))
+            .toEqual({ from: "4017", to: "4018" });
+    });
+
+    it("reads it through the colour the logger writes", () => {
+        expect(portMovedNotice("[33m⚠️ Port 3013 is in use — trying 3014.[0m"))
+            .toEqual({ from: "3013", to: "3014" });
+    });
+
+    it("says nothing about the last port, which is not a move", () => {
+        // "Port N is in use, and it was the last one to try." — there is no new
+        // number to correct the banner with.
+        expect(portMovedNotice("Port 3013 is in use, and it was the last one to try.")).toBeNull();
+    });
+
+    it("says nothing about an ordinary log line", () => {
+        expect(portMovedNotice("Server running at http://localhost:3001")).toBeNull();
+        expect(portMovedNotice("[INFO] Port scanning is disabled")).toBeNull();
+    });
+});
+
+describe("schemaPushArgv", () => {
+    /**
+     * The first `rebase dev --docker` of a fresh scaffold used to start the
+     * container and then kill itself. The push ran in-process with
+     * `["node","rebase","db","push"]` — an argv naming no database — so
+     * `runDriverDbCommand` re-resolved from a `.env` whose `DATABASE_URL` is
+     * commented out, decided "managed PGlite", and refused a command that was
+     * never meant for PGlite. The container it had just started was two lines
+     * above in the same transcript.
+     */
+    it("names the database the preflight resolved", () => {
+        const url = "postgresql://rebase_app:pw@127.0.0.1:5435/rebase";
+
+        expect(schemaPushArgv(url)).toEqual(["node", "rebase", "db", "push", "--database-url", url]);
+    });
+
+    it("says nothing when there is no database to name", () => {
+        // `ensureDevDatabase` never reaches a push in this state; the argv stays
+        // the plain one rather than carrying an empty flag value.
+        expect(schemaPushArgv(undefined)).toEqual(["node", "rebase", "db", "push"]);
+    });
+
+    it("keeps the argv shape every command in this CLI receives", () => {
+        // The driver slices the process argument vector, so the first two
+        // entries are not decoration.
+        expect(schemaPushArgv("postgres://u@127.0.0.1:5432/db").slice(0, 2)).toEqual(["node", "rebase"]);
+    });
+});
+
+describe("the ↳ Database banner line", () => {
+    /**
+     * The boot this line introduces writes DDL. Until it named an address, the
+     * only output that ever did was a *failed* connection: a successful boot
+     * against `postgresql://app:pw@127.0.0.1:3141/appdb` mentioned neither 3141
+     * nor `appdb` anywhere in 126 lines.
+     */
+    const external = (url: string): PreparedDatabase => ({
+        database: { kind: "external", url, source: "environment" },
+        env: {},
+        description: "your database (DATABASE_URL in the environment)"
+    });
+
+    it("names the host, the port and the database for an external URL", () => {
+        const line = databaseBannerValue(external("postgresql://app:sweep14@127.0.0.1:3141/appdb"));
+
+        expect(line).toContain("127.0.0.1:3141/appdb");
+        // The one thing that must never be on a banner.
+        expect(line).not.toContain("sweep14");
+    });
+
+    it("omits a port the URL does not state", () => {
+        expect(databaseBannerValue(external("postgres://u@db.example.com/appdb")))
+            .toContain("db.example.com/appdb");
+    });
+
+    it("names the socket directory when the DSN has no host", () => {
+        expect(databaseBannerValue(external("postgresql:///appdb?host=/var/run/postgresql")))
+            .toContain("/var/run/postgresql/appdb");
+    });
+
+    it("names the daemon's port for the managed database", () => {
+        // The managed DSN is in the environment the child gets, not on the
+        // `DevDatabase` — which is why this line could not say where PGlite was.
+        const line = databaseBannerValue({
+            database: { kind: "managed", source: "managed" },
+            env: { DATABASE_URL: "postgresql://postgres@127.0.0.1:5433/postgres?sslmode=disable" },
+            description: "the managed development database (PGlite)"
+        });
+
+        expect(line).toContain("PGlite");
+        expect(line).toContain("127.0.0.1:5433");
+    });
+
+    it("says what --no-db left the backend with", () => {
+        expect(databaseBannerValue(null)).toContain("--no-db");
+    });
+
+    it("falls back to provenance alone when the DSN will not parse", () => {
+        // A wrong address is worse than a missing one.
+        expect(databaseBannerValue(external("not a url")))
+            .toBe("your database (DATABASE_URL in the environment)");
+    });
+
+    it("says nothing extra for a --docker project with no compose file", () => {
+        expect(databaseBannerValue({
+            database: { kind: "docker", source: "docker", url: null },
+            env: {},
+            description: "Postgres in Docker"
+        })).toBe("Postgres in Docker");
+    });
+});
+
+describe("pinnedPortRefusal", () => {
+    /**
+     * `--port` used to be advice. `resolveStartPort` returned the number, the
+     * banner printed it, and the server walked past the collision to the next
+     * free port — so with a backend already on 3140, `rebase dev --port 3140`
+     * announced 3140, served on 3142, and a `curl localhost:3140` answered 200
+     * from the *other* project. Dev ports are derived per project, which is
+     * exactly why the number somebody types is so often another Rebase backend.
+     */
+    const servers: net.Server[] = [];
+
+    afterEach(async () => {
+        await Promise.all(servers.splice(0).map(s => new Promise<void>(r => s.close(() => r()))));
+    });
+
+    /** A listening server, and the port it took. */
+    async function occupy(): Promise<number> {
+        const server = net.createServer();
+        servers.push(server);
+        await new Promise<void>(r => server.listen(0, "127.0.0.1", r));
+        const address = server.address();
+        if (address === null || typeof address === "string") throw new Error("no port");
+        return address.port;
+    }
+
+    async function freePort(): Promise<number> {
+        const port = await occupy();
+        const server = servers.pop()!;
+        await new Promise<void>(r => server.close(() => r()));
+        return port;
+    }
+
+    it("refuses a pinned port something is answering on, and names it", async () => {
+        const occupied = await occupy();
+
+        const refusal = await pinnedPortRefusal(occupied, true);
+
+        expect(refusal).toContain(String(occupied));
+        expect(refusal).toContain("--port");
+    });
+
+    it("says nothing when the port was derived — that one still walks", async () => {
+        const occupied = await occupy();
+
+        expect(await pinnedPortRefusal(occupied, false)).toBeNull();
+    });
+
+    it("says nothing about a pinned port that is free", async () => {
+        expect(await pinnedPortRefusal(await freePort(), true)).toBeNull();
     });
 });

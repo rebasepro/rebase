@@ -15,7 +15,7 @@ Rebase supports three storage backends:
 ## Configuration
 
 :::note[Where this goes]
-**Managed runtime** — the `STORAGE_*` variables in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` or `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffix any of them `__<KEY>` for a named source), plus `export const storageSources` and `export const storageAuthorize` from `config/index.ts`. `storageAuthorize` has no environment form on purpose: no variable can express "this user may read this key".
+**Managed runtime** — the `STORAGE_*` variables in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` or `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffix any of them `__<KEY>` for a named source), plus a `bucket("<key>")` declaration in `config/resources.ts` for every bucket beyond the default, and `export const storageAuthorize` from `config/index.ts`. `storageAuthorize` has no environment form on purpose: no variable can express "this user may read this key".
 
 **Ejected** — the `storage` block on `initializeRebaseBackend({ … })`. `storagePolicies` and `storageTriggers` are ejected-only.
 
@@ -98,14 +98,45 @@ image: {
 |--------|------|-------------|
 | `POST` | `/api/storage/upload` | Direct file upload |
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload to a specific named backend |
-| `GET` | `/api/storage/files/:path` | Retrieve a file |
-| `GET` | `/api/storage/files/:path?storageId=<key>` | Retrieve a file from a specific backend |
-| `DELETE` | `/api/storage/files/:path` | Delete a file |
+| `GET` | `/api/storage/file/*` | Retrieve a file — everything after `/file/` is the object key |
+| `GET` | `/api/storage/file/*?storageId=<key>` | Retrieve a file from a specific backend |
+| `GET` | `/api/storage/metadata/*` | Size, content type and last modification of one object, without its bytes |
+| `DELETE` | `/api/storage/file/*` | Delete a file |
+| `GET` | `/api/storage/list` | List objects under a prefix (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`) |
+| `POST` | `/api/storage/folder` | Create an empty folder marker |
+| `GET` | `/api/storage/sources` | The storage sources this backend serves, by key |
 | `OPTIONS` | `/api/storage/tus` | Query supported TUS protocol capabilities |
 | `POST` | `/api/storage/tus` | Initiate a resumable TUS upload session |
 | `HEAD` | `/api/storage/tus/:id` | Check upload progress (byte offset) |
 | `PATCH` | `/api/storage/tus/:id` | Append data chunk to temporary file |
 | `DELETE` | `/api/storage/tus/:id` | Terminate/abort TUS upload session |
+
+**What they answer.** One envelope, the same one `/api/data` uses: the payload
+is under `data`, and a failure is `{ "error": { message, code, requestId } }`
+with the codes on the [error reference](/docs/backend/errors/). `/api/storage/file/*`
+is the exception, because its payload is the file — it answers the bytes, with
+`Content-Type`, `Content-Length` and the caching headers.
+
+```json
+// GET /api/storage/list?prefix=products/images/
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+```
+
+`POST /api/storage/upload` answers `201` with the `{ key, bucket, storageUrl }`
+of the stored object under `data`; `GET /api/storage/metadata/*` the object's
+metadata and, for a private object, the short-lived `token`;
+`GET /api/storage/sources` the array of configured sources.
+`DELETE /api/storage/file/*` and `POST /api/storage/folder` carry only a
+`message`, since there is nothing to return.
+
+**How a file read is authorized.** The read routes — `/api/storage/file/*` and
+`/api/storage/metadata/*` — take the short-lived signed token that
+[`getSignedUrl()`](/docs/sdk/storage) mints, passed as `?token=<token>` or as a
+`Bearer`. An ordinary access JWT is **refused** on `/file/*` with `401
+Unauthorized: Access JWT not allowed on file routes`: the token that works on
+every other route does not work there, on purpose, because a file URL is
+something you hand to a browser, a CDN or an `<img>` tag. Every other row above
+takes the access JWT as usual.
 
 ## On-the-Fly Image Transformations
 
@@ -113,7 +144,7 @@ Rebase includes a built-in image processing pipeline powered by **Sharp**. When 
 
 ```bash
 # Serve image scaled to 300px width in webp format
-GET /api/storage/files/products/laptop.jpg?width=300&format=webp
+GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 ```
 
 ### Supported Parameters

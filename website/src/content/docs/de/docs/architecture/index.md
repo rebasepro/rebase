@@ -1,4 +1,5 @@
 ---
+sourceHash: 08efd8549191e760
 title: Architektur-Übersicht
 sidebar_label: Architektur
 description: Erfahren Sie, wie sich Backend, Frontend, Client-SDK und Datenbank von Rebase zu einem vollständigen Backend-as-a-Service integrieren.

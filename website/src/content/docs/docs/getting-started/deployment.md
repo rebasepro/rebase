@@ -81,12 +81,22 @@ services:
       REBASE_ADMIN_PASSWORD: ${REBASE_ADMIN_PASSWORD:?set REBASE_ADMIN_PASSWORD in .env}
       DISABLE_SELF_REGISTRATION: ${DISABLE_SELF_REGISTRATION:-true}
     volumes:
-      # Your built project, from `rebase build`.
-      - ./dist-bundle:/bundle
+      # Your built project, from `rebase build`. Read-only: the build vendors
+      # the bundle's dependencies by default, so nothing has to write here.
+      - ./dist-bundle:/bundle:ro
 
 volumes:
   postgres_data:
 ```
+
+The three `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` lines are new <span class="since-badge" data-since="0.18">Since 0.18</span>
+— on 0.17.3 the first account to register becomes the administrator, in
+production too. See [Your first admin](#your-first-admin) below.
+
+The bundle is mounted read-only. `rebase build` installs the project's declared
+dependencies into `dist-bundle` unless you pass `--no-vendor`, in which case the
+runtime installs them at every start and the mount has to be writable — drop the
+`:ro`. See [Self-hosting](/docs/deployment/self-hosting/#dependencies).
 
 `rebase init` writes all of these into `.env` for you, including a generated
 admin password. Each is declared with `${VAR:?…}`, so a missing one stops the
@@ -147,6 +157,12 @@ through open registration is an ordinary account, `GET /api/auth/config` never
 advertises `needsSetup`, and `POST /api/admin/bootstrap` refuses. In 0.17.3 and
 earlier the window was open in production too, so upgrade before you expose a
 fresh deployment.
+
+`rebase dev` reads the same `.env` and deliberately ignores both variables, and
+says so at boot: locally the first registration is still the way in. The values
+`rebase init` wrote belong to the production boot. Seeding on both sides would
+spend the window before the developer had opened the app, which is what made the
+quickstart's own first step produce a role-less account.
 
 That leaves two ways in, neither of which is a race:
 

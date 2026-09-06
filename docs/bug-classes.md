@@ -1,11 +1,14 @@
 # Bug classes, and how to sweep for them
 
-Every gate in `.github/workflows/verify.yml` has a comment that is a post-mortem.
-Fourteen gates, fourteen bugs that had already shipped. That is a healthy reflex —
-a bug that becomes a gate cannot come back — but it is a strictly reactive one:
-each gate is added *after* an incident and scoped to that incident's exact shape,
-so the net grows one hole at a time and the next bug falls through a hole nobody
-has patched yet.
+Every gate this repository runs carries a comment that is a post-mortem. They
+live in `tooling/scripts/ci-static.mjs` and `tooling/scripts/ci-build-gates.mjs`
+now — one array each, with the rationale beside the script name, printed only
+when the gate fails — and [gates.md](gates.md) renders both as a table with what
+each one protects. Sixty-odd gates, sixty-odd bugs that had already shipped.
+That is a healthy reflex — a bug that becomes a gate cannot come back — but it is
+a strictly reactive one: each gate is added *after* an incident and scoped to
+that incident's exact shape, so the net grows one hole at a time and the next bug
+falls through a hole nobody has patched yet.
 
 This document is the other half. When a bug is found, the fix is the easy part;
 the leverage is in naming the **class** and sweeping for its siblings before
@@ -2955,7 +2958,7 @@ a "not yet" answer, ask what happens to something that stays in it.
 
 ---
 
-## 50. The reassuring half, and the same defect run backwards
+## 51. The reassuring half, and the same defect run backwards
 
 Class 49 says an unknown must have a channel. Two things a full UX sweep of the
 SaaS console's project view (2026-08-27) added to it.
@@ -2996,7 +2999,7 @@ so does re-gating storage on the count.
 
 ---
 
-## 51. Zero is exactly the value the fallback was written to catch
+## 52. Zero is exactly the value the fallback was written to catch
 
 `useDataTableController` restores how many rows a collection had loaded, so
 coming back to a scrolled table does not snap to page one:
@@ -3059,3 +3062,146 @@ hand — `useBoardDataController` and `useRelationSelector` — sit outside
 `toFindParams` and so outside that floor. They are safe by their own arithmetic
 today. `toFindParams` exists because four hand-built call sites disagreed about
 `searchExplain`; these two are the same shape, one guard later.
+
+---
+
+The eight classes below come from the two full DX sweeps of 2026-09-05 (183
+findings across 13 surfaces) and 2026-09-06 (244 findings across 16). They are
+written from the root cause each sweep converged on rather than from a single
+incident, so the "sweep" line matters more than the story.
+
+## 53. Documentation that describes the release before last
+
+Six platform guides told readers to build `backend/Dockerfile`; seventeen backend
+pages showed `initializeRebaseBackend`; `frontend/index.md`, `plugins/index.md`
+and the deployment sub-path recipe composed the admin panel by hand and crash if
+copied. All of it was true of the project shape before the managed runtime, and
+none of it had been true for releases.
+
+What makes this a class rather than a backlog is *why the verifier could not see
+it*: 96 fences carried `no-verify`, the snippet map had no entry for
+`@rebasepro/cms-types`, TS1005 was ignored, and `strictNullChecks` was off in the
+snippet program. Every one of those is a decision that made a red bar green, and
+together they meant `verify:docs` reported on a subset nobody had written down.
+
+**Sweep:** for every opt-out mechanism a verifier has — a fence flag, an ignore
+list, a suppressed diagnostic code, a loosened compiler option — count the
+members and ask what fraction of the corpus is inside it. A verifier with an
+uncounted opt-out is a verifier reporting on an unknown denominator.
+
+## 54. A revert nobody reverted
+
+`d55d17ad9` is a commit whose own message says it is a temporary revert to be
+undone. It deleted `first-run.test.ts`, the npm-12 Atlas `allowScripts` entry,
+the scaffold `.npmrc`, and the quickstart's Docker wording — and it sat on main
+for weeks, so every first run since carried the defects those four things had
+fixed. The sweep found it by reading the log, not the code: nothing in the tree
+says "this is missing", because a deletion leaves no marker.
+
+**Sweep:** `git log --grep` for "revert", "temporar", "restore later", "put back"
+over the range since the last release, and for each hit ask whether the thing it
+promised to restore is in the tree. A revert is the one commit shape whose
+follow-up has no artefact to remind anyone.
+
+## 55. A contract documented in the opposite direction from the code
+
+Five in one sweep, all verified in source. `afterSave`/`afterDelete` run *inside*
+the transaction and a throw rolls the write back as a 500, while `hooks.md:121`
+described them as post-commit. `afterRead` is read-only, and the page implied it
+could mutate. `beforeDelete` returning `false` answers 204, not 4xx. A required
+`belongsTo` defaults to `ON DELETE CASCADE` — the destructive option — where the
+docs implied `RESTRICT`. A relation carries *two* `required` knobs, and the SDK
+generator reads `relation.validation` while the DDL reads `property.validation`,
+so the two halves of one declaration can disagree.
+
+Each of these is cheap to write and expensive to discover: the reader gets a
+correct-looking program whose failure mode is data loss or a rolled-back write,
+and no tier of testing compares prose to behaviour.
+
+**Sweep:** for every lifecycle hook, every default that is destructive, and every
+field name that appears in two schemas, find the sentence that states it and the
+line that implements it, and read them side by side. `verify:docs` compiles
+snippets; nothing checks a claim about *semantics*, so this one stays manual.
+
+## 56. A migration described from both ends at once
+
+The first-admin story was mid-transition and every artefact told a different
+half. The closed production bootstrap window was merged locally and unreleased;
+the launch checklist said the opposite; the self-hosting guide said "four values"
+while the compose file required `REBASE_ADMIN_*`; the Helm guide's headline
+command is refused by the chart; and the scaffold's compose file had no
+`REBASE_ADMIN_*` at all, which locks a user out at the next runtime release.
+
+**Sweep:** when a security-shaped default is being changed, enumerate every place
+that states the old contract — docs, checklists, charts, scaffolds, the compose
+files a user already has on disk — before the change lands, and treat the list as
+part of the change. The scaffolded file is the one everyone forgets, because it
+is not in this repository's runtime path at all.
+
+## 57. A silent failure in the inner loop
+
+Eleven in one sweep, all of the same shape: a command accepted input it did not
+act on. A duplicate slug dropped; unknown flags swallowed by `db`, `schema` and
+`generate-sdk`; `schema generate --help` *running* the generator; `cloud webhooks
+--url` eaten by the global `--url`; five cloud command groups treating a
+mistyped action as `list`; `--no-db` starting PGlite and `--docker` starting
+nothing; new function files unwatched; MCP environment variables ignored when
+`~/.rebase/projects.json` has a default; `rls-check --role` accepting a typo.
+
+This is the most expensive class per line of code, because the cost is not the
+bug — it is that the user's mental model is now wrong and everything they do next
+is built on it.
+
+**Sweep:** for every argument parser, ask what an unknown token does. For every
+watcher, ask what a *new* file does. For every flag that selects a resource, ask
+what happens when it names one that does not exist. The answer must never be
+"nothing, quietly"; `check:ui-string-paths` and `check:doc-links` are the
+written-down half of the same instinct.
+
+## 58. An error that drops its cause
+
+`logger.ts:164`'s `serialiseError` did not read `.cause`, so a boot against an
+unreachable database printed `Failed query: [redacted]` and nothing else —
+provisioning runs before driver diagnosis, so the one message that names the host
+never reached the log. `PersistService.ts:541` threw a bare `Error` and lost the
+SQLSTATE. `doctor` printed a raw stack. `rebase dev` never noticed the backend
+exiting at all.
+
+Node has carried `error.cause` since 16, and every layer in this repository wraps
+errors. A serialiser that stops at `message` and `stack` therefore discards
+exactly the part that was added to survive the wrapping.
+
+**Sweep:** grep every `catch` that constructs a new error and check it passes
+`{ cause }`; then grep every serialiser, log formatter and error-to-HTTP mapper
+and check it *reads* one. Both halves are needed and they are usually written by
+different people months apart.
+
+## 59. The site runs ahead of npm
+
+`rebase status`, `db branch switch`, `db branch prune`, `REBASE_ADMIN_*` and the
+zod-dedup fix were all documented on rebase.pro and none of them was in the
+published 0.17.3. The mechanism is structural, not careless: the website
+publishes weekly from `main`, and npm publishes when someone runs a release. Any
+gap between those two cadences is a page describing a command the reader cannot
+run, and the reader has no way to tell which side is wrong.
+
+**Sweep:** for anything a docs page tells a reader to *type*, ask which released
+version first accepts it. `check:version-pins` holds the version numbers written
+into prose; the harder half — a command name or a flag that exists only on main
+— is what the "since" badge on a docs page is for.
+
+## 60. A fix reported done whose acceptance check was never run
+
+The 2026-09-06 sweep re-ran the 195 acceptance checks written for the 2026-09-05
+tasks. 185 were re-checkable and **32 of them did not hold** — tasks whose fix
+had been written, committed and reported, against a `Check:` line that was never
+executed. Several were not partial work: the change had been made somewhere other
+than the path the check exercised, so the code moved and the behaviour did not.
+
+The task format is what makes this visible at all — every task carries the
+command that proves it — and the discipline it needs is one line long: run the
+check, paste the output. A fix without its check is a claim.
+
+**Sweep:** when closing a batch of work, re-run the acceptance line of every item
+rather than reading the diff. And when an item is reported done and its check was
+not run, that is the finding — not the code.

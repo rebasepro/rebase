@@ -1,4 +1,5 @@
 ---
+sourceHash: c4f8030fadf21ecf
 title: Descripción general del backend
 sidebar_label: Backend
 description: El backend de Rebase proporciona un servidor completo con API REST, autenticación, almacenamiento, tiempo real con WebSocket e historial de entidades, todo inicializado con una única llamada a función.
@@ -126,21 +127,28 @@ La API REST se auto-genera a partir de tus colecciones. Cada colección obtiene 
 
 | Método | Path | Descripción |
 |--------|------|-------------|
-| `GET` | `/api/data/:slug` | Listar entidades (con filtro, orden, límite, búsqueda) |
+| `GET` | `/api/data/:slug` | Listar entidades — filtrar, ordenar, paginar y buscar son parámetros de consulta |
+| `GET` | `/api/data/:slug/count` | Cuántas filas coinciden con esa misma consulta |
+| `GET` | `/api/data/:slug/aggregate` | `count`/`sum`/`avg`/`min`/`max`, opcionalmente agrupados |
 | `GET` | `/api/data/:slug/:id` | Obtener una única entidad |
 | `POST` | `/api/data/:slug` | Crear una nueva entidad |
+| `PATCH` | `/api/data/:slug/:id` | Actualizar los campos que envías |
 | `DELETE` | `/api/data/:slug/:id` | Eliminar una entidad |
+| `POST` | `/api/data/:slug/bulk` | Crear muchas filas en una sola transacción |
+| `PATCH` | `/api/data/:slug/bulk` | Actualizar muchas filas en una sola transacción |
+| `POST` | `/api/data/:slug/bulk/delete` | Eliminar muchas filas en una sola transacción |
 
 ### Parámetros de consulta
 
-| Parámetro | Descripción | Ejemplo |
-|-------|-------------|---------|
-| `filter` | Condiciones de filtro codificadas en JSON | `?filter={"active":["==",true]}` |
-| `orderBy` | Campo de ordenación | `?orderBy=createdAt` |
-| `order` | Dirección de ordenación | `?order=desc` |
-| `limit` | Tamaño de página | `?limit=25` |
-| `startAfter` | Cursor para paginación | `?startAfter=encodedCursor` |
-| `search` | Búsqueda de texto completo | `?search=laptop` |
+Hay una referencia para ellos y no es esta página. [API REST](/docs/backend/api/) documenta
+los dos dialectos de consulta que el servidor acepta — la forma `?column=op.value` al estilo
+PostgREST y la forma JSON `?where=` — junto con `orderBy`, `limit`/`offset`, `include`,
+`fields`, `searchString` y la búsqueda vectorial.
+[Puntos finales](/docs/backend/endpoints/) es el índice de todas las rutas que monta el
+servidor, incluidas las generadas.
+
+Un parámetro que el servidor no reserva se lee como un filtro sobre la columna de ese
+nombre, así que uno inventado no falla: simplemente no coincide con nada.
 
 ## WebSocket
 
@@ -176,8 +184,6 @@ El backend incluye un manejador de errores que captura todas las excepciones y d
 El estado HTTP va en la respuesta, no en el cuerpo. Ramifica sobre `code`, no
 sobre `message` — los mensajes están escritos para personas y pueden cambiar.
 
-Si la inicialización falla (por ejemplo, error de conexión a la base de datos), el servidor aún se inicia pero devuelve 503 para todas las solicitudes API, con un mensaje de error descriptivo en los registros.
-
 ## Próximos pasos
 
 - **[Autenticación](/docs/backend/authentication)** — JWT, proveedores OAuth y OIDC, MFA, claves de API, gestión de usuarios
@@ -187,5 +193,6 @@ Si la inicialización falla (por ejemplo, error de conexión a la base de datos)
 - **[Funciones personalizadas](/docs/backend/custom-functions)** — Añadir puntos finales de API personalizados
 - **[Tareas Cron](/docs/backend/cron-jobs)** — Tareas en segundo plano programadas
 - **[Ramificación de la base de datos](/docs/backend/branching)** — Copias instantáneas de bases de datos para desarrollo/staging
+- **[Despliegue](/docs/getting-started/deployment)** — Llevar el backend a producción
 
 ---

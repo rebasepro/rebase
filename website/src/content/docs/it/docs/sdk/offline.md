@@ -1,4 +1,5 @@
 ---
+sourceHash: 6bc50ef7860bac7d
 title: Offline e sincronizzazione local-first
 sidebar_label: Offline
 description: Attiva il motore di sincronizzazione local-first dell'SDK Client di Rebase — un database locale di righe, scritture offline istantanee con rollback e query live reattive.
@@ -67,7 +68,9 @@ const post = await client.data.posts.create({ title: "Draft", status: "draft" })
 const drafts = await client.data.posts.where("status", "==", "draft").find();
 ```
 
-Le righe create offline ricevono un id generato dal client. Se il server ne assegna uno proprio in fase di ritrasmissione, la riga locale e tutte le scritture in coda che puntano ancora all'id temporaneo vengono spostate su quello reale.
+Le righe create offline ricevono un id generato dal client, nel tipo che gli id della collezione hanno già: un **intero negativo** dove sono numeri, una stringa UUID dove sono stringhe. Il segno è l'indizio — una chiave reale non è mai negativa —, così una riga che non ha ancora raggiunto il server si riconosce senza consultare nulla, e `id` resta ciò che dichiara il tipo `Row` generato. Su una collezione che questo dispositivo non ha mai letto non c'è nulla in locale da cui dedurre il tipo, e l'id è un UUID.
+
+Se il server ne assegna uno proprio in fase di ritrasmissione, la riga locale e tutte le scritture in coda che puntano ancora all'id temporaneo vengono spostate su quello reale. Fino ad allora, non conservare un id temporaneo fuori dal database offline: una chiave esterna o un URL salvato che ne contenga uno punta a una riga che sta per essere rinumerata.
 
 Le scritture vengono ritrasmesse nell'ordine in cui le hai eseguite, attraverso le collezioni — così una create in una collezione arriva comunque prima della riga in un'altra che vi fa riferimento.
 

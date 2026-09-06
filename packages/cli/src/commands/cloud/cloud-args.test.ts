@@ -76,7 +76,6 @@ function argv(...words: string[]): string[] {
 async function refusalOf(run: () => unknown): Promise<{ message: string; code: string | null }> {
     const chunks: string[] = [];
     const origWrite = process.stdout.write.bind(process.stdout);
-    // @ts-expect-error test shim
     process.stdout.write = (s: string) => {
         chunks.push(typeof s === "string" ? s : String(s));
         return true;
@@ -402,7 +401,10 @@ pendingRedeploy: true }));
     });
 
     it("`webhooks delete --project acme 42` never deletes the project slug", async () => {
-        const del = vi.fn(async () => ({}));
+        // The parameter is what the assertion below reads: a bare `vi.fn()`
+        // types `mock.calls` as `[][]`, so `calls[0][0]` is a tuple index error
+        // and the "never deletes the project slug" claim compiles to nothing.
+        const del = vi.fn(async (_id: string) => ({}));
         (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
             client: fakeClient({ del }),
             url: "https://cp.example"

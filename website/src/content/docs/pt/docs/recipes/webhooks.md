@@ -1,4 +1,5 @@
 ---
+sourceHash: 713d80a42d70ff87
 title: "Receita: Integração de Webhook"
 sidebar_label: Webhooks
 description: Utilize callbacks de entidade para enviar webhooks a serviços externos quando os dados mudam, sem manter aberta a transação da escrita.

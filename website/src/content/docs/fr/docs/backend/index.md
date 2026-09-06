@@ -1,4 +1,5 @@
 ---
+sourceHash: c4f8030fadf21ecf
 title: Aperçu du backend
 sidebar_label: Backend
 description: Le backend Rebase fournit un serveur complet avec API REST, authentification, stockage, temps réel WebSocket et historique des entités — le tout initialisé par un seul appel de fonction.
@@ -126,21 +127,28 @@ L'API REST est auto-générée à partir de vos collections. Chaque collection o
 
 | Méthode | Chemin | Description |
 |--------|-------|-------------|
-| `GET` | `/api/data/:slug` | Lister les entités (avec filtre, tri, limite, recherche) |
+| `GET` | `/api/data/:slug` | Lister les entités — filtrer, trier, paginer et rechercher sont des paramètres de requête |
+| `GET` | `/api/data/:slug/count` | Combien de lignes cette même requête correspond |
+| `GET` | `/api/data/:slug/aggregate` | `count`/`sum`/`avg`/`min`/`max`, éventuellement groupés |
 | `GET` | `/api/data/:slug/:id` | Obtenir une seule entité |
 | `POST` | `/api/data/:slug` | Créer une nouvelle entité |
+| `PATCH` | `/api/data/:slug/:id` | Mettre à jour les champs que vous envoyez |
 | `DELETE` | `/api/data/:slug/:id` | Supprimer une entité |
+| `POST` | `/api/data/:slug/bulk` | Créer plusieurs lignes en une seule transaction |
+| `PATCH` | `/api/data/:slug/bulk` | Mettre à jour plusieurs lignes en une seule transaction |
+| `POST` | `/api/data/:slug/bulk/delete` | Supprimer plusieurs lignes en une seule transaction |
 
 ### Paramètres de requête
 
-| Param | Description | Exemple |
-|-------|-------------|---------|
-| `filter` | Conditions de filtre encodées en JSON | `?filter={"active":["==",true]}` |
-| `orderBy` | Champ de tri | `?orderBy=createdAt` |
-| `order` | Direction du tri | `?order=desc` |
-| `limit` | Taille de la page | `?limit=25` |
-| `startAfter` | Curseur pour la pagination | `?startAfter=encodedCursor` |
-| `search` | Recherche en texte intégral | `?search=laptop` |
+Il existe une référence pour eux, et ce n'est pas cette page. [API REST](/docs/backend/api/)
+documente les deux dialectes de requête que le serveur accepte — la forme
+`?column=op.value` de style PostgREST et la forme JSON `?where=` — ainsi que `orderBy`,
+`limit`/`offset`, `include`, `fields`, `searchString` et la recherche vectorielle.
+[Points d'extrémité](/docs/backend/endpoints/) est l'index de toutes les routes que le
+serveur monte, y compris celles générées.
+
+Un paramètre que le serveur ne réserve pas est lu comme un filtre sur la colonne de ce nom :
+un paramètre inventé n'échoue donc pas, il ne correspond silencieusement à rien.
 
 ## WebSocket
 
@@ -176,8 +184,6 @@ Le backend inclut un gestionnaire d'erreurs qui intercepte toutes les exceptions
 Le statut HTTP est sur la réponse, pas dans le corps. Branchez sur `code`, pas
 sur `message` — les messages sont écrits pour des humains et peuvent changer.
 
-Si l'initialisation échoue (par exemple, erreur de connexion à la base de données), le serveur démarre tout de même mais retourne 503 pour toutes les requêtes API, avec un message d'erreur descriptif dans les journaux.
-
 ## Prochaines étapes
 
 - **[Authentification](/docs/backend/authentication)** — JWT, fournisseurs OAuth et OIDC, MFA, clés d'API, gestion des utilisateurs
@@ -187,5 +193,6 @@ Si l'initialisation échoue (par exemple, erreur de connexion à la base de donn
 - **[Fonctions personnalisées](/docs/backend/custom-functions)** — Ajouter des points d'extrémité API personnalisés
 - **[Tâches Cron](/docs/backend/cron-jobs)** — Tâches d'arrière-plan planifiées
 - **[Ramification de base de données](/docs/backend/branching)** — Copies de base de données instantanées pour le développement/staging
+- **[Déploiement](/docs/getting-started/deployment)** — Mettre le backend en production
 
 ---

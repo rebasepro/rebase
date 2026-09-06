@@ -163,13 +163,41 @@ function offlineError(message: string): RebaseApiError {
     return new RebaseApiError(message, { status: 0, code: "OFFLINE" });
 }
 
-function generateOfflineId(): string {
+function generateOfflineStringId(): string {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
         return crypto.randomUUID();
     }
     // Non-cryptographic fallback for exotic runtimes; collision odds are
     // irrelevant at offline-queue scale.
     return `off-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * The last temporary numeric id minted, so the next one is smaller.
+ *
+ * Module-scoped and strictly decreasing: two temporary ids in the same session
+ * must not collide, and neither must one minted a millisecond after another.
+ */
+let lastOfflineNumericId = 0;
+
+/**
+ * A temporary id for a collection whose ids are numbers.
+ *
+ * **Negative**, which is the convention every local-first engine settles on for
+ * the same reason: a real key is a positive integer or an identity sequence, so
+ * the sign alone says "this one is not the server's yet" — and it stays a
+ * number, which is what matters. A UUID string was minted for every collection,
+ * so a `create` while offline handed back `{ id: "526e2faf-…" }` on a row the
+ * generated types declare `id: number`. Anything that put that in a URL, a
+ * foreign key or an `id.toFixed()` was wrong or threw until the replay
+ * reconciled it — and the SDK's own types said it could not happen.
+ */
+function generateOfflineNumericId(): number {
+    const candidate = -Date.now();
+    lastOfflineNumericId = lastOfflineNumericId === 0
+        ? candidate
+        : Math.min(candidate, lastOfflineNumericId - 1);
+    return lastOfflineNumericId;
 }
 
 type AnyRow = Record<string, unknown>;
@@ -532,7 +560,7 @@ export class OfflineManager {
                     }
                 }
                 const providedId = id ?? (data as AnyRow).id as string | number | undefined;
-                const rowId = providedId ?? generateOfflineId();
+                const rowId = providedId ?? this.mintOfflineId(slug);
                 const row = { ...(data as AnyRow), id: rowId } as unknown as M;
                 await this.enqueue({
                     collection: slug,
@@ -568,7 +596,7 @@ export class OfflineManager {
                 }
                 const rows = data.map((r) => ({
                     ...(r as AnyRow),
-                    id: (r as AnyRow).id ?? generateOfflineId()
+                    id: (r as AnyRow).id ?? this.mintOfflineId(slug)
                 })) as unknown as M[];
                 const rollback: Record<string, AnyRow | null> = {};
                 for (const row of rows) {
@@ -1171,6 +1199,29 @@ data: u.data as AnyRow })),
         }
         const answer = this.answer<M>(slug, params, snapshot);
         return snapshot ? answer : { ...answer, partial: true };
+    }
+
+    /**
+     * A temporary id of the type this collection's ids actually have.
+     *
+     * There is no schema here to read it off — the generated `Database` types
+     * are erased at compile time, and the whole point of this path is that the
+     * server is unreachable. So it is read off the rows the local database
+     * already holds: a collection whose cached ids are numbers gets a negative
+     * number, and everything else gets a UUID.
+     *
+     * A collection with nothing cached falls back to a UUID, which is the same
+     * guess as before — but that is a first write on a device that has never
+     * read the collection, which is also the case where nothing local can tell
+     * the difference. Reading one row first is enough to fix it.
+     */
+    private mintOfflineId(slug: string): string | number {
+        for (const entry of this.collections.get(slug)?.rows.values() ?? []) {
+            const id = (entry.row as AnyRow).id;
+            if (typeof id === "number") return generateOfflineNumericId();
+            if (typeof id === "string") break;
+        }
+        return generateOfflineStringId();
     }
 
     private rawLocalRow(slug: string, id: string | number): AnyRow | undefined {

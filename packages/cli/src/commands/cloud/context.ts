@@ -156,8 +156,10 @@ export function setCurrentContext(url: string): void {
    URL resolution
    ═══════════════════════════════════════════════════════════════
 
-   Priority: --url flag > REBASE_CLOUD_URL env > linked project's url
+   Priority: --url flag > REBASE_CLOUD_URL env > CLOUD link's url
              > stored current context > default hosted URL.
+
+   A **direct** link is deliberately absent from that list; see below.
 */
 
 export function resolveCloudUrl(rawArgs: string[]): string {
@@ -167,12 +169,59 @@ permissive: true });
     if (explicit) return normalizeUrl(explicit);
 
     const link = readLink();
-    if (link?.url) return normalizeUrl(link.url);
+    /*
+     * A direct link is a tenant, not a control plane.
+     *
+     * `rebase cloud link <url>` points this checkout at ONE running Rebase API
+     * — "no control plane, no login", as its own help page puts it — so its URL
+     * is the customer's own backend. Returning it here made it the control
+     * plane for the entire `cloud` family: `whoami` reported "Not logged in to
+     * https://api.example.com", and following that printed remedy POSTed the
+     * user's *control-plane* email and password to the tenant host.
+     *
+     * Commands that genuinely need a control plane refuse instead — see
+     * `refuseDirectLink`, which every one of them reaches through
+     * `requireClient` (and `login`, which builds its client directly).
+     */
+    if (link?.url && link.mode !== "direct") return normalizeUrl(link.url);
 
     const current = currentContextUrl();
     if (current) return normalizeUrl(current);
 
     return DEFAULT_CLOUD_URL;
+}
+
+/**
+ * Refuse to run a control-plane command in a directory linked straight at a
+ * backend.
+ *
+ * The alternative — quietly using the default control plane — would be worse
+ * than the bug it replaces: the user asked for `https://api.example.com` and
+ * would get an answer about `app.rebase.pro` with nothing saying so. Naming the
+ * link, and both ways out of it, is the whole message.
+ *
+ * `--project` and `--url` are the ways out, so a line carrying either passes
+ * through: both say, explicitly, which control-plane subject the caller means.
+ */
+export function refuseDirectLink(rawArgs: string[]): void {
+    const link = readLink();
+    if (link?.mode !== "direct") return;
+
+    const parsed = arg(
+        { "--project": String,
+"-p": "--project",
+"--url": String },
+        { argv: rawArgs.slice(2),
+permissive: true }
+    );
+    if (parsed["--project"] || parsed["--url"]) return;
+
+    fail(
+        `This directory is linked directly to ${chalk.cyan(link.url)} — `
+        + `${chalk.bold("rebase cloud unlink")} first, or pass ${chalk.bold("--project")}.`,
+        "A direct link is one backend, not a control plane: it has no projects, no organizations and no session.",
+        "direct_link"
+    );
 }
 
 function normalizeUrl(url: string): string {
@@ -234,6 +283,10 @@ const EXPIRY_BUFFER_MS = 120_000;
  * usable session (never logged in, or the refresh token was revoked).
  */
 export async function requireClient(rawArgs: string[]): Promise<{ client: CloudClient; url: string }> {
+    // Before anything else: everything downstream of here is a control-plane
+    // call, and a direct-linked directory has no control plane to make it
+    // against.
+    refuseDirectLink(rawArgs);
     const url = resolveCloudUrl(rawArgs);
     const client = createCloudClient(url);
     const session = client.auth.getSession();

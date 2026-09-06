@@ -26,11 +26,21 @@ import { isBootstrapWindowOpen } from "./registration-policy";
  * that has users has already been bootstrapped, and minting an admin into it
  * from an environment variable would be a way to take over a running system by
  * editing a manifest.
+ *
+ * And runs only where the window it replaces is CLOSED — production. The two are
+ * one mechanism with two halves, and running both halves at once is what broke
+ * the documented first run: `rebase init` writes `REBASE_ADMIN_EMAIL` and a
+ * generated password into `.env` for the compose stack, `rebase dev` reads the
+ * same `.env`, and the account appeared before the developer opened the app. The
+ * quickstart's first step — register, become the admin — then produced a
+ * role-less account, because the table was no longer empty and the window had
+ * been spent by a boot nobody watched. Outside production the first registration
+ * is the way in, so the variables are announced and ignored.
  */
 export interface SeedAdminEnv {
     REBASE_ADMIN_EMAIL?: string;
     REBASE_ADMIN_PASSWORD?: string;
-    /** Read only to decide whether an unrequested seed is worth a warning. */
+    /** Decides whether the seed is this deployment's way in at all. */
     NODE_ENV?: string;
 }
 
@@ -41,6 +51,11 @@ export type SeedAdminOutcome =
     | { status: "not-requested" }
     /** Asked for, but the deployment already has users. */
     | { status: "already-bootstrapped" }
+    /**
+     * Asked for where the first registration is still the way in — development.
+     * Announced at boot and not acted on.
+     */
+    | { status: "window-open" }
     /** Asked for incompletely, or the create failed. `reason` has been logged. */
     | { status: "skipped"; reason: string };
 
@@ -80,6 +95,20 @@ export async function seedInitialAdmin(
             }
         }
         return { status: "not-requested" };
+    }
+
+    // Something was asked for. Where the bootstrap window is still open the
+    // answer is no — the first registration is this deployment's way in, and
+    // seeding would spend the window before anyone arrived. One line, because
+    // the variables are in the `.env` `rebase init` wrote and the operator is
+    // entitled to know why the account they named is not there.
+    if (isBootstrapWindowOpen(env)) {
+        logger.info(
+            "REBASE_ADMIN_EMAIL/REBASE_ADMIN_PASSWORD are ignored outside production — here the first " +
+            "account to register becomes the admin. They are read by the production boot (the compose " +
+            "stack runs with NODE_ENV=production), where that window is closed."
+        );
+        return { status: "window-open" };
     }
 
     // Half a credential is a typo, not a request, and the deployment it

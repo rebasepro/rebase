@@ -20,18 +20,12 @@ production otherwise means a database client, a copy of the connection string
 and an audit trail that ends at "someone with psql". Studio does all of it as
 the signed-in admin, through the same authorization the API uses.
 
-## The three modes
+## The two modes
 
-The panel has three modes — `"cms" | "studio" | "settings"`:
+The panel has two modes — `"cms" | "studio"`:
 
 - **CMS** (`"cms"`) — For content editors and operations teams. Shows collections and data management. This is the default.
 - **Studio** (`"studio"`) — For developers. Unlocks the tools below.
-- **Settings** (`"settings"`) — declared in the type, but nothing sets it and
-  nothing reads it. There is no way to enter this mode today. It is listed here
-  because it is part of the public `AdminModeController` type you will see in
-  your editor, not because it does anything.
-
-The drawer's toggle switches between the first two.
 
 Toggle between them with the admin mode controller or the drawer toggle. The
 chosen mode is persisted in `localStorage` under `rebase-admin-mode`; a browser
@@ -44,11 +38,23 @@ migrated to `"cms"` on read.
 
 A visual schema editor that lets you create and modify collections through a drag-and-drop UI. When you save changes, it uses [ts-morph](https://ts-morph.com/) to update your TypeScript source files via AST manipulation — preserving all existing code and custom logic. It is the screenshot at the top of this page.
 
+The editor is on wherever Studio is mounted — a scaffold's `<RebaseStudio/>` is
+enough, and there is no prop to add. `collectionEditor` tunes it rather than
+turning it on:
+
 ```tsx
 import { RebaseCMS } from "@rebasepro/cms";
+import { RebaseStudio } from "@rebasepro/studio";
 
-// The Collection Editor is automatically enabled when you provide the 
-// collectionEditor configuration to your RebaseCMS component
+// Studio is mounted, so the Collection Editor is available. Nothing else
+// is needed for it.
+<Rebase>
+    <RebaseCMS collections={collections}/>
+    <RebaseStudio/>
+</Rebase>
+
+// `collectionEditor` is for fine-tuning — a read-only editor, a different
+// token — not for opting in.
 <RebaseCMS
     collections={collections}
     collectionEditor={{
@@ -56,6 +62,12 @@ import { RebaseCMS } from "@rebasepro/cms";
     }}
 />
 ```
+
+Whether a *save* lands is the server's decision, not the panel's: the editor
+rewrites collection source files, so it is off under `NODE_ENV=production`, in
+`baas` mode, and on a server with no `collectionsDir`. The panel asks
+`GET /api/schema-editor/status` and shows the reason it gets back beside the
+disabled button.
 
 ### Built-in tools
 
@@ -102,11 +114,11 @@ between replicas, and a restart empties it. For anything you need to keep, read
 the process's stdout, which carries the same lines and more.
 
 The **Collection Editor** is a Studio tool too, but it is not in this list because
-it is registered differently: `RebaseStudio` does not lazy-load it. The panel injects
-it when `RebaseCMS` is given a `collectionEditor` prop, because unlike the tools
-above it needs the project's collection source at hand to write back to. That is a
-difference in how it is mounted, not in what it is — it edits schema, and it belongs
-beside the SQL and RLS editors.
+it is registered differently: `RebaseStudio` does not lazy-load it. The panel mounts
+it wherever Studio is registered, because unlike the tools above it needs the
+project's collection source at hand to write back to. That is a difference in how it
+is mounted, not in what it is — it edits schema, and it belongs beside the SQL and
+RLS editors.
 
 ## Turning Studio on
 

@@ -15,10 +15,14 @@
  *     translation was made. This is the finding. It is the one case where the
  *     translation is provably describing something that is no longer true, and
  *     the fix is one command.
- *   - **no stamp** — written before this existed, so which English version it
- *     came from is unknowable. Counted and reported, never failed: it is the
- *     whole existing tree, and calling 390 files a regression on the day the
- *     mechanism lands would make the number meaningless.
+ *   - **no stamp** — which English version it came from is unknowable. That was
+ *     the whole tree for two releases: the writer shipped, the backfill never
+ *     ran, and with 390 unstamped pages the finding branch above was
+ *     unreachable, so the stage printed "0 fresh, 390 unstamped ✓" while
+ *     `backend/Dockerfile` recipes survived in five languages.
+ *     `website/scripts/backfill_source_hashes.mjs` closed it, and
+ *     {@link UNSTAMPED_BUDGET} keeps it closed: an unstamped page is a finding
+ *     above the budget, and the budget only ever goes down.
  *
  * A page with no translation at all is also counted rather than failed.
  * Starlight falls back to the English page per-locale, so it renders correctly
@@ -40,6 +44,18 @@ const LOCALES = ["es", "de", "fr", "it", "pt"];
  */
 const NOT_TRANSLATED = [/^docs\/ui\//, /^docs\/CHANGELOG\.md$/];
 
+/**
+ * How many translated pages may carry no `sourceHash`.
+ *
+ * Zero, because `website/scripts/backfill_source_hashes.mjs` stamped all 390 of
+ * them. A new translated page written by hand rather than by
+ * `translate_docs.mjs` is the only way to add one, and it is a page whose
+ * source version nobody can recover later — which is exactly the state that
+ * made this whole check unable to fail. Run the backfill instead; never raise
+ * this number.
+ */
+const UNSTAMPED_BUDGET = 0;
+
 /** Same digest as the translator's `sourceHash`; keep the two in step. */
 function sourceHash(content) {
     return crypto.createHash("sha256").update(content, "utf8").digest("hex").slice(0, 16);
@@ -52,7 +68,7 @@ function readSourceHash(text) {
     return line ? line[1] : null;
 }
 
-export function checkTranslationFreshness(root) {
+export function checkTranslationFreshness(root, { strict = false } = {}) {
     const sources = [
         ...globSync("docs/**/*.md", { cwd: path.join(root, CONTENT) }),
         ...globSync("docs/**/*.mdx", { cwd: path.join(root, CONTENT) })
@@ -94,5 +110,25 @@ export function checkTranslationFreshness(root) {
         }
     }
 
-    return { findings, missing, unstamped, fresh, sources: sources.length, locales: LOCALES.length };
+    // Under `--strict` an unstamped page is a finding: a stamp nobody wrote is
+    // a page this check cannot ever fail on, and 390 of them are how it spent
+    // two releases reporting "✓".
+    if (strict && unstamped.length > UNSTAMPED_BUDGET) {
+        findings.push({
+            file: "website/src/content/docs",
+            line: 1,
+            message:
+                `${unstamped.length} translated page(s) carry no \`sourceHash\`, budget ` +
+                `${UNSTAMPED_BUDGET} — this check cannot report drift on any of them. ` +
+                "Run `node scripts/backfill_source_hashes.mjs` in website/ after replaying " +
+                "the English change into the locale. The budget goes down, never up.\n      " +
+                unstamped.slice(0, 8).join(", ") +
+                (unstamped.length > 8 ? `, … and ${unstamped.length - 8} more` : "")
+        });
+    }
+
+    return {
+        findings, missing, unstamped, fresh,
+        sources: sources.length, locales: LOCALES.length, budget: UNSTAMPED_BUDGET
+    };
 }

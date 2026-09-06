@@ -17,20 +17,25 @@ import {
     findEnvFile,
     exitDependenciesNotInstalled
 } from "../utils/project";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
+import { createRequire } from "module";
 import { scanTextForLibpqUrls, type LibpqUrlFinding } from "../utils/libpq-url";
 import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
+import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
+import { DEV_DATABASE_KIND_ENV, devDatabaseKind, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
 import {
     checkDuplicateSlugs,
     checkEnvSanity,
+    checkAtlasBinary,
     checkNodeVersion,
     checkPackageManager,
     checkVersionSkew,
     LOCKFILES,
     parseEnvFile,
+    type AtlasBinaryState,
     type DeclaredDependency,
     type EnvironmentFinding
 } from "../doctor-environment";
@@ -190,7 +195,98 @@ export function collectEnvironmentFindings(
     // One `@rebasepro/*` package, two versions.
     findings.push(...checkVersionSkew(readDeclaredRebaseDeps(projectRoot)));
 
+    // The atlas binary, which every schema command shells out to and whose
+    // absence is invisible until one of them is run.
+    findings.push(...checkAtlasBinary(readAtlasBinaryState(projectRoot)));
+
     return findings;
+}
+
+/**
+ * What is actually on disk for `@ariga/atlas`, from the project's point of view.
+ *
+ * Three separate questions, because the three states they distinguish need
+ * three different remedies — see `checkAtlasBinary`. Directories are searched
+ * from the project root upwards and through the workspaces a scaffold has,
+ * because `db push` runs from `backend/` and the install may be hoisted to the
+ * root.
+ */
+export function readAtlasBinaryState(projectRoot: string): AtlasBinaryState | null {
+    const roots = [projectRoot, path.join(projectRoot, "backend"), path.join(projectRoot, "config")];
+
+    const findUpwards = (starts: string[], relative: string): string | null => {
+        for (const start of starts) {
+            let dir = start;
+            for (let i = 0; i < 8; i++) {
+                const candidate = path.join(dir, "node_modules", relative);
+                if (fs.existsSync(candidate)) return candidate;
+                const parent = path.dirname(dir);
+                if (parent === dir) break;
+                dir = parent;
+            }
+        }
+        return null;
+    };
+
+    // `@ariga/atlas` is a dependency of `@rebasepro/server-postgres`, not of the
+    // project, so under pnpm's isolated layout — the scaffold default — it lives
+    // in `.pnpm/` and a directory walk over `node_modules/` never sees it.
+    // Resolve through the module graph the way the driver itself does.
+    const resolveFrom = (from: string, request: string): string | null => {
+        try {
+            return createRequire(pathToFileURL(from)).resolve(request);
+        } catch {
+            return null;
+        }
+    };
+    const bases = roots.map(dir => path.join(dir, "package.json")).filter(file => fs.existsSync(file));
+    const driverManifests = bases
+        .map(base => resolveFrom(base, "@rebasepro/server-postgres/package.json"))
+        .filter((file): file is string => file !== null);
+
+    let manifest: string | null = findUpwards(roots, path.join("@ariga", "atlas", "package.json"));
+    if (!manifest) {
+        for (const base of [...bases, ...driverManifests]) {
+            manifest = resolveFrom(base, "@ariga/atlas/package.json");
+            if (manifest) break;
+        }
+    }
+
+    // The `.bin` shim is written beside whichever package declared the
+    // dependency, so the driver's own directory is a search root too.
+    const onPath = findUpwards(
+        [...roots, ...driverManifests.map(file => path.dirname(file))],
+        path.join(".bin", "atlas")
+    ) !== null;
+
+    let binaryOnDisk = false;
+    if (manifest) {
+        try {
+            const pkg = JSON.parse(fs.readFileSync(manifest, "utf-8")) as {
+                bin?: string | Record<string, string>;
+            };
+            const dir = path.dirname(manifest);
+            const targets = typeof pkg.bin === "string"
+                ? [pkg.bin]
+                : Object.values(pkg.bin ?? {}).filter((t): t is string => typeof t === "string");
+            binaryOnDisk = targets.some(target => fs.existsSync(path.resolve(dir, target)));
+        } catch { /* unreadable manifest: treat the binary as absent */ }
+    }
+
+    return {
+        onPath,
+        packageInstalled: manifest !== null,
+        binaryOnDisk,
+        manager: readPackageManagerName(projectRoot)
+    };
+}
+
+/** The reader's own package manager, from the lockfile beside their project. */
+function readPackageManagerName(projectRoot: string): string {
+    for (const [file, manager] of Object.entries(LOCKFILES)) {
+        if (fs.existsSync(path.join(projectRoot, file))) return manager;
+    }
+    return "pnpm";
 }
 
 /** The `engines.node` range of the CLI actually running. */
@@ -242,6 +338,25 @@ function readDeclaredRebaseDeps(projectRoot: string): DeclaredDependency[] {
 }
 
 /**
+ * Does this project declare its collections in code?
+ *
+ * `resolveBackendPaths` answers it against the manifest's own `config` path
+ * rather than the convention, because a project may move the directory. A
+ * project with no manifest, or one shaped differently, is treated as declaring
+ * them: the wrong answer there would silently skip the drift report, which is
+ * the reason the command exists.
+ */
+export function hasDeclaredCollections(projectRoot: string): boolean {
+    try {
+        const backend = findBackendApp(loadManifest(projectRoot).manifest);
+        if (!backend) return true;
+        return resolveBackendPaths(backend.app, projectRoot).hasCollections;
+    } catch {
+        return true;
+    }
+}
+
+/**
  * Every `slug:` a collection file declares, read as text.
  *
  * Deliberately not by importing them: a collection file may import anything the
@@ -287,12 +402,57 @@ function reportEnvironmentFindings(findings: EnvironmentFinding[]): boolean {
     return findings.some(finding => finding.severity === "error");
 }
 
+/**
+ * The flags `rebase doctor` takes, and what each is for.
+ *
+ * One table, read by both the parser and the help page, because they were two
+ * things that had to agree and did not: the page listed no flags at all, so
+ * `--policies` — the form `cli/index.md` calls "the form to use as a CI gate" —
+ * was invisible to anyone who ran `rebase doctor --help` to find it. And with
+ * nothing parsing the line here, a typo travelled to the driver's permissive
+ * parser and was silently dropped, so `rebase doctor --polices` ran the ordinary
+ * doctor and reported success on a gate that never ran.
+ *
+ * The spec mirrors the driver's own (`doctorPluginCommand` in
+ * `server-postgres/src/cli.ts`), because the line is relayed to it verbatim.
+ */
+export const DOCTOR_FLAGS = {
+    "--policies": Boolean,
+    "--collections": String,
+    "-c": "--collections",
+    "--schema": String,
+    "-s": "--schema",
+    "--sdk": String,
+    "-k": "--sdk"
+} as const;
+
+/** What each long flag above does, for the Options block. */
+const DOCTOR_FLAG_HELP: Record<string, string> = {
+    "--policies": "Also audit the row-level security policies. The form to use as a CI gate.",
+    "--collections": "Path to the collections directory (default: ../config/collections)",
+    "--schema": "Path to the generated Drizzle schema (default: src/schema.generated.ts)",
+    "--sdk": "Path to the generated SDK types (default: ../generated/sdk/database.types.ts)"
+};
+
+/** `--collections, -c` — the aliases, resolved from the spec rather than retyped. */
+function doctorFlagLabel(flag: string): string {
+    const aliases = Object.entries(DOCTOR_FLAGS)
+        .filter(([, target]) => target === flag)
+        .map(([alias]) => alias);
+    return [flag, ...aliases].join(", ");
+}
+
 function printDoctorHelp(): void {
     console.log(`
 ${chalk.bold("rebase doctor")} — Check a project for drift and misconfiguration
 
 ${chalk.green.bold("Usage")}
-  rebase doctor
+  rebase doctor [options]
+
+${chalk.green.bold("Options")}
+${Object.keys(DOCTOR_FLAG_HELP)
+        .map(flag => `  ${chalk.blue(doctorFlagLabel(flag).padEnd(22))} ${DOCTOR_FLAG_HELP[flag]}`)
+        .join("\n")}
 
 Compares the collections you declare, the generated Drizzle schema, and the
 tables that actually exist, then reports what disagrees and how to reconcile it.
@@ -307,10 +467,23 @@ connects to its database.
 }
 
 export async function doctorCommand(rawArgs: string[]): Promise<void> {
-    if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
+    if (wantsHelp(rawArgs)) {
         printDoctorHelp();
         return;
     }
+
+    // Strictly, before the line is relayed. The driver's own parser is
+    // `permissive`, which turns an undeclared flag into a positional rather
+    // than an error, so `rebase doctor --polices` ran the ordinary doctor and
+    // exited 0 — a CI gate that reported success because the flag asking for it
+    // was dropped on the way.
+    parseCommandArgs({
+        spec: DOCTOR_FLAGS,
+        rawArgs,
+        commandWords: 1,
+        command: "doctor",
+        maxPositionals: 0
+    });
 
     const projectRoot = requireProjectRoot();
     const backendDir = requireBackendDir(projectRoot);
@@ -333,6 +506,7 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     if (envFile) {
         env.DOTENV_CONFIG_PATH = envFile;
     }
+    env[DEV_DATABASE_KIND_ENV] = devDatabaseKind(projectRoot) ?? "";
 
     // Reported before the plugin runs: this one needs no database, and if the
     // URL is the problem then anything that tries to connect with it first will
@@ -351,6 +525,56 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     // any of it. Reported before the plugin runs, and non-blocking — a project
     // with one of these still deserves its drift report.
     const environmentFailed = reportEnvironmentFindings(collectEnvironmentFindings(projectRoot, envFile));
+
+    // Which database, resolved the way every other command resolves it.
+    //
+    // Two of doctor's three phases need one, and both used to key on
+    // `DATABASE_URL` alone. On the documented first-run path that variable does
+    // not exist — `rebase init` leaves it commented out and the managed
+    // database fills the vacuum — so a stock scaffold always ended with
+    // `⏭ Collections → Database: skipped (DATABASE_URL not set)` and
+    // `⚠ No DATABASE_URL — RLS policies were NOT checked`, then told the reader
+    // to set the one variable the quickstart tells them to leave alone. For the
+    // command `ai-instructions.md` names as the thing to run before guessing.
+    //
+    // The managed daemon is started here, exactly as `rebase db url` starts it:
+    // a doctor that will not start the database it is asked about can only ever
+    // answer "I did not look".
+    //
+    // Last, and never fatal. Everything above needs no database, and a doctor
+    // that cannot report what it *can* see because a database would not start
+    // is the opposite of the job. A failure here is said out loud and the run
+    // continues; the driver then reports its two database phases as skipped,
+    // which is the truth.
+    try {
+        const prepared = await prepareDatabaseEnv(projectRoot, {
+            onProgress: (message) => console.log(chalk.gray(`  ${message}`))
+        });
+        Object.assign(env, prepared.env);
+        for (const line of managedNotices(prepared)) console.log(chalk.gray(`  ${line}`));
+    } catch (error) {
+        console.log("");
+        console.error(chalk.yellow(`  ⚠ Could not resolve this project's database: ${
+            error instanceof Error ? error.message : String(error)}`));
+        console.error(chalk.gray("    The checks that need one are reported below as not run."));
+    }
+
+    // A headless project has no `config/collections` by design — its API is
+    // introspected from the live database at boot — and the driver's doctor
+    // opens by loading them, finds none, and exits 1. So `rebase doctor` failed
+    // on the documented headless path, in 0.17.3 and on main, while every check
+    // above it had just passed. Its three phases all compare *against* declared
+    // collections, so there is nothing for them to do here; the environment
+    // findings are the whole report.
+    if (!hasDeclaredCollections(projectRoot)) {
+        console.log("");
+        console.log(chalk.gray(
+            "  ○ Schema drift not checked: this project derives its API from the database — "
+            + "run `rebase schema introspect` first."
+        ));
+        if (environmentFailed) process.exit(1);
+        return;
+    }
 
     try {
         const isTs = pluginCli.endsWith(".ts");

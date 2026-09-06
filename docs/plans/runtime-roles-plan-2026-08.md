@@ -71,12 +71,12 @@ Functions are already much closer to independently deployable than they look.
 
 | What we need | What already exists |
 | --- | --- |
-| A stable per-function address | `createFunctionRoutes` mounts each file at `/api/functions/<name>` ([function-routes.ts](../packages/server/src/functions/function-routes.ts)). `FunctionsClient.invoke` builds exactly that path ([functions.ts](../packages/client/src/functions.ts)). Routing one function elsewhere is an ingress rule — no client change. |
-| An unambiguous function identity | `loadFunctionsWithDiagnostics` is flat by construction: subdirectories are explicitly refused and reported ([function-loader.ts](../packages/server/src/functions/function-loader.ts)). The name space is already a set of strings. |
+| A stable per-function address | `createFunctionRoutes` mounts each file at `/api/functions/<name>` ([function-routes.ts](../../packages/server/src/functions/function-routes.ts)). `FunctionsClient.invoke` builds exactly that path ([functions.ts](../../packages/client/src/functions.ts)). Routing one function elsewhere is an ingress rule — no client change. |
+| An unambiguous function identity | `loadFunctionsWithDiagnostics` is flat by construction: subdirectories are explicitly refused and reported ([function-loader.ts](../../packages/server/src/functions/function-loader.ts)). The name space is already a set of strings. |
 | Code decoupled from the process | The bundle. `entry.functions` is a directory in the manifest; `bootFromBundle` mounts it. Upgrading the runtime is an image tag. |
-| Deps for a second copy of the framework | Already handled. The singleton lives on `Symbol.for("@rebasepro/server:singleton-instance")` precisely because a bundle loads its own copy of `@rebasepro/server` alongside the image's ([singleton.ts](../packages/server/src/singleton.ts)). |
-| Multi-instance cron | **Already coordinated.** `CronScheduler` claims each `(job, slot)` pair via `tryClaimRun` against `rebase.cron_claims`, and the store is attached by default on any SQL driver ([cron-scheduler.ts](../packages/server/src/cron/cron-scheduler.ts), [cron-store.ts](../packages/server/src/cron/cron-store.ts)). |
-| Multi-worker job queue | **Already safe.** `JobStore.claim` uses `FOR UPDATE SKIP LOCKED` and reclaims from workers that stop responding ([job-store.ts](../packages/server/src/jobs/job-store.ts)). |
+| Deps for a second copy of the framework | Already handled. The singleton lives on `Symbol.for("@rebasepro/server:singleton-instance")` precisely because a bundle loads its own copy of `@rebasepro/server` alongside the image's ([singleton.ts](../../packages/server/src/singleton.ts)). |
+| Multi-instance cron | **Already coordinated.** `CronScheduler` claims each `(job, slot)` pair via `tryClaimRun` against `rebase.cron_claims`, and the store is attached by default on any SQL driver ([cron-scheduler.ts](../../packages/server/src/cron/cron-scheduler.ts), [cron-store.ts](../../packages/server/src/cron/cron-store.ts)). |
+| Multi-worker job queue | **Already safe.** `JobStore.claim` uses `FOR UPDATE SKIP LOCKED` and reclaims from workers that stop responding ([job-store.ts](../../packages/server/src/jobs/job-store.ts)). |
 | A per-function permission scope | API keys already carry `functions` / `functions/<name>` permissions. |
 | Multi-container self-host | [docker-compose.selfhost.yml](../../infra/docker/docker-compose.selfhost.yml) already runs the published image against a mounted bundle, with no application image to build. Adding services is adding services. |
 
@@ -90,8 +90,8 @@ decision instead of a hardcoded one.
    way to boot a process that serves functions and *not* `/api/data`, or the
    reverse.
 2. `ensureCollectionSchema` / `ensureCollectionPolicies` in
-   [boot.ts](../packages/server/src/boot/boot.ts) run on every boot and do **not**
-   go through [ddl-bootstrap.ts](../packages/server/src/boot/ddl-bootstrap.ts).
+   [boot.ts](../../packages/server/src/boot/boot.ts) run on every boot and do **not**
+   go through [ddl-bootstrap.ts](../../packages/server/src/boot/ddl-bootstrap.ts).
    Concurrent boots racing `CREATE … IF NOT EXISTS` is measured, not theoretical:
    5 instances, 8 of 10 calls took the losing branch. Today one replica hides
    this; three do not.
@@ -130,7 +130,7 @@ it makes them reachable, which means it has to fix or fail-close on them.
 export type RebaseRuntimeRole = "all" | "api" | "functions" | "worker";
 ```
 
-Read from `REBASE_ROLE` in [boot/env.ts](../packages/server/src/boot/env.ts),
+Read from `REBASE_ROLE` in [boot/env.ts](../../packages/server/src/boot/env.ts),
 alongside `REBASE_MIGRATE_ON_BOOT`, as a `z.enum([...]).default("all")`.
 
 Env rather than a CLI flag on purpose: Compose, Kubernetes and Cloud Run all
@@ -211,7 +211,7 @@ Boot must fail, with an actionable message, when:
 2. `REBASE_ROLE` is set to anything other than `all` and the resolved channel bus
    is the in-memory one. Broadcast and presence would silently stop crossing
    instances. Point at `realtime: { bus: { type: "postgres" } }`
-   ([channel_bus.ts](../packages/types/src/types/channel_bus.ts)).
+   ([channel_bus.ts](../../packages/types/src/types/channel_bus.ts)).
 3. `REBASE_FUNCTIONS_UPSTREAM` is set on a role other than `api`.
 4. `REBASE_FUNCTIONS_ONLY` / `_EXCLUDE` is set on a role other than `functions`.
 5. A name in `ONLY` / `EXCLUDE` is not in the bundle (§3.4).
@@ -306,7 +306,7 @@ registered and no DDL statement is issued.
 
 Route `ensureCollectionSchema` and `ensureCollectionPolicies` through
 `createDdlBootstrapper` from
-[ddl-bootstrap.ts](../packages/server/src/boot/ddl-bootstrap.ts), as
+[ddl-bootstrap.ts](../../packages/server/src/boot/ddl-bootstrap.ts), as
 `cron-store.ts` and `api-key-store.ts` already do. Same pass: the still-unfixed
 `ensureTables()` in `channel-presence.ts` / `channel-history.ts`
 (`packages/server-postgres`).
@@ -380,7 +380,7 @@ Every one of these has already burned this repository.
 4. **A blank environment variable is not an unset one.** `Number("")` is `0`, and
    `REBASE_FUNCTIONS_TIMEOUT_MS=${SOMETHING}` with `SOMETHING` undefined is the
    ordinary way to write a compose file. `resolveFunctionsTimeoutMs` in
-   [request-timeout.ts](../packages/server/src/functions/request-timeout.ts)
+   [request-timeout.ts](../../packages/server/src/functions/request-timeout.ts)
    already handles this correctly — every new variable here must too, and each
    needs a test with `""` and `" "`.
 

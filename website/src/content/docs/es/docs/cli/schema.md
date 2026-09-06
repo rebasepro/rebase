@@ -1,4 +1,5 @@
 ---
+sourceHash: 03df1518e08ca072
 title: Generación de Esquemas
 sidebar_label: Generación de Esquemas
 description: Genere esquemas de Drizzle ORM a partir de las definiciones de colecciones, cree migraciones SQL y mantenga su base de datos sincronizada con la CLI de Rebase.
@@ -122,6 +123,21 @@ rebase db migrate
 - Las aplica en orden a la base de datos
 - Rastrea qué migraciones se han aplicado
 
+#### Establecer una baseline en una base de datos que Rebase ya ha arrancado
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+Cada arranque de Rebase asegura el esquema, y `rebase db push` lo aplica directamente. Una base de datos sobre la que se haya ejecutado cualquiera de los dos ya tiene las tablas y los tipos que crearía la primera migración, y `rebase db migrate` se detiene con `pq: type "posts_status" already exists (42710)`.
+
+La migración no tiene nada de malo: la base de datos se aprovisionó por otra vía. Registre dónde está ya y migre con normalidad:
+
+```bash
+rebase db migrate --baseline 20260906101530
+rebase db migrate
+```
+
+La versión es el prefijo numérico del archivo de migración que describe lo que hay en la base de datos *ahora*. Esa migración y todas las anteriores quedan registradas como aplicadas; todo lo posterior se ejecuta. Sobre una base de datos que nunca ha arrancado no hace falta baseline: migre directamente.
+
 ### `rebase db branch`
 
 Ramificación de base de datos para desarrollo en paralelo:
@@ -178,7 +194,7 @@ import { createRebaseClient } from "@rebasepro/client";
 import { collectionsDictionary, type Database } from "./generated/sdk/database.types";
 
 const client = createRebaseClient<Database>({
-    baseUrl: "http://localhost:3001",
+    baseUrl: import.meta.env.VITE_API_URL,
     collections: collectionsDictionary,
 });
 
@@ -218,6 +234,8 @@ rebase db generate
 git add drizzle/
 
 # 6. Apply in production
+#    A database Rebase has already booted needs a baseline the first time —
+#    see the baselining section above.
 rebase db migrate
 ```
 
@@ -229,6 +247,7 @@ rebase db migrate
 | El archivo de esquema no se actualiza | Compruebe que la ruta `--collections` apunta al directorio correcto |
 | La migración muestra cambios inesperados | Ejecute `rebase doctor` para identificar la desviación |
 | `db push` falla en producción | Use `db generate` + `db migrate` en su lugar |
+| `db migrate` falla con `already exists (42710)` | El arranque o `db push` ya aprovisionaron el esquema — regístrelo con `rebase db migrate --baseline <version>` |
 
 ## Próximos Pasos
 

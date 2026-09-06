@@ -12,8 +12,12 @@ import {
     readEnvFile
 } from "../utils/project";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
+import { unknownCommand } from "../utils/unknown-command";
 import fs from "fs";
 import path from "path";
+
+/** Everything the switch below dispatches, for the did-you-mean. */
+const API_KEYS_SUBCOMMANDS = ["list", "create", "revoke"] as const;
 
 /* ═══════════════════════════════════════════════════════════════
    Env helper — reads SERVICE_KEY and PORT from .env
@@ -73,10 +77,12 @@ export async function apiKeysCommand(subcommand: string | undefined, rawArgs: st
             await revokeKey(rawArgs);
             break;
         default:
-            console.error(chalk.red(`Unknown api-keys command: ${subcommand}`));
-            console.log("");
-            printApiKeysHelp();
-            process.exit(1);
+            // The shape every other family uses. This one printed a bare line
+            // to stderr *and* the whole help page to stdout, so a typo wrote
+            // twenty lines to a stream a `--json` caller reads, with no `✗`, no
+            // pointer at `--help`, and no did-you-mean — `craete` is one
+            // transposition from `create`.
+            unknownCommand(subcommand, API_KEYS_SUBCOMMANDS, "api-keys");
     }
 }
 

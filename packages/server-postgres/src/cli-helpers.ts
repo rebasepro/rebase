@@ -130,6 +130,25 @@ export function describeBuildScriptRemedy(
     }
 }
 
+/**
+ * "Install again, from scratch", in the reader's own package manager.
+ *
+ * For the `bin-link-missing` state: the tree is half-written, and re-resolving
+ * it is what recreates the `.bin` shim. `--force` on pnpm is what makes it
+ * relink rather than decide the tree is already up to date.
+ */
+export function describeReinstallCommand(
+    manager: ProjectPackageManager = detectProjectPackageManager()
+): string {
+    switch (manager) {
+        case "npm": return "rm -rf node_modules && npm install";
+        case "yarn": return "yarn install --force";
+        case "bun": return "rm -rf node_modules && bun install";
+        case "pnpm":
+        default: return "pnpm install --force";
+    }
+}
+
 /** `add <pkg>` as a dev dependency, in the reader's own package manager. */
 export function describeDevAddCommand(
     packageName: string,
@@ -144,24 +163,77 @@ export function describeDevAddCommand(
     }
 }
 
-export function diagnoseMissingBin(packageName: string): "not-installed" | "build-script-blocked" {
+/**
+ * Why a dependency's binary is not on `PATH`.
+ *
+ * `bin-link-missing` is the third state, and the reason this is not a boolean.
+ * The `preinstall` did run and the binary IS on disk — only the
+ * `node_modules/.bin` shim that points at it is absent. pnpm produces exactly
+ * that when it writes the link before the script that creates the target
+ * ("Failed to create bin … ENOENT"), and so does a tree copied without its
+ * symlinks. Telling that reader their build scripts are blocked sends them to
+ * `approve-builds`, which does nothing, because nothing is blocked.
+ */
+export type MissingBinDiagnosis = "not-installed" | "build-script-blocked" | "bin-link-missing";
+
+/**
+ * Where a package's own manifest lives, or null if it is not installed here.
+ *
+ * `package.json` rather than the package root: a package with an `exports` map
+ * that omits `.` is unresolvable by name even when it is perfectly installed,
+ * which would misreport it as absent.
+ */
+function resolvePackageManifest(packageName: string): string | null {
     const bases = [
         pathToFileURL(path.join(process.cwd(), "package.json")),
         pathToFileURL(path.join(__helpersDirname, "package.json"))
     ];
-
     for (const base of bases) {
         try {
-            // `package.json` rather than the package root: a package with an
-            // `exports` map that omits `.` is unresolvable by name even when it
-            // is perfectly installed, which would misreport it as absent.
-            createRequire(base).resolve(`${packageName}/package.json`);
-            return "build-script-blocked";
+            return createRequire(base).resolve(`${packageName}/package.json`);
         } catch {
             // Try the next base.
         }
     }
-    return "not-installed";
+    return null;
+}
+
+/**
+ * The binaries a package's own manifest declares, as absolute paths.
+ *
+ * `bin` is a string for a single binary named after the package, or a map.
+ * Both forms appear in the wild and `@ariga/atlas` uses the map.
+ */
+export function declaredBinaries(manifestPath: string): string[] {
+    let manifest: { name?: string; bin?: string | Record<string, string> };
+    try {
+        manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as typeof manifest;
+    } catch {
+        return [];
+    }
+    const dir = path.dirname(manifestPath);
+    if (typeof manifest.bin === "string") return [path.resolve(dir, manifest.bin)];
+    if (manifest.bin && typeof manifest.bin === "object") {
+        return Object.values(manifest.bin)
+            .filter((target): target is string => typeof target === "string")
+            .map(target => path.resolve(dir, target));
+    }
+    return [];
+}
+
+export function diagnoseMissingBin(packageName: string): MissingBinDiagnosis {
+    const manifestPath = resolvePackageManifest(packageName);
+    if (!manifestPath) return "not-installed";
+
+    // Installed — but "installed" was the whole verdict, and it is not enough.
+    // `@ariga/atlas` downloads its platform binary in `preinstall`, so a blocked
+    // script leaves the package on disk with its `install.js` and manifest and
+    // no binary: the state this branch was written for. It is NOT the state of
+    // a tree whose binary exists and whose `.bin` shim does not, and those two
+    // need opposite advice. Ask the manifest which file the binary is, and look.
+    const binaries = declaredBinaries(manifestPath);
+    if (binaries.length === 0) return "build-script-blocked";
+    return binaries.some(file => fs.existsSync(file)) ? "bin-link-missing" : "build-script-blocked";
 }
 
 export function resolveLocalBin(binName: string): string | null {
@@ -240,6 +312,9 @@ export async function getTableIncludes(collectionsPath: string): Promise<string[
  * that cannot tolerate a partial answer (the table excludes, which fail closed)
  * check the result themselves.
  */
+/** Paths this process has already complained about. See {@link loadCollectionsForCli}. */
+const warnedMissingCollectionsPaths = new Set<string>();
+
 export async function loadCollectionsForCli(collectionsPath: string): Promise<CollectionConfig[]> {
     // Note: a relative --collections path resolves against the *current working
     // directory*, not the backend package. When invoked via the generated npm
@@ -248,7 +323,17 @@ export async function loadCollectionsForCli(collectionsPath: string): Promise<Co
     // different relative path can silently point at the wrong place.
     const resolvedPath = path.resolve(collectionsPath);
     const collections: CollectionConfig[] = [];
-    if (!fs.existsSync(resolvedPath)) {
+    if (!fs.existsSync(resolvedPath) && !warnedMissingCollectionsPaths.has(resolvedPath)) {
+        // Once per path per process. `db push` re-enters this from
+        // `schemaCommand`, `generatePostgresDdlCommand` and the Atlas argv
+        // assembly, so the same four lines were printed four times — sixteen
+        // lines of identical text ahead of the real output.
+        //
+        // An explicitly typed `--collections` never reaches here at all: it is
+        // refused at the entry point, before anything is generated. See
+        // `cli-collections-path.ts`. What is left is the default, which a
+        // headless project legitimately does not have.
+        warnedMissingCollectionsPaths.add(resolvedPath);
         outWarn(chalk.yellow(
             `  ⚠  Collections path not found: "${collectionsPath}"\n` +
             `     Resolved to: ${resolvedPath}\n` +
@@ -294,12 +379,31 @@ export function getDevDatabaseUrl(databaseUrl: string): string {
     }
 }
 
-export async function ensureDevDatabaseExists(databaseUrl: string, devDatabaseUrl: string) {
+/**
+ * Create the scratch database Atlas plans against, and say so when we cannot.
+ *
+ * Atlas needs a `--dev-url` — an empty database it can build the desired state
+ * in — and this makes `<db>_dev_diff` next to the real one. The whole body used
+ * to be wrapped in an empty catch commented "Ignore, let Atlas handle
+ * connection failures", and Atlas's version of handling it is `postgres:
+ * querying system variables: pq: database "app_dev_diff" does not exist
+ * (3D000)` — the symptom, four frames downstream of the cause, with the cause
+ * thrown away.
+ *
+ * The cause is almost always `42501`: `CREATE DATABASE` is a privilege managed
+ * providers do not grant, so this is the first thing a hosted user hits and the
+ * one they can do least with.
+ *
+ * @returns whether the scratch database was created by *this* call — the only
+ *          case in which dropping it afterwards is ours to do.
+ */
+export async function ensureDevDatabaseExists(databaseUrl: string, devDatabaseUrl: string): Promise<boolean> {
+    let devDbName = "";
     try {
         const { Client } = await import("pg");
         const parsed = new URL(databaseUrl);
-        const devDbName = new URL(devDatabaseUrl).pathname.slice(1);
-        
+        devDbName = new URL(devDatabaseUrl).pathname.slice(1);
+
         parsed.pathname = "/postgres";
         const client = new Client({ connectionString: parsed.toString() });
         await client.connect();
@@ -308,12 +412,80 @@ export async function ensureDevDatabaseExists(databaseUrl: string, devDatabaseUr
             if (res.rowCount === 0) {
                 await client.query(`CREATE DATABASE "${devDbName}"`);
                 out(chalk.gray(`  ✓ Created validation database "${devDbName}"`));
+
+                return true;
             }
         } finally {
             await client.end();
         }
-    } catch {
-        // Ignore, let Atlas handle connection failures
+    } catch (err) {
+        outWarn(describeDevDatabaseFailure(err, devDbName || "<db>_dev_diff"));
+    }
+
+    return false;
+}
+
+/**
+ * What went wrong creating the scratch database, and what to do about it.
+ *
+ * Exported for its test: the `42501` branch is the one that matters and it
+ * cannot be provoked without a non-superuser role.
+ */
+export function describeDevDatabaseFailure(err: unknown, devDbName: string): string {
+    const code = (err as { code?: string } | null)?.code;
+    const message = err instanceof Error ? err.message : String(err);
+
+    const lines = [
+        chalk.yellow(`  ⚠  Could not create the Atlas scratch database "${devDbName}": ${message}`)
+    ];
+    if (code === "42501") {
+        lines.push(chalk.gray(
+            "     Atlas plans every change in a throwaway copy of the schema, and CREATE DATABASE\n" +
+            "     is a privilege most managed providers withhold. Two ways forward:\n" +
+            `       • GRANT the role CREATEDB:  ALTER ROLE "<role>" CREATEDB;\n` +
+            `       • or create it once by hand:  CREATE DATABASE "${devDbName}";`
+        ));
+    } else {
+        lines.push(chalk.gray("     Atlas will fail next with `database \"" + devDbName + "\" does not exist (3D000)`, which is this."));
+    }
+
+    return lines.join("\n");
+}
+
+/**
+ * Drop the scratch database again, after the command that needed it succeeded.
+ *
+ * It is a full copy of the schema — no rows, but every table, type and index —
+ * and it was left behind per target forever. The only notice anyone got was
+ * `rebase db branch prune` reporting "3 Atlas scratch database(s) left over
+ * from db push", and on a provider that bills per database it is a silent cost.
+ *
+ * Deliberately NOT called on the failure path: after a failed push the scratch
+ * database holds the state Atlas was planning against, which is the one thing
+ * worth inspecting.
+ */
+export async function dropDevDatabase(databaseUrl: string, devDatabaseUrl: string): Promise<void> {
+    try {
+        const { Client } = await import("pg");
+        const parsed = new URL(databaseUrl);
+        const devDbName = new URL(devDatabaseUrl).pathname.slice(1);
+
+        parsed.pathname = "/postgres";
+        const client = new Client({ connectionString: parsed.toString() });
+        await client.connect();
+        try {
+            await client.query(`DROP DATABASE IF EXISTS "${devDbName}"`);
+            out(chalk.gray(`  ✓ Removed validation database "${devDbName}"`));
+        } finally {
+            await client.end();
+        }
+    } catch (err) {
+        // Not fatal, and not silent: the push has already succeeded, so the
+        // worst case is one database left where `prune` can find it.
+        outWarn(chalk.gray(
+            `  ⚠  Could not remove the Atlas scratch database: ${err instanceof Error ? err.message : String(err)}\n` +
+            "     `rebase db branch prune --include-dev-diff` clears them."
+        ));
     }
 }
 

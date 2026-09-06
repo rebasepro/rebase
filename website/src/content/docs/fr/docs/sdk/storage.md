@@ -1,4 +1,5 @@
 ---
+sourceHash: 7a0c74973860c714
 title: Stockage et fichiers
 sidebar_label: Stockage
 description: Téléverser, télécharger, lister et supprimer des fichiers à l'aide du module de stockage du SDK Client de Rebase.
@@ -26,7 +27,7 @@ const result = await client.storage.putObject({
     }
 });
 
-// result: { key: string, url: string, ... }
+// result: { key: string; bucket: string; storageUrl: string }
 ```
 
 ### Depuis un champ de fichier
@@ -60,6 +61,10 @@ if (url) {
     console.log("File not found");
 }
 ```
+
+:::caution[L'argument `bucket` est aujourd'hui un préfixe de chemin]
+Sur `getSignedUrl`, `getObject` et `deleteObject`, le second argument est replié dans la clé de l'objet (`<bucket>/<key>`) et n'atteint jamais le serveur en tant que bucket : un nom que le déploiement ne sert pas est signalé comme *fichier* manquant, pas comme bucket inconnu — et un fichier écrit avec `putObject({ bucket: "media" })` n'est pas relu avec `getSignedUrl(key, "media")`. Relisez un fichier avec la même forme d'appel que celle qui l'a écrit. Côté serveur, `/api/storage/list` répond déjà `404 UNKNOWN_STORAGE_SOURCE` ; l'argument du SDK est en cours de refonte pour s'y conformer.
+:::
 
 Avec un bucket spécifique :
 

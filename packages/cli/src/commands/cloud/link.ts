@@ -4,13 +4,13 @@
  * `link` associates the current directory with a cloud project by writing
  * `.rebase/cloud.json`; deploy/logs/status then operate on it with no flags.
  */
-import arg from "arg";
 import chalk from "chalk";
 import inquirer from "inquirer";
 import {
     requireClient,
     resolveProjectRef,
     resolveCloudUrl,
+    parseCloudArgs,
     writeLink,
     removeLink,
     readLink,
@@ -114,13 +114,22 @@ async function linkDirect(target: string, rawArgs: string[]): Promise<void> {
 }
 
 export async function linkCommand(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--project": String,
-"-p": "--project" }, { argv: rawArgs.slice(3),
-permissive: true });
+    // `--project` is a global, so the spec is empty: declaring it here would
+    // replace the global in the merge while the global's other readers went on
+    // reading the raw line. Strict rather than permissive — a mistyped flag
+    // used to be dropped, and `link` then opened the interactive picker as
+    // though nothing had been asked for.
+    const { flags: args, positionals } = parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 2, // cloud link
+        command: "cloud link",
+        maxPositionals: 1 // [url]
+    });
 
     // A positional URL means "this exact backend", which needs no login and no
     // control plane. `rebase cloud link https://api.example.com`
-    const positional = args._.find(value => /^https?:\/\//i.test(value));
+    const positional = positionals.find(value => /^https?:\/\//i.test(value));
     if (positional) {
         await linkDirect(positional, rawArgs);
         return;
@@ -202,7 +211,14 @@ permissive: true });
     }
 }
 
-export function unlinkCommand(): void {
+export function unlinkCommand(rawArgs: string[]): void {
+    // It took no arguments at all, so `rebase cloud unlink --frobnicate`
+    // removed the link and exited 0.
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 2,
+command: "cloud unlink",
+maxPositionals: 0 });
     const link = readLink();
     if (!link) {
         // Idempotent, like `logout`: `unlinked: false` is how a caller tells
@@ -227,8 +243,17 @@ linkPath: projectLinkPath() });
 }
 
 export async function selectOrgCommand(rawArgs: string[]): Promise<void> {
-    // positionals after "cloud" are [use, <org>]; take the token after "use".
-    const target = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[1];
+    // Was `rawArgs.slice(3).filter(a => !a.startsWith("-"))[1]` — a hand-rolled
+    // positional scan that skipped flag-shaped tokens and therefore accepted
+    // any flag at all, including the value of one it did not declare.
+    const { positionals } = parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 2, // cloud use
+        command: "cloud use",
+        maxPositionals: 1 // [org]
+    });
+    const target = positionals[0];
     const { client, url } = await requireClient(rawArgs);
 
     try {
@@ -280,6 +305,11 @@ slug: chosen.slug ?? null }
 
 /** Open the Rebase Cloud dashboard (or the linked project) in a browser. */
 export function openCommand(rawArgs: string[]): void {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 2,
+command: "cloud open",
+maxPositionals: 0 });
     const url = resolveCloudUrl(rawArgs);
     const link = readLink();
     const target = link ? `${url}/projects/${link.projectId}` : url;

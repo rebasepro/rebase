@@ -21,6 +21,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
+import { resourceKinds } from "@rebasepro/types";
 import { composeBundleManifest } from "./bundle";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -72,6 +73,31 @@ describe("the bundle manifest contract", () => {
         const committed = fs.existsSync(CONTRACT_FILE) ? fs.readFileSync(CONTRACT_FILE, "utf8") : null;
         expect(committed, `${path.relative(process.cwd(), CONTRACT_FILE)} is missing or stale — run with REBASE_UPDATE_CONTRACTS=1, then make saas's contract test pass`)
             .toBe(expected);
+    });
+
+    /**
+     * The fixture is one of EVERY kind, and "every" is read from the registry.
+     *
+     * `exampleManifest`'s `resources` array is a hand-written literal, and the
+     * control plane's own contract test asserts a hand-written list of accepted
+     * kinds. So a seventh `registerResourceKind({ kind: … })` passed both suites
+     * untouched, and the first tenant to declare it got its deploy refused at
+     * intake with `RESOURCE_KIND_UNKNOWN` — the exact "two green suites, one
+     * broken product" failure this contract file was created for, moved up one
+     * level from the field it was created about.
+     *
+     * Adding a kind is now a change to this fixture (and, through the committed
+     * contract file, to the control plane's test), which is what it always was
+     * in reality.
+     */
+    it("carries one of every kind the registry knows", () => {
+        const fixture = exampleManifest() as { resources?: { resources: { kind: string }[] } };
+        const declared = new Set(fixture.resources?.resources.map(r => r.kind) ?? []);
+        const registered = new Set(resourceKinds().map(k => k.kind));
+        expect(
+            [...declared].sort(),
+            "a kind with no row here reaches the control plane untested — its first tenant is the test"
+        ).toEqual([...registered].sort());
     });
 
     it("carries buckets in the graph, never in storage.sources", () => {

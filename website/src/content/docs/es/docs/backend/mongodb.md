@@ -1,4 +1,5 @@
 ---
+sourceHash: 239a291d53ade1fd
 title: MongoDB
 sidebar_label: MongoDB
 description: "@rebasepro/server-mongo runs Rebase on MongoDB: a complete data driver, change-stream realtime and snapshot history — and no row-level security."
@@ -20,7 +21,9 @@ authorization is whatever your own code checks.
 
 That is not a gap waiting to be filled — it is a property of the engine. If
 per-row authorization enforced below the application is why you are looking at
-Rebase, use the [PostgreSQL driver](/docs/backend/database/).
+Rebase, use the PostgreSQL driver — [Backend Setup](/docs/backend/) is where it
+is configured, and [Security Rules](/docs/collections/security-rules/) is what it
+buys you.
 :::
 
 ## Installation

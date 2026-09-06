@@ -43,6 +43,7 @@ export type PreflightOutcome =
     | { action: "no-compose" }
     | { action: "no-docker"; hint: string }
     | { action: "start-failed"; hint: string }
+    | { action: "wrong-port"; hint: string; port: number; composePort: number }
     | { action: "started"; port: number; pushed: boolean };
 
 /**
@@ -139,6 +140,35 @@ export function composeDatabaseUrl(
     yamlText: string,
     env: Record<string, string | undefined> = {}
 ): string | null {
+    const found = scanComposeDbService(yamlText);
+
+    const user = expandComposeValue(found.POSTGRES_USER, env);
+    const password = expandComposeValue(found.POSTGRES_PASSWORD, env);
+    const database = expandComposeValue(found.POSTGRES_DB, env);
+    if (!user || !password || !database || !found.hostPort) return null;
+
+    return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}` +
+        `@127.0.0.1:${found.hostPort}/${database}?options=-c%20search_path%3Dpublic&sslmode=disable`;
+}
+
+/**
+ * The host port the compose `db` service publishes, or null.
+ *
+ * Separate from {@link composeDatabaseUrl} because the port is answerable on
+ * its own: the URL needs the user, the password and the database name too, and
+ * a compose file missing any of them still says which port a container would
+ * listen on. That is the question "would starting this container answer the
+ * DSN in `.env`?" — see the `wrong-port` branch of {@link ensureDevDatabase},
+ * where getting it wrong meant starting a container nobody asked for.
+ */
+export function composeHostPort(yamlText: string): number | null {
+    const port = scanComposeDbService(yamlText).hostPort;
+
+    return port ? Number(port) : null;
+}
+
+/** The raw values of the compose `db` service, before any expansion. */
+function scanComposeDbService(yamlText: string): Record<string, string> & { hostPort?: string } {
     let inServices = false;
     let inDb = false;
     let dbIndent = 0;
@@ -182,13 +212,7 @@ export function composeDatabaseUrl(
         }
     }
 
-    const user = expandComposeValue(found.POSTGRES_USER, env);
-    const password = expandComposeValue(found.POSTGRES_PASSWORD, env);
-    const database = expandComposeValue(found.POSTGRES_DB, env);
-    if (!user || !password || !database || !hostPort) return null;
-
-    return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}` +
-        `@127.0.0.1:${hostPort}/${database}?options=-c%20search_path%3Dpublic&sslmode=disable`;
+    return hostPort === null ? found : { ...found, hostPort };
 }
 
 /**
@@ -262,6 +286,13 @@ export interface EnsureDevDatabaseOptions {
     hasCollections: boolean;
     /** Runs `rebase db push` for this project. Injected so tests need no database. */
     pushSchema: () => Promise<void>;
+    /**
+     * Brings the compose `db` service up. Injected for the same reason
+     * `pushSchema` is: what happens *after* a start — a push that fails without
+     * taking the dev server with it — is the part worth asserting, and it was
+     * untestable while the only way in was a real `docker compose up`.
+     */
+    startDatabase?: (projectRoot: string) => Promise<void>;
     log?: (message: string) => void;
 }
 
@@ -294,16 +325,40 @@ export async function ensureDevDatabase(options: EnsureDevDatabaseOptions): Prom
 
     const composePath = path.join(projectRoot, "docker-compose.yml");
     if (!fs.existsSync(composePath)) return { action: "no-compose" };
-    if (!composeDeclaresDbService(fs.readFileSync(composePath, "utf8"))) return { action: "no-compose" };
+    const composeText = fs.readFileSync(composePath, "utf8");
+    if (!composeDeclaresDbService(composeText)) return { action: "no-compose" };
 
     const manualSteps =
         `${chalk.cyan("docker compose up -d db")} then ${chalk.cyan("rebase db push")}`;
 
+    // Would starting that container answer *this* DSN? A `.env` naming a port
+    // the compose file does not publish is the commonest way to get here, and
+    // starting the container then told the reader the exact opposite of the
+    // truth: `⚠ The database container did not begin listening on port 3139.
+    // Run docker compose up -d db then rebase db push to see why.` The
+    // container was up and healthy on 5436; the port in `.env` was what was
+    // wrong. And a container nobody asked for was left running.
+    const composePort = composeHostPort(composeText);
+    if (composePort !== null && composePort !== target.port) {
+        const hint =
+            `DATABASE_URL points at ${target.host}:${target.port} and nothing listens there. `
+            + `The compose file's db service publishes ${composePort}, so starting it would not `
+            + `answer that URL — nothing was started. Either correct the port in .env, or point `
+            + `DATABASE_URL at 127.0.0.1:${composePort}.`;
+        log("");
+        log(`  ${chalk.yellow("⚠")} ${chalk.gray(hint)}`);
+        return { action: "wrong-port", hint, port: target.port, composePort };
+    }
+
     log("");
     log(`  ${chalk.gray("Database not running — starting it…")}`);
 
+    const startDatabase = options.startDatabase ?? (async (root: string) => {
+        await execa("docker", ["compose", "up", "-d", "db"], { cwd: root, stdio: "pipe" });
+    });
+
     try {
-        await execa("docker", ["compose", "up", "-d", "db"], { cwd: projectRoot, stdio: "pipe" });
+        await startDatabase(projectRoot);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         // Two very different failures land here and the reader needs to know

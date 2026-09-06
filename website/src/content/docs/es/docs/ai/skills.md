@@ -1,4 +1,5 @@
 ---
+sourceHash: 771019609412b5b6
 title: Agent Skills
 sidebar_label: Agent Skills
 description: rebase skills install escribe 21 habilidades de referencia de Rebase en tu repositorio, en la estructura que espera tu asistente de IA — Cursor, Claude Code, Windsurf, Gemini CLI y Antigravity.
@@ -47,7 +48,15 @@ leer. Los cuerpos quedan en subdirectorios por skill y se abren bajo demanda.
 
 `gemini` cubre **tanto** Gemini CLI como Antigravity; ambos leen el mismo directorio `.agents/`, por lo que no existe un valor `antigravity` independiente.
 
-Si no se especifica `--agent`, el comando detecta qué asistentes ya utiliza un proyecto buscando `.cursor/`, `.claude/`, `.windsurf/` y `.agents/`. Si no encuentra ninguno, te solicitará que elijas uno.
+Si no se especifica `--agent`, el comando detecta qué asistentes ya utiliza un
+proyecto buscando `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` y
+`.kiro/`. Si no encuentra ninguno, te solicitará que elijas uno.
+
+**GitHub Copilot nunca se detecta.** Su directorio sería `.github/`, y
+`.github/` no es prueba de que alguien use Copilot: `rebase init` escribe
+`.github/copilot-instructions.md` en cada proyecto generado, y la mayoría de los
+repositorios tienen un `.github/` para sus workflows. Instálalo con
+`--agent copilot`.
 
 :::note[Un proyecto recién generado siempre solicita confirmación]
 `rebase init` genera `CLAUDE.md`, `.cursorrules` y similares, pero ninguno de los *directorios* que busca la detección. Por lo tanto, la primera ejecución en un proyecto nuevo recurre al prompt interactivo y, en CI, donde no hay TTY, finaliza con un error en su lugar. Pasa `--agent` explícitamente en cualquier contexto no interactivo.

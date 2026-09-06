@@ -29,7 +29,9 @@ import {
     startBackend,
     stopBackend,
     registerAndLogin,
-    loginSeededAdmin,
+    claimFirstAdmin,
+    FIRST_ADMIN,
+    login,
     writeRow,
     readRows,
     type RunningBackend
@@ -205,16 +207,13 @@ describe.each(CMS_CASES)("cms template: $preset", (testCase) => {
         await client.connect();
         backend = await startBackend(projectDir, env);
 
-        // The account `rebase init` seeded, signed in once here. This used to
-        // register `admin@example.com` and rely on the first user being
-        // promoted — a path the scaffold no longer has, because `init` now
-        // names that exact address in `.env` and boot creates it. Registering
-        // it answered `409 EMAIL_EXISTS`.
+        // The first registered account, which is the admin — the documented
+        // path, and the one `rebase dev` still takes: `REBASE_ADMIN_*` in the
+        // scaffold's `.env` belongs to the production boot and is ignored here.
         //
-        // Still once, in `beforeAll`, for the original reason: signing in
-        // inside each test would add rows to the blank preset, whose only
-        // collection is `users`.
-        admin = await loginSeededAdmin(projectDir, backend.baseUrl);
+        // Once, in `beforeAll`: registering inside each test would add rows to
+        // the blank preset, whose only collection is `users`.
+        admin = await claimFirstAdmin(backend.baseUrl);
     }, 600_000);
 
     afterAll(async () => {
@@ -316,6 +315,11 @@ describe.each(BAAS_PRESETS)("baas template: %s", (preset) => {
         await client.connect();
         // baas has no db:push; the auth schema is created by the server at boot.
         backend = await startBackend(projectDir, env);
+        // The first registered account, which is the admin — and the one the
+        // RLS test below signs in as after a restart. Nothing else creates it:
+        // `REBASE_ADMIN_*` in the scaffold's `.env` belongs to the production
+        // boot and is ignored here, which is the whole point of that change.
+        await claimFirstAdmin(backend.baseUrl);
     }, 600_000);
 
     afterAll(async () => {
@@ -385,11 +389,9 @@ describe.each(BAAS_PRESETS)("baas template: %s", (preset) => {
         await stopBackend(backend);
         backend = await startBackend(projectDir, env);
 
-        // The seeded admin owns the row, which is the same actor this asserted
-        // before — the first registered user, back when registering made you
-        // one. It is reached with the credentials in the scaffold's `.env`
-        // rather than the pair this test used to invent.
-        const owner = await loginSeededAdmin(projectDir, backend.baseUrl);
+        // The first registered account owns the row. Signed in rather than
+        // registered: the backend was restarted above, so it already exists.
+        const owner = await login(backend.baseUrl, FIRST_ADMIN.email, FIRST_ADMIN.password);
         const other = await registerAndLogin(backend.baseUrl, "other@example.com", "StrongPass3!");
 
         const written = await writeRow(backend.baseUrl, owner.accessToken, "notes", { body: "owner's private note" });

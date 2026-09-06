@@ -174,6 +174,42 @@ describe("generatePostgresDdl", () => {
         expect(plans.find(p => p.column === "editor_id")?.foreignKey?.sql).toContain("ON DELETE SET NULL");
     });
 
+    // One rule per link, not per spelling of a link. `reference` emits a foreign
+    // key exactly like `belongsTo` does, and it kept the CASCADE default for a
+    // release after the rule changed — so `required: true` meant "restrict" on
+    // one property type and "delete the children" on the other, with only the
+    // first documented.
+    it("gives a reference property the same ON DELETE rule as belongsTo", async () => {
+        const usersCollection: CollectionConfig = {
+            slug: "users",
+            table: "users",
+            name: "Users",
+            properties: { name: { type: "string" } }
+        };
+        const postsCollection: CollectionConfig = {
+            slug: "posts",
+            table: "posts",
+            name: "Posts",
+            properties: {
+                title: { type: "string" },
+                author: { type: "reference", path: "users", validation: { required: true } },
+                editor: { type: "reference", path: "users" }
+            }
+        } as unknown as CollectionConfig;
+
+        const cleanResult = cleanDdl(await generatePostgresDdl([usersCollection, postsCollection]));
+
+        expect(cleanResult).toContain("\"posts_author_fkey\" FOREIGN KEY (\"author\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE RESTRICT;");
+        expect(cleanResult).toContain("\"posts_editor_fkey\" FOREIGN KEY (\"editor\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE SET NULL;");
+        expect(cleanResult).not.toContain("ON DELETE CASCADE");
+
+        // And the desired state boot-ensure diffs against, or every boot plans
+        // a constraint rewrite for the difference.
+        const plans = planRelationalColumns([usersCollection, postsCollection]);
+        expect(plans.find(p => p.column === "author")?.foreignKey?.sql).toContain("ON DELETE RESTRICT");
+        expect(plans.find(p => p.column === "editor")?.foreignKey?.sql).toContain("ON DELETE SET NULL");
+    });
+
     it("should generate many-to-many junction tables", async () => {
         const postsCollection: CollectionConfig = {
             slug: "posts",

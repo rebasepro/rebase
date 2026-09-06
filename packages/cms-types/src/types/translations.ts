@@ -228,6 +228,10 @@ export interface RebaseTranslations {
     reference_not_set: string;
     reference_does_not_exist: string;
     entity_not_found: string;
+    /** Why a record the URL names is not there, without asserting it never was. */
+    entity_not_found_body?: string;
+    /** Way out of a record that does not exist. `{{name}}` is the collection. */
+    back_to_collection?: string;
     file_not_found: string;
     unsaved_changes_in_entity: string;
     delete_this_role: string;
@@ -893,6 +897,10 @@ export interface RebaseTranslations {
     studio_sql_sidebar_no_history?: string;
     studio_sql_sidebar_history_hint?: string;
     studio_sql_sidebar_delete_snippet?: string;
+    /** Accessible name for the ✕ on a query tab. */
+    studio_sql_close_tab?: string;
+    /** Accessible name for the + beside the query tabs. */
+    studio_sql_new_tab?: string;
 
     // ─── Studio: Schema Browser ──────────────────────────────────
     studio_schema_tables?: string;
@@ -1099,6 +1107,12 @@ export interface RebaseTranslations {
     history_no_more?: string;
 
     // ─── Studio: tools, groups and empty states ─────────────────
+    /** Heading for the admin's default navigation group. */
+    studio_group_views?: string;
+    /** Heading for the admin's `Admin` navigation group. */
+    studio_group_admin?: string;
+    /** Heading for the admin's `Settings` navigation group. */
+    studio_group_settings?: string;
     studio_group_database?: string;
     studio_group_compute?: string;
     studio_group_storage?: string;
@@ -1136,6 +1150,30 @@ export interface RebaseTranslations {
     studio_api_keys_denied_title?: string;
     studio_api_keys_denied_hint?: string;
     studio_api_keys_read_failed?: string;
+    studio_api_keys_empty_title?: string;
+    studio_api_keys_empty_hint?: string;
+    studio_api_keys_revoke?: string;
+    studio_api_keys_select_hint?: string;
+    studio_api_keys_permissions?: string;
+    studio_api_keys_no_permissions?: string;
+    studio_api_keys_revoke_confirmation?: string;
+    studio_api_keys_name_label?: string;
+    studio_api_keys_access_label?: string;
+    studio_api_keys_admin_granted?: string;
+    studio_api_keys_admin_granted_hint?: string;
+    studio_api_keys_done?: string;
+    studio_api_keys_status_active?: string;
+    studio_api_keys_status_expired?: string;
+    studio_api_keys_status_revoked?: string;
+    studio_api_keys_stat_status?: string;
+    studio_api_keys_stat_last_used?: string;
+    studio_api_keys_stat_expires?: string;
+    studio_api_keys_never?: string;
+    studio_api_keys_role_service?: string;
+    studio_api_keys_stat_rate_limit?: string;
+    studio_api_keys_rate_limit_default?: string;
+    studio_api_keys_stat_created_by?: string;
+    studio_api_keys_copy_failed?: string;
     studio_branches_denied_title?: string;
     studio_branches_denied_hint?: string;
     studio_branches_read_failed?: string;

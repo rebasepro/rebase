@@ -1,4 +1,5 @@
 ---
+sourceHash: 8894ea74b3dd7b7d
 title: Historial de Entidades
 sidebar_label: Historial de Entidades
 description: "Rastrea cada cambio en tus entidades con una auditoría completa: quién cambió qué, cuándo y una instantánea completa del antes/después."

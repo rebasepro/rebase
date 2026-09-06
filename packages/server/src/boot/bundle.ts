@@ -37,6 +37,17 @@ export interface LoadedBundle {
      * warning, so a partially-built bundle still boots its API.
      */
     staticApps: LoadedStaticApp[];
+    /**
+     * True when this "bundle" is a view over the project's own source tree —
+     * what `rebase dev` boots — rather than a built one.
+     *
+     * The difference matters to anything that would write a file back: the
+     * schema editor rewrites collection *source*, which exists on one of these
+     * paths and not the other. Read it from here rather than from
+     * `manifest.runtime.builtAgainst === "source"`: the manifest is what a
+     * build wrote down, and a bundle can carry any string a builder put there.
+     */
+    isSource: boolean;
 }
 
 /** One built static app inside a loaded bundle, with an absolute directory. */
@@ -228,6 +239,7 @@ export function loadBundle(bundleDir: string): LoadedBundle {
     return {
         dir,
         manifest,
+        isSource: false,
         collectionsDir,
         functionsDir: resolveEntry(entry.functions, "functions"),
         cronsDir: resolveEntry(entry.crons, "crons"),
@@ -358,6 +370,7 @@ createdAt: new Date().toISOString() }
     return {
         dir,
         manifest,
+        isSource: true,
         collectionsDir: resolve(collectionsDir),
         functionsDir: resolve(options.functions),
         cronsDir: resolve(options.crons),
@@ -375,7 +388,14 @@ createdAt: new Date().toISOString() }
  * is known from the bundle, without reading anyone's secrets.
  */
 export interface BundleConfigExports {
+    /**
+     * Read only so that `assertNoReplacedResourceConfig` can refuse a bundle
+     * still carrying them. Databases and buckets are declared with `database()`
+     * and `bucket()` in `config/resources.ts`; nothing downstream consumes these
+     * two fields.
+     */
     dataSources?: DataSourceDefinition[];
+    /** See `dataSources` — present only so boot can refuse it by name. */
     storageSources?: StorageSourceDefinition[];
     /**
      * Per-object storage access control.
@@ -396,11 +416,16 @@ export interface BundleConfigExports {
 /**
  * Read the config package's `index` for declarations.
  *
- * Absent, empty or unreadable all mean the same thing: a single default database
- * and a single default bucket. That is the overwhelmingly common project, and it
- * must not be required to say so. A malformed export is reported and ignored
- * rather than fatal — a typo in an optional declaration should not take down a
- * server whose collections are fine.
+ * Absent or empty mean the same thing: a single default database and a single
+ * default bucket. That is the overwhelmingly common project, and it must not be
+ * required to say so. A malformed export — `dataSources` that is not an array —
+ * is reported and ignored rather than fatal: a typo in one optional declaration
+ * should not take down a server whose collections are fine.
+ *
+ * A file that is THERE and cannot be imported is a different thing, and it is
+ * fatal. Every declaration in it is gone, so the process comes up bound to a
+ * different set of databases and buckets than the project declares, announcing
+ * success. That is not a degraded start, it is a different deployment.
  */
 export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<BundleConfigExports> {
     const configEntry = bundle.manifest.entry?.config;
@@ -418,12 +443,19 @@ export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<Bun
     try {
         mod = await import(pathToFileURL(indexPath).href) as Record<string, unknown>;
     } catch (err) {
-        logger.warn(
-            `Could not import the config index at ${indexPath}: ` +
-            `${err instanceof Error ? err.message : String(err)}. ` +
-            "Continuing with a single default data source and storage source."
+        // A `BundleError`, so the fatal path treats it as the configuration
+        // problem it is: the message below IS the answer, and a plain `Error`
+        // sends it down the "this is a bug" branch, where in development it is
+        // logged at `debug` and the author sees only the esbuild cause.
+        throw new BundleError(
+            `Could not load ${indexPath}.\n\n` +
+            `${err instanceof Error ? err.message : String(err)}\n\n` +
+            "This file declares this project's data sources, storage sources and callbacks. " +
+            "Booting without it would bind the server to a different set of databases and " +
+            "buckets than the project declares, so this is fatal rather than a warning.",
+            undefined,
+            { cause: err }
         );
-        return {};
     }
 
     const readArray = <T>(name: string): T[] | undefined => {
@@ -460,10 +492,16 @@ export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<Bun
     };
 }
 
-/** Everything the managed runtime reads out of `config/index.ts`. */
+/**
+ * Everything the managed runtime reads out of `config/index.ts`.
+ *
+ * `dataSources` and `storageSources` are deliberately absent: they are read out
+ * of the module only so `assertNoReplacedResourceConfig` can refuse them by
+ * name, and the topology they used to carry now lives in `config/resources.ts`.
+ * Listing them here would make the docs gate that reads this set say they are
+ * still a supported export.
+ */
 const READ_CONFIG_EXPORTS = new Set([
-    "dataSources",
-    "storageSources",
     "storageAuthorize",
     "callbacks",
     // Not read here, but a legitimate export of this module: the admin build and
@@ -516,8 +554,9 @@ function warnOnUnreadConfigExports(mod: Record<string, unknown>, indexPath: stri
         "runtime does not read " + (known.length === 1 ? "it" : "them") + ".\n" +
         known.map(name => `  • ${name}: ${NO_MANAGED_ROUTE[name]}`).join("\n") + "\n" +
         "  The runtime reads only: " +
-        ["dataSources", "storageSources", "storageAuthorize", "callbacks"].map(n => `\`${n}\``).join(", ") +
-        ". Everything else is configured with environment variables, or by ejecting."
+        ["storageAuthorize", "callbacks"].map(n => `\`${n}\``).join(", ") +
+        ". Databases and buckets are declared in `config/resources.ts`; everything " +
+        "else is configured with environment variables, or by ejecting."
     );
 }
 

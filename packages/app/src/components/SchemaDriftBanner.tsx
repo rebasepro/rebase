@@ -93,8 +93,7 @@ export function SchemaDriftBanner({ className }: SchemaDriftBannerProps) {
                     Schema drift detected
                 </Typography>
                 <Typography variant="body2" className="text-amber-700 dark:text-amber-300">
-                    {schemaDriftMessage}{" "}
-                    Run <code className="bg-amber-200 dark:bg-amber-800 px-1 rounded text-xs">pnpm db:push</code> in your backend terminal to sync.
+                    {schemaDriftMessage}
                 </Typography>
             </div>
         </Alert>

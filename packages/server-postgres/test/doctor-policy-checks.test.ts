@@ -113,4 +113,52 @@ describe("rebase doctor --policies", () => {
         await runPolicyChecks("./collections", "postgres://db");
         expect(end).toHaveBeenCalled();
     });
+
+    // (c) A tick above the failure. `validatePolicyPgRoles` returns without a
+    // query when no collection names a `pgRoles` — most projects — so it
+    // "passed" against a database nothing had reached, and
+    // `✓ Policy roles are usable by this server` printed above
+    // `✗ Could not check RLS policies: connect ECONNREFUSED 127.0.0.1:5499`.
+    describe("against a database that cannot be reached", () => {
+        beforeEach(() => {
+            const { Pool } = jest.requireMock("pg") as { Pool: jest.Mock };
+            Pool.mockImplementation(() => ({
+                query: jest.fn().mockRejectedValue(new Error("connect ECONNREFUSED 127.0.0.1:5499")),
+                end: (...args: unknown[]) => end(...args)
+            }));
+        });
+
+        it("prints no green tick", async () => {
+            const log = console.log as jest.Mock;
+            const error = console.error as jest.Mock;
+
+            expect(await runPolicyChecks("./collections", "postgres://127.0.0.1:5499/db")).toBe("unchecked");
+
+            const printed = [...log.mock.calls, ...error.mock.calls].map(c => c.join(" ")).join("\n");
+            expect(printed).not.toContain("✓");
+            expect(printed).toContain("⏭ Policy roles: not checked");
+            expect(printed).toContain("ECONNREFUSED");
+        });
+
+        it("says the cause once, not once per check", async () => {
+            const error = console.error as jest.Mock;
+
+            await runPolicyChecks("./collections", "postgres://127.0.0.1:5499/db");
+
+            const causes = error.mock.calls
+                .map(c => c.join(" "))
+                .filter(line => line.includes("ECONNREFUSED"));
+            expect(causes).toHaveLength(1);
+        });
+
+        it("does not go on to compare policy drift it cannot read", async () => {
+            await runPolicyChecks("./collections", "postgres://127.0.0.1:5499/db");
+            expect(checkPolicyDrift).not.toHaveBeenCalled();
+        });
+
+        it("still closes the pool", async () => {
+            await runPolicyChecks("./collections", "postgres://127.0.0.1:5499/db");
+            expect(end).toHaveBeenCalled();
+        });
+    });
 });

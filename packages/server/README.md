@@ -8,6 +8,10 @@ Database-agnostic backend core for Rebase.
 pnpm add @rebasepro/server
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 ## What This Package Does
 
 This is the central orchestrator for any Rebase backend. It provides the framework-level plumbing — HTTP routing (Hono), authentication middleware, storage, email, cron jobs, custom functions, and the REST API generator — without being coupled to any specific database. Database implementations are plugged in via driver packages like `@rebasepro/server-postgres` or `@rebasepro/server-mongo`.

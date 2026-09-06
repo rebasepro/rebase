@@ -1,4 +1,5 @@
 ---
+sourceHash: 27ad5b75346e802f
 title: Auto-Hospedagem
 sidebar_label: Auto-Hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem de runtime oficial e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS comum.

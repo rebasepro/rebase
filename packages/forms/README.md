@@ -8,6 +8,10 @@ Lightweight React form state management with undo/redo support.
 pnpm add @rebasepro/forms
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 **Peer dependencies:** `react >= 19.0.0`, `react-dom >= 19.0.0`
 
 ## What This Package Does

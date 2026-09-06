@@ -1,4 +1,5 @@
 ---
+sourceHash: 4f7a93fd3a8e67c8
 title: Tiempo Real y WebSocket
 sidebar_label: Tiempo Real
 description: Sincronización de datos en tiempo real, canales de difusión y seguimiento de presencia mediante WebSocket.
@@ -143,15 +144,31 @@ El método `.listen()` del constructor de consultas solo está disponible cuando
 
 ## Entrega de Actualizaciones: Parche Instantáneo + Refetch de Corrección
 
-Rebase usa una estrategia de actualización en dos fases para las suscripciones de colección, combinando velocidad extrema con corrección absoluta:
+Un cambio nunca viaja hasta un suscriptor como datos. Viaja como el hecho de que
+algo cambió, y a cada suscriptor se le dice después qué puede ver *él* mediante
+una consulta ejecutada como él:
 
-1. **Fase 1 — Parche de entidad instantáneo:** Cuando una sola entidad cambia (creada, actualizada, eliminada), el servidor envía inmediatamente un mensaje ligero `collection_patch` que contiene los valores modificados de la entidad directamente a los suscriptores. El cliente fusiona esto en sus datos de colección en caché para una retroalimentación entre pestañas casi instantánea — evitando por completo la base de datos para actualizaciones percibidas en menos de un milisegundo.
+1. **Invalidación.** Cuando una entidad cambia (creada, actualizada, eliminada),
+   el servidor marca las rutas afectadas. La fila que se escribió no se reenvía:
+   se leyó bajo la autorización de quien escribió, que no dice nada sobre lo que
+   cualquier suscriptor tiene permiso para ver.
 
-2. **Fase 2 — Refetch RLS con debounce:** Tras un breve retraso de **300 ms** (`REFETCH_DEBOUNCE_MS`), el servidor realiza un refetch autoritativo de la base de datos de la colección que coincide con sus filtros y orden originales. Esto es crítico porque las mutaciones de campos podrían alterar la visibilidad de la entidad (p. ej., si su estado cambió y ya no coincide con un filtro `where`).
+2. **Refetch RLS con debounce.** Tras **300 ms** (`REFETCH_DEBOUNCE_MS`), el
+   servidor vuelve a consultar la colección con sus filtros y su orden
+   originales. La consulta se ejecuta dentro de una transacción que establece los
+   valores locales de transacción `app.user_id` y `app.user_roles` desde el
+   `SubscriptionAuthContext` del suscriptor, de modo que Postgres evalúa la
+   seguridad a nivel de fila bajo la identidad de ese cliente y solo las filas
+   que está autorizado a ver se envían en el `collection_update`. El debounce
+   también agrupa una ráfaga de escrituras en una sola consulta.
 
-   Para mantener límites de seguridad estrictos, esta consulta de refetch se ejecuta dentro de una transacción que establece las variables locales de transacción `app.userId` y `app.user_roles` mapeadas desde el `SubscriptionAuthContext` del suscriptor. Esto garantiza que las restricciones de seguridad a nivel de fila (RLS) de PostgreSQL se evalúen correctamente bajo la sesión de autenticación del cliente, y solo los registros que el usuario está autorizado a ver se envían en el `collection_update` final.
-
-Este enfoque garantiza que los filtros de lista y las políticas de acceso permanezcan perfectamente consistentes, manteniendo al mismo tiempo una alta capacidad de respuesta de la UI.
+Las versiones anteriores enviaban un `collection_patch` inmediato con la fila
+escrita antes de este refetch, para una retroalimentación entre pestañas en menos
+de un milisegundo. Esa fila se había leído bajo el alcance de quien escribió, así
+que podía llegar — y llegaba — a suscriptores cuyas propias políticas la habrían
+denegado, y el filtro `where` de la propia suscripción tampoco se le aplicaba.
+El parche se ha eliminado: la latencia percibida de una actualización es ahora la
+ventana del debounce.
 
 ## Canales de Difusión (Broadcast)
 
@@ -195,6 +212,14 @@ Cuando un cliente envía un mensaje `broadcast`, el servidor lo retransmite a **
 Por defecto, una difusión llega a los miembros conectados en ese momento y luego desaparece. Es el equilibrio correcto para notificaciones y cursores, y no cuesta nada.
 
 Para un flujo de operaciones — edición colaborativa, cualquier cosa donde un hueco silencioso cause divergencia — un canal puede configurarse para **retener** sus mensajes. Las difusiones retenidas reciben un número de secuencia por canal y se almacenan, de modo que un cliente que se reconecta puede pedir todo lo posterior al último que vio.
+
+:::caution[Dónde va esto]
+**Runtime gestionado: en ninguna parte.** La retención de canales y
+`realtime.bus` forman parte del adaptador de base de datos que el runtime
+gestionado construye por sí mismo, y ninguno de los dos tiene forma de variable
+de entorno. Haga eject para configurarlos.
+**Ejectado:** `createPostgresAdapter({ realtime })` en `backend/src/index.ts`.
+:::
 
 La retención es opcional y se configura aquí, en el servidor:
 
@@ -249,8 +274,9 @@ La poda ocurre a medida que llegan los mensajes, limitada por canal para que el 
 - **Al menos una vez al recuperar.** Un rango de repetición puede solaparse con mensajes que el cliente ya recibió; el SDK descarta los que ya entregó.
 
 :::caution[El historial tiene el mismo modelo de acceso que el canal]
-Cualquiera que pueda unirse a un canal puede reproducir sus mensajes retenidos, incluidos los difundidos antes de su llegada. La retención es opcional por patrón de canal, así que considere que activarla en un canal de acceso público hace legible el pasado de ese canal para cualquier visitante.
+Un cliente que se ha unido a un canal puede reproducir sus mensajes retenidos, incluidos los difundidos antes de su llegada: la pertenencia es la única comprobación, y unirse está abierto a cualquier cliente capaz de nombrar el canal. La retención es opcional por patrón de canal, así que activarla hace legible el pasado de ese canal para cualquier visitante que adivine el nombre. Los canales con retención son el caso en el que esto pasa a ser duradero en lugar de momentáneo, así que trate el contenido de un canal con retención como público para sus usuarios.
 :::
+
 ## Seguimiento de Presencia
 
 La presencia rastrea qué usuarios están actualmente en línea en un canal y permite que cada usuario comparta un estado personalizado (p. ej., posición del cursor, estado).
@@ -308,12 +334,14 @@ El SDK del cliente se reconecta automáticamente cuando la conexión WebSocket s
 Puede escuchar los eventos del ciclo de vida de la conexión:
 
 ```typescript
-const ws = client.ws; // Access the WebSocket client
-
-ws.on("connect", () => console.log("Connected"));
-ws.on("disconnect", () => console.log("Disconnected"));
-ws.on("reconnect", () => console.log("Reconnected"));
-ws.on("error", (error) => console.error("Error:", error));
+// `ws` is undefined on a client built without realtime, so narrow it once.
+const ws = client.ws;
+if (ws) {
+    ws.on("connect", () => console.log("Connected"));
+    ws.on("disconnect", () => console.log("Disconnected"));
+    ws.on("reconnect", () => console.log("Reconnected"));
+    ws.on("error", (error) => console.error("Error:", error));
+}
 ```
 
 ## Autenticación y RLS
@@ -321,37 +349,14 @@ ws.on("error", (error) => console.error("Error:", error));
 Las suscripciones WebSocket respetan automáticamente las políticas de seguridad a nivel de fila (RLS). Cuando el cliente está autenticado:
 
 1. La conexión WebSocket se autentica usando el mismo token JWT que la API REST.
-2. Cada refetch de suscripción se ejecuta dentro de una transacción PostgreSQL con `set_config('app.userId', ...)` y `set_config('app.user_roles', ...)` — garantizando que se apliquen las políticas RLS.
+2. Cada refetch de suscripción se ejecuta dentro de una transacción PostgreSQL con `set_config('app.user_id', ...)` y `set_config('app.user_roles', ...)` — garantizando que se apliquen las políticas RLS.
 3. Si un token expira durante una sesión activa, el cliente se vuelve a autenticar y se vuelve a suscribir automáticamente.
 
 Esto significa que cada usuario solo recibe actualizaciones de los registros que tiene permiso para ver.
 
-## Difusión Entre Instancias y Arquitectura LISTEN/NOTIFY
-
-Para entornos de clúster con múltiples instancias (p. ej., ejecutándose dentro de contenedores Kubernetes o Docker detrás de un balanceador de carga), Rebase se apoya en `LISTEN/NOTIFY` de PostgreSQL para sincronizar las operaciones de mutación y el estado en tiempo real entre instancias.
-
-### Evitando los Pools de pgBouncer
-
-Debido a que los agrupadores de conexiones como **pgBouncer** no admiten el modelo de conexión persistente que requieren las sesiones SQL `LISTEN` de larga duración, el supervisor de tiempo real abre un cliente Postgres dedicado y sin agrupar (`PgClient`) directamente a la base de datos. Esta conexión directa utiliza la variable de entorno `DATABASE_DIRECT_URL` si está configurada, garantizando la estabilidad y evitando el agotamiento del pool o cortes abruptos.
-
-### Mecánica de Notificaciones y Diseño del Payload
-
-Cuando una entidad se modifica en la Instancia A, esta difunde una notificación en el canal `rebase_entity_changes`. Para minimizar la sobrecarga de la base de datos y el ancho de banda de la red, el payload de la notificación se mantiene extremadamente compacto:
-
-```json
-{
-  "sid": "inst_7a9c1b",
-  "p": "posts",
-  "eid": "45",
-  "db": null
-}
-```
-
-*Nota: `sid` representa el ID de instancia aleatorio y único del servidor generado al iniciar, `p` es el slug (ruta) de la colección y `eid` es el ID de la entidad objetivo.*
-
-- **Autofiltrado**: Al recibir un mensaje, cada instancia lee el `sid`. Si coincide con su propio ID de instancia, el servidor descarta la notificación para evitar bucles de enrutamiento infinitos.
-- **Retransmisión y fan-out**: Si la notificación provino de otra instancia, el servidor programa un refetch con debounce y retransmite la actualización a sus suscriptores WebSocket conectados localmente.
-- **Bucle de reconexión del supervisor**: Si la conexión de base de datos se cae, un supervisor de conexión en segundo plano monitoriza el estado y activa una secuencia de reconexión automática tras un retraso fijo de **3 segundos**, restaurando el bucle `LISTEN` sin afectar al ciclo de vida principal de la aplicación Hono.
+Ejecutar más de una instancia — el bus LISTEN/NOTIFY, lo que hace la presencia
+entre procesos y cómo escribir su propio transporte — tiene una página propia:
+[Tiempo real entre instancias](/docs/backend/realtime-transports/).
 
 ## Captura de Cambios a Nivel de Base de Datos (CDC)
 
@@ -406,6 +411,37 @@ Para evitar que las peticiones del cliente se queden colgadas indefinidamente, t
 Si el servidor no responde dentro de esta ventana de 30 segundos, el cliente elimina automáticamente la petición pendiente y rechaza la promesa con un `ApiError` con el mensaje `"Request timed out"`.
 
 Los mensajes unidireccionales que no esperan respuesta (como `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack` y `presence_state`) se resuelven inmediatamente al transmitirse y no activan timeouts.
+
+### Cuando se rechaza un frame de canal
+
+Un frame de canal es fire-and-forget: `await channel.broadcast(...)` se resuelve
+cuando el frame se escribe en el socket, **no** cuando el servidor lo ha
+aceptado. Es deliberado — una aplicación colaborativa difunde una posición de
+cursor sesenta veces por segundo, y esperar un acuse de recibo en cada una
+convertiría cada difusión en un viaje de ida y vuelta.
+
+Por eso un rechazo no puede ser una promesa rechazada. Llega en `onError`:
+
+```typescript
+const channel = client.realtime.channel("doc:42");
+
+channel.onError((error) => {
+    if (error.code === "CHANNEL_FORBIDDEN") showReadOnlyBanner();
+    if (error.code === "RATE_LIMITED") throttleCursorUpdates();
+});
+```
+
+| Código | Significado |
+|------|-------|
+| `CHANNEL_FORBIDDEN` | No es miembro del canal — únase a él antes de difundir o de leer su historial |
+| `RATE_LIMITED` | Por encima del presupuesto de frames de canal indicado arriba |
+| `CHANNEL_HISTORY_WRITE_FAILED` | Una difusión retenida no pudo persistirse, así que se descartó |
+| `CHANNEL_HISTORY_READ_FAILED` | Una petición de recuperación no pudo atenderse |
+| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | La difusión llegó solo a esta instancia — vea [El límite de 8&nbsp;KB del bus de Postgres](#the-8-kb-limit-on-the-postgres-bus) |
+
+Sin un manejador conectado, estos errores se registran como advertencia. Antes se
+descartaban por completo: no había promesa que rechazar ni canal al que entregar,
+así que una difusión prohibida era indistinguible de una entregada.
 
 ## Próximos Pasos
 

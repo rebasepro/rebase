@@ -129,7 +129,13 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
     // `--help`, so `arg` *consumes* it — correct for `--project` and `--json`,
     // which modify a command, but wrong for `--help`, which replaces it.
     const wantsHelp = rawArgs.includes("--help") || rawArgs.includes("-h");
-    const action = pos[1];
+    // A flag is never an action. `rebase cloud env --frobnicate` used to read
+    // the flag as the action and refuse it as an unknown *command* — a refusal,
+    // but about the wrong half of the line; the group's own parser is what
+    // knows the flag is undeclared, and it never got the chance to say so.
+    // Skipped here rather than in `positionals()`, whose contract past the
+    // action is deliberately "these are somebody else's positionals".
+    const action = pos.slice(1).find(token => !token.startsWith("-"));
 
     // The index help is for `rebase cloud` and `rebase cloud --help` — that is,
     // when no group was named. It used to also fire whenever `subcommand` was
@@ -195,7 +201,7 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
             await linkCommand(rawArgs);
             break;
         case "unlink":
-            unlinkCommand();
+            unlinkCommand(rawArgs);
             break;
         case "use":
             await selectOrgCommand(rawArgs);

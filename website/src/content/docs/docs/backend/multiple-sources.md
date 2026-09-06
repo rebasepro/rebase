@@ -41,6 +41,10 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
+`queue()` is new <span class="since-badge" data-since="0.18">Since 0.18</span>. `database()`, `bucket()` and `topic()`
+have been declarable since 0.17, so a project on the released version declares
+those three and reaches background work through `jobs.tasks` instead.
+
 Then point a collection at one, by handle — the same name, spelled once:
 
 ```ts
@@ -124,6 +128,31 @@ spelled `custom:`:
 export const objects = bucket("objects", { engine: "custom:minio" });
 ```
 
+### Correcting a kind that has already shipped
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+For driver authors. A resource kind's registered definition is **frozen** once a
+package carrying it has been published: every published driver inlines its own
+copy of `@rebasepro/types`, and the copy compares the shared registry's entry
+against its own literal and throws on any difference. Editing the literal
+therefore kills every bundle built with an older driver at driver load.
+
+`amendResourceKind` corrects what a kind *binds* — its environment bases, its
+option keys — without touching the literal any older copy compares:
+
+```ts
+import { amendResourceKind } from "@rebasepro/types";
+
+amendResourceKind("database", {
+    envBases: ["DATABASE_URL", "DATABASE_READ_URL", "ADMIN_CONNECTION_STRING"]
+});
+```
+
+The amendment applies to reads through this copy only, so an older driver keeps
+binding the way it did when it was published. Use it for every correction to a
+shipped kind; use `registerResourceKind` only for a kind nobody has published.
+
 ### Handing them to the frontend
 
 The `<Rebase>` provider needs to know which sources exist and how each is
@@ -199,6 +228,23 @@ S3_SECRET_ACCESS_KEY__MEDIA=…
 
 The engine comes from the declaration, so there is no `STORAGE_TYPE` to set.
 
+#### Which bucket receives an unqualified upload
+
+A storage property that names no `storageSource` writes to the **default**
+bucket, and a project of named buckets has to say which one that is. Either
+declare the default-keyed bucket — `export const uploads = bucket();` — or mark
+one of the named ones:
+
+```ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+Without either, boot promotes the first named bucket declared and warns, naming
+both fixes. Take one of them: a promotion decides where a user's files land by
+declaration order, and it gives different answers either side of a deploy,
+because the local bucket development stands in with is dropped in production
+and the promotion is not.
+
 ### Many buckets on one account
 
 Every variable is read per key, which is right for the bucket name and wrong for
@@ -242,7 +288,8 @@ await signups.publish({ userId });
 ```
 
 A queue is the other shape of background work: a work list with **one
-handler**, where the caller holds the job's id.
+handler**, where the caller holds the job's id. Queues are new
+<span class="since-badge" data-since="0.18">Since 0.18</span> — topics shipped in 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");

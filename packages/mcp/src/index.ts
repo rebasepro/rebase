@@ -172,6 +172,15 @@ const REGISTRY_PATH = resolve(homedir(), ".rebase", "projects.json");
 let registry: ProjectRegistryFile = { projects: {}, activeProject: null };
 
 /**
+ * Whether this run's `default` was computed from the environment or the
+ * working directory rather than read from disk. A derived `default` is never
+ * written back: it is recomputed at every start, and persisting it puts one
+ * project's directory, URL and dev service key in a machine-wide file that
+ * every other project on the machine reads.
+ */
+let defaultIsDerived = false;
+
+/**
  * Load the project registry from disk. Creates the file if it doesn't exist.
  */
 function loadRegistry(): ProjectRegistryFile {
@@ -192,6 +201,13 @@ function loadRegistry(): ProjectRegistryFile {
 
 /**
  * Save the project registry to disk.
+ *
+ * A `default` that this run derived (from the env block or from a `rebase.json`
+ * in the working directory) is left out. `~/.rebase/projects.json` is
+ * machine-wide, so persisting a derived `default` writes one project's
+ * directory, backend URL and dev service key into the file every other project
+ * on the machine reads at startup — which is how project A's admin key became
+ * project B's. It costs nothing to leave out: it is recomputed at every start.
  */
 function saveRegistry(): void {
     try {
@@ -199,9 +215,34 @@ function saveRegistry(): void {
         if (!existsSync(dir)) {
             mkdirSync(dir, { recursive: true });
         }
+        // Leaving the derived `default` out is not the same as deleting the
+        // key: the file may already hold somebody's registered `default`, and
+        // dropping it lost that project's URL and token the first time any
+        // other project's server saved. Whatever was there is put back.
+        const onDisk: ProjectRegistryFile = defaultIsDerived
+            ? (() => {
+                let persisted: ProjectConfig | undefined;
+                try {
+                    persisted = (JSON.parse(readFileSync(REGISTRY_PATH, "utf-8")) as ProjectRegistryFile)
+                        .projects?.["default"];
+                } catch {
+                    // No file yet, or unreadable — nothing to preserve.
+                }
+                const projects = Object.fromEntries(
+                    Object.entries(registry.projects).filter(([name]) => name !== "default")
+                );
+                if (persisted) projects["default"] = persisted;
+                return {
+                    projects,
+                    activeProject: registry.activeProject === "default" && !persisted
+                        ? null
+                        : registry.activeProject
+                };
+            })()
+            : registry;
         // Owner-only: this file holds bearer tokens (service keys / API keys).
         // `mode` only applies on create, so chmod covers pre-existing files.
-        writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2), { encoding: "utf-8", mode: 0o600 });
+        writeFileSync(REGISTRY_PATH, JSON.stringify(onDisk, null, 2), { encoding: "utf-8", mode: 0o600 });
         chmodSync(REGISTRY_PATH, 0o600);
     } catch {
         // Non-fatal — registry won't persist across restarts
@@ -239,26 +280,60 @@ function readDevState(projectDir: string): { baseUrl: string; serviceKey?: strin
     }
 }
 
+/** Warn about a discovered/registered `baseUrl` disagreement at most once. */
+const warnedBaseUrlMismatch = new Set<string>();
+
 /**
  * Try to auto-discover the backend from `.rebase/state.json` in the project dir.
  * Updates the project config in the registry if a running server is found.
+ *
+ * Discovery fills gaps. It never overrules what the operator wrote down —
+ * neither the token nor the URL. Overruling the URL was worse than overruling
+ * the token: a project registered against staging or production had its
+ * `baseUrl` replaced by `http://localhost:<devport>` for as long as
+ * `rebase dev` happened to be running in that directory, and every tool then
+ * delivered that project's `rk_live_` key to the local backend. The registered
+ * value is the deliberate one; the state file is a convenience.
+ *
+ * @param devState - Injected for tests; read from the project dir by default.
  */
-function autoDiscoverLocal(project: ProjectConfig): ProjectConfig {
-    if (!project.projectDir) return project;
+export function autoDiscoverLocal(
+    project: ProjectConfig,
+    devState: ReturnType<typeof readDevState> | undefined = undefined
+): ProjectConfig {
+    const state = devState !== undefined
+        ? devState
+        : project.projectDir
+            ? readDevState(project.projectDir)
+            : null;
+    if (!state) return project;
 
-    const devState = readDevState(project.projectDir);
-    if (!devState) return project;
+    if (project.baseUrl && state.baseUrl && project.baseUrl !== state.baseUrl) {
+        // stderr, not stdout: stdout is the MCP framing channel.
+        const key = `${project.name}::${project.baseUrl}::${state.baseUrl}`;
+        if (!warnedBaseUrlMismatch.has(key)) {
+            warnedBaseUrlMismatch.add(key);
+            process.stderr.write(
+                `[rebase-mcp] project "${project.name}" is registered against ${project.baseUrl}, ` +
+                `but a dev server is running at ${state.baseUrl}. The registered URL wins — ` +
+                `call rebase_project_switch with a project whose baseUrl is the dev server, ` +
+                `or rebase_project_add one, to target it.\n`
+            );
+        }
+    }
 
     return {
         ...project,
-        baseUrl: devState.baseUrl,
+        // A registered baseUrl wins over the discovered one, for the same
+        // reason the token does.
+        baseUrl: project.baseUrl || state.baseUrl,
         // A registered token wins over the discovered one. What discovery finds
         // is the dev server's *service key* — the unscoped admin secret — so
         // letting it win meant a deliberately narrow API key registered for
         // this project was silently upgraded to full admin on every call.
         // Discovery now only fills a gap, which is all the zero-config story
         // ever needed it to do.
-        token: project.token || devState.serviceKey || ""
+        token: project.token || state.serviceKey || ""
     };
 }
 
@@ -308,7 +383,18 @@ function readServiceKeyFromEnv(projectDir: string): string | undefined {
 
 // ── Environment & Initialization ────────────────────────────────────────────
 
-const ENV_PROJECT_DIR = process.env.REBASE_PROJECT_DIR || process.cwd();
+/**
+ * The project this server run is about.
+ *
+ * `resolve` is not decoration: the scaffolded `.mcp.json` sets
+ * `REBASE_PROJECT_DIR: "."` — relative to the client's cwd, which for a
+ * project-level `.mcp.json` is the project — and a relative path stored in a
+ * machine-wide registry would mean a different directory in every terminal.
+ */
+const ENV_PROJECT_DIR = resolve(process.env.REBASE_PROJECT_DIR || process.cwd());
+
+/** `true` when the server's working directory is itself a Rebase project. */
+const CWD_IS_PROJECT = existsSync(resolve(process.cwd(), "rebase.json"));
 
 // Try to load .env from the project directory
 for (const envPath of [
@@ -345,14 +431,28 @@ export function envDeclaredProject(
 /**
  * Initialize the project registry.
  *
- * Priority:
+ * One precedence, and it holds everywhere this is written down (the docs, the
+ * README and this comment):
+ *
  * 1. `REBASE_PROJECT_DIR` / `REBASE_BASE_URL` / `REBASE_API_TOKEN` — the block
  *    in the client's own MCP config. If any of them is set, the `default`
  *    project is rebuilt from them on **every** start.
- * 2. The persisted `default` in `~/.rebase/projects.json`, when the client
- *    declared none of the three.
- * 3. Auto-discovery from `.rebase/state.json` in the project dir, which fills
- *    the gaps in either case.
+ * 2. The server's working directory, when it holds a `rebase.json`. That is a
+ *    project the person is standing in; nothing in a home-directory cache
+ *    outranks it.
+ * 3. The persisted `default` in `~/.rebase/projects.json`, when neither of the
+ *    first two says anything.
+ *
+ * Auto-discovery from `.rebase/state.json` fills the gaps in every case; it
+ * never overrules a value one of the three supplied.
+ *
+ * Step 2 exists because the registry is machine-wide and `default` is one
+ * entry in it. The scaffold shipped no env block, so the first project on the
+ * machine to call `rebase_project_add` persisted a `default` carrying *its*
+ * directory, URL and dev service key — and every other project on that machine
+ * then resolved to it, silently. A derived `default` is therefore also never
+ * written back to disk (`saveRegistry`): it is recomputed at every start, so
+ * persisting it only leaks one project's admin key into another's session.
  *
  * Step 1 used to be `if (!registry.projects["default"])` — the env vars seeded
  * the registry once and were dead ever after. That is the wrong way round:
@@ -372,13 +472,18 @@ function initializeRegistry(): void {
 
     const fromEnv = envDeclaredProject();
 
-    if (fromEnv || !registry.projects["default"]) {
-        const devState = readDevState(ENV_PROJECT_DIR);
+    if (fromEnv || CWD_IS_PROJECT || !registry.projects["default"]) {
+        defaultIsDerived = true;
         const envServiceKey = readServiceKeyFromEnv(ENV_PROJECT_DIR);
         registry.projects["default"] = {
             name: "default",
             projectDir: ENV_PROJECT_DIR,
-            baseUrl: ENV_BASE_URL || devState?.baseUrl || "http://localhost:3001",
+            // Deliberately no `devState.baseUrl` here either, for the same
+            // reason: `autoDiscoverLocal` fills an empty `baseUrl` per call, so
+            // a dev server started (or restarted on a new port) after this
+            // process booted is still found. `DEFAULT_BASE_URL` is applied by
+            // `getActiveProject` when discovery finds nothing.
+            baseUrl: ENV_BASE_URL || "",
             // Deliberately no `devState.serviceKey` here: this runs once, at
             // startup, and a key baked in now would outrank the freshly
             // discovered one for the rest of the process — so a dev server
@@ -390,6 +495,26 @@ function initializeRegistry(): void {
     }
 
     if (!registry.activeProject || !registry.projects[registry.activeProject]) {
+        registry.activeProject = "default";
+    }
+
+    // A sticky `activeProject` is machine-wide too. Remembering that the last
+    // session switched to "staging" is the point of a registry — but only
+    // inside the project that registered it. When this run resolves a project
+    // of its own and the remembered entry belongs to a different directory,
+    // the remembered one is somebody else's backend and somebody else's token.
+    const active = registry.activeProject ? registry.projects[registry.activeProject] : undefined;
+    if (
+        defaultIsDerived &&
+        registry.activeProject !== "default" &&
+        active?.projectDir &&
+        resolve(active.projectDir) !== ENV_PROJECT_DIR
+    ) {
+        process.stderr.write(
+            `[rebase-mcp] the remembered project "${registry.activeProject}" is registered under ` +
+            `${active.projectDir}, but this server runs in ${ENV_PROJECT_DIR}. Targeting "default" ` +
+            `(this directory) instead; call rebase_project_switch to change that.\n`
+        );
         registry.activeProject = "default";
     }
 
@@ -483,6 +608,13 @@ type RebaseClient = {
 /** Client instances keyed by project name. */
 const clientCache = new Map<string, RebaseClient>();
 
+/**
+ * Where a project points when nobody said and no dev server is running.
+ * The last resort, applied after discovery — never written into the registry,
+ * because a stored value would then outrank the dev server discovery is for.
+ */
+export const DEFAULT_BASE_URL = "http://localhost:3001";
+
 /** Get the active project config, with auto-discovery applied. */
 function getActiveProject(): ProjectConfig {
     const name = registry.activeProject || "default";
@@ -490,7 +622,8 @@ function getActiveProject(): ProjectConfig {
     if (!project) {
         throw new Error(`No active project configured. Use rebase_project_add to register one.`);
     }
-    return autoDiscoverLocal(project);
+    const discovered = autoDiscoverLocal(project);
+    return discovered.baseUrl ? discovered : { ...discovered, baseUrl: DEFAULT_BASE_URL };
 }
 
 /** Get the project directory for the active project. */
@@ -538,12 +671,13 @@ function clearClientCache(): void {
  * auditable at a glance and a new tool now arrives protected.
  */
 export const READ_ONLY_TOOLS = new Set<string>([
-    // CLI tools that only inspect the database. `rebase_schema_plan` is
-    // `db push --dry-run`: it reads the live schema, prints the diff, and
-    // applies nothing — including the auth-schema step, which is skipped
-    // precisely so that "show me what would happen" does not change anything
-    // on the way.
+    // `rebase_schema_plan` posts to `/api/admin/schema/plan`, the live schema
+    // editor's planner: it computes the statements and returns them, and
+    // `apply` is a different route. It used to be `db push --dry-run`, which
+    // was a read of the database and a *write* of three generated files into
+    // the repository — the half that made "applies nothing" untrue.
     "rebase_schema_plan",
+    // CLI tools that only inspect the database.
     "rebase_doctor",
     "rebase_db_branch_list",
     "rebase_db_branch_info",
@@ -583,6 +717,10 @@ export const LOCAL_ONLY_TOOLS = new Set<string>([
     // overwriting hand-written collection files with generated ones. Local-only
     // is what it is.
     "rebase_schema_introspect",
+    // `rebase_db_branch_switch` writes a branch pointer under `.rebase/` and
+    // never touches `.env` or the database. Like `rebase_project_switch`, it
+    // retargets everything else rather than acting on a target itself.
+    "rebase_db_branch_switch",
     "rebase_schema_generate",
     "rebase_db_generate",
     "rebase_generate_sdk",
@@ -844,13 +982,6 @@ properties: {} },
         cmd: ["schema", "generate"]
     },
     {
-        name: "rebase_schema_plan",
-        description: "Show the SQL that rebase_db_push would run, without running any of it. Read this before proposing a schema change: it names every statement, and marks the ones that destroy data.",
-        inputSchema: { type: "object",
-properties: {} },
-        cmd: ["db", "push", "--dry-run"]
-    },
-    {
         name: "rebase_db_push",
         description: "Apply the current Drizzle schema directly to the database (development shortcut, skips migration files). Refuses changes that destroy data — use rebase_schema_plan first, then ask the human to run `rebase db push --allow-destructive`.",
         inputSchema: { type: "object",
@@ -933,6 +1064,23 @@ properties: {} },
             required: ["name"]
         },
         cmd: ["db", "branch", "info"]
+    },
+    {
+        // create/delete/info/list without switch meant an agent could make a
+        // branch it had no way to use: the only route onto one was hand-editing
+        // `DATABASE_URL`, which is not a thing to ask an assistant to do.
+        name: "rebase_db_branch_switch",
+        description:
+            "Point this checkout at a database branch, or back at the main database (Admins only). " +
+            "With no name, reports which branch is active. Writes a local pointer, never `.env`.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "Branch to switch to. Omit to report the active branch." },
+                off: { type: "boolean", description: "Switch back to the main database instead of a branch." }
+            }
+        },
+        cmd: ["db", "branch", "switch"]
     }
 ];
 
@@ -1216,6 +1364,53 @@ const CRON_TOOLS: ToolDef[] = [
     }
 ];
 
+/**
+ * Showing a schema change before making it.
+ *
+ * This was `rebase db push --dry-run`, and that was wrong twice over. `db push`
+ * runs `schema generate` first, so a tool documented as "applies nothing" wrote
+ * `backend/drizzle/schema.sql`, `backend/drizzle/policies.sql` and a rewritten
+ * `backend/src/schema.generated.ts` into the repository on every call. And
+ * `db push` plans with Atlas, which needs a second empty database — the managed
+ * development database serves exactly one, so on the default scaffold the tool
+ * that `rebase_db_push`'s own refusal points at exited 1.
+ *
+ * `POST /api/admin/schema/plan` is the live schema editor's planner: it builds
+ * the statements with `generateSchemaCommit`, not Atlas, so it answers on
+ * PGlite; it has no side effects by construction (the route's own comment says
+ * so, and `apply` is a separate route); and it works over the backend the other
+ * HTTP tools already talk to, so there is no project checkout to write into.
+ *
+ * The cost is that a plan now needs a subject. That is honest: `db push
+ * --dry-run` diffed whatever the working tree happened to contain, which is not
+ * a question an agent asked.
+ */
+const SCHEMA_TOOLS: ToolDef[] = [
+    {
+        name: "rebase_schema_plan",
+        description:
+            "Show the SQL a collection change would run, without running any of it. Posts to " +
+            "/api/admin/schema/plan — it changes nothing, writes no files, and works on the " +
+            "managed development database. Read this before proposing a schema change: it names " +
+            "every statement and marks the ones that destroy data.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                collectionId: {
+                    type: "string",
+                    description: "The collection's id — the filename under config/collections/, without the extension."
+                },
+                collection: {
+                    type: "object",
+                    description: "The whole collection as it should be AFTER the edit, in the shape defineCollection takes.",
+                    additionalProperties: true
+                }
+            },
+            required: ["collectionId", "collection"]
+        }
+    }
+];
+
 const FUNCTION_TOOLS: ToolDef[] = [
     {
         name: "invoke_function",
@@ -1289,6 +1484,7 @@ const PROJECT_TOOLS: ToolDef[] = [
 
 export const ALL_TOOLS: ToolDef[] = [
     ...CLI_TOOLS.map(({ cmd: _c, ...rest }) => rest),
+    ...SCHEMA_TOOLS,
     ...DATA_TOOLS,
     ...ADMIN_TOOLS,
     ...DEV_TOOLS,
@@ -1357,7 +1553,8 @@ function destructiveRefusalHint(toolName: string, output: string): string | null
     if (!/destructive changes require confirmation|--allow-destructive/.test(output)) return null;
     return (
         "\n\nThis push was refused because it destroys data, and that is not yours to approve. " +
-        "Show the planned SQL above (rebase_schema_plan prints it without running anything), " +
+        "Show the planned SQL above (rebase_schema_plan prints one collection's statements " +
+        "without running anything), " +
         "say which statements drop data, and ask the person you are working with to run:\n\n" +
         "    rebase db backup\n" +
         "    rebase db push --allow-destructive\n"
@@ -1374,6 +1571,42 @@ export function lastLines(text: string, count: number): string {
     if (!text) return "";
     const lines = text.replace(/\n$/, "").split("\n");
     return lines.slice(-Math.max(1, count)).join("\n");
+}
+
+/**
+ * A dev server this process did not spawn, named rather than denied.
+ *
+ * `devProcess` is only the child `rebase_dev_start` made, so "Dev server is not
+ * running." was what `rebase_dev_logs` and `rebase_dev_stop` answered while one
+ * was running in a terminal — in the same session where
+ * `rebase_project_current` was reporting that server's URL, discovered from the
+ * same `.rebase/state.json` these two never read. The output belongs to the
+ * terminal that started it, and so does the decision to stop it.
+ *
+ * @returns The sentence to answer with, or `null` when nothing is running.
+ */
+export function describeForeignDevServer(
+    action: "logs" | "stop",
+    state: ReturnType<typeof readDevState> | undefined = undefined
+): string | null {
+    const project = (() => {
+        try {
+            return getActiveProject();
+        } catch {
+            return null;
+        }
+    })();
+    const dir = project?.projectDir;
+    const found = state !== undefined ? state : dir ? readDevState(dir) : null;
+    if (!found) return null;
+    const where = `${found.baseUrl}${found.pid ? ` (PID ${found.pid})` : ""}`;
+    return action === "logs"
+        ? `A dev server is running at ${where}, but this session did not start it — ` +
+          "its output goes to the terminal that did. Only a server started with " +
+          "`rebase_dev_start` has logs here."
+        : `A dev server is running at ${where}, but this session did not start it. ` +
+          "Stop it in the terminal that did (Ctrl-C); this tool only stops a server " +
+          "`rebase_dev_start` spawned.";
 }
 
 function appendDevLog(line: string) {
@@ -1430,9 +1663,11 @@ function untrustedJsonResult(source: string, data: unknown) {
  * question, and answering it is how somebody notices they are pointed at the
  * wrong project rather than at a stopped one.
  */
-export function explainToolError(err: unknown, baseUrl?: string): string {
+export function explainToolError(err: unknown, baseUrl?: string, toolName?: string): string {
     const msg = err instanceof Error ? err.message : String(err);
     const url = baseUrl ?? safeActiveBaseUrl();
+    const surface = toolName ? surfaceNotMounted(err, toolName) : null;
+    if (surface) return surface;
     const networkish = /fetch failed|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|socket hang up|network error/i;
     if (!networkish.test(msg)) return msg;
     const where = url ? ` while calling ${url}` : "";
@@ -1441,6 +1676,47 @@ export function explainToolError(err: unknown, baseUrl?: string): string {
         "Start it with `rebase_dev_start`, or check `rebase_project_current`: " +
         "the active project is sticky and lives outside your repository."
     );
+}
+
+/**
+ * A whole API surface a project never turned on, told apart from a missing row.
+ *
+ * `surfaces.cron` gates the mount, so on a project with no cron jobs — which is
+ * every fresh scaffold — `/api/admin/cron` does not exist and the client raises
+ * a bare `Not Found`. Passed through, that is the least useful sentence
+ * available: no URL, no cause, and nothing an agent can do next except guess
+ * that a *job* is missing and go looking for one. What is missing is the
+ * surface, and the way to get it is a file.
+ *
+ * Keyed by tool prefix rather than by URL because the client raises the error,
+ * not this process, and the prefix is the one fact that is certainly here.
+ */
+const SURFACE_BY_TOOL_PREFIX: Array<{ tool: string; message: string }> = [
+    {
+        // `cron_list_jobs` only, not every `cron_` tool. The row tools take a
+        // `jobId`, and the server answers a missing job with the same 404 —
+        // `Cron job "nightly" not found`. Mapped by prefix, that sentence was
+        // replaced with "this project declares no cron jobs" on a project that
+        // has five, which is a worse answer than the one it hid. A tool that
+        // addresses no row is the only one whose 404 can only be the surface.
+        tool: "cron_list_jobs",
+        message:
+            "this project declares no cron jobs, so the cron surface is not mounted — " +
+            "`/api/admin/cron` does not exist on this backend. Add a job at " +
+            "`backend/crons/<name>.ts`, default-exporting a `CronJobDefinition`, and restart " +
+            "`rebase dev`. (An older backend answers 404 here even when jobs exist; a current " +
+            "one answers with an empty list.)"
+    }
+];
+
+function surfaceNotMounted(err: unknown, toolName: string): string | null {
+    const status = (err as { status?: number } | undefined)?.status;
+    const msg = err instanceof Error ? err.message : String(err);
+    // `status` when the client supplied one; the message is the fallback for a
+    // client old enough not to carry it.
+    if (status !== 404 && !/^not found$/i.test(msg.trim())) return null;
+    const surface = SURFACE_BY_TOOL_PREFIX.find((s) => s.tool === toolName);
+    return surface ? surface.message : null;
 }
 
 /** The active project's baseUrl, or undefined if even that cannot be resolved. */
@@ -1486,6 +1762,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         } else if (name === "rebase_db_branch_delete" || name === "rebase_db_branch_info") {
             const argsObj = args as { name: string };
             cmdArgs.push(assertValidBranchName(argsObj.name, "name"));
+        } else if (name === "rebase_db_branch_switch") {
+            // Both optional, and mutually exclusive in effect: with neither the
+            // command reports the active branch, which is the question asked
+            // most often.
+            const argsObj = args as { name?: string; off?: boolean };
+            if (argsObj.off) cmdArgs.push("--off");
+            else if (argsObj.name) cmdArgs.push(assertValidBranchName(argsObj.name, "name"));
         }
 
         const { output, code } = await runRebaseCmd(cmdArgs);
@@ -1495,6 +1778,44 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     // ── Project management tools ────────────────────────────────────────
     switch (name) {
+        case "rebase_schema_plan": {
+            const argsObj = args as { collectionId: string; collection: Record<string, unknown> };
+            const project = getActiveProject();
+            const res = await fetch(`${project.baseUrl}/api/admin/schema/plan`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(project.token ? { Authorization: `Bearer ${project.token}` } : {})
+                },
+                body: JSON.stringify({
+                    collectionId: argsObj.collectionId,
+                    collection: argsObj.collection
+                })
+            });
+            const body = await res.text();
+            if (!res.ok) {
+                // 501 is the one refusal worth translating: the surface is
+                // mounted but the server was started without a collections
+                // directory or a repository, so there is nothing to plan
+                // against. Every other status carries the server's own message,
+                // which is written for a person.
+                const hint = res.status === 501
+                    ? "\n\nThis backend was started without `collectionsDir` or `liveSchema.repository`, " +
+                      "so it has no collection source to plan against. `rebase dev` supplies one; a " +
+                      "deployment running from a built bundle does not."
+                    : "";
+                return untrustedTextResult(
+                    `POST ${project.baseUrl}/api/admin/schema/plan`,
+                    `HTTP ${res.status}\n${body}${hint}`,
+                    true
+                );
+            }
+            return untrustedJsonResult(
+                `POST ${project.baseUrl}/api/admin/schema/plan`,
+                JSON.parse(body)
+            );
+        }
+
         case "rebase_project_list": {
             const projects = Object.values(registry.projects).map((p) => ({
                 name: p.name,
@@ -1569,6 +1890,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 token,
                 addedAt: new Date().toISOString()
             };
+            // Registering one *by name* is the operator saying it out loud, so
+            // it is no longer derived and `saveRegistry` must write it. Without
+            // this, `rebase_project_add` with the name "default" answered
+            // "registered" and persisted nothing at all.
+            if (projectName === "default") defaultIsDerived = false;
             saveRegistry();
             return jsonResult({
                 message: `Project "${projectName}" registered`,
@@ -1786,6 +2112,16 @@ roles });
         // ── Cron Tools ─────────────────────────────────────────────────────
         case "cron_list_jobs": {
             const result = await client.cron.listJobs();
+            // An empty list is the same situation as an unmounted surface, and
+            // `{ "jobs": [] }` on its own reads as a failure to an agent that
+            // asked what runs on a schedule. Say what a job is made of.
+            if (!result?.jobs?.length) {
+                return textResult(
+                    "This project declares no cron jobs. Add one at `backend/crons/<name>.ts`, " +
+                    "default-exporting a `CronJobDefinition`, and restart `rebase dev` — the " +
+                    "filename becomes the job id."
+                );
+            }
             return untrustedJsonResult("the cron scheduler", result);
         }
 
@@ -1865,14 +2201,15 @@ roles });
             // and the docs both promised lines.
             const recent = lastLines(devLogs.join(""), lineCount);
             if (!recent) {
-                return textResult(devProcess ? "No output captured yet." : "Dev server is not running.");
+                if (devProcess) return textResult("No output captured yet.");
+                return textResult(describeForeignDevServer("logs") ?? "Dev server is not running.");
             }
             return untrustedTextResult("the dev server's output", recent);
         }
 
         case "rebase_dev_stop": {
             if (!devProcess || devProcess.killed) {
-                return textResult("Dev server is not running.");
+                return textResult(describeForeignDevServer("stop") ?? "Dev server is not running.");
             }
             devProcess.kill("SIGTERM");
             return textResult("Dev server stopped.");
@@ -1885,7 +2222,7 @@ roles });
         return {
             content: [{
                 type: "text" as const,
-                text: `Error: ${explainToolError(err)}`
+                text: `Error: ${explainToolError(err, undefined, request.params.name)}`
             }],
             isError: true
         };

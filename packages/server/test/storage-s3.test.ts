@@ -270,7 +270,12 @@ LastModified: new Date() }
 
             expect(ListObjectsV2Command).toHaveBeenCalledWith(expect.objectContaining({
                 Bucket: "test-bucket",
-                Prefix: "uploads" // Implementation doesn't add trailing slash
+                // With a trailing slash, always. Under `Delimiter: "/"`,
+                // `Prefix: "uploads"` matches `uploads.txt` and
+                // `uploadsomething/` and returns nothing from inside
+                // `uploads/` — so the same call answered one thing against
+                // local dev and another against the bucket.
+                Prefix: "uploads/"
             }));
             expect(result.items).toHaveLength(2);
         });

@@ -44,16 +44,32 @@ function silenceDotenvBanner(): void {
     }
 }
 
+/**
+ * The flags that mean the same thing wherever they appear.
+ *
+ * `--debug` is in here even though this file does not act on it: it is
+ * implemented one level up, in `bin/rebase.js`, which prints the stack of a
+ * failed command instead of the one-line message. That is exactly why it went
+ * missing from the help for as long as it did — the flag lived in the
+ * launcher, the Options block lived here, and neither knew about the other.
+ * Declaring it here puts both under one spec, which `cli.test.ts` holds
+ * against the printed help.
+ *
+ * Exported for that test.
+ */
+export const ROOT_FLAGS = {
+    "--version": Boolean,
+    "--help": Boolean,
+    "--debug": Boolean,
+    "-v": "--version",
+    "-h": "--help"
+} as const;
+
 export async function entry(args: string[]) {
     silenceDotenvBanner();
 
     const parsedArgs = arg(
-        {
-            "--version": Boolean,
-            "--help": Boolean,
-            "-v": "--version",
-            "-h": "--help"
-        },
+        { ...ROOT_FLAGS },
         {
             argv: args.slice(2),
             permissive: true
@@ -234,7 +250,8 @@ export async function entry(args: string[]) {
     }
 }
 
-function printHelp() {
+/** The global help. Exported so its Options block can be held against {@link ROOT_FLAGS}. */
+export function printHelp() {
     console.log(`
 ${chalk.bold("Rebase CLI")} — Developer tools for Rebase projects
 
@@ -300,6 +317,7 @@ ${chalk.green.bold("Rebase Cloud")}
 ${chalk.green.bold("Options")}
   ${chalk.blue("--version, -v")}   Show version number
   ${chalk.blue("--help, -h")}      Show this help message
+  ${chalk.blue("--debug")}         Print the stack trace when a command fails ${chalk.gray("(or REBASE_DEBUG=1)")}
 
 ${chalk.gray("Documentation: https://rebase.pro/docs")}
 ${telemetryNotice()}`);

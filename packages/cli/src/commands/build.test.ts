@@ -34,7 +34,8 @@ cpu: "x64",
 node: "22" } }
         })),
         detectFrameworkDepDrift: vi.fn(() => ({ behind: [],
-disagreeing: [] }))
+disagreeing: [],
+conflicting: [] }))
     };
 });
 
@@ -112,5 +113,33 @@ describe("what `rebase build` does with each runtime", () => {
         manifest("managed");
         await buildCommand(["node", "rebase", "--debug", "build", "backend"]);
         expect(vi.mocked(buildBundle).mock.calls[0][0]).toMatchObject({ appName: "backend" });
+    });
+});
+
+describe("the build summary line", () => {
+    /** Every `console.log` argument of one build, joined. */
+    async function summary(schemaVersion: string): Promise<string> {
+        manifest("managed");
+        vi.mocked(buildBundle).mockResolvedValueOnce({
+            outDir: path.join(projectRoot, "dist-bundle"),
+            collectionCount: 0,
+            manifest: { schemaVersion, hooks: { native: false }, deps: { declared: {} } },
+            vendor: { vendored: false }
+        } as unknown as Awaited<ReturnType<typeof buildBundle>>);
+        await buildCommand(["node", "rebase", "build"]);
+        const printed = vi.mocked(console.log).mock.calls.map(c => String(c[0]));
+        return printed.find(line => line.includes("collection(s)")) ?? "";
+    }
+
+    it("omits the schema clause for a headless build, rather than dangling", async () => {
+        // A headless project's manifest carries `schemaVersion: ""` — its API is
+        // introspected at boot — and the line interpolated it anyway, ending in
+        // `0 collection(s), schema ` with nothing after it. That reads as a
+        // value that failed to render.
+        expect(await summary("")).toMatchInlineSnapshot(`"    0 collection(s)"`);
+    });
+
+    it("still names the schema when there is one", async () => {
+        expect(await summary("v1")).toMatchInlineSnapshot(`"    0 collection(s), schema v1"`);
     });
 });

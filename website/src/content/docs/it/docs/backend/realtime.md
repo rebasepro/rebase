@@ -1,4 +1,5 @@
 ---
+sourceHash: 4f7a93fd3a8e67c8
 title: Tempo reale e WebSocket
 sidebar_label: Tempo reale
 description: Sincronizzazione dei dati in tempo reale, canali di broadcast e tracciamento della presenza tramite WebSocket.
@@ -143,15 +144,31 @@ Il metodo `.listen()` del query builder è disponibile solo quando il `RebaseCli
 
 ## Consegna degli Aggiornamenti: Patch Istantanea + Refetch di Correttezza
 
-Rebase usa una strategia di aggiornamento in due fasi per le sottoscrizioni di collezione, per combinare velocità estrema e correttezza assoluta:
+Una modifica non viaggia mai fino a un sottoscrittore sotto forma di dati.
+Viaggia come il fatto che qualcosa è cambiato, e a ogni sottoscrittore viene poi
+detto che cosa può vedere *lui*, tramite una query eseguita come lui:
 
-1. **Fase 1 — Patch dell'entità istantanea:** Quando una singola entità cambia (creata, aggiornata, eliminata), il server invia immediatamente un messaggio leggero `collection_patch` contenente i valori modificati dell'entità direttamente ai sottoscrittori. Il client lo unisce ai suoi dati di collezione in cache per un feedback tra schede quasi istantaneo — bypassando completamente il database per aggiornamenti percepiti in meno di un millisecondo.
+1. **Invalidazione.** Quando un'entità cambia (creata, aggiornata, eliminata), il
+   server marca i percorsi interessati. La riga che è stata scritta non viene
+   inoltrata — è stata letta sotto l'autorizzazione di chi ha scritto, che non
+   dice nulla su ciò che un sottoscrittore ha il permesso di vedere.
 
-2. **Fase 2 — Refetch RLS con debounce:** Dopo un breve ritardo di **300 ms** (`REFETCH_DEBOUNCE_MS`), il server esegue un refetch autorevole dal database della collezione corrispondente ai tuoi filtri e all'ordinamento originali. Questo è fondamentale perché le mutazioni dei campi potrebbero alterare la visibilità dell'entità (ad es. se il suo stato è cambiato e non corrisponde più a un filtro `where`).
+2. **Refetch RLS con debounce.** Dopo **300 ms** (`REFETCH_DEBOUNCE_MS`) il
+   server rilegge la collezione con i tuoi filtri e il tuo ordinamento originali.
+   La query viene eseguita all'interno di una transazione che imposta i valori
+   locali alla transazione `app.user_id` e `app.user_roles` dal
+   `SubscriptionAuthContext` del sottoscrittore, così Postgres valuta la
+   Row-Level Security sotto l'identità di quel client e solo le righe che è
+   autorizzato a vedere vengono inviate nel `collection_update`. Il debounce
+   accorpa anche una raffica di scritture in un'unica query.
 
-   Per mantenere confini di sicurezza rigorosi, questa query di refetch viene eseguita all'interno di una transazione che imposta le variabili locali alla transazione `app.userId` e `app.user_roles` derivate dal `SubscriptionAuthContext` del sottoscrittore. Questo garantisce che i vincoli di sicurezza a livello di riga (RLS) di PostgreSQL vengano valutati correttamente sotto la sessione di autenticazione del client, e solo i record che l'utente è autorizzato a vedere vengono inviati nel `collection_update` finale.
-
-Questo approccio garantisce che i filtri di elenco e le politiche di accesso rimangano perfettamente coerenti mantenendo al contempo un'elevata reattività dell'interfaccia.
+Le versioni precedenti inviavano subito un `collection_patch` con la riga
+scritta prima di questo refetch, per un feedback tra schede in meno di un
+millisecondo. Quella riga era stata letta nell'ambito di chi scriveva, quindi
+poteva raggiungere — e raggiungeva — sottoscrittori le cui politiche l'avrebbero
+negata, e nemmeno il filtro `where` della sottoscrizione le veniva applicato. La
+patch è stata rimossa: la latenza percepita di un aggiornamento è ora la finestra
+di debounce.
 
 ## Canali di Broadcast
 
@@ -195,6 +212,14 @@ Quando un client invia un messaggio `broadcast`, il server lo ritrasmette a **tu
 Per impostazione predefinita un broadcast raggiunge i membri connessi in quel momento e poi sparisce. È il compromesso giusto per notifiche e cursori, e non costa nulla.
 
 Per un flusso di operazioni — editing collaborativo, qualsiasi cosa in cui un vuoto silenzioso causi divergenza — un canale può essere configurato per **conservare** i suoi messaggi. I broadcast conservati ricevono un numero di sequenza per canale e vengono memorizzati, così un client che si riconnette può chiedere tutto ciò che segue l'ultimo che ha visto.
+
+:::caution[Dove si configura]
+**Runtime gestito: da nessuna parte.** La conservazione dei canali e
+`realtime.bus` fanno parte dell'adattatore di database che il runtime gestito
+costruisce da sé, e nessuno dei due ha una forma come variabile d'ambiente. Fai
+eject per configurarli.
+**Con eject:** `createPostgresAdapter({ realtime })` in `backend/src/index.ts`.
+:::
 
 La conservazione è opzionale e si configura qui, sul server:
 
@@ -249,8 +274,9 @@ La potatura avviene man mano che arrivano i messaggi, limitata per canale così 
 - **Almeno una volta in recupero.** Un intervallo di ritrasmissione può sovrapporsi a messaggi già ricevuti dal client; il SDK scarta quelli già consegnati.
 
 :::caution[La cronologia ha lo stesso modello di accesso del canale]
-Chiunque possa unirsi a un canale può ritrasmettere i suoi messaggi conservati, compresi quelli diffusi prima del suo arrivo. La conservazione è opzionale per pattern di canale, quindi considera che abilitarla su un canale ad accesso pubblico rende leggibile il passato di quel canale a qualsiasi visitatore.
+Un client che si è unito a un canale può ritrasmettere i suoi messaggi conservati, compresi quelli diffusi prima del suo arrivo — l'appartenenza è l'unico controllo, e unirsi è aperto a qualsiasi client in grado di nominare il canale. La conservazione è opzionale per pattern di canale, quindi abilitarla rende leggibile il passato di quel canale a qualsiasi visitatore che ne indovini il nome. I canali con conservazione sono il caso in cui questo diventa duraturo anziché momentaneo: tratta quindi il contenuto di un canale conservato come pubblico per i tuoi utenti.
 :::
+
 ## Tracciamento della Presenza
 
 La presenza traccia quali utenti sono attualmente online in un canale e permette a ciascun utente di condividere uno stato personalizzato (ad es. posizione del cursore, stato).
@@ -308,12 +334,14 @@ L'SDK client si riconnette automaticamente quando la connessione WebSocket cade:
 Puoi ascoltare gli eventi del ciclo di vita della connessione:
 
 ```typescript
-const ws = client.ws; // Access the WebSocket client
-
-ws.on("connect", () => console.log("Connected"));
-ws.on("disconnect", () => console.log("Disconnected"));
-ws.on("reconnect", () => console.log("Reconnected"));
-ws.on("error", (error) => console.error("Error:", error));
+// `ws` is undefined on a client built without realtime, so narrow it once.
+const ws = client.ws;
+if (ws) {
+    ws.on("connect", () => console.log("Connected"));
+    ws.on("disconnect", () => console.log("Disconnected"));
+    ws.on("reconnect", () => console.log("Reconnected"));
+    ws.on("error", (error) => console.error("Error:", error));
+}
 ```
 
 ## Autenticazione & RLS
@@ -321,37 +349,14 @@ ws.on("error", (error) => console.error("Error:", error));
 Le sottoscrizioni WebSocket rispettano automaticamente le politiche di sicurezza a livello di riga (RLS). Quando il client è autenticato:
 
 1. La connessione WebSocket si autentica usando lo stesso token JWT dell'API REST.
-2. Ogni refetch di sottoscrizione viene eseguito all'interno di una transazione PostgreSQL con `set_config('app.userId', ...)` e `set_config('app.user_roles', ...)` — garantendo l'applicazione delle politiche RLS.
+2. Ogni refetch di sottoscrizione viene eseguito all'interno di una transazione PostgreSQL con `set_config('app.user_id', ...)` e `set_config('app.user_roles', ...)` — garantendo l'applicazione delle politiche RLS.
 3. Se un token scade durante una sessione attiva, il client si riautentica e si risottoscrive automaticamente.
 
 Ciò significa che ogni utente riceve aggiornamenti solo per i record che ha il permesso di vedere.
 
-## Broadcasting Tra Istanze & Architettura LISTEN/NOTIFY
-
-Per ambienti cluster multi-istanza (ad es. in esecuzione all'interno di container Kubernetes o Docker dietro un bilanciatore di carico), Rebase si affida a `LISTEN/NOTIFY` di PostgreSQL per sincronizzare le operazioni di mutazione e lo stato in tempo reale tra le istanze.
-
-### Aggirare i Pool di pgBouncer
-
-Poiché i pooler di connessioni come **pgBouncer** non supportano il modello di connessione persistente richiesto per le sessioni SQL `LISTEN` di lunga durata, il supervisore in tempo reale apre un client Postgres dedicato e non poolato (`PgClient`) direttamente al database. Questa connessione diretta utilizza la variabile d'ambiente `DATABASE_DIRECT_URL` se configurata, garantendo stabilità e prevenendo l'esaurimento del pool o interruzioni improvvise.
-
-### Meccanica delle Notifiche & Layout del Payload
-
-Quando un'entità viene modificata sull'Istanza A, questa diffonde una notifica sul canale `rebase_entity_changes`. Per ridurre al minimo il sovraccarico del database e la larghezza di banda di rete, il payload della notifica viene mantenuto estremamente compatto:
-
-```json
-{
-  "sid": "inst_7a9c1b",
-  "p": "posts",
-  "eid": "45",
-  "db": null
-}
-```
-
-*Nota: `sid` rappresenta l'ID istanza casuale e univoco del server generato all'avvio, `p` è lo slug (percorso) della collezione e `eid` è l'ID dell'entità target.*
-
-- **Auto-filtraggio**: Alla ricezione di un messaggio, ogni istanza legge il `sid`. Se corrisponde al proprio ID istanza, il server scarta la notifica per prevenire loop di routing infiniti.
-- **Relay e fan-out**: Se la notifica proviene da un'altra istanza, il server pianifica un refetch con debounce e ritrasmette l'aggiornamento ai suoi sottoscrittori WebSocket connessi localmente.
-- **Loop di riconnessione del supervisore**: Se la connessione al database cade, un supervisore di connessione in background monitora lo stato e attiva una sequenza di riconnessione automatica dopo un ritardo fisso di **3 secondi**, ripristinando il loop `LISTEN` senza influenzare il ciclo di vita principale dell'applicazione Hono.
+Eseguire più di un'istanza — il bus LISTEN/NOTIFY, che cosa fa la presenza tra i
+processi e come scrivere il proprio trasporto — ha una pagina dedicata:
+[Tempo reale tra istanze](/docs/backend/realtime-transports/).
 
 ## Cattura delle Modifiche a Livello di Database (CDC)
 
@@ -406,6 +411,37 @@ Per evitare che le richieste del client rimangano bloccate indefinitamente, tutt
 Se il server non risponde entro questa finestra di 30 secondi, il client elimina automaticamente la richiesta in sospeso e rifiuta la promise con un `ApiError` con il messaggio `"Request timed out"`.
 
 I messaggi unidirezionali che non si aspettano una risposta (come `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack` e `presence_state`) si risolvono immediatamente alla trasmissione e non attivano timeout.
+
+### Quando un frame di canale viene rifiutato
+
+Un frame di canale è fire-and-forget: `await channel.broadcast(...)` si risolve
+quando il frame viene scritto sul socket, **non** quando il server lo ha
+accettato. È deliberato — un'app collaborativa trasmette una posizione del cursore
+sessanta volte al secondo, e attendere una conferma per ognuna trasformerebbe
+ciascuna in un round trip.
+
+Un rifiuto non può quindi essere una promise rifiutata. Arriva su `onError`:
+
+```typescript
+const channel = client.realtime.channel("doc:42");
+
+channel.onError((error) => {
+    if (error.code === "CHANNEL_FORBIDDEN") showReadOnlyBanner();
+    if (error.code === "RATE_LIMITED") throttleCursorUpdates();
+});
+```
+
+| Codice | Significato |
+|------|-------|
+| `CHANNEL_FORBIDDEN` | Non sei membro del canale — entra nel canale prima di trasmettere o di leggerne la cronologia |
+| `RATE_LIMITED` | Oltre il budget di frame di canale indicato sopra |
+| `CHANNEL_HISTORY_WRITE_FAILED` | Non è stato possibile persistere un broadcast conservato, quindi è stato scartato |
+| `CHANNEL_HISTORY_READ_FAILED` | Non è stato possibile servire una richiesta di recupero |
+| `CHANNEL_BUS_PAYLOAD_TOO_LARGE` | Il broadcast ha raggiunto solo questa istanza — vedi [Il limite di 8&nbsp;KB del bus Postgres](#the-8-kb-limit-on-the-postgres-bus) |
+
+Senza un handler collegato, questi errori vengono registrati come avviso. Prima
+venivano scartati del tutto: non c'era una promise da rifiutare né un canale a cui
+consegnare, così un broadcast vietato era indistinguibile da uno consegnato.
 
 ## Prossimi Passi
 

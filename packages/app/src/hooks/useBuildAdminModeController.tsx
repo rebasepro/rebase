@@ -13,11 +13,17 @@ export function useBuildAdminModeController(): AdminModeController {
     // before the rename still has "content" in local storage — read as-is it
     // casts to a mode nothing matches, and the drawer renders neither half.
     // Migrating on read is the exception the no-shims rule allows for stored data.
+    //
+    // Anything else stored under this key falls back to "cms" for the same
+    // reason, rather than being cast to a mode: the union used to carry a third
+    // value, `"settings"`, that nothing set and nothing read, and a cast is how
+    // a value outside the union reaches state in the first place.
     const stored = readStoredString("rebase-admin-mode");
-    const savedMode = (stored === "content" ? "cms" : stored) as "cms" | "studio" | "settings" | null;
-    const [mode, setMode] = useState<"cms" | "studio" | "settings">(savedMode ?? "cms");
+    const migrated = stored === "content" ? "cms" : stored;
+    const savedMode = migrated === "cms" || migrated === "studio" ? migrated : null;
+    const [mode, setMode] = useState<"cms" | "studio">(savedMode ?? "cms");
 
-    const setModeInternal = useCallback((newMode: "cms" | "studio" | "settings") => {
+    const setModeInternal = useCallback((newMode: "cms" | "studio") => {
         writeStoredString("rebase-admin-mode", newMode);
         setMode(newMode);
     }, []);

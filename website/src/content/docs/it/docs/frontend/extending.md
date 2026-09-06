@@ -1,4 +1,5 @@
 ---
+sourceHash: 5de2aebf9af99221
 title: Estendere Rebase
 sidebar_label: Estendere Rebase
 description: Una guida decisionale per scegliere il giusto meccanismo di estensione — plugin, slot, sovrascritture dei componenti, viste entità, azioni e altro.

@@ -1,4 +1,5 @@
 ---
+sourceHash: c933db5cdbb2cfc2
 title: IA & Agentes
 sidebar_label: Visão Geral
 description: O que o Rebase oferece para assistentes de código com IA e agentes autônomos — um servidor MCP, agent skills locais no projeto, arquivos de instruções gerados e o modelo de credenciais que decide o que um agente pode realmente acessar.
@@ -12,7 +13,7 @@ problemas diferentes. Vale a pena saber qual delas você está buscando:
 | [**Servidor MCP**](/docs/ai/mcp) | Um servidor Model Context Protocol via stdio com 41 ferramentas sobre seu schema, dados, usuários, storage, cron e servidor de desenvolvimento | Um assistente, em tempo de execução |
 | [**Agent skills**](/docs/ai/skills) | 20 arquivos de skill em Markdown gravados no seu repositório por `rebase skills install` | Um assistente, como material de referência |
 | [**Arquivos de instrução**](/docs/ai/instruction-files) | `ai-instructions.md` mais arquivos de apontamento específicos por assistente, gravados por `rebase init` | Um assistente, como regras sempre ativas |
-| [**Chaves de API**](/docs/backend/api#api-keys) | Credenciais de máquina com escopo delimitado, por coleção e por operação | Qualquer cliente que chame a API HTTP |
+| [**Chaves de API**](/docs/backend/api-keys) | Credenciais de máquina com escopo delimitado, por coleção e por operação | Qualquer cliente que chame a API HTTP |
 
 Os três primeiros têm a ver com dar *conhecimento* e *ferramentas* a um assistente. O
 quarto é o único que decide o que ele pode realmente fazer.
@@ -44,7 +45,7 @@ visibilidade de linhas, não sobre autenticação. Concedê-lo não adiciona um 
 lista de permissões, e retê-lo não bloqueia um chamador.
 
 A mecânica — criação de chaves, o JSON de permissões, rotação, expiração, limites
-de taxa — é abordada em [API REST → Chaves de API](/docs/backend/api#api-keys).
+de taxa — é abordada em [API REST → Chaves de API](/docs/backend/api-keys).
 Não deixe de conferir [Regras de Segurança (RLS)](/docs/collections/security-rules);
 a segunda barreira é tão boa quanto as políticas que você escreveu.
 
@@ -63,7 +64,7 @@ O Rebase possui um tipo de propriedade `vector` nativo no Postgres e um
 método de consulta `.vectorSearch()` com suporte a distâncias `cosine`, `l2` e `inner_product`.
 Isso já está documentado, em dois lugares em vez de um:
 
-- [Consultando Dados → Busca Vetorial](/docs/sdk/querying#vector-search) — o método
+- [Consultando Dados → Busca Vetorial](/docs/sdk/aggregates-and-search#vector-search) — o método
   do SDK, o campo `_distance` que ele adiciona a cada linha e as ressalvas
 - [API REST → Busca Vetorial](/docs/backend/api#vector-search) — os parâmetros de
   consulta `vector_search`, `vector`, `vector_distance` e `vector_threshold`
@@ -80,7 +81,7 @@ imagem que carregue a biblioteca e de um papel autorizado a instalá-la. E
 **cada coluna de vetor ganha um índice HNSW para distância de cosseno**, porque é
 com cosseno que `vectorSearch` mede a menos que você passe `distance` — um índice
 serve exatamente um operador. Ajuste-o, ou desligue-o, na propriedade: veja
-[O índice](/docs/sdk/querying#the-index).
+[O índice](/docs/sdk/aggregates-and-search#the-index).
 
 Consultas vetoriais também não aceitam subscrição em tempo real; `.vectorSearch(...).listen()`
 é recusado com `VECTOR_SEARCH_NOT_LIVE`.

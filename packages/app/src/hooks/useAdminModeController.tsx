@@ -6,8 +6,8 @@ import { useContext } from "react";
  * @group Hooks and utilities
  */
 export interface AdminModeController {
-    mode: "cms" | "studio" | "settings";
-    setMode: (mode: "cms" | "studio" | "settings") => void;
+    mode: "cms" | "studio";
+    setMode: (mode: "cms" | "studio") => void;
 }
 
 /**

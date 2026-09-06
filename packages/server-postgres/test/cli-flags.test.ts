@@ -17,10 +17,50 @@
  * *db* line, so a check placed in those generators would reject
  * `--allow-destructive` on a line where it is correct.
  */
-import { assertKnownFlags, DRIVER_FLAG_SPECS } from "../src/cli-flags";
+import fs from "fs";
+import path from "path";
+
+import {
+    assertKnownFlags,
+    assertOutputAliasesPaired,
+    assertSpecMatchesUsage,
+    DRIVER_FLAG_SPECS,
+    flagsInUsage,
+    OUTPUT_FLAG_ALIASES
+} from "../src/cli-flags";
 
 /** The driver's own line: `["db", "push", …]`, as the CLI relays it. */
 const line = (...args: string[]) => args;
+
+/**
+ * The `--help` usage lines, read out of the CLI's own help pages.
+ *
+ * The help lives in `packages/cli` and the specs live here, because `rebase db
+ * --help` must answer without *running* the driver. Two packages, two lists,
+ * one contract — so the test reads the other package's source rather than
+ * restating it, the way `help-coverage.test.ts` reads a dispatcher's cases.
+ *
+ * Keyed the way {@link DRIVER_FLAG_SPECS} is, off the usage string itself:
+ * every one of them opens `rebase <domain> <subcommand>`.
+ */
+function usageStrings(): Record<string, string> {
+    const cliCommands = path.resolve(__dirname, "..", "..", "cli", "src", "commands");
+    const usages: Record<string, string> = {};
+    for (const file of ["db.ts", "schema.ts"]) {
+        const source = fs.readFileSync(path.join(cliCommands, file), "utf8");
+        for (const [, usage] of source.matchAll(/^\s+usage: "(rebase [^"]+)",?$/gm)) {
+            const [, domain, subcommand] = usage.split(" ");
+            if (subcommand && !subcommand.startsWith("<") && !subcommand.startsWith("[")) {
+                usages[`${domain} ${subcommand}`] = usage;
+            }
+        }
+    }
+    // A silently empty map would make every check below pass by reading nothing.
+    if (Object.keys(usages).length < 6) {
+        throw new Error(`Found ${Object.keys(usages).length} usage strings under ${cliCommands} — the help pages moved.`);
+    }
+    return usages;
+}
 
 describe("assertKnownFlags", () => {
     it("rejects a misspelled --allow-destructive", () => {
@@ -39,10 +79,15 @@ describe("assertKnownFlags", () => {
     });
 
     it("accepts the flags db push documents", () => {
-        expect(() => assertKnownFlags(
-            "db", "push",
-            line("db", "push", "--collections", "./config/collections", "--allow-destructive", "--yes")
-        )).not.toThrow();
+        // Derived, not hand-listed: this used to name three flags and `db push
+        // --help` documented four, so `--dry-run` was rejected for two releases
+        // by a test called "accepts the flags db push documents". See the
+        // "help and spec" describe block below for the check that keeps them
+        // in step; this asserts the line a reader would actually type.
+        const documented = flagsInUsage(usageStrings()["db push"]);
+        expect(documented).toContain("--dry-run");
+        const typed = documented.flatMap(flag => (flag === "--collections" ? [flag, "./config/collections"] : [flag]));
+        expect(() => assertKnownFlags("db", "push", line("db", "push", ...typed))).not.toThrow();
     });
 
     it("accepts the short forms", () => {
@@ -89,5 +134,81 @@ describe("assertKnownFlags", () => {
 
     it("says nothing when no subcommand was named", () => {
         expect(() => assertKnownFlags("db", undefined, line("db"))).not.toThrow();
+    });
+});
+
+/**
+ * The help page and the spec are one contract, checked in both directions.
+ *
+ * `rebase db push --help` documented `[--dry-run]`; the spec did not list it;
+ * `assertKnownFlags` then answered `unknown or unexpected option: --dry-run` to
+ * a line the command's own help had just offered. Nothing failed — the test
+ * that was supposed to cover this hand-listed three flags and was green.
+ */
+describe("the help page and the flag spec", () => {
+    it("agree on every command that has both", () => {
+        expect(assertSpecMatchesUsage(DRIVER_FLAG_SPECS, usageStrings())).toEqual([]);
+    });
+
+    it("reports a flag added to the help but not the spec", () => {
+        // The check has to be able to fail, or a green run means nothing. This
+        // is the exact shape of the `--dry-run` drift.
+        const problems = assertSpecMatchesUsage(
+            { "db push": { "--yes": Boolean } },
+            { "db push": "rebase db push [--dry-run] [--yes]" }
+        );
+        expect(problems).toEqual(["`db push` documents --dry-run in its usage line but the spec rejects it"]);
+    });
+
+    it("reports a flag the spec accepts and no help mentions", () => {
+        const problems = assertSpecMatchesUsage(
+            { "db push": { "--yes": Boolean, "--force": Boolean } },
+            { "db push": "rebase db push [--yes]" }
+        );
+        expect(problems).toEqual(["`db push` accepts --force but no usage line documents it"]);
+    });
+
+    it("does not ask for a line per alias, or per flag the CLI relays", () => {
+        const problems = assertSpecMatchesUsage(
+            { "db push": { "--collections": String, "-c": "--collections", "--docker": Boolean } },
+            { "db push": "rebase db push [--collections <dir>]" }
+        );
+        expect(problems).toEqual([]);
+    });
+
+    it("says nothing about a command that parses its own line", () => {
+        expect(assertSpecMatchesUsage({}, { "db branch": "rebase db branch <create|list> [--force]" })).toEqual([]);
+    });
+});
+
+/**
+ * One destination flag, two spellings, accepted everywhere either is.
+ *
+ * `--out` is the primary name on `rebase build`, an alias on `generate-sdk`,
+ * `db backup` and `cloud env pull`, and was refused outright by all three
+ * `schema` commands — so `rebase schema generate --out /tmp/x.ts`, typed by
+ * someone who had just used `--out` on `build`, answered "unknown or unexpected
+ * option". Neither name can be retired: both are shipped. The rule is that a
+ * spec naming one names both, and it is checked over the specs rather than
+ * asserted command by command, so the next `--output`-only command fails here.
+ */
+describe("the --out / --output pair", () => {
+    it("is complete in every driver spec that names either", () => {
+        expect(assertOutputAliasesPaired(DRIVER_FLAG_SPECS)).toEqual([]);
+    });
+
+    it("would report a spec that names only one", () => {
+        // The check has to be able to fail, or a green run means nothing.
+        const problems = assertOutputAliasesPaired({ "schema drift": { "--output": String } });
+        expect(problems).toHaveLength(1);
+        expect(problems[0]).toContain("schema drift");
+        expect(problems[0]).toContain("--out");
+    });
+
+    it.each(OUTPUT_FLAG_ALIASES)("is accepted by every schema command as %s", flag => {
+        for (const subcommand of ["generate", "introspect", "stale"]) {
+            expect(() => assertKnownFlags("schema", subcommand, line("schema", subcommand, flag, "/tmp/x.ts")))
+                .not.toThrow();
+        }
     });
 });

@@ -1,4 +1,5 @@
 ---
+sourceHash: 3830846c0457a79f
 title: Formular-Layout
 sidebar_label: Formular-Layout
 description: Steuern Sie die Anordnung des Entitätsformulars — Spaltenbreiten, Abschnitte und die Metadaten-Leiste.

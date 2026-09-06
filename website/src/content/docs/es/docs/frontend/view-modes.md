@@ -1,4 +1,5 @@
 ---
+sourceHash: 480ba165906124fe
 title: Modos de Vista
 sidebar_label: Modos de Vista
 description: Configure vistas de tabla, tarjetas y tablero Kanban para sus colecciones.
@@ -19,10 +20,20 @@ Cada colección puede mostrarse en cuatro modos de vista:
 import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
-    properties: { /* … */ },
+    // `orderProperty` y `kanban.columnProperty` se comprueban contra estas
+    // claves — con un bloque `properties` vacío se reducen a `never`.
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        status: { name: "Status", type: "string" },
+        // La clave de orden. Un *string*, nunca un número — véase «Ordenamiento» más abajo.
+        __order: {
+            name: "Order",
+            type: "string",
+            admin: { disabled: true, hideFromCollection: true }
+        }
+    },
     name: "Products",
     table: "products",
-    // ...
     admin: {
         defaultViewMode: "table",            // Vista predeterminada
         enabledViews: ["list", "table", "kanban"],    // Vistas disponibles
@@ -37,13 +48,9 @@ const productsCollection = defineCollection({
 
 ## Vista de Lista
 
-![Marcador de posición de la captura de pantalla de la Vista de Lista](/img/features/list-view.png)
-
 La vista de lista es el modo de vista predeterminado clásico y limpio del CMS, que muestra las entidades en un formato de lista directo sin la densidad de una hoja de cálculo.
 
 ## Vista de Tabla
-
-![Marcador de posición de la captura de pantalla de la Vista de Tabla](/img/features/table-view.png)
 
 La vista predeterminada es una hoja de cálculo virtualizada de alto rendimiento con:
 
@@ -68,8 +75,6 @@ Controle la altura de la fila con `defaultSize`:
 | `"xl"` | 260 | Previsualizaciones de contenido enriquecido |
 
 ## Vista Kanban
-
-![Marcador de posición de la captura de pantalla de la Vista Kanban](/img/features/kanban-view.png)
 
 Configure un tablero Kanban especificando qué propiedad de enumeración usar como columnas:
 
@@ -149,8 +154,10 @@ admin:
 import { generateKeyBetween } from "fractional-indexing";
 
 // Base36, minúsculas. Quien ordena es Postgres, cuya collation por defecto no es
-// el orden de bytes: omitir este tercer argumento produce claves base62 como
-// "a0" que el tablero rechaza.
+// el orden de bytes, así que el alfabeto base62 por defecto de la biblioteca —que
+// mezcla mayúsculas y minúsculas— se ordena distinto en la base de datos que en la
+// clave. Omitir este tercer argumento produce claves como "a0" que el tablero
+// rechaza.
 const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 const tasks = client.data.collection("tasks");
@@ -167,13 +174,20 @@ const { data: last } = await tasks.find({
 await tasks.create({
     title,
     status,
-    __order: generateKeyBetween(last[0]?.__order ?? null, null, ORDER_KEY_DIGITS)
+    __order: generateKeyBetween(
+        (last[0]?.__order as string | undefined) ?? null,
+        null,
+        ORDER_KEY_DIGITS
+    )
 });
 ```
 
-## Vista de Tarjetas
+Las filas creadas desde el formulario del admin también llegan sin clave — la
+única diferencia es que ves la barra en el momento en que añades una.
+**Initialize** es el arreglo ahí; en un tablero alimentado por un backend es un
+arreglo que se deshace a sí mismo en cada ejecución.
 
-![Marcador de posición de la captura de pantalla de la Vista de Tarjetas](/img/features/cards-view.png)
+## Vista de Tarjetas
 
 Las tarjetas muestran las entidades como tarjetas visuales — útiles para contenido con muchas imágenes:
 

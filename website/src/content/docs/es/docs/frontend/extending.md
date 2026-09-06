@@ -1,4 +1,5 @@
 ---
+sourceHash: 5de2aebf9af99221
 title: Extender Rebase
 sidebar_label: Extender Rebase
 description: Una guía de decisión para elegir el mecanismo de extensión adecuado — plugins, slots, sustituciones de componentes, vistas de entidad, acciones y más.

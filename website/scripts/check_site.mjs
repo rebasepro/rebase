@@ -17,34 +17,83 @@ if (!existsSync(DIST)) {
     process.exit(2);
 }
 
-/** Every generated page, as a route string -> file path. */
+/**
+ * Every generated page, as a route string -> file path, and every emitted file
+ * as its `dist`-relative path.
+ *
+ * The file set is what makes the link check honest. `existsSync(join(DIST, r))`
+ * — what this used to ask — says `true` for a *directory*, so `/docs/deployment`
+ * "resolved" for the eleven months it had sub-pages and no `index.html`, and
+ * `0 failures` was printed over a 404 that was live on the home page. It is
+ * also case-insensitive on macOS, so `/docs/ui/components/Card` passed here and
+ * 404ed on the Linux host that serves the site.
+ */
 const pages = new Map();
+const files = new Set();
 (function walk(dir) {
     for (const e of readdirSync(dir)) {
         const p = join(dir, e);
         if (statSync(p).isDirectory()) walk(p);
-        else if (e === "index.html") {
-            const route = "/" + relative(DIST, dir).split("\\").join("/");
-            pages.set(route === "/." ? "/" : route, p);
+        else {
+            files.add(relative(DIST, p).split("\\").join("/"));
+            if (e === "index.html") {
+                const route = "/" + relative(DIST, dir).split("\\").join("/");
+                pages.set(route === "/." ? "/" : route, p);
+            }
         }
     }
 })(DIST);
 
 /* Marketing pages only. `/docs/**` is generated from the packages' AST and is
    gated by `pnpm verify:docs`; component reference pages legitimately share a
-   title across locales because a component name is a proper noun. */
+   title across locales because a component name is a proper noun.
+
+   The link check is the exception: it runs over `linkPages` — every page in
+   `dist` — because the site chrome a docs page renders (the logo, the language
+   picker, the footer) is hand-written, is on 1100 pages nobody was reading, and
+   is exactly where the dead `/it` and `/pt` logo links lived. */
 const IGNORED = /^\/(?:[a-z]{2}\/)?(?:docs|pagefind|_astro|dev|404)(?:\/|$)/;
+const linkPages = new Map(pages);
 for (const r of [...pages.keys()]) if (IGNORED.test(r)) pages.delete(r);
 
 const failures = [];
 const fail = (route, check, detail) => failures.push({ route, check, detail });
 
-/** Routes that resolve: every index.html, plus any real file in dist. */
-const routeExists = (r) => {
-    if (pages.has(r) || pages.has(r.replace(/\/$/, ""))) return true;
-    const asFile = join(DIST, r.replace(/^\//, ""));
-    return existsSync(asFile);
+/**
+ * Routes that resolve: a page with an `index.html`, or a real *file* emitted at
+ * that exact path. Both tests are exact-match against what the build wrote, so
+ * a directory with no index and a link whose casing differs from the emitted
+ * one both read as broken — which is what the host does with them.
+ */
+const resolves = (r, pageRoutes, fileSet) => {
+    const route = r.replace(/\/$/, "") || "/";
+    if (pageRoutes.has(route)) return true;
+    return fileSet.has(route.replace(/^\//, ""));
 };
+const routeExists = (r) => resolves(r, linkPages, files);
+
+/* Self-test. Each case is a defect this gate has shipped: a link to a directory
+   with no `index.html`, and a link whose casing differs from the emitted path.
+   It runs on every invocation because a link checker that has quietly stopped
+   checking looks exactly like a site with no broken links. */
+{
+    const p = new Map([["/docs/ui/components/card", "x"]]);
+    const f = new Set(["docs/ui/components/card/index.html", "llms.txt"]);
+    const cases = [
+        ["/docs/deployment", false, "a directory with no index.html is not a route"],
+        ["/docs/ui/components/Card", false, "route casing must match the emitted path"],
+        ["/docs/ui/components/card", true, "a real page resolves"],
+        ["/docs/ui/components/card/", true, "a trailing slash resolves"],
+        ["/llms.txt", true, "an emitted file resolves"],
+        ["/LLMS.txt", false, "file casing must match too"],
+    ];
+    for (const [route, want, why] of cases) {
+        if (resolves(route, p, f) !== want) {
+            console.error(`check_site self-test failed: ${route} — ${why}`);
+            process.exit(2);
+        }
+    }
+}
 
 /* SITE-STORY §2, the naming sheet. Only phrases that can ONLY be naming Rebase's
    own product: a competitor keeps its own name, and the tree legitimately says
@@ -55,17 +104,22 @@ const BANNED = [
     /\bthe Rebase Studio\b/, /\badmin console\b/i, /\badmin scaffolding\b/i,
 ];
 
-for (const [route, file] of [...pages].sort()) {
+// 1. Internal links resolve, on every page in `dist`. The cookie banner
+//    shipped 114 404s this way: a localised prefix on a route that exists only
+//    at the root. The docs logo shipped 378 more, pointing at `/it` and `/pt`.
+for (const [route, file] of [...linkPages].sort()) {
     const html = readFileSync(file, "utf8");
     const body = html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "");
-
-    // 1. Internal links resolve. The cookie banner shipped 114 404s this way:
-    //    a localised prefix on a route that exists only at the root.
     for (const m of body.matchAll(/href="(\/[^"#?]*)/g)) {
         const href = m[1].replace(/\/$/, "") || "/";
         if (href.startsWith("/_astro") || href.startsWith("/pagefind")) continue;
         if (!routeExists(href)) fail(route, "broken-link", href);
     }
+}
+
+for (const [route, file] of [...pages].sort()) {
+    const html = readFileSync(file, "utf8");
+    const body = html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "");
 
     // 2. Exactly one <h1>. Two policy pages rendered their title in a <div>.
     const h1s = body.match(/<h1[\s>]/g) ?? [];
@@ -91,18 +145,93 @@ for (const [route, file] of [...pages].sort()) {
 }
 
 /* 6. The locale fan-out: a string that is identical in every locale is a
-      string that was never translated. Only checked on <title>, which every
-      page sets deliberately. */
+      string that was never translated. Checked on the two strings every page
+      sets deliberately and a search result shows: <title>, and the meta
+      description — `/compare` hardcoded its description as an English literal
+      while taking its title from the i18n file next to it, and shipped the
+      same English sentence to German, Spanish and French readers.
+
+      The three-word carve-out is the same on both: a short string is often a
+      proper noun that is the same in every language. */
+const META = [
+    ["untranslated-title", /<title>([\s\S]*?)<\/title>/],
+    ["untranslated-description", /<meta\s+name="description"\s+content="([^"]*)"/]
+];
 for (const [route, file] of pages) {
     if (!/^\/(es|de|fr)\//.test(route)) continue;
     // Pages kept out of the index are not localisation surfaces (`/pitch`).
     if (/noindex/i.test(readFileSync(file, "utf8"))) continue;
     const en = pages.get(route.replace(/^\/(es|de|fr)/, "") || "/");
     if (!en) continue;
-    const t = (f) => readFileSync(f, "utf8").match(/<title>([\s\S]*?)<\/title>/)?.[1]?.trim();
-    const got = t(file);
-    if (got && got === t(en) && got.replace("— Rebase", "").trim().split(/\s+/).length > 2)
-        fail(route, "untranslated-title", got);
+    for (const [check, re] of META) {
+        const read = (f) => readFileSync(f, "utf8").match(re)?.[1]?.trim();
+        const got = read(file);
+        if (got && got === read(en) && got.replace("— Rebase", "").trim().split(/\s+/).length > 2)
+            fail(route, check, got);
+    }
+}
+
+/* 7. Every English marketing route has a `.md` mirror.
+      `[page].md.ts` derives its slug list from the routes, so this is the
+      assertion that the derivation still sees them all — the hand-kept list it
+      replaced was sixteen slugs against thirty-one routes, and `/pricing`,
+      `/rls-check` and all eight comparison pages had no mirror at all. */
+{
+    const routeDir = new URL("../src/pages/[...lang]/", import.meta.url);
+    const wanted = readdirSync(routeDir)
+        .filter((f) => f.endsWith(".astro"))
+        .map((f) => f.replace(/\.astro$/, ""));
+    for (const slug of wanted) {
+        if (!files.has(`${slug}.md`))
+            fail(`/${slug}`, "missing-md-mirror", `${slug}.md is not in dist/`);
+    }
+    // `public/` is copied verbatim into `dist`, so a `.md` that came from there
+    // (`sitemap.md`) is an asset, not a route mirror.
+    const assets = new Set(
+        readdirSync(new URL("../public/", import.meta.url)).filter((f) => f.endsWith(".md"))
+    );
+    for (const f of files) {
+        const m = /^([a-z0-9-]+)\.md$/.exec(f);
+        if (m && m[1] !== "index" && !assets.has(f) && !wanted.includes(m[1]))
+            fail(`/${m[1]}`, "orphan-md-mirror", `${f} mirrors no route`);
+    }
+}
+
+/* 8. Every localised marketing route declares its translations in the HTML,
+      and no `noindex` page is in the sitemap.
+
+      The docs emit six `<link rel="alternate">` per page and the marketing
+      pages emitted none, so the signal existed only in `sitemap-0.xml` — the
+      weaker of the two places — and the two halves of the site disagreed about
+      the convention. `/pitch` had the opposite problem: `noindex, nofollow` in
+      the page and four rows in the sitemap. */
+{
+    const marketingLocales = ["en", "es", "de", "fr"];
+    const sitemapFiles = [...files].filter((f) => /^sitemap-\d+\.xml$/.test(f));
+    const sitemap = sitemapFiles
+        .map((f) => readFileSync(join(DIST, f), "utf8"))
+        .join("");
+
+    for (const [route, file] of pages) {
+        const html = readFileSync(file, "utf8");
+        const noindex = /content="noindex/i.test(html);
+        const inSitemap = sitemap.includes(`<loc>https://rebase.pro${route === "/" ? "/" : route + "/"}</loc>`);
+
+        if (noindex && inSitemap) fail(route, "noindex-in-sitemap", route);
+        if (noindex) continue;
+
+        // `/blog/**` and `/policy/**` are English-only routes: they have no
+        // translation, and an alternate at `/de/blog/…` would be a 404 in an
+        // index. A route is localised iff its Spanish twin was built.
+        const english = route.replace(/^\/(es|de|fr)(?=\/|$)/, "") || "/";
+        if (!pages.has(english === "/" ? "/es" : `/es${english}`)) continue;
+
+        const alternates = new Set(
+            [...html.matchAll(/rel="alternate"\s+hreflang="([^"]+)"/g)].map((m) => m[1])
+        );
+        const missing = [...marketingLocales, "x-default"].filter((l) => !alternates.has(l));
+        if (missing.length) fail(route, "missing-hreflang", missing.join(", "));
+    }
 }
 
 const byCheck = {};
@@ -120,5 +249,8 @@ for (const [check, list] of Object.entries(byCheck)) {
     }
 }
 
-console.log(`\n${failures.length} failures across ${pages.size} pages.`);
+console.log(
+    `\n${failures.length} failures across ${pages.size} marketing pages ` +
+        `(links checked on all ${linkPages.size}).`
+);
 process.exit(failures.length ? 1 : 0);

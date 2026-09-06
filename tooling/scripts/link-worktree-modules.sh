@@ -2,8 +2,10 @@
 # Wire a worktree's node_modules to the primary checkout's install, WITHOUT
 # letting workspace packages resolve back into the primary.
 #
-# `pnpm install` must never run in a worktree (it prunes importers the worktree
-# cannot see — see docs), so a worktree borrows the primary's node_modules. The
+# `pnpm install` must never run in a worktree — it prunes importers the worktree
+# cannot see, rewriting the PRIMARY checkout's node_modules and leaving both
+# half-linked, with no warning. See "Working in a git worktree" in
+# CONTRIBUTING.md. So a worktree borrows the primary's node_modules. The
 # naive way, one symlink per importer, silently defeats the whole exercise: the
 # `@rebasepro/*` entries pnpm wrote are *relative* links, so resolving them
 # through a symlinked node_modules lands in the PRIMARY's packages/ and the

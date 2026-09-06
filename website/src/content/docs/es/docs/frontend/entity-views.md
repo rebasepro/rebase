@@ -1,4 +1,5 @@
 ---
+sourceHash: af85efb5a9d69006
 title: Vistas de Entidad
 sidebar_label: Vistas de Entidad
 description: Añada pestañas y vistas personalizadas a las páginas de detalles de la entidad para previsualizaciones, análisis, datos relacionados o UI personalizada.

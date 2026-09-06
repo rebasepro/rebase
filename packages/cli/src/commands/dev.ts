@@ -18,7 +18,13 @@ import chalk from "chalk";
 import { DEFAULT_RESOURCE_KEY } from "@rebasepro/types";
 import { execa, execaCommandSync, type ResultPromise } from "execa";
 
-import { managedNotices, prepareDatabaseEnv, resolveComposeUrl } from "../dev-db/prepare";
+import {
+    DEV_DATABASE_KIND_ENV,
+    managedNotices,
+    prepareDatabaseEnv,
+    resolveComposeUrl,
+    type PreparedDatabase
+} from "../dev-db/prepare";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -38,31 +44,83 @@ import {
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { affectsSqlSchema } from "../utils/collection-drift";
-import { ensureDevDatabase } from "../utils/dev-preflight";
+import { ensureDevDatabase, probeTcp } from "../utils/dev-preflight";
 import { runDriverDbCommand, runDriverSchemaCommand } from "./db";
 import dotenv from "dotenv";
 import { recordEvent } from "../telemetry";
 
 /**
- * The line the watcher prints when the entry it ran threw.
+ * The line the watcher prints when it is about to run the entry again.
  *
  * `rebase dev` has no exit code to read: the watcher outlives the process it
- * started, so a backend that dies on boot leaves it running and the CLI
- * printing "Press Ctrl+C to stop all servers." under the stack trace, as if
- * everything were fine. This string is the fastest signal that it is not.
+ * started, so a backend that dies leaves it running and the CLI printing
+ * "Press Ctrl+C to stop all servers." under the stack trace, as if everything
+ * were fine.
  *
- * It is Node's, not tsx's — `--watch="…"` in `watchArgs` is passed straight
- * through to Node, so Node's own watcher does the restarting and writes
- * "Failed running 'src/index.ts'. Waiting for file changes before
- * restarting...". Which means it appears on the default `rebase dev` path and
- * NOT under `--generate`, where tsx watches by itself and says nothing. The
- * readiness deadline below is what covers that half.
+ * What used to be here was `/Waiting for file changes before restarting/` —
+ * **Node's** message, on the theory that `--watch=…` was passed through to
+ * Node. It is not: the backend is spawned as `tsx watch …` (see `watchArgs`),
+ * so tsx does the watching and Node's line is never printed. The marker
+ * matched nothing at all — and the test guarding it ran `node --watch`
+ * directly, so it kept proving that Node's wording was intact while the CLI
+ * watched a stream that never contained it. That is precisely the silent death
+ * the old comment warned about, reached by a different route.
  *
- * Exported so `dev-crash-marker.test.ts` can hold the running Node to it. A
- * match on another tool's wording is exactly the check that dies silently on an
- * upgrade: nothing throws, and `rebase dev` quietly goes back to saying nothing.
+ * So this is tsx's, captured from tsx 4.23.1:
+ *
+ *     6:26:11 AM [tsx] change in ./src/index.ts Rerunning...
+ *     6:26:11 AM [tsx] change in ./src/index.ts Restarting...
+ *
+ * "Rerunning" when the previous run had already exited, "Restarting" when it
+ * was still up and had to be killed first. Both mean the same thing here: the
+ * backend that was announced is gone, and whether another one arrives is an
+ * open question again — so the readiness deadline is re-armed.
+ *
+ * Exported so `dev-crash-marker.test.ts` can hold the running tsx to it.
  */
-export const WATCHER_CRASH_MARKER = /Waiting for file changes before restarting/i;
+export const WATCHER_RESTART_MARKER = /\[tsx\][^\n]*\b(?:Rerunning|Restarting)\b/i;
+
+/**
+ * How often to ask whether the announced backend is still listening.
+ *
+ * The watcher says nothing when its child is killed outright, so a poll is the
+ * only signal there is. Five seconds is chosen against the thing it must not
+ * do — report a healthy server as dead — rather than against detection speed:
+ * two consecutive misses are needed, so it takes ten seconds of a genuinely
+ * closed port to say anything.
+ */
+const LIVENESS_INTERVAL_MS = 5_000;
+
+/**
+ * Strip ANSI codes before matching.
+ *
+ * At module scope so `portMovedNotice` below can use the same one the stream
+ * handlers do: a second copy of this regex is a second thing to keep in step.
+ */
+// eslint-disable-next-line no-control-regex
+const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
+
+/**
+ * The corrected banner line, when the backend says it moved port.
+ *
+ * `↳ PORT = 3014` is printed before the server binds — the backend's
+ * environment has to be fixed before it spawns — so when the port turns out to
+ * be taken and the server moves, the banner two inches up is simply wrong. The
+ * true number then appears in a `[backend]` line a hundred lines of DDL later,
+ * which nobody scrolls back through, and the banner is where a reader looks for
+ * the port.
+ *
+ * A correction rather than a rewrite: the terminal is a transcript, and a line
+ * that changes after the fact is a line nobody can trust. So the old number is
+ * named too.
+ *
+ * Exported for its test.
+ */
+export function portMovedNotice(line: string): { from: string; to: string } | null {
+    const moved = stripAnsi(line).match(/Port (\d+) is in use — trying (\d+)/);
+
+    return moved ? { from: moved[1], to: moved[2] } : null;
+}
 
 /**
  * Quote a path for the shell `execa` runs the backend through.
@@ -224,12 +282,25 @@ export function getProjectPort(projectRoot: string): number {
 }
 
 /**
- * Resolve the best starting port for this project:
- * 1. Explicit --port flag (highest priority)
- * 2. PORT env var
- * 3. Previously used port from .rebase-dev-port (port affinity across restarts)
- * 4. Deterministic hash from project path (unique per project)
+ * Which rung of the ladder below decided the port.
+ *
+ * Reported because the ladder is invisible from the outside and the two middle
+ * rungs look identical from where the developer stands: `PORT` in the shell
+ * wins, `PORT` in `.env` does not — `rebase dev` never reads the file for it —
+ * and a saved affinity port looks exactly like a derived one. A developer who
+ * sets `PORT=3001` in `.env`, sees 3774, and has nothing to read but the number
+ * concludes the setting is broken rather than out of scope.
  */
+export type StartPortSource = "--port" | "PORT" | "affinity" | "derived";
+
+/** What the banner says after the port, naming the rung. */
+export const START_PORT_SOURCE_LABELS: Record<StartPortSource, string> = {
+    "--port": "from --port",
+    PORT: "from PORT",
+    affinity: "kept from the last run",
+    derived: "derived"
+};
+
 /**
  * A TCP port, or `undefined` for anything that is not one.
  *
@@ -246,14 +317,27 @@ function parsePort(raw: string | undefined): number | undefined {
     return port;
 }
 
-export function resolveStartPort(projectRoot: string, explicitPort?: number): number {
+/**
+ * The port this project's backend starts on, and the rung that decided it:
+ * 1. `--port` (highest priority)
+ * 2. `PORT` **in the shell environment** — a `PORT` in `.env` is not read here
+ * 3. the port a previous run saved in `.rebase-dev-port` (affinity)
+ * 4. a port derived from the project path, unique per project
+ */
+export function resolveStartPort(
+    projectRoot: string,
+    explicitPort?: number
+): { port: number; source: StartPortSource } {
     // 1. Explicit flag
-    if (explicitPort) return explicitPort;
+    if (explicitPort) return { port: explicitPort, source: "--port" };
 
-    // 2. PORT env var
+    // 2. PORT env var. `process.env` only: the CLI does not load `.env` before
+    // resolving the port, so a `PORT=` line in that file never reaches here —
+    // it is handed to the child, which this then overrides. Both facts are in
+    // `getting-started/configuration.md` and in `rebase dev --help`.
     if (process.env.PORT) {
         const fromEnv = parsePort(process.env.PORT);
-        if (fromEnv !== undefined) return fromEnv;
+        if (fromEnv !== undefined) return { port: fromEnv, source: "PORT" };
         // Set deliberately and unusable: falling through silently would start a
         // server on a port nobody asked for and say nothing about why.
         console.warn(chalk.yellow(
@@ -266,12 +350,106 @@ export function resolveStartPort(projectRoot: string, explicitPort?: number): nu
         const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
         if (fs.existsSync(portFile)) {
             const saved = parsePort(fs.readFileSync(portFile, "utf-8"));
-            if (saved !== undefined) return saved;
+            if (saved !== undefined) return { port: saved, source: "affinity" };
         }
     } catch { /* ignore */ }
 
     // 4. Deterministic hash
-    return getProjectPort(projectRoot);
+    return { port: getProjectPort(projectRoot), source: "derived" };
+}
+
+/**
+ * Where a connection string actually points, as `host:port/name`.
+ *
+ * The banner used to name the database only by *provenance* — "your database
+ * (DATABASE_URL in the environment)" — and the boot that follows it writes
+ * thirty DDL statements. Which host, which port, which database name appeared
+ * nowhere on the success path; only a *failed* connection printed an address.
+ * So the one question after pointing a project at staging by accident — did it
+ * touch staging? — had no answer in a hundred and twenty lines of output.
+ *
+ * The password is never in it. `new URL` keeps the credentials in their own
+ * fields, so building the string out of `hostname`, `port` and `pathname`
+ * cannot carry them by accident, which string surgery on a DSN reliably does.
+ *
+ * A DSN with no host is a UNIX socket (`postgresql:///app?host=/tmp`), and the
+ * socket directory is the address there.
+ *
+ * Returns null for anything that is not a parseable URL rather than guessing:
+ * a banner line that is wrong about the database is worse than one that is
+ * missing.
+ *
+ * Exported for its test.
+ */
+export function databaseEndpoint(url: string | null | undefined): string | null {
+    if (!url) return null;
+
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return null;
+    }
+
+    const host = parsed.hostname || parsed.searchParams.get("host");
+    if (!host) return null;
+
+    const name = parsed.pathname.replace(/^\//, "");
+
+    return `${host}${parsed.port ? `:${parsed.port}` : ""}${name ? `/${name}` : ""}`;
+}
+
+/**
+ * The `↳ Database =` line: which database, why it was chosen, and where it is.
+ *
+ * Provenance alone was what this line said, and the boot underneath it applies
+ * schema. "your database (DATABASE_URL in the environment)" and "Applied 30
+ * additive schema change(s) before boot" together still do not answer the
+ * question somebody asks after pointing a project at staging by accident.
+ *
+ * The managed database gets its address too — the daemon's port is what a
+ * `psql` in another terminal needs, and it is nowhere else in the banner.
+ *
+ * Exported for its test.
+ */
+export function databaseBannerValue(prepared: PreparedDatabase | null): string {
+    if (!prepared) return "none (--no-db) — the backend needs DATABASE_URL";
+
+    const endpoint = databaseEndpoint(
+        prepared.database.kind === "managed" ? prepared.env.DATABASE_URL : prepared.database.url
+    );
+
+    return endpoint ? `${prepared.description} · ${endpoint}` : prepared.description;
+}
+
+/**
+ * Refuse a port the developer named and something else already answers on.
+ *
+ * `--port` used to be advice, not an instruction: `resolveStartPort` returned
+ * the number, the banner printed it, and the server then walked past the
+ * collision to 3141, 3142. Because dev ports are derived per project, the
+ * number typed into `--port` is very often *another Rebase backend*, so the
+ * curl that followed answered 200 from the wrong project rather than refusing
+ * — the one failure mode a port collision is supposed to rule out.
+ *
+ * Asked here as well as in the server (`listenWithPortRetry`'s `explicit`
+ * option, which `REBASE_DEV_PORT_EXPLICIT` below turns on) so the refusal
+ * arrives before a database is started and a schema is pushed, rather than a
+ * minute later underneath them.
+ *
+ * Both loopback addresses, because a listener on `::1` alone is the same
+ * collision and costs one more connect to rule out. Returns the sentence to
+ * print, or `null` when there is nothing to refuse.
+ *
+ * Exported for its test.
+ */
+export async function pinnedPortRefusal(port: number, pinned: boolean): Promise<string | null> {
+    if (!pinned) return null;
+    const taken = await Promise.all([probeTcp("127.0.0.1", port), probeTcp("::1", port)]);
+    if (!taken.some(Boolean)) return null;
+    return `Port ${port} is in use, and you asked for it with --port. ` +
+        `Stop whatever is listening on ${port}, or pass a different port. ` +
+        "(Without --port, dev derives a port for this project and walks past a collision.)";
 }
 
 /**
@@ -437,6 +615,26 @@ export function readEnvValue(envText: string, key: string): string | undefined {
 }
 
 /**
+ * The argv the first-boot schema push runs with.
+ *
+ * The database is named on the command line rather than left to be re-resolved.
+ * `runDriverDbCommand` runs the resolver again for whatever argv it is handed,
+ * and the argv it used to be handed (`["node","rebase","db","push"]`) carried
+ * nothing at all — so on the `--docker` path it read a `.env` whose
+ * `DATABASE_URL` is commented out, concluded "managed PGlite", and refused the
+ * push for a database that was not the one the preflight had just started.
+ *
+ * Exported for its test: the missing pair of arguments is the whole defect, and
+ * it is invisible in any assertion about the push's *outcome*.
+ */
+export function schemaPushArgv(databaseUrl: string | undefined): string[] {
+    const argv = ["node", "rebase", "db", "push"];
+    if (databaseUrl) argv.push("--database-url", databaseUrl);
+
+    return argv;
+}
+
+/**
  * The database half of `rebase dev` starting up.
  *
  * Separated from `ensureDevDatabase` so that everything needing a project on
@@ -457,18 +655,26 @@ async function runDatabasePreflight(options: {
 
     const hasCollections = projectHasCollections(projectRoot);
 
+    // The one DSN this preflight is about. `ensureDevDatabase` decides from it,
+    // and the push has to run against the same one — re-resolving inside the
+    // push saw a `.env` with DATABASE_URL commented out, chose the managed
+    // PGlite, and refused, on the first `rebase dev --docker` of every scaffold.
+    const databaseUrl = options.databaseUrl ?? readEnvVar(projectRoot, "DATABASE_URL");
+
     const outcome = await ensureDevDatabase({
         projectRoot,
-        databaseUrl: options.databaseUrl ?? readEnvVar(projectRoot, "DATABASE_URL"),
+        databaseUrl,
         disabled,
         hasCollections,
         pushSchema: async () => {
             // The same driver entry point `rebase db push` uses, called with the
             // argv layout every command in this CLI receives — the full process
-            // argument vector, which the callee slices. The throwing variant:
-            // a failed push must not take the dev server down with it.
+            // argument vector, which the callee slices. `--database-url` names
+            // the database the preflight just started, so the push cannot
+            // resolve its way to a different one. The throwing variant: a failed
+            // push must not take the dev server down with it.
             // Quiet: the database was resolved and announced in the banner above.
-            await runDriverDbCommand(["node", "rebase", "db", "push"], { quiet: true });
+            await runDriverDbCommand(schemaPushArgv(databaseUrl), { quiet: true });
         }
     });
 
@@ -515,7 +721,13 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     // Resolve the ports ONCE, before starting anything. Both, because the
     // backend is told where the frontend will be and cannot be told later: its
     // environment is fixed when it spawns.
-    const startPort = resolveStartPort(projectRoot, args["--port"]);
+    const { port: startPort, source: startPortSource } = resolveStartPort(projectRoot, args["--port"]);
+    // Named, not derived — see `pinnedPortRefusal`. Only the flag counts: the
+    // .env's `PORT` is deliberately overridden by this command, and the shell's
+    // is what a test harness sets when it wants a port that may still move.
+    // `startPortSource === "--port"` says the same thing; kept as its own read
+    // because this one is about the *flag*, not about which rung answered.
+    const portIsPinned = args["--port"] !== undefined;
     const pinnedFrontendPort = process.env.REBASE_FRONTEND_PORT;
     if (pinnedFrontendPort && !/^\d+$/.test(pinnedFrontendPort)) {
         throw new Error(`REBASE_FRONTEND_PORT must be a number, got ${JSON.stringify(pinnedFrontendPort)}.`);
@@ -523,6 +735,17 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     const frontendPort = pinnedFrontendPort
         ? Number(pinnedFrontendPort)
         : getProjectFrontendPort(projectRoot);
+
+    // Before the banner, and before anything is started: a pinned port that is
+    // already answering is a refusal, not a warning, and the developer should
+    // get it in the first second rather than after a database and a schema push.
+    if (!frontendOnly) {
+        const refusal = await pinnedPortRefusal(startPort, portIsPinned);
+        if (refusal) {
+            console.error(chalk.red(`  ✗ ${refusal}`));
+            process.exit(1);
+        }
+    }
 
     console.log("");
     console.log(chalk.bold("  🚀 Rebase Dev Server"));
@@ -579,10 +802,6 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     /** Actual backend port, resolved once the server prints its URL. */
     let resolvedBackendPort: number | null = null;
 
-    // Use regex to strip ANSI codes before matching
-    // eslint-disable-next-line no-control-regex
-    const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
-
     /**
      * The connection string of the database this run started, when it started
      * one. Filled in below; read by the headless banner, which is the only
@@ -623,8 +842,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     // every SDK client, curl and Swagger link needs — and it is
                     // not derivable from the other, since the two ports are
                     // derived separately from this project's path.
-                    ["➜ API:   ", api],
-                    ["", ""]
+                    ["➜ API:   ", api]
                 ]
                 : [["", ""], ["✦ Rebase API is ready!", ""], ["➜ API:      ", api]];
 
@@ -647,8 +865,21 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     lines.push(["  ", managedConnectionString]);
                     lines.push(["  ", "also: rebase db url"]);
                 }
-                lines.push(["", ""]);
             }
+
+            // Both halves of the first-admin rule, in the box the reader is
+            // looking at when they go to sign in.
+            //
+            // `rebase init` writes REBASE_ADMIN_EMAIL and a generated password
+            // into `.env` — for the compose stack, which runs in production,
+            // where the first-registration window is shut. Nothing said so, and
+            // `rebase dev` reads the same file, so the honest reading of that
+            // `.env` was "these are my credentials" and the documented first
+            // step — register, become the admin — looked broken.
+            lines.push(["", ""]);
+            lines.push(["First login: ", "the first account to register becomes admin"]);
+            lines.push(["  ", "(a production boot seeds REBASE_ADMIN_EMAIL from .env instead)"]);
+            lines.push(["", ""]);
 
             // Sized to its contents. A fixed width silently pushed the right
             // border off the moment a value was longer than the cell, and a
@@ -707,7 +938,11 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 }
             }
         });
-        process.exit(0);
+        // Not a hard-coded 0. Ctrl+C is how `rebase dev` normally ends, so
+        // exiting 0 unconditionally threw away the one thing `--backend-only`
+        // has to report: whether the backend it was asked to run is up. A
+        // healthy run still exits 0 — nothing sets the code in that case.
+        process.exit(typeof process.exitCode === "number" ? process.exitCode : 0);
     };
     process.on("SIGINT", cleanup);
     process.on("SIGTERM", cleanup);
@@ -845,11 +1080,22 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
          */
         const managed = prepared?.database.kind === "managed";
         if (managed) managedConnectionString = prepared?.env.DATABASE_URL ?? null;
+        // …and the backend needs the same answer, for the same reason. Its
+        // schema-drift remedy said `pnpm db:push` whatever database it was
+        // serving, and on the managed one that command is refused. `db`,
+        // `schema` and `doctor` already pass this to their driver children;
+        // the backend is the one that had to guess.
+        if (prepared) env[DEV_DATABASE_KIND_ENV] = prepared.database.kind;
 
         // Always inject PORT so the backend uses our resolved port instead of
         // its hardcoded default (3001). This prevents cross-project collisions
         // when multiple Rebase instances run simultaneously.
         env.PORT = String(startPort);
+        // …and whether that number was typed or derived, which decides whether
+        // the server may walk past a collision. Always stated, never merely
+        // set: `env` starts as a copy of this process's, so leaving the key
+        // alone would let an inherited value pin a port nobody asked for.
+        env.REBASE_DEV_PORT_EXPLICIT = String(portIsPinned);
 
         // And where the frontend will be, for the same reason. `FRONTEND_URL`
         // is the base of every emailed link and one of the two things CORS is
@@ -862,10 +1108,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         }
 
         console.log(`  ${chalk.cyan("▶")} Backend:  ${chalk.gray(backendDir)}`);
-        console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(String(startPort))}`);
-        console.log(`  ${chalk.gray("↳ Database")} = ${chalk.white(
-            prepared ? prepared.description : "none (--no-db) — the backend needs DATABASE_URL"
-        )}`);
+        console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(String(startPort))} ${chalk.gray(`(${START_PORT_SOURCE_LABELS[startPortSource]})`)}`);
+        console.log(`  ${chalk.gray("↳ Database")} = ${chalk.white(databaseBannerValue(prepared))}`);
         // Stated on every start rather than left to be discovered. A developer
         // who does not know requests are serialized here will read the
         // difference as a bug in their own code.
@@ -1121,24 +1365,6 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
          */
         let backendAnnounced = false;
 
-        /**
-         * The watcher's verdict on a run that threw.
-         *
-         * The exact moment the backend stops being a thing that is starting and
-         * becomes a thing that failed — and it arrives as one `[backend]` line
-         * between a stack trace and the "Press Ctrl+C to stop all servers"
-         * footer, which is why a developer reads the footer and believes it.
-         *
-         * Checked on both streams: which pipe it lands on is Node's business,
-         * and a marker watched on the wrong one is a check that silently never
-         * fires.
-         */
-        const noticeWatcherVerdict = (line: string): void => {
-            if (!WATCHER_CRASH_MARKER.test(stripAnsi(line))) return;
-            // Deferred a tick so the marker prints above the verdict, not under it.
-            setTimeout(() => reportBackendDown("The backend crashed on startup."), 0);
-        };
-
         /** The verdict, printed once per failure rather than once per line. */
         let backendDownReported = false;
         const reportBackendDown = (headline: string) => {
@@ -1148,27 +1374,106 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             console.error(chalk.red(`  ✗ ${headline}`));
             console.error(chalk.gray("    Fix the error above; the watcher restarts it on the next change."));
             console.log("");
+            // With a frontend still running there is a server to keep serving,
+            // so the run continues and only the message is owed. `--backend-only`
+            // has nothing left to do, and a zero exit there tells a script the
+            // backend ran fine. Cleared again by the next "Server running at".
+            if (backendOnly) process.exitCode = 1;
         };
 
         /**
-         * Say so when the backend never came up.
+         * Say so when the backend is not up.
          *
-         * A deadline rather than an exit code, because there is often no exit to
-         * watch: the watcher survives its child and waits for a file change, so
-         * a crash is visible only as an absence. The marker above usually gets
-         * there first — but only on the default path, since `--generate` leaves
-         * tsx to watch on its own and tsx says nothing. This is the half that
-         * covers that, and a boot that hangs instead of throwing. Generous on
-         * purpose, and it neither kills anything nor changes what the watcher does.
+         * A deadline rather than an exit code, because there is usually no exit
+         * to watch: the watcher survives its child and waits for a file change,
+         * so a crash is visible only as an absence.
+         *
+         * Armed once at spawn and **re-armed on every restart**, which is the
+         * half that was missing. The old timer fired once, thirty seconds after
+         * start-up, and its body began `if (backendAnnounced) return` — so a
+         * backend that came up and then died on the next save was covered by
+         * nothing at all. Breaking `config/resources.ts` under a running
+         * `rebase dev` printed a stack trace, took `/health` to nothing, and
+         * left the CLI saying "Press Ctrl+C to stop all servers."
          */
         const readyTimeoutMs = Number(env.REBASE_DEV_READY_TIMEOUT_MS ?? process.env.REBASE_DEV_READY_TIMEOUT_MS ?? 30_000);
-        const readyDeadline = readyTimeoutMs > 0
-            ? setTimeout(() => {
+        let readyDeadline: NodeJS.Timeout | undefined;
+        const disarmReadyDeadline = () => {
+            if (readyDeadline) clearTimeout(readyDeadline);
+            readyDeadline = undefined;
+        };
+        const armReadyDeadline = (headline: string) => {
+            disarmReadyDeadline();
+            if (readyTimeoutMs <= 0) return;
+            readyDeadline = setTimeout(() => {
                 if (backendAnnounced) return;
-                reportBackendDown(`The backend has not started after ${Math.round(readyTimeoutMs / 1000)}s.`);
-            }, readyTimeoutMs)
-            : undefined;
-        readyDeadline?.unref?.();
+                reportBackendDown(headline);
+            }, readyTimeoutMs);
+            readyDeadline.unref?.();
+        };
+        const readySeconds = Math.round(readyTimeoutMs / 1000);
+        armReadyDeadline(`The backend has not started after ${readySeconds}s.`);
+
+        const noticePortMoved = (line: string): void => {
+            const moved = portMovedNotice(line);
+            if (!moved) return;
+            console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(moved.to)} ${chalk.gray(`(${moved.from} was in use)`)}`);
+        };
+
+        /**
+         * The restart line, on either stream.
+         *
+         * A restart means the announced backend is gone: it either exited on
+         * its own (tsx says "Rerunning") or is being killed (tsx says
+         * "Restarting"). Either way the question "is there a server?" is open
+         * again, so readiness is un-announced and the deadline re-armed. Without
+         * this the flag stayed true forever after the first successful boot.
+         *
+         * Checked on both streams because which pipe it lands on is tsx's
+         * business, and a marker watched on the wrong one never fires.
+         */
+        const noticeWatcherRestart = (line: string): void => {
+            if (!WATCHER_RESTART_MARKER.test(stripAnsi(line))) return;
+            backendAnnounced = false;
+            backendDownReported = false;
+            armReadyDeadline(`The backend did not come back up after ${readySeconds}s.`);
+        };
+
+        /**
+         * And notice a backend that dies without tsx saying anything.
+         *
+         * `kill -9` of the server process is the plain case: tsx stays alive,
+         * prints nothing, and waits for a file change that may never come.
+         * Measured on tsx 4.23.1 — the watcher's transcript after the kill is
+         * empty. So the only honest question left is whether anything is still
+         * listening on the port the backend announced, and this asks it.
+         *
+         * Only runs between an announcement and the next restart, so an
+         * ordinary restart (where the port is legitimately closed for a second)
+         * cannot trip it: `noticeWatcherRestart` clears `backendAnnounced`
+         * before the process is killed. Two misses rather than one, because a
+         * single refused connect under load is not yet news.
+         */
+        let missedProbes = 0;
+        const liveness = setInterval(() => {
+            if (shuttingDown || !backendAnnounced || !resolvedBackendPort) {
+                missedProbes = 0;
+                return;
+            }
+            const port = resolvedBackendPort;
+            void probeTcp("127.0.0.1", port, 1_000).then(alive => {
+                if (!backendAnnounced || resolvedBackendPort !== port) return;
+                if (alive) {
+                    missedProbes = 0;
+                    return;
+                }
+                if (++missedProbes < 2) return;
+                backendAnnounced = false;
+                missedProbes = 0;
+                reportBackendDown(`The backend stopped listening on port ${port}.`);
+            });
+        }, LIVENESS_INTERVAL_MS);
+        liveness.unref?.();
 
         /**
          * And say so when tsx itself gives up.
@@ -1180,17 +1485,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
          * exit code should say so.
          */
         backendChild.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
-            if (readyDeadline) clearTimeout(readyDeadline);
+            disarmReadyDeadline();
+            clearInterval(liveness);
+            backendAnnounced = false;
             // The watcher itself is gone, so this is terminal in a way a failed
             // run is not — worth saying even if a crash was already reported.
             backendDownReported = false;
             reportBackendDown(signal
                 ? `Backend was killed by ${signal}.`
                 : `Backend exited with code ${code ?? 1}.`);
-            // With a frontend still running there is a server to keep serving,
-            // so the run continues and only the message is owed. `--backend-only`
-            // has nothing left to do, and a zero exit there tells a script the
-            // backend ran fine.
             if (backendOnly) process.exitCode = code ?? 1;
         });
 
@@ -1198,7 +1501,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             const lines = data.toString().split("\n").filter(Boolean);
             lines.forEach((line: string) => {
                 console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
-                noticeWatcherVerdict(line);
+                noticeWatcherRestart(line);
+                noticePortMoved(line);
                 const cleanLine = stripAnsi(line);
                 const swaggerMatch = cleanLine.match(/Swagger UI available.*"path":"([^"]+)"/);
                 if (swaggerMatch) swaggerPath = swaggerMatch[1];
@@ -1207,7 +1511,11 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 if (serverMatch) {
                     backendAnnounced = true;
                     backendDownReported = false;
-                    if (readyDeadline) clearTimeout(readyDeadline);
+                    missedProbes = 0;
+                    // The backend is up, so an earlier failure is no longer the
+                    // answer this run gives.
+                    if (backendOnly) process.exitCode = 0;
+                    disarmReadyDeadline();
                     resolvedBackendPort = parseInt(serverMatch[1], 10);
                     backendUrl = "started";
                     printSummary();
@@ -1237,7 +1545,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             lines.forEach((line: string) => {
                 console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
 
-                noticeWatcherVerdict(line);
+                noticeWatcherRestart(line);
+                noticePortMoved(line);
 
                 // Detect corrupted node_modules at runtime
                 // (covers tsx and any other dependency whose pnpm store entry is broken)
@@ -1339,6 +1648,19 @@ ${chalk.green.bold("Which database")}
   is left alone entirely. Pass ${chalk.blue("--no-db")}, or set REBASE_DEV_NO_DB=1, to
   start nothing — the backend then fails on the database it cannot reach,
   which is the point.
+
+${chalk.green.bold("Which port")}
+  Ordered like the database, and the order is the promise. The first of
+  these that says something wins, and the start banner names which one did:
+
+    1. ${chalk.blue("--port <n>")}              on this command line
+    2. ${chalk.gray("PORT")}                    in the shell environment
+    3. the port the last ${chalk.gray("rebase dev")} used ${chalk.gray("(.rebase-dev-port)")}
+    4. a port derived from this project's path
+
+  ${chalk.gray("PORT")} in the project's .env is ${chalk.bold("not")} read here: this command resolves
+  its port before .env is loaded and then sets ${chalk.gray("PORT")} for the backend from
+  what it resolved. Export it in your shell, or pass ${chalk.blue("--port")}.
 
 ${chalk.green.bold("Description")}
   Starts both the backend (tsx watch + Hono) and frontend (Vite)

@@ -57,7 +57,7 @@ export const SQL_HTML = `<span class="text-primary-light">CREATE TABLE</span> <s
 export const SDK_HTML = `<span class="text-primary-light">import</span> <span class="text-white">{ createRebaseClient }</span> <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/client"</span>;
 
 <span class="text-primary-light">const</span> <span class="text-white">client</span> <span class="text-primary-light">=</span> <span class="text-blue-300">createRebaseClient</span>&lt;Database&gt;({
-  <span class="text-blue-300">baseUrl</span>: <span class="text-green-400">"http://localhost:3001"</span>
+  <span class="text-blue-300">baseUrl</span>: <span class="text-blue-300">import.meta.env.VITE_API_URL</span>
 });
 
 <span class="text-surface-500">// Fully typed queries</span>

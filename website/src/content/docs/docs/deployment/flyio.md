@@ -67,6 +67,9 @@ primary_region = "fra"
 
 `/livez` rather than `/health`: the second performs a database round-trip, so a liveness check on it restarts a healthy machine during a brief database hiccup.
 
+`DISABLE_SELF_REGISTRATION` is new <span class="since-badge" data-since="0.18">Since 0.18</span>: on 0.17.3 there is no such
+switch, and the first account to register becomes the administrator.
+
 Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched.
 
 ## 3. Set production secrets
@@ -82,7 +85,7 @@ fly secrets set \
   -a my-rebase-app
 ```
 
-The last two are how this app gets an administrator at all: in production the first account to register is not promoted, so nothing else produces the first signed-in caller. Set them before the first deploy serves traffic — see [Your first admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` shows only digests, so keep the generated password from this command; there is no way to read it back.
+The last two are new <span class="since-badge" data-since="0.18">Since 0.18</span>, and are how this app gets an administrator at all: in production the first account to register is not promoted, so nothing else produces the first signed-in caller. Set them before the first deploy serves traffic — see [Your first admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` shows only digests, so keep the generated password from this command; there is no way to read it back.
 
 ## 4. Deploy
 

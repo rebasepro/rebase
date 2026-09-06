@@ -1,4 +1,5 @@
 ---
+sourceHash: a82dd911da9d58ef
 title: Assinaturas em Tempo Real
 sidebar_label: Tempo Real
 description: Assine mudanças de dados ao vivo com o SDK Cliente da Rebase usando listeners em tempo real baseados em WebSocket.
@@ -201,7 +202,7 @@ Os canais são leves e efêmeros — existem enquanto pelo menos um cliente esti
 
 Um canal pode ser configurado para reter seus broadcasts, de modo que um cliente que se reconecta recupere o que perdeu em vez de ressincronizar do zero. É isso que torna os canais utilizáveis como transporte para edição colaborativa.
 
-A retenção é configurada **no servidor**, por padrão de canal — veja [Backend Realtime](/docs/backend/realtime#retenção-de-canais). Um cliente não pode ativá-la por conta própria, porque um canal é criado por quem o nomeia, e uma profundidade de histórico escolhida pelo cliente permitiria a qualquer visitante comprometer seu backend com armazenamento ilimitado.
+A retenção é configurada **no servidor**, por padrão de canal — veja [Backend Realtime](/pt/docs/backend/realtime#retenção-de-canais). Um cliente não pode ativá-la por conta própria, porque um canal é criado por quem o nomeia, e uma profundidade de histórico escolhida pelo cliente permitiria a qualquer visitante comprometer seu backend com armazenamento ilimitado.
 
 Em um canal com retenção, passe `{ history: true }` e o SDK faz o resto:
 

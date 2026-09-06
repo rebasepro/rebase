@@ -1,7 +1,16 @@
 import type { Check, DbPolicy, DbSnapshot, Finding, Severity } from "../types";
 import { SEVERITIES } from "../types";
 
-import { callerIdCall, finding, listAnd, policyTargetsExposedRole, qi, qrel } from "./util";
+import {
+    callerIdCall,
+    finding,
+    isRebaseManagedPolicy,
+    listAnd,
+    managedPolicyFix,
+    policyTargetsExposedRole,
+    qi,
+    qrel
+} from "./util";
 
 const ID = "policy-anonymous-tautology";
 
@@ -96,8 +105,14 @@ export const policyAnonymousTautology: Check = {
                             ? ` A policy in this shape reads as safe on review, which is why it survives: the ` +
                               `guard is present, spelled plausibly, and matches nothing.`
                             : ""),
-                    fix:
-                        `-- Scope the policy to the row's owner rather than to the existence of an id:\n` +
+                    fix: isRebaseManagedPolicy(snapshot, policy)
+                        ? managedPolicyFix(
+                            policy,
+                            "scope the rule to the row's owner (an `ownerField`) rather than to the existence " +
+                            "of an id — `access: \"authenticated\"` compiled to exactly this shape before 1.0, " +
+                            "so a database pushed then still carries it"
+                        )
+                        : `-- Scope the policy to the row's owner rather than to the existence of an id:\n` +
                         `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
                         `    USING (user_id = ${uidCall});\n` +
                         `-- If the intent really is "any signed-in user", exclude every id your stack has\n` +

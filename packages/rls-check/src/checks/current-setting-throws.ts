@@ -1,7 +1,7 @@
 import type { Check, DbSnapshot, Finding } from "../types";
 
 import { matchParen, tokenize } from "./sql";
-import { finding, qi, qrel } from "./util";
+import { finding, isRebaseManagedPolicy, managedPolicyFix, qi, qrel } from "./util";
 
 const ID = "current-setting-throws";
 
@@ -65,8 +65,13 @@ export const currentSettingThrows: Check = {
                         `database error rather than being denied. The caller sees a 500 rather than an ` +
                         `empty result, and any middleware that retries 5xx responses will retry a request ` +
                         `that can never succeed.`,
-                    fix:
-                        `-- Add the missing_ok argument so an unset value denies instead of raising:\n` +
+                    fix: isRebaseManagedPolicy(snapshot, policy)
+                        ? managedPolicyFix(
+                            policy,
+                            `pass the missing_ok argument in the rule's raw SQL — \`current_setting('${names[0]}', true)\` — ` +
+                            `so an unset value denies instead of raising`
+                        )
+                        : `-- Add the missing_ok argument so an unset value denies instead of raising:\n` +
                         `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
                         `    USING (tenant_id = current_setting('${names[0]}', true)::uuid);`
                 })

@@ -1,4 +1,5 @@
 ---
+sourceHash: 4d7e2205e3aed6fc
 title: Rebase auf Railway bereitstellen
 description: Stellen Sie Rebase mühelos mit der nativ von Railway unterstützten Dockerfile-Analyse bereit. Behalten Sie den Fokus auf die EU bei.
 sidebar_label: Railway
@@ -24,7 +25,20 @@ Zusätzlich unterstützt Railway vollständig europäische Bereitstellungsregion
 3. Railway erkennt das Repository sofort und sucht nach einer `Dockerfile`. Warten Sie, bis der erste Build beginnt.
 
 :::caution
-Setzen Sie unter **Settings → Build** den **Dockerfile Path** auf `backend/Dockerfile` und belassen Sie das **Root Directory** im Repository-Stammverzeichnis. Das Backend-`Dockerfile` benötigt den gesamten Workspace als Build-Kontext (es kopiert `pnpm-workspace.yaml`, `backend/` und `config/`) — zeigt das Root Directory auf `backend/`, schlägt der Build beim ersten `COPY` fehl.
+Es gibt **kein Anwendungs-Image, das aus Ihrem Quellcode gebaut wird**. `rebase build` erzeugt ein `dist-bundle`-Verzeichnis mit Ihren kompilierten Collections, Funktionen und Crons — und, wenn Ihr Projekt eine statische App deklariert, Ihrem gebauten Frontend. Das veröffentlichte Runtime-Image führt es aus:
+
+```bash
+rebase build
+```
+
+Railway zieht aus einer Registry, backen Sie das Bundle also in ein abgeleitetes Image. Drei Zeilen, und sie fixieren genau das, was läuft:
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+Ein späteres Rebase-Upgrade ist eine Änderung an dieser `FROM`-Zeile. Ihr Bundle bleibt unberührt.
 :::
 
 ## 4. Umgebungsvariablen festlegen

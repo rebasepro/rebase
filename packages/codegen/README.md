@@ -8,6 +8,10 @@ Generates typed TypeScript definitions from Rebase collection definitions — pr
 pnpm add @rebasepro/codegen
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 ### Dependencies
 
 - `@rebasepro/common` — a runtime dependency (`resolveCollectionRelations`)

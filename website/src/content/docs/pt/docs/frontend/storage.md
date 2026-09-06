@@ -1,4 +1,5 @@
 ---
+sourceHash: 1134b2a4207579d3
 title: Armazenamento e Upload de Arquivos
 sidebar_label: Armazenamento e Upload de Arquivos
 description: Adicione campos de upload de arquivos às suas coleções, gerencie arquivos programaticamente e roteie uploads para diferentes backends de armazenamento.

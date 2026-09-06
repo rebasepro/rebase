@@ -159,4 +159,117 @@ describe("listenWithPortRetry", () => {
 
         expect(bound).toBe(previouslyBound);
     });
+
+    describe("a squatter on loopback only", () => {
+        /**
+         * The collision `listen` cannot see. Binding `0.0.0.0` over a listener
+         * that holds `127.0.0.1:<port>` **succeeds** on Linux and macOS — the
+         * two sockets coexist and the kernel routes loopback traffic to the
+         * more specific bind — so `EADDRINUSE` never fires and the retry above
+         * has nothing to retry on.
+         *
+         * Measured: with `node -e "…listen(3013,'127.0.0.1')"` running,
+         * `rebase dev --port 3013` announced `Server running at
+         * http://localhost:3013` and `curl localhost:3013` answered
+         * `squatter`. Vite's default bind is exactly this shape, which makes
+         * it the ordinary way for a developer to meet it.
+         */
+        it("is treated as in use, and the server moves to the next port", async () => {
+            const occupied = await freePort();
+            await new Promise<void>(r => track(createServer()).listen(occupied, "127.0.0.1", r));
+
+            const server = track(createServer());
+            const bound = await listenWithPortRetry(server, occupied, { portFileDir: dir });
+
+            const actual = server.address();
+            if (actual === null || typeof actual === "string") throw new Error("not listening on a TCP port");
+
+            expect(bound).toBeGreaterThan(occupied);
+            expect(bound).toBe(actual.port);
+        });
+
+        it("says so, in the same words as any other port collision", async () => {
+            const occupied = await freePort();
+            await new Promise<void>(r => track(createServer()).listen(occupied, "127.0.0.1", r));
+
+            const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
+            try {
+                const bound = await listenWithPortRetry(track(createServer()), occupied, { portFileDir: dir });
+
+                const said = warn.mock.calls.map(call => String(call[0])).join("\n");
+                expect(said).toContain(`Port ${occupied} is in use`);
+                expect(said).toContain(String(bound));
+            } finally {
+                warn.mockRestore();
+            }
+        });
+
+        it("leaves a genuinely free port alone", async () => {
+            // The probe must not cost anything on the ordinary path, and above
+            // all must not report a free port as taken.
+            const free = await freePort();
+
+            const bound = await listenWithPortRetry(track(createServer()), free, { portFileDir: dir });
+
+            expect(bound).toBe(free);
+        });
+    });
+
+    /**
+     * A port that was typed binds or fails; only a derived one walks.
+     *
+     * Dev ports are derived per project, so the number a developer types into
+     * `--port` is very often another Rebase backend. Walking past it announced
+     * one port, served on another, and left the typed address answering 200
+     * from the wrong project — which reads exactly like the right one.
+     */
+    describe("an explicitly requested port", () => {
+        it("fails rather than moving, and names the port", async () => {
+            const occupied = await freePort();
+            await new Promise<void>(r => track(createServer()).listen(occupied, "0.0.0.0", r));
+
+            await expect(
+                listenWithPortRetry(track(createServer()), occupied, { portFileDir: dir, explicit: true })
+            ).rejects.toThrow(new RegExp(`Port ${occupied} is in use`));
+        });
+
+        it("ignores the affinity file, which records where the last run landed", async () => {
+            const requested = await freePort();
+            const elsewhere = await freePort();
+            fs.writeFileSync(portFile(), `${elsewhere} ${requested}`, "utf-8");
+
+            const bound = await listenWithPortRetry(track(createServer()), requested, { portFileDir: dir, explicit: true });
+
+            expect(bound).toBe(requested);
+        });
+
+        it("is off by default, so a derived port still walks", async () => {
+            const occupied = await freePort();
+            await new Promise<void>(r => track(createServer()).listen(occupied, "0.0.0.0", r));
+
+            const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
+            try {
+                const bound = await listenWithPortRetry(track(createServer()), occupied, { portFileDir: dir });
+                expect(bound).toBeGreaterThan(occupied);
+            } finally {
+                warn.mockRestore();
+            }
+        });
+
+        it("reads REBASE_DEV_PORT_EXPLICIT, which is how the CLI says so", async () => {
+            // The CLI knows about `--port`; the server is the one that binds.
+            // The child's environment is the only channel between them.
+            const occupied = await freePort();
+            await new Promise<void>(r => track(createServer()).listen(occupied, "0.0.0.0", r));
+
+            process.env.REBASE_DEV_PORT_EXPLICIT = "true";
+            try {
+                await expect(
+                    listenWithPortRetry(track(createServer()), occupied, { portFileDir: dir })
+                ).rejects.toThrow(new RegExp(`Port ${occupied} is in use`));
+            } finally {
+                delete process.env.REBASE_DEV_PORT_EXPLICIT;
+            }
+        });
+    });
 });

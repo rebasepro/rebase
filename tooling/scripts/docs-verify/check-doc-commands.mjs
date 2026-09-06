@@ -208,24 +208,122 @@ function flagsIn(rest) {
 function* tableFlags(text) {
     let command = null;
     let offset = 0;
+    /** Index of the `Default` column in the table currently being read. */
+    let defaultColumn = -1;
+    /** Commands named by the rows of the table currently being read. */
+    let named = new Set();
     for (const line of text.split("\n")) {
         const start = offset;
         offset += line.length + 1;
 
         if (/^#{2,6}\s/.test(line)) {
-            const named = /`(?:rebase\s+)?([a-z][a-z0-9-]*)(?:\s+[a-z][a-z0-9-]*)?`/.exec(line);
-            command = named?.[1] ?? null;
+            // Backticks required. A bare word from the heading looks tempting
+            // — "### Auth Commands" is how half these sections are titled —
+            // and it is wrong often enough to be useless: the German
+            // translation of "Compute, and what it costs" opens with the word
+            // "Resources", which is a command, and the dial table under it is
+            // not `rebase resources`'s options. The command table below fills
+            // the gap with a signal that cannot be a coincidence.
+            const quoted = /`(?:rebase\s+)?([a-z][a-z0-9-]*)(?:\s+[a-z][a-z0-9-]*)?`/.exec(line);
+            command = quoted?.[1] ?? null;
+            defaultColumn = -1;
             continue;
         }
-        if (!command || !line.startsWith("|")) continue;
+        if (!line.startsWith("|")) {
+            // A blank line ends the table, and with it the column layout. Two
+            // tables under one heading do not have to agree on where `Default`
+            // sits, and reading the previous one's index into this one is how a
+            // "Description" cell gets compared against a default.
+            if (line.trim() !== "") continue;
+            // A `| \`rebase db push\` | … |` command table immediately above an
+            // options table names the command that table is about, and names it
+            // more precisely than the heading does. Only when its rows agree:
+            // a section listing two families cannot say which one the options
+            // belong to, and guessing there is worse than not checking.
+            if (named.size === 1) command = [...named][0];
+            named = new Set();
+            defaultColumn = -1;
+            continue;
+        }
 
         const cells = line.split("|").slice(1, -1);
+        const invocation = /^\s*`rebase\s+([a-z][a-z0-9-]*)/.exec(cells[0] ?? "");
+        if (invocation) named.add(invocation[1]);
+
+        const header = cells.findIndex(c => /^\s*Default\s*$/i.test(c));
+        if (header !== -1) {
+            defaultColumn = header;
+            continue;
+        }
+        if (!command) continue;
         for (const cell of cells.slice(0, 2)) {
             const flag = /^\s*`(-{1,2}[A-Za-z][\w-]*)`\s*$/.exec(cell);
-            if (flag) yield { index: start, command, flag: flag[1] };
+            if (!flag) continue;
+            const documentedDefault = defaultColumn === -1 ? null : (cells[defaultColumn] ?? "").trim();
+            yield { index: start, command, flag: flag[1], documentedDefault };
         }
     }
 }
+
+/**
+ * `(default: …)` as each command's own `--help` page states it.
+ *
+ * A documented flag that *exists* was already checked; a documented flag whose
+ * stated default is wrong is the same claim one level down, and it is the one
+ * that survives a rename. `rebase auth reset-password --help` has said
+ * "(default: one is generated and printed)" since the CLI stopped shipping a
+ * fixed password, while the skills' CLI reference went on printing
+ * `NewPassword123!` in the Default column — a value an agent will type.
+ *
+ * Read out of the help blocks, not out of the `arg` spec: `arg` has no notion
+ * of a default, and the help page is what a reader compares a doc against.
+ *
+ * @returns {Map<string, Map<string, string>>} command → flag → default text
+ */
+function loadFlagDefaults(root) {
+    const out = new Map();
+    const files = [
+        ...globSync("packages/cli/src/commands/*.ts", { cwd: root }),
+        ...globSync("packages/cli/src/commands/cloud/*.ts", { cwd: root })
+    ];
+    for (const rel of files) {
+        const base = path.basename(rel, ".ts");
+        if (base.endsWith(".test")) continue;
+        const command = rel.includes(`${path.sep}cloud${path.sep}`) ? "cloud" : base.replace(/_/g, "-");
+        const source = readFileSync(path.join(root, rel), "utf8");
+        for (const line of source.split("\n")) {
+            const stated = /\(default:\s*([^)]*)\)/.exec(line);
+            if (!stated) continue;
+            // `${DEFAULT_BUNDLE_DIR}` is resolved at print time; this reads
+            // source. An unresolvable default is not a claim to compare.
+            const value = stated[1].trim();
+            if (!value || value.includes("${")) continue;
+            // Only the part of the line before the default, so a flag named
+            // inside the default text ("defaults to --out") is not the subject.
+            const before = line.slice(0, stated.index);
+            const flagsHere = [...before.matchAll(/(-{1,2}[A-Za-z][\w-]*)/g)].map(m => m[1]);
+            if (!flagsHere.length) continue;
+            const map = out.get(command) ?? new Map();
+            for (const flag of flagsHere) if (!map.has(flag)) map.set(flag, value);
+            out.set(command, map);
+        }
+    }
+    return out;
+}
+
+/** Compare a documented default with the help page's, ignoring presentation. */
+function sameDefault(documented, stated) {
+    const clean = s => s
+        .replace(/`/g, "")
+        .replace(/\*\*/g, "")
+        .replace(/[.,;]$/, "")
+        .trim()
+        .toLowerCase();
+    return clean(documented) === clean(stated);
+}
+
+/** Cells that mean "no default", which is not a claim about one. */
+const NO_DEFAULT = /^(?:|—|-|–|n\/a|none|\(none\)|\(required\)|required|\(optional\))$/i;
 
 /**
  * `pnpm run <script>` in an example README must name a script that exists.
@@ -336,10 +434,89 @@ function checkRunScripts(root, rel, text, findings, home = path.dirname(rel)) {
     }
 }
 
+/**
+ * Environment variables a scaffolded project actually has.
+ *
+ * The template's `.env.example`, plus every variable the scaffold's own files
+ * read — `scripts/example.ts` reads `REBASE_URL`, `docker-compose.yml`
+ * interpolates `${REBASE_VERSION}`, the frontend reads `import.meta.env.VITE_*`.
+ * A page telling a reader to paste `$SOMETHING` that is in none of these is
+ * telling them to paste an empty string.
+ *
+ * @param {string} root
+ * @returns {Set<string>}
+ */
+function loadScaffoldEnvKeys(root) {
+    const keys = new Set();
+    for (const rel of [
+        "packages/cli/templates/template/.env.example",
+        "packages/cli/templates/overlays/baas/.env.example"
+    ]) {
+        const file = path.join(root, rel);
+        if (!existsSync(file)) continue;
+        // Commented-out keys count: `rebase init` writes some of them commented
+        // and the reader uncomments them.
+        for (const m of readFileSync(file, "utf8").matchAll(/^#?\s*([A-Z][A-Z0-9_]*)=/gm)) keys.add(m[1]);
+    }
+    for (const rel of globSync("packages/cli/templates/**/*.{ts,tsx,js,mjs,json,yml,yaml}", { cwd: root })) {
+        const text = readFileSync(path.join(root, rel), "utf8");
+        for (const m of text.matchAll(/process\.env\.([A-Z][A-Z0-9_]*)/g)) keys.add(m[1]);
+        for (const m of text.matchAll(/process\.env\[["']([A-Z][A-Z0-9_]*)["']\]/g)) keys.add(m[1]);
+        for (const m of text.matchAll(/import\.meta\.env\.([A-Z][A-Z0-9_]*)/g)) keys.add(m[1]);
+        for (const m of text.matchAll(/\$\{?([A-Z][A-Z0-9_]*)[:}\s]/g)) keys.add(m[1]);
+    }
+    return keys;
+}
+
+/**
+ * Names the shell or the platform provides, which no project has to define.
+ */
+const SHELL_VARS = new Set([
+    "PATH", "HOME", "PWD", "OLDPWD", "USER", "SHELL", "EDITOR", "LANG", "LC_ALL",
+    "TMPDIR", "TERM", "CI", "OSTYPE", "RANDOM", "PS1", "SHLVL",
+    "GITHUB_TOKEN", "GITHUB_SHA", "GITHUB_REF", "GITHUB_REPOSITORY"
+]);
+
+/**
+ * `$VAR` references inside shell fences, with what the fence itself assigns.
+ *
+ * @param {string} text
+ * @returns {Array<{ line: number, name: string, assigned: Set<string> }>}
+ */
+function shellVariables(text) {
+    const lines = text.split("\n");
+    const out = [];
+    let fence = null;          // the delimiter that opened the current fence
+    let isShell = false;
+    let assigned = new Set();
+    for (let i = 0; i < lines.length; i++) {
+        const open = lines[i].match(/^\s*(`{3,}|~{3,})([A-Za-z0-9+#-]*)/);
+        if (open) {
+            if (fence && open[1][0] === fence[0] && open[1].length >= fence.length) {
+                fence = null;
+                isShell = false;
+            } else if (!fence) {
+                fence = open[1];
+                isShell = /^(bash|sh|shell|zsh|console)$/i.test(open[2]);
+                assigned = new Set();
+            }
+            continue;
+        }
+        if (!isShell) continue;
+        for (const m of lines[i].matchAll(/(?:^|[\s(;&|])(?:export\s+)?([A-Z][A-Z0-9_]*)=/g)) assigned.add(m[1]);
+        for (const m of lines[i].matchAll(/\$\{?([A-Z][A-Z0-9_]*)\}?/g)) {
+            out.push({ line: i + 1, name: m[1], assigned: new Set(assigned) });
+        }
+    }
+    return out;
+}
+
 export function checkDocCommands(root) {
     const cli = loadCliCommands(root);
     const flags = loadCliFlags(root);
+    const defaults = loadFlagDefaults(root);
     const bins = loadWorkspaceBins(root);
+    const envKeys = loadScaffoldEnvKeys(root);
     const findings = [];
     let scanned = 0;
 
@@ -397,13 +574,26 @@ export function checkDocCommands(root) {
         }
 
         // 3. Options tables make the same claim, in the shape nobody runs.
-        for (const { index, command, flag } of tableFlags(text)) {
+        for (const { index, command, flag, documentedDefault } of tableFlags(text)) {
             const accepted = flags.get(command);
-            if (!accepted || UNIVERSAL_FLAGS.has(flag) || accepted.has(flag)) continue;
+            if (!accepted) continue;
+            if (!UNIVERSAL_FLAGS.has(flag) && !accepted.has(flag)) {
+                report(
+                    lineAt(text, index),
+                    `\`rebase ${command}\` does not accept \`${flag}\` — documented in an options table. ` +
+                        `Accepted: ${[...accepted].sort().join(", ")}`
+                );
+                continue;
+            }
+
+            // 3b. And its stated default is the one `--help` prints.
+            const stated = defaults.get(command)?.get(flag);
+            if (!stated || documentedDefault === null || NO_DEFAULT.test(documentedDefault)) continue;
+            if (sameDefault(documentedDefault, stated)) continue;
             report(
                 lineAt(text, index),
-                `\`rebase ${command}\` does not accept \`${flag}\` — documented in an options table. ` +
-                    `Accepted: ${[...accepted].sort().join(", ")}`
+                `\`rebase ${command} ${flag}\` is documented with the default ` +
+                    `\`${documentedDefault}\`; \`--help\` says "(default: ${stated})".`
             );
         }
 
@@ -417,6 +607,28 @@ export function checkDocCommands(root) {
                 lineAt(text, m.index),
                 `\`${pkg}\` is the *binary* name shipped by \`${owner}\`, not a package on npm — ` +
                     `installing or running it fetches an unrelated third party's package. Use \`${owner}\`.`
+            );
+        }
+
+        // 6. A `$VAR` a reader is told to paste, that nothing gives them.
+        //
+        // `getting-started/headless.md` had `curl "$API_URL/api/data/posts"` and
+        // `baseUrl: process.env.API_URL!` in a snippet titled with the name of a
+        // file the scaffold already ships — under `REBASE_URL`. Pasted as
+        // written, the URL is `undefined` and the page's own "use it" section is
+        // the first thing that does not work.
+        //
+        // Four ways to be fine: the fence assigns it, the scaffold defines it,
+        // the shell provides it, or the page says in prose what it is (`$TOKEN`
+        // is the reader's own JWT, and the pages that use it say so).
+        for (const { line, name, assigned } of shellVariables(text)) {
+            if (assigned.has(name) || envKeys.has(name) || SHELL_VARS.has(name)) continue;
+            if (text.includes(`\`$${name}\``) || text.includes(`\`\${${name}}\``)) continue;
+            report(
+                line,
+                `\`$${name}\` is not defined by any shipped \`.env*\` or scaffold file, not assigned ` +
+                    "in this block, and not explained on this page — pasted as written it expands to " +
+                    "the empty string. Name a variable the scaffold has, assign it above, or say what it is."
             );
         }
 

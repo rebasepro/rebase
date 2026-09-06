@@ -46,10 +46,12 @@ import {
     resourceKeyOf,
     type CollectionConfig,
     type RebaseBackendAppConfig,
+    type ResourceDeclaration,
     type ResourceGraph
 } from "@rebasepro/types";
 import { analyseFunctionsDirectory } from "../function-portability";
 import { resolveBackendPaths } from "../manifest";
+import { cliVersion } from "../utils/version";
 
 /** The committed, generated record of what a project needs. */
 export const RESOURCE_GRAPH_FILENAME = "rebase.resources.json";
@@ -58,6 +60,91 @@ export const RESOURCE_GRAPH_FILENAME = "rebase.resources.json";
 export interface ResourceIssue {
     path: string;
     message: string;
+}
+
+/**
+ * Which `@rebasepro/*` package a module error is about, when it is about one.
+ *
+ * Both directions of a version skew arrive as an error about the *user's* file:
+ * `resources.ts  The requested module '@rebasepro/types' does not provide an
+ * export named 'queue'`. Nothing in that says which copy of `@rebasepro/types`
+ * is installed, what version this CLI is, or that the two disagree — so the
+ * reader goes looking for a typo in code they just copied out of the docs.
+ *
+ * Two shapes, because the two directions produce different errors: a named
+ * export the installed copy is too old for, and a package the installed tree
+ * does not have at all.
+ */
+const NAMED_EXPORT_MISSING = /does not provide an export named ['"]([^'"]+)['"]/;
+const SPECIFIER = /(@rebasepro\/[a-z0-9-]+)/;
+
+/** The version of a package as resolved from the project, or null. */
+function installedVersion(specifier: string, from: string): string | null {
+    try {
+        const require = createRequire(path.join(from, "noop.js"));
+        const manifest = require.resolve(`${specifier}/package.json`);
+        const version: unknown = JSON.parse(fs.readFileSync(manifest, "utf-8")).version;
+        return typeof version === "string" ? version : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The message an issue carries, with the skew named when there is one.
+ *
+ * `main` runs 497 commits ahead of npm `latest` and the docs site publishes from
+ * `main`, so the shape this exists for is routine: a scaffold pinned to the
+ * published version, config code written against today's documentation, and an
+ * error about the config file. The fix is one command and the error named none
+ * of it — the same failure as `404 No PUT route on collection 'projects'`, one
+ * layer down.
+ *
+ * Says nothing extra when the two versions agree, or when either is unreadable:
+ * a sentence naming one version twice is worse than no sentence.
+ */
+export function describeIssue(err: unknown, projectRoot: string, ownVersion = cliVersion()): string {
+    const message = err instanceof Error ? err.message : String(err);
+    const code = (err as { code?: unknown } | null)?.code;
+    const missingExport = NAMED_EXPORT_MISSING.exec(message);
+    const isSkewShaped = missingExport !== null || code === "ERR_MODULE_NOT_FOUND";
+    if (!isSkewShaped) return message;
+
+    const specifier = SPECIFIER.exec(message)?.[1];
+    if (!specifier) return message;
+
+    // One line, not two: every caller renders an issue as `path  message` on a
+    // single row, so a newline here would land the useful half unindented under
+    // the file name.
+    const lead = /[.!?]$/.test(message.trim()) ? message.trim() : `${message.trim()}.`;
+
+    const installed = installedVersion(specifier, projectRoot);
+    if (installed === null) {
+        return `${lead} ${specifier} is not installed in this project; this CLI is ${ownVersion}. `
+            + `Run pnpm add ${specifier}@${ownVersion}`;
+    }
+    if (ownVersion === "unknown" || installed === ownVersion) return message;
+
+    // Which side to move is the question the reader actually has, and it has a
+    // right answer: the CLI is what evaluates this file, so the packages follow
+    // it — unless the CLI is the older one, in which case following it would
+    // move the project backwards.
+    const cliIsNewer = compareVersions(ownVersion, installed) > 0;
+    return cliIsNewer
+        ? `${lead} ${specifier} ${installed} is installed; this CLI is ${ownVersion}. `
+            + `Run pnpm add ${specifier}@${ownVersion}`
+        : `${lead} ${specifier} ${installed} is installed; this CLI is ${ownVersion}, which is older. `
+            + `Update the CLI to ${installed}, or pin ${specifier} back to ${ownVersion}`;
+}
+
+/** -1 / 0 / 1 on the numeric parts, ignoring any prerelease tail. */
+function compareVersions(a: string, b: string): number {
+    const parts = (v: string): number[] => v.split("-")[0].split(".").map(n => Number(n) || 0);
+    const [x, y] = [parts(a), parts(b)];
+    for (let i = 0; i < 3; i++) {
+        if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) < (y[i] ?? 0) ? -1 : 1;
+    }
+    return 0;
 }
 
 /** Files that declare resources, in the order they are loaded. */
@@ -238,11 +325,52 @@ function collectionEdges(collection: CollectionConfig, declared: Set<string>): A
  * wrong" when the environment is not the point.
  */
 function cronLoadIssue(problem: string): string {
-    return `${problem}\n` +
+    return `${summariseCronProblem(problem)}\n` +
         "    `rebase resources` evaluates each cron file to read its schedule, and it is a build " +
         "step: no .env, no secrets. Move work that needs the deployment's environment inside the " +
         "handler — `const { x } = await import(\"…\")` — so the module scope imports nothing that " +
         "reads configuration.";
+}
+
+/**
+ * The cron loader's `<file> (threw: <message>)`, as one line.
+ *
+ * The message is whatever the module threw, and the common case is a schema
+ * validator: `loadEnv()` at module scope with no `.env` present throws a
+ * `ZodError`, whose `.message` is the JSON array of its issues. That arrived
+ * here verbatim — ten lines of `{ "expected": "string", "code":
+ * "invalid_type", … }` — with the sentence that says what to do underneath it,
+ * so the reader met "Invalid input: expected string, received undefined" twice
+ * before reaching the explanation.
+ *
+ * A validator's own sentences are the useful half of that object, so they are
+ * kept and the serialisation is dropped.
+ */
+function summariseCronProblem(problem: string): string {
+    const match = problem.match(/^(.*) \(threw: ([\s\S]*)\)$/);
+    if (!match) return problem.split("\n")[0];
+    const [, file, thrown] = match;
+    return `${file}: ${summariseThrownMessage(thrown)}`;
+}
+
+/** One sentence out of a thrown message, whatever shape it arrived in. */
+function summariseThrownMessage(message: string): string {
+    const trimmed = message.trim();
+    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+        try {
+            const parsed: unknown = JSON.parse(trimmed);
+            const issues = Array.isArray(parsed) ? parsed : [parsed];
+            const sentences = [...new Set(
+                issues
+                    .map(issue => (issue as { message?: unknown } | null)?.message)
+                    .filter((m): m is string => typeof m === "string" && m.length > 0)
+            )];
+            if (sentences.length > 0) return sentences.join("; ");
+        } catch {
+            // Not JSON after all — fall through to the first line.
+        }
+    }
+    return trimmed.split("\n")[0];
 }
 
 /**
@@ -294,7 +422,7 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
                 if (isResourceHandle(value)) handleExports.set(exportName, resourceId(value.kind, value.key));
             }
         } catch (err) {
-            issues.push({ path: path.relative(configDir, candidate), message: err instanceof Error ? err.message : String(err) });
+            issues.push({ path: path.relative(configDir, candidate), message: describeIssue(err, projectRoot) });
         }
         break;
     }
@@ -313,7 +441,7 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
                 // it sends somebody reading every module in the directory.
                 issues.push({
                     path: path.relative(configDir, entry),
-                    message: err instanceof Error ? err.message : String(err)
+                    message: describeIssue(err, projectRoot)
                 });
             }
         }
@@ -371,7 +499,7 @@ export async function deriveResourceGraph(options: DeriveOptions): Promise<{ gra
                     ...(requires.length > 0 ? { requires } : {})
                 });
             } catch (err) {
-                issues.push({ path: report.file, message: err instanceof Error ? err.message : String(err) });
+                issues.push({ path: report.file, message: describeIssue(err, projectRoot) });
             }
             for (const imported of report.resourceImports) {
                 const resource = handleExports.get(imported);
@@ -510,4 +638,77 @@ export function parseResourceGraph(contents: string): ResourceGraph {
     // `options` is omitted from the file when empty; a reader of the graph
     // expects it present, so it is restored here.
     return { version: 1, resources: entries.map(r => ({ options: {}, ...r })) as ResourceGraph["resources"] };
+}
+
+/**
+ * Add the resources a project has without declaring them.
+ *
+ * A backend has a database whether or not anyone said so, and a project that
+ * declares no buckets still gets one default storage source from the plain
+ * unsuffixed variables. Both are load-bearing defaults and both are invisible
+ * in the graph, so a status view built only from declarations would show an
+ * empty screen to the majority of projects — the ones that most need to be told
+ * which variable their one database reads.
+ */
+export function withImplicitDefaults(graph: ResourceGraph): {
+    declaration: ResourceDeclaration;
+    implicit: boolean;
+}[] {
+    const entries = graph.resources.map(declaration => ({ declaration, implicit: false }));
+    const has = (kind: string) => graph.resources.some(r => r.kind === kind);
+
+    if (!has("database")) {
+        entries.unshift({
+            declaration: {
+                kind: "database",
+                key: DEFAULT_RESOURCE_KEY,
+                engine: "postgres",
+                transport: "server",
+                options: {}
+            },
+            implicit: true
+        });
+    }
+    if (!has("bucket")) {
+        entries.push({
+            declaration: {
+                kind: "bucket",
+                key: DEFAULT_RESOURCE_KEY,
+                // `local` is what an unconfigured default source resolves to,
+                // and naming it here keeps the row honest about what a project
+                // with no S3 variables actually gets: a directory that a
+                // container erases on restart, which production then drops.
+                engine: "local",
+                transport: "server",
+                options: {}
+            },
+            implicit: true
+        });
+    }
+    return entries;
+}
+
+/**
+ * The resources a project *has*, which is what a person is asking about.
+ *
+ * One projection, because two of them disagreed. `rebase status` built its
+ * rows from {@link withImplicitDefaults} and listed `buckets ✓ (default) local
+ * · implicit`; `rebase resources` and `rebase resources --json` built theirs
+ * from the raw graph and listed only the database and the function. Two
+ * commands whose whole job is to answer "what does this project need", on the
+ * same stock scaffold, giving different answers.
+ *
+ * The implicit entries are marked rather than hidden, because the distinction
+ * is real and load-bearing: a declared resource is recorded in
+ * `rebase.resources.json` for a host to provision, and an implicit one is a
+ * default the runtime supplies whether or not anyone wrote it down. That file
+ * still holds declarations only — it is a wire contract a host reads, and
+ * putting defaults in it would ask for something to be provisioned that
+ * nobody declared.
+ */
+export type ProjectedResource = ResourceDeclaration & { implicit?: true };
+
+export function projectResourceGraph(graph: ResourceGraph): ProjectedResource[] {
+    return withImplicitDefaults(graph).map(({ declaration, implicit }) =>
+        (implicit ? { ...declaration, implicit: true as const } : declaration));
 }

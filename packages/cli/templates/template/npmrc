@@ -9,3 +9,11 @@ link-workspace-packages=true
 # were doing nothing, while npm 12 warned about them on every install and every
 # `npm run` — two lines of noise, in a first run, for settings that had already
 # stopped applying.
+
+# Refuse to install on a Node older than `engines.node` in package.json.
+#
+# npm-only: pnpm reads the same setting as `engineStrict` from
+# pnpm-workspace.yaml, and answers `undefined` for this spelling. Kept here
+# because a scaffold may be installed with either manager, and npm's default is
+# a warning it then ignores — EBADENGINE, exit 0.
+engine-strict=true

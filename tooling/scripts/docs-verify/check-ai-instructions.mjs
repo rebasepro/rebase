@@ -162,7 +162,97 @@ export function checkAiInstructions(root) {
 
     checkScaffold(root, findings);
     checkPointerAgents(root, findings);
+    checkQuotedPointer(root, findings);
     return { findings, scanned };
+}
+
+/**
+ * The `CLAUDE.md` block on the docs page against the file `rebase init` writes.
+ *
+ * The page showed a two-line pointer and said so in the prose ("Each pointer
+ * file is two lines"). The template writes three: the third tells the assistant
+ * to install the skills, which is the line that makes the whole feature
+ * discoverable — and the page had quietly dropped it, so the one page
+ * describing the file disagreed with the file.
+ *
+ * Only the English page is diffed. The five translations carry the same fence
+ * verbatim (a code block is not translated), and holding them to it would
+ * report a translation lag as a content error; the English page is where the
+ * claim is made.
+ */
+function checkQuotedPointer(root, findings) {
+    const PAGE = "website/src/content/docs/docs/ai/instruction-files.md";
+    const TEMPLATE = "packages/cli/templates/template/CLAUDE.md";
+    let page, template;
+    try {
+        page = readFileSync(path.join(root, PAGE), "utf8");
+        template = readFileSync(path.join(root, TEMPLATE), "utf8");
+    } catch {
+        findings.push({ file: PAGE, line: 0, message: `could not read ${PAGE} or ${TEMPLATE}` });
+        return;
+    }
+
+    const fence = /```markdown title="CLAUDE\.md"\n([\s\S]*?)```/.exec(page);
+    if (!fence) {
+        findings.push({
+            file: PAGE,
+            line: 0,
+            message:
+                'no ```markdown title="CLAUDE.md" block — the page has stopped quoting the file ' +
+                "`rebase init` writes, and this check cannot compare them."
+        });
+        return;
+    }
+    if (fence[1].trim() !== template.trim()) {
+        findings.push({
+            file: PAGE,
+            line: lineAt(page, fence.index),
+            message:
+                `the quoted \`CLAUDE.md\` is not the one ${TEMPLATE} writes.\n` +
+                `      page:     ${JSON.stringify(fence[1].trim())}\n` +
+                `      template: ${JSON.stringify(template.trim())}`
+        });
+    }
+
+    // The same page quotes `.mcp.json`, and that block said "there is no
+    // `REBASE_PROJECT_DIR` in it on purpose" for as long as the scaffold agreed.
+    // Compared as parsed JSON rather than as text: indentation is a rendering
+    // choice, the contents are the claim.
+    const mcpFence = /```json title="\.mcp\.json"\n([\s\S]*?)```/.exec(page);
+    if (mcpFence) {
+        const parse = (s) => { try { return JSON.parse(s); } catch { return null; } };
+        const quoted = parse(mcpFence[1]);
+        const actual = parse(readFileSync(path.join(root, SCAFFOLD, ".mcp.json"), "utf8"));
+        if (!quoted) {
+            findings.push({
+                file: PAGE,
+                line: lineAt(page, mcpFence.index),
+                message: "the quoted `.mcp.json` is not valid JSON."
+            });
+        } else if (actual && JSON.stringify(quoted) !== JSON.stringify(actual)) {
+            findings.push({
+                file: PAGE,
+                line: lineAt(page, mcpFence.index),
+                message:
+                    `the quoted \`.mcp.json\` is not the one ${SCAFFOLD}/.mcp.json writes.\n` +
+                    `      page:     ${JSON.stringify(quoted)}\n` +
+                    `      scaffold: ${JSON.stringify(actual)}`
+            });
+        }
+    }
+
+    // The prose counts the lines, and a count is the half a diff cannot catch:
+    // the fence can be right while the sentence above it says "two lines".
+    const lines = template.trim().split("\n").length;
+    const words = ["zero", "one", "two", "three", "four", "five", "six"];
+    const stated = /Each pointer file is (\w+) lines/.exec(page);
+    if (stated && stated[1] !== words[lines]) {
+        findings.push({
+            file: PAGE,
+            line: lineAt(page, stated.index),
+            message: `states "${stated[1]} lines"; ${TEMPLATE} is ${words[lines] ?? lines}.`
+        });
+    }
 }
 
 /** The default `rebase init` layout — the one every quickstart produces. */
@@ -221,6 +311,23 @@ function checkScaffold(root, findings) {
             file: `${SCAFFOLD}/.mcp.json`,
             line: 0,
             message: `\`mcpServers.rebase\` does not run \`@rebasepro/mcp\` (args: ${JSON.stringify(args)})`
+        });
+    }
+
+    // `~/.rebase/projects.json` is machine-wide and its `default` entry carries
+    // a project's directory, backend URL and dev service key. A scaffold that
+    // names no project of its own falls through to whatever the last project on
+    // this machine persisted — so the first project to register anything became
+    // every later project's backend, with its admin key. Naming the directory
+    // in the scaffold's own config block is what stops that.
+    const projectDir = mcp?.mcpServers?.rebase?.env?.REBASE_PROJECT_DIR;
+    if (projectDir !== ".") {
+        findings.push({
+            file: `${SCAFFOLD}/.mcp.json`,
+            line: 0,
+            message:
+                `\`mcpServers.rebase.env.REBASE_PROJECT_DIR\` is ${JSON.stringify(projectDir)}, expected ".". ` +
+                "Without it the server falls back to the machine-wide registry default, which is another project."
         });
     }
 }

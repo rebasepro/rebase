@@ -1,4 +1,5 @@
 ---
+sourceHash: 8721ee795ebd8dce
 title: Custom UI stylen
 sidebar_label: Custom UI stylen
 description: Erstellen Sie benutzerdefinierte Ansichten, Startseiten und Aktionen aus denselben Komponenten und Theme-Tokens wie der Rest des Admins, damit sie nativ aussehen und dem Theme folgen.
@@ -39,7 +40,7 @@ export function DashboardView() {
 }
 ```
 
-Jede Komponente im Kit ist unter [UI components](/docs/ui/components/Card) mit ihren echten, aus dem Quellcode generierten Props katalogisiert. Schauen Sie dort nach, bevor Sie etwas selbst bauen: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` und etwa vierzig weitere existieren bereits.
+Jede Komponente im Kit ist unter [UI components](/docs/ui/components/card/) mit ihren echten, aus dem Quellcode generierten Props katalogisiert. Schauen Sie dort nach, bevor Sie etwas selbst bauen: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` und etwa vierzig weitere existieren bereits.
 
 ## Farben: Verwenden Sie Tokens, niemals literale Werte
 

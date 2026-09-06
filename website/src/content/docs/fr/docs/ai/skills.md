@@ -1,4 +1,5 @@
 ---
+sourceHash: 771019609412b5b6
 title: Compétences d'agent (Agent Skills)
 sidebar_label: Agent Skills
 description: rebase skills install écrit 21 compétences de référence Rebase dans votre dépôt, dans la structure attendue par votre assistant IA — Cursor, Claude Code, Windsurf, Gemini CLI et Antigravity.
@@ -55,9 +56,16 @@ sont ouverts à la demande.
 `gemini` couvre **à la fois** Gemini CLI et Antigravity — ils lisent le même
 répertoire `.agents/`, il n'y a donc pas de valeur `antigravity` distincte.
 
-Sans `--agent`, la commande détecte quels assistants sont déjà utilisés par un projet en
-recherchant `.cursor/`, `.claude/`, `.windsurf/` et `.agents/`. Si elle n'en trouve
-aucun, elle vous invite à faire un choix.
+Sans `--agent`, la commande détecte quels assistants sont déjà utilisés par un
+projet en recherchant `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`,
+`.codex/` et `.kiro/`. Si elle n'en trouve aucun, elle vous invite à faire un
+choix.
+
+**GitHub Copilot n'est jamais détecté.** Son répertoire serait `.github/`, et
+`.github/` ne prouve pas que quelqu'un utilise Copilot : `rebase init` écrit
+`.github/copilot-instructions.md` dans chaque projet généré, et la plupart des
+dépôts ont un `.github/` pour leurs workflows. Installez-le avec
+`--agent copilot`.
 
 :::note[Un projet fraîchement initialisé affiche toujours une invite]
 `rebase init` écrit `CLAUDE.md`, `.cursorrules` et autres, mais aucun des

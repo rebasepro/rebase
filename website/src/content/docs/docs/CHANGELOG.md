@@ -74,10 +74,11 @@ description: Every released change to Rebase — new features, fixes, and the br
 
   The boot validator refuses the old key by name rather than ignoring it: silence
   would have left the surviving `required` unset, quietly turning a required
-  relation optional in the generated types and nullable in the column. New in
-  `@rebasepro/common`: `isRelationRequired(collection, relation)` and
-  `relationDeclaringProperty(collection, relation)`, which are how every reader
-  now asks.
+  relation optional in the generated types and nullable in the column. How every
+  reader now asks is
+  `import { isRelationRequired, relationDeclaringProperty } from "@rebasepro/common"`:
+  `isRelationRequired(collection, relation)` for the answer,
+  `relationDeclaringProperty(collection, relation)` for the property that carries it.
 
   The runtime contract major is **not** bumped. What was removed is an optional
   member of a TypeScript interface — it has no runtime representation, so no
@@ -106,17 +107,34 @@ description: Every released change to Rebase — new features, fixes, and the br
   so the default cannot differ between them and make every boot plan the same
   rewrite forever.
 
+- **The Node floor is `>=22.22.0`, on every published package.** It was `>=20`
+  (and `@rebasepro/cli@0.17.3` declared no `engines` at all), so a project on
+  Node 20 installed and ran. The single source is `.nvmrc`, and `check:floors`
+  holds every manifest to it — one floor, in one file, rather than a number
+  repeated in twenty-two. Move to 22.22.0 before upgrading: `pnpm install`
+  answers an engines mismatch with `[WARN] Unsupported engine` and carries on,
+  so the failure arrives later, somewhere with no mention of Node in it.
+  `check:release-bump` now refuses a release that moves an `engines` field
+  without saying so here.
+
 ### Added
+
+- **`rebase db migrate --baseline <version>`** records a version as applied on a
+  database that already carries the schema — every database Rebase has booted
+  against does, because boot provisions the tables — so the first `db migrate`
+  no longer dies on `type "posts_status" already exists`. That error now names
+  the version on disk and the command that records it.
 
 - **Every kind in one graph: crons, functions and queues join databases, buckets
   and topics.** A cron file is now also a declaration — the loader records it
   under the id the scheduler runs it as, with its schedule and zone — and a
   function is recorded from the bundler's analysis by filename. `rebase
   resources` lists them; a host reads a project's schedules before running it.
-  `queue<T>("thumbnails")` is the work-list shape of background work, one handler
-  per queue, on the same durable job queue topics ride on — and unlike
-  `jobs.tasks`, which needed an entrypoint a managed project does not have, a
-  declared queue is picked up by every boot path.
+  `import { queue } from "@rebasepro/types"` joins `database`, `bucket` and
+  `topic`: `queue<T>("thumbnails")` is the work-list shape of background work,
+  one handler per queue, on the same durable job queue topics ride on — and
+  unlike `jobs.tasks`, which needed an entrypoint a managed project does not
+  have, a declared queue is picked up by every boot path.
 
 - **Handles are the API.** `defineCollection({ dataSource: analytics })` and
   `storage: { storageSource: media }` take the handle a constructor returned —
@@ -164,6 +182,201 @@ description: Every released change to Rebase — new features, fixes, and the br
   finds every resource in it. Both suites were green for two weeks while every
   bucket a current CLI declared reached the platform as nothing; this is the test
   across that seam.
+
+
+- **`rebase db branch prune` — branching shipped with no cleanup story at all.**
+  No TTL, no prune, no `delete --all`, and every branch is a full-size copy:
+  `CREATE DATABASE ... TEMPLATE` duplicates the files on disk, so five branches
+  of a 100 GB database cost 500 GB. The only way to reclaim any of it was to
+  remember every name you had ever typed.
+
+  ```bash
+  rebase db branch prune                   # orphans only — always safe
+  rebase db branch prune --older-than 2w   # and anything past two weeks
+  ```
+
+  It also finds the two ways branches drift from their metadata, which drift in
+  opposite directions: an entry whose database was dropped outside Rebase, which
+  `list` would keep reporting forever while `switch` and `info` fail against a
+  database nothing can find; and a branch database whose entry was never
+  written, because `create` makes the database first and records it second.
+  Nothing expires unless asked, ages are floored so a cutoff never catches
+  something younger than it says, and `--older-than 7h` is refused rather than
+  read as seven days. Atlas's `<db>_dev_diff` scratch databases are reported
+  alongside but removed only with `--include-dev-diff`.
+
+- **`rebase db branch` reported branches the managed database had not made.**
+  PGlite serves exactly one database, so `CREATE DATABASE ... TEMPLATE` wrote a
+  `pg_database` catalog entry and copied nothing. Every step then agreed:
+  `create` answered `✓ Branch "feature_x" created successfully.`, and `list`
+  showed it at 7.1 MB because the catalog entry makes its `JOIN pg_database`
+  succeed and `pg_database_size` answer for the one real database. Connecting to
+  `rb_feature_x` reported `current_database()` = `postgres`, and a table created
+  "in the branch" appeared in the parent — so every write made in the belief
+  that it was sandboxed landed in the developer's own database. Measured on a
+  fresh `rebase init` scaffold, which is the default path. The whole `branch`
+  domain is now refused there, before the database is started, naming
+  `rebase dev --docker` and `DATABASE_URL` as the two things that work.
+
+- **`rebase db pull` handed back a database the application could not read.**
+  `pg_dump --no-privileges` strips every GRANT, so the copy arrived with the
+  source's RLS policies and its `FORCE ROW LEVEL SECURITY` intact and nothing
+  behind them. Measured on a 30-table project: 68 policies and 60 grants in, 68
+  policies and **0** grants out, and the first read as the role Rebase serves
+  every request through failing with `permission denied for table leads` — after
+  a green `✓ Local database now holds a copy of …`. Anyone who pulled and then
+  opened `psql`, ran `rls-check`, or pointed a test suite at the copy hit a wall
+  with no hint of the cause. The pull now re-provisions the app role through the
+  same `ensureAppRole` boot and `db push` call, so internal tables stay revoked
+  as well. The backup path already guarded this hazard; the newer command people
+  are told to use did not.
+
+- **`rebase db pull --database-url` was accepted and ignored.** The flag never
+  reached the resolver, so the pull went ahead against the `.env` database
+  anyway: `rebase db pull --from prod --database-url scratch --yes` destroyed the
+  working database while naming a different one. It is now refused rather than
+  honoured — the target is the local development database by construction, since
+  a command that can copy in both directions eventually copies the wrong way, and
+  the wrong way here is a laptop over production. The refusal points at `--from`.
+
+
+- **`rebase db branch switch` — branching stopped one step short of being a
+  feature.** `create` copied a 12 MB database in 1.2s and then printed
+  `Database: rb_feature_auth` and nothing else: there was no `switch`, no
+  `--branch` on `rebase dev`, no `REBASE_BRANCH`, and not even a connection
+  string to paste. The only way to work on a branch was to hand-edit
+  `DATABASE_URL`, while the documentation said the CLI updated your local
+  development configuration — it did not, and the `.env` was byte-identical
+  afterwards.
+
+  ```bash
+  rebase db branch switch feature_auth   # every later command follows
+  rebase db branch switch                # which branch am I on?
+  rebase db branch switch --off          # back to the main database
+  ```
+
+  The branch is recorded in `.rebase/branch.json` as a name, never a connection
+  string, so credentials stay in `.env` alone. It outranks `DATABASE_URL` in
+  `.env` — any lower and switching would do nothing on a project that sets one —
+  and loses to `--database-url` and a `DATABASE_URL` in the shell, so a flag on
+  the command line still beats a switch made yesterday. Deleting the branch you
+  are on returns the checkout to the main database instead of leaving it aimed
+  at a database that no longer exists.
+
+
+- **`policy.registered()`.** `POST /auth/anonymous` mints a real user row with a
+  real uid, so a guest satisfies `policy.authenticated()` — which is the point
+  of the feature, and also means "signed in" was true for anyone who pressed
+  *Continue as guest*. `registered()` is `authenticated()` plus "not a guest";
+  reach for it wherever a rule is about somebody who could be held responsible
+  for something. The flag travels in the access token and reaches the database
+  as `rebase.is_anonymous()`, so a policy can ask without a lookup.
+
+- **`rls-check` gained `policy-authenticated-tautology`.** Correcting an
+  anonymous tautology by excluding the sentinel is where people stop, and what
+  remains — "every account may read every row" — is the shape that made a
+  customer's `users` table readable by anyone who could sign up. It is a
+  separate id from the anonymous finding on purpose: different severity,
+  different fix, and `--skip` should be able to silence one without the other.
+- **In production, whoever registered first owned the deployment.** An empty
+  user table admitted the first registration and promoted it to admin — the
+  right rule for a laptop, and an open window on every host with a public
+  hostname, since the shipped artifacts bring DNS and TLS up before the
+  operator has typed anything. `GET /auth/config` advertised `needsSetup:
+  true`, so the unclaimed hosts were also easy to find. `POST /admin/bootstrap`
+  offered the same prize one request later, to the earliest-registered user.
+
+  The window now exists only outside `NODE_ENV=production`. In production an
+  empty table refuses the bootstrap registration with `SETUP_REQUIRED` and says
+  what to do instead, a first account created through open registration is an
+  ordinary account, `needsSetup` is never advertised, `/admin/bootstrap`
+  refuses, and boot warns when the table is empty and `REBASE_ADMIN_EMAIL` is
+  unset. The two ways in — the named admin seed (`REBASE_ADMIN_EMAIL` /
+  `REBASE_ADMIN_PASSWORD`, which every shipped blueprint already sets) and the
+  service key — are the ones nobody can race for. Development, `rebase dev`
+  and the test suites keep first-registration-is-admin.
+
+- **`GET /api/functions` handed anyone the inventory of custom endpoints.**
+  Functions themselves stay anonymous-callable by default (a webhook receiver
+  has to be), but the listing now requires a resolved identity — a signed-in
+  user, an API key or the service key. `rebase cloud debug` already read a
+  401 there as "mounted".
+
+- **Two audit reports named internal infrastructure.** A private database
+  address and a cluster-internal service hostname in `docs/audits/` are
+  replaced with placeholders, and the webhook audit carries a dated status
+  line, since the SSRF guard it says does not exist has existed since
+  2026-08-08.
+
+### Changed
+
+- **A bucket can be marked as the default, and the promotion that stands in for
+  that says so.** `bucket("media", { default: true })` names the bucket that
+  serves uploads which name no `storageSource`. A project of named buckets with
+  none marked still gets the first one declared promoted at boot — refusing
+  would have stopped every project written before the option existed at the
+  next runtime rollout — but the warning now names the one line that ends the
+  guessing, and why it matters: the local bucket development stands in with is
+  dropped in production and the promotion is not, so the answer differs either
+  side of a deploy until one is marked.
+
+- **`rebase cloud deploy --force` is now `--eject`, with no alias.** `--force`
+  means four different things across this CLI — overwrite a file (`schema
+  introspect`, `apps`, `eject`), disconnect other Postgres sessions (`db
+  branch`), set a build-time key anyway (`cloud env set`) — and three of them
+  are recoverable in a minute. The fourth moved a live project off the managed
+  runtime onto a container image it now owns, which is the least reversible
+  thing the CLI can be asked to do, under the same word as "overwrite this
+  file". It has its own name now, and `--force` on `cloud deploy` is an unknown
+  option rather than an alias: a script carrying the old spelling stops instead
+  of ejecting a project on a word it no longer means. What the flag does is
+  unchanged — it is still the only way to build a container image for a managed
+  project, for the bare form and for `--source` alike.
+
+- **A collection's `callbacks` runs on the server, and only there. The panel's
+  own callbacks are `admin.browserCallbacks`.** The Vite plugin has always
+  stripped that block's bodies out of the admin bundle, so a `beforeSave`
+  calling a vendor with a key from `process.env` does not ship to every visitor
+  — but two keys were exempt, on the grounds that the panel ran them. Both
+  exemptions were wrong, in different directions. `afterSave` had no
+  client-side call site at all: the body shipped and never ran. `afterRead` did
+  run, unconditionally, on top of the server having already applied it — so
+  every server-backed collection transformed its rows twice, and anything not
+  idempotent compounded. Meanwhile a collection on a `direct` transport, where
+  the panel talks to the store itself and no server sees the operation, got
+  read callbacks while its write callbacks were stripped out from under it,
+  silently. The strip is total now, with no allowlist to fall out of date, and
+  callbacks the panel runs live under `admin.browserCallbacks`: a separate key,
+  so which runtime a callback belongs to is a fact about the collection file
+  rather than about a `dataSources` declaration in another one — which is the
+  thing a build-time transform cannot see. Move a browser-side `afterRead` into
+  the new block; a server-side one already worked and needs no change.
+
+- **`saveEntityWithCallbacks` and `deleteEntityWithCallbacks` run callbacks.**
+  Both have been named for callbacks they never ran, since they were written,
+  and `deleteEntityWithCallbacks` went as far as accepting a `callbacks` prop
+  and dropping it on the floor. They run the collection's
+  `admin.browserCallbacks` around the write: `beforeSave` can block a save the
+  way the server's does, `beforeDelete` can block a delete, and `afterSave`
+  receives the row *as saved* rather than the values submitted. That prop is
+  gone, as is the `callbacks` prop on `DeleteEntityDialog` that fed it — both
+  were being passed the server's block, in the browser, where it does nothing.
+
+- **The ERD has one layout, and it reads top to bottom.** The LR/TB toggle
+  offered a choice the canvas cannot honour: the visualizer's pane is tall and
+  narrow, so the left-to-right default pushed the graph off both sides on open.
+  The machinery went with the buttons rather than being left behind.
+
+### Removed
+
+- **`loadDeclaredStorageSources`** (`@rebasepro/server`), **`normalizeStorageSources`**
+  and **`DeclaredStorageSources`** (`@rebasepro/types`). All three served the
+  `storage` block of `rebase.json`, which the manifest validator now refuses:
+  buckets are declared with `bucket()` and the graph is generated into
+  `rebase.resources.json`. The loader parsed a block that can no longer exist and
+  the merge resolved a conflict between two homes there is now one of. Pre-release,
+  a breaking change is just a change — the runtime contract stays at 1, as it did
+  for the declaration change itself.
 
 ### Fixed
 
@@ -228,7 +441,6 @@ description: Every released change to Rebase — new features, fixes, and the br
   "configured" means, which would eventually reassure someone about a deployment
   that is about to refuse to start.
 
-### Fixed
 
 - **A second collection claiming the same `slug` or table was dropped without a
   word.** `CollectionRegistry` registers by slug and by table name, and returns
@@ -398,101 +610,124 @@ description: Every released change to Rebase — new features, fixes, and the br
   connected. The failure now lists the sessions by `application_name`, and
   `--force` disconnects them for you, on create and delete alike.
 
-### Added
 
-- **`rebase db branch prune` — branching shipped with no cleanup story at all.**
-  No TTL, no prune, no `delete --all`, and every branch is a full-size copy:
-  `CREATE DATABASE ... TEMPLATE` duplicates the files on disk, so five branches
-  of a 100 GB database cost 500 GB. The only way to reclaim any of it was to
-  remember every name you had ever typed.
+- **Creating a user in the panel never showed the temporary password.** The
+  server mints one, returns it beside the columns on the create response, and
+  will not repeat it; the dialog that shows it to the administrator was
+  installed as an `afterSave` on the collection's `callbacks` — the server's
+  block, which nothing in the browser runs and whose bodies the bundler strips
+  on the way in. So the callback was never called, by anything, and the
+  credential was returned to a panel that dropped it. It is injected onto
+  `admin.browserCallbacks` now, written to both the block and its flattened
+  form so re-resolving a collection cannot undo it. Resetting a password was
+  never affected: that dialog fetches and renders the result itself.
 
-  ```bash
-  rebase db branch prune                   # orphans only — always safe
-  rebase db branch prune --older-than 2w   # and anything past two weeks
-  ```
+- **Four of the seven showcase cards on the homepage rendered blank.** A
+  key sweep on 2026-09-02 deleted the strings for the presupuestos, Prospector,
+  Unfeigned and Edith cards because the carousel builds its keys dynamically
+  and the sweep only saw literal `t("…")` calls. The four locales get their
+  copy back, and the built page no longer carries `alt="undefined …"`.
 
-  It also finds the two ways branches drift from their metadata, which drift in
-  opposite directions: an entry whose database was dropped outside Rebase, which
-  `list` would keep reporting forever while `switch` and `info` fail against a
-  database nothing can find; and a branch database whose entry was never
-  written, because `create` makes the database first and records it second.
-  Nothing expires unless asked, ages are floored so a cutoff never catches
-  something younger than it says, and `--older-than 7h` is refused rather than
-  read as seven days. Atlas's `<db>_dev_diff` scratch databases are reported
-  alongside but removed only with `--include-dev-diff`.
 
-- **`rebase db branch` reported branches the managed database had not made.**
-  PGlite serves exactly one database, so `CREATE DATABASE ... TEMPLATE` wrote a
-  `pg_database` catalog entry and copied nothing. Every step then agreed:
-  `create` answered `✓ Branch "feature_x" created successfully.`, and `list`
-  showed it at 7.1 MB because the catalog entry makes its `JOIN pg_database`
-  succeed and `pg_database_size` answer for the one real database. Connecting to
-  `rb_feature_x` reported `current_database()` = `postgres`, and a table created
-  "in the branch" appeared in the parent — so every write made in the belief
-  that it was sandboxed landed in the developer's own database. Measured on a
-  fresh `rebase init` scaffold, which is the default path. The whole `branch`
-  domain is now refused there, before the database is started, naming
-  `rebase dev --docker` and `DATABASE_URL` as the two things that work.
+- **`rls-check` reported clean on a table the whole internet could read.** The
+  `policy-anonymous-tautology` check bailed out whenever it saw the literal
+  `<> 'anonymous'`, so a policy guarding against `'anon'` instead fell past the
+  bail — and then no longer matched the bare null-test shape either, so the check
+  returned nothing at all. `rebase.uid() IS NOT NULL AND rebase.uid() <> 'anon'`
+  reads as "signed in", is true for every anonymous caller, and was scanned and
+  passed. The guard is now parsed rather than string-matched: the expression is
+  split on `AND` counting parens, `<> ALL (ARRAY[…])` and `NOT IN (…)` are read
+  as the exclusions they are, and a policy only clears when it excludes an id a
+  signed-out caller can actually arrive with. Excluding some other literal is now
+  the loudest finding of the three, because it is the one that survives review.
+  Severity also rises a step for `ALL`, `UPDATE` and `DELETE` policies, where the
+  same predicate decides who may write.
 
-- **`rebase db pull` handed back a database the application could not read.**
-  `pg_dump --no-privileges` strips every GRANT, so the copy arrived with the
-  source's RLS policies and its `FORCE ROW LEVEL SECURITY` intact and nothing
-  behind them. Measured on a 30-table project: 68 policies and 60 grants in, 68
-  policies and **0** grants out, and the first read as the role Rebase serves
-  every request through failing with `permission denied for table leads` — after
-  a green `✓ Local database now holds a copy of …`. Anyone who pulled and then
-  opened `psql`, ran `rls-check`, or pointed a test suite at the copy hit a wall
-  with no hint of the cause. The pull now re-provisions the app role through the
-  same `ensureAppRole` boot and `db push` call, so internal tables stay revoked
-  as well. The backup path already guarded this hazard; the newer command people
-  are told to use did not.
+- **A bundle that vendors its own `node_modules` booted two copies of the
+  framework.** New pods crash-looped with `Could not load the database driver
+  "@rebasepro/server-postgres": Resource kind "database" is already registered
+  with a different definition` — while the driver was installed the whole time.
+  The process held the image's `@rebasepro/types` and the bundle's vendored
+  copy; `registerResourceKind` keys off `globalThis` deliberately, so both
+  registered into one registry, and the two specs for kind `database` had
+  diverged by a single `optionKeys` entry. It threw during the driver's import,
+  so the driver got the blame. The dedupe that exists to prevent this was
+  unreachable on three of the four paths into a running pod. (#38)
 
-- **`rebase db pull --database-url` was accepted and ignored.** The flag never
-  reached the resolver, so the pull went ahead against the `.env` database
-  anyway: `rebase db pull --from prod --database-url scratch --yes` destroyed the
-  working database while naming a different one. It is now refused rather than
-  honoured — the target is the local development database by construction, since
-  a command that can copy in both directions eventually copies the wrong way, and
-  the wrong way here is a laptop over production. The refusal points at `--from`.
+  The shipped kind literals are frozen at their 0.17.3 bytes now, because the
+  copy that compares them is inlined in every published driver and is in the
+  field. What a kind *binds* from is a per-copy overlay instead —
+  `import { amendResourceKind } from "@rebasepro/types"` — which an older inlined
+  copy never sees and therefore never compares.
 
-### Added
+- **`zod` was missing from the runtime-provided list, so a managed app ran no
+  crons and reported success.** A bundle shipped its own zod beside the image's;
+  `loadEnv({ extend })` then parsed a schema built by a different module
+  instance, and every field carrying a `.default()` was rejected. Nothing in
+  that failure mentions zod. Added to all three lists, and the agreement test
+  that should have caught it no longer filters to `@rebasepro/*` — which is why
+  a non-scoped entry could diverge for four releases unseen. The runtime also
+  re-exports its own copy — `import { z } from "@rebasepro/server"` — so an
+  `extend` schema cannot be built from the wrong one; `loadEnv` refuses a foreign
+  schema by name rather than validating half of it.
 
-- **`rebase db branch switch` — branching stopped one step short of being a
-  feature.** `create` copied a 12 MB database in 1.2s and then printed
-  `Database: rb_feature_auth` and nothing else: there was no `switch`, no
-  `--branch` on `rebase dev`, no `REBASE_BRANCH`, and not even a connection
-  string to paste. The only way to work on a branch was to hand-edit
-  `DATABASE_URL`, while the documentation said the CLI updated your local
-  development configuration — it did not, and the `.env` was byte-identical
-  afterwards.
+- **Every failure on a first cloud deploy said what it was, or said nothing.**
+  The boot ensure built its message from `err.message`, which for drizzle is
+  `Failed query: <sql>` and not one word of Postgres's answer — the SQLSTATE,
+  message, detail and hint all sat in `.cause` and were discarded. Four
+  unrelated boot failures read identically. Fixed here and in the RLS-policy
+  sibling, where the swallowed reason explains a table that is now denying every
+  request. Also: `storage create` 404'd because `invoke()` percent-encoded a
+  function name the CLI had folded a project id into, so
+  `storage-provision%2F<id>` matched a route that had been live for six weeks.
 
-  ```bash
-  rebase db branch switch feature_auth   # every later command follows
-  rebase db branch switch                # which branch am I on?
-  rebase db branch switch --off          # back to the main database
-  ```
+- **A restored, empty scroll entry asked the API for `limit=0`.**
+  `initialItemCount` fell back with `??`, which catches `null` and `undefined`
+  but not `0` — and `0` is exactly the value that means nothing was restored.
+  Any filter combination matching no rows saved `data: []`, so returning to that
+  view rendered `Invalid limit: 0` instead of a table, and a client bug wore an
+  API failure's clothes. (#37)
 
-  The branch is recorded in `.rebase/branch.json` as a name, never a connection
-  string, so credentials stay in `.env` alone. It outranks `DATABASE_URL` in
-  `.env` — any lower and switching would do nothing on a project that sets one —
-  and loses to `--database-url` and a `DATABASE_URL` in the shell, so a flag on
-  the command line still beats a switch made yesterday. Deleting the branch you
-  are on returns the checkout to the main database instead of leaving it aimed
-  at a database that no longer exists.
+- **The default scaffold's first data read returned 500.** `rebase init` writes
+  no `DATABASE_URL`, so `rebase dev` takes the managed PGlite path — and nothing
+  on that path replaced the template's stub `schema.generated.ts`
+  (`export const tables = {}`). The database was fine: boot created every table,
+  `/health` answered 200 and auth worked, while every `GET /api/data/*` returned
+  `Table not found`. `rebase dev` now generates the Drizzle schema before
+  starting anything, whichever database is behind it.
 
-### Documentation
+- **`rebase db push` against the managed database failed twice over.** First
+  `pq: SSL is not enabled on the server`, because PGlite's socket server speaks
+  no TLS — its remedy box then told the reader to append `sslmode=disable` to
+  `DATABASE_URL`, the variable that is unset precisely because the managed
+  database is in use. Past that, Atlas needs a second empty database to diff
+  against and PGlite serves exactly one. The managed DSN now disables SSL, and
+  `push`, `generate` and `migrate` stop up front on that database with the two
+  things that do work.
 
-- **The branching page promised three things the feature does not do.** It said
-  the CLI updates your local development configuration when you create or switch
-  to a branch — there is no `switch`, and `create` leaves `.env` byte-identical.
-  It presented `DatabasePoolManager`'s pool eviction as the guard against
-  `is being accessed by other users`, when that only reaches pools inside the
-  process doing the work and `rebase db branch` is its own process — so a running
-  `rebase dev` blocks branching and always did. And nothing said branching needs
-  a real PostgreSQL server: on the managed PGlite database
-  `CREATE DATABASE ... TEMPLATE` writes a catalog entry and copies nothing, so
-  the "branch" resolves to the database it was cloned from. `rebase db branch
-  info` and `--from` were missing from the CLI reference as well.
+- **A `--headless` project read as misconfigured on a clean boot.** The source
+  bundle's manifest declared `entry.collections` and `entry.schema` from the
+  conventional layout whether or not those paths existed, so a correct project
+  warned that a file "does not exist" and that no tables would be created. The
+  manifest now states what the project has.
+
+- **`/api/data/*` answered a plain-text 404 when a project served no
+  collections.** The surface was not mounted at all, so Hono's default replied —
+  which reads as a wrong URL when the truth is that there is nothing to serve
+  yet. It now returns a JSON `NO_COLLECTIONS` 404 saying tables must exist
+  first.
+
+- **The welcome email was in Spanish, and linked the wrong port.** Subject and
+  body, on an English project, while every other template is English. And
+  `rebase dev` left the frontend port to Vite while the backend was started with
+  the scaffold's fixed `FRONTEND_URL=http://localhost:5173`, so the link named a
+  port the app was not on. The frontend port is now derived per project, like
+  the backend's, and handed to the server that builds the link.
+
+- **Twenty lines of ERESOLVE before the CLI printed anything.**
+  `@electric-sql/pglite-socket` pins its peers to exact versions per release, so
+  `^0.2.9` floated to 0.2.11, which demands `pglite-pgvector` 0.0.9 while the
+  CLI asked for 0.0.7. The family is pinned exactly.
 
 ### Security
 
@@ -643,200 +878,20 @@ deployment you already run.
   `qs` both reach `@rebasepro/mcp` as runtime dependencies, not only build
   tooling. Both raised, with `browserslist` alongside them.
 
-### Added
-
-- **`policy.registered()`.** `POST /auth/anonymous` mints a real user row with a
-  real uid, so a guest satisfies `policy.authenticated()` — which is the point
-  of the feature, and also means "signed in" was true for anyone who pressed
-  *Continue as guest*. `registered()` is `authenticated()` plus "not a guest";
-  reach for it wherever a rule is about somebody who could be held responsible
-  for something. The flag travels in the access token and reaches the database
-  as `rebase.is_anonymous()`, so a policy can ask without a lookup.
-
-- **`rls-check` gained `policy-authenticated-tautology`.** Correcting an
-  anonymous tautology by excluding the sentinel is where people stop, and what
-  remains — "every account may read every row" — is the shape that made a
-  customer's `users` table readable by anyone who could sign up. It is a
-  separate id from the anonymous finding on purpose: different severity,
-  different fix, and `--skip` should be able to silence one without the other.
-- **In production, whoever registered first owned the deployment.** An empty
-  user table admitted the first registration and promoted it to admin — the
-  right rule for a laptop, and an open window on every host with a public
-  hostname, since the shipped artifacts bring DNS and TLS up before the
-  operator has typed anything. `GET /auth/config` advertised `needsSetup:
-  true`, so the unclaimed hosts were also easy to find. `POST /admin/bootstrap`
-  offered the same prize one request later, to the earliest-registered user.
-
-  The window now exists only outside `NODE_ENV=production`. In production an
-  empty table refuses the bootstrap registration with `SETUP_REQUIRED` and says
-  what to do instead, a first account created through open registration is an
-  ordinary account, `needsSetup` is never advertised, `/admin/bootstrap`
-  refuses, and boot warns when the table is empty and `REBASE_ADMIN_EMAIL` is
-  unset. The two ways in — the named admin seed (`REBASE_ADMIN_EMAIL` /
-  `REBASE_ADMIN_PASSWORD`, which every shipped blueprint already sets) and the
-  service key — are the ones nobody can race for. Development, `rebase dev`
-  and the test suites keep first-registration-is-admin.
-
-- **`GET /api/functions` handed anyone the inventory of custom endpoints.**
-  Functions themselves stay anonymous-callable by default (a webhook receiver
-  has to be), but the listing now requires a resolved identity — a signed-in
-  user, an API key or the service key. `rebase cloud debug` already read a
-  401 there as "mounted".
-
-- **Two audit reports named internal infrastructure.** A private database
-  address and a cluster-internal service hostname in `docs/audits/` are
-  replaced with placeholders, and the webhook audit carries a dated status
-  line, since the SSRF guard it says does not exist has existed since
-  2026-08-08.
-
-### Fixed
-
-- **Creating a user in the panel never showed the temporary password.** The
-  server mints one, returns it beside the columns on the create response, and
-  will not repeat it; the dialog that shows it to the administrator was
-  installed as an `afterSave` on the collection's `callbacks` — the server's
-  block, which nothing in the browser runs and whose bodies the bundler strips
-  on the way in. So the callback was never called, by anything, and the
-  credential was returned to a panel that dropped it. It is injected onto
-  `admin.browserCallbacks` now, written to both the block and its flattened
-  form so re-resolving a collection cannot undo it. Resetting a password was
-  never affected: that dialog fetches and renders the result itself.
-
-- **Four of the seven showcase cards on the homepage rendered blank.** A
-  key sweep on 2026-09-02 deleted the strings for the presupuestos, Prospector,
-  Unfeigned and Edith cards because the carousel builds its keys dynamically
-  and the sweep only saw literal `t("…")` calls. The four locales get their
-  copy back, and the built page no longer carries `alt="undefined …"`.
-
-
-- **`rls-check` reported clean on a table the whole internet could read.** The
-  `policy-anonymous-tautology` check bailed out whenever it saw the literal
-  `<> 'anonymous'`, so a policy guarding against `'anon'` instead fell past the
-  bail — and then no longer matched the bare null-test shape either, so the check
-  returned nothing at all. `rebase.uid() IS NOT NULL AND rebase.uid() <> 'anon'`
-  reads as "signed in", is true for every anonymous caller, and was scanned and
-  passed. The guard is now parsed rather than string-matched: the expression is
-  split on `AND` counting parens, `<> ALL (ARRAY[…])` and `NOT IN (…)` are read
-  as the exclusions they are, and a policy only clears when it excludes an id a
-  signed-out caller can actually arrive with. Excluding some other literal is now
-  the loudest finding of the three, because it is the one that survives review.
-  Severity also rises a step for `ALL`, `UPDATE` and `DELETE` policies, where the
-  same predicate decides who may write.
-
-- **A bundle that vendors its own `node_modules` booted two copies of the
-  framework.** New pods crash-looped with `Could not load the database driver
-  "@rebasepro/server-postgres": Resource kind "database" is already registered
-  with a different definition` — while the driver was installed the whole time.
-  The process held the image's `@rebasepro/types` and the bundle's vendored
-  copy; `registerResourceKind` keys off `globalThis` deliberately, so both
-  registered into one registry, and the two specs for kind `database` had
-  diverged by a single `optionKeys` entry. It threw during the driver's import,
-  so the driver got the blame. The dedupe that exists to prevent this was
-  unreachable on three of the four paths into a running pod. (#38)
-
-- **`zod` was missing from the runtime-provided list, so a managed app ran no
-  crons and reported success.** A bundle shipped its own zod beside the image's;
-  `loadEnv({ extend })` then parsed a schema built by a different module
-  instance, and every field carrying a `.default()` was rejected. Nothing in
-  that failure mentions zod. Added to all three lists, and the agreement test
-  that should have caught it no longer filters to `@rebasepro/*` — which is why
-  a non-scoped entry could diverge for four releases unseen.
-
-- **Every failure on a first cloud deploy said what it was, or said nothing.**
-  The boot ensure built its message from `err.message`, which for drizzle is
-  `Failed query: <sql>` and not one word of Postgres's answer — the SQLSTATE,
-  message, detail and hint all sat in `.cause` and were discarded. Four
-  unrelated boot failures read identically. Fixed here and in the RLS-policy
-  sibling, where the swallowed reason explains a table that is now denying every
-  request. Also: `storage create` 404'd because `invoke()` percent-encoded a
-  function name the CLI had folded a project id into, so
-  `storage-provision%2F<id>` matched a route that had been live for six weeks.
-
-- **A restored, empty scroll entry asked the API for `limit=0`.**
-  `initialItemCount` fell back with `??`, which catches `null` and `undefined`
-  but not `0` — and `0` is exactly the value that means nothing was restored.
-  Any filter combination matching no rows saved `data: []`, so returning to that
-  view rendered `Invalid limit: 0` instead of a table, and a client bug wore an
-  API failure's clothes. (#37)
-
-- **The default scaffold's first data read returned 500.** `rebase init` writes
-  no `DATABASE_URL`, so `rebase dev` takes the managed PGlite path — and nothing
-  on that path replaced the template's stub `schema.generated.ts`
-  (`export const tables = {}`). The database was fine: boot created every table,
-  `/health` answered 200 and auth worked, while every `GET /api/data/*` returned
-  `Table not found`. `rebase dev` now generates the Drizzle schema before
-  starting anything, whichever database is behind it.
-
-- **`rebase db push` against the managed database failed twice over.** First
-  `pq: SSL is not enabled on the server`, because PGlite's socket server speaks
-  no TLS — its remedy box then told the reader to append `sslmode=disable` to
-  `DATABASE_URL`, the variable that is unset precisely because the managed
-  database is in use. Past that, Atlas needs a second empty database to diff
-  against and PGlite serves exactly one. The managed DSN now disables SSL, and
-  `push`, `generate` and `migrate` stop up front on that database with the two
-  things that do work.
-
-- **A `--headless` project read as misconfigured on a clean boot.** The source
-  bundle's manifest declared `entry.collections` and `entry.schema` from the
-  conventional layout whether or not those paths existed, so a correct project
-  warned that a file "does not exist" and that no tables would be created. The
-  manifest now states what the project has.
-
-- **`/api/data/*` answered a plain-text 404 when a project served no
-  collections.** The surface was not mounted at all, so Hono's default replied —
-  which reads as a wrong URL when the truth is that there is nothing to serve
-  yet. It now returns a JSON `NO_COLLECTIONS` 404 saying tables must exist
-  first.
-
-- **The welcome email was in Spanish, and linked the wrong port.** Subject and
-  body, on an English project, while every other template is English. And
-  `rebase dev` left the frontend port to Vite while the backend was started with
-  the scaffold's fixed `FRONTEND_URL=http://localhost:5173`, so the link named a
-  port the app was not on. The frontend port is now derived per project, like
-  the backend's, and handed to the server that builds the link.
-
-- **Twenty lines of ERESOLVE before the CLI printed anything.**
-  `@electric-sql/pglite-socket` pins its peers to exact versions per release, so
-  `^0.2.9` floated to 0.2.11, which demands `pglite-pgvector` 0.0.9 while the
-  CLI asked for 0.0.7. The family is pinned exactly.
-
-### Changed
-
-- **A collection's `callbacks` runs on the server, and only there. The panel's
-  own callbacks are `admin.browserCallbacks`.** The Vite plugin has always
-  stripped that block's bodies out of the admin bundle, so a `beforeSave`
-  calling a vendor with a key from `process.env` does not ship to every visitor
-  — but two keys were exempt, on the grounds that the panel ran them. Both
-  exemptions were wrong, in different directions. `afterSave` had no
-  client-side call site at all: the body shipped and never ran. `afterRead` did
-  run, unconditionally, on top of the server having already applied it — so
-  every server-backed collection transformed its rows twice, and anything not
-  idempotent compounded. Meanwhile a collection on a `direct` transport, where
-  the panel talks to the store itself and no server sees the operation, got
-  read callbacks while its write callbacks were stripped out from under it,
-  silently. The strip is total now, with no allowlist to fall out of date, and
-  callbacks the panel runs live under `admin.browserCallbacks`: a separate key,
-  so which runtime a callback belongs to is a fact about the collection file
-  rather than about a `dataSources` declaration in another one — which is the
-  thing a build-time transform cannot see. Move a browser-side `afterRead` into
-  the new block; a server-side one already worked and needs no change.
-
-- **`saveEntityWithCallbacks` and `deleteEntityWithCallbacks` run callbacks.**
-  Both have been named for callbacks they never ran, since they were written,
-  and `deleteEntityWithCallbacks` went as far as accepting a `callbacks` prop
-  and dropping it on the floor. They run the collection's
-  `admin.browserCallbacks` around the write: `beforeSave` can block a save the
-  way the server's does, `beforeDelete` can block a delete, and `afterSave`
-  receives the row *as saved* rather than the values submitted. That prop is
-  gone, as is the `callbacks` prop on `DeleteEntityDialog` that fed it — both
-  were being passed the server's block, in the browser, where it does nothing.
-
-- **The ERD has one layout, and it reads top to bottom.** The LR/TB toggle
-  offered a choice the canvas cannot honour: the visualizer's pane is tall and
-  narrow, so the left-to-right default pushed the graph off both sides on open.
-  The machinery went with the buttons rather than being left behind.
-
 ### Documentation
+
+- **The branching page promised three things the feature does not do.** It said
+  the CLI updates your local development configuration when you create or switch
+  to a branch — there is no `switch`, and `create` leaves `.env` byte-identical.
+  It presented `DatabasePoolManager`'s pool eviction as the guard against
+  `is being accessed by other users`, when that only reaches pools inside the
+  process doing the work and `rebase db branch` is its own process — so a running
+  `rebase dev` blocks branching and always did. And nothing said branching needs
+  a real PostgreSQL server: on the managed PGlite database
+  `CREATE DATABASE ... TEMPLATE` writes a catalog entry and copies nothing, so
+  the "branch" resolves to the database it was cloned from. `rebase db branch
+  info` and `--from` were missing from the CLI reference as well.
+
 
 - **`docs/compatibility.md` publishes the readiness table it promised** — one
   row per subsystem, dated, rated stable / beta / experimental, each with what
@@ -863,16 +918,6 @@ deployment you already run.
 - **`@rebasepro/server-mongo` and `@rebasepro/firebase` have pages**, each
   leading with what it does not do.
 
-### Removed
-
-- **`loadDeclaredStorageSources`** (`@rebasepro/server`), **`normalizeStorageSources`**
-  and **`DeclaredStorageSources`** (`@rebasepro/types`). All three served the
-  `storage` block of `rebase.json`, which the manifest validator now refuses:
-  buckets are declared with `bucket()` and the graph is generated into
-  `rebase.resources.json`. The loader parsed a block that can no longer exist and
-  the merge resolved a conflict between two homes there is now one of. Pre-release,
-  a breaking change is just a change — the runtime contract stays at 1, as it did
-  for the declaration change itself.
 
 ## [0.17.3] - 2026-08-31
 

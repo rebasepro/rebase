@@ -8,39 +8,54 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import path from "path";
-import { absolutizeLocalPathArgs, refuseAtlasOnManagedDatabase, refuseBranchOnManagedDatabase } from "./db.js";
+import {
+    absolutizeLocalPathArgs,
+    databaseUrlOf,
+    dbExamples,
+    ManagedDatabaseRefusal,
+    refuseAtlasOnManagedDatabase,
+    refuseBranchOnManagedDatabase
+} from "./db.js";
 
 const ROOT = path.resolve("/projects/my-app");
 
+/**
+ * Every spelling the driver's backup spec accepts — `backup-cli.ts` aliases
+ * `--output` and `-o` onto `--out`, and `rebase db backup --help` advertises
+ * `--output`. The suite used to cover two of the three, and the uncovered one
+ * was the one that was broken: `--output ./backups` reached the driver
+ * unresolved and wrote under `backend/`.
+ */
+const DESTINATION_FLAGS = ["--out", "--output", "-o"];
+
 describe("absolutizeLocalPathArgs", () => {
-    it("resolves a relative --out against the directory the user is standing in", () => {
-        /*
-         * The reported bug: `rebase db backup --out ./backups` from the project
-         * root wrote to `backend/backups` while the success line echoed the path
-         * as typed, so the file existed and the location printed was wrong. That
-         * exact invocation is in `rebase db --help`'s own examples.
-         */
-        const out = absolutizeLocalPathArgs(["db", "backup", "--out", "./backups"], ROOT);
-        expect(out).toEqual(["db", "backup", "--out", path.join(ROOT, "backups")]);
+    it.each(DESTINATION_FLAGS)(
+        "resolves a relative %s against the directory the user is standing in",
+        flag => {
+            /*
+             * The reported bug: `rebase db backup --out ./backups` from the
+             * project root wrote to `backend/backups` while the success line
+             * echoed the path as typed, so the file existed and the location
+             * printed was wrong. That exact invocation is in `rebase db
+             * --help`'s own examples.
+             */
+            const out = absolutizeLocalPathArgs(["db", "backup", flag, "./backups"], ROOT);
+            expect(out).toEqual(["db", "backup", flag, path.join(ROOT, "backups")]);
+        }
+    );
+
+    it.each(DESTINATION_FLAGS)("handles the %s=<value> spelling", flag => {
+        const out = absolutizeLocalPathArgs(["db", "backup", `${flag}=./backups`], ROOT);
+        expect(out).toEqual(["db", "backup", `${flag}=${path.join(ROOT, "backups")}`]);
     });
 
-    it("handles the --out=<value> spelling", () => {
-        const out = absolutizeLocalPathArgs(["db", "backup", "--out=./backups"], ROOT);
-        expect(out).toEqual(["db", "backup", `--out=${path.join(ROOT, "backups")}`]);
-    });
-
-    it("handles the -o alias", () => {
-        const out = absolutizeLocalPathArgs(["db", "backup", "-o", "backups"], ROOT);
-        expect(out).toEqual(["db", "backup", "-o", path.join(ROOT, "backups")]);
-    });
-
-    it("leaves an already-absolute path alone", () => {
+    it.each(DESTINATION_FLAGS)("leaves an already-absolute %s path alone", flag => {
         const abs = path.resolve("/var/backups");
-        expect(absolutizeLocalPathArgs(["db", "backup", "--out", abs], ROOT))
-            .toEqual(["db", "backup", "--out", abs]);
+        expect(absolutizeLocalPathArgs(["db", "backup", flag, abs], ROOT))
+            .toEqual(["db", "backup", flag, abs]);
     });
 
-    it("never touches a remote destination", () => {
+    it.each(DESTINATION_FLAGS)("never touches a remote %s destination", flag => {
         /*
          * The whole point of the fix is joining paths onto a cwd, and an
          * `s3://bucket/prefix` joined onto anything stops being a URL. Matched
@@ -48,14 +63,24 @@ describe("absolutizeLocalPathArgs", () => {
          * destination this build does not support yet still survives intact.
          */
         for (const url of ["s3://bucket/prefix", "gs://bucket/prefix", "https://example.com/x"]) {
-            expect(absolutizeLocalPathArgs(["db", "backup", "--out", url], ROOT))
-                .toEqual(["db", "backup", "--out", url]);
+            expect(absolutizeLocalPathArgs(["db", "backup", flag, url], ROOT))
+                .toEqual(["db", "backup", flag, url]);
         }
     });
 
-    it("does not mistake the next flag for the value of --out", () => {
-        const out = absolutizeLocalPathArgs(["db", "backup", "--out", "--no-owner"], ROOT);
-        expect(out).toEqual(["db", "backup", "--out", "--no-owner"]);
+    it.each(DESTINATION_FLAGS)("does not mistake the next flag for the value of %s", flag => {
+        const out = absolutizeLocalPathArgs(["db", "backup", flag, "--no-owner"], ROOT);
+        expect(out).toEqual(["db", "backup", flag, "--no-owner"]);
+    });
+
+    it.each(DESTINATION_FLAGS)("does not treat %s's value as the restore positional", flag => {
+        const out = absolutizeLocalPathArgs(
+            ["db", "restore", flag, "./copy", "./backups/x.dump"],
+            ROOT
+        );
+        expect(out).toEqual([
+            "db", "restore", flag, path.join(ROOT, "copy"), path.join(ROOT, "backups/x.dump")
+        ]);
     });
 
     it("resolves the dump file `db restore` reads", () => {
@@ -109,19 +134,20 @@ describe("refuseAtlasOnManagedDatabase", () => {
      */
     const call = (args: string[], kind: string) => {
         const exit = vi.spyOn(process, "exit").mockImplementation((() => {
-            throw new Error("exited");
+            throw new Error("the guard must not exit the process");
         }) as never);
-        const err = vi.spyOn(console, "error").mockImplementation(() => {});
-        let threw = false;
         try {
             refuseAtlasOnManagedDatabase(args, kind);
-        } catch {
-            threw = true;
+        } catch (error) {
+            // The type is the assertion: an exit here would be the bug this
+            // guard caused in `rebase dev`, which runs `db push` in-process.
+            expect(error).toBeInstanceOf(ManagedDatabaseRefusal);
+            const refusal = error as ManagedDatabaseRefusal;
+            return { refused: true, output: refusal.lines.join("\n"), message: refusal.message };
+        } finally {
+            exit.mockRestore();
         }
-        const output = err.mock.calls.map(c => String(c[0] ?? "")).join("\n");
-        exit.mockRestore();
-        err.mockRestore();
-        return { refused: threw, output };
+        return { refused: false, output: "", message: "" };
     };
 
     it.each(["push", "generate", "migrate"])("refuses db %s on the managed database", (sub) => {
@@ -159,19 +185,17 @@ describe("refuseBranchOnManagedDatabase", () => {
      */
     const call = (args: string[], kind: string) => {
         const exit = vi.spyOn(process, "exit").mockImplementation((() => {
-            throw new Error("exited");
+            throw new Error("the guard must not exit the process");
         }) as never);
-        const err = vi.spyOn(console, "error").mockImplementation(() => {});
-        let threw = false;
         try {
             refuseBranchOnManagedDatabase(args, kind);
-        } catch {
-            threw = true;
+        } catch (error) {
+            expect(error).toBeInstanceOf(ManagedDatabaseRefusal);
+            return { refused: true, output: (error as ManagedDatabaseRefusal).lines.join("\n") };
+        } finally {
+            exit.mockRestore();
         }
-        const output = err.mock.calls.map(c => String(c[0] ?? "")).join("\n");
-        exit.mockRestore();
-        err.mockRestore();
-        return { refused: threw, output };
+        return { refused: false, output: "" };
     };
 
     it("refuses db branch on the managed database", () => {
@@ -210,5 +234,85 @@ describe("refuseBranchOnManagedDatabase", () => {
         for (const sub of ["push", "backup", "restore", "pull"]) {
             expect(call(["node", "rebase", "db", sub], "managed").refused).toBe(false);
         }
+    });
+});
+
+describe("the examples in `rebase db --help`", () => {
+    /**
+     * Every command the help used to lead with — `db push`, `db generate`,
+     * `db migrate`, `db branch` — is refused on the managed development
+     * database, by the two guards above, in this same file. So on the project
+     * the CLI had just scaffolded, the first thing `rebase db --help` offered
+     * was a command that answers with a refusal.
+     */
+    // eslint-disable-next-line no-control-regex
+    const plain = (kind: Parameters<typeof dbExamples>[0]) => dbExamples(kind).replace(/\x1b\[[0-9;]*m/g, "");
+
+    const REFUSED_ON_MANAGED = ["rebase db push", "rebase db generate", "rebase db migrate", "rebase db branch"];
+
+    it("offers nothing the managed database refuses", () => {
+        const examples = plain("managed");
+        for (const command of REFUSED_ON_MANAGED) {
+            expect(examples, `${command} is refused on the managed database`).not.toContain(command);
+        }
+    });
+
+    it("leads with something that works there", () => {
+        const first = plain("managed").split("\n").find(l => l.trim() && !l.trim().startsWith("#"))!;
+        expect(first).toContain("rebase schema generate");
+    });
+
+    it("names how to get a database those commands do work on", () => {
+        // Declining without naming the alternative is how a reader concludes
+        // their install is broken.
+        const examples = plain("managed");
+        expect(examples).toContain("rebase dev --docker");
+        expect(examples).toContain("DATABASE_URL");
+    });
+
+    it.each(["external", "docker", null] as const)("keeps the full workflow for %s", (kind) => {
+        const examples = plain(kind);
+        for (const command of REFUSED_ON_MANAGED) expect(examples).toContain(command);
+    });
+});
+
+/**
+ * `db pull` and `db url` answer the same question about the same project.
+ *
+ * They did not. `prepareDatabaseEnv` returns `env: {}` for a plain external
+ * database — the connection string is already in a place the child reads — so
+ * `db pull`, which read only `prepared.env.DATABASE_URL ?? process.env
+ * .DATABASE_URL`, answered `✗ No local database to pull into.` on the standard
+ * configuration: `DATABASE_URL` in `.env` and nowhere else. `rebase db url` on
+ * the same project printed the URL. Exporting it in the shell made the pull
+ * work, which is how a broken command comes to look like a user error.
+ */
+describe("databaseUrlOf", () => {
+    const external = (url: string) => ({ kind: "external", url, source: "env-file" } as const);
+
+    it("finds the URL that is only in .env", () => {
+        expect(databaseUrlOf(
+            { env: {}, database: external("postgres://u@h/app") },
+            { DATABASE_URL: "postgres://u@h/app" }
+        )).toBe("postgres://u@h/app");
+    });
+
+    it("prefers the prepared environment, which is where a branch URL lives", () => {
+        expect(databaseUrlOf(
+            { env: { DATABASE_URL: "postgres://u@h/rb_feature" }, database: external("postgres://u@h/app") },
+            { DATABASE_URL: "postgres://u@h/app" }
+        )).toBe("postgres://u@h/rb_feature");
+    });
+
+    it("does not invent a URL for the managed database", () => {
+        // The managed variant carries no `url` at all: it is served by a daemon
+        // the caller may not have started. `prepareDatabaseEnv` puts the real
+        // one in `env` when it does start it.
+        expect(databaseUrlOf({ env: {}, database: { kind: "managed", source: "managed" } }, {}))
+            .toBeUndefined();
+    });
+
+    it("still answers for a project that configured nothing anywhere", () => {
+        expect(databaseUrlOf({ env: {}, database: external("") }, {})).toBeUndefined();
     });
 });

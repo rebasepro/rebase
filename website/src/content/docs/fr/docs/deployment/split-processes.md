@@ -1,4 +1,5 @@
 ---
+sourceHash: 6fed2244f8f617c0
 title: Répartir sur plusieurs processus
 sidebar_label: Processus séparés
 description: "Exécutez un bundle sous forme de plusieurs processus coopérants — une API, une couche de fonctions, un worker — depuis la même image de runtime publiée, afin qu'une fonction personnalisée lourde cesse de concurrencer l'API de données."

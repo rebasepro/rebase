@@ -1,4 +1,5 @@
 ---
+sourceHash: 8894ea74b3dd7b7d
 title: Cronologia Entità
 sidebar_label: Cronologia Entità
 description: Tieni traccia di ogni modifica alle tue entità con una traccia di audit completa — chi ha modificato cosa, quando, e lo entity completo prima/dopo.

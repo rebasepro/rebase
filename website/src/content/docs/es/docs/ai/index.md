@@ -1,4 +1,5 @@
 ---
+sourceHash: c933db5cdbb2cfc2
 title: IA y agentes
 sidebar_label: Información general
 description: "Lo que Rebase incluye para asistentes de programación con IA y agentes autónomos: un servidor MCP, skills de agentes locales del proyecto, archivos de instrucciones estructurados y el modelo de credenciales que decide a qué puede acceder realmente un agente."
@@ -12,7 +13,7 @@ un problema diferente. Vale la pena saber a cuál de ellos estás recurriendo:
 | [**Servidor MCP**](/docs/ai/mcp) | Un servidor Model Context Protocol basado en stdio con 41 herramientas sobre tu esquema, datos, usuarios, almacenamiento, cron y servidor de desarrollo | Un asistente, en tiempo de ejecución |
 | [**Skills de agentes**](/docs/ai/skills) | 20 archivos de skills en Markdown escritos en tu repositorio mediante `rebase skills install` | Un asistente, como material de referencia |
 | [**Archivos de instrucciones**](/docs/ai/instruction-files) | `ai-instructions.md` además de archivos de puntero por asistente, generados por `rebase init` | Un asistente, como reglas siempre activas |
-| [**Claves de API**](/docs/backend/api#api-keys) | Credenciales de máquina con alcance limitado, por colección y por operación | Cualquier elemento que llame a la API HTTP |
+| [**Claves de API**](/docs/backend/api-keys) | Credenciales de máquina con alcance limitado, por colección y por operación | Cualquier elemento que llame a la API HTTP |
 
 Los tres primeros tratan de dotar al asistente de *conocimiento* y *herramientas*. El
 cuarto es el único que decide lo que realmente puede hacer.
@@ -44,7 +45,7 @@ visibilidad de las filas, no sobre la autenticación. Concederlo no añade a un 
 lista de permisos, y denegarlo no detiene a ninguno.
 
 La mecánica (creación de claves, el JSON de permisos, rotación, caducidad,
-límites de velocidad) se detalla en [API REST → Claves de API](/docs/backend/api#api-keys).
+límites de velocidad) se detalla en [API REST → Claves de API](/docs/backend/api-keys).
 No pases por alto [Reglas de seguridad (RLS)](/docs/collections/security-rules);
 la segunda compuerta solo es tan buena como las políticas que hayas escrito.
 
@@ -63,7 +64,7 @@ Rebase cuenta con un tipo de propiedad `vector` nativo en Postgres y un
 método de consulta `.vectorSearch()` con distancias `cosine`, `l2` e `inner_product`.
 Ya está documentado, en dos lugares en vez de uno:
 
-- [Consulta de datos → Búsqueda vectorial](/docs/sdk/querying#vector-search) — el método del SDK,
+- [Consulta de datos → Búsqueda vectorial](/docs/sdk/aggregates-and-search#vector-search) — el método del SDK,
   el campo `_distance` que añade a cada fila y las consideraciones
 - [API REST → Búsqueda vectorial](/docs/backend/api#vector-search) — los
   parámetros de consulta `vector_search`, `vector`, `vector_distance` y `vector_threshold`
@@ -80,7 +81,7 @@ lleve la biblioteca y un rol con permiso para instalarla. Y
 **cada columna vectorial obtiene un índice HNSW para la distancia coseno**,
 porque coseno es lo que mide `vectorSearch` salvo que pases `distance`: un
 índice sirve exactamente a un operador. Ajústalo, o desactívalo, en la
-propiedad: consulta [El índice](/docs/sdk/querying#the-index).
+propiedad: consulta [El índice](/docs/sdk/aggregates-and-search#the-index).
 
 Tampoco es posible suscribirse a consultas vectoriales; `.vectorSearch(...).listen()` es
 rechazado con `VECTOR_SEARCH_NOT_LIVE`.

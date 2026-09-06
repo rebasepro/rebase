@@ -1,4 +1,5 @@
 import { RealtimeService } from "./services/realtimeService";
+import { BranchingUnsupportedError } from "./services/BranchService";
 import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
 import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter } from "@rebasepro/types";
 import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
@@ -171,8 +172,26 @@ export function createPostgresWebSocket(
     const clientSessions = new Map<string, ClientSession>();
 
     const isProduction = process.env.NODE_ENV === "production";
-    /** Debug logger that is suppressed in production to prevent PII/data leaks */
-    const wsDebug = (...args: unknown[]) => { if (!isProduction) console.debug(...args); };
+    /**
+     * Debug tracing for this socket.
+     *
+     * Through `logger.debug`, not `console.debug`. A bare console call sits
+     * outside the one level system, so `LOG_LEVEL=warn` — a line the scaffold's
+     * own `.env.example` ships — silenced every structured line in the process
+     * and left these ones printing; the deletion of the old `console.debug`
+     * override is what exposed that. It also skipped the redactor, and the
+     * extras these calls carry are rows.
+     *
+     * The production guard stays on top of the level gate rather than being
+     * replaced by it: these lines trace requests and their payloads, and
+     * `LOG_LEVEL=debug` on a deployment is not consent to put a user's row on
+     * stdout.
+     */
+    const wsDebug = (message: string, ...extras: unknown[]) => {
+        if (isProduction) return;
+        if (extras.length === 0) logger.debug(message);
+        else logger.debug(message, { details: extras.length === 1 ? extras[0] : extras });
+    };
     const wss = new WebSocketServer({ server });
 
     // Handle errors on the WSS so that EADDRINUSE from the underlying HTTP
@@ -848,6 +867,23 @@ code: "INVALID_LIMIT" } }
                 // branch it becomes INTERNAL_ERROR with the text dropped in
                 // production, so the socket would refuse the write and decline
                 // to say why.
+                // "This server cannot branch" is a refusal too, and the same
+                // reasoning applies twice over: the generic branch would drop
+                // the text in production, and the text is the only thing that
+                // says what to do instead. Studio renders it where the success
+                // toast used to be.
+                if (error instanceof BranchingUnsupportedError
+                    || (error as Error)?.name === "BranchingUnsupportedError") {
+                    const refusal = error as BranchingUnsupportedError;
+                    logger.warn(`[WebSocket Server] Refused a branch operation: ${refusal.message}`);
+                    ws.send(JSON.stringify({
+                        type: "ERROR",
+                        requestId,
+                        payload: { error: { message: refusal.message,
+code: "BRANCHING_UNSUPPORTED" } }
+                    }));
+                    return;
+                }
                 if (error instanceof ApiError || (error as Error)?.name === "ApiError") {
                     const apiError = error as ApiError;
                     logger.warn(`[WebSocket Server] Refused a write: ${apiError.message}`);

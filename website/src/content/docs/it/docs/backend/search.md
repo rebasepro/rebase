@@ -1,4 +1,5 @@
 ---
+sourceHash: 04421ade309db1ce
 title: Ricerca
 sidebar_label: Search
 description: Come si comporta .search() per impostazione predefinita e come attivare la ricerca full-text con rilevanza in una collection Postgres sui campi specificati, inclusi i contenuti JSONB e array.

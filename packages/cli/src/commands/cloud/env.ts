@@ -106,6 +106,11 @@ function pendingHint(pending: boolean | null): string | undefined {
 }
 
 async function listEnv(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud env",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);

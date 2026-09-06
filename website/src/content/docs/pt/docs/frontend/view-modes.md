@@ -1,4 +1,5 @@
 ---
+sourceHash: 480ba165906124fe
 title: Modos de Visualização
 sidebar_label: Modos de Visualização
 description: Configure as visualizações de tabela, cartões e quadro Kanban para suas coleções.
@@ -19,10 +20,20 @@ Cada coleção pode ser exibida em quatro modos de visualização:
 import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
-    properties: { /* … */ },
+    // `orderProperty` e `kanban.columnProperty` são verificados contra estas
+    // chaves — com um bloco `properties` vazio eles se estreitam para `never`.
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        status: { name: "Status", type: "string" },
+        // A chave de ordem. Uma *string*, nunca um número — veja «Ordenação» abaixo.
+        __order: {
+            name: "Order",
+            type: "string",
+            admin: { disabled: true, hideFromCollection: true }
+        }
+    },
     name: "Products",
     table: "products",
-    // ...
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
@@ -37,13 +48,9 @@ const productsCollection = defineCollection({
 
 ## Visualização em Lista
 
-![Espaço reservado para captura de tela de visualização em lista](/img/features/list-view.png)
-
 A visualização em lista é o modo de visualização padrão clássico e limpo do CMS, mostrando entidades em um formato de lista direta, sem a densidade de uma planilha.
 
 ## Visualização em Tabela
-
-![Espaço reservado para captura de tela de visualização em tabela](/img/features/table-view.png)
 
 A visualização padrão é uma planilha virtualizada de alto desempenho com:
 
@@ -68,8 +75,6 @@ Controle a altura da linha com `defaultSize`:
 | `"xl"`  | 260    | Pré-visualizações de conteúdo rico |
 
 ## Visualização Kanban
-
-![Espaço reservado para captura de tela de visualização Kanban](/img/features/kanban-view.png)
 
 Configure um quadro Kanban especificando qual propriedade enum usar como colunas:
 
@@ -147,8 +152,9 @@ um quadro, ele mesmo deve atribuir a chave, com o mesmo alfabeto do admin:
 import { generateKeyBetween } from "fractional-indexing";
 
 // Base36, minúsculas. Quem ordena é o Postgres, cuja collation padrão não é a
-// ordenação por bytes: omitir este terceiro argumento produz chaves base62 como
-// "a0" que o quadro rejeita.
+// ordenação por bytes, então o alfabeto base62 padrão da biblioteca — que mistura
+// maiúsculas e minúsculas — ordena de forma diferente no banco e na chave.
+// Omitir este terceiro argumento produz chaves como "a0" que o quadro rejeita.
 const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 const tasks = client.data.collection("tasks");
@@ -165,13 +171,20 @@ const { data: last } = await tasks.find({
 await tasks.create({
     title,
     status,
-    __order: generateKeyBetween(last[0]?.__order ?? null, null, ORDER_KEY_DIGITS)
+    __order: generateKeyBetween(
+        (last[0]?.__order as string | undefined) ?? null,
+        null,
+        ORDER_KEY_DIGITS
+    )
 });
 ```
 
-## Visualização em Cartões
+As linhas criadas pelo formulário do admin também chegam sem chave — a diferença
+é apenas que você vê a barra no momento em que adiciona uma. Ali **Initialize** é
+a correção; num quadro alimentado por um backend é uma correção que se desfaz a
+cada execução.
 
-![Espaço reservado para captura de tela de visualização em cartões](/img/features/cards-view.png)
+## Visualização em Cartões
 
 Os cartões exibem entidades como cartões visuais — úteis para conteúdo com muitas imagens:
 

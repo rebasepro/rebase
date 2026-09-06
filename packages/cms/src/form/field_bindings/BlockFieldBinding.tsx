@@ -240,6 +240,9 @@ function BlockEntry({
                         <>
                             <Select
                                 className="mb-2"
+                                // The placeholder is an element, so this
+                                // control had no name of its own either.
+                                aria-label={t("type")}
                                 placeholder={<Typography variant={"caption"}
                                                          className={"px-4 py-2 font-medium"}>{t("type")}</Typography>}
                                 size={"medium"}

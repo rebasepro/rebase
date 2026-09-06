@@ -1,8 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
 
-import { hasOwnErrorHandler, installRootErrorHandler } from "../src/api/root-error-handler";
+import {
+    hasOwnErrorHandler,
+    installRootErrorHandler,
+    installUnmatchedApiEnvelope
+} from "../src/api/root-error-handler";
 import type { HonoEnv } from "../src/api/types";
+import { requestId, REQUEST_ID_HEADER } from "../src/utils/request-id";
 
 /**
  * Anything that throws answers the JSON envelope, not `text/plain`.
@@ -69,5 +74,102 @@ describe("installRootErrorHandler", () => {
         const configured = new Hono();
         configured.onError((_e, c) => c.text("mine", 500));
         expect(hasOwnErrorHandler(configured)).toBe(true);
+    });
+});
+
+/**
+ * `onError` was only ever half of it.
+ *
+ * A request that matches no route is not a thrown error — Hono answers it from
+ * `notFoundHandler`, which `onError` never sees — so every unmatched path under
+ * `/api` came back `404 Not Found` as `text/plain`, while `backend/errors.md`
+ * opens by promising one envelope with a stable `code` for every failure and
+ * `troubleshooting.md` says it again. Through the SDK it arrived as
+ * `RebaseApiError { code: undefined }`, so no documented branch could match it.
+ */
+describe("an unmatched route answers the envelope", () => {
+    const app = () => {
+        const a = new Hono<HonoEnv>();
+        installRootErrorHandler(a);
+        installUnmatchedApiEnvelope(a, "/api");
+        a.use("/api/*", requestId());
+        a.get("/api/data/posts", (c) => c.json({ data: [] }));
+        // Registered *after* the envelope middleware, exactly as `boot.ts`
+        // registers `/api/health` after `initializeRebaseBackend` returns. A
+        // catch-all route here would have swallowed it.
+        a.get("/api/health", (c) => c.json({ status: "ok" }));
+        return a;
+    };
+
+    it.each(["/api/nope", "/api/data", "/api/auth/nope", "/api/functions/hello/nope"])(
+        "%s is application/json with a code",
+        async (path) => {
+            const res = await app().request(path);
+
+            expect(res.status).toBe(404);
+            expect(res.headers.get("content-type")).toContain("application/json");
+            const body = await res.json() as { error: { code: string; message: string; requestId?: string } };
+            expect(body.error.code).toBe("NOT_FOUND");
+            expect(body.error.message).toContain(path);
+            expect(body.error.requestId).toBe(res.headers.get(REQUEST_ID_HEADER));
+        }
+    );
+
+    it("names the method as well as the path", async () => {
+        const res = await app().request("/api/data/posts", { method: "DELETE" });
+        const body = await res.json() as { error: { message: string } };
+        expect(body.error.message).toContain("DELETE");
+    });
+
+    it("lets every real route win it, whenever it was registered", async () => {
+        expect(await (await app().request("/api/data/posts")).json()).toEqual({ data: [] });
+        // The one a catch-all route would have broken.
+        expect(await (await app().request("/api/health")).json()).toEqual({ status: "ok" });
+    });
+
+    it("leaves a 404 a route already wrote as an envelope alone", async () => {
+        const a = new Hono<HonoEnv>();
+        installRootErrorHandler(a);
+        installUnmatchedApiEnvelope(a, "/api");
+        a.get("/api/storage/file/*", (c) => c.json({ success: true, data: null, fileNotFound: true }, 404));
+
+        const res = await a.request("/api/storage/file/nope.txt");
+        expect(res.status).toBe(404);
+        expect(await res.json()).toEqual({ success: true, data: null, fileNotFound: true });
+    });
+
+    it("leaves a text or HTML 404 a matched handler wrote on purpose", async () => {
+        // A custom function serving pages answers its own 404. The envelope
+        // is for "nothing handled this", which is Hono's default answer and
+        // nothing else; a body a handler wrote is that handler's to keep.
+        const a = new Hono<HonoEnv>();
+        installRootErrorHandler(a);
+        installUnmatchedApiEnvelope(a, "/api");
+        a.get("/api/functions/texty", (c) => c.text("this function's own 404", 404));
+        a.get("/api/functions/pagey", (c) => c.html("<h1>gone</h1>", 404));
+
+        const text = await a.request("/api/functions/texty");
+        expect(text.status).toBe(404);
+        expect(await text.text()).toBe("this function's own 404");
+        const html = await a.request("/api/functions/pagey");
+        expect(await html.text()).toBe("<h1>gone</h1>");
+
+        // And the unmatched path beside them still gets the envelope.
+        const missing = await a.request("/api/functions/nope");
+        expect(missing.headers.get("content-type")).toContain("application/json");
+    });
+
+    it("leaves paths outside basePath to the application's own 404", async () => {
+        // An app that mounts a backend at `/api` and serves its own pages at
+        // `/` keeps answering its own way for the pages — which is also why
+        // this is not `app.notFound`, whose handler Hono keeps private and
+        // which we would therefore have replaced without being able to see it.
+        const a = new Hono<HonoEnv>();
+        a.notFound((c) => c.text("the project's own 404", 404));
+        installRootErrorHandler(a);
+        installUnmatchedApiEnvelope(a, "/api");
+
+        expect(await (await a.request("/about")).text()).toBe("the project's own 404");
+        expect((await a.request("/api/nope")).headers.get("content-type")).toContain("application/json");
     });
 });

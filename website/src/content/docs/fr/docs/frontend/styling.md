@@ -1,4 +1,5 @@
 ---
+sourceHash: 8721ee795ebd8dce
 title: Styliser l'UI personnalisée
 sidebar_label: Styliser l'UI personnalisée
 description: Créez des vues personnalisées, des pages d'accueil et des actions à partir des mêmes composants et jetons de thème que le reste de l'administration, afin qu'elles paraissent natives et respectent le thème.
@@ -39,7 +40,7 @@ export function DashboardView() {
 }
 ```
 
-Chaque composant du kit est répertorié sous [Composants UI](/docs/ui/components/Card) avec ses véritables props, générées à partir du code source. Vérifiez-y avant de développer vous-même : `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` et une quarantaine d'autres existent déjà.
+Chaque composant du kit est répertorié sous [Composants UI](/docs/ui/components/card/) avec ses véritables props, générées à partir du code source. Vérifiez-y avant de développer vous-même : `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` et une quarantaine d'autres existent déjà.
 
 ## Couleur : utilisez des jetons, jamais de valeurs littérales
 

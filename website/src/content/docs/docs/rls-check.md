@@ -42,9 +42,13 @@ DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
 npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 
-If your password contains `@`, `:`, `/`, `?` or `#`, percent-encode it. That is by far the
-most common cause of an authentication failure here, and `rls-check` will say so rather
-than letting you guess.
+If your password contains `/`, `?` or `#`, percent-encode it. Those three end the URL's
+authority section, so the split lands inside the credential — rather than print fragments of
+a password, `rls-check` refuses the string and says so.
+
+`@` and `:` need no encoding: the userinfo is split at the **last** `@` and the user at the
+**first** `:`, which is what `pg` does too, so `postgres://user:pa@ss@host:5432/db` connects
+to `host` with the password `pa@ss`. Encoding them anyway is never wrong.
 
 ### Options
 
@@ -97,6 +101,21 @@ database.
   env:
     DATABASE_URL: ${{ secrets.DATABASE_URL }}
 ```
+
+**A new Rebase project does not pass that on day one, and it is not meant to.** The
+scaffold's `defaultSecurityRules` open reads to everyone — `{ operation: "select", access:
+"public" }` in `config/collections/index.ts` — so `posts`, `authors` and `tags` each report a
+critical `policy-always-true`. `access: "public"` is about *rows*, not about who may call the
+API: a request with no token is still answered 401 while `AUTH_REQUIRE` is on. The finding is
+correct all the same, because that is the only thing standing in front of the data.
+
+Decide which of those two it is before you wire this into CI:
+
+- **the rules are a placeholder** — replace them with the ones your data actually needs
+  ([security rules](/docs/collections/security-rules)), and the findings go away;
+- **the rows really are world-readable** — say so once, with
+  `npx @rebasepro/rls-check --fail-on high --skip policy-always-true`, and know what you gave
+  up: `--skip` turns the check off everywhere, including on the table you add next month.
 
 ### JSON output
 
@@ -188,6 +207,26 @@ role with `BYPASSRLS`, it says so. That role sees the true catalog, which is wha
 audit possible, but it also means nothing in the report describes what *that* connection
 experiences. The findings are about what other roles get.
 
+### On a Rebase database, change the rule, not the policy
+
+Every policy on a Rebase deployment is compiled from a collection's `securityRules`, and the
+runtime **re-applies them on every boot**: it drops each generated policy and creates it
+again from the config. An `ALTER POLICY` run against one of them therefore survives exactly
+until the next restart, and the finding comes back with it — after you watched it disappear.
+
+`rls-check` recognises those policies (a `<table>_<operation>_<hash>` name, or a call to
+`rebase.uid()` / `rebase.roles()` in the expression) and prescribes the rule instead of SQL.
+When you see a fix that says so:
+
+1. find the collection whose table it names, under `config/collections/`;
+2. change its `securityRules` — see [security rules](/docs/collections/security-rules);
+3. if the collection declares none of its own, it inherits `defaultSecurityRules` from
+   `config/collections/index.ts`, and that is the file to edit;
+4. redeploy — boot re-applies the policies — or run `rebase db push`.
+
+A policy you wrote by hand, in a migration, is not touched by any of this, and its fix is
+still the SQL to run.
+
 ## The checks
 
 Severities below are the defaults; several checks adjust their own severity based on what
@@ -228,6 +267,10 @@ after the permissive ones OR.
 ALTER POLICY "your_policy" ON "public"."your_table"
     USING (user_id = rebase.uid());
 ```
+
+On a Rebase database the fix is the collection's rule rather than that statement — see
+[change the rule, not the policy](#on-a-rebase-database-change-the-rule-not-the-policy). A
+stock scaffold reports this check on `posts`, `authors` and `tags` by design.
 
 ### policy-anonymous-tautology
 

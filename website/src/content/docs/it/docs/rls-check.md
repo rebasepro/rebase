@@ -1,4 +1,5 @@
 ---
+sourceHash: 45912133a3586b34
 slug: it/docs/rls-check
 title: rls-check
 description: Esegui l'audit della row-level security (sicurezza a livello di riga) su qualsiasi database PostgreSQL — Supabase, Neon, RDS o sul tuo server. In sola lettura, nessuna registrazione, Rebase non richiesto.
@@ -41,9 +42,13 @@ DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
 npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 
-Se la tua password contiene `@`, `:`, `/`, `?` o `#`, eseguine l'encoding percentuale (percent-encoding).
-È di gran lunga la causa più comune di errore di autenticazione in questo contesto, e `rls-check` lo
-indicherà chiaramente invece di farti tirare a indovinare.
+Se la tua password contiene `/`, `?` o `#`, eseguine l'encoding percentuale (percent-encoding). Questi tre
+caratteri chiudono la sezione authority dell'URL, quindi la suddivisione cade dentro le credenziali:
+invece di stampare frammenti di una password, `rls-check` rifiuta la stringa e lo dichiara.
+
+`@` e `:` non richiedono alcuna codifica: la userinfo viene divisa sull'**ultima** `@` e l'utente sul
+**primo** `:`, esattamente come fa `pg`, quindi `postgres://user:pa@ss@host:5432/db` si collega a `host`
+con la password `pa@ss`. Codificarli comunque non è mai sbagliato.
 
 ### Opzioni
 
@@ -96,6 +101,13 @@ con il ruolo della tua applicazione è la cosa più vicina a chiedere al databas
     DATABASE_URL: ${{ secrets.DATABASE_URL }}
 ```
 
+**Un progetto Rebase appena creato non lo supera il primo giorno, e non deve farlo.** Le `defaultSecurityRules` dello scaffold aprono le letture a chiunque — `{ operation: "select", access: "public" }` in `config/collections/index.ts` —, così `posts`, `authors` e `tags` segnalano ciascuno un `policy-always-true` critico. `access: "public"` riguarda le *righe*, non chi può chiamare l'API: una richiesta senza token riceve comunque un 401 finché `AUTH_REQUIRE` è attivo. Il riscontro resta però corretto, perché è l'unica cosa che sta davanti ai dati.
+
+Decidi quale dei due casi è il tuo prima di collegare tutto questo alla CI:
+
+- **le regole sono un segnaposto** — sostituiscile con quelle di cui i tuoi dati hanno davvero bisogno ([regole di sicurezza](/docs/collections/security-rules)) e i riscontri spariscono;
+- **le righe sono davvero pubbliche** — dillo una volta, con `npx @rebasepro/rls-check --fail-on high --skip policy-always-true`, sapendo a cosa rinunci: `--skip` disattiva il controllo ovunque, anche sulla tabella che aggiungerai il mese prossimo.
+
 ### Output JSON
 
 `--json` emette un oggetto stabile: `scannedAt`, `database` (solo host e nome — mai credenziali),
@@ -118,6 +130,19 @@ come domande e mai mescolati alle certezze.
 tabella o un ruolo con `BYPASSRLS`, viene indicato. Quel ruolo vede il catalogo reale, il che rende possibile
 l'audit, ma significa anche che nulla nel report descrive ciò che prova *quella* specifica connessione.
 I risultati riguardano ciò a cui accedono gli altri ruoli.
+
+### Su un database Rebase, cambia la regola, non la policy
+
+Ogni policy di un deployment Rebase è compilata dalle `securityRules` di una collection, e il runtime **le riapplica a ogni avvio**: elimina ogni policy generata e la ricrea dalla configurazione. Un `ALTER POLICY` su una di esse sopravvive quindi esattamente fino al riavvio successivo, e il riscontro torna insieme a lui — dopo che lo hai visto sparire.
+
+`rls-check` riconosce queste policy (un nome nella forma `<tabella>_<operazione>_<hash>`, oppure una chiamata a `rebase.uid()` / `rebase.roles()` nell'espressione) e prescrive la regola invece del SQL. Quando un fix lo dice:
+
+1. trova la collection di cui nomina la tabella, sotto `config/collections/`;
+2. modifica le sue `securityRules` — vedi [regole di sicurezza](/docs/collections/security-rules);
+3. se la collection non ne dichiara di proprie, eredita `defaultSecurityRules` da `config/collections/index.ts`, ed è quello il file da modificare;
+4. rideploya — l'avvio riapplica le policy — oppure esegui `rebase db push`.
+
+Una policy che hai scritto a mano, in una migrazione, non è toccata da nulla di tutto questo, e il suo fix resta il SQL da eseguire.
 
 ## I controlli
 
@@ -159,6 +184,8 @@ AND dopo che quelle permissive sono state combinate in OR.
 ALTER POLICY "your_policy" ON "public"."your_table"
     USING (user_id = rebase.uid());
 ```
+
+Su un database Rebase il fix è la regola della collection anziché quell'istruzione — vedi «Su un database Rebase, cambia la regola, non la policy». Uno scaffold appena creato segnala questo controllo su `posts`, `authors` e `tags` per scelta.
 
 ### policy-anonymous-tautology
 

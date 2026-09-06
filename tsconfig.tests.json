@@ -130,7 +130,38 @@
     "packages/cms/test/data_export/fetch_export_data.test.ts",
     "packages/cms/test/data_import/csv.test.ts",
     "packages/cms/test/data_import/prototype_pollution.test.ts",
-    "packages/cms/test/data_import/save_entities.test.ts"
+    "packages/cms/test/data_import/save_entities.test.ts",
+    // Files, not directories, and each one for the same reason: it carries a
+    // `@ts-expect-error`, which is a test written in the type system and inert
+    // in a file no program reads. `pnpm check:ts-expect-error-coverage` is what
+    // keeps this half of the list from being quietly deleted to make
+    // `pnpm typecheck` green.
+    //
+    // The five cloud suites. Four of their directives were on a
+    // `process.stdout.write` shim that has type-checked for a while, so tsc
+    // reports them as UNUSED the moment it reads the file — and two assertions
+    // the suites are named after (`webhooks delete` never deleting the project
+    // slug; the auth probe posting a JSON body) read `mock.calls[0][n]` off a
+    // bare `vi.fn()`, whose calls tuple is empty, so they were tuple-index
+    // errors rather than checks. The rest of `packages/cli` carries 11
+    // pre-existing errors; clearing those is what earns the directory a line.
+    "packages/cli/src/commands/cloud/cloud-args.test.ts",
+    "packages/cli/src/commands/cloud/cloud-commands.test.ts",
+    "packages/cli/src/commands/cloud/context.test.ts",
+    "packages/cli/src/commands/cloud/debug.test.ts",
+    "packages/cli/src/commands/cloud/emit-json-arg.test.ts",
+    // `packages/client` carries 265 pre-existing errors, so one file: the
+    // opt-out asserts a realtime option that is not on the type.
+    "packages/client/src/realtime-optout.test.ts",
+    // `packages/server` carries 165, so two files. `define-cron.test.ts`'s
+    // directive sat one line above the property it meant to reject — tsc reports
+    // an excess property where it is written — so "rejects misspelled fields at
+    // compile time" rejected nothing. `auth-config-types.test.ts` is the guard
+    // against a `[key: string]: unknown` catch-all landing on
+    // `RebaseAuthConfig`, and its own docblock says "the real value is that tsc
+    // validates the @ts-expect-error annotations"; nothing had.
+    "packages/server/src/cron/define-cron.test.ts",
+    "packages/server/test/auth-config-types.test.ts"
   ],
   "exclude": [
     "**/node_modules",

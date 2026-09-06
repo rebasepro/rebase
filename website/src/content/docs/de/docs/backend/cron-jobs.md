@@ -1,4 +1,5 @@
 ---
+sourceHash: 9df2202ffe55b40c
 title: Cron-Jobs
 sidebar_label: Cron-Jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.
@@ -68,7 +69,7 @@ Das ist alles. Rebase wird:
 2. Jeden Standard-Export als Cron-Job registrieren
 3. Die Tabelle `rebase.cron_logs` in PostgreSQL automatisch erstellen (falls der Treiber SQL unterstützt)
 4. Den Scheduler starten und Zähler aus vorhandenen DB-Logs initialisieren
-5. Admin-REST-Routen unter `/api/cron` bereitstellen
+5. Admin-REST-Routen unter `/api/admin/cron` bereitstellen
 
 ## Zeitplan-Syntax
 
@@ -97,6 +98,9 @@ Cron-Ausdrücke verwenden das Standard-**5-Feld-Format**:
 Schrittwerte (`*/n`), Bereiche (`a-b`) und Listen (`a,b,c`) werden alle unterstützt.
 
 ## CronJobDefinition Referenz
+
+`timezone` ist neu <span class="since-badge" data-since="0.18">Since 0.18</span> — in 0.17.3 wird ein Zeitplan immer in der Zone des
+Hosts gelesen. Alles Übrige an dieser Schnittstelle ist bereits ausgeliefert.
 
 ```typescript
 interface CronJobDefinition {
@@ -149,16 +153,18 @@ Alle Cron-Routen erfordern eine **Admin-Authentifizierung** (`requireAuth` + `re
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
-| `GET` | `/api/cron` | Alle registrierten Cron-Jobs auflisten |
-| `GET` | `/api/cron/:id` | Status eines einzelnen Jobs abrufen |
-| `POST` | `/api/cron/:id/trigger` | Einen Job manuell auslösen |
-| `GET` | `/api/cron/:id/logs` | Ausführungsverlauf abrufen (`?limit=N`) |
-| `PUT` | `/api/cron/:id` | Einen Job aktivieren/deaktivieren (`{ "enabled": true }`) |
+| `GET` | `/api/admin/cron` | Alle registrierten Cron-Jobs auflisten |
+| `GET` | `/api/admin/cron/:id` | Status eines einzelnen Jobs abrufen |
+| `POST` | `/api/admin/cron/:id/trigger` | Einen Job manuell auslösen |
+| `GET` | `/api/admin/cron/:id/logs` | Ausführungsverlauf abrufen (`?limit=N`) |
+| `PUT` | `/api/admin/cron/:id` | Einen Job aktivieren/deaktivieren (`{ "enabled": true }`) |
 
 ### Beispiel: Alle Jobs auflisten
 
+`$TOKEN` ist ein Admin-Access-Token: melden Sie sich an und verwenden Sie das `accessToken` aus der Login-Antwort. `$API_URL` ist die URL, die `rebase dev` ausgegeben hat — der Port wird aus dem Projekt abgeleitet und ist nicht fest.
+
 ```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
+curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/admin/cron"
 ```
 
 ```json
@@ -184,7 +190,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3001/api/cron/health-check/trigger
+    "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
 ## Client-SDK
@@ -194,7 +200,7 @@ Das Rebase Client-SDK stellt einen `cron`-Namespace für alle Operationen bereit
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
 
-const client = createRebaseClient({ baseUrl: "http://localhost:3001" });
+const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
 
 // Alle Jobs auflisten
 const { jobs } = await client.cron.listJobs();
@@ -231,7 +237,7 @@ Wenn der Datenbanktreiber SQL unterstützt (z.B. PostgreSQL), werden Ausführung
 
 - Der Ausführungsverlauf **überlebt Server-Neustarts** und Deployments
 - Die Zähler `totalRuns` und `totalFailures` werden beim Start **aus der Datenbank initialisiert**
-- Der `/api/cron/:id/logs`-Endpunkt fragt die Datenbank ab, nicht nur den In-Memory-Speicher
+- Der `/api/admin/cron/:id/logs`-Endpunkt fragt die Datenbank ab, nicht nur den In-Memory-Speicher
 - Mehrere Server-Instanzen teilen sich denselben Ausführungsverlauf
 
 Die Tabelle wird beim ersten Start automatisch erstellt — keine Migrationen erforderlich.

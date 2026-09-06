@@ -20,6 +20,12 @@ Or use via `pnpm dlx`:
 pnpm dlx @rebasepro/cli <command>
 ```
 
+## Machine-readable output
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+`--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources` and `rebase apps list` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
+
 ## Commands
 
 ### `rebase init`
@@ -36,7 +42,7 @@ Sets up the project structure with frontend, backend, and shared packages.
 |---|---|
 | `-t, --template <preset>` | `blog`, `ecommerce` or `blank`. Default `blog` |
 | `--headless` | Backend only — no admin panel and no collection files. `--template` has no effect, because there are no collections to seed |
-| `-y, --yes` | Accept every default and never prompt. **Required wherever there is no terminal to answer**, such as CI |
+| `-y, --yes` | Never prompt. **Required wherever there is no terminal to answer**, such as CI. It skips git init and dependency install — the interactive defaults say yes to both, so pass `--git` / `--install` if you want them |
 | `-i, --install` | Install dependencies after scaffolding |
 | `-g, --git` | Initialize a repository and make the first commit |
 | `--database-url <url>` | Use an existing database instead of the managed one |
@@ -318,12 +324,20 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
+`rebase resources --check` is new <span class="since-badge" data-since="0.18">Since 0.18</span> — the flag a CI job uses to fail
+on a `rebase.resources.json` that no longer matches the config code.
+
 A resource is declared in config code — `database("analytics")`,
 `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — or is a file
 under `backend/crons` or `backend/functions`, and never written by hand in
 `rebase.resources.json`, which is generated from those declarations so a host can
 read what a project needs without building it. Each entry records who uses it
 (`collection:events`, `property:posts.cover`, `function:report`).
+
+A backend also has a default database and a default storage source that nobody
+declares. Both are listed here, marked `implicit`, and neither is written to
+`rebase.resources.json` — the host supplies them, so recording them would ask
+for something to be provisioned that nobody asked for.
 
 To see what the platform holds for a project against what its code declares,
 and to remove a provisioned database the code no longer names, see
@@ -354,10 +368,11 @@ rebase cloud whoami     # show the current session
 #### Project link
 
 ```bash
-rebase cloud link       # link this directory to a cloud project
-rebase cloud unlink     # remove the link
-rebase cloud use [org]  # select the active organization
-rebase cloud open       # open the dashboard in a browser
+rebase cloud link         # link this directory to a cloud project
+rebase cloud link [url]   # or straight at a backend: no control plane, no login, and the rest of the family refuses until you unlink
+rebase cloud unlink       # remove the link
+rebase cloud use [org]    # select the active organization
+rebase cloud open         # open the dashboard in a browser
 ```
 
 #### Projects
@@ -443,11 +458,10 @@ rebase cloud storage             # list storage buckets
 rebase cloud storage create      # provision platform-managed storage
 rebase cloud storage attach      # attach your own S3-compatible bucket
 rebase cloud webhooks list | create | delete
-rebase cloud clusters            # the clusters tenants run on
-rebase cloud clusters add        # register one from a kubeconfig
-rebase cloud clusters verify     # ask a cluster whether it can host tenants
+rebase cloud clusters list | add | verify   # the clusters tenants run on; `add` registers one from a kubeconfig
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
+rebase cloud billing checkout    # a Stripe session for one project
 ```
 
 ### `rebase generate-sdk`

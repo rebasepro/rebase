@@ -8,6 +8,10 @@ Automatically infer Rebase collection property schemas from sample data — anal
 pnpm add @rebasepro/inference
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 ## What This Package Does
 
 `@rebasepro/inference` examines arrays of data objects and produces `Properties` definitions compatible with the Rebase collection schema. It uses statistical analysis to determine the most probable type for each field, detect enum values, identify reference patterns, and build nested map/array structures. Used by the Rebase introspection pipeline and data import tools.

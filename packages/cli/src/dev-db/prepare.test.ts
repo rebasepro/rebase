@@ -5,8 +5,10 @@
  * told about it. The failure that matters is narrow and severe: adding a
  * `DATABASE_URL` to the environment of a command that already had one would
  * silently redirect a migration away from the database its author meant. So the
- * central assertion here is a negative — for anything but the managed database,
- * the returned environment is empty.
+ * central assertion here is a negative — where the child can already see the
+ * connection string (the shell, or `.env`), the returned environment is empty.
+ * The exceptions are the strings that exist nowhere else: `--database-url`, a
+ * branch pointer, `--docker`'s compose URL, and the managed database.
  */
 
 import fs from "fs";
@@ -81,6 +83,28 @@ describe("an explicit database", () => {
         const prepared = await prepareDatabaseEnv(root, { flagUrl: "postgresql://u:pw@from-flag/app" });
 
         expect(prepared.database).toMatchObject({ kind: "external", source: "flag" });
+    });
+
+    it("exports the --database-url flag, which exists nowhere the child can look", async () => {
+        // The flag lives in this process's argv and in no environment at all.
+        // Leaving `env` empty announced the database in the banner and then
+        // handed the backend nothing: `DATABASE_URL: is required`, on a run
+        // that had just been told which database to use.
+        const prepared = await prepareDatabaseEnv(root, { flagUrl: "postgresql://u:pw@from-flag/app" });
+
+        expect(prepared.database).toMatchObject({ kind: "external", source: "flag" });
+        expect(prepared.env.DATABASE_URL).toBe("postgresql://u:pw@from-flag/app");
+        expect(fs.existsSync(path.join(root, ".rebase"))).toBe(false);
+    });
+
+    it("exports the flag even when a different DATABASE_URL is already in the environment", async () => {
+        // Without the export the child would inherit the *shell's* URL while
+        // every message named the flag's — the worst of both.
+        process.env.DATABASE_URL = "postgresql://u:pw@from-environment/app";
+
+        const prepared = await prepareDatabaseEnv(root, { flagUrl: "postgresql://u:pw@from-flag/app" });
+
+        expect(prepared.env.DATABASE_URL).toBe("postgresql://u:pw@from-flag/app");
     });
 
     it("starts nothing at all", async () => {

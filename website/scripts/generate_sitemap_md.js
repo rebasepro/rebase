@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { extractSidebarSlugs } from "./sidebar-slugs.js";
 
 // This script generates website/public/sitemap.md alongside sitemap.xml
 // It lists all pages on the website in Markdown format for AI agents (Claude, GPT, Perplexity, etc.)
@@ -15,44 +16,87 @@ import { fileURLToPath } from "url";
     
     let slugs = [];
     try {
-        const configContent = fs.readFileSync(absoluteConfigPath, "utf-8");
-        
-        // Extract sidebar config
-        const sidebarMatch = configContent.match(/sidebar:\s*\[([\s\S]*?)\],?\s*components:/);
-        if (sidebarMatch) {
-            const sidebarContent = sidebarMatch[1];
-            const slugPattern = /slug:\s*["']([^"']+)["']/g;
-            let match;
-            while ((match = slugPattern.exec(sidebarContent)) !== null) {
-                slugs.push(match[1]);
-            }
-        } else {
+        // Shared with generate_llms_txt.js, and it expands
+        // `{ autogenerate: { directory } }` groups: a `slug:`-only scan misses
+        // every page Starlight lists that way, which was the whole UI component
+        // reference.
+        const found = extractSidebarSlugs(
+            absoluteConfigPath,
+            path.resolve(__dirname, "../src/content/docs")
+        );
+        if (found === null) {
             console.warn("Could not find sidebar config in astro.config.mjs, using default fallback slugs.");
             slugs = ["index", "getting-started/quickstart"];
+        } else {
+            slugs = found;
         }
     } catch (e) {
         console.error("Error reading astro.config.mjs:", e.message);
         slugs = ["index", "getting-started/quickstart"];
     }
     
-    const marketingPages = [
-        { name: "Home", path: "/" },
-        { name: "Compare Rebase", path: "/compare" },
-        { name: "Rebase CMS", path: "/cms" },
-        { name: "Rebase Studio", path: "/studio" },
-        { name: "Client SDK", path: "/sdk" },
-        { name: "CLI Tooling", path: "/cli" },
-        { name: "Backend & APIs", path: "/backend" },
-        { name: "AI & Agents", path: "/ai" },
-        { name: "Security & Auth", path: "/security" },
-        { name: "UI Components", path: "/ui" },
-        { name: "For Startups", path: "/startups" },
-        { name: "For Agencies", path: "/agencies" },
-        { name: "About Rebase", path: "/about" },
-        { name: "Developers Overview", path: "/developers" },
-        { name: "Product Catalog", path: "/product" },
-        { name: "Contact", path: "/contact" }
-    ];
+    /*
+     * The marketing routes, read off the routes.
+     *
+     * This was sixteen hand-written rows in a file that calls itself a list of
+     * "all pages of the Rebase website", against thirty-one routes: the word
+     * "pricing" appeared in it zero times, and so did every comparison page.
+     * A hand-kept mirror of a directory is a mirror that is wrong from the next
+     * page onwards, and `robots.txt` points crawlers at this file.
+     *
+     * `noindex` routes are left out — the pitch deck is a page we ask engines
+     * not to list, so listing it in the sitemap an agent reads would be asking
+     * twice and meaning neither.
+     */
+    const pagesDir = path.resolve(__dirname, "../src/pages/[...lang]");
+    const NAMES = {
+        index: "Home",
+        compare: "Compare Rebase",
+        cms: "Rebase CMS",
+        studio: "Rebase Studio",
+        sdk: "Client SDK",
+        cli: "CLI Tooling",
+        backend: "Backend & APIs",
+        ai: "AI & Agents",
+        security: "Security & Auth",
+        ui: "UI Components",
+        startups: "For Startups",
+        agencies: "For Agencies",
+        about: "About Rebase",
+        developers: "Developers Overview",
+        product: "Product Catalog",
+        contact: "Contact",
+        "rls-check": "rls-check (free RLS audit)",
+        "kit-digital": "Kit Digital",
+        europe: "European hosting"
+    };
+    const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
+    const titleFor = (slug) => {
+        if (NAMES[slug]) return NAMES[slug];
+        // The comparison pages read as a sentence, not as a slug: "Rebase vs
+        // Supabase", never "Rebase Vs Supabase".
+        const versus = /^rebase-vs-(.+)$/.exec(slug);
+        if (versus) return `Rebase vs ${cap(versus[1])}`;
+        return slug.split("-").map(cap).join(" ");
+    };
+
+    const marketingPages = fs
+        .readdirSync(pagesDir)
+        .filter(file => file.endsWith(".astro"))
+        .filter(file => !/noindex/.test(fs.readFileSync(path.join(pagesDir, file), "utf-8")))
+        .map(file => file.replace(/\.astro$/, ""))
+        .sort()
+        .map(slug => ({ name: titleFor(slug), path: slug === "index" ? "/" : `/${slug}` }));
+
+    /* `alternatives/[competitor].astro` is one route per entry in the data file.
+       They are real pages with real content and had no row here either. */
+    const alternativesSource = fs.readFileSync(
+        path.resolve(__dirname, "../src/data/alternatives.ts"), "utf-8");
+    const alternativesBlock = alternativesSource.slice(
+        alternativesSource.indexOf("export const ALTERNATIVES_PAGES"));
+    for (const m of alternativesBlock.matchAll(/slug:\s*"([a-z0-9-]+)",\s*\n\s*name:\s*"([^"]+)"/g)) {
+        marketingPages.push({ name: `${m[2]} alternatives`, path: `/alternatives/${m[1]}`, md: false });
+    }
     
     const languages = ["en", "es", "de", "fr"];
     
@@ -71,6 +115,14 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
             const pagePath = page.path === "/" ? (langPrefix || "/") : `${langPrefix}${page.path}`;
             const fullUrl = `https://rebase.pro${pagePath}`;
             
+            // `[page].md.ts` mirrors the flat routes only; the nested
+            // `/alternatives/*` pages have no `.md` twin, and advertising one
+            // would put a 404 in the file that claims to list every page.
+            if (page.md === false) {
+                mdContent += `- [${page.name} (${langName})](${fullUrl})\n`;
+                continue;
+            }
+
             let fullMdUrl;
             if (pagePath === "/" || pagePath === "/es" || pagePath === "/de" || pagePath === "/fr") {
                 const prefix = pagePath === "/" ? "" : pagePath;
@@ -78,11 +130,50 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
             } else {
                 fullMdUrl = `https://rebase.pro${pagePath}.md`;
             }
-            
+
             mdContent += `- [${page.name} (${langName})](${fullUrl}) — [Markdown Version](${fullMdUrl})\n`;
         }
     }
     
+
+    /*
+     * A docs entry is titled by the page's own frontmatter when it has one.
+     * The slug is lowercase because that is what Astro serves, so a title
+     * derived from it would read "Virtualtableswitch" where the page says
+     * "VirtualTableSwitch"; the path segments above the page keep the old
+     * capitalised-word form.
+     */
+    const docsContentRoot = path.resolve(__dirname, "../src/content/docs");
+    const frontmatterTitle = (slug) => {
+        for (const candidate of [`${slug}.mdx`, `${slug}.md`, `${slug}/index.mdx`, `${slug}/index.md`]) {
+            const file = path.join(docsContentRoot, candidate);
+            const found = findCaseInsensitive(file);
+            if (!found) continue;
+            const head = fs.readFileSync(found, "utf-8").slice(0, 2000);
+            const m = head.match(/^---[\s\S]*?^title:\s*["']?([^"'\n]+?)["']?\s*$/m);
+            if (m) return m[1].trim();
+        }
+        return null;
+    };
+    // The files keep their CamelCase names while the served slug is lowercase.
+    const findCaseInsensitive = (file) => {
+        if (fs.existsSync(file)) return file;
+        const dir = path.dirname(file);
+        if (!fs.existsSync(dir)) return null;
+        const want = path.basename(file).toLowerCase();
+        const hit = fs.readdirSync(dir).find(name => name.toLowerCase() === want);
+        return hit ? path.join(dir, hit) : null;
+    };
+    const titleForDocsSlug = (slug) => {
+        const parts = slug.split("/");
+        const crumbs = parts.slice(0, -1)
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).replace("-", " "));
+        const last = parts[parts.length - 1];
+        const own = frontmatterTitle(slug)
+            ?? (last.charAt(0).toUpperCase() + last.slice(1).replace("-", " "));
+        return [...crumbs, own].join(" > ");
+    };
+
     mdContent += `\n## Documentation (Multilingual)\n`;
     
     for (const lang of languages) {
@@ -91,11 +182,7 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
         mdContent += `\n### ${langName} Documentation\n`;
         for (const slug of slugs) {
             const fullUrl = `https://rebase.pro${langPrefix}/${slug}`;
-            const cleanTitle = slug
-                .split("/")
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1).replace("-", " "))
-                .join(" > ");
-            mdContent += `- [${cleanTitle} (${langName})](${fullUrl})\n`;
+            mdContent += `- [${titleForDocsSlug(slug)} (${langName})](${fullUrl})\n`;
         }
     }
     

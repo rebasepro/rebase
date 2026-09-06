@@ -55,4 +55,18 @@ describe("unexpectedBranchArgs", () => {
     it("reports every extra, so one re-run fixes them all", () => {
         expect(unexpectedBranchArgs(["create", "a", "b", "c"])).toEqual(["b", "c"]);
     });
+
+    it.each(["--database-url", "--older-than"])("accepts %s and its value", flag => {
+        // `--from` was the only flag whose value was skipped, so `rebase db
+        // branch list --database-url postgres://…` answered `✗ Unexpected
+        // argument: postgres://…` — a line the CLI itself composes when the
+        // checkout is on a branch, so `rebase.branches` is read in the parent
+        // where it lives.
+        expect(unexpectedBranchArgs(["list", flag, "value"])).toEqual([]);
+        expect(unexpectedBranchArgs(["list", "x", flag, "value"])).toEqual([]);
+    });
+
+    it("accepts --database-url=value", () => {
+        expect(unexpectedBranchArgs(["list", "--database-url=postgres://u@h/app"])).toEqual([]);
+    });
 });

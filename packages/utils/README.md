@@ -8,6 +8,10 @@ Shared utility functions used across the Rebase ecosystem.
 pnpm add @rebasepro/utils
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 ## What This Package Does
 
 A zero-dependency\* collection of pure utility functions for string manipulation, deep object operations, pluralization, hashing, and more. Used internally by most Rebase packages.

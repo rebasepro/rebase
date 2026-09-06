@@ -8,6 +8,7 @@ import {
 } from "@rebasepro/types";
 import type { BackendStorageConfig } from "../storage/types";
 import { BundleError } from "./bundle";
+import { logger } from "../utils/logger";
 
 /**
  * Resolving *named* data and storage sources from the environment.
@@ -487,9 +488,48 @@ export function resolveStorageSources(
     // in development and in the media bucket in production. Two different
     // destinations either side of a deploy is worse than having no default
     // bucket, which at least fails the same way in both.
-    const effective: { key: string; engine?: string; account?: string }[] = declared.length === 0
+    const effective: { key: string; engine?: string; account?: string; default?: boolean }[] = declared.length === 0
         ? [{ key: DEFAULT_STORAGE_SOURCE_KEY, engine: undefined }]
         : serverSide;
+
+    // ── Which bucket receives an unqualified upload? ─────────────────────────
+    //
+    // The author's decision, made with `default: true` or by declaring the
+    // default bucket itself. Two claimants is a contradiction and refuses.
+    //
+    // No claimant at all is the shape every project written before the option
+    // existed has — and the shape the control plane resolves one source at a
+    // time — so it cannot refuse: a runtime image the platform rolls out would
+    // stop every such tenant at boot. The first server-side bucket is promoted,
+    // as it always was, but the warning now names the one line that ends the
+    // guessing. (What it guards against is real: a synthesized local default
+    // is dropped in production and the promotion is not, so a project
+    // declaring only `bucket("media")` writes to local disk in development and
+    // into the media bucket in production. Mark one and both agree.)
+    //
+    // Only when this process actually serves storage: a project whose buckets
+    // are all `transport: "direct"` has nothing here to be the default of.
+    const claimants = serverSide.filter(d => d.default === true);
+    if (claimants.length > 1) {
+        throw new BundleError(
+            `${claimants.length} storage sources declare \`default: true\`: ` +
+            `${claimants.map(d => `"${d.key}"`).join(", ")}.`,
+            "Exactly one bucket serves uploads that name no `storageSource`. Remove the flag from all but one."
+        );
+    }
+    let promoted: string | undefined;
+    if (serverSide.length > 0
+        && claimants.length === 0
+        && !serverSide.some(d => d.key === DEFAULT_STORAGE_SOURCE_KEY)) {
+        promoted = serverSide[0].key;
+        const named = serverSide.map(d => `"${d.key}"`).join(", ");
+        logger.warn(
+            `This project declares ${named} and none of them is the default bucket, so "${promoted}" ` +
+            "is serving uploads that name no `storageSource` — by declaration order, not by decision. " +
+            `In \`config/resources.ts\` mark it — bucket("${promoted}", { default: true }) — or declare ` +
+            "the default bucket alongside it: export const uploads = bucket();"
+        );
+    }
 
     const result: Record<string, BackendStorageConfig> = {};
     for (const definition of effective) {
@@ -501,7 +541,15 @@ export function resolveStorageSources(
             definition.account,
             options
         );
-        if (config) result[definition.key] = config;
+        if (!config) continue;
+        result[definition.key] = config;
+        // `default: true` binds the same backend under the default key as well,
+        // so an unqualified upload reaches it. Registered rather than renamed:
+        // the source keeps its own key, its own `__SUFFIX` variables and its own
+        // place in the graph, and only gains a second name.
+        if ((definition.default === true || definition.key === promoted) && definition.key !== DEFAULT_STORAGE_SOURCE_KEY) {
+            result[DEFAULT_STORAGE_SOURCE_KEY] = config;
+        }
     }
 
     return Object.keys(result).length > 0 ? result : undefined;

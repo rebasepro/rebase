@@ -8,6 +8,37 @@ PostgreSQL database driver for Rebase, built on Drizzle ORM.
 pnpm add @rebasepro/server-postgres
 ```
 
+This package is ESM-only (`"type": "module"`, no CommonJS build), so it is
+loaded with `import`. `require()` of it from a CJS file works only on Node
+22.12+, which supports `require(esm)`.
+
+### Allow `@ariga/atlas` to run its install script
+
+`db push`, `db generate` and `db migrate` shell out to the `atlas` binary, and
+`@ariga/atlas` downloads that binary in a `preinstall` script. pnpm 10+ and npm
+12+ refuse a dependency's lifecycle scripts unless the project allowlists them —
+and the install still exits 0, so the only sign is
+`ERR_PNPM_IGNORED_BUILDS: @ariga/atlas` several screens up, followed by
+`Failed to create bin … ENOENT`. Nothing then fails until the first schema push.
+
+A project scaffolded by `rebase init` already carries the entry. Adding this
+package to an existing project needs it:
+
+```yaml
+# pnpm-workspace.yaml
+allowBuilds:
+  "@ariga/atlas": true
+```
+
+```json
+// package.json, for npm
+{ "allowScripts": { "@ariga/atlas": true } }
+```
+
+`rebase doctor` reports the state of that binary, and tells the three apart:
+not installed, installed with its script blocked, and on disk with only the
+`node_modules/.bin` link missing.
+
 ## What This Package Does
 
 Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for PostgreSQL. It provides connection pooling, a Drizzle-based data driver, Postgres LISTEN/NOTIFY realtime, auth table management, snapshot history, schema generation, branching, read replicas, and WebSocket support. Plug it into `@rebasepro/server` via `createPostgresAdapter()` or `createPostgresBootstrapper()`.

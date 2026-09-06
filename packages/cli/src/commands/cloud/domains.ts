@@ -101,6 +101,11 @@ export async function domainsCommand(action: string | undefined, rawArgs: string
 }
 
 async function listDomains(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud domains",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -180,6 +185,11 @@ projectId,
 }
 
 async function verifyDomains(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud domains",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
