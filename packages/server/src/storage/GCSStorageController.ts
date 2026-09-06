@@ -11,6 +11,7 @@ import {
     GCSStorageConfig,
     DEFAULT_MAX_FILE_SIZE
 } from "./types";
+import { folderKey, listingPrefix } from "./keys";
 import {
     UploadFileProps,
     UploadFileResult,
@@ -78,6 +79,14 @@ export class GCSStorageController implements StorageController {
 
     getType(): "gcs" {
         return "gcs";
+    }
+
+    /**
+     * The configured bucket, and the logical `default` that maps to it.
+     * @see S3StorageController.knownBuckets
+     */
+    knownBuckets(): string[] {
+        return ["default", this.config.bucket];
     }
 
     async putObject({
@@ -232,7 +241,7 @@ export class GCSStorageController implements StorageController {
 
         // Fetch files (objects) matching the prefix
         const [files, , filesApiResponse] = await gcsBucket.getFiles({
-            prefix: prefix || undefined,
+            prefix: listingPrefix(prefix),
             delimiter: "/",
             maxResults: options?.maxResults ?? 1000,
             pageToken: options?.pageToken,
@@ -252,14 +261,19 @@ export class GCSStorageController implements StorageController {
         const apiPrefixes: string[] =
             (filesApiResponse as Record<string, unknown> | undefined)?.prefixes as string[] ?? [];
 
-        const prefixes: StorageReference[] = apiPrefixes.map(p => ({
-            bucket: resolvedBucket,
-            fullPath: p,
-            name: p.replace(/\/$/, "").split("/").pop() || "",
-            parent: null as never,
-            root: null as never,
-            toString: () => `gs://${resolvedBucket}/${p}`
-        }));
+        const prefixes: StorageReference[] = apiPrefixes.map(p => {
+            // Without the trailing slash GCS puts on a common prefix, so a
+            // `fullPath` from a listing is a key any controller accepts.
+            const folder = folderKey(p);
+            return {
+                bucket: resolvedBucket,
+                fullPath: folder,
+                name: folder.split("/").pop() || "",
+                parent: null as never,
+                root: null as never,
+                toString: () => `gs://${resolvedBucket}/${folder}`
+            };
+        });
 
         // The next page token is returned on the query object (second element)
         const nextPageToken =

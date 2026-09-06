@@ -271,8 +271,8 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Error-code reference ━━━${NC}`);
-    const { findings: bad, scanned, total } = checkErrorCodes(ROOT);
-    console.log(`${DIM}Found ${total} error code(s) across ${scanned} source file(s).${NC}`);
+    const { findings: bad, scanned, total, families } = checkErrorCodes(ROOT);
+    console.log(`${DIM}Found ${total} error code(s) and ${families} code ${families === 1 ? "family" : "families"} across ${scanned} source file(s).${NC}`);
     if (!bad.length) {
         console.log(`${GREEN}✓ Every code the server can raise is documented, and every documented code exists.${NC}`);
     } else {
@@ -349,10 +349,10 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Endpoint index ━━━${NC}`);
-    const { findings: bad, routes, modules, paramRows, reserved } = checkEndpointIndex(ROOT);
-    console.log(`${DIM}Extracted ${routes} route(s) from ${modules} router module(s); ${paramRows} declared query parameter(s) against ${reserved} reserved key(s).${NC}`);
+    const { findings: bad, routes, modules, paramRows, reserved, endpointRows } = checkEndpointIndex(ROOT);
+    console.log(`${DIM}Extracted ${routes} route(s) from ${modules} router module(s); ${endpointRows} documented endpoint row(s); ${paramRows} declared query parameter(s) against ${reserved} reserved key(s).${NC}`);
     if (!bad.length) {
-        console.log(`${GREEN}\u2713 Every mounted route is in the endpoint index, and every documented query parameter is reserved.${NC}`);
+        console.log(`${GREEN}\u2713 Every mounted route is in the endpoint index, every documented endpoint row resolves to one, and every documented query parameter is reserved.${NC}`);
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} route(s) the index does not account for:${NC}`);

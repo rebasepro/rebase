@@ -1,5 +1,5 @@
 ---
-sourceHash: 8e6b49d8e91f586c
+sourceHash: ac8563166446ff44
 title: Almacenamiento y Archivos
 sidebar_label: Almacenamiento
 description: Suba, descargue, liste y elimine archivos con el módulo de almacenamiento del SDK del Cliente de Rebase.
@@ -27,7 +27,7 @@ const result = await client.storage.putObject({
     }
 });
 
-// result: { key: string, url: string, ... }
+// result: { key: string; bucket: string; storageUrl: string }
 ```
 
 ### Desde un Campo de Archivo

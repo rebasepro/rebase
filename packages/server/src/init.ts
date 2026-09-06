@@ -44,9 +44,9 @@ import { createAuthMiddleware } from "./auth/middleware";
 import { createAdapterAuthMiddleware } from "./auth/adapter-middleware";
 import { scopeDataDriver, SERVICE_IDENTITY } from "./auth/rls-scope";
 import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
-import { errorHandler } from "./api/errors";
+import { ApiError, errorHandler } from "./api/errors";
 import { createSchemaDriftDetector } from "./api/schema-drift";
-import { installRootErrorHandler } from "./api/root-error-handler";
+import { installRootErrorHandler, installUnmatchedApiEnvelope } from "./api/root-error-handler";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HonoEnv } from "./api/types";
@@ -1058,6 +1058,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // reads one. An app that already has its own handler keeps it — see
     // `installRootErrorHandler`.
     installRootErrorHandler(config.app);
+
+    // The other half of it: a path under `basePath` that matches no route is not
+    // a throw, so `onError` never sees it and it came back `404 Not Found` as
+    // `text/plain` — the one shape no caller handles, on the 404 a typo'd
+    // collection or function name produces.
+    installUnmatchedApiEnvelope(config.app, basePath);
 
     // Configure Hono middlewares (Request ID, body limit, CSRF, CORS warning, logging)
     configureMiddlewares(config.app, basePath, isProduction, config);
@@ -2323,14 +2329,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // Apply a permissive body limit specifically for the upload endpoint
         storageRouter.use("/upload", bodyLimit({
             maxSize: storageMaxSize,
-            onError: (c) => {
-                return c.json({
-                    error: {
-                        message: `File too large. Maximum upload size is ${Math.round(storageMaxSize / 1024 / 1024)}MB.`,
-                        code: "PAYLOAD_TOO_LARGE"
-                    }
-                }, 413);
-            }
+            onError: (c) => errorHandler(
+                new ApiError(
+                    413,
+                    "PAYLOAD_TOO_LARGE",
+                    `File too large. Maximum upload size is ${Math.round(storageMaxSize / 1024 / 1024)}MB.`
+                ),
+                c
+            ) as Response
         }));
 
         storageRouter.route("/", storageRoutes);
@@ -2845,7 +2851,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }));
         }
 
-        const fnRoutes = createFunctionRoutes(loadedFunctions, problems.length, `${basePath}/functions`);
+        const fnRoutes = createFunctionRoutes(loadedFunctions, problems, `${basePath}/functions`);
         functionsRouter.route("/", fnRoutes);
         config.app.route(`${basePath}/functions`, functionsRouter);
 

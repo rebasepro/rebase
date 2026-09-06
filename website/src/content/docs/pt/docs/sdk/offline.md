@@ -1,5 +1,5 @@
 ---
-sourceHash: f3023e081dcc3e4a
+sourceHash: 6bc50ef7860bac7d
 title: Offline e Sincronização Local-First
 sidebar_label: Offline
 description: Ative o motor de sincronização local-first do SDK Cliente da Rebase — um banco de dados local de linhas, escritas offline instantâneas com reversão e consultas ao vivo reativas.
@@ -68,7 +68,9 @@ const post = await client.data.posts.create({ title: "Draft", status: "draft" })
 const drafts = await client.data.posts.where("status", "==", "draft").find();
 ```
 
-As linhas criadas offline recebem um id gerado pelo cliente. Se o servidor atribuir o seu próprio na reexecução, a linha local e quaisquer escritas enfileiradas que ainda apontem para o id temporário são movidas para o id real.
+As linhas criadas offline recebem um id gerado pelo cliente, no tipo que os ids da coleção já têm: um **inteiro negativo** onde são números, uma string UUID onde são strings. O sinal é a pista — uma chave real nunca é negativa —, por isso uma linha que ainda não chegou ao servidor é reconhecível sem consulta, e `id` continua a ser o que o tipo `Row` gerado diz. Numa coleção que este dispositivo nunca leu não há nada local de onde deduzir o tipo, e o id é um UUID.
+
+Se o servidor atribuir o seu próprio na reexecução, a linha local e quaisquer escritas enfileiradas que ainda apontem para o id temporário são movidas para o id real. Até lá, não guarde um id temporário fora da base de dados offline: uma chave estrangeira ou um URL guardado que contenha um aponta para uma linha prestes a ser renumerada.
 
 As escritas são reexecutadas na ordem em que você as fez, entre coleções — de modo que um create em uma coleção ainda chega antes da linha de outra que o referencia.
 

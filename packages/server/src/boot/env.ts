@@ -287,13 +287,6 @@ const bootEnvExtension = z.object({
 
 export type RebaseBootEnv = RebaseEnv & z.infer<typeof bootEnvExtension>;
 
-/**
- * Load and validate the environment for a bundle boot.
- *
- * Does not read `.env` files — that is the deployment's job (a container gets
- * real environment variables; `rebase dev` and `rebase start` load dotenv before
- * calling in).
- */
 /** One entry of a ZodError, narrowed to the parts this file reads. */
 interface BootEnvIssue {
     path?: (string | number)[];
@@ -321,6 +314,13 @@ function isMissingVariable(issue: BootEnvIssue): boolean {
     return issue.code === "invalid_type" && /received undefined$/.test(issue.message ?? "");
 }
 
+/**
+ * Load and validate the environment for a bundle boot.
+ *
+ * Does not read `.env` files — that is the deployment's job (a container gets
+ * real environment variables; `rebase dev` and `rebase start` load dotenv before
+ * calling in).
+ */
 export function loadBootEnv(): RebaseBootEnv {
     try {
         return loadEnv({ extend: bootEnvExtension }) as RebaseBootEnv;
@@ -364,7 +364,6 @@ export function isLocalhostOrigin(origin: string): boolean {
     }
 }
 
-/** A CORS origin resolver of the shape Hono's `cors()` middleware expects. */
 /**
  * Whether this process serves the OpenAPI docs.
  *
@@ -383,6 +382,7 @@ export function resolveEnableSwagger(env: RebaseBootEnv): boolean | undefined {
     return env.NODE_ENV === "production" ? false : undefined;
 }
 
+/** A CORS origin resolver of the shape Hono's `cors()` middleware expects. */
 export type CorsOriginResolver = (origin: string) => string | null;
 
 /**

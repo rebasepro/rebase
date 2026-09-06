@@ -527,6 +527,51 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         throw new Error("No storage controller or registry available");
     };
 
+    /**
+     * A bucket this deployment does not serve is a 404, not a missing file.
+     *
+     * `getSignedUrl("x.txt", "no-such-bucket")` answered `{ url: null,
+     * fileNotFound: true }` — byte for byte what a real key that does not exist
+     * answers — so there was no way to learn the second argument was wrong.
+     * Worse on S3, where an unrecognised bucket name went straight to the
+     * provider: the request parameter was a way to address any bucket the
+     * deployment's credentials can reach.
+     *
+     * Only checked against a controller that says what it serves
+     * ({@link StorageController.knownBuckets}); a custom implementation that
+     * does not is handed whatever the caller wrote, as before.
+     *
+     * `UNKNOWN_STORAGE_SOURCE` rather than a code of its own: to a caller,
+     * "media" being a bucket and "media" being a storage source are the same
+     * mistake with the same fix — look at `GET /api/storage/sources` — and one
+     * code they can branch on beats two they have to learn apart.
+     */
+    const refuseUnknownBucket = (bucket: string, resolved: StorageController): never => {
+        const served = resolved.knownBuckets?.() ?? [];
+        const sources = registry ? registry.list() : [DEFAULT_STORAGE_SOURCE_KEY];
+        throw new ApiError(
+            404,
+            "UNKNOWN_STORAGE_SOURCE",
+            `Unknown storage bucket "${bucket}". This deployment serves ` +
+            `${served.map(b => `"${b}"`).join(", ")} on this source. ` +
+            `Storage sources: ${sources.map(k => `"${k}"`).join(", ")} — a second store is a ` +
+            "second source (`?storageId=`), not a second bucket.",
+            { bucket, knownBuckets: served, storageSources: sources },
+            true
+        );
+    };
+
+    /** The bucket a request may use, or a refusal naming what is served. */
+    const bucketOrRefuse = (
+        bucket: string | undefined,
+        resolved: StorageController
+    ): string | undefined => {
+        if (bucket === undefined) return undefined;
+        const served = resolved.knownBuckets?.();
+        if (!served || served.includes(bucket)) return bucket;
+        return refuseUnknownBucket(bucket, resolved);
+    };
+
     /** Get the default controller (used for TUS and base-path derivation). */
     const getDefaultController = (): StorageController => {
         if (registry) return registry.getDefault();
@@ -592,8 +637,12 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         }
 
         const key = typeof body["key"] === "string" ? body["key"] : "";
-        const bucket = canonicalBucketOrBadRequest(typeof body["bucket"] === "string" ? body["bucket"] : undefined);
         const storageId = typeof body["storageId"] === "string" ? body["storageId"] : c.req.query("storageId");
+        // Not `bucketOrRefuse`: a write may bring a bucket into existence. On
+        // local storage `putObject({ bucket: "media" })` creates `<root>/media`,
+        // which is deliberate and tested — so only the *shape* is checked here,
+        // and a read is what has something to compare against.
+        const bucket = canonicalBucketOrBadRequest(typeof body["bucket"] === "string" ? body["bucket"] : undefined);
 
         const finalKey = canonicalKeyOrBadRequest(key || uploadedFile.name || "unnamed");
 
@@ -626,10 +675,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             at: new Date().toISOString()
         });
 
-        return c.json({
-            success: true,
-            data: result
-        }, 201);
+        return c.json({ data: result }, 201);
     });
 
     /**
@@ -863,11 +909,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     router.get("/metadata/*", fileTokenAuth, publicObjectAuth, readAuthMiddleware, async (c) => {
         const rawPath = extractWildcardPath(c);
         if (!rawPath) {
-            return c.json({
-                success: true,
-                data: null,
-                fileNotFound: true
-            }, 404);
+            return c.json({ data: null, fileNotFound: true }, 404);
         }
 
         const filePath = decodeURIComponent(rawPath);
@@ -923,10 +965,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             }
         }
 
-        return c.json({
-            success: true,
-            data: downloadConfig.metadata
-        });
+        return c.json({ data: downloadConfig.metadata });
     });
 
     /**
@@ -935,8 +974,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     router.delete("/file/*", writeAuthMiddleware, async (c) => {
         const rawPath = extractWildcardPath(c);
         if (!rawPath) {
-            return c.json({ success: true,
-message: "No file to delete" });
+            return c.json({ message: "No file to delete" });
         }
 
         const filePath = decodeURIComponent(rawPath);
@@ -957,10 +995,7 @@ message: "No file to delete" });
             at: new Date().toISOString()
         });
 
-        return c.json({
-            success: true,
-            message: "File deleted"
-        });
+        return c.json({ message: "File deleted" });
     });
 
     /**
@@ -975,11 +1010,11 @@ message: "No file to delete" });
         // A listing is the read half of the same unvalidated parameter:
         // `?bucket=../../..` enumerated arbitrary directories on the pod,
         // including the TUS temp directory next to the buckets.
-        const bucket = canonicalBucketOrBadRequest(c.req.query("bucket"));
         const maxResults = c.req.query("maxResults");
         const pageToken = c.req.query("pageToken");
         const storageId = c.req.query("storageId");
         const resolved = resolveController(storageId);
+        const bucket = bucketOrRefuse(canonicalBucketOrBadRequest(c.req.query("bucket")), resolved);
 
         // The prefix is the "object" being asked about — a listing is how you
         // discover keys you were never told, so leaving it ungated would hand
@@ -995,10 +1030,7 @@ message: "No file to delete" });
             }
         );
 
-        return c.json({
-            success: true,
-            data: result
-        });
+        return c.json({ data: result });
     });
 
     /**
@@ -1030,6 +1062,7 @@ message: "No file to delete" });
         // bucket has — "this route's multipart body, the `?bucket=` query, and
         // the TUS `Upload-Metadata` header". This body was the fourth, missing
         // from the list and from the code.
+        // A write, so no `bucketOrRefuse` — see the upload route.
         const bucket = canonicalBucketOrBadRequest(typeof body.bucket === "string" ? body.bucket : undefined);
 
         if (!resolvedPath || resolvedPath.trim() === "") {
@@ -1056,10 +1089,7 @@ message: "No file to delete" });
             });
         }
 
-        return c.json({
-            success: true,
-            message: "Folder created"
-        }, 201);
+        return c.json({ message: "Folder created" }, 201);
     });
 
     // -----------------------------------------------------------------------
@@ -1154,7 +1184,7 @@ message: "No file to delete" });
             });
         }
 
-        return c.json({ success: true, data: Array.from(byKey.values()) });
+        return c.json({ data: Array.from(byKey.values()) });
     });
 
     return router;

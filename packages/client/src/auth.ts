@@ -566,7 +566,8 @@ redirectUri });
             // any request is made, which is exactly what that class is.
             throw new RebaseClientError(
                 "No active session to refresh. Sign in first, or set `authFlowMode: \"cookie\"` " +
-                "if the refresh token is held in an HttpOnly cookie."
+                "if the refresh token is held in an HttpOnly cookie.",
+                { code: "NOT_SIGNED_IN" }
             );
         }
         const fetchFn = getFetch();

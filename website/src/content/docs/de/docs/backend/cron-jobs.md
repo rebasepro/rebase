@@ -69,7 +69,7 @@ Das ist alles. Rebase wird:
 2. Jeden Standard-Export als Cron-Job registrieren
 3. Die Tabelle `rebase.cron_logs` in PostgreSQL automatisch erstellen (falls der Treiber SQL unterstützt)
 4. Den Scheduler starten und Zähler aus vorhandenen DB-Logs initialisieren
-5. Admin-REST-Routen unter `/api/cron` bereitstellen
+5. Admin-REST-Routen unter `/api/admin/cron` bereitstellen
 
 ## Zeitplan-Syntax
 
@@ -153,18 +153,18 @@ Alle Cron-Routen erfordern eine **Admin-Authentifizierung** (`requireAuth` + `re
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
-| `GET` | `/api/cron` | Alle registrierten Cron-Jobs auflisten |
-| `GET` | `/api/cron/:id` | Status eines einzelnen Jobs abrufen |
-| `POST` | `/api/cron/:id/trigger` | Einen Job manuell auslösen |
-| `GET` | `/api/cron/:id/logs` | Ausführungsverlauf abrufen (`?limit=N`) |
-| `PUT` | `/api/cron/:id` | Einen Job aktivieren/deaktivieren (`{ "enabled": true }`) |
+| `GET` | `/api/admin/cron` | Alle registrierten Cron-Jobs auflisten |
+| `GET` | `/api/admin/cron/:id` | Status eines einzelnen Jobs abrufen |
+| `POST` | `/api/admin/cron/:id/trigger` | Einen Job manuell auslösen |
+| `GET` | `/api/admin/cron/:id/logs` | Ausführungsverlauf abrufen (`?limit=N`) |
+| `PUT` | `/api/admin/cron/:id` | Einen Job aktivieren/deaktivieren (`{ "enabled": true }`) |
 
 ### Beispiel: Alle Jobs auflisten
 
 `$TOKEN` ist ein Admin-Access-Token: melden Sie sich an und verwenden Sie das `accessToken` aus der Login-Antwort. `$API_URL` ist die URL, die `rebase dev` ausgegeben hat — der Port wird aus dem Projekt abgeleitet und ist nicht fest.
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"
+curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/admin/cron"
 ```
 
 ```json
@@ -190,7 +190,7 @@ curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    "$API_URL/api/cron/health-check/trigger"
+    "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
 ## Client-SDK
@@ -237,7 +237,7 @@ Wenn der Datenbanktreiber SQL unterstützt (z.B. PostgreSQL), werden Ausführung
 
 - Der Ausführungsverlauf **überlebt Server-Neustarts** und Deployments
 - Die Zähler `totalRuns` und `totalFailures` werden beim Start **aus der Datenbank initialisiert**
-- Der `/api/cron/:id/logs`-Endpunkt fragt die Datenbank ab, nicht nur den In-Memory-Speicher
+- Der `/api/admin/cron/:id/logs`-Endpunkt fragt die Datenbank ab, nicht nur den In-Memory-Speicher
 - Mehrere Server-Instanzen teilen sich denselben Ausführungsverlauf
 
 Die Tabelle wird beim ersten Start automatisch erstellt — keine Migrationen erforderlich.

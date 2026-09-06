@@ -137,6 +137,27 @@ export interface StorageController {
      * should return their own identifier (e.g. `'gcs'`, `'azure'`).
      */
     getType(): string;
+
+    /**
+     * The buckets this controller serves, if it knows.
+     *
+     * The `bucket` a request may name is not a free-text field: on S3 and GCS it
+     * goes straight to the provider, so an unvalidated one addresses *any*
+     * bucket the deployment's credentials can reach, and locally it names a
+     * directory the framework would create on demand. Either way, a caller who
+     * mistypes it gets "file not found" — the same answer as a missing object —
+     * with nothing to say the bucket was the problem.
+     *
+     * So a controller that knows its buckets says so, and the routes refuse
+     * anything else with `UNKNOWN_STORAGE_SOURCE` naming what is served. A
+     * controller that does not implement this keeps the old behaviour and is
+     * handed whatever the caller wrote — a custom implementation may address
+     * buckets this framework has no way to enumerate.
+     *
+     * `"default"` is always among them: it is the logical name every route uses
+     * when the caller names none, and each provider maps it to its own.
+     */
+    knownBuckets?(): string[];
 }
 
 /**
