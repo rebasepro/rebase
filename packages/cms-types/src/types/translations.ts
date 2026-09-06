@@ -897,6 +897,10 @@ export interface RebaseTranslations {
     studio_sql_sidebar_no_history?: string;
     studio_sql_sidebar_history_hint?: string;
     studio_sql_sidebar_delete_snippet?: string;
+    /** Accessible name for the ✕ on a query tab. */
+    studio_sql_close_tab?: string;
+    /** Accessible name for the + beside the query tabs. */
+    studio_sql_new_tab?: string;
 
     // ─── Studio: Schema Browser ──────────────────────────────────
     studio_schema_tables?: string;

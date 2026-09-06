@@ -61,6 +61,16 @@ large: 32 },
     IconButton: ({ children, variant: _v, color: _c, size: _s, ...props }) =>
         React.createElement("button", { type: "button",
             ...props }, children),
+    // Real elements, and `Tab` really is a `<button>` — Radix's `TabsTrigger`
+    // is one, and the fallback's `<div>` hid a `<button>` nested inside a
+    // `<button>` in the SQL console's tab strip for as long as it stood in.
+    Tabs: ({ children, value: _v, onValueChange: _o, variant: _var, className: _c, innerClassName: _i }) =>
+        React.createElement("div", { role: "tablist" }, children),
+    Tab: ({ children, value, className: _c, disabled }) =>
+        React.createElement("button", { type: "button",
+            role: "tab",
+            disabled,
+            "data-value": value }, children),
     Select: ({ value, onValueChange, children, placeholder, ...props }) =>
         React.createElement(
             "select",

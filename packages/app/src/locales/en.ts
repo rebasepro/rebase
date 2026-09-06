@@ -828,6 +828,8 @@ export const en: RebaseTranslations = {
     studio_sql_sidebar_no_history: "No history",
     studio_sql_sidebar_history_hint: "Executed queries will appear here.",
     studio_sql_sidebar_delete_snippet: "Delete snippet",
+    studio_sql_close_tab: "Close this query tab",
+    studio_sql_new_tab: "New query tab",
 
     // ─── Studio: Schema Browser ──────────────────────────────────
     studio_schema_tables: "Tables",

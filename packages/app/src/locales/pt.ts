@@ -825,6 +825,8 @@ export const pt: RebaseTranslations = {
     studio_sql_sidebar_no_history: "Sem histórico",
     studio_sql_sidebar_history_hint: "As consultas executadas aparecerão aqui.",
     studio_sql_sidebar_delete_snippet: "Eliminar excerto",
+    studio_sql_close_tab: "Fechar este separador de consulta",
+    studio_sql_new_tab: "Novo separador de consulta",
 
     // ─── Studio: Schema Browser ──────────────────────────────────
     studio_schema_tables: "Tables",

@@ -820,6 +820,8 @@ export const it: RebaseTranslations = {
     studio_sql_sidebar_no_history: "Nessuna cronologia",
     studio_sql_sidebar_history_hint: "Le query eseguite appariranno qui.",
     studio_sql_sidebar_delete_snippet: "Elimina frammento",
+    studio_sql_close_tab: "Chiudi questa scheda di query",
+    studio_sql_new_tab: "Nuova scheda di query",
 
     // ─── Studio: Schema Browser ──────────────────────────────────
     studio_schema_tables: "Tables",

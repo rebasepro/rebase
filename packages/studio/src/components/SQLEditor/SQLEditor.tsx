@@ -1301,13 +1301,26 @@ id: String(ra.entityId) })}
                                                 <TerminalIcon size={iconSize.smallest} className="text-blue-500 mr-1.5 flex-shrink-0"/>
                                                 <span className="truncate">{tab.name}</span>
                                                 {tabs.length > 1 && (
-                                                    <IconButton
-                                                        size="smallest"
+                                                    // A span, not an `IconButton`: `Tab` is a Radix
+                                                    // `TabsTrigger`, which is itself a `<button>`, and
+                                                    // React refuses the nesting — "`<button>` cannot be
+                                                    // a descendant of `<button>`. This will cause a
+                                                    // hydration error" on every second tab opened.
+                                                    //
+                                                    // `tabIndex={-1}` keeps the tab strip at one stop
+                                                    // per tab rather than two; the label is here so the
+                                                    // control is at least named, which the icon-only
+                                                    // button never was.
+                                                    <span
+                                                        role="button"
+                                                        tabIndex={-1}
+                                                        aria-label={t("studio_sql_close_tab")}
+                                                        title={t("studio_sql_close_tab")}
                                                         onClick={(e) => handleCloseTab(tab.id, e)}
-                                                        className="ml-1 !p-0.5 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
+                                                        className="ml-1 p-0.5 rounded inline-flex items-center opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity cursor-pointer"
                                                     >
                                                         <XIcon size={iconSize.smallest}/>
-                                                    </IconButton>
+                                                    </span>
                                                 )}
                                             </Tab>
                                         ))}
@@ -1315,6 +1328,8 @@ id: String(ra.entityId) })}
                                     <IconButton
                                         size="small"
                                         onClick={handleAddTab}
+                                        aria-label={t("studio_sql_new_tab")}
+                                        title={t("studio_sql_new_tab")}
                                         className="ml-2 flex-shrink-0"
                                     >
                                         <PlusIcon size={iconSize.smallest}/>

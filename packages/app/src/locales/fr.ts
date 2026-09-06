@@ -820,6 +820,8 @@ export const fr: RebaseTranslations = {
     studio_sql_sidebar_no_history: "Aucun historique",
     studio_sql_sidebar_history_hint: "Les requêtes exécutées apparaîtront ici.",
     studio_sql_sidebar_delete_snippet: "Supprimer l'extrait",
+    studio_sql_close_tab: "Fermer cet onglet de requête",
+    studio_sql_new_tab: "Nouvel onglet de requête",
 
     // ─── Studio: Schema Browser ──────────────────────────────────
     studio_schema_tables: "Tables",

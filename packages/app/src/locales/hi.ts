@@ -820,6 +820,8 @@ export const hi: RebaseTranslations = {
     studio_sql_sidebar_no_history: "कोई इतिहास नहीं",
     studio_sql_sidebar_history_hint: "चलाई गई क्वेरीज़ यहाँ दिखाई देंगी।",
     studio_sql_sidebar_delete_snippet: "स्निपेट हटाएँ",
+    studio_sql_close_tab: "यह क्वेरी टैब बंद करें",
+    studio_sql_new_tab: "नया क्वेरी टैब",
 
     // ─── Studio: Schema Browser ──────────────────────────────────
     studio_schema_tables: "Tables",
