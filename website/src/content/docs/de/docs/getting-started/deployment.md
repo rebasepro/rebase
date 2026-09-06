@@ -1,4 +1,5 @@
 ---
+sourceHash: 17245c4fecea02de
 title: Bereitstellung
 sidebar_label: Bereitstellung
 description: Stellen Sie Ihr Rebase-Projekt mit Docker, Cloud-Plattformen oder manuellen Setups in der Produktion bereit.
@@ -41,9 +42,8 @@ services:
       - "5432:5432"
 
   app:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    # Das veröffentlichte Runtime-Image. Ein Rebase-Upgrade ist eine Tag-Änderung, kein Rebuild.
+    image: rebasepro/server:${REBASE_VERSION:-latest}
     ports:
       - "3001:3001"
     environment:
@@ -53,6 +53,8 @@ services:
     depends_on:
       - postgres
     volumes:
+      # Ihr gebautes Projekt, aus `rebase build`.
+      - ./dist-bundle:/bundle:ro
       - uploads:/app/uploads
 
 volumes:
@@ -61,10 +63,11 @@ volumes:
 ```
 
 ```bash
+rebase build          # erzeugt ./dist-bundle
 docker compose up -d
 ```
 
-Das oben gezeigte YAML ist illustrativ — die im Projekt generierte `docker-compose.yml` ist die maßgebliche Quelle und verwendet bereits `context: .` mit `dockerfile: backend/Dockerfile` (das Backend-`Dockerfile` benötigt den gesamten Workspace als Build-Kontext).
+Das oben gezeigte YAML ist illustrativ — die im Projekt generierte `docker-compose.yml` ist die maßgebliche Quelle. Sie baut kein Image aus Ihrem Quellcode: sie startet das veröffentlichte Runtime-Image und hängt das `dist-bundle` ein, das `rebase build` erzeugt hat.
 
 ## Datenbankschema erstellen
 

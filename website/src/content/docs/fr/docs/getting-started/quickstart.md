@@ -1,4 +1,5 @@
 ---
+sourceHash: 58ed48e92b8ff6cb
 title: Démarrage rapide
 sidebar_label: Démarrage rapide
 description: Créez un nouveau projet Rebase et faites-le fonctionner localement en moins de 2 minutes.

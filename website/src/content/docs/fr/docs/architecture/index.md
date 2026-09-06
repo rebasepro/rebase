@@ -1,4 +1,5 @@
 ---
+sourceHash: 08efd8549191e760
 title: Vue d'ensemble de l'architecture
 sidebar_label: Architecture
 description: Comprenez comment le backend, le frontend, le SDK client et la base de données de Rebase s'intègrent pour former un Backend-as-a-Service complet.

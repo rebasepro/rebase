@@ -1,4 +1,5 @@
 ---
+sourceHash: 62f27c4cab31e65a
 title: Consultar Dados
 sidebar_label: Consultar Dados
 description: Operações CRUD, construtor de consultas fluente, operadores de filtro, paginação, ordenação e carregamento de relações com o SDK Cliente da Rebase.

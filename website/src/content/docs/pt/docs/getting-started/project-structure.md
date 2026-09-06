@@ -1,4 +1,5 @@
 ---
+sourceHash: 8fb63312e30e41a2
 title: Estrutura do Projeto
 sidebar_label: Estrutura do Projeto
 description: Compreenda a estrutura de um projeto Rebase — frontend, backend e coleções compartilhadas.
@@ -45,8 +46,7 @@ import { collections } from "virtual:rebase-collections";
 
 // O cliente se conecta à sua API de backend e WebSocket
 const rebaseClient = createRebaseClient({
-    baseUrl: "http://localhost:3001",
-    websocketUrl: "ws://localhost:3001"
+    baseUrl: import.meta.env.VITE_API_URL
 });
 
 // As coleções são importadas via um módulo virtual Vite

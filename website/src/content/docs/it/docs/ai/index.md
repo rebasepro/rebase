@@ -1,4 +1,5 @@
 ---
+sourceHash: 29c1bcc39a3460e5
 title: IA & Agenti
 sidebar_label: Panoramica
 description: Cosa offre Rebase per gli assistenti di programmazione AI e gli agenti autonomi — un server MCP, skill per agenti a livello di progetto, file di istruzioni generati e il modello di credenziali che stabilisce a cosa un agente può effettivamente accedere.

@@ -95,7 +95,7 @@ if (asJson) {
         out.skillClaims = checkSkillClaims(ROOT).findings;
         out.unreleasedBadges = checkUnreleasedBadges(ROOT).findings;
         out.docsLinks = checkDocsLinks(ROOT).findings;
-        out.translationFreshness = checkTranslationFreshness(ROOT).findings;
+        out.translationFreshness = checkTranslationFreshness(ROOT, { strict }).findings;
         out.configExports = checkConfigExports(ROOT).findings;
     }
     if (only !== "names") {
@@ -215,8 +215,8 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Translation freshness ━━━${NC}`);
-    const { findings: bad, missing, unstamped, fresh, sources, locales } =
-        checkTranslationFreshness(ROOT);
+    const { findings: bad, missing, unstamped, fresh, sources, locales, budget } =
+        checkTranslationFreshness(ROOT, { strict });
     console.log(
         `${DIM}${sources} translatable page(s) × ${locales} locales: ${fresh} fresh, ` +
             `${unstamped.length} unstamped, ${missing.length} missing.${NC}`
@@ -233,8 +233,9 @@ if (only === "both" || only === "names") {
     }
     if (missing.length || unstamped.length) {
         console.log(
-            `      ${DIM}${unstamped.length} predate the stamp and ${missing.length} do not exist ` +
-                `(Starlight falls back to English). Neither fails this check; ` +
+            `      ${DIM}${unstamped.length} carry no stamp (budget ${budget}, a finding under ` +
+                `--strict) and ${missing.length} do not exist at all (Starlight falls back to ` +
+                `English, so that one is a coverage gap rather than a break). ` +
                 `\`node scripts/translate_docs.mjs --dry-run\` in website/ lists them.${NC}`
         );
     }

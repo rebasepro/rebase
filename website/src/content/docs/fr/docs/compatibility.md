@@ -1,4 +1,5 @@
 ---
+sourceHash: 5de8d85cb2d31896
 slug: fr/docs/compatibility
 title: Compatibilité
 description: Ce que Rebase garantit ou non entre les versions — les six contrats versionnés, la façon dont chacun échoue, et ce qui peut encore changer dans une version mineure.

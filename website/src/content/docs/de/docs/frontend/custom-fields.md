@@ -1,4 +1,5 @@
 ---
+sourceHash: db02ecc36f64f46c
 title: Benutzerdefinierte Felder
 sidebar_label: Benutzerdefinierte Felder
 description: Erstellen Sie benutzerdefinierte Formularfelder für die Entitätsbearbeitung mit vollem Zugriff auf den Formular-Kontext, Entitätswerte und Rebase-Hooks.

@@ -1,4 +1,5 @@
 ---
+sourceHash: 9dc4adc1ff3c773b
 title: Tarefas em Segundo Plano
 sidebar_label: Tarefas em Segundo Plano
 description: Uma fila de jobs durável, baseada em Postgres — trabalho que sobrevive a reinicializações, com novas tentativas usando backoff e falhas mantidas em vez de descartadas.

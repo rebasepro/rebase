@@ -1,4 +1,5 @@
 ---
+sourceHash: ba0337fd764eebaa
 title: Fichiers d'instructions pour l'IA
 sidebar_label: Fichiers d'instructions pour l'IA
 description: Chaque projet Rebase généré inclut ai-instructions.md ainsi que des fichiers pointeurs d'une ligne pour Claude, Cursor, Windsurf, Copilot et AGENTS.md — une source unique de vérité, plusieurs noms de fichiers.

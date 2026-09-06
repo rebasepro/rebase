@@ -1,4 +1,5 @@
 ---
+sourceHash: 3e7cee199ce0ba69
 slug: de/docs/rls-check
 title: rls-check
 description: Überprüfe Row-Level Security auf jeder PostgreSQL-Datenbank — Supabase, Neon, RDS oder deinem eigenen Server. Schreibgeschützt, keine Registrierung, kein Rebase erforderlich.

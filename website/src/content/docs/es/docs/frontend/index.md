@@ -1,4 +1,5 @@
 ---
+sourceHash: 03d03e9fa055a194
 title: Descripción general del Frontend
 sidebar_label: Frontend
 description: "Crea y personaliza el panel de administración de Rebase con React: controladores, scaffold, enrutamiento y vistas."

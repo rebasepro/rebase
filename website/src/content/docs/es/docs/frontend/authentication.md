@@ -1,4 +1,5 @@
 ---
+sourceHash: 90e2137462c112d2
 title: Autenticación e Inicio de Sesión
 sidebar_label: Autenticación e Inicio de Sesión
 description: Configure el controlador de autenticación, la vista de inicio de sesión y la simulación de roles en su frontend React de Rebase.

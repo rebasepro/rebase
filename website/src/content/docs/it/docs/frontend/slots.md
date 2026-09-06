@@ -1,4 +1,5 @@
 ---
+sourceHash: 24ecb93e6262aeca
 title: Slot
 sidebar_label: Slot
 description: Riferimento per tutti gli slot dei punti di estensione UI disponibili in Rebase — posizioni con nome dove puoi iniettare componenti personalizzati.

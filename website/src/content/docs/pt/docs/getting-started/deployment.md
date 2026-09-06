@@ -1,4 +1,5 @@
 ---
+sourceHash: 17245c4fecea02de
 title: Implantação
 sidebar_label: Implantação
 description: Implante seu projeto Rebase em produção usando Docker, plataformas de nuvem ou configurações manuais.
@@ -41,9 +42,8 @@ services:
       - "5432:5432"
 
   app:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    # A imagem de runtime publicada. Atualizar o Rebase é uma mudança de tag, não uma recompilação.
+    image: rebasepro/server:${REBASE_VERSION:-latest}
     ports:
       - "3001:3001"
     environment:
@@ -53,6 +53,8 @@ services:
     depends_on:
       - postgres
     volumes:
+      # O seu projeto construído, a partir do `rebase build`.
+      - ./dist-bundle:/bundle:ro
       - uploads:/app/uploads
 
 volumes:
@@ -61,6 +63,7 @@ volumes:
 ```
 
 ```bash
+rebase build
 docker compose up -d
 ```
 

@@ -1,4 +1,5 @@
 ---
+sourceHash: 8e6b49d8e91f586c
 title: Speicher & Dateien
 sidebar_label: Speicher
 description: Dateien mit dem Speichermodul des Rebase Client SDK hochladen, herunterladen, auflisten und löschen.

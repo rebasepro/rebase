@@ -1,4 +1,5 @@
 ---
+sourceHash: 3346d2728eb8f2e4
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -21,7 +22,7 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei
 
 | Variable | Beschreibung | Standard |
 |----------|-------------|---------|
-| `VITE_API_URL` | Backend-API-URL. Wird vom Client-SDK verwendet. | `http://localhost:3001` |
+| `VITE_API_URL` | Backend-API-URL für das Client-SDK. **Nur in der Entwicklung setzen.** | Ursprung der Seite |
 | `VITE_GOOGLE_CLIENT_ID` | Google OAuth Client-ID. Ermöglicht "Mit Google anmelden". | — |
 
 ### Backend

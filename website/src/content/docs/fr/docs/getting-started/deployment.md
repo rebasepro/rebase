@@ -1,4 +1,5 @@
 ---
+sourceHash: 17245c4fecea02de
 title: Déploiement
 sidebar_label: Déploiement
 description: Déployez votre projet Rebase en production à l'aide de Docker, de plateformes cloud ou de configurations manuelles.
@@ -39,15 +40,14 @@ services:
       - "5432:5432"
 
   backend:
-    build:
-      # Context is the PROJECT ROOT so the image can copy
-      # pnpm-workspace.yaml, backend/, and config/. A `./backend`
-      # context would fail — the Dockerfile lives at backend/Dockerfile.
-      context: .
-      dockerfile: backend/Dockerfile
+    # L'image de runtime publiée. Mettre Rebase à niveau est un changement de tag, pas une reconstruction.
+    image: rebasepro/server:${REBASE_VERSION:-latest}
     ports:
       - "3001:3001"
     env_file: .env
+    volumes:
+      # Votre projet construit, issu de `rebase build`.
+      - ./dist-bundle:/bundle:ro
     depends_on:
       - db
 
@@ -57,6 +57,7 @@ volumes:
 ```
 
 ```bash
+rebase build
 docker compose up -d
 ```
 

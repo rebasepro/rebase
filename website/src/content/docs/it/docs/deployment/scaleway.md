@@ -1,4 +1,5 @@
 ---
+sourceHash: a83732a379b7739b
 title: Distribuzione di Rebase su Scaleway
 description: Scopri come distribuire Rebase su Scaleway per un'infrastruttura cloud sicura, basata in Francia, utilizzando i Serverless Containers.
 sidebar_label: Scaleway
@@ -11,6 +12,21 @@ Consigliamo di utilizzare il **Managed Database** di Scaleway per un supporto Po
 ## 1. Crea un Managed Postgres Database
 
 I Managed Database di Scaleway offrono backup automatici e alta disponibilità.
+
+**Non c'è nessuna immagine applicativa da costruire dal tuo sorgente**. `rebase build` produce una directory `dist-bundle` con le tue collezioni, funzioni e cron compilati — e, se il progetto dichiara un'app statica, il frontend costruito. L'immagine di runtime pubblicata la esegue:
+
+```bash
+rebase build
+```
+
+Serverless Containers preleva da un registry, quindi incorpora il bundle in un'immagine derivata. Tre righe, e fissa esattamente ciò che gira:
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+Aggiornare Rebase in seguito è una modifica a quella riga `FROM`. Il tuo bundle resta intatto.
 
 1. Nella Console Scaleway, vai a **PostgreSQL**.
 2. Clicca su **Crea un'istanza di database**.
@@ -26,10 +42,10 @@ I Serverless Containers di Scaleway eseguono immagini Docker standard. Per prima
 
 1. Vai a **Container Registry** nella Console Scaleway e crea un Namespace (es. `rebase-apps`).
 2. Effettua l'accesso al registry dal tuo terminale locale utilizzando le istruzioni fornite.
-3. Crea la tua app Rebase dalla radice del progetto — il Dockerfile del backend ha bisogno dell'intero workspace come contesto di build (copia `pnpm-workspace.yaml`, `backend/` e `config/`):
+3. Costruisci e carica dalla radice del progetto:
 
 ```bash
-docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f backend/Dockerfile .
+docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest .
 ```
 
 4. Carica l'immagine:

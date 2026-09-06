@@ -1,4 +1,5 @@
 ---
+sourceHash: 2cf8f0e1f2cb33d7
 title: Ansichtsmodi
 sidebar_label: Ansichtsmodi
 description: Konfigurieren Sie Tabellen-, Karten- und Kanban-Board-Ansichten für Ihre Sammlungen.

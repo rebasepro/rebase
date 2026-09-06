@@ -1,4 +1,5 @@
 ---
+sourceHash: 24d65c28c1584227
 title: MCP-Server
 sidebar_label: MCP-Server
 description: Verbinden Sie Claude Code, Cursor, die Gemini CLI oder einen beliebigen MCP-Client mit einem Rebase-Projekt – die 41 bereitgestellten Tools, die Anmeldedaten für die Authentifizierung und das Loopback-Gate, das zwischen einem Agenten und der Produktion steht.

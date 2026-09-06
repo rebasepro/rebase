@@ -1,4 +1,5 @@
 ---
+sourceHash: f54d8319cbbee30f
 title: Referência de Hooks
 sidebar_label: Hooks
 description: Hooks React fornecidos pelo Rebase para acessar autenticação, dados, navegação, painéis laterais, armazenamento e estado da UI.

@@ -1,4 +1,5 @@
 ---
+sourceHash: 03d03e9fa055a194
 title: Vue d'ensemble du frontend
 sidebar_label: Frontend
 description: Créez et personnalisez le panneau d'administration Rebase avec React — contrôleurs, échafaudage, routage et vues.

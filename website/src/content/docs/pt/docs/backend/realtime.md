@@ -1,4 +1,5 @@
 ---
+sourceHash: b05865d9a4f8b3f2
 title: Tempo Real e WebSocket
 sidebar_label: Tempo Real
 description: Sincronização de dados em tempo real, canais de broadcast e rastreamento de presença via WebSocket.

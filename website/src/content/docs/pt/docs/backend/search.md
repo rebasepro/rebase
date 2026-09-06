@@ -1,4 +1,5 @@
 ---
+sourceHash: 04421ade309db1ce
 title: Busca
 sidebar_label: Busca
 description: Como o .search() se comporta por padrão e como habilitar uma coleção Postgres para busca em texto completo ranqueada nos campos nomeados por você — incluindo conteúdo JSONB e array.

@@ -1,4 +1,5 @@
 ---
+sourceHash: c719f1cf36899c0a
 title: Relations
 sidebar_label: Relations
 description: Définir les relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre les collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.

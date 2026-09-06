@@ -1,4 +1,5 @@
 ---
+sourceHash: 8a90381a6f529677
 title: Génération de schéma
 sidebar_label: Génération de schéma
 description: Générez des schémas Drizzle ORM à partir des définitions de collections, créez des migrations SQL et gardez votre base de données synchronisée avec la CLI Rebase.
@@ -178,7 +179,7 @@ import { createRebaseClient } from "@rebasepro/client";
 import { collectionsDictionary, type Database } from "./generated/sdk/database.types";
 
 const client = createRebaseClient<Database>({
-    baseUrl: "http://localhost:3001",
+    baseUrl: import.meta.env.VITE_API_URL,
     collections: collectionsDictionary,
 });
 

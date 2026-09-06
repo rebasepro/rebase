@@ -1,4 +1,5 @@
 ---
+sourceHash: c4f8030fadf21ecf
 title: Visão Geral do Backend
 sidebar_label: Backend
 description: O backend Rebase oferece um servidor completo com API REST, autenticação, armazenamento, WebSocket em tempo real e histórico de entidades — tudo inicializado com uma única chamada de função.

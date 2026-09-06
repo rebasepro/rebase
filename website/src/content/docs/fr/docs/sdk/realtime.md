@@ -1,4 +1,5 @@
 ---
+sourceHash: a82dd911da9d58ef
 title: Abonnements en temps réel
 sidebar_label: Temps réel
 description: Abonnez-vous aux changements de données en direct avec le SDK Client de Rebase à l'aide d'écouteurs temps réel basés sur WebSocket.

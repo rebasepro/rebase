@@ -1,4 +1,5 @@
 ---
+sourceHash: 5de8d85cb2d31896
 slug: de/docs/compatibility
 title: Kompatibilität
 description: Was Rebase über Versionen hinweg verspricht und was nicht – die sechs versionierten Verträge, wie jeder fehlschlägt und was sich in einem Minor-Release noch ändern kann.

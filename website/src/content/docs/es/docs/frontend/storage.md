@@ -1,4 +1,5 @@
 ---
+sourceHash: 1134b2a4207579d3
 title: Almacenamiento y Subida de Archivos
 sidebar_label: Almacenamiento y Subida de Archivos
 description: Añada campos de subida de archivos a sus colecciones, gestione archivos programáticamente y enrute las subidas a distintos backends de almacenamiento.

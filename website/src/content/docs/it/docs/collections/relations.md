@@ -1,4 +1,5 @@
 ---
+sourceHash: c719f1cf36899c0a
 title: Relazioni
 sidebar_label: Relazioni
 description: Definisci relazioni SQL uno-a-uno, uno-a-molti e molti-a-molti tra collezioni con chiavi esterne, tabelle di giunzione e join multi-hop.

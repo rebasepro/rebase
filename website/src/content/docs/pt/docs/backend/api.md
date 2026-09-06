@@ -1,4 +1,5 @@
 ---
+sourceHash: f025e30f1bb61b63
 title: API REST
 sidebar_label: API REST
 description: Endpoints de API REST gerados automaticamente para cada coleção, com filtragem, ordenação, paginação e inclusão de relações.

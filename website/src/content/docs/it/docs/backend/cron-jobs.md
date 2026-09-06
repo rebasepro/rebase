@@ -1,4 +1,5 @@
 ---
+sourceHash: c90a105840f07ad0
 title: Lavori Cron
 sidebar_label: Lavori Cron
 description: Pianifica attività in background ricorrenti con il sistema di lavori cron integrato di Rebase. Definisci i lavori come file TypeScript, monitorali in Studio e gestiscili tramite l'API REST.
@@ -160,8 +161,10 @@ Tutte le rotte cron richiedono **autenticazione amministrativa** (`requireAuth` 
 
 ### Esempio: Elenca tutti i lavori
 
+`$API_URL` è l'URL stampato da `rebase dev` — la porta è derivata dal progetto e non è fissa.
+
 ```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
+curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"
 ```
 
 ```json
@@ -187,7 +190,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3001/api/cron/health-check/trigger
+    "$API_URL/api/cron/health-check/trigger"
 ```
 
 ## SDK del client
@@ -197,7 +200,7 @@ L'SDK client di Rebase espone un namespace `cron` per tutte le operazioni:
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
 
-const client = createRebaseClient({ baseUrl: "http://localhost:3001" });
+const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
 
 // Elenca tutti i lavori
 const { jobs } = await client.cron.listJobs();

@@ -1,4 +1,5 @@
 ---
+sourceHash: 25ae48f967fcc90a
 title: Integración con Servidores Personalizados
 sidebar_label: Servidor Personalizado (Express)
 description: Cómo incrustar los servicios de base de datos y tiempo real de Rebase en su propio backend Node.js sin utilizar Hono ni el coordinador de Rebase.

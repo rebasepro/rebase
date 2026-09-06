@@ -1,4 +1,5 @@
 ---
+sourceHash: c719f1cf36899c0a
 title: Relaciones
 sidebar_label: Relaciones
 description: Define relaciones SQL uno a uno, uno a muchos y muchos a muchos entre colecciones con claves foráneas, tablas de unión y uniones multi-salto.

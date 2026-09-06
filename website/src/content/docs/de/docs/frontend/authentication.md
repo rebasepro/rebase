@@ -1,4 +1,5 @@
 ---
+sourceHash: 90e2137462c112d2
 title: Authentifizierung & Login
 sidebar_label: Authentifizierung & Login
 description: Richten Sie den Auth-Controller, die Login-Ansicht und die Rollensimulation in Ihrem Rebase-React-Frontend ein.

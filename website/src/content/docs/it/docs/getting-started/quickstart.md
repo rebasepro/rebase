@@ -1,4 +1,5 @@
 ---
+sourceHash: 58ed48e92b8ff6cb
 title: Avvio Rapido
 sidebar_label: Avvio Rapido
 description: Crea un nuovo progetto Rebase e avvialo localmente in meno di 2 minuti.

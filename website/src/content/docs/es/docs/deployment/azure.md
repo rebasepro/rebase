@@ -1,4 +1,5 @@
 ---
+sourceHash: 44b8d8c5aa0525b6
 title: Implementación de Rebase en Microsoft Azure
 description: Implemente su instancia de Rebase de forma segura en Azure utilizando Azure Database for PostgreSQL y Azure Container Apps.
 sidebar_label: Azure
@@ -9,6 +10,21 @@ Microsoft Azure ofrece integraciones estrechas y cumplimiento empresarial. La ar
 Para cumplir con la normativa europea de datos y obtener tiempos de respuesta locales rápidos, aprovisione sus recursos en regiones como **Europa Occidental (Ámsterdam)**, **Europa del Norte (Irlanda)** o **Francia Central (París)**.
 
 ## 1. Aprovisionar Servidor Flexible de PostgreSQL
+
+**No hay ninguna imagen de aplicación que construir a partir de tu código**. `rebase build` produce un directorio `dist-bundle` con tus colecciones, funciones y crons compilados y —si tu proyecto declara una app estática— tu frontend construido. La imagen de runtime publicada lo ejecuta:
+
+```bash
+rebase build
+```
+
+Container Apps extrae desde un registro, así que hornea el bundle en una imagen derivada. Tres líneas, y fija exactamente lo que se ejecuta:
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+Actualizar Rebase más adelante es un cambio en esa línea `FROM`. Tu bundle queda intacto.
 
 1. Desde el Portal de Azure, busque y seleccione **Servidores de Azure Database for PostgreSQL**.
 2. Haga clic en **Crear** y seleccione **Servidor Flexible**.
@@ -27,9 +43,9 @@ Azure Container Apps extraerá su imagen de Docker desde ACR.
    ```bash
    az acr login --name YourRegistryName
    ```
-3. Compile y envíe la imagen de Rebase desde su repositorio local:
+3. Compila y envía desde la raíz del proyecto:
    ```bash
-   docker build -t yourregistryname.azurecr.io/rebase-backend:latest -f backend/Dockerfile .
+   docker build -t yourregistryname.azurecr.io/rebase-backend:latest .
    docker push yourregistryname.azurecr.io/rebase-backend:latest
    ```
    Compile desde la raíz del proyecto — el Dockerfile del backend necesita todo el workspace como contexto de compilación (copia `pnpm-workspace.yaml`, `backend/` y `config/`), por lo que usar `./backend` como contexto falla.

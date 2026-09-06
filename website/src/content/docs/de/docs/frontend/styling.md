@@ -1,4 +1,5 @@
 ---
+sourceHash: 29a546b753005a42
 title: Custom UI stylen
 sidebar_label: Custom UI stylen
 description: Erstellen Sie benutzerdefinierte Ansichten, Startseiten und Aktionen aus denselben Komponenten und Theme-Tokens wie der Rest des Admins, damit sie nativ aussehen und dem Theme folgen.

@@ -1,4 +1,5 @@
 ---
+sourceHash: 49591505dd2b1094
 title: Live schema editing
 description: Create and alter collections against a running backend — committed to your repository first, then applied.
 ---

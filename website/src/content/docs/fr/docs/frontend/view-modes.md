@@ -1,4 +1,5 @@
 ---
+sourceHash: 2cf8f0e1f2cb33d7
 title: Modes d'affichage
 sidebar_label: Modes d'affichage
 description: Configurez les vues tableau, cartes et Kanban pour vos collections.
