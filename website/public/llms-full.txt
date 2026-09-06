@@ -11105,7 +11105,7 @@ the message names the constraint.
 | `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | The storage source is declared but has no credentials here. | Set that source's environment variables. |
 | `STORAGE_WRITE_FAILED` | 502 | The storage backend refused or dropped the write. | Check its own logs and credentials. |
 | `TRANSFORM_OVERLOADED` | 503 | Too many image transforms are in flight. | Retry; consider a CDN in front. |
-| `UNKNOWN_STORAGE_SOURCE` | 400 | The request named a storage source this project does not declare. | Declare it in `config/resources.ts`. |
+| `UNKNOWN_STORAGE_SOURCE` | 400 | The request named a storage source (`?storageId=`) this project does not declare. A `bucket` this deployment does not serve is the same code at **404** — the store is what is missing, and `details` names the buckets and the sources that do exist. Both used to come back as "file not found", identical to a key that is simply absent. | Declare the source in `config/resources.ts`, or check `GET /api/storage/sources`. |
 
 ### Custom functions
 

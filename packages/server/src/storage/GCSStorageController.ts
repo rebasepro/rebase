@@ -81,6 +81,14 @@ export class GCSStorageController implements StorageController {
         return "gcs";
     }
 
+    /**
+     * The configured bucket, and the logical `default` that maps to it.
+     * @see S3StorageController.knownBuckets
+     */
+    knownBuckets(): string[] {
+        return ["default", this.config.bucket];
+    }
+
     async putObject({
         file,
         key,

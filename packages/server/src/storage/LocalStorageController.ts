@@ -68,6 +68,32 @@ export class LocalStorageController implements StorageController {
     }
 
     /**
+     * The bucket directories that exist under the storage root, plus `default`.
+     *
+     * Read from disk rather than from config, because a local bucket *is* a
+     * directory and a write creates it: `putObject({ bucket: "media" })` makes
+     * `<root>/media` on the spot, which is deliberate and tested. So there is no
+     * configured list to compare against — the only honest answer to "which
+     * buckets does this serve" is "the ones that are there".
+     *
+     * Which is exactly what a read needs. `default` is always included: it is
+     * the logical name every route uses when the caller names none, and it may
+     * not have been written to yet.
+     */
+    knownBuckets(): string[] {
+        try {
+            const dirs = fs.readdirSync(this.basePath, { withFileTypes: true })
+                .filter(entry => entry.isDirectory())
+                .map(entry => entry.name);
+            return [...new Set([DEFAULT_BUCKET, ...dirs])];
+        } catch {
+            // No storage root yet — nothing has been written. `default` is
+            // still the bucket a read would use.
+            return [DEFAULT_BUCKET];
+        }
+    }
+
+    /**
      * Ensure directory exists, creating it if necessary
      */
     private async ensureDir(dirPath: string): Promise<void> {

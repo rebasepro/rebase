@@ -81,6 +81,17 @@ export class S3StorageController implements StorageController {
     }
 
     /**
+     * The configured bucket, and the logical `default` that maps to it.
+     *
+     * Any other name went straight to S3 as a bucket name, so the request
+     * parameter was a way to address *any* bucket the deployment's credentials
+     * can reach — and a mistyped one came back as "file not found".
+     */
+    knownBuckets(): string[] {
+        return ["default", this.config.bucket];
+    }
+
+    /**
      * Validate file before upload
      */
     private validateFile(file: File): void {
