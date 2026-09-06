@@ -1,7 +1,7 @@
 ---
 title: MCP Server
 sidebar_label: MCP Server
-description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 41 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
+description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 42 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
 ---
 
 `@rebasepro/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
@@ -28,7 +28,10 @@ file for you:
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -41,7 +44,10 @@ file for you:
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -54,7 +60,10 @@ file for you:
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -77,7 +86,10 @@ env = { REBASE_PROJECT_DIR = "/absolute/path/to/your/project" }
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -87,13 +99,24 @@ Any MCP client that can spawn a stdio server works; the shape is the same.
 
 ### Which directory it acts on
 
-`REBASE_PROJECT_DIR` should be the directory containing `rebase.json`. Omit it
-and the server uses its working directory, which for a project-level config file
-is the project — that is why only the user-level Codex block sets it.
+`REBASE_PROJECT_DIR` is the directory containing `rebase.json`. There is **one**
+precedence, and it is the same in every client:
 
-Set it and it wins: the environment rebuilds the `default` project on every
-start, so an absolute path in a per-user config outranks anything remembered in
-`~/.rebase/projects.json`.
+1. **The environment block** — `REBASE_PROJECT_DIR`, `REBASE_BASE_URL`,
+   `REBASE_API_TOKEN`. If any of them is set, the `default` project is rebuilt
+   from them on every start.
+2. **The server's working directory**, when it holds a `rebase.json`. A project
+   you are standing in outranks anything remembered in `~/.rebase/projects.json`.
+3. **The persisted `default`** in `~/.rebase/projects.json`, when neither of the
+   first two says anything.
+
+Auto-discovery from `.rebase/state.json` fills gaps in all three cases and never
+overrules a value one of them supplied.
+
+The project-level blocks set `REBASE_PROJECT_DIR` to `"."` — the client's
+working directory is the project — because rule 3 reads a file shared by every
+project on the machine. The Codex block is user-level rather than per-project,
+so it names an absolute path instead.
 
 ## What the server can reach
 
@@ -302,16 +325,23 @@ environments. While `rebase dev` is running, the server reads the active port an
 service key from `.rebase/state.json` in the project directory, which is what
 makes the local case zero-config.
 
-:::note[The environment block wins over the registry]
+:::note[The registry is the last word, not the first]
+The precedence is the one above: environment block, then the working directory
+when it holds a `rebase.json`, then the persisted `default`.
+
 `REBASE_PROJECT_DIR`, `REBASE_BASE_URL` and `REBASE_API_TOKEN` rebuild the
 `default` project **on every start**, not just the first one. The rebuild is
 whole-entry: a token registered against the old `projectDir` is dropped rather
-than carried into a directory it was never issued for.
+than carried into a directory it was never issued for. A `default` derived that
+way — or from the working directory — is never written back to
+`~/.rebase/projects.json`, so one project's dev service key cannot become
+another's.
 
-The persisted `default` is used only when the client's config sets none of the
-three. `activeProject` is still sticky, so if a previous session called
+`activeProject` is sticky, so if a previous session called
 `rebase_project_switch`, tools target that project and the server says so on
-stderr. If an assistant seems to be reading the wrong database, call
+stderr — unless that project is registered under a *different* directory from
+the one this server runs in, in which case it falls back to `default` and says
+so. If an assistant seems to be reading the wrong database, call
 `rebase_project_current` first.
 :::
 
@@ -321,7 +351,7 @@ it accordingly.
 
 ## Tool reference
 
-41 tools, in eight groups. Tools marked ⚠ are refused against non-local targets
+42 tools, in nine groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
 ### Schema & database (12)
@@ -330,7 +360,6 @@ Spawn the Rebase CLI in the active project directory.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_schema_plan` | — | Show the SQL `rebase_db_push` would run, without running any of it |
 | `rebase_schema_generate` | — | Generate Drizzle schema from collection definitions |
 | `rebase_db_push` ⚠ | — | Apply the schema directly to the database (dev shortcut) |
 | `rebase_schema_introspect` | — | Introspect the live database into collection definitions |
@@ -342,6 +371,17 @@ Spawn the Rebase CLI in the active project directory.
 | `rebase_db_branch_list` | — | List database branches (admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete a database branch (admins only) |
 | `rebase_db_branch_info` | `name` | Branch information and status (admins only) |
+| `rebase_db_branch_switch` | — | Point this checkout at a branch, or back at the main database (admins only) |
+
+### Schema planning (1)
+
+Asks the backend what a change would do, over `POST /api/admin/schema/plan`. No
+CLI, and nothing written to disk — it works on the managed development database,
+which the Atlas-backed commands cannot.
+
+| Tool | Required | Description |
+|---|---|---|
+| `rebase_schema_plan` | `collectionId`, `collection` | The SQL one collection's change would run, and which statements destroy data |
 
 ### Documents (5)
 

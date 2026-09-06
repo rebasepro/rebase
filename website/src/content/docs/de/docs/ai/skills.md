@@ -49,7 +49,16 @@ werden bei Bedarf geöffnet.
 
 `gemini` deckt **sowohl** Gemini CLI als auch Antigravity ab – beide lesen dasselbe `.agents/`-Verzeichnis, daher gibt es keinen separaten `antigravity`-Wert.
 
-Ohne `--agent` erkennt der Befehl anhand der Verzeichnisse `.cursor/`, `.claude/`, `.windsurf/` und `.agents/`, welche Assistenten ein Projekt bereits verwendet. Wird keines gefunden, werden Sie zur Auswahl aufgefordert.
+Ohne `--agent` erkennt der Befehl anhand der Verzeichnisse `.cursor/`,
+`.claude/`, `.windsurf/`, `.agents/`, `.codex/` und `.kiro/`, welche
+Assistenten ein Projekt bereits verwendet. Wird keines gefunden, werden Sie zur
+Auswahl aufgefordert.
+
+**GitHub Copilot wird nie erkannt.** Sein Verzeichnis wäre `.github/`, und
+`.github/` ist kein Beleg dafür, dass jemand Copilot verwendet: `rebase init`
+schreibt `.github/copilot-instructions.md` in jedes Gerüst, und die meisten
+Repositories haben ein `.github/` für Workflows. Installieren Sie es mit
+`--agent copilot`.
 
 :::note[Ein frisch erstelltes Projekt fordert immer zur Auswahl auf]
 `rebase init` schreibt `CLAUDE.md`, `.cursorrules` und Ähnliches, aber keines der

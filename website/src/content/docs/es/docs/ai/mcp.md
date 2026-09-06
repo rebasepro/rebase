@@ -2,7 +2,7 @@
 sourceHash: dcb903c511617dd5
 title: Servidor MCP
 sidebar_label: Servidor MCP
-description: Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto Rebase — las 41 herramientas que expone, la credencial con la que se autentica y la compuerta loopback que se interpone entre un agente y producción.
+description: Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto Rebase — las 42 herramientas que expone, la credencial con la que se autentica y la compuerta loopback que se interpone entre un agente y producción.
 ---
 
 `@rebasepro/mcp` es un servidor del [Model Context Protocol](https://modelcontextprotocol.io)
@@ -28,7 +28,10 @@ Cada bloque de abajo es la integración completa.
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -41,7 +44,10 @@ Cada bloque de abajo es la integración completa.
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -54,7 +60,10 @@ Cada bloque de abajo es la integración completa.
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -76,7 +85,10 @@ env = { REBASE_PROJECT_DIR = "/absolute/path/to/your/project" }
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -86,14 +98,25 @@ Funciona cualquier cliente MCP capaz de lanzar un servidor stdio; la forma es la
 
 ### Sobre qué directorio actúa
 
-`REBASE_PROJECT_DIR` debe ser el directorio que contiene `rebase.json`. Si lo
-omites, el servidor usa su directorio de trabajo, que para un archivo de
-configuración a nivel de proyecto es el propio proyecto — por eso solo lo define
-el bloque de Codex, que es a nivel de usuario.
+`REBASE_PROJECT_DIR` es el directorio que contiene `rebase.json`. Hay **una**
+prioridad, y es la misma en todos los clientes:
 
-Si lo defines, gana: el entorno reconstruye el proyecto `default` en cada
-arranque, así que una ruta absoluta en una configuración de usuario tiene
-prioridad sobre lo que recuerde `~/.rebase/projects.json`.
+1. **El bloque de entorno** — `REBASE_PROJECT_DIR`, `REBASE_BASE_URL`,
+   `REBASE_API_TOKEN`. Si alguna de ellas está definida, el proyecto `default` se
+   reconstruye a partir de ellas en cada arranque.
+2. **El directorio de trabajo del servidor**, cuando contiene un `rebase.json`.
+   Un proyecto en el que estás situado tiene prioridad sobre cualquier cosa
+   recordada en `~/.rebase/projects.json`.
+3. **El `default` persistido** en `~/.rebase/projects.json`, cuando ninguno de
+   los dos primeros dice nada.
+
+La detección automática desde `.rebase/state.json` rellena huecos en los tres
+casos y nunca sobrescribe un valor aportado por alguno de ellos.
+
+Los bloques a nivel de proyecto definen `REBASE_PROJECT_DIR` como `"."` — el
+directorio de trabajo del cliente es el proyecto — porque la regla 3 lee un
+archivo compartido por todos los proyectos de la máquina. El bloque de Codex es a
+nivel de usuario en lugar de por proyecto, así que nombra una ruta absoluta.
 
 ## A qué puede acceder el servidor
 
@@ -310,17 +333,24 @@ y remotos. Mientras `rebase dev` está en ejecución, el servidor lee el puerto 
 y la clave de servicio desde `.rebase/state.json` en el directorio del proyecto, que
 es lo que hace que el caso local funcione sin configuración previa.
 
-:::note[El bloque de entorno tiene prioridad sobre el registro]
+:::note[El registro es la última palabra, no la primera]
+Rige la prioridad de arriba: bloque de entorno, después el directorio de trabajo
+cuando contiene un `rebase.json`, y después el `default` persistido.
+
 `REBASE_PROJECT_DIR`, `REBASE_BASE_URL` y `REBASE_API_TOKEN` reconstruyen el
 proyecto `default` **en cada arranque**, no solo en el primero. La reconstrucción
 afecta a toda la entrada: un token registrado para el `projectDir` anterior se
-descarta en lugar de trasladarse a un directorio para el que nunca se emitió.
+descarta en lugar de trasladarse a un directorio para el que nunca se emitió. Un
+`default` derivado así — o del directorio de trabajo — nunca se escribe de vuelta
+en `~/.rebase/projects.json`, para que la clave de servicio de desarrollo de un
+proyecto no acabe siendo la de otro.
 
-El `default` persistido solo se usa cuando la configuración del cliente no define
-ninguna de las tres variables. `activeProject` sigue siendo persistente: si una
-sesión anterior llamó a `rebase_project_switch`, las herramientas apuntan a ese
-proyecto y el servidor lo indica por stderr. Si un asistente parece estar leyendo
-la base de datos equivocada, ejecuta primero `rebase_project_current`.
+`activeProject` es persistente: si una sesión anterior llamó a
+`rebase_project_switch`, las herramientas apuntan a ese proyecto y el servidor lo
+indica por stderr — salvo que ese proyecto esté registrado bajo un directorio
+*distinto* de aquel en el que corre este servidor, en cuyo caso vuelve a
+`default` y lo dice. Si un asistente parece estar leyendo la base de datos
+equivocada, ejecuta primero `rebase_project_current`.
 :::
 
 Los tokens se almacenan en ese registro **en texto plano**. Es un archivo en tu directorio
@@ -329,7 +359,7 @@ registrado; trátalo como corresponde.
 
 ## Referencia de herramientas
 
-41 herramientas, en ocho grupos. Las herramientas marcadas con ⚠ son rechazadas contra
+42 herramientas, en nueve grupos. Las herramientas marcadas con ⚠ son rechazadas contra
 destinos no locales a menos que desactives esta protección.
 
 ### Esquema y base de datos (12)
@@ -338,7 +368,6 @@ Ejecutan la CLI de Rebase en el directorio del proyecto activo.
 
 | Herramienta | Requerido | Descripción |
 |---|---|---|
-| `rebase_schema_plan` | — | Muestra el SQL que ejecutaría `rebase_db_push`, sin ejecutar nada |
 | `rebase_schema_generate` | — | Genera el esquema Drizzle a partir de las definiciones de colecciones |
 | `rebase_db_push` ⚠ | — | Aplica el esquema directamente a la base de datos (atajo para desarrollo) |
 | `rebase_schema_introspect` | — | Realiza introspección de la base de datos en vivo hacia definiciones de colecciones |
@@ -350,6 +379,17 @@ Ejecutan la CLI de Rebase en el directorio del proyecto activo.
 | `rebase_db_branch_list` | — | Lista las ramas de base de datos (solo administradores) |
 | `rebase_db_branch_delete` ⚠ | `name` | Elimina una rama de base de datos (solo administradores) |
 | `rebase_db_branch_info` | `name` | Información y estado de la rama (solo administradores) |
+| `rebase_db_branch_switch` | — | Apunta este checkout a una rama, o de vuelta a la base de datos principal (solo administradores) |
+
+### Planificación de esquema (1)
+
+Pregunta al backend qué haría un cambio, mediante `POST /api/admin/schema/plan`. Sin
+CLI y sin escribir nada en disco: funciona sobre la base de datos de desarrollo
+gestionada, donde los comandos respaldados por Atlas no pueden.
+
+| Herramienta | Requerido | Descripción |
+|---|---|---|
+| `rebase_schema_plan` | `collectionId`, `collection` | El SQL que ejecutaría el cambio de una colección, y qué sentencias destruyen datos |
 
 ### Documentos (5)
 

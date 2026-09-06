@@ -27481,7 +27481,10 @@ file for you:
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -27494,7 +27497,10 @@ file for you:
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -27507,7 +27513,10 @@ file for you:
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -27530,7 +27539,10 @@ env = { REBASE_PROJECT_DIR = "/absolute/path/to/your/project" }
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -27540,13 +27552,24 @@ Any MCP client that can spawn a stdio server works; the shape is the same.
 
 #### Which directory it acts on
 
-`REBASE_PROJECT_DIR` should be the directory containing `rebase.json`. Omit it
-and the server uses its working directory, which for a project-level config file
-is the project — that is why only the user-level Codex block sets it.
+`REBASE_PROJECT_DIR` is the directory containing `rebase.json`. There is **one**
+precedence, and it is the same in every client:
 
-Set it and it wins: the environment rebuilds the `default` project on every
-start, so an absolute path in a per-user config outranks anything remembered in
-`~/.rebase/projects.json`.
+1. **The environment block** — `REBASE_PROJECT_DIR`, `REBASE_BASE_URL`,
+   `REBASE_API_TOKEN`. If any of them is set, the `default` project is rebuilt
+   from them on every start.
+2. **The server's working directory**, when it holds a `rebase.json`. A project
+   you are standing in outranks anything remembered in `~/.rebase/projects.json`.
+3. **The persisted `default`** in `~/.rebase/projects.json`, when neither of the
+   first two says anything.
+
+Auto-discovery from `.rebase/state.json` fills gaps in all three cases and never
+overrules a value one of them supplied.
+
+The project-level blocks set `REBASE_PROJECT_DIR` to `"."` — the client's
+working directory is the project — because rule 3 reads a file shared by every
+project on the machine. The Codex block is user-level rather than per-project,
+so it names an absolute path instead.
 
 ### What the server can reach
 
@@ -27754,16 +27777,23 @@ environments. While `rebase dev` is running, the server reads the active port an
 service key from `.rebase/state.json` in the project directory, which is what
 makes the local case zero-config.
 
-:::note[The environment block wins over the registry]
+:::note[The registry is the last word, not the first]
+The precedence is the one above: environment block, then the working directory
+when it holds a `rebase.json`, then the persisted `default`.
+
 `REBASE_PROJECT_DIR`, `REBASE_BASE_URL` and `REBASE_API_TOKEN` rebuild the
 `default` project **on every start**, not just the first one. The rebuild is
 whole-entry: a token registered against the old `projectDir` is dropped rather
-than carried into a directory it was never issued for.
+than carried into a directory it was never issued for. A `default` derived that
+way — or from the working directory — is never written back to
+`~/.rebase/projects.json`, so one project's dev service key cannot become
+another's.
 
-The persisted `default` is used only when the client's config sets none of the
-three. `activeProject` is still sticky, so if a previous session called
+`activeProject` is sticky, so if a previous session called
 `rebase_project_switch`, tools target that project and the server says so on
-stderr. If an assistant seems to be reading the wrong database, call
+stderr — unless that project is registered under a *different* directory from
+the one this server runs in, in which case it falls back to `default` and says
+so. If an assistant seems to be reading the wrong database, call
 `rebase_project_current` first.
 :::
 
@@ -27773,7 +27803,7 @@ it accordingly.
 
 ### Tool reference
 
-41 tools, in eight groups. Tools marked ⚠ are refused against non-local targets
+42 tools, in nine groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
 #### Schema & database (12)
@@ -27782,7 +27812,6 @@ Spawn the Rebase CLI in the active project directory.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_schema_plan` | — | Show the SQL `rebase_db_push` would run, without running any of it |
 | `rebase_schema_generate` | — | Generate Drizzle schema from collection definitions |
 | `rebase_db_push` ⚠ | — | Apply the schema directly to the database (dev shortcut) |
 | `rebase_schema_introspect` | — | Introspect the live database into collection definitions |
@@ -27794,6 +27823,17 @@ Spawn the Rebase CLI in the active project directory.
 | `rebase_db_branch_list` | — | List database branches (admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete a database branch (admins only) |
 | `rebase_db_branch_info` | `name` | Branch information and status (admins only) |
+| `rebase_db_branch_switch` | — | Point this checkout at a branch, or back at the main database (admins only) |
+
+#### Schema planning (1)
+
+Asks the backend what a change would do, over `POST /api/admin/schema/plan`. No
+CLI, and nothing written to disk — it works on the managed development database,
+which the Atlas-backed commands cannot.
+
+| Tool | Required | Description |
+|---|---|---|
+| `rebase_schema_plan` | `collectionId`, `collection` | The SQL one collection's change would run, and which statements destroy data |
 
 #### Documents (5)
 
@@ -27961,9 +28001,13 @@ bodies sit in per-skill subdirectories and are opened on demand.
 `.agents/` directory, so there is no separate `antigravity` value.
 
 With no `--agent`, the command detects which assistants a project already uses by
-looking for `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/`,
-`.kiro/` and `.github/`. If it finds
-none it prompts you to choose.
+looking for `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` and
+`.kiro/`. If it finds none it prompts you to choose.
+
+**GitHub Copilot is never detected.** Its directory would be `.github/`, and
+`.github/` is not evidence anyone uses Copilot: `rebase init` writes
+`.github/copilot-instructions.md` into every scaffold, and most repositories have
+a `.github/` for workflows. Install it with `--agent copilot`.
 
 :::note[A freshly scaffolded project always prompts]
 `rebase init` writes `CLAUDE.md`, `.cursorrules` and friends, but none of the
@@ -28063,15 +28107,18 @@ your-project/
     └── copilot-instructions.md   ← pointer
 ```
 
-Each pointer file is two lines:
+Each pointer file is three lines:
 
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
+Install the Rebase skills for this assistant: `rebase skills install --agent claude`.
 ```
 
-`.github/copilot-instructions.md` is identical but for the relative path
-(`../ai-instructions.md`).
+The others differ only in the last word of the third line — `--agent cursor`,
+`--agent windsurf`, `--agent codex`, `--agent copilot` — and in the relative
+path, which is `../ai-instructions.md` in `.github/copilot-instructions.md` and
+`ai-instructions.md` in `AGENTS.md`.
 
 This happens on every `rebase init`, for every preset including `--headless`.
 There is no flag and no prompt.
@@ -28081,27 +28128,36 @@ any other MCP client at the [Rebase MCP server](/docs/ai/mcp):
 
 ```json title=".mcp.json"
 {
-  "mcpServers": {
-    "rebase": { "command": "npx", "args": ["-y", "@rebasepro/mcp"] }
-  }
+    "mcpServers": {
+        "rebase": {
+            "command": "npx",
+            "args": ["-y", "@rebasepro/mcp"],
+            "env": {
+                "REBASE_PROJECT_DIR": "."
+            }
+        }
+    }
 }
 ```
 
-There is no `REBASE_PROJECT_DIR` in it on purpose: the client spawns the server
+`REBASE_PROJECT_DIR` is `"."`, not an absolute path: the client spawns the server
 at the project root, and an absolute path is the one line of that file that
-cannot be committed.
+cannot be committed. It is there because `~/.rebase/projects.json` is
+machine-wide — a project that names no directory of its own falls through to
+whatever the last project on that machine persisted. See
+[the precedence](/docs/ai/mcp#which-directory-it-acts-on).
 
 ### Why a pointer rather than a copy
 
 The pointer files are deliberately content-free. Assistants follow relative
-Markdown links, so a two-line file that names the real one gets the same result
+Markdown links, so a three-line file that names the real one gets the same result
 as a copy — and it has properties a copy does not:
 
 - **One file to edit.** Rules cannot drift between assistants, because there is
   only one set of rules.
 - **One diff to review.** A change to project conventions is a change to one
   file, not five identical ones a reviewer must compare.
-- **Adding an assistant is two lines.** A new tool with a new filename gets a
+- **Adding an assistant is three lines.** A new tool with a new filename gets a
   pointer, not a sixth copy of your conventions.
 
 The pattern is worth keeping if you fork the scaffold, and worth adopting in
@@ -28117,8 +28173,13 @@ session:
 1. **Schema as code.** Collections are defined in `config/collections/`. Never
    hand-edit the generated Drizzle schema or the Postgres tables — see
    [Schema as Code](/docs/architecture/schema-as-code).
-2. **Migrations are two steps.** `rebase schema generate`, then `rebase db push`
-   in development, or `rebase db generate && rebase db migrate` for production.
+2. **Applying a collection change** depends on the database. While `pnpm dev`
+   is running, saving the collection file is the whole step: boot regenerates the
+   Drizzle schema and creates the missing tables and columns. `pnpm db:push` is
+   only for what boot deliberately leaves alone — a renamed column, a narrowed
+   type, a removed field, junction-table RLS — and it needs your own PostgreSQL,
+   not the managed development database. Production is `pnpm db:generate` then
+   `pnpm db:migrate`.
 3. **Use the SDK.** Go through `rebase.dataAsAdmin.<slug>` for work done as the
    service identity, or `getDriver(c)` inside a function when the read should run
    as the caller. The server client has no plain `data` accessor. Raw SQL and direct

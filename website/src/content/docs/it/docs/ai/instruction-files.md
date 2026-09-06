@@ -2,7 +2,7 @@
 sourceHash: ba0337fd764eebaa
 title: File di Istruzioni AI
 sidebar_label: File di Istruzioni AI
-description: Ogni progetto Rebase scaffoldato include ai-instructions.md più file puntatore di una riga per Claude, Cursor, Windsurf, Copilot e AGENTS.md — un'unica fonte di verità, molti nomi di file.
+description: Ogni progetto Rebase scaffoldato include ai-instructions.md più file puntatore di tre righe per Claude, Cursor, Windsurf, Copilot e AGENTS.md — un'unica fonte di verità, molti nomi di file.
 ---
 
 Ogni assistente vuole le proprie regole in un file diverso. Claude Code legge
@@ -24,15 +24,18 @@ your-project/
     └── copilot-instructions.md   ← pointer
 ```
 
-Ogni file puntatore è composto da due righe:
+Ogni file puntatore è composto da tre righe:
 
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
+Install the Rebase skills for this assistant: `rebase skills install --agent claude`.
 ```
 
-`.github/copilot-instructions.md` è identico ad eccezione del percorso relativo
-(`../ai-instructions.md`).
+Gli altri differiscono solo nell'ultima parola della terza riga —
+`--agent cursor`, `--agent windsurf`, `--agent codex`, `--agent copilot` — e nel
+percorso relativo, che è `../ai-instructions.md` in
+`.github/copilot-instructions.md` e `ai-instructions.md` in `AGENTS.md`.
 
 Questo avviene a ogni `rebase init`, per ogni preset incluso `--headless`.
 Non ci sono flag né richieste di conferma.
@@ -42,27 +45,36 @@ qualsiasi altro client MCP al [server MCP di Rebase](/it/docs/ai/mcp):
 
 ```json title=".mcp.json"
 {
-  "mcpServers": {
-    "rebase": { "command": "npx", "args": ["-y", "@rebasepro/mcp"] }
-  }
+    "mcpServers": {
+        "rebase": {
+            "command": "npx",
+            "args": ["-y", "@rebasepro/mcp"],
+            "env": {
+                "REBASE_PROJECT_DIR": "."
+            }
+        }
+    }
 }
 ```
 
-Al suo interno non c'è `REBASE_PROJECT_DIR`, ed è voluto: il client avvia il
-server nella radice del progetto, e un percorso assoluto è l'unica riga di quel
-file che non può essere committata.
+`REBASE_PROJECT_DIR` è `"."`, non un percorso assoluto: il client avvia il server
+nella radice del progetto, e un percorso assoluto è l'unica riga di quel file che
+non può essere committata. C'è perché `~/.rebase/projects.json` vale per l'intera
+macchina — un progetto che non nomina una directory propria ricade su ciò che vi
+ha salvato l'ultimo progetto di quella macchina. Vedi
+[la precedenza](/it/docs/ai/mcp#su-quale-directory-agisce).
 
 ## Perché un puntatore invece di una copia
 
 I file puntatore sono deliberatamente privi di contenuti. Gli assistenti seguono i
-link Markdown relativi, quindi un file di due righe che fa riferimento a quello reale ottiene lo stesso risultato
+link Markdown relativi, quindi un file di tre righe che fa riferimento a quello reale ottiene lo stesso risultato
 di una copia — offrendo al contempo vantaggi che una copia non ha:
 
 - **Un solo file da modificare.** Le regole non possono divergere tra gli assistenti, perché esiste
   un solo set di regole.
 - **Un solo diff da revisionare.** Una modifica alle convenzioni del progetto è una modifica a un
   solo file, non a cinque file identici che un revisore deve confrontare.
-- **Aggiungere un assistente richiede due righe.** Un nuovo strumento con un nuovo nome di file ottiene
+- **Aggiungere un assistente richiede tre righe.** Un nuovo strumento con un nuovo nome di file ottiene
   un puntatore, non una sesta copia delle tue convenzioni.
 
 È un pattern che vale la pena mantenere se fai un fork dello scaffold, e che vale la pena adottare
@@ -78,8 +90,13 @@ sessione:
 1. **Schema come codice.** Le collezioni sono definite in `config/collections/`. Non
    modificare mai a mano lo schema Drizzle generato o le tabelle Postgres — vedi
    [Schema as Code](/docs/architecture/schema-as-code).
-2. **Le migrazioni sono in due passaggi.** `rebase schema generate`, poi `rebase db push`
-   in fase di sviluppo, oppure `rebase db generate && rebase db migrate` per la produzione.
+2. **Come si applica una modifica a una collection dipende dal database.** Mentre
+   `pnpm dev` è in esecuzione, salvare il file della collection è l'intero passo:
+   il boot rigenera lo schema Drizzle e crea le tabelle e le colonne mancanti.
+   `pnpm db:push` serve solo per ciò che il boot lascia deliberatamente stare —
+   una colonna rinominata, un tipo ristretto, un campo rimosso, la RLS di una
+   tabella di giunzione — e richiede il tuo PostgreSQL, non il database di
+   sviluppo gestito. In produzione la coppia è `rebase db generate && rebase db migrate`.
 3. **Usa l'SDK.** Passa attraverso `rebase.dataAsAdmin.<slug>` per il lavoro svolto
    con l'identità del servizio, oppure `getDriver(c)` dentro una function quando la
    lettura deve avvenire come chiamante. Sul server il client non espone un accessore `data` semplice.

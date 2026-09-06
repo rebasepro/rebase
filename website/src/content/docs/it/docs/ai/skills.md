@@ -48,7 +48,15 @@ corpi restano in sottodirectory per skill e vengono aperti su richiesta.
 
 `gemini` copre **sia** Gemini CLI che Antigravity — leggono la stessa directory `.agents/`, quindi non esiste un valore separato `antigravity`.
 
-Senza `--agent`, il comando rileva quali assistenti vengono già utilizzati da un progetto cercando `.cursor/`, `.claude/`, `.windsurf/` e `.agents/`. Se non ne trova alcuno, ti chiederà di sceglierne uno.
+Senza `--agent`, il comando rileva quali assistenti vengono già utilizzati da un
+progetto cercando `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` e
+`.kiro/`. Se non ne trova alcuno, ti chiederà di sceglierne uno.
+
+**GitHub Copilot non viene mai rilevato.** La sua directory sarebbe `.github/`, e
+`.github/` non è la prova che qualcuno usi Copilot: `rebase init` scrive
+`.github/copilot-instructions.md` in ogni progetto generato, e la maggior parte
+dei repository ha una `.github/` per i workflow. Installalo con
+`--agent copilot`.
 
 :::note[Un progetto appena inizializzato richiede sempre una scelta]
 `rebase init` scrive `CLAUDE.md`, `.cursorrules` e simili, ma nessuna delle *directory* cercate dal rilevamento. Di conseguenza, la prima esecuzione in un nuovo progetto ricadrà nella richiesta interattiva — e in ambiente CI, dove non c'è un TTY, terminerà invece con un errore. Passa `--agent` esplicitamente in qualsiasi contesto non interattivo.

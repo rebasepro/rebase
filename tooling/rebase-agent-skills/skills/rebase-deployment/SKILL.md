@@ -259,7 +259,7 @@ Copy the `.env.example` file as a starting point:
 cp .env.example .env
 ```
 
-The `.env.example` includes all variables with inline documentation. See `app/.env.example` in the repository.
+The `.env.example` includes all variables with inline documentation. `rebase init` writes one at the project root and copies it to `.env`.
 
 ### `.env.production` (Frontend Build)
 
@@ -873,4 +873,4 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 - **Helm chart:** `infra/charts/rebase` (see `infra/charts/rebase/README.md`)
 - **Role resolution:** `packages/server/src/boot/role.ts`
 - **serveSPA:** `packages/server/src/serve-spa.ts`
-- **.env.example:** `app/.env.example`
+- **.env.example:** the project root`s own `.env.example`, written by `rebase init`
