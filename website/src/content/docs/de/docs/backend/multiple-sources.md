@@ -1,5 +1,5 @@
 ---
-sourceHash: bf0f225501043030
+sourceHash: b2263faa9ec92398
 title: Mehrere Datenbanken und Buckets
 sidebar_label: Mehrere Quellen
 description: Leiten Sie Collections an verschiedene Datenbanken und Properties an verschiedene Storage-Buckets weiter und konfigurieren Sie jede einzelne über die Umgebung.

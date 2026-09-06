@@ -1,5 +1,5 @@
 ---
-sourceHash: bf0f225501043030
+sourceHash: b2263faa9ec92398
 title: Database e Bucket Multipli
 sidebar_label: Origini Multiple
 description: Instrada le collezioni verso database diversi e le proprietà verso bucket di archiviazione diversi, e configura ciascuno di essi dall'ambiente.
