@@ -41,11 +41,23 @@ exception carrying its reason — so a fourth still fails.
 
 ```bash
 pnpm ci:static      # every gate in the `static` job, in the same order
-pnpm check:<name>   # one of them
+pnpm run build && \
+  pnpm ci:build-gates   # every gate in the `build-gates` job, likewise
+pnpm check:<name>       # one of them
 ```
 
+Both take `--list`, which prints their gate names one per line — that is the
+machine-readable form of the two tables below, and what `check:gates-doc`
+compares them against.
+
 `ci:static` skips the two gates needing a tool the repository cannot install
-(Docker, Helm) and says so. Under CI it refuses to skip.
+(Docker, Helm) and says so. Under CI it refuses to skip. `ci:build-gates` reads
+build output, so it refuses to run at all when no `packages/*/dist` exists —
+several of its gates would otherwise find nothing to look at and pass.
+
+`./tooling/scripts/verify-quality.sh` runs the build, both of these, the unit
+suites and the Playwright suite: it is the pre-PR command, and it is these two
+lists plus what neither of them covers.
 
 ## The static job
 
@@ -92,6 +104,7 @@ this list, in this order.
 ## After the build
 
 `build-gates` builds first, then runs only the gates that read what it emitted.
+`pnpm ci:build-gates` runs exactly this list, in this order.
 
 | Script | What it protects | Bank / fix |
 |---|---|---|

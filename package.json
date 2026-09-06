@@ -75,6 +75,7 @@
     "check:ui-string-paths": "node tooling/scripts/check-ui-string-paths.mjs",
     "check:lint": "eslint . --quiet",
     "ci:static": "node tooling/scripts/ci-static.mjs",
+    "ci:build-gates": "node tooling/scripts/ci-build-gates.mjs",
     "harness": "node tooling/scripts/harness/harness.mjs",
     "harness:preflight": "node tooling/scripts/harness/harness.mjs preflight",
     "harness:eval": "node tooling/scripts/harness/harness.mjs eval",

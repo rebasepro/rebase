@@ -168,10 +168,13 @@ Before submitting a PR, make sure all checks pass:
 ./tooling/scripts/verify-quality.sh
 ```
 
-It runs the build, `pnpm ci:static` — the same gate list CI's `static` job runs,
-type check and ESLint included — the unit suites, and the Playwright end-to-end
-tests. The browser suite needs a browser, which the npm package does not ship;
-the script installs it for you, or do it once yourself:
+It runs the build, then both of CI's gate lists — `pnpm ci:static` (the `static`
+job: type check, ESLint, the ratchets, the docs verifier) and
+`pnpm ci:build-gates` (the `build-gates` job: the published `.d.ts`, the
+scaffolded and ejected project typechecks, the API surface, the eager-JS budget,
+the generated website artifacts) — then the unit suites and the Playwright
+end-to-end tests. The browser suite needs a browser, which the npm package does
+not ship; the script installs it for you, or do it once yourself:
 
 ```bash
 pnpm exec playwright install chromium
@@ -182,8 +185,17 @@ the runtime image) and Helm (it renders the chart). Without them `ci:static`
 says so and skips them; CI has both and refuses to skip.
 
 If you only want the fast half, `pnpm ci:static` on its own reads source and
-needs no build, no database and no browser. Every gate it runs is listed with
-what it protects in **[docs/gates.md](docs/gates.md)**.
+needs no build, no database and no browser. Its counterpart needs the build and
+nothing else:
+
+```bash
+pnpm run build && pnpm ci:build-gates
+```
+
+Every gate either of them runs is listed with what it protects in
+**[docs/gates.md](docs/gates.md)**, in the section named after the job that runs
+it. A gate in one of those two tables and in neither runner fails
+`pnpm check:gates-doc`.
 
 ## Testing
 
