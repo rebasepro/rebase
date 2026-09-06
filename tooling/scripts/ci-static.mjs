@@ -71,8 +71,12 @@ Reads source directly, so it needs no build and fails fast.`
         why: `The type-level counterpart. check:headless proves the backend never
 *executes* React and passed for months while 13 shipped .d.ts files began
 with \`import React from "react"\` and @types/react was a devDependency
-only — so a BaaS install had nothing to resolve them against. This scans
-the text of core sources AND built .d.ts, plus the manifests.`
+only — so a BaaS install had nothing to resolve them against.
+
+The SOURCE half: core sources and manifests, which need no build. The
+declarations that rationale is actually about are \`check:types-headless:dts\`,
+in build-gates — it ran here for months, in a job that never builds, so it
+scanned an absent dist and printed the same green line either way.`
     },
     {
         run: "check:browser-deps",

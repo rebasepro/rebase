@@ -69,7 +69,7 @@ this list, in this order.
 | `typecheck` | The authoritative type gate: the monorepo and `tsconfig.tests.json`, resolving `@rebasepro/*` to source, so a stale `dist` cannot make it pass. | — |
 | `check:core-types` | The core packages with `@rebasepro/cms-types` absent, which the gate above structurally cannot check. | — |
 | `check:headless` | The backend never *executes* React or a UI package: every collection file imported under a rejecting loader hook. | — |
-| `check:types-headless` | The type-level counterpart — sources, built `.d.ts` and manifests, where thirteen files once imported React types a BaaS install could not resolve. | — |
+| `check:types-headless` | The type-level counterpart, source half: core sources and manifests, where `@types/react` as a devDependency satisfied the monorepo and no consumer. | — |
 | `check:browser-deps` | The other direction: a browser-facing package pulling a server framework into `node_modules` through an auto-installed peer, which neither headless guard sees. | — |
 | `check:baas-types` | A real BaaS project typechecked with `react` mapped to a stub: a React type reached through an alias. | — |
 | `check:runtime-image` | Every container image the shipped files name has a workflow that publishes it. | — |
@@ -109,6 +109,7 @@ this list, in this order.
 | Script | What it protects | Bank / fix |
 |---|---|---|
 | `check:api-surface` | The public export surface of every package, as a committed contract. | `pnpm write:api-surface` |
+| `check:types-headless:dts` | The same guard's declaration half: the built `.d.ts`, where thirteen shipped files began with `import React`. Refuses to run when a core package has no `dist`, rather than scanning nothing and passing. | — |
 | `check:dts` | Published `.d.ts` resolve under `nodenext`, where they were silently `any`. | — |
 | `check:templates` | The scaffolded collection files compile, once per preset, laid out as `rebase init` lays them out. | — |
 | `check:eject` | An ejected project typechecks against built output. | — |

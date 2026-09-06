@@ -112,6 +112,20 @@ nothing depends on them. The dependency is in five databases, and this is
 where that gets said. Exit condition is in the script.`
     },
     {
+        run: "check:types-headless:dts",
+        why: `The declaration half of the headless guard, which ran in no job at all.
+
+\`check:types-headless\` walks \`packages/*/src\` AND \`packages/*/dist\`, and
+its rationale is specifically about SHIPPED declarations: 13 published .d.ts
+files began with \`import React\`, against a devDependency-only @types/react,
+so a BaaS install had nothing to resolve them against. It ran only in the
+\`static\` job, which never builds — so \`dist\` was absent and the scan
+covered nothing while printing a byte-identical "passed". Split: the source
+half stays static, this half runs here, and it exits 1 rather than 0 when no
+package has a \`dist\`, the way \`rls:check\` uses \`--min-tables\` to refuse a
+vacuous run.`
+    },
+    {
         run: "check:dts",
         why: `Whether the *published* types survive being resolved. Every gate in
 \`ci:static\` maps \`@rebasepro/*\` onto source, so all of them were blind to
