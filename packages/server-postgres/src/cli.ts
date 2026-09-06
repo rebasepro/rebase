@@ -1310,7 +1310,15 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
             env: { ...process.env as Record<string, string> }
         });
     } catch (err: unknown) {
-        outError(chalk.red(`✗ Failed to run Postgres DDL generator: ${err instanceof Error ? err.message : String(err)}`));
+        // The generator runs with inherited stdio, so on a non-zero exit its
+        // own message is already the last useful thing on the terminal and
+        // execa's wrapper ("Command failed with exit code 1: …/tsx …") would
+        // bury it. Repeat it only when the child never got as far as speaking.
+        if (typeof (err as { exitCode?: number }).exitCode === "number") {
+            outError(chalk.red("✗ Postgres DDL generation failed — nothing was applied."));
+        } else {
+            outError(chalk.red(`✗ Failed to run Postgres DDL generator: ${err instanceof Error ? err.message : String(err)}`));
+        }
         process.exit(1);
     }
 }
@@ -1471,7 +1479,13 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 env: { ...process.env as Record<string, string> }
             });
         } catch (err: unknown) {
-            outError(chalk.red(`✗ Failed to run schema generator: ${err instanceof Error ? err.message : String(err)}`));
+            // Same contract as the DDL generator above: a child that exited
+            // non-zero has already printed the cause on inherited stdio.
+            if (typeof (err as { exitCode?: number }).exitCode === "number") {
+                outError(chalk.red("✗ Drizzle schema generation failed — nothing was applied."));
+            } else {
+                outError(chalk.red(`✗ Failed to run schema generator: ${err instanceof Error ? err.message : String(err)}`));
+            }
             process.exit(1);
         }
     } else if (subcommand === "introspect") {
