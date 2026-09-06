@@ -204,6 +204,16 @@ export function checkEnvReads(root = DEFAULT_ROOT) {
             if (NAME.test(m[1])) record(m[1], file);
         }
 
+        // `hostEnv().NAME` — a function that hands back the environment, read
+        // in place. A fourth shape, and the one that got away: the logger's
+        // `REBASE_LOG_RAW_QUERIES` is the only thing that un-redacts a failed
+        // statement, and every DDL, RLS and CDC failure ends at that marker.
+        // It matched none of the three patterns above, so the gate reported
+        // "all documented" while the page had never named it.
+        for (const m of source.matchAll(/\b[A-Za-z_$][\w$]*[Ee]nv\(\s*\)\s*\.\s*([A-Z][A-Z0-9_]*)\b/g)) {
+            if (NAME.test(m[1])) record(m[1], file);
+        }
+
         // A bare name in a string, on a line that is about the environment.
         for (const line of source.split("\n")) {
             if (!/env/i.test(line)) continue;

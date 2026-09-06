@@ -607,6 +607,7 @@ All configuration is done via environment variables in your `.env` file at the p
 |----------|-------------|---------|
 | `PORT` | Port for the backend HTTP server. Read by `rebase start`. `rebase dev` reads it **from the shell environment only** — a `PORT` in `.env` is not read there, because the port is resolved before that file is loaded — and otherwise binds a port derived from the project path, so several projects can run at once. `rebase dev --port` beats both, and the start banner names the rung it used. | `3001` |
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
+| `REBASE_LOG_RAW_QUERIES` | Show the SQL behind a `Failed query: [redacted]` line. Every failing statement is redacted by default, because a failed query carries its bound parameters — an email, a password hash. Set it to `true` while diagnosing a DDL, RLS or change-capture failure. Ignored when `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |
 | `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS, in both environments. | — |

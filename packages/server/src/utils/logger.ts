@@ -104,7 +104,17 @@ function getMinLevel(): LogLevel {
 // reintroduce it. Nothing above this line needs to know about it.
 
 const FAILED_QUERY_MARKER = "Failed query:";
-const REDACTED_QUERY = "Failed query: [redacted]";
+/**
+ * The marker says how to lift it.
+ *
+ * Every DDL, RLS and CDC failure ends at this string, and the statement is the
+ * whole diagnosis — three of them landed in one boot of a two-database project,
+ * each a dead end. The switch existed; nothing named it, in the log or in the
+ * docs, so `grep -rn REBASE_LOG_RAW_QUERIES` over the documentation, the
+ * templates and the agent skills came back empty.
+ */
+const REDACTED_QUERY =
+    "Failed query: [redacted — set REBASE_LOG_RAW_QUERIES=true in development to see it]";
 const REDACTED_VALUE = "[redacted]";
 
 /**
