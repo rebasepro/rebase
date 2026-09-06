@@ -18,7 +18,7 @@ import chalk from "chalk";
 import { DEFAULT_RESOURCE_KEY } from "@rebasepro/types";
 import { execa, execaCommandSync, type ResultPromise } from "execa";
 
-import { managedNotices, prepareDatabaseEnv, resolveComposeUrl } from "../dev-db/prepare";
+import { managedNotices, prepareDatabaseEnv, resolveComposeUrl, type PreparedDatabase } from "../dev-db/prepare";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -324,6 +324,70 @@ export function resolveStartPort(projectRoot: string, explicitPort?: number): nu
 
     // 4. Deterministic hash
     return getProjectPort(projectRoot);
+}
+
+/**
+ * Where a connection string actually points, as `host:port/name`.
+ *
+ * The banner used to name the database only by *provenance* — "your database
+ * (DATABASE_URL in the environment)" — and the boot that follows it writes
+ * thirty DDL statements. Which host, which port, which database name appeared
+ * nowhere on the success path; only a *failed* connection printed an address.
+ * So the one question after pointing a project at staging by accident — did it
+ * touch staging? — had no answer in a hundred and twenty lines of output.
+ *
+ * The password is never in it. `new URL` keeps the credentials in their own
+ * fields, so building the string out of `hostname`, `port` and `pathname`
+ * cannot carry them by accident, which string surgery on a DSN reliably does.
+ *
+ * A DSN with no host is a UNIX socket (`postgresql:///app?host=/tmp`), and the
+ * socket directory is the address there.
+ *
+ * Returns null for anything that is not a parseable URL rather than guessing:
+ * a banner line that is wrong about the database is worse than one that is
+ * missing.
+ *
+ * Exported for its test.
+ */
+export function databaseEndpoint(url: string | null | undefined): string | null {
+    if (!url) return null;
+
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return null;
+    }
+
+    const host = parsed.hostname || parsed.searchParams.get("host");
+    if (!host) return null;
+
+    const name = parsed.pathname.replace(/^\//, "");
+
+    return `${host}${parsed.port ? `:${parsed.port}` : ""}${name ? `/${name}` : ""}`;
+}
+
+/**
+ * The `↳ Database =` line: which database, why it was chosen, and where it is.
+ *
+ * Provenance alone was what this line said, and the boot underneath it applies
+ * schema. "your database (DATABASE_URL in the environment)" and "Applied 30
+ * additive schema change(s) before boot" together still do not answer the
+ * question somebody asks after pointing a project at staging by accident.
+ *
+ * The managed database gets its address too — the daemon's port is what a
+ * `psql` in another terminal needs, and it is nowhere else in the banner.
+ *
+ * Exported for its test.
+ */
+export function databaseBannerValue(prepared: PreparedDatabase | null): string {
+    if (!prepared) return "none (--no-db) — the backend needs DATABASE_URL";
+
+    const endpoint = databaseEndpoint(
+        prepared.database.kind === "managed" ? prepared.env.DATABASE_URL : prepared.database.url
+    );
+
+    return endpoint ? `${prepared.description} · ${endpoint}` : prepared.description;
 }
 
 /**
@@ -1005,9 +1069,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
         console.log(`  ${chalk.cyan("▶")} Backend:  ${chalk.gray(backendDir)}`);
         console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(String(startPort))}`);
-        console.log(`  ${chalk.gray("↳ Database")} = ${chalk.white(
-            prepared ? prepared.description : "none (--no-db) — the backend needs DATABASE_URL"
-        )}`);
+        console.log(`  ${chalk.gray("↳ Database")} = ${chalk.white(databaseBannerValue(prepared))}`);
         // Stated on every start rather than left to be discovered. A developer
         // who does not know requests are serialized here will read the
         // difference as a bug in their own code.
