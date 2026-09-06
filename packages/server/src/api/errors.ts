@@ -96,6 +96,37 @@ function extractMissingIdentifier(pgMessage?: string): string | null {
 }
 
 /**
+ * The sentence a `INVALID_FILTER_VALUE` answer carries.
+ *
+ * Built from Postgres's own wording rather than passed through, because the
+ * driver hands the whole failed statement over as `error.message` and this one
+ * goes to the caller in production too. What is quoted back is the type name
+ * and the literal the caller themselves sent — never a table, a column list or
+ * a statement.
+ *
+ * The three shapes are the ones a filter actually produces: an unparseable
+ * literal (22P02, `?id=eq.abc`), a value outside an enum's labels (22P02 with
+ * different wording), and a number past the column type's range (22003). A
+ * fourth SQLSTATE in class 22 lands on the general sentence, which still says
+ * the useful thing: it is the value that is wrong, not the server.
+ */
+function describeDataException(dbError?: PgLikeError): string {
+    const message = dbError?.message ?? "";
+    const column = dbError?.column ? ` for column "${dbError.column}"` : "";
+
+    const syntax = message.match(/invalid input syntax for type ([\w ]+): "(.*)"/);
+    if (syntax) return `"${syntax[2]}" is not a valid ${syntax[1]}${column}.`;
+
+    const enumValue = message.match(/invalid input value for enum ([\w."]+): "(.*)"/);
+    if (enumValue) return `"${enumValue[2]}" is not one of the values of ${enumValue[1]}${column}.`;
+
+    const range = message.match(/value "(.*)" is out of range for type ([\w ]+)/);
+    if (range) return `"${range[1]}" is out of range for ${range[2]}${column}.`;
+
+    return `A value in this request could not be read as the type of the column it was compared against${column}.`;
+}
+
+/**
  * Standardized API error class.
  * Throw this from any route handler — the errorHandler middleware
  * will format it into `{ error: { message, code, details? } }`.
@@ -380,6 +411,19 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
             statusCode = 409;
             parts.push(READ_ONLY_TRANSACTION_MESSAGE);
         }
+        // SQLSTATE class 22 — data exception. The caller sent a value the
+        // column's type cannot hold: `?id=eq.abc` on an integer key,
+        // `?status=eq.nope` on an enum, a timestamp that is not one, a number
+        // past the type's range. Every *other* bad query parameter already has
+        // a precise 400 (`INVALID_LIMIT`, `UNKNOWN_FILTER_FIELD`,
+        // `INVALID_LOGICAL_GROUP`); a bad *value* fell off the end of this
+        // chain and answered 500 INTERNAL_ERROR — and in production `dbMessage`
+        // is stripped, so the caller got a bare 500 naming nothing and had no
+        // way to learn their own typo was the cause.
+        if (dbError.code?.startsWith("22")) {
+            code = "INVALID_FILTER_VALUE";
+            statusCode = 400;
+        }
         logMessage = parts.join(". ");
     }
 
@@ -415,10 +459,11 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
                 ""
             ].join("\n"));
         }
-    } else if (code === "READ_ONLY_TRANSACTION") {
-        // A 4xx: the application's own callback, refused. Not a server fault, so
-        // not an ❌ in the log either — and, like the drift arm above, not a
-        // second line when the request log is already going to carry it.
+    } else if (code === "READ_ONLY_TRANSACTION" || code === "INVALID_FILTER_VALUE") {
+        // A 4xx: the application's own callback, refused — or a filter value
+        // the caller's own request could not have worked with. Not a server
+        // fault, so not an ❌ in the log either — and, like the drift arm above,
+        // not a second line when the request log is already going to carry it.
         if (!requestWillBeLogged(c)) logger.warn(
             `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
             (reqId ? ` [${reqId}]` : "")
@@ -457,6 +502,11 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         // Ahead of the generic 4xx arm below, which would echo the raw driver
         // message ("Failed query: insert into …") back to the caller.
         clientMessage = READ_ONLY_TRANSACTION_MESSAGE;
+    } else if (code === "INVALID_FILTER_VALUE") {
+        // Also ahead of the 4xx arm: `error.message` here is the driver's
+        // "Failed query: select … / params: …", which is both unhelpful and the
+        // one thing this envelope must never carry.
+        clientMessage = describeDataException(dbError || (error as PgLikeError));
     } else if (statusCode < 500 && error.message) {
         // If it's a 4xx error (e.g. from validation), it's generally safe to send the message
         clientMessage = error.message;
@@ -519,6 +569,7 @@ function codeToStatus(code?: string): number | undefined {
         EMAIL_EXISTS: 409,
         ROLE_EXISTS: 409,
         READ_ONLY_TRANSACTION: 409,
+        INVALID_FILTER_VALUE: 400,
         SCHEMA_DRIFT: 500,
         DB_PERMISSION_DENIED: 500,
         INTERNAL_ERROR: 500,
