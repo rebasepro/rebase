@@ -50,6 +50,7 @@ import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
 import { checkErrorCodes } from "./docs-verify/check-error-codes.mjs";
 import { checkMcpToolTables } from "./docs-verify/check-mcp-tool-tables.mjs";
+import { checkCloudSurface } from "./docs-verify/check-cloud-surface.mjs";
 import { checkAiInstructions } from "./docs-verify/check-ai-instructions.mjs";
 import { checkSkillClaims } from "./docs-verify/check-skill-claims.mjs";
 import { checkRlsCheckFlags } from "./docs-verify/check-rls-check-flags.mjs";
@@ -94,6 +95,7 @@ if (asJson) {
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
         out.errorCodes = checkErrorCodes(ROOT).findings;
         out.mcpToolTables = checkMcpToolTables(ROOT).findings;
+        out.cloudSurface = checkCloudSurface(ROOT).findings;
         out.aiInstructions = checkAiInstructions(ROOT).findings;
         out.skillClaims = checkSkillClaims(ROOT).findings;
         out.unreleasedBadges = checkUnreleasedBadges(ROOT).findings;
@@ -437,6 +439,22 @@ if (only === "both" || only === "names") {
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} claim(s) the code contradicts:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Cloud surface table ━━━${NC}`);
+    const { findings: bad, scanned } = checkCloudSurface(ROOT);
+    console.log(`${DIM}Compared deployment/cloud.md's surface table against ${scanned} CLOUD_GROUPS entries.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every group \`rebase cloud\` dispatches has exactly one row on the cloud page.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} group(s) the cloud page and the CLI disagree about:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);
