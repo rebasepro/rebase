@@ -56,10 +56,12 @@ function isExpired(key: ApiKeyMasked): boolean {
     return !!(key.expires_at && new Date(key.expires_at) < new Date());
 }
 
-function keyStatus(key: ApiKeyMasked): { label: string; color: string } {
-    if (key.revoked_at) return { label: "Revoked", color: "text-red-500" };
-    if (isExpired(key)) return { label: "Expired", color: "text-amber-500" };
-    return { label: "Active", color: "text-emerald-500" };
+type KeyStatusKind = "active" | "expired" | "revoked";
+
+function keyStatus(key: ApiKeyMasked): { kind: KeyStatusKind; color: string } {
+    if (key.revoked_at) return { kind: "revoked", color: "text-red-500" };
+    if (isExpired(key)) return { kind: "expired", color: "text-amber-500" };
+    return { kind: "active", color: "text-emerald-500" };
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -161,8 +163,8 @@ export function ApiKeysView() {
                         {!failure && activeKeys.length === 0 && inactiveKeys.length === 0 && (
                             <div className="flex flex-col items-center justify-center h-full gap-3 text-center p-6">
                                 <KeyRoundIcon size={iconSize.medium} className="text-surface-300 dark:text-surface-600"/>
-                                <Typography variant="body2" color="secondary">No API keys yet</Typography>
-                                <Typography variant="caption" color="disabled">Create a key to enable machine-to-machine authentication</Typography>
+                                <Typography variant="body2" color="secondary">{t("studio_api_keys_empty_title")}</Typography>
+                                <Typography variant="caption" color="disabled">{t("studio_api_keys_empty_hint")}</Typography>
                             </div>
                         )}
                         {activeKeys.map(key => (
@@ -171,7 +173,7 @@ export function ApiKeysView() {
                         {inactiveKeys.length > 0 && (
                             <>
                                 <div className="px-2 pt-3 pb-1">
-                                    <Typography variant="caption" color="disabled" className="text-[10px] uppercase tracking-wider font-medium">Revoked / Expired</Typography>
+                                    <Typography variant="caption" color="disabled" className="text-[10px] uppercase tracking-wider font-medium">{t("studio_api_keys_revoke")}d / Expired</Typography>
                                 </div>
                                 {inactiveKeys.map(key => (
                                     <KeyListItem key={key.id} apiKey={key} selected={selectedId === key.id} onClick={() => setSelectedId(key.id)}/>
@@ -185,7 +187,7 @@ export function ApiKeysView() {
                 <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
                     {!selectedKey ? (
                         <div className="flex items-center justify-center h-full">
-                            <Typography variant="body2" color="disabled">Select an API key to view details</Typography>
+                            <Typography variant="body2" color="disabled">{t("studio_api_keys_select_hint")}</Typography>
                         </div>
                     ) : (
                         <>
@@ -211,7 +213,7 @@ export function ApiKeysView() {
                                             disabled={revoking === selectedKey.id}
                                             startIcon={revoking === selectedKey.id ? <CircularProgress size="smallest"/> : <DeleteIcon size={iconSize.smallest}/>}
                                         >
-                                            Revoke
+                                            {t("studio_api_keys_revoke")}
                                         </Button>
                                     )}
                                 </div>
@@ -220,25 +222,25 @@ export function ApiKeysView() {
                             {/* Stats */}
                             <div className="px-5 py-4 bg-surface-50 dark:bg-surface-900/50">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    <StatCard label="Status" value={keyStatus(selectedKey).label} className={keyStatus(selectedKey).color}/>
-                                    <StatCard label="Created" value={formatRelative(selectedKey.created_at)}/>
-                                    <StatCard label="Last Used" value={formatRelative(selectedKey.last_used_at)}/>
-                                    <StatCard label="Expires" value={selectedKey.expires_at ? formatRelative(selectedKey.expires_at) : "Never"}/>
+                                    <StatCard label={t("studio_api_keys_stat_status")} value={t(`studio_api_keys_status_${keyStatus(selectedKey).kind}`)} className={keyStatus(selectedKey).color}/>
+                                    <StatCard label={t("created")} value={formatRelative(selectedKey.created_at)}/>
+                                    <StatCard label={t("studio_api_keys_stat_last_used")} value={formatRelative(selectedKey.last_used_at)}/>
+                                    <StatCard label={t("studio_api_keys_stat_expires")} value={selectedKey.expires_at ? formatRelative(selectedKey.expires_at) : t("studio_api_keys_never")}/>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
                                     <StatCard
-                                        label="Role"
-                                        value={selectedKey.admin ? "Admin" : "Service"}
+                                        label={t("role")}
+                                        value={selectedKey.admin ? t("admin") : t("studio_api_keys_role_service")}
                                         className={selectedKey.admin ? "text-amber-600 dark:text-amber-400" : undefined}
                                     />
-                                    <StatCard label="Rate Limit" value={selectedKey.rate_limit ? `${selectedKey.rate_limit}/15min` : "Default (1000/15min)"}/>
-                                    <StatCard label="Created By" value={selectedKey.created_by} mono/>
+                                    <StatCard label={t("studio_api_keys_stat_rate_limit")} value={selectedKey.rate_limit ? `${selectedKey.rate_limit}/15min` : t("studio_api_keys_rate_limit_default")}/>
+                                    <StatCard label={t("studio_api_keys_stat_created_by")} value={selectedKey.created_by} mono/>
                                 </div>
                             </div>
 
                             {/* Permissions */}
                             <div className={cls("flex items-center gap-2 px-5 py-2 border-y bg-white dark:bg-surface-950", defaultBorderMixin)}>
-                                <Typography variant="subtitle2" className="font-semibold text-[13px]">Permissions</Typography>
+                                <Typography variant="subtitle2" className="font-semibold text-[13px]">{t("studio_api_keys_permissions")}</Typography>
                                 <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
                                     {selectedKey.permissions.length}
                                 </Chip>
@@ -255,7 +257,7 @@ export function ApiKeysView() {
                                     </div>
                                 )}
                                 {selectedKey.permissions.length === 0 ? (
-                                    <Typography variant="body2" color="disabled">No permissions configured</Typography>
+                                    <Typography variant="body2" color="disabled">{t("studio_api_keys_no_permissions")}</Typography>
                                 ) : (
                                     <div className="space-y-2">
                                         {selectedKey.permissions.map((perm, idx) => (
@@ -294,7 +296,7 @@ export function ApiKeysView() {
                     if (!open && !revoking) setConfirmRevoke(null);
                 }}
             >
-                <DialogTitle hidden>Revoke Confirmation</DialogTitle>
+                <DialogTitle hidden>{t("studio_api_keys_revoke_confirmation")}</DialogTitle>
                 <DialogContent>
                     <Typography variant="subtitle1" className="font-semibold mb-2">
                         Revoke &quot;{confirmRevoke?.name}&quot;?
@@ -309,7 +311,7 @@ export function ApiKeysView() {
                         onClick={() => setConfirmRevoke(null)}
                         disabled={revoking !== null}
                     >
-                        Cancel
+                        {t("cancel")}
                     </Button>
                     <Button
                         color="error"
@@ -383,8 +385,8 @@ function KeyListItem({ apiKey, selected, onClick }: { apiKey: ApiKeyMasked; sele
             )}
         >
             <div className={cls("w-2 h-2 rounded-full shrink-0",
-                status.label === "Active" ? "bg-emerald-400" :
-                status.label === "Expired" ? "bg-amber-400" : "bg-red-400"
+                status.kind === "active" ? "bg-emerald-400" :
+                status.kind === "expired" ? "bg-amber-400" : "bg-red-400"
             )}/>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -422,6 +424,7 @@ function StatCard({ label, value, mono, className }: { label: string; value: str
    ═══════════════════════════════════════════════════════════════ */
 
 function SecretDisplayDialog({ keyWithSecret, onClose }: { keyWithSecret: ApiKeyWithSecret; onClose: () => void }) {
+    const { t } = useTranslation();
     const snackbar = useSnackbarController();
     const [copied, setCopied] = useState(false);
 
@@ -432,7 +435,7 @@ function SecretDisplayDialog({ keyWithSecret, onClose }: { keyWithSecret: ApiKey
             snackbar.open({ type: "success", message: "API key copied to clipboard" });
             setTimeout(() => setCopied(false), 2000);
         } catch {
-            snackbar.open({ type: "error", message: "Failed to copy" });
+            snackbar.open({ type: "error", message: t("studio_api_keys_copy_failed") });
         }
     };
 
@@ -461,7 +464,7 @@ function SecretDisplayDialog({ keyWithSecret, onClose }: { keyWithSecret: ApiKey
                     <code className="flex-1 text-[12px] font-mono break-all text-surface-700 dark:text-surface-300 select-all">
                         {keyWithSecret.key}
                     </code>
-                    <Tooltip title={copied ? "Copied!" : "Copy"}>
+                    <Tooltip title={copied ? t("copied") : t("copy")}>
                         <IconButton size="small" onClick={handleCopy}>
                             {copied
                                 ? <CheckCircleIcon size={iconSize.smallest} className="text-emerald-500"/>
@@ -473,21 +476,21 @@ function SecretDisplayDialog({ keyWithSecret, onClose }: { keyWithSecret: ApiKey
 
                 <div className="mt-4 space-y-1">
                     <Typography variant="caption" color="secondary">
-                        <strong>Name:</strong> {keyWithSecret.name}
+                        <strong>{t("studio_api_keys_name_label")}</strong> {keyWithSecret.name}
                     </Typography>
                     <Typography variant="caption" color="secondary">
-                        <strong>Access:</strong> {permissionSummary(keyWithSecret.permissions)}
+                        <strong>{t("studio_api_keys_access_label")}</strong> {permissionSummary(keyWithSecret.permissions)}
                     </Typography>
                     {keyWithSecret.admin && (
                         <Typography variant="caption" className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
                             <ShieldIcon size={iconSize.smallest} className="shrink-0"/>
-                            <span><strong>Admin role granted</strong> — the admin routes and the default_admin policies</span>
+                            <span><strong>{t("studio_api_keys_admin_granted")}</strong> — {t("studio_api_keys_admin_granted_hint")}</span>
                         </Typography>
                     )}
                 </div>
             </DialogContent>
             <DialogActions>
-                <Button color="primary" onClick={onClose}>Done</Button>
+                <Button color="primary" onClick={onClose}>{t("studio_api_keys_done")}</Button>
             </DialogActions>
         </Dialog>
     );

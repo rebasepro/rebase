@@ -3,13 +3,13 @@ import { CheckIcon, IconButton, iconSize, LanguagesIcon, Menu, MenuItem, Typogra
 import { useTranslation } from "../hooks";
 
 export function LanguageToggle() {
-    const { i18n } = useTranslation();
+    const { t, i18n } = useTranslation();
 
     return (
         <Menu
             trigger={<IconButton
                 color="inherit"
-                aria-label="Change language">
+                aria-label={t("change_language")}>
                 <LanguagesIcon size={iconSize.small}/>
             </IconButton>}>
             <MenuItem onClick={() => i18n.changeLanguage("en")}>
