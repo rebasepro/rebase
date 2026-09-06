@@ -183,8 +183,6 @@ O backend inclui um manipulador de erros que captura todas as exceções e retor
 O estado HTTP está na resposta, não no corpo. Ramifique sobre `code`, não sobre
 `message` — as mensagens são escritas para pessoas e podem mudar.
 
-Se a inicialização falhar (por exemplo, erro de conexão à base de dados), o servidor ainda inicia, mas retorna 503 para todos os pedidos da API, com uma mensagem de erro descritiva nos logs.
-
 ## Próximos Passos
 
 -   **[Autenticação](/docs/backend/authentication)** — JWT, fornecedores OAuth e OIDC, MFA, chaves de API, gestão de utilizadores
@@ -194,3 +192,4 @@ Se a inicialização falhar (por exemplo, erro de conexão à base de dados), o 
 -   **[Funções Personalizadas](/docs/backend/custom-functions)** — Adicionar endpoints de API personalizados
 -   **[Tarefas Cron](/docs/backend/cron-jobs)** — Tarefas em segundo plano agendadas
 -   **[Ramificação de Base de Dados](/docs/backend/branching)** — Cópias de base de dados instantâneas para dev/staging
+- **[Implantação](/docs/getting-started/deployment)** — Levar o backend para produção

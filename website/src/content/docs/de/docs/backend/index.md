@@ -184,8 +184,6 @@ Das Backend enthält einen Fehler-Handler, der alle Ausnahmen abfängt und struk
 Der HTTP-Status steht in der Antwort, nicht im Body. Verzweigen Sie auf `code`,
 nicht auf `message` — Meldungen sind für Menschen geschrieben und dürfen sich ändern.
 
-Schlägt die Initialisierung fehl (z. B. Datenbankverbindungsfehler), startet der Server trotzdem, gibt aber für alle API-Anfragen 503 zurück, mit einer beschreibenden Fehlermeldung in den Logs.
-
 ## Nächste Schritte
 
 - **[Authentifizierung](/docs/backend/authentication)** — JWT, OAuth- und OIDC-Provider, MFA, API-Schlüssel, Benutzerverwaltung
@@ -195,5 +193,6 @@ Schlägt die Initialisierung fehl (z. B. Datenbankverbindungsfehler), startet de
 - **[Benutzerdefinierte Funktionen](/docs/backend/custom-functions)** — Benutzerdefinierte API-Endpunkte hinzufügen
 - **[Cron-Jobs](/docs/backend/cron-jobs)** — Geplante Hintergrundaufgaben
 - **[Datenbank-Verzweigung](/docs/backend/branching)** — Sofortige Datenbankkopien für Entwicklung/Staging
+- **[Bereitstellung](/docs/getting-started/deployment)** — Das Backend in Produktion bringen
 
 ---

@@ -183,8 +183,6 @@ Le backend inclut un gestionnaire d'erreurs qui intercepte toutes les exceptions
 Le statut HTTP est sur la réponse, pas dans le corps. Branchez sur `code`, pas
 sur `message` — les messages sont écrits pour des humains et peuvent changer.
 
-Si l'initialisation échoue (par exemple, erreur de connexion à la base de données), le serveur démarre tout de même mais retourne 503 pour toutes les requêtes API, avec un message d'erreur descriptif dans les journaux.
-
 ## Prochaines étapes
 
 - **[Authentification](/docs/backend/authentication)** — JWT, fournisseurs OAuth et OIDC, MFA, clés d'API, gestion des utilisateurs
@@ -194,5 +192,6 @@ Si l'initialisation échoue (par exemple, erreur de connexion à la base de donn
 - **[Fonctions personnalisées](/docs/backend/custom-functions)** — Ajouter des points d'extrémité API personnalisés
 - **[Tâches Cron](/docs/backend/cron-jobs)** — Tâches d'arrière-plan planifiées
 - **[Ramification de base de données](/docs/backend/branching)** — Copies de base de données instantanées pour le développement/staging
+- **[Déploiement](/docs/getting-started/deployment)** — Mettre le backend en production
 
 ---

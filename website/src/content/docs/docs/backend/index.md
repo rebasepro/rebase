@@ -355,8 +355,6 @@ async function setPrice(id: string, price: number) {
 }
 ```
 
-If initialization fails (e.g., database connection error), the server still starts but returns 503 for all API requests, with a descriptive error message in the logs.
-
 ## Next Steps
 
 - **[Authentication](/docs/backend/authentication)** — JWT, OAuth and OIDC providers, MFA, API keys, user management
@@ -366,3 +364,4 @@ If initialization fails (e.g., database connection error), the server still star
 - **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints
 - **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks
 - **[Database Branching](/docs/backend/branching)** — Instant database copies for dev/staging
+- **[Deployment](/docs/getting-started/deployment)** — Take the backend to production
