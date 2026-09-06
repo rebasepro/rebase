@@ -1,5 +1,5 @@
 ---
-sourceHash: 3346d2728eb8f2e4
+sourceHash: 2078e2f99041a59e
 title: Environnement et Configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -51,6 +51,7 @@ Toute la configuration est effectuée via des variables d'environnement dans vot
 | `JWT_ACCESS_EXPIRES_IN` | Durée de vie du token d'accès | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Durée de vie du token de rafraîchissement | `30d` |
 | `ALLOW_REGISTRATION` | Permettre aux nouveaux utilisateurs de s'inscrire (`true`/`false`). Le premier utilisateur peut toujours s'inscrire. | `true` |
+| `AUTH_COOKIE_SECURE` | `Secure` sur le cookie de rafraîchissement. Activé par défaut ; `AUTH_COOKIE_SECURE=false` pour du http en clair — un déploiement sur une adresse de réseau local, où le navigateur abandonnerait sinon le cookie et où la session meurt à l'expiration du jeton d'accès, sans aucune erreur. Le démarrage émet un avertissement. `http://localhost` n'en a pas besoin. | `true` |
 | `GOOGLE_CLIENT_ID` | ID client Google OAuth (validation backend) | — |
 
 ### Stockage

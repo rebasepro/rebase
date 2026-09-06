@@ -1,5 +1,5 @@
 ---
-sourceHash: 3346d2728eb8f2e4
+sourceHash: 2078e2f99041a59e
 title: Ambiente e Configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -50,6 +50,7 @@ Tutta la configurazione viene gestita tramite variabili d'ambiente nel tuo file 
 | `JWT_ACCESS_EXPIRES_IN` | Durata del token di accesso | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Durata del token di refresh | `30d` |
 | `ALLOW_REGISTRATION` | Consente ai nuovi utenti di registrarsi (`true`/`false`). Il primo utente può sempre registrarsi. | `true` |
+| `AUTH_COOKIE_SECURE` | `Secure` sul cookie di refresh. Attivo per impostazione predefinita; `AUTH_COOKIE_SECURE=false` per http in chiaro — un deployment su un indirizzo di rete locale, dove altrimenti il browser scarta il cookie e la sessione muore alla scadenza dell'access token, senza alcun errore. L'avvio avvisa. `http://localhost` non ne ha bisogno. | `true` |
 | `GOOGLE_CLIENT_ID` | ID client Google OAuth (validazione backend) | — |
 
 ### Archiviazione

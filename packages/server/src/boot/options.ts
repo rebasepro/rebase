@@ -5,6 +5,7 @@ import { createDevEmailSink, registerDevEmailSink } from "../email/dev-sink";
 import type { CaptchaConfig, CaptchaRoute } from "../auth/captcha";
 import type { RebaseBootEnv } from "./env";
 import { normalizePemFromEnv } from "../auth/jwt-keys";
+import { logger } from "../utils/logger";
 
 /**
  * True when an emailed link would be followable — i.e. when there is an
@@ -108,6 +109,25 @@ export function resolveCaptchaOptions(env: RebaseBootEnv): CaptchaConfig | undef
  * present. Google is the exception the template already made: a client id alone
  * is enough, because the ID-token flow needs no secret.
  */
+/**
+ * The OAuth providers configured from a plain `<PROVIDER>_CLIENT_ID` /
+ * `_CLIENT_SECRET` pair, spelled exactly as the field on `RebaseAuthConfig`.
+ *
+ * Google, GitHub and Microsoft are handled above because their shapes differ
+ * (Google's secret is optional, Microsoft carries a tenant); Apple is below
+ * because it has no static secret at all.
+ */
+const ENV_PAIR_PROVIDERS = [
+    "linkedin",
+    "facebook",
+    "twitter",
+    "discord",
+    "gitlab",
+    "bitbucket",
+    "slack",
+    "spotify"
+] as const satisfies readonly (keyof RebaseAuthConfig)[];
+
 export function resolveAuthOptions(
     env: RebaseBootEnv,
     usersCollection: CollectionConfig | undefined
@@ -137,8 +157,29 @@ export function resolveAuthOptions(
         // localStorage, putting it out of reach of XSS. Enabling it costs a
         // token-flow client nothing — the client opts in via `authFlowMode` —
         // so the safer flow is simply always available.
-        cookieAuth: { sameSite: env.AUTH_COOKIE_SAME_SITE || "Lax" }
+        //
+        // `secure` is passed through rather than left undefined so that a
+        // deployment configured entirely by environment can reach it at all:
+        // `getCookieSettings` defaults an absent value to `Secure`, which is
+        // right, but left `AUTH_COOKIE_SECURE=false` with nothing to set.
+        cookieAuth: {
+            sameSite: env.AUTH_COOKIE_SAME_SITE || "Lax",
+            secure: env.AUTH_COOKIE_SECURE
+        }
     };
+
+    // Loud, because it is the one setting here that makes a credential
+    // travel in cleartext, and because the symptom of getting it wrong in the
+    // other direction (a browser silently dropping the cookie) is what leads
+    // people to set it. Named at boot so it appears in the log of the
+    // deployment that has it, not only in the config of the one that wrote it.
+    if (env.AUTH_COOKIE_SECURE === false) {
+        logger.warn(
+            "AUTH_COOKIE_SECURE=false — the refresh cookie is being sent without `Secure`, so it " +
+            "travels in cleartext over plain http. That is a long-lived credential: only do this " +
+            "on a network you control, and put TLS in front of this deployment before it is public."
+        );
+    }
 
     if (env.AUTH_DEFAULT_ROLE) {
         auth.defaultRole = env.AUTH_DEFAULT_ROLE;
@@ -160,6 +201,32 @@ export function resolveAuthOptions(
         auth.microsoft = {
             clientId: env.MICROSOFT_CLIENT_ID,
             clientSecret: env.MICROSOFT_CLIENT_SECRET
+        };
+    }
+
+    // The rest of the twelve. Each is the same two lines, so they are a loop
+    // rather than nine near-identical blocks: the failure this is fixing is one
+    // provider being forgotten, and a list is easier to compare against
+    // `ls src/auth/*-oauth.ts` than nine hand-written ifs. `oauth-env-coverage`
+    // does that comparison.
+    for (const provider of ENV_PAIR_PROVIDERS) {
+        const clientId = env[`${provider.toUpperCase()}_CLIENT_ID` as keyof RebaseBootEnv] as string | undefined;
+        const clientSecret = env[`${provider.toUpperCase()}_CLIENT_SECRET` as keyof RebaseBootEnv] as string | undefined;
+        if (clientId && clientSecret) {
+            auth[provider] = { clientId, clientSecret };
+        }
+    }
+
+    // Apple has no static secret to pair with the id: `createAppleProvider`
+    // signs a short-lived ES256 JWT per token exchange. All four or nothing —
+    // a partial set would build a provider that fails at the first sign-in
+    // rather than at boot.
+    if (env.APPLE_CLIENT_ID && env.APPLE_TEAM_ID && env.APPLE_KEY_ID && env.APPLE_PRIVATE_KEY) {
+        auth.apple = {
+            clientId: env.APPLE_CLIENT_ID,
+            teamId: env.APPLE_TEAM_ID,
+            keyId: env.APPLE_KEY_ID,
+            privateKey: normalizePemFromEnv(env.APPLE_PRIVATE_KEY)
         };
     }
 

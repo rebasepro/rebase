@@ -106,19 +106,40 @@ answers.
 | `DISABLE_SELF_REGISTRATION` <span class="since-badge" data-since="0.18">Since 0.18</span> | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open outside production, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
 | `REBASE_ADMIN_EMAIL` <span class="since-badge" data-since="0.18">Since 0.18</span> | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a production deployment gets its admin: the operator names the first account instead of racing the internet for it. Boot warns when the table is empty in production and this is unset. | — |
 | `REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span> | Password for that account. At least 12 characters, or it is refused and the account is not created. Change it after the first sign-in. | — |
-| `MFA_ENCRYPTION_KEY` | Encrypts every stored TOTP secret. Without it, MFA enrolment is refused rather than storing secrets in the clear. | — |
+| `MFA_ENCRYPTION_KEY` | Encrypts every stored TOTP secret. Unset, the secrets are encrypted with `JWT_SECRET` instead and boot warns once — so rotating `JWT_SECRET` signs everybody out *and* leaves every enrolled authenticator undecryptable. Set a dedicated key (32+ random characters) before anyone enrols. | — |
 | `MFA_ENCRYPTION_KEY_PREVIOUS` | The key being rotated *away* from. Set both during a rotation: new secrets are written with `MFA_ENCRYPTION_KEY` and existing ones are still readable, so nobody is locked out of their own account mid-rotation. Remove it once every secret has been re-encrypted. | — |
 | `ALLOW_ANONYMOUS` | Enable anonymous sign-in (`POST /api/auth/anonymous`). Opt-in, and deliberately not gated by `ALLOW_REGISTRATION`. | `false` |
 | `AUTH_REQUIRE` | Require authentication for the data API. Set `false` for a fully public read surface — RLS still applies. | `true` |
 | `AUTH_DEFAULT_ROLE` | Role assigned to a newly registered user when none is given. | — |
 | `AUTH_ALLOW_USER_LOOKUP` | Mount `POST /api/auth/find-user`, which resolves an email to a minimal public profile (`uid`, `displayName`, `photoURL`) for invite-by-email flows. Authenticated callers only, and it never returns the email, roles or metadata of the user it found. Off by default: it is an enumeration surface. | `false` |
 | `AUTH_COOKIE_SAME_SITE` | `SameSite` on the refresh cookie: `Strict`, `Lax` or `None`. `None` requires HTTPS and is only for a genuinely cross-site frontend. | `Lax` |
+| `AUTH_COOKIE_SECURE` | `Secure` on the refresh cookie. Secure by default; `AUTH_COOKIE_SECURE=false` for plain http — a deployment on a LAN address where the browser would otherwise drop the cookie and the session would die at the access token's expiry with no error. It warns at boot. `http://localhost` does not need it. | `true` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (backend validation) | — |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | — |
 | `GITHUB_CLIENT_ID` | GitHub OAuth client ID | — |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth client secret | — |
 | `MICROSOFT_CLIENT_ID` | Microsoft OAuth client ID | — |
 | `MICROSOFT_CLIENT_SECRET` | Microsoft OAuth client secret | — |
+| `LINKEDIN_CLIENT_ID` | LinkedIn OAuth client ID | — |
+| `LINKEDIN_CLIENT_SECRET` | LinkedIn OAuth client secret | — |
+| `FACEBOOK_CLIENT_ID` | Facebook OAuth client ID | — |
+| `FACEBOOK_CLIENT_SECRET` | Facebook OAuth client secret | — |
+| `TWITTER_CLIENT_ID` | X/Twitter OAuth client ID | — |
+| `TWITTER_CLIENT_SECRET` | X/Twitter OAuth client secret | — |
+| `DISCORD_CLIENT_ID` | Discord OAuth client ID | — |
+| `DISCORD_CLIENT_SECRET` | Discord OAuth client secret | — |
+| `GITLAB_CLIENT_ID` | GitLab OAuth client ID. A self-hosted instance's `baseUrl` has no environment spelling — configure GitLab in the `auth` block for that. | — |
+| `GITLAB_CLIENT_SECRET` | GitLab OAuth client secret | — |
+| `BITBUCKET_CLIENT_ID` | Bitbucket OAuth client ID | — |
+| `BITBUCKET_CLIENT_SECRET` | Bitbucket OAuth client secret | — |
+| `SLACK_CLIENT_ID` | Slack OAuth client ID | — |
+| `SLACK_CLIENT_SECRET` | Slack OAuth client secret | — |
+| `SPOTIFY_CLIENT_ID` | Spotify OAuth client ID | — |
+| `SPOTIFY_CLIENT_SECRET` | Spotify OAuth client secret | — |
+| `APPLE_CLIENT_ID` | Apple Services ID. Apple has no static client secret — Rebase signs a short-lived ES256 JWT per token exchange — so it needs all four `APPLE_*` values, and configures nothing without them. | — |
+| `APPLE_TEAM_ID` | Apple Developer Team ID, the JWT's issuer. | — |
+| `APPLE_KEY_ID` | Key ID of the private key registered with Apple. | — |
+| `APPLE_PRIVATE_KEY` | Contents of the `.p8` private key file, newlines and all (`\n` escapes are accepted). | — |
 | `REBASE_SERVICE_KEY` | Static admin API key. Bypasses normal JWT auth for server-to-server calls when passed as `Authorization: Bearer <key>`. (Auto-generated in development). | — |
 | `REBASE_RATE_LIMIT_STORE` | Where auth rate-limit counters live: `memory` (per-process) or `sql` (shared across replicas). A process cannot see its own replica count, so a deployment with peers has to say so — three replicas on the default enforce three times the limit. Any other value **refuses to boot** rather than falling back, `postgres` included. | `memory` |
 | `AUTH_MAGIC_LINK` | Mount the passwordless sign-in-link flow. Needs an email service configured, or the link has nowhere to go. | `false` |
