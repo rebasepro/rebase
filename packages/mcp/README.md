@@ -95,15 +95,15 @@ Spawn the Rebase CLI in the active project directory.
 | Tool | Required | Description |
 |---|---|---|
 | `rebase_schema_generate` | — | Generate Drizzle schema from Rebase TypeScript collection definitions |
-| `rebase_db_push` | — | Apply the current Drizzle schema directly to the database (development shortcut, skips migration files) |
+| `rebase_db_push` ⚠ | — | Apply the current Drizzle schema directly to the database (development shortcut, skips migration files) |
 | `rebase_schema_introspect` | — | Introspect the live database and generate Rebase collection definitions from existing tables |
 | `rebase_db_generate` | — | Generate SQL migration files from schema changes (compares current Drizzle schema against the last entity) |
-| `rebase_db_migrate` | — | Run all pending SQL migrations against the database |
+| `rebase_db_migrate` ⚠ | — | Run all pending SQL migrations against the database |
 | `rebase_generate_sdk` | — | Generate a fully-typed JavaScript/TypeScript SDK from collection definitions |
 | `rebase_doctor` | — | Detect schema drift between collection definitions, generated Drizzle schema, and the live PostgreSQL database |
-| `rebase_db_branch_create` | `name` | Create a new database branch (Admins only) |
+| `rebase_db_branch_create` ⚠ | `name` | Create a new database branch (Admins only) |
 | `rebase_db_branch_list` | — | List all database branches (Admins only) |
-| `rebase_db_branch_delete` | `name` | Delete an existing database branch (Admins only) |
+| `rebase_db_branch_delete` ⚠ | `name` | Delete an existing database branch (Admins only) |
 | `rebase_db_branch_info` | `name` | Show information and status for a database branch (Admins only) |
 | `rebase_db_branch_switch` | — | Point this checkout at a database branch, or back at the main database (Admins only) |
 
@@ -123,20 +123,20 @@ CRUD over a collection through `@rebasepro/client`.
 |---|---|---|
 | `list_documents` | `collection` | List documents from a Rebase collection with optional filtering, sorting, and pagination |
 | `get_document` | `collection`, `id` | Get a single document by ID from a Rebase collection |
-| `create_document` | `collection`, `data` | Create a new document in a Rebase collection |
-| `update_document` | `collection`, `id`, `data` | Update an existing document in a Rebase collection |
-| `delete_document` | `collection`, `id` | Delete a document from a Rebase collection |
+| `create_document` ⚠ | `collection`, `data` | Create a new document in a Rebase collection |
+| `update_document` ⚠ | `collection`, `id`, `data` | Update an existing document in a Rebase collection |
+| `delete_document` ⚠ | `collection`, `id` | Delete a document from a Rebase collection |
 
 ### Users & roles (6)
 
 | Tool | Required | Description |
 |---|---|---|
 | `list_users` | — | List all users registered in the Rebase backend, including their roles |
-| `create_user` | `email` | Create a new user in the Rebase backend |
-| `update_user` | `uid` | Update an existing user (email, display name, roles) |
-| `delete_user` | `uid` | Delete a user from the Rebase backend |
+| `create_user` ⚠ | `email` | Create a new user in the Rebase backend |
+| `update_user` ⚠ | `uid` | Update an existing user (email, display name, roles) |
+| `delete_user` ⚠ | `uid` | Delete a user from the Rebase backend |
 | `list_roles` | — | List all roles defined in the Rebase backend |
-| `rebase_auth_reset_password` | `email` | Reset a user's password via the admin API |
+| `rebase_auth_reset_password` ⚠ | `email` | Reset a user's password via the admin API |
 
 ### Dev server (3)
 
@@ -151,7 +151,7 @@ CRUD over a collection through `@rebasepro/client`.
 | Tool | Required | Description |
 |---|---|---|
 | `storage_list_objects` | — | List files/objects stored in Rebase storage |
-| `storage_delete_object` | `key` | Delete an object/file from Rebase storage |
+| `storage_delete_object` ⚠ | `key` | Delete an object/file from Rebase storage |
 | `storage_get_download_url` | `key` | Mint a temporary signed download URL for a file in Rebase storage |
 
 ### Cron (5)
@@ -160,15 +160,15 @@ CRUD over a collection through `@rebasepro/client`.
 |---|---|---|
 | `cron_list_jobs` | — | List all scheduled cron jobs and their configuration status |
 | `cron_get_job` | `jobId` | Get status and details of a specific scheduled cron job |
-| `cron_trigger_job` | `jobId` | Manually trigger a cron job run immediately |
+| `cron_trigger_job` ⚠ | `jobId` | Manually trigger a cron job run immediately |
 | `cron_get_job_logs` | `jobId` | Read execution logs for a specific cron job |
-| `cron_toggle_job` | `jobId`, `enabled` | Enable or disable a scheduled cron job |
+| `cron_toggle_job` ⚠ | `jobId`, `enabled` | Enable or disable a scheduled cron job |
 
 ### Functions (1)
 
 | Tool | Required | Description |
 |---|---|---|
-| `invoke_function` | `name` | Invoke a custom backend Hono function (located in api/functions/:name) |
+| `invoke_function` ⚠ | `name` | Invoke a custom backend Hono function (located in api/functions/:name) |
 
 ### Project registry (6)
 

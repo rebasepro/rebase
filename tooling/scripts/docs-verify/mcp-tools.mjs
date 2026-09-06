@@ -111,12 +111,30 @@ function requiredIn(objectSource) {
     return [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]);
 }
 
+/**
+ * The source with `//` and block comments blanked out, newlines kept.
+ *
+ * `arrayLiteralAt` treats `'` as a string opener wherever it finds one, and a
+ * comment inside a literal is allowed to hold an apostrophe — "the schema
+ * editor's planner". One of those swallowed the `]` that closes
+ * `READ_ONLY_TOOLS`, so the parse ran to the end of the file, every tool name
+ * in it landed in the read-only set, and the generated README dropped the ⚠
+ * from every gated tool while still explaining what ⚠ means. The gate could
+ * not see it: generator and check read the same parse.
+ */
+function withoutComments(text) {
+    return text
+        .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+        .replace(/(^|[^:])\/\/[^\n]*/g, (m, lead) => lead + " ".repeat(m.length - lead.length));
+}
+
 /** A `new Set<string>([...])` declaration's string members. */
 function setMembers(text, name) {
+    const source = withoutComments(text);
     const marker = `export const ${name} = new Set<string>(`;
-    const at = text.indexOf(marker);
+    const at = source.indexOf(marker);
     if (at === -1) return new Set();
-    const body = arrayLiteralAt(text, text.indexOf("[", at + marker.length - 1));
+    const body = arrayLiteralAt(source, source.indexOf("[", at + marker.length - 1));
     return new Set([...body.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]));
 }
 

@@ -215,13 +215,30 @@ function saveRegistry(): void {
         if (!existsSync(dir)) {
             mkdirSync(dir, { recursive: true });
         }
+        // Leaving the derived `default` out is not the same as deleting the
+        // key: the file may already hold somebody's registered `default`, and
+        // dropping it lost that project's URL and token the first time any
+        // other project's server saved. Whatever was there is put back.
         const onDisk: ProjectRegistryFile = defaultIsDerived
-            ? {
-                projects: Object.fromEntries(
+            ? (() => {
+                let persisted: ProjectConfig | undefined;
+                try {
+                    persisted = (JSON.parse(readFileSync(REGISTRY_PATH, "utf-8")) as ProjectRegistryFile)
+                        .projects?.["default"];
+                } catch {
+                    // No file yet, or unreadable — nothing to preserve.
+                }
+                const projects = Object.fromEntries(
                     Object.entries(registry.projects).filter(([name]) => name !== "default")
-                ),
-                activeProject: registry.activeProject === "default" ? null : registry.activeProject
-            }
+                );
+                if (persisted) projects["default"] = persisted;
+                return {
+                    projects,
+                    activeProject: registry.activeProject === "default" && !persisted
+                        ? null
+                        : registry.activeProject
+                };
+            })()
             : registry;
         // Owner-only: this file holds bearer tokens (service keys / API keys).
         // `mode` only applies on create, so chmod covers pre-existing files.
@@ -1674,9 +1691,15 @@ export function explainToolError(err: unknown, baseUrl?: string, toolName?: stri
  * Keyed by tool prefix rather than by URL because the client raises the error,
  * not this process, and the prefix is the one fact that is certainly here.
  */
-const SURFACE_BY_TOOL_PREFIX: Array<{ prefix: string; message: string }> = [
+const SURFACE_BY_TOOL_PREFIX: Array<{ tool: string; message: string }> = [
     {
-        prefix: "cron_",
+        // `cron_list_jobs` only, not every `cron_` tool. The row tools take a
+        // `jobId`, and the server answers a missing job with the same 404 —
+        // `Cron job "nightly" not found`. Mapped by prefix, that sentence was
+        // replaced with "this project declares no cron jobs" on a project that
+        // has five, which is a worse answer than the one it hid. A tool that
+        // addresses no row is the only one whose 404 can only be the surface.
+        tool: "cron_list_jobs",
         message:
             "this project declares no cron jobs, so the cron surface is not mounted — " +
             "`/api/admin/cron` does not exist on this backend. Add a job at " +
@@ -1692,7 +1715,7 @@ function surfaceNotMounted(err: unknown, toolName: string): string | null {
     // `status` when the client supplied one; the message is the fallback for a
     // client old enough not to carry it.
     if (status !== 404 && !/^not found$/i.test(msg.trim())) return null;
-    const surface = SURFACE_BY_TOOL_PREFIX.find((s) => toolName.startsWith(s.prefix));
+    const surface = SURFACE_BY_TOOL_PREFIX.find((s) => s.tool === toolName);
     return surface ? surface.message : null;
 }
 
@@ -1867,6 +1890,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 token,
                 addedAt: new Date().toISOString()
             };
+            // Registering one *by name* is the operator saying it out loud, so
+            // it is no longer derived and `saveRegistry` must write it. Without
+            // this, `rebase_project_add` with the name "default" answered
+            // "registered" and persisted nothing at all.
+            if (projectName === "default") defaultIsDerived = false;
             saveRegistry();
             return jsonResult({
                 message: `Project "${projectName}" registered`,
