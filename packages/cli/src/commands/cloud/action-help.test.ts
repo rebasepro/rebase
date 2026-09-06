@@ -264,6 +264,94 @@ code: code ? code[1] : null });
             "a mistyped action and a server failure must not answer with the same code"
         ).toEqual([]);
     });
+
+    /**
+     * …and every command that HAS an action list has one of those refusals.
+     *
+     * The check above reads the refusals that exist and holds them to a code. It
+     * says nothing about a dispatcher with no refusal at all, which is the other
+     * half of the class and the half that survived: `db backup` ended in an
+     * unguarded `// default: list`, so `db backup restre` and `db backup lst`
+     * listed the backups and read as "ran, nothing to do" — on a command whose
+     * other actions overwrite the live database.
+     *
+     * Derived from each page's own usage line, so a group written tomorrow with
+     * an action list and no refusal fails on the commit that adds it.
+     */
+    describe("every documented action list has one", () => {
+        /**
+         * The alternatives a page's usage line puts immediately after its
+         * command words — `<list|create|delete>`, `[setup|checkout]`.
+         *
+         * Only the FIRST token counts: a group later on the line is a flag's
+         * value (`db create --type <managed|byodb>`), and refusing an unknown
+         * one is the flag parser's job, not the dispatcher's.
+         */
+        function actionAlternatives(page: { command: string; usage: string }): string[] {
+            const rest = page.usage.startsWith(page.command)
+                ? page.usage.slice(page.command.length).trim()
+                : "";
+            const group = /^[[<]([a-z][a-z0-9|-]*)[\]>]/.exec(rest);
+            if (!group) return [];
+            const words = group[1].split("|");
+            return words.length > 1 ? words : [];
+        }
+
+        /**
+         * Whether those alternatives are ACTIONS rather than metavariables.
+         *
+         * `projects delete <slug|id>` has the same shape and means something
+         * else entirely: it names what the positional may be, and there is
+         * nothing for a dispatcher to refuse. The page's own examples tell them
+         * apart — an action shows up in one as the word right after the command,
+         * a metavariable never does.
+         */
+        function isActionGroup(page: { command: string; usage: string; examples?: string[] }): boolean {
+            const alternatives = actionAlternatives(page);
+            if (!alternatives.length) return false;
+            const prefix = `rebase ${page.command} `;
+            return (page.examples ?? []).some(example =>
+                example.startsWith(prefix)
+                && alternatives.includes(example.slice(prefix.length).split(/\s+/)[0])
+            );
+        }
+
+        /**
+         * Whether some module in this directory refuses an unknown action for
+         * that command.
+         *
+         * Two shapes count, because both ship. Most groups call the shared
+         * `requireKnownAction(group, action, KNOWN)` before the client is built;
+         * a few carry their own `fail(\`Unknown <group> command: …\`)`. What is
+         * NOT accepted is neither.
+         */
+        function refuses(command: string): boolean {
+            const group = command.replace(/^cloud /, "");
+            const shared = new RegExp(`requireKnownAction\\(\\s*"${group}"`);
+            const literal = new RegExp("fail\\(\\s*`Unknown " + group + " command:");
+            return cloudSources().some(source => shared.test(source) || literal.test(source));
+        }
+
+        const withActionLists = Object.values(ACTION_HELP).filter(isActionGroup);
+
+        it("finds the action lists it is checking, so an empty sweep cannot pass", () => {
+            expect(withActionLists.map(p => p.command).sort()).toContain("cloud db backup");
+            expect(withActionLists.length).toBeGreaterThan(4);
+        });
+
+        it("reads `projects delete <slug|id>` as a positional, not as actions", () => {
+            expect(withActionLists.map(p => p.command)).not.toContain("cloud projects delete");
+        });
+
+        it("refuses a word outside the list, for every one of them", () => {
+            const unguarded = withActionLists.filter(page => !refuses(page.command));
+            expect(
+                unguarded.map(p => `${p.command} — ${p.usage}`),
+                "a dispatcher with no refusal runs its default action for a typo, which reads as "
+                + "\"ran, nothing to do\" on commands that overwrite live data"
+            ).toEqual([]);
+        });
+    });
 });
 
 describe("no command's spec redeclares a global flag", () => {
