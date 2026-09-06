@@ -1,5 +1,5 @@
 ---
-sourceHash: 7dadf2d57e6bfecf
+sourceHash: ec729d5ce6fb4036
 title: Bases de données et buckets multiples
 sidebar_label: Sources multiples
 description: Acheminez les collections vers différentes bases de données et les propriétés vers différents buckets de stockage, et configurez chacune d'elles depuis l'environnement.
@@ -250,12 +250,12 @@ bucket();` — soit vous marquez l'un des buckets nommés :
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-Le démarrage refuse un projet dont les buckets sont tous nommés et dont aucun
-n'est le défaut, et il nomme les deux solutions. Auparavant le premier déclaré
-était retenu, avec un avertissement : cela décidait de l'endroit où atterrissent
-les fichiers d'un utilisateur par ordre de déclaration, et la réponse différait
-de part et d'autre d'un déploiement, car le bucket local dont le développement
-se sert comme doublure est écarté en production — la promotion, non.
+Sans l'un ni l'autre, le démarrage promeut le premier bucket nommé déclaré et
+avertit, en nommant les deux solutions. Retenez-en une : une promotion décide de
+l'endroit où atterrissent les fichiers d'un utilisateur par ordre de
+déclaration, et la réponse diffère de part et d'autre d'un déploiement, car le
+bucket local dont le développement se sert comme doublure est écarté en
+production — la promotion, non.
 
 ### Plusieurs buckets sur un seul compte
 

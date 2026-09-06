@@ -1,5 +1,5 @@
 ---
-sourceHash: 18e92afb4a0b8644
+sourceHash: 36838c587151b5fb
 slug: de/docs/upgrading/0-17-to-next
 title: Upgrade von 0.17 auf das nächste Release
 sidebar_label: 0.17 → nächstes
@@ -95,17 +95,6 @@ die `.nvmrc` des Repositorys.
 antwortet auf eine nicht passende Engine mit `[WARN] Unsupported engine` und
 installiert trotzdem — der Fehler kommt also nicht bei der Installation, sondern
 später, an einer Stelle, an der von Node keine Rede ist.
-
-## 26. Ein Projekt mit ausschließlich benannten Buckets benennt seinen Standard
-
-`bucket("media")` allein wurde früher beim Start mit einer Warnung zum
-Standard-Bucket befördert. Der Start verweigert jetzt, wenn kein Bucket der
-Standard ist.
-
-**Zu ändern:** Ist in `config/resources.ts` jeder Bucket benannt, markieren Sie
-einen — `bucket("media", { default: true })` — oder stellen Sie ein
-`bucket("(default)")` daneben. Ein Projekt, das bereits einen Standard
-deklariert, braucht nichts.
 
 ---
 

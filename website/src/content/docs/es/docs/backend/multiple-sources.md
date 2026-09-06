@@ -1,5 +1,5 @@
 ---
-sourceHash: 7dadf2d57e6bfecf
+sourceHash: ec729d5ce6fb4036
 title: Múltiples bases de datos y buckets
 sidebar_label: Múltiples fuentes
 description: Enruta colecciones a diferentes bases de datos y propiedades a diferentes buckets de almacenamiento, y configura cada uno desde el entorno.
@@ -246,12 +246,11 @@ bucket();` — o marcas uno de los nombrados:
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-El arranque rechaza un proyecto con buckets nombrados y sin ninguno por defecto,
-y nombra las dos soluciones. Antes elegía el primero declarado, con un aviso:
-eso decidía dónde acaban los archivos de un usuario por orden de declaración, y
-daba respuestas distintas a cada lado de un despliegue, porque el bucket local
-con el que el desarrollo hace de suplente se descarta en producción y la
-promoción no.
+Sin ninguna de las dos, el arranque promueve el primer bucket nombrado que se
+declara y avisa, nombrando ambas soluciones. Tome una de ellas: una promoción
+decide dónde acaban los archivos de un usuario por orden de declaración, y da
+respuestas distintas a cada lado de un despliegue, porque el bucket local con el
+que el desarrollo hace de suplente se descarta en producción y la promoción no.
 
 ### Varios buckets en una sola cuenta
 

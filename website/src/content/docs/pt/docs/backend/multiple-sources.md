@@ -1,5 +1,5 @@
 ---
-sourceHash: 7dadf2d57e6bfecf
+sourceHash: ec729d5ce6fb4036
 title: Múltiplos Bancos de Dados e Buckets
 sidebar_label: Múltiplas Fontes
 description: Especifique rotas de coleções para diferentes bancos de dados e propriedades para diferentes buckets de armazenamento, e configure cada um a partir do ambiente.
@@ -209,12 +209,11 @@ marca um dos nomeados:
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-O arranque recusa um projeto com buckets nomeados e sem nenhum padrão, e nomeia
-as duas soluções. Antes escolhia o primeiro declarado, com um aviso: isso
-decidia onde os ficheiros de um utilizador vão parar pela ordem de declaração, e
-dava respostas diferentes de um lado e do outro de um deploy, porque o bucket
-local com que o desenvolvimento faz de substituto é descartado em produção — e a
-promoção não.
+Sem nenhuma das duas, o arranque promove o primeiro bucket nomeado declarado e
+avisa, nomeando as duas soluções. Escolha uma delas: uma promoção decide onde os
+ficheiros de um utilizador vão parar pela ordem de declaração, e dá respostas
+diferentes de um lado e do outro de um deploy, porque o bucket local com que o
+desenvolvimento faz de substituto é descartado em produção — e a promoção não.
 
 ### Vários buckets em uma só conta
 

@@ -1,6 +1,7 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import type { StorageSourceDefinition } from "@rebasepro/types";
 
+import { logger } from "../src/utils/logger";
 import { resolveStorageSources } from "../src/boot/sources";
 
 /**
@@ -28,18 +29,23 @@ const S3_ENV = {
 const source = (key: string, extra: Partial<StorageSourceDefinition> = {}): StorageSourceDefinition =>
     ({ key, engine: "s3", transport: "server", account: "minio", ...extra }) as StorageSourceDefinition;
 
-describe("the default bucket is declared, never promoted", () => {
-    it("refuses a project of named buckets with no default, naming both fixes", () => {
-        expect(() => resolveStorageSources(S3_ENV, [source("media"), source("avatars")], "/tmp"))
-            .toThrow(/none of them is the default bucket/);
-
+describe("the default bucket is declared, or promoted with a warning that names the fix", () => {
+    it("promotes the first named bucket when none is the default, and says which line ends that", () => {
+        // Refusing here would stop every project written before `default: true`
+        // existed — and every tenant whose control plane resolves one source
+        // at a time — at the next runtime rollout. So the promotion stays, and
+        // the warning names both fixes.
+        const warned: string[] = [];
+        const spy = jest.spyOn(logger, "warn").mockImplementation((message: string) => { warned.push(message); });
         try {
-            resolveStorageSources(S3_ENV, [source("media")], "/tmp");
-            throw new Error("expected a refusal");
-        } catch (err) {
-            const hint = (err as Error & { hint?: string }).hint ?? "";
-            expect(hint).toContain('bucket("media", { default: true })');
-            expect(hint).toContain("export const uploads = bucket();");
+            const resolved = resolveStorageSources(S3_ENV, [source("media"), source("avatars")], "/tmp")!;
+            expect(Object.keys(resolved).sort()).toEqual(["(default)", "avatars", "media"]);
+            expect(resolved["(default)"]).toBe(resolved.media);
+            expect(warned.join("\n")).toContain("none of them is the default bucket");
+            expect(warned.join("\n")).toContain('bucket("media", { default: true })');
+            expect(warned.join("\n")).toContain("export const uploads = bucket();");
+        } finally {
+            spy.mockRestore();
         }
     });
 

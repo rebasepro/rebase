@@ -121,15 +121,6 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `check:release-bump` now refuses a release that moves an `engines` field
   without saying so here.
 
-- **A project with only named buckets must say which one is the default.** A
-  single named bucket used to be promoted to the default at boot with a warning
-  nobody asked for — `bucket("media")` read `S3_BUCKET__MEDIA`, and unqualified
-  uploads went there anyway. Boot now refuses when no bucket is the default and
-  names both ways out: `bucket("media", { default: true })`, or a
-  `bucket("(default)")` beside it. A project whose *only* bucket was named
-  refuses to boot until one of those lines is added; a project that already
-  declared a default is unchanged.
-
 ### Added
 
 - **`rebase db migrate --baseline <version>`** records a version as applied on a
@@ -322,6 +313,16 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   2026-08-08.
 
 ### Changed
+
+- **A bucket can be marked as the default, and the promotion that stands in for
+  that says so.** `bucket("media", { default: true })` names the bucket that
+  serves uploads which name no `storageSource`. A project of named buckets with
+  none marked still gets the first one declared promoted at boot — refusing
+  would have stopped every project written before the option existed at the
+  next runtime rollout — but the warning now names the one line that ends the
+  guessing, and why it matters: the local bucket development stands in with is
+  dropped in production and the promotion is not, so the answer differs either
+  side of a deploy until one is marked.
 
 - **`rebase cloud deploy --force` is now `--eject`, with no alias.** `--force`
   means four different things across this CLI — overwrite a file (`schema

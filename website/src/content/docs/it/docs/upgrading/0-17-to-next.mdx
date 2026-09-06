@@ -1,5 +1,5 @@
 ---
-sourceHash: 18e92afb4a0b8644
+sourceHash: 36838c587151b5fb
 slug: it/docs/upgrading/0-17-to-next
 title: Aggiornare da 0.17 alla prossima release
 sidebar_label: 0.17 → prossima
@@ -95,16 +95,6 @@ fonte è il `.nvmrc` del repository.
 risponde a un disallineamento di engines con `[WARN] Unsupported engine` e
 installa comunque, quindi l'errore non arriva all'installazione: arriva dopo, in
 un punto in cui Node non viene mai nominato.
-
-## 26. Un progetto con soli bucket nominati nomina il suo predefinito
-
-`bucket("media")` da solo veniva prima promosso a bucket predefinito all'avvio,
-con un avvertimento. Ora l'avvio rifiuta quando nessun bucket è il predefinito.
-
-**Cosa cambiare:** se ogni bucket in `config/resources.ts` è nominato,
-contrassegnane uno — `bucket("media", { default: true })` — oppure aggiungi un
-`bucket("(default)")` accanto. Un progetto che dichiara già un predefinito non ha
-bisogno di nulla.
 
 ---
 

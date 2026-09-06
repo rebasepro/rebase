@@ -239,11 +239,11 @@ one of the named ones:
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-Boot refuses a project with named buckets and no default, and names both fixes.
-It used to pick the first one declared, with a warning: that decided where a
-user's files land by declaration order, and it gave different answers either
-side of a deploy, because the local bucket development stands in with is dropped
-in production and the promotion was not.
+Without either, boot promotes the first named bucket declared and warns, naming
+both fixes. Take one of them: a promotion decides where a user's files land by
+declaration order, and it gives different answers either side of a deploy,
+because the local bucket development stands in with is dropped in production
+and the promotion is not.
 
 ### Many buckets on one account
 

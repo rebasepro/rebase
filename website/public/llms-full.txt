@@ -1432,15 +1432,6 @@ answers an engines mismatch with `[WARN] Unsupported engine` and installs
 anyway, so the failure does not arrive at install time; it arrives later,
 somewhere with no mention of Node in it.
 
-### 26. A project with only named buckets names its default
-
-`bucket("media")` alone used to be promoted to the default bucket at boot,
-with a warning. Boot now refuses when no bucket is the default.
-
-**What to change:** if every bucket in `config/resources.ts` is named, mark
-one — `bucket("media", { default: true })` — or add a `bucket("(default)")`
-beside it. A project that already declares a default needs nothing.
-
 ---
 
 **Next:** [the upgrade checklist](/docs/upgrading/#upgrade-checklist) ·
@@ -2687,15 +2678,6 @@ backfilled after the fact.
   `check:release-bump` now refuses a release that moves an `engines` field
   without saying so here.
 
-- **A project with only named buckets must say which one is the default.** A
-  single named bucket used to be promoted to the default at boot with a warning
-  nobody asked for — `bucket("media")` read `S3_BUCKET__MEDIA`, and unqualified
-  uploads went there anyway. Boot now refuses when no bucket is the default and
-  names both ways out: `bucket("media", { default: true })`, or a
-  `bucket("(default)")` beside it. A project whose *only* bucket was named
-  refuses to boot until one of those lines is added; a project that already
-  declared a default is unchanged.
-
 #### Added
 
 - **`rebase db migrate --baseline <version>`** records a version as applied on a
@@ -2885,6 +2867,16 @@ backfilled after the fact.
   2026-08-08.
 
 #### Changed
+
+- **A bucket can be marked as the default, and the promotion that stands in for
+  that says so.** `bucket("media", { default: true })` names the bucket that
+  serves uploads which name no `storageSource`. A project of named buckets with
+  none marked still gets the first one declared promoted at boot — refusing
+  would have stopped every project written before the option existed at the
+  next runtime rollout — but the warning now names the one line that ends the
+  guessing, and why it matters: the local bucket development stands in with is
+  dropped in production and the promotion is not, so the answer differs either
+  side of a deploy until one is marked.
 
 - **`rebase cloud deploy --force` is now `--eject`, with no alias.** `--force`
   means four different things across this CLI — overwrite a file (`schema
@@ -13623,11 +13615,11 @@ one of the named ones:
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-Boot refuses a project with named buckets and no default, and names both fixes.
-It used to pick the first one declared, with a warning: that decided where a
-user's files land by declaration order, and it gave different answers either
-side of a deploy, because the local bucket development stands in with is dropped
-in production and the promotion was not.
+Without either, boot promotes the first named bucket declared and warns, naming
+both fixes. Take one of them: a promotion decides where a user's files land by
+declaration order, and it gives different answers either side of a deploy,
+because the local bucket development stands in with is dropped in production
+and the promotion is not.
 
 #### Many buckets on one account
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7dadf2d57e6bfecf
+sourceHash: ec729d5ce6fb4036
 title: Database e Bucket Multipli
 sidebar_label: Origini Multiple
 description: Instrada le collezioni verso database diversi e le proprietà verso bucket di archiviazione diversi, e configura ciascuno di essi dall'ambiente.
@@ -209,12 +209,11 @@ bucket();` — oppure contrassegni uno di quelli nominati:
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-L'avvio rifiuta un progetto con bucket nominati e nessun predefinito, e nomina
-entrambe le soluzioni. Prima veniva scelto il primo dichiarato, con un
-avvertimento: così l'ordine di dichiarazione decideva dove finiscono i file di un
-utente, e la risposta cambiava ai due lati di un deploy, perché il bucket locale
-con cui lo sviluppo fa da sostituto viene scartato in produzione e la promozione
-no.
+Senza nessuna delle due, l'avvio promuove il primo bucket nominato dichiarato e
+avverte, nominando entrambe le soluzioni. Scegline una: una promozione decide
+dove finiscono i file di un utente in base all'ordine di dichiarazione, e la
+risposta cambia ai due lati di un deploy, perché il bucket locale con cui lo
+sviluppo fa da sostituto viene scartato in produzione e la promozione no.
 
 ### Più bucket su un solo account
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7dadf2d57e6bfecf
+sourceHash: ec729d5ce6fb4036
 title: Mehrere Datenbanken und Buckets
 sidebar_label: Mehrere Quellen
 description: Leiten Sie Collections an verschiedene Datenbanken und Properties an verschiedene Storage-Buckets weiter und konfigurieren Sie jede einzelne über die Umgebung.
@@ -251,12 +251,12 @@ das ist. Entweder deklarieren Sie den Bucket mit dem Standardschlüssel —
 export const media = bucket("media", { engine: "s3", default: true });
 ```
 
-Der Start wird verweigert, wenn ein Projekt benannte Buckets und keinen Standard
-hat, und nennt beide Auswege. Früher wurde der zuerst deklarierte gewählt, mit
-einer Warnung: das entschied anhand der Deklarationsreihenfolge, wo die Dateien
-eines Nutzers landen, und es fiel dies- und jenseits eines Deploys
-unterschiedlich aus, weil der lokale Bucket, mit dem die Entwicklung einspringt,
-in der Produktion entfällt — die Beförderung aber nicht.
+Ohne beides befördert der Start den zuerst deklarierten benannten Bucket und
+warnt, wobei er beide Auswege nennt. Nehmen Sie einen davon: eine Beförderung
+entscheidet anhand der Deklarationsreihenfolge, wo die Dateien eines Nutzers
+landen, und sie fällt dies- und jenseits eines Deploys unterschiedlich aus, weil
+der lokale Bucket, mit dem die Entwicklung einspringt, in der Produktion entfällt
+— die Beförderung aber nicht.
 
 ### Mehrere Buckets auf einem Konto
 
