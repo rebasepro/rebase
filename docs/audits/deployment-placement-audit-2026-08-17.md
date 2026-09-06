@@ -37,20 +37,20 @@ per-field patching discipline, and that collision has to be resolved explicitly
 
 | Module | What it does | Reachable? |
 |---|---|---|
-| [`packages/server/src/boot/role.ts`](../packages/server/src/boot/role.ts) | `REBASE_ROLE=all\|api\|functions\|worker` → surfaces + owned singletons | **Yes**, self-host only |
-| [`packages/server/src/init/surfaces.ts`](../packages/server/src/init/surfaces.ts) | 7 mountable surfaces × 3 ownership flags | Yes |
-| `bootStaticApp` ([`boot.ts:158`](../packages/server/src/boot/boot.ts:158)) | serves N static apps by path, no DB, no JWT | Yes |
-| [`saas/.../utils/tenant-topology.ts`](../saas/backend/src/utils/tenant-topology.ts) | **pure** plan → `TenantTopology` (compute/db/storage) | Yes (`orchestrator.ts:668`) |
-| [`saas/.../k8s/topology-diff.ts`](../saas/backend/src/k8s/topology-diff.ts) | **pure** desired vs live → `TopologyChange[]` + impact | Yes |
-| [`saas/.../k8s/reconciler.ts`](../saas/backend/src/k8s/reconciler.ts) | reads a namespace, applies approved changes | Yes |
-| [`saas/.../managed/deployment.ts`](../saas/backend/src/managed/deployment.ts) | **pure** `buildManagedDeployment` + `pinnedRuntimeEnv(role)` | Yes |
-| [`saas/.../k8s/resolve.ts`](../saas/backend/src/k8s/resolve.ts) | project → which cluster drives it (kubeconfig / GCP WIF / Hetzner token) | Yes |
-| [`saas/.../k8s/baseline.ts`](../saas/backend/src/k8s/baseline.ts) | installs ingress-nginx + cert-manager + CNPG onto a new cluster | Yes |
-| [`saas/.../k8s/external-backend.ts`](../saas/backend/src/k8s/external-backend.ts) | `ExternalName` Service so a tenant URL can front anything | **Wired, never exercised** |
-| [`saas/.../k8s/wildcard-tls.ts`](../saas/backend/src/k8s/wildcard-tls.ts) | `*.apps.<base>` certificate handling | **Gated off** (`REBASE_WILDCARD_TLS`) |
-| [`saas/.../static/hosting.ts`](../saas/backend/src/static/hosting.ts) + `publish.ts` | bucket-hosted static sites, immutable prefixes, free rollback | **Tests only** |
-| [`saas/.../cloudrun/service.ts`](../saas/backend/src/cloudrun/service.ts) | `buildCloudRunService` for `substrate: "cloudrun"` | **Tests only** |
-| [`saas/.../metering/enforcement.ts`](../saas/backend/src/metering/enforcement.ts) | quota → Cloud Run `maxScale` ceiling | **Tests only** (says so at line 46) |
+| [`packages/server/src/boot/role.ts`](../../packages/server/src/boot/role.ts) | `REBASE_ROLE=all\|api\|functions\|worker` → surfaces + owned singletons | **Yes**, self-host only |
+| [`packages/server/src/init/surfaces.ts`](../../packages/server/src/init/surfaces.ts) | 7 mountable surfaces × 3 ownership flags | Yes |
+| `bootStaticApp` ([`boot.ts:158`](../../packages/server/src/boot/boot.ts#L158)) | serves N static apps by path, no DB, no JWT | Yes |
+| `saas/.../utils/tenant-topology.ts` | **pure** plan → `TenantTopology` (compute/db/storage) | Yes (`orchestrator.ts:668`) |
+| `saas/.../k8s/topology-diff.ts` | **pure** desired vs live → `TopologyChange[]` + impact | Yes |
+| `saas/.../k8s/reconciler.ts` | reads a namespace, applies approved changes | Yes |
+| `saas/.../managed/deployment.ts` | **pure** `buildManagedDeployment` + `pinnedRuntimeEnv(role)` | Yes |
+| `saas/.../k8s/resolve.ts` | project → which cluster drives it (kubeconfig / GCP WIF / Hetzner token) | Yes |
+| `saas/.../k8s/baseline.ts` | installs ingress-nginx + cert-manager + CNPG onto a new cluster | Yes |
+| `saas/.../k8s/external-backend.ts` | `ExternalName` Service so a tenant URL can front anything | **Wired, never exercised** |
+| `saas/.../k8s/wildcard-tls.ts` | `*.apps.<base>` certificate handling | **Gated off** (`REBASE_WILDCARD_TLS`) |
+| `saas/.../static/hosting.ts` + `publish.ts` | bucket-hosted static sites, immutable prefixes, free rollback | **Tests only** |
+| `saas/.../cloudrun/service.ts` | `buildCloudRunService` for `substrate: "cloudrun"` | **Tests only** |
+| `saas/.../metering/enforcement.ts` | quota → Cloud Run `maxScale` ceiling | **Tests only** (says so at line 46) |
 | the front-door router (§4.4 of the plan) | `Host` → destination table | **Does not exist** |
 | Helm / kustomize, anywhere in the repo | — | **Does not exist** |
 
@@ -67,7 +67,7 @@ that includes the other four.
 
 1. **Cloud Run substrate.** `PLANS.hobby` declares `substrate: "cloudrun"` and is returned
    by `sellablePlans()`. `buildCloudRunService` is pure and has no caller.
-   [`topology-diff.ts:156`](../saas/backend/src/k8s/topology-diff.ts:156) explicitly
+   `topology-diff.ts:156` explicitly
    refuses to treat a non-`k8s-pod` substrate as a patch: *"Migrating substrates needs a
    routing change, not a patch."* → **the plan ladder currently sells a substrate with no
    deploy path.**
@@ -75,7 +75,7 @@ that includes the other four.
    right home for the admin panel, marketing pages, docs sites"* — with immutable
    `<projectId>/<deploymentId>/` prefixes and rollback by repointing. Consumed by its own
    tests only, and
-   [`deploy-plan.ts:126`](../saas/backend/src/managed/deploy-plan.ts:126) rejects the
+   `deploy-plan.ts:126` rejects the
    bundle at intake: *"the platform does not host static apps yet."*
 3. **External backends.** `BackendTarget` supports `external-https`, `provisionRebaseService`
    and `provisionIngress` both accept it, and every call site passes the `in-cluster`
@@ -142,7 +142,7 @@ the property `external-backend.ts` was written to preserve.
 ### O4 — Two "where does traffic go" mechanisms
 
 Per-tenant `Ingress` with a single `path: "/"` rule
-([`orchestrator.ts:2256`](../saas/backend/src/k8s/orchestrator.ts:2256)) versus the planned
+(`orchestrator.ts:2256`) versus the planned
 front-door router. The existing Ingress cannot express per-path fan-out to different
 services without becoming a per-tenant routing table — which is what the front door is.
 

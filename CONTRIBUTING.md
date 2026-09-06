@@ -46,6 +46,22 @@ pnpm run build
 cd app/backend && docker compose up -d db && cd ../..
 ```
 
+   **If you already run Postgres on 5432, start it somewhere else.** Docker
+   publishes on `0.0.0.0`; a native Postgres binds the more specific
+   `127.0.0.1`, which is what `localhost` resolves to first — so compose starts,
+   reports `Up (healthy) 0.0.0.0:5432->5432/tcp`, and the next two steps quietly
+   push a schema into *your* database instead of the container's. Nothing
+   errors. `lsof -iTCP:5432 -sTCP:LISTEN` tells you whether the port is taken;
+   if it is:
+
+```bash
+cd app/backend && REBASE_DB_PORT=5499 docker compose up -d db && cd ../..
+```
+
+   and change the port in the `DATABASE_URL` you copy in the next step.
+   `pnpm check:contributor-setup --live` starts the container and proves the URL
+   in `app/.env` reaches it rather than something else answering on that port.
+
 4. **Point the app at it**. Nothing creates `app/.env` for you, and without it
    `db:push` has no `DATABASE_URL` to push to. The example file already carries
    the compose credentials:
@@ -83,15 +99,51 @@ between checkouts, and `PORT` / `VITE_API_URL` apply to `rebase start`, not here
 | `examples/` | Standalone example apps |
 | `tooling/rebase-agent-skills/` | Agent skills installed by `rebase skills install` |
 | `tooling/videos/` | Remotion project for the product videos on the website (a workspace package, not part of the library) |
+| `contracts/` | The banked baselines the gates compare against — `derived-names.txt`, `portable-core.txt`, `server.api.txt`. Every "Bank / fix" column in [docs/gates.md](docs/gates.md) writes here |
+| `infra/` | Helm charts, Terraform, the runtime Dockerfile and its entrypoint, Cloud Build configs |
 
 One-off scripts, codemods and utilities go in `tooling/scripts/`, never at the repo root
 or inside a package directory.
+
+`contracts/` is worth knowing about before your first PR rather than after:
+a failing `check:api-surface` or `check:derived-names` shows a diff against a
+file you have never been told exists, and the fix is usually to re-bank it
+(`pnpm write:api-surface`, `pnpm write:derived-names`) and say in the commit why
+the surface moved.
 
 `pnpm-workspace.yaml` also lists `saas/*`, and the root `saas` and `saas:prod`
 scripts point there. That is Rebase Cloud's control plane, a private repository
 checked out at `saas/`. It is absent from a public clone; pnpm ignores a pattern
 that matches nothing, so the install is unaffected and those two scripts are the
 only things that will not run.
+
+## Working in a git worktree
+
+`git worktree` is the right tool for running two branches side by side — and
+**`pnpm install` must never run inside one**. pnpm prunes importers it cannot
+see, and a worktree's `pnpm-workspace.yaml` names packages whose directories the
+*primary* checkout also has; installing from the worktree rewrites the primary's
+`node_modules` and leaves both checkouts half-linked. Nothing warns you.
+
+So a worktree borrows the primary's install instead:
+
+```bash
+git worktree add ../rebase-feature -b feat/my-branch
+cd ../rebase-feature
+bash tooling/scripts/link-worktree-modules.sh /path/to/primary/checkout
+```
+
+That script gives each importer a real
+`node_modules` whose entries are absolute links into the primary's install,
+except `@rebasepro/*`, which it rebuilds to point at the *worktree's* own
+`packages/`. That exception is the whole point: pnpm writes those entries as
+relative links, so a naively symlinked `node_modules` resolves them back into
+the primary's `packages/` and your edits are invisible to vite, tsx and jest
+alike — every tool reports the code you did not change.
+
+`dist/` is not shared. A worktree either builds its own (`pnpm run build`) or
+symlinks a built sibling's, and a package whose `dist` is a symlink must never
+be rebuilt in place — that writes through the link into the other checkout.
 
 ## Coding Standards
 
@@ -152,10 +204,13 @@ Before submitting a PR, make sure all checks pass:
 ./tooling/scripts/verify-quality.sh
 ```
 
-It runs the build, `pnpm ci:static` — the same gate list CI's `static` job runs,
-type check and ESLint included — the unit suites, and the Playwright end-to-end
-tests. The browser suite needs a browser, which the npm package does not ship;
-the script installs it for you, or do it once yourself:
+It runs the build, then both of CI's gate lists — `pnpm ci:static` (the `static`
+job: type check, ESLint, the ratchets, the docs verifier) and
+`pnpm ci:build-gates` (the `build-gates` job: the published `.d.ts`, the
+scaffolded and ejected project typechecks, the API surface, the eager-JS budget,
+the generated website artifacts) — then the unit suites and the Playwright
+end-to-end tests. The browser suite needs a browser, which the npm package does
+not ship; the script installs it for you, or do it once yourself:
 
 ```bash
 pnpm exec playwright install chromium
@@ -166,8 +221,17 @@ the runtime image) and Helm (it renders the chart). Without them `ci:static`
 says so and skips them; CI has both and refuses to skip.
 
 If you only want the fast half, `pnpm ci:static` on its own reads source and
-needs no build, no database and no browser. Every gate it runs is listed with
-what it protects in **[docs/gates.md](docs/gates.md)**.
+needs no build, no database and no browser. Its counterpart needs the build and
+nothing else:
+
+```bash
+pnpm run build && pnpm ci:build-gates
+```
+
+Every gate either of them runs is listed with what it protects in
+**[docs/gates.md](docs/gates.md)**, in the section named after the job that runs
+it. A gate in one of those two tables and in neither runner fails
+`pnpm check:gates-doc`.
 
 ## Testing
 
@@ -214,13 +278,25 @@ docker compose -f app/backend/docker-compose.yml up -d db
 
 The build is not optional for any of them: the CLI suite scaffolds a project
 that consumes every package as built output and refuses to start otherwise, and
-the Vitest suites import `dist` directly. Then:
+the Vitest suites import `dist` directly. Then, and this is all of them — CI
+runs no e2e suite that is not on this list:
 
 ```bash
-pnpm e2e                                    # the Playwright admin-panel suite
-pnpm exec tsx tests/e2e/tests/cli-init-e2e.ts
-pnpm --filter @rebasepro/server-postgres test:e2e
+pnpm e2e                                          # the Playwright admin-panel suite
+pnpm exec tsx tests/e2e/tests/cli-init-e2e.ts     # scaffold, install, boot
+pnpm exec tsx tests/e2e/tests/cli-init-baas-e2e.ts   # the same for the BaaS preset
+pnpm exec tsx tests/e2e/tests/client-sdk-e2e.ts   # the SDK as a browser drives it
+pnpm --filter @rebasepro/server-postgres test:e2e # RLS enforcement, policy agreement
+pnpm --filter @rebasepro/cli test:e2e             # the CLI against a real database
+pnpm --filter @rebasepro/rls-check test:e2e       # the scanner's own fixture
 ```
+
+Four more run in CI's e2e jobs and are gates rather than suites —
+`verify:selfhost`, `verify:selfhost:docker`, `verify:corpus` and `rls:check`.
+They are in **[docs/gates.md](docs/gates.md)** with what each protects.
+`pnpm check:gates-doc` reads the workflow's e2e jobs and fails when a suite it
+runs is named in neither this list nor that file, so neither can quietly fall
+behind the pipeline.
 
 ## Compatibility
 

@@ -71,8 +71,12 @@ Reads source directly, so it needs no build and fails fast.`
         why: `The type-level counterpart. check:headless proves the backend never
 *executes* React and passed for months while 13 shipped .d.ts files began
 with \`import React from "react"\` and @types/react was a devDependency
-only — so a BaaS install had nothing to resolve them against. This scans
-the text of core sources AND built .d.ts, plus the manifests.`
+only — so a BaaS install had nothing to resolve them against.
+
+The SOURCE half: core sources and manifests, which need no build. The
+declarations that rationale is actually about are \`check:types-headless:dts\`,
+in build-gates — it ran here for months, in a job that never builds, so it
+scanned an absent dist and printed the same green line either way.`
     },
     {
         run: "check:browser-deps",
@@ -94,6 +98,22 @@ and check:gates-doc now exist too.`
 a collection file, SDK calls) typechecked with \`react\` mapped to a stub
 that stands in for its absence. Catches a React type reached through an
 alias, which a text scan cannot see.`
+    },
+    {
+        run: "check:ts-expect-error-coverage",
+        why: `A \`@ts-expect-error\` is a test written in the type system, and \`tsc\` is
+the only thing that runs it. Jest and vitest strip types without checking
+them, so in a file no program reads the directive is a comment — and the
+file usually says the opposite in its own docblock:
+\`packages/server/test/auth-config-types.test.ts\` opened with "the real value
+is that tsc validates the @ts-expect-error annotations" and was in neither
+program. Ten directives across eight files were in that state; adding them
+found four that had gone stale, one written a line above the error it meant
+to suppress, and three assertions that were tuple-index errors.
+
+It also holds the include list in \`tsconfig.tests.json\`, which is otherwise
+a hand-maintained ratchet nothing stops you from shortening to make
+\`pnpm typecheck\` green.`
     },
     {
         run: "check:runtime-image",
@@ -266,6 +286,28 @@ an "Automation" section that has never existed.`
         why: `The backups pane said "See docs/backups.md" — a path in this repository,
 not in the reader's project, so following it finds nothing and there is
 no way to discover where the page actually is.`
+    },
+    {
+        run: "check:doc-links",
+        why: `A relative link is resolved against the directory of the file it is
+written in, and nothing checked that the result was a file. 62 links under
+\`docs/plans/\` and \`docs/audits/\` wrote \`../packages/…\` from one level too
+deep, so every one of them resolved to \`docs/packages/…\` and pointed at
+nothing — a reader following a citation to a 404 with nothing to search
+for. \`docs/README.md\` names this exact hazard ("70 of them moved the last
+time this was reorganised") and naming it was all anyone had done.
+
+Scope is the markdown a contributor reads — docs, .agent, .github, the two
+root files. The website's pages are \`verify:docs\`, which knows its routing
+and its locales.`
+    },
+    {
+        run: "check:bug-classes",
+        why: `docs/bug-classes.md is cited by number — "class 4 in its purest form" —
+and it had two \`## 50.\` sections, added months apart, one of which referred
+to the other as class 49. A duplicate heading breaks no link and fails no
+test, so nothing said so. This holds uniqueness and contiguity: a gap means
+an entry was deleted, and a deleted class is a sweep nobody runs again.`
     },
     {
         run: "check:untranslated",

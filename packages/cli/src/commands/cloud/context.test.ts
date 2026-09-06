@@ -185,7 +185,6 @@ describe("printGroupHelp", () => {
         setJsonModeForTest(true);
         const chunks: string[] = [];
         const original = process.stdout.write.bind(process.stdout);
-        // @ts-expect-error test shim
         process.stdout.write = (chunk: string) => {
             chunks.push(String(chunk));
             return true;

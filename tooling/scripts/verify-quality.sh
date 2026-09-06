@@ -15,10 +15,14 @@
 #     that could not fail, reporting on a tool nobody has;
 #   - it ran a hand-picked handful of gates while CI ran twenty-five.
 #
-# So the static half is now `pnpm ci:static`, the same command the workflow
-# runs, and the list lives in one place (tooling/scripts/ci-static.mjs, and
-# docs/gates.md). What is left here is what that command deliberately does not
-# do: the build, the unit suites, and the browser end-to-end tests.
+# So the static half is `pnpm ci:static` and the post-build half is
+# `pnpm ci:build-gates` — the same two commands the workflow runs, with their
+# lists living in one place each (tooling/scripts/ci-static.mjs,
+# tooling/scripts/ci-build-gates.mjs, and docs/gates.md as the table over both).
+# `ci:build-gates` was the last hole: eleven YAML steps this script never ran,
+# `check:generated` — the gate CONTRIBUTING warns you about forgetting — among
+# them. What is left here is what neither command does: the build, the unit
+# suites, and the browser end-to-end tests.
 # ============================================================
 
 RED='\033[0;31m'
@@ -58,8 +62,20 @@ else
     err "One or more static gates failed. Each names the script to re-run."
 fi
 
-# 3. Unit Tests Check
-section "3. Unit Tests Suite"
+# 3. The post-build gates — the same list, in the same order, as CI's
+#    `build-gates` job. They read what step 1 emitted: published .d.ts, the
+#    scaffolded and ejected project typechecks, the API surface, the eager-JS
+#    budget, the generated website artifacts.
+section "3. Build Gates (pnpm ci:build-gates)"
+echo "Running the CI post-build gate list..."
+if pnpm run ci:build-gates; then
+    ok "All build gates passed."
+else
+    err "One or more build gates failed. Each names the script to re-run."
+fi
+
+# 4. Unit Tests Check
+section "4. Unit Tests Suite"
 echo "Running unit tests (pnpm test)..."
 if pnpm test; then
     ok "All unit tests passed successfully."
@@ -67,12 +83,12 @@ else
     err "Some unit tests failed."
 fi
 
-# 4. E2E Tests Check
+# 5. E2E Tests Check
 #    Playwright ships no browser with the npm package: on a fresh clone the
 #    suite fails with "Executable doesn't exist" before running a single test.
 #    Installing is idempotent and near-instant once the browser is there, so it
 #    is a step rather than a precondition somebody has to have read about.
-section "4. Playwright E2E Integration Suite"
+section "5. Playwright E2E Integration Suite"
 echo "Ensuring the Chromium build Playwright expects is installed..."
 if ! pnpm exec playwright install chromium; then
     err "Could not install Chromium for Playwright."
@@ -84,8 +100,8 @@ else
     err "Playwright E2E tests failed."
 fi
 
-# 5. Build Health Check (Vite & Bundles)
-section "5. Bundle ESM/CJS Health Check"
+# 6. Build Health Check (Vite & Bundles)
+section "6. Bundle ESM/CJS Health Check"
 if [ -f "./tooling/scripts/check-packages.sh" ]; then
     echo "Running build-health package check..."
     if ./tooling/scripts/check-packages.sh; then
