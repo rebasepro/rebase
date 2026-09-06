@@ -169,3 +169,83 @@ export const listAnd = (items: string[]): string =>
 export function callerIdCall(snapshot: DbSnapshot): string {
     return snapshot.platform === "rebase" ? "rebase.uid()" : "auth.uid()";
 }
+
+// ---------------------------------------------------------------------------
+// Rebase-managed policies
+// ---------------------------------------------------------------------------
+
+/**
+ * The helper functions a Rebase deployment creates in its `rebase` schema, as
+ * they appear inside a policy expression. A call to one of these is the
+ * strongest single signal that the policy was compiled from a collection's
+ * `securityRules` rather than written by hand.
+ */
+const REBASE_HELPER_CALL = /\brebase\.(uid|roles|jwt|is_anonymous)\s*\(/i;
+
+/**
+ * `<table>_<operation>_<7 hex>` — the name Rebase derives for a rule that does
+ * not carry one of its own. The hash is of the rule's *semantics*, which is why
+ * editing a rule abandons the old policy instead of updating it.
+ *
+ * Kept in step with `isGeneratedPolicyName` in
+ * `packages/server-postgres/src/security/policy-drift.ts`, which is the
+ * predicate the product itself uses to decide what it owns. This package cannot
+ * import it — it ships with `pg` and nothing else so that `npx` is fast — so the
+ * shape is restated here and anchored to the table for the same reason it is
+ * there: a name that merely looks similar is not ours to reason about.
+ */
+function hasGeneratedPolicyName(policy: DbPolicy): boolean {
+    const table = policy.table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`^${table}_(select|insert|update|delete|all)_[0-9a-f]{7}(_\\d+)?$`).test(policy.name);
+}
+
+/**
+ * Is this policy one Rebase derives from a collection's `securityRules` and
+ * re-applies at every boot?
+ *
+ * It matters because the ordinary remediation — edit the policy in the database
+ * — is *silently undone* on such a policy: boot drops and recreates every
+ * generated policy from the collection config, so a fix applied with SQL
+ * survives exactly until the next restart. Prescribing it is worse than
+ * prescribing nothing, because the operator watches the finding disappear and
+ * files it as done.
+ *
+ * Gated on the platform as well as the shape: this scanner is pointed at plenty
+ * of databases Rebase did not create, and a hash-suffixed policy name on one of
+ * those is a coincidence, not a contract.
+ */
+export function isRebaseManagedPolicy(snapshot: DbSnapshot, policy: DbPolicy): boolean {
+    if (snapshot.platform !== "rebase") return false;
+    if (REBASE_HELPER_CALL.test(policy.using ?? "")) return true;
+    if (REBASE_HELPER_CALL.test(policy.withCheck ?? "")) return true;
+    return hasGeneratedPolicyName(policy);
+}
+
+/** Where the rule that produces a managed policy is documented. */
+export const SECURITY_RULES_DOCS = "https://rebase.pro/docs/collections/security-rules";
+
+/**
+ * The remediation for a Rebase-managed policy: change the rule it is compiled
+ * from. `intent` is one clause saying what to change the rule to, in the
+ * vocabulary of the check that found it.
+ *
+ * Deliberately contains no SQL. Every other fix in this tool is copy-pasteable
+ * because pasting it works; here it would not, and an example that is reverted
+ * on the next deploy teaches the wrong model of where access control lives.
+ */
+export function managedPolicyFix(policy: DbPolicy, intent: string): string {
+    return (
+        `This policy is not hand-written: Rebase compiles it from the collection's\n` +
+        `\`securityRules\` and re-applies it (drop, then create) on every boot, so a\n` +
+        `change made to the policy in the database is undone the next time the runtime\n` +
+        `starts. Change the rule instead:\n` +
+        `  1. find the collection whose table is ${qrel(policy.schema, policy.table)} — in a scaffold,\n` +
+        `     under config/collections/;\n` +
+        `  2. ${intent};\n` +
+        `  3. a collection that declares no \`securityRules\` of its own inherits\n` +
+        `     \`defaultSecurityRules\` from config/collections/index.ts — a stock scaffold's\n` +
+        `     unfiltered read rule lives there, not on the collection;\n` +
+        `  4. redeploy (boot re-applies the policies), or run \`rebase db push\`.\n` +
+        `${SECURITY_RULES_DOCS}`
+    );
+}

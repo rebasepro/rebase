@@ -1,5 +1,5 @@
 ---
-sourceHash: 3e7cee199ce0ba69
+sourceHash: 8443765eb7147143
 slug: pt/docs/rls-check
 title: rls-check
 description: Audite a segurança em nível de linha (RLS) em qualquer banco de dados PostgreSQL — Supabase, Neon, RDS ou seu próprio servidor. Somente leitura, sem cadastro, sem necessidade do Rebase.
@@ -98,6 +98,13 @@ dados limpo.
     DATABASE_URL: ${{ secrets.DATABASE_URL }}
 ```
 
+**Um projeto Rebase recém-criado não passa nisso no primeiro dia, e não é para passar.** As `defaultSecurityRules` do scaffold abrem a leitura para todos — `{ operation: "select", access: "public" }` em `config/collections/index.ts` —, de modo que `posts`, `authors` e `tags` relatam cada um um `policy-always-true` crítico. `access: "public"` diz respeito a *linhas*, não a quem pode chamar a API: uma requisição sem token continua recebendo 401 enquanto `AUTH_REQUIRE` estiver ativo. Ainda assim o achado está correto, porque é a única coisa que está na frente dos dados.
+
+Decida qual dos dois casos é o seu antes de ligar isso ao CI:
+
+- **as regras são um espaço reservado** — substitua-as pelas que seus dados realmente precisam ([regras de segurança](/docs/collections/security-rules)) e os achados desaparecem;
+- **as linhas são mesmo públicas** — diga isso uma vez, com `npx @rebasepro/rls-check --fail-on high --skip policy-always-true`, sabendo do que você abre mão: `--skip` desliga a verificação em todo lugar, inclusive na tabela que você adicionar no mês que vem.
+
 ### Saída JSON
 
 `--json` emite um objeto estável: `scannedAt`, `database` (apenas host e nome — nunca
@@ -120,6 +127,19 @@ perguntas e nunca misturadas com as certezas.
 ou uma função (role) com `BYPASSRLS`, ela avisará. Essa função vê o catálogo real, o que torna a
 auditoria possível, mas também significa que nada no relatório descreve o que *essa* conexão
 vivencia. Os achados são sobre o que as outras funções recebem.
+
+### Em um banco de dados Rebase, mude a regra, não a política
+
+Toda política de uma implantação Rebase é compilada a partir das `securityRules` de uma coleção, e o runtime **as reaplica a cada inicialização**: ele remove cada política gerada e a cria de novo a partir da configuração. Um `ALTER POLICY` sobre uma delas sobrevive, portanto, exatamente até a próxima reinicialização, e o achado volta junto — depois de você tê-lo visto sumir.
+
+O `rls-check` reconhece essas políticas (um nome na forma `<tabela>_<operação>_<hash>`, ou uma chamada a `rebase.uid()` / `rebase.roles()` na expressão) e prescreve a regra em vez de SQL. Quando você vir uma correção que diz isso:
+
+1. encontre a coleção cuja tabela ela nomeia, em `config/collections/`;
+2. altere suas `securityRules` — veja [regras de segurança](/docs/collections/security-rules);
+3. se a coleção não declarar nenhuma própria, ela herda `defaultSecurityRules` de `config/collections/index.ts`, e esse é o arquivo a editar;
+4. reimplante — a inicialização reaplica as políticas — ou execute `rebase db push`.
+
+Uma política que você escreveu à mão, em uma migração, não é afetada por nada disso, e a correção dela continua sendo o SQL a executar.
 
 ## As verificações
 
@@ -160,6 +180,8 @@ algo a ser verificado em vez de uma certeza, porque políticas restritivas aplic
 ALTER POLICY "your_policy" ON "public"."your_table"
     USING (user_id = rebase.uid());
 ```
+
+Em um banco de dados Rebase a correção é a regra da coleção, e não aquela instrução — veja «Em um banco de dados Rebase, mude a regra, não a política». Um scaffold padrão relata esta verificação em `posts`, `authors` e `tags` por design.
 
 ### policy-anonymous-tautology
 

@@ -1,7 +1,18 @@
 import type { Check, DbPolicy, DbSnapshot, Finding, Severity } from "../types";
 
 import { isUnconditionalTrue } from "./sql";
-import { callerIdCall, finding, listAnd, policyTargetsExposedRole, qi, qrel, relationAt, rowsPhrase } from "./util";
+import {
+    callerIdCall,
+    finding,
+    isRebaseManagedPolicy,
+    listAnd,
+    managedPolicyFix,
+    policyTargetsExposedRole,
+    qi,
+    qrel,
+    relationAt,
+    rowsPhrase
+} from "./util";
 
 const ID = "policy-always-true";
 
@@ -70,8 +81,13 @@ export const policyAlwaysTrue: Check = {
                           `If it does not cover a case, ${listAnd(exposed)} can ${verb} every row${rowsPhrase(rel)}.`
                         : `If this table is reachable over an API as ${listAnd(exposed)}, a caller can ` +
                           `${verb} every row${rowsPhrase(rel)} — the policy applies no scoping whatsoever.`,
-                    fix:
-                        `-- Replace the constant with the scoping you intended, e.g.:\n` +
+                    fix: isRebaseManagedPolicy(snapshot, policy)
+                        ? managedPolicyFix(
+                            policy,
+                            `replace the rule that grants unconditional ${policy.command === "SELECT" ? "reads" : "access"} ` +
+                            `with one that scopes the rows — \`ownerField\`, \`roles\`, or a \`condition\``
+                        )
+                        : `-- Replace the constant with the scoping you intended, e.g.:\n` +
                         `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
                         `    ${clauses.includes("USING") ? `USING (user_id = ${uidCall})` : `WITH CHECK (user_id = ${uidCall})`};\n` +
                         `-- or, if unconditional access really is intended, drop the policy and say so\n` +
