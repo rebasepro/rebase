@@ -1,4 +1,49 @@
 trustLockfile: true
+
+# ── Install settings ─────────────────────────────────────────────────────────
+#
+# All of these lived in `.npmrc`, in kebab-case, and pnpm 11 does not read that
+# file any more: `pnpm config get minimum-release-age` answered `undefined` with
+# the setting sitting right there under twenty lines of comment explaining why
+# it mattered. The tree was resolving with pnpm's defaults — the isolated
+# node_modules layout despite `node-linker=hoisted`, no release-age floor at all
+# — while npm 12 printed one "Unknown project config" warning per line on every
+# npm command. The same move was made in the generated scaffold months ago and
+# never here.
+#
+# `pnpm config get <camelCaseKey>` is the only way to know a setting is live.
+# `check:pnpm-settings` runs exactly that.
+linkWorkspacePackages: true
+preferWorkspacePackages: true
+autoInstallPeers: true
+saveExact: true
+nodeLinker: hoisted
+hoist: true
+# Types hoisted to the root so every workspace compiles against one copy;
+# express because its types are resolved by name from several packages.
+publicHoistPattern:
+  - '@types/*'
+  - express
+# How new a version may be before this repo will install it, in minutes.
+#
+# Three days. The attack this bounds is the one that actually happens to npm: a
+# maintainer account is compromised, a malicious version is published, and it is
+# found and unpublished within hours — so the whole exposure is the window
+# between the publish and the discovery. Waiting the window out is a cheap way
+# not to be in it, and it costs nothing here because versions are pinned exactly
+# (`saveExact`) and CI installs from a frozen lockfile.
+#
+# This said `0` once, above a comment reading "Temporarily disable release age
+# policy for @firecms/neat canary — remove once the package is >24h old". The
+# package had been released for two months. A temporary measure with no expiry
+# is a permanent one, and that one turned the protection off for every
+# dependency in the tree to unblock a single canary; `minimumReleaseAgeExclude`
+# below is how a single package is exempted instead.
+#
+# To take a genuinely fresh version, pass it deliberately for that one install
+# rather than lowering it here again:
+#     pnpm add <pkg> --config.minimum-release-age=0
+minimumReleaseAge: 4320
 packages:
   - packages/*
   - tooling/rebase-agent-skills

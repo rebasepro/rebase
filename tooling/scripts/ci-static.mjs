@@ -229,6 +229,16 @@ not cosmetic: it lets someone through on Node 20 and moves the failure
 into a transitive dependency. The React peer floor decayed the same way.`
     },
     {
+        run: "check:pnpm-settings",
+        why: `pnpm 11 stopped reading its settings from \`.npmrc\` and said nothing. Eight
+were dead at once, including the three-day \`minimum-release-age\` floor whose
+own comment explains what it bounds — so the tree resolved with pnpm's
+defaults, in the isolated node_modules layout despite \`node-linker=hoisted\`,
+with no supply-chain window at all. This asks pnpm rather than reading the
+file: every setting declared in pnpm-workspace.yaml must come back from
+\`pnpm config\`, with the value declared.`
+    },
+    {
         run: "check:jsdoc-coverage",
         why: `The property and relation types are authored by hand, and for most of
 their fields the ONLY explanation anywhere is an editor's hover. A third

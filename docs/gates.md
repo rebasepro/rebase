@@ -75,6 +75,7 @@ this list, in this order.
 | `check:control-chars` | A literal NUL in a source file, which makes grep classify it as binary and skip it in silence. | — |
 | `check:untranslated` | A ratchet over admin strings written as English literals beside a translation key that already exists. | `pnpm check:untranslated --update` |
 | `check:floors` | Every manifest's declared `engines.node` and React peer floor against `.nvmrc` and what the packages actually require. pnpm enforces `engines`, so an understated floor moves the failure into a dependency. | — |
+| `check:pnpm-settings` | Every setting `pnpm-workspace.yaml` declares comes back from `pnpm config`, with the value declared, and no `.npmrc` key duplicates one or is dead. pnpm 11 stopped reading `.npmrc` silently, leaving eight settings — the supply-chain release-age floor among them — doing nothing. | — |
 | `check:jsdoc-coverage` | Every public field on the hand-authored property and relation types has a doc comment — for most of them the editor hover is the only explanation anywhere. | — |
 | `check:rebase-props` | The `<Rebase>` props table against `RebaseProps` and what `Rebase.tsx` reads, so the table cannot document ten of twenty-four. | — |
 | `check:property-options` | The properties page against every `Admin*Options` interface, so a per-property `admin` option cannot exist in the type and nowhere else. | — |
