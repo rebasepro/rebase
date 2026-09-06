@@ -52,6 +52,11 @@ export async function declaredResourcesCommand(action: string | undefined, rawAr
 }
 
 async function listResources(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud resources",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);

@@ -1,11 +1,11 @@
 /**
  * `rebase cloud orgs` — list / create / members.
  */
-import arg from "arg";
 import chalk from "chalk";
 import inquirer from "inquirer";
 import {
     requireClient,
+    parseCloudArgs,
     getContextOrg,
     setContextOrg,
     colorStatus,
@@ -47,6 +47,11 @@ export async function orgsCommand(subcommand: string | undefined, rawArgs: strin
 }
 
 async function listOrgs(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud orgs",
+maxPositionals: 0 });
     const { client, url } = await requireClient(rawArgs);
     try {
         const orgs = (await client.data.collection("organizations").find({ limit: 100 })).data as unknown as OrgRow[];
@@ -87,14 +92,23 @@ async function listOrgs(rawArgs: string[]): Promise<void> {
     }
 }
 
+/** What `rebase cloud orgs create` parses. Its page is the group's own. */
+export const CREATE_ORG_FLAGS = {
+    "--name": String,
+    "--slug": String,
+    "-n": "--name"
+} as const;
+
 async function createOrg(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        { "--name": String,
-"--slug": String,
-"-n": "--name" },
-        { argv: rawArgs.slice(4),
-permissive: true }
-    );
+    // Strict: `--nmae "Acme"` used to be dropped, and the command then prompted
+    // for a name — or, off a terminal, refused for one that had been given.
+    const { flags: args } = parseCloudArgs({
+        spec: CREATE_ORG_FLAGS,
+        rawArgs,
+        commandWords: 3, // cloud orgs create
+        command: "cloud orgs",
+        maxPositionals: 0
+    });
     const { client, url } = await requireClient(rawArgs);
 
     const prompts: Array<Record<string, unknown>> = [];
@@ -133,6 +147,11 @@ message: "Organization name:" });
 }
 
 async function listMembers(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud orgs",
+maxPositionals: 0 });
     const { client, url } = await requireClient(rawArgs);
     const org = getContextOrg(url);
     if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");

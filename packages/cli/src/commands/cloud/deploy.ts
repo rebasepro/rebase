@@ -1324,14 +1324,23 @@ async function streamBuildLogs(
     }
 }
 
+/** What `rebase cloud logs` parses. Its page pairs against this. */
+export const LOGS_FLAGS = {
+    "--runtime": Boolean,
+    "--follow": Boolean,
+    "-f": "--follow"
+} as const;
+
 export async function logsCommand(rawArgs: string[], projectRef: string): Promise<void> {
-    const args = arg(
-        { "--runtime": Boolean,
-"--follow": Boolean,
-"-f": "--follow" },
-        { argv: rawArgs.slice(2),
-permissive: true }
-    );
+    // Strict: `--folow` used to be dropped, so a caller that asked to follow
+    // the log got one snapshot and an exit code.
+    const { flags: args } = parseCloudArgs({
+        spec: LOGS_FLAGS,
+        rawArgs,
+        commandWords: 2, // cloud logs
+        command: "cloud logs",
+        maxPositionals: 0
+    });
     const { client, url } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
 

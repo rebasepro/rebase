@@ -75,6 +75,11 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
 }
 
 async function listDatabases(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud db",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -168,8 +173,16 @@ export const CREATE_DATABASE_FLAGS = {
 } as const;
 
 async function createDatabase(rawArgs: string[]): Promise<void> {
-    const args = arg(CREATE_DATABASE_FLAGS, { argv: rawArgs.slice(4),
-permissive: true });
+    // Strict, and through the family's parser: an undeclared flag used to be
+    // dropped, so `db create --typ managed` opened the interactive picker —
+    // or, off a terminal, refused for a type that had been given.
+    const { flags: args } = parseCloudArgs({
+        spec: CREATE_DATABASE_FLAGS,
+        rawArgs,
+        commandWords: 3, // cloud db create
+        command: "cloud db create",
+        maxPositionals: 0
+    });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -334,6 +347,11 @@ connectionStatus: "connected" };
 }
 
 async function testDatabase(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud db",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -388,10 +406,16 @@ interface DbInfoResponse {
  * unavailable, never a placeholder.
  */
 async function dbInfo(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--reveal": Boolean,
-"--project": String,
-"-p": "--project" }, { argv: rawArgs.slice(2),
-permissive: true });
+    // `--project`/`-p` are globals and are not redeclared. Strict, so
+    // `db info --revel` refuses instead of quietly masking the password it
+    // was asked to show.
+    const { flags: args } = parseCloudArgs({
+        spec: { "--reveal": Boolean },
+        rawArgs,
+        commandWords: 3, // cloud db info
+        command: "cloud db",
+        maxPositionals: 0
+    });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
