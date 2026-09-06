@@ -17,6 +17,8 @@ import {
     dependenciesNotInstalled
 } from "../utils/project";
 import { reportSpawnFailure } from "../utils/spawn-error";
+import { parseCommandArgs } from "../utils/args";
+import { unknownCommand } from "../utils/unknown-command";
 import { argsFromCommand, commandWords } from "../utils/command-words";
 import { recordEvent } from "../telemetry";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind } from "../dev-db/prepare";
@@ -457,6 +459,22 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         return;
     }
 
+    // A typo is answered here, not by the driver, and not after a database has
+    // been started for it.
+    //
+    // `rebase db psh` used to reach `runDriverDbCommand`, which resolves the
+    // database first — so it **booted the managed PGlite**, a 180 MB daemon,
+    // in order to hand the driver an argv it then rejected with `Unknown db
+    // command. Valid: push, generate, migrate, branch, backup, restore,
+    // backups`: a list missing `url`, `pull`, `stop` and `reset`, all four of
+    // which `rebase db --help` lists and this CLI implements itself. The driver
+    // cannot know about them, which is exactly why the answer does not belong
+    // to the driver.
+    //
+    // The set comes from the help table, so the list a typo is measured against
+    // and the list `--help` prints cannot drift apart.
+    if (!DB_ACTION_HELP[subcommand]) unknownCommand(subcommand, Object.keys(DB_ACTION_HELP), "db");
+
     const projectRoot = requireProjectRoot();
 
     // Fire-and-forget, and a no-op unless the developer opted in. Never awaited:
@@ -537,6 +555,22 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
  * string for a database nobody is serving is not an answer.
  */
 async function printDatabaseUrl(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
+    // Strict about its flags, like every other command.
+    //
+    // The `db` family's strictness lives in the driver, and `url` is answered
+    // here, before the driver is ever spawned — so it accepted anything.
+    // `rebase db url --bogus` printed the URL and exited 0, and so did
+    // `rebase db url --json`, which is worse: a flag that looks like it asks
+    // for a different output format, silently ignored, hands a script a bare
+    // string it will try to parse as JSON.
+    parseCommandArgs({
+        spec: { "--database-url": String, "--docker": Boolean },
+        rawArgs: [...rawArgs],
+        commandWords: 2,
+        command: "db url",
+        maxPositionals: 0
+    });
+
     const { prepareDatabaseEnv } = await import("../dev-db/prepare");
     const { readEnvFile } = await import("../utils/project");
 

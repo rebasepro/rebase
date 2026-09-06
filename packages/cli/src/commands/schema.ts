@@ -16,6 +16,7 @@ import { recordEvent } from "../telemetry";
 import { wantsHelp } from "../utils/args";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
+import { unknownCommand } from "../utils/unknown-command";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind } from "../dev-db/prepare";
 
 export async function schemaCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
@@ -35,6 +36,16 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     if (!subcommand || subcommand === "--help" || wantsHelp(rawArgs)) {
         printSchemaHelp(subcommand === "--help" ? undefined : subcommand);
         return;
+    }
+
+    // A typo is answered here, in the same words every other family uses.
+    //
+    // It used to travel to the driver, which said the bare line `Unknown schema
+    // command.` — no list, no pointer, no did-you-mean, for a family with three
+    // subcommands. The set comes from the help table, so what a typo is measured
+    // against and what `--help` prints cannot drift apart.
+    if (!SCHEMA_ACTION_HELP[subcommand]) {
+        unknownCommand(subcommand, Object.keys(SCHEMA_ACTION_HELP), "schema");
     }
 
     const projectRoot = requireProjectRoot();
