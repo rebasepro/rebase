@@ -352,6 +352,40 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     // with one of these still deserves its drift report.
     const environmentFailed = reportEnvironmentFindings(collectEnvironmentFindings(projectRoot, envFile));
 
+    // Which database, resolved the way every other command resolves it.
+    //
+    // Two of doctor's three phases need one, and both used to key on
+    // `DATABASE_URL` alone. On the documented first-run path that variable does
+    // not exist — `rebase init` leaves it commented out and the managed
+    // database fills the vacuum — so a stock scaffold always ended with
+    // `⏭ Collections → Database: skipped (DATABASE_URL not set)` and
+    // `⚠ No DATABASE_URL — RLS policies were NOT checked`, then told the reader
+    // to set the one variable the quickstart tells them to leave alone. For the
+    // command `ai-instructions.md` names as the thing to run before guessing.
+    //
+    // The managed daemon is started here, exactly as `rebase db url` starts it:
+    // a doctor that will not start the database it is asked about can only ever
+    // answer "I did not look".
+    //
+    // Last, and never fatal. Everything above needs no database, and a doctor
+    // that cannot report what it *can* see because a database would not start
+    // is the opposite of the job. A failure here is said out loud and the run
+    // continues; the driver then reports its two database phases as skipped,
+    // which is the truth.
+    try {
+        const { prepareDatabaseEnv, managedNotices } = await import("../dev-db/prepare");
+        const prepared = await prepareDatabaseEnv(projectRoot, {
+            onProgress: (message) => console.log(chalk.gray(`  ${message}`))
+        });
+        Object.assign(env, prepared.env);
+        for (const line of managedNotices(prepared)) console.log(chalk.gray(`  ${line}`));
+    } catch (error) {
+        console.log("");
+        console.error(chalk.yellow(`  ⚠ Could not resolve this project's database: ${
+            error instanceof Error ? error.message : String(error)}`));
+        console.error(chalk.gray("    The checks that need one are reported below as not run."));
+    }
+
     try {
         const isTs = pluginCli.endsWith(".ts");
         if (isTs) {
