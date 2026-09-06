@@ -5,12 +5,12 @@
  * Atlas plans every change in a throwaway copy of the schema, which this
  * creates as `<db>_dev_diff` beside the real database. Two things were wrong:
  *
- *  - **The cause was thrown away.** `catch { /* Ignore, let Atlas handle
- *    connection failures *​/ }`. Atlas's version of handling it is `postgres:
- *    querying system variables: pq: database "app_dev_diff" does not exist
- *    (3D000)`, four frames downstream, and `CREATE DATABASE` is a privilege
- *    managed providers withhold — so this is the first thing a hosted user
- *    hits and the one they can act on least.
+ *  - **The cause was thrown away.** An empty catch, commented "Ignore, let
+ *    Atlas handle connection failures". Atlas's version of handling it is
+ *    `postgres: querying system variables: pq: database "app_dev_diff" does
+ *    not exist (3D000)`, four frames downstream, and `CREATE DATABASE` is a
+ *    privilege managed providers withhold — so this is the first thing a
+ *    hosted user hits and the one they can act on least.
  *  - **It was never dropped.** One per target, forever, and the only notice was
  *    `rebase db branch prune` reporting "3 Atlas scratch database(s) left over
  *    from db push".

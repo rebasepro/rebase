@@ -384,10 +384,11 @@ export function getDevDatabaseUrl(databaseUrl: string): string {
  *
  * Atlas needs a `--dev-url` — an empty database it can build the desired state
  * in — and this makes `<db>_dev_diff` next to the real one. The whole body used
- * to be wrapped in `catch { /* Ignore, let Atlas handle connection failures *​/ }`,
- * and Atlas's version of "handle" is `postgres: querying system variables: pq:
- * database "app_dev_diff" does not exist (3D000)` — the symptom, four frames
- * downstream of the cause, with the cause thrown away.
+ * to be wrapped in an empty catch commented "Ignore, let Atlas handle
+ * connection failures", and Atlas's version of handling it is `postgres:
+ * querying system variables: pq: database "app_dev_diff" does not exist
+ * (3D000)` — the symptom, four frames downstream of the cause, with the cause
+ * thrown away.
  *
  * The cause is almost always `42501`: `CREATE DATABASE` is a privilege managed
  * providers do not grant, so this is the first thing a hosted user hits and the
