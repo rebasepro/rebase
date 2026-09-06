@@ -23,6 +23,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 
 import { checkTemplatePins } from "./check-template-pins.mjs";
+import { loadCliCommands } from "./docs-verify/cli-commands.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 const templateRoot = path.join(repoRoot, "packages/cli/templates/template");
@@ -515,6 +516,106 @@ function checkPgliteStackIsPinned() {
         ));
 }
 
+/**
+ * Every script a scaffold ships can succeed on the tree it is scaffolded into.
+ *
+ * The headless overlay shipped `"generate:sdk": "rebase generate-sdk"`, and a
+ * headless project has no `config/collections` by design — its API is
+ * introspected from the live database at boot. So the script could never
+ * succeed, in 0.17.3 and on main, on the documented headless path. `rebase
+ * doctor` was the same shape. Nothing noticed, because a `package.json` script
+ * is not code and no gate read them.
+ *
+ * Two questions, neither of which needs the scripts to be run:
+ *
+ *   1. Every `rebase <command>` a script names is a command this CLI has. This
+ *      is the same class as the failure above, one layer up: a script naming
+ *      something that is not there.
+ *   2. Every script is declared here with what it needs before it can succeed,
+ *      and every declaration is used by some scaffold. A script nobody wrote a
+ *      precondition for is a script nobody asked "can this work here?" about,
+ *      which is exactly how the two above shipped.
+ *
+ * The preconditions are deliberately coarse. What matters is that adding a
+ * script forces somebody to answer the question, and that a `"succeeds on a
+ * fresh scaffold"` claim is written down where the next reader can check it.
+ */
+const SCAFFOLD_SCRIPTS = new Map([
+    ["dev", "succeeds on a fresh scaffold — the documented first command"],
+    ["build", "succeeds on a fresh scaffold"],
+    ["start", "needs a build"],
+    ["db:generate", "needs collections declared in code"],
+    ["db:push", "needs collections declared in code, and a database"],
+    ["db:migrate", "needs a database"],
+    ["schema:generate", "needs collections declared in code"],
+    ["schema:introspect", "needs a database"],
+    ["generate:sdk", "succeeds on a fresh scaffold — says what to run first when there are no collections"],
+    ["skills:install", "succeeds on a fresh scaffold"],
+    ["example", "needs a running server"],
+    ["deploy", "needs a linked cloud project"]
+]);
+
+/** Scripts a headless scaffold must not ship: it has no `config/collections`. */
+const NEEDS_COLLECTIONS = new Set(["db:generate", "db:push", "schema:generate"]);
+
+function checkScaffoldedScriptsCanSucceed() {
+    const problems = [];
+    const { top, sub } = loadCliCommands(repoRoot);
+    const seen = new Set();
+
+    const variants = [
+        ["templates/template", path.join(templateRoot, "package.json"), false],
+        ["templates/overlays/baas", path.join(baasOverlay, "package.json"), true]
+    ];
+
+    for (const [label, manifest, headless] of variants) {
+        let scripts;
+        try {
+            scripts = JSON.parse(fs.readFileSync(manifest, "utf8")).scripts ?? {};
+        } catch (err) {
+            problems.push(`${label}/package.json is not readable JSON: ${err.message}`);
+            continue;
+        }
+        for (const [name, command] of Object.entries(scripts)) {
+            seen.add(name);
+            if (!SCAFFOLD_SCRIPTS.has(name)) {
+                problems.push(
+                    `${label} ships "${name}": ${command} — add it to SCAFFOLD_SCRIPTS with what it `
+                    + "needs before it can succeed, or delete it. A script nobody wrote a precondition "
+                    + "for is one nobody asked whether it can work here."
+                );
+                continue;
+            }
+            if (headless && NEEDS_COLLECTIONS.has(name)) {
+                problems.push(
+                    `${label} ships "${name}", which ${SCAFFOLD_SCRIPTS.get(name)} — and a headless `
+                    + "scaffold has no config/collections."
+                );
+            }
+            // `rebase db push --collections …` → command `db`, subcommand `push`.
+            const invocation = /(?:^|&&\s*|\|\|\s*)rebase\s+([a-z][a-z0-9-]*)(?:\s+([a-z][a-z0-9-]*))?/.exec(command);
+            if (!invocation) continue;
+            const [, cmd, subcommand] = invocation;
+            if (!top.has(cmd)) {
+                problems.push(`${label}'s "${name}" runs \`rebase ${cmd}\`, which this CLI has no command for.`);
+                continue;
+            }
+            const known = sub.get(cmd);
+            if (subcommand && known && !known.has(subcommand)) {
+                problems.push(`${label}'s "${name}" runs \`rebase ${cmd} ${subcommand}\`, which is not a subcommand of \`rebase ${cmd}\`.`);
+            }
+        }
+    }
+
+    for (const name of SCAFFOLD_SCRIPTS.keys()) {
+        if (!seen.has(name)) {
+            problems.push(`SCAFFOLD_SCRIPTS declares "${name}" and no scaffold ships it any more — delete the entry.`);
+        }
+    }
+    if (seen.size === 0) problems.push("Read no scripts out of the templates — the guard is checking nothing.");
+    return problems;
+}
+
 function checkBaasHasNoAdminTypes() {
     const problems = [];
     const walk = (dir) => {
@@ -682,6 +783,15 @@ if (baasProblems.length > 0) {
     for (const p of baasProblems) console.error(`    ${p}`);
 } else {
     console.log("  ok   baas has no admin layer");
+}
+
+const scriptProblems = checkScaffoldedScriptsCanSucceed();
+if (scriptProblems.length > 0) {
+    failed++;
+    console.log("  FAIL every scaffolded script can succeed on the tree it is scaffolded into");
+    for (const p of scriptProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   every scaffolded script can succeed on the tree it is scaffolded into");
 }
 
 const resolutionProblems = checkResolutionMatchesShipped();
