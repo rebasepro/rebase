@@ -1385,6 +1385,17 @@ after it those parent deletes start failing where they used to cascade.
 
 Then read the plan before applying it — `rebase db push` prints the statements.
 
+### 25. The Node floor is `>=22.22.0`
+
+Every published package declared `>=20` at 0.17.3 — `@rebasepro/cli` declared no
+`engines` at all — and every one of them declares `>=22.22.0` on `main`. The
+single source is the repository's `.nvmrc`.
+
+**What to change:** move to Node 22.22.0 before you upgrade. `pnpm install`
+answers an engines mismatch with `[WARN] Unsupported engine` and installs
+anyway, so the failure does not arrive at install time; it arrives later,
+somewhere with no mention of Node in it.
+
 ---
 
 **Next:** [the upgrade checklist](/docs/upgrading/#upgrade-checklist) ·
@@ -2597,6 +2608,16 @@ backfilled after the fact.
   boot-ensure diffs the live database against, and the generated Drizzle schema),
   so the default cannot differ between them and make every boot plan the same
   rewrite forever.
+
+- **The Node floor is `>=22.22.0`, on every published package.** It was `>=20`
+  (and `@rebasepro/cli@0.17.3` declared no `engines` at all), so a project on
+  Node 20 installed and ran. The single source is `.nvmrc`, and `check:floors`
+  holds every manifest to it — one floor, in one file, rather than a number
+  repeated in twenty-two. Move to 22.22.0 before upgrading: `pnpm install`
+  answers an engines mismatch with `[WARN] Unsupported engine` and carries on,
+  so the failure arrives later, somewhere with no mention of Node in it.
+  `check:release-bump` now refuses a release that moves an `engines` field
+  without saying so here.
 
 #### Added
 

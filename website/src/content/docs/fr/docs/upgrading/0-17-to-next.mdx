@@ -1,5 +1,5 @@
 ---
-sourceHash: aaf8b8e73bc43c87
+sourceHash: 36838c587151b5fb
 slug: fr/docs/upgrading/0-17-to-next
 title: Migrer de 0.17 vers la prochaine version
 sidebar_label: 0.17 → prochaine
@@ -84,6 +84,17 @@ cascadaient.
 ```
 
 Relisez le plan avant de l'appliquer — `rebase db push` affiche les instructions.
+
+## 25. Le plancher Node est `>=22.22.0`
+
+En 0.17.3 chaque paquet publié déclarait `>=20` — `@rebasepro/cli` ne déclarait
+aucun `engines` — et sur `main` tous déclarent `>=22.22.0`. La source unique est
+le `.nvmrc` du dépôt.
+
+**À changer :** passez à Node 22.22.0 avant de mettre à niveau. `pnpm install`
+répond à une incompatibilité d'engines par `[WARN] Unsupported engine` et
+installe quand même : l'échec n'arrive donc pas à l'installation, mais plus tard,
+à un endroit où Node n'est jamais mentionné.
 
 ---
 

@@ -111,6 +111,16 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   so the default cannot differ between them and make every boot plan the same
   rewrite forever.
 
+- **The Node floor is `>=22.22.0`, on every published package.** It was `>=20`
+  (and `@rebasepro/cli@0.17.3` declared no `engines` at all), so a project on
+  Node 20 installed and ran. The single source is `.nvmrc`, and `check:floors`
+  holds every manifest to it — one floor, in one file, rather than a number
+  repeated in twenty-two. Move to 22.22.0 before upgrading: `pnpm install`
+  answers an engines mismatch with `[WARN] Unsupported engine` and carries on,
+  so the failure arrives later, somewhere with no mention of Node in it.
+  `check:release-bump` now refuses a release that moves an `engines` field
+  without saying so here.
+
 ### Added
 
 - **Every kind in one graph: crons, functions and queues join databases, buckets

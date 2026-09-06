@@ -1,5 +1,5 @@
 ---
-sourceHash: aaf8b8e73bc43c87
+sourceHash: 36838c587151b5fb
 slug: de/docs/upgrading/0-17-to-next
 title: Upgrade von 0.17 auf das nächste Release
 sidebar_label: 0.17 → nächstes
@@ -84,6 +84,17 @@ danach schlagen Löschvorgänge am Elternobjekt fehl, wo sie vorher kaskadierten
 
 Prüfen Sie danach den Plan, bevor Sie ihn anwenden — `rebase db push` gibt die
 Anweisungen aus.
+
+## 25. Die Node-Untergrenze ist `>=22.22.0`
+
+In 0.17.3 deklarierte jedes veröffentlichte Paket `>=20` — `@rebasepro/cli` gar
+kein `engines` —, auf `main` deklarieren alle `>=22.22.0`. Die einzige Quelle ist
+die `.nvmrc` des Repositorys.
+
+**Zu ändern:** Wechseln Sie vor dem Upgrade auf Node 22.22.0. `pnpm install`
+antwortet auf eine nicht passende Engine mit `[WARN] Unsupported engine` und
+installiert trotzdem — der Fehler kommt also nicht bei der Installation, sondern
+später, an einer Stelle, an der von Node keine Rede ist.
 
 ---
 

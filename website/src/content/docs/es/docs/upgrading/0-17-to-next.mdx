@@ -1,5 +1,5 @@
 ---
-sourceHash: aaf8b8e73bc43c87
+sourceHash: 36838c587151b5fb
 slug: es/docs/upgrading/0-17-to-next
 title: Actualizar de 0.17 a la próxima versión
 sidebar_label: 0.17 → próxima
@@ -83,6 +83,17 @@ cascadeaban.
 ```
 
 Revisa el plan antes de aplicarlo — `rebase db push` imprime las sentencias.
+
+## 25. El mínimo de Node es `>=22.22.0`
+
+En 0.17.3 todos los paquetes publicados declaraban `>=20` —`@rebasepro/cli` no
+declaraba `engines` en absoluto— y en `main` todos declaran `>=22.22.0`. La única
+fuente es el `.nvmrc` del repositorio.
+
+**Qué cambiar:** pásate a Node 22.22.0 antes de actualizar. `pnpm install`
+responde a un desajuste de engines con `[WARN] Unsupported engine` e instala
+igualmente, así que el fallo no llega al instalar: llega más tarde, en un sitio
+donde no se menciona Node.
 
 ---
 
