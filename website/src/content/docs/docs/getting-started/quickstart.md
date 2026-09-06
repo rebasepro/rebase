@@ -65,7 +65,7 @@ Pin a port with `rebase dev --port 3001`.
 
 | Flag | On | What it does |
 |---|---|---|
-| `--yes` | `init` | Accept every default. **Required when there is no terminal to prompt**, such as CI |
+| `--yes` | `init` | Never prompt. **Required when there is no terminal to answer**, such as CI. It skips git init and dependency install — the interactive defaults say yes to both, so pass `--git` / `--install` if you want them |
 | `--headless` | `init` | A backend with no collection files and no UI — see [Backend only](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Start from a template other than the default |
 | `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |

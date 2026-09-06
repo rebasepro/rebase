@@ -68,7 +68,7 @@ producción, y aquí se ignoran.) Fija un puerto con `rebase dev --port 3001`.
 
 | Flag | En | Qué hace |
 |---|---|---|
-| `--yes` | `init` | Acepta todos los valores por defecto. **Obligatorio cuando no hay terminal que preguntar**, como en CI |
+| `--yes` | `init` | Nunca pregunta. **Obligatorio cuando no hay terminal que preguntar**, como en CI. Omite `git init` y la instalación de dependencias — de forma interactiva los valores por defecto dicen que sí a ambas, así que pasa `--git` / `--install` si las quieres |
 | `--headless` | `init` | Un backend sin archivos de colección y sin UI |
 | `--template <nombre>` | `init` | Parte de una plantilla distinta de la predeterminada |
 | `--install` / `--no-install` | `init` | Ejecuta el gestor de paquetes por ti, o no |
@@ -131,7 +131,7 @@ Cuando abras la URL del frontend que imprimió `rebase dev`, verás la pantalla 
 
 ## Define tu Primera Colección
 
-Abre `config/collections/` y crea un nuevo archivo. Exporta la colección como **export por defecto** — así es como el registro la detecta:
+Abre `config/collections/` y crea un nuevo archivo. Exporta la colección como **export por defecto** — así es como el registro la detecta. El nombre de la tabla es opcional: por defecto es el slug, así que defínelo sólo cuando difieran:
 
 ```typescript title="config/collections/products.ts"
 import { defineCollection } from "@rebasepro/cms-types";
@@ -139,8 +139,6 @@ import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
-    singularName: "Product",
-    table: "products",
     properties: {
         name: {
             type: "string",

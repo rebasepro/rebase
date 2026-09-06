@@ -36,7 +36,7 @@ Sets up the project structure with frontend, backend, and shared packages.
 |---|---|
 | `-t, --template <preset>` | `blog`, `ecommerce` or `blank`. Default `blog` |
 | `--headless` | Backend only — no admin panel and no collection files. `--template` has no effect, because there are no collections to seed |
-| `-y, --yes` | Accept every default and never prompt. **Required wherever there is no terminal to answer**, such as CI |
+| `-y, --yes` | Never prompt. **Required wherever there is no terminal to answer**, such as CI. It skips git init and dependency install — the interactive defaults say yes to both, so pass `--git` / `--install` if you want them |
 | `-i, --install` | Install dependencies after scaffolding |
 | `-g, --git` | Initialize a repository and make the first commit |
 | `--database-url <url>` | Use an existing database instead of the managed one |
