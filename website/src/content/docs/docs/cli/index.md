@@ -368,10 +368,11 @@ rebase cloud whoami     # show the current session
 #### Project link
 
 ```bash
-rebase cloud link       # link this directory to a cloud project
-rebase cloud unlink     # remove the link
-rebase cloud use [org]  # select the active organization
-rebase cloud open       # open the dashboard in a browser
+rebase cloud link         # link this directory to a cloud project
+rebase cloud link [url]   # or straight at a backend: no control plane, no login, and the rest of the family refuses until you unlink
+rebase cloud unlink       # remove the link
+rebase cloud use [org]    # select the active organization
+rebase cloud open         # open the dashboard in a browser
 ```
 
 #### Projects
@@ -457,11 +458,10 @@ rebase cloud storage             # list storage buckets
 rebase cloud storage create      # provision platform-managed storage
 rebase cloud storage attach      # attach your own S3-compatible bucket
 rebase cloud webhooks list | create | delete
-rebase cloud clusters            # the clusters tenants run on
-rebase cloud clusters add        # register one from a kubeconfig
-rebase cloud clusters verify     # ask a cluster whether it can host tenants
+rebase cloud clusters list | add | verify   # the clusters tenants run on; `add` registers one from a kubeconfig
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
+rebase cloud billing checkout    # a Stripe session for one project
 ```
 
 ### `rebase generate-sdk`

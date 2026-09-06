@@ -6,6 +6,9 @@
  * that resolves nowhere near the user's app. The host is per-deployment config,
  * so it can only come from the control plane (`platform-config`).
  */
+import fs from "fs";
+import os from "os";
+import path from "path";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
     fetchDeployTargets,
@@ -13,6 +16,8 @@ import {
     formatTenantHost,
     initOutputMode,
     projectHost,
+    refuseDirectLink,
+    resolveCloudUrl,
     setJsonModeForTest,
     type CloudClient
 } from "./context";
@@ -215,5 +220,123 @@ describe("printGroupHelp", () => {
     it("names the globals, so a reader does not have to find the index page", () => {
         const page = pipedPage(printEnvHelp) as { globalFlags: Array<{ flag: string }> };
         expect(page.globalFlags.map(f => f.flag)).toContain("--json");
+    });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   A direct link is a tenant, not a control plane
+   ══════════════════════════════════════════════════════════════════ */
+
+/**
+ * `rebase cloud link <url>` writes `{ mode: "direct" }` and points this checkout
+ * at ONE running backend — "no control plane, no login", per its own help page.
+ * `resolveCloudUrl` used to hand that URL to the whole `cloud` family whatever
+ * the mode, which made the customer's own server the control plane: `whoami`
+ * reported "Not logged in to https://example.com", and following that printed
+ * remedy POSTed the user's control-plane email and password to the tenant host.
+ */
+describe("a direct link never becomes the control plane", () => {
+    /** `rebase cloud <words…>` as `process.argv`. */
+    function argv(...words: string[]): string[] {
+        return ["/usr/bin/node", "/x/y/rebase.js", "cloud", ...words];
+    }
+
+    /**
+     * A scratch directory holding `.rebase/cloud.json`, with `HOME` inside it.
+     *
+     * The home redirect matters: a stored `current` context would answer before
+     * the default control plane does, and what is under test is what happens
+     * with nothing but the link file.
+     */
+    function linkedDirectory(link: Record<string, unknown>): string {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-link-"));
+        fs.mkdirSync(path.join(root, ".rebase"), { recursive: true });
+        fs.writeFileSync(path.join(root, ".rebase", "cloud.json"), JSON.stringify(link));
+        vi.spyOn(process, "cwd").mockReturnValue(root);
+        vi.spyOn(os, "homedir").mockReturnValue(path.join(root, "home"));
+        return root;
+    }
+
+    /** Run something that must `fail`, and return the parsed `{error}` payload. */
+    function refusalOf(run: () => unknown): { message: string; code: string | null } {
+        const chunks: string[] = [];
+        const originalWrite = process.stdout.write.bind(process.stdout);
+        process.stdout.write = (s: string) => {
+            chunks.push(typeof s === "string" ? s : String(s));
+            return true;
+        };
+        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+            throw new Error("__exit__");
+        }) as never);
+        let exited = false;
+        try {
+            run();
+        } catch (e) {
+            exited = e instanceof Error && e.message === "__exit__";
+            if (!exited) throw e;
+        } finally {
+            process.stdout.write = originalWrite;
+            exit.mockRestore();
+        }
+        expect(exited).toBe(true);
+        return JSON.parse(chunks.join("").trim()).error;
+    }
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        delete process.env.REBASE_CLOUD_URL;
+    });
+
+    it("resolves the default control plane, not the linked backend", () => {
+        linkedDirectory({ url: "https://example.com",
+projectId: "",
+apiUrl: "https://example.com",
+mode: "direct" });
+        expect(resolveCloudUrl(argv("whoami"))).toBe("https://app.rebase.pro");
+    });
+
+    it("still resolves a cloud link, which is a control plane", () => {
+        linkedDirectory({ url: "https://console.example.com",
+projectId: "42",
+mode: "cloud" });
+        expect(resolveCloudUrl(argv("whoami"))).toBe("https://console.example.com");
+    });
+
+    /** Every link written before `mode` existed is a cloud link. */
+    it("treats a link with no mode as a cloud link", () => {
+        linkedDirectory({ url: "https://console.example.com",
+projectId: "42" });
+        expect(resolveCloudUrl(argv("whoami"))).toBe("https://console.example.com");
+    });
+
+    it("refuses a control-plane command, naming the link and both ways out", () => {
+        linkedDirectory({ url: "https://example.com",
+projectId: "",
+mode: "direct" });
+        setJsonModeForTest(true);
+        try {
+            const error = refusalOf(() => refuseDirectLink(argv("whoami")));
+            expect(error.code).toBe("direct_link");
+            expect(error.message).toContain("https://example.com");
+            expect(error.message).toContain("rebase cloud unlink");
+            expect(error.message).toContain("--project");
+        } finally {
+            setJsonModeForTest(false);
+        }
+    });
+
+    it("lets through a line that says which control-plane subject it means", () => {
+        linkedDirectory({ url: "https://example.com",
+projectId: "",
+mode: "direct" });
+        expect(() => refuseDirectLink(argv("logs", "--project", "shop"))).not.toThrow();
+        expect(() => refuseDirectLink(argv("whoami", "--url", "https://app.rebase.pro"))).not.toThrow();
+    });
+
+    it("says nothing in a cloud-linked directory", () => {
+        linkedDirectory({ url: "https://console.example.com",
+projectId: "42",
+mode: "cloud" });
+        expect(() => refuseDirectLink(argv("whoami"))).not.toThrow();
     });
 });

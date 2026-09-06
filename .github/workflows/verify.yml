@@ -122,6 +122,43 @@ jobs:
         with:
           fetch-depth: 1
 
+      # ── The console, which this repository can break from here ─────────────
+      #
+      # `saas/` is a separate, private repository and an importer of THIS
+      # workspace: its frontend resolves `@rebasepro/*` to `packages/*/src` in
+      # this checkout. So a change made here is a change to the console, and on
+      # 2026-09-05 one was — `useTranslation` grew an `i18n` member, and the
+      # control plane's CI went red for three consecutive runs from a commit
+      # nobody in that repository had made. The producing side is where that
+      # should fail.
+      #
+      # Whether it CAN run depends on a credential this workflow may not have:
+      # a fork's pull request never sees repository secrets, and neither does a
+      # contributor's clone. The suite is skipped there rather than failing —
+      # a private repository must not be a wall in front of an outside
+      # contributor — and the step below says so out loud when it skips.
+      - name: Can this runner reach the control plane?
+        id: saas-access
+        env:
+          SAAS_REPO_TOKEN: ${{ secrets.SAAS_REPO_TOKEN }}
+        run: |
+          if [ -n "$SAAS_REPO_TOKEN" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Before the install, not after: `saas/` holds four importers of this
+      # workspace, and `pnpm install` with the directory absent prunes them.
+      - name: Checkout the control plane into saas/
+        if: steps.saas-access.outputs.available == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: rebasepro/saas
+          path: saas
+          token: ${{ secrets.SAAS_REPO_TOKEN }}
+          fetch-depth: 1
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -152,6 +189,20 @@ jobs:
       # "after the build" section and in no runner.
       - name: Build gates
         run: pnpm run ci:build-gates
+
+      # Outside the gates array on purpose: `ci:build-gates` refuses to run
+      # without build output and is a list of this repository's own checks,
+      # while this one depends on a checkout that may not exist.
+      - name: Console suite
+        if: steps.saas-access.outputs.available == 'true'
+        run: pnpm run test:saas-console
+
+      - name: Console suite (skipped)
+        if: steps.saas-access.outputs.available != 'true'
+        run: |
+          echo "::notice::Skipped the Cloud console's suite: no SAAS_REPO_TOKEN on this runner." \
+               "A fork's pull request cannot read it. Run \`pnpm test:saas-console\` locally with" \
+               "rebasepro/saas checked out at ./saas."
 
   # The unit suites. `pnpm -r test` runs with --workspace-concurrency=1, so this
   # is ~3.5 minutes of strictly serial work; on its own runner it costs nothing,

@@ -324,13 +324,11 @@ describe("every command the dispatch answers parses its flags strictly", () => {
      * below fails if one of them starts parsing strictly and the entry is left
      * behind.
      *
-     * `cloud` — W8-12 of the 2026-09-06 DX sweep. Its actions that never call
-     * `parseCloudArgs` (`whoami`, `orgs`, `clusters`, `logout`, `projects list`)
-     * exit 0 on an unknown flag.
+     * Empty. `cloud` was the last one, and the sweep at the bottom of this file
+     * is what replaced it: the family is thirty dispatchers across a dozen
+     * modules, so a single file's name could never have been its gate.
      */
-    const PENDING: Record<string, string> = {
-        cloud: "W8-12 (2026-09-06 DX sweep) routes the cloud family through parseCloudArgs"
-    };
+    const PENDING: Record<string, string> = {};
 
     /** Where each dispatched command's line is parsed. */
     const PARSER_FILE: Record<string, string> = {
@@ -349,7 +347,12 @@ describe("every command the dispatch answers parses its flags strictly", () => {
         "generate-sdk": "../cli.ts",
         telemetry: "telemetry.ts",
         resources: "resources.ts",
-        status: "status.ts"
+        status: "status.ts",
+        // The family's parse is `parseCloudArgs`, which lives here and wraps
+        // `parseCommandArgs` with the global cloud flags merged in. Which of its
+        // thirty dispatchers reach it is the sweep at the bottom of this file —
+        // one file name could never have answered that.
+        cloud: "cloud/context.ts"
     };
 
     /**
@@ -392,17 +395,149 @@ describe("every command the dispatch answers parses its flags strictly", () => {
         }
     });
 
-    it("still has the debt PENDING claims, so the entry is not decoration", () => {
+    it("carries no debt that has already been paid", () => {
         // The other direction. An entry that outlives its fix turns the whole
-        // check into a comment, so the debt has to be observable: these four
-        // `cloud` actions take `rawArgs` and never hand it to `parseCloudArgs`,
-        // which is why `rebase cloud whoami --frobnicate` exits 0 with the
-        // session JSON. When W8-12 lands, this fails and PENDING loses its row.
-        expect(Object.keys(PENDING)).toEqual(["cloud"]);
-        const auth = fs.readFileSync(path.join(here, "cloud", "auth.ts"), "utf8");
-        expect(
-            auth.includes("parseCloudArgs("),
-            `cloud/auth.ts parses strictly now — drop "cloud" from PENDING (${PENDING.cloud})`
-        ).toBe(false);
+        // check into a comment, so every one has to still be observable.
+        for (const [command, reason] of Object.entries(PENDING)) {
+            const file = PARSER_FILE[command];
+            if (!file) continue;
+            const source = fs.readFileSync(path.join(here, file), "utf8");
+            expect(
+                source.includes("parseCommandArgs("),
+                `${file} parses strictly now — drop "${command}" from PENDING (${reason})`
+            ).toBe(false);
+        }
+    });
+
+    /* ══════════════════════════════════════════════════════════════════
+       The cloud family, which is thirty dispatchers rather than one
+       ══════════════════════════════════════════════════════════════════ */
+
+    /**
+     * Every cloud action parses the line it was handed.
+     *
+     * `PARSER_FILE` above names one file per command, which is the right shape
+     * for `init` or `build` and cannot describe `cloud`: the group dispatcher
+     * hands `rawArgs` to a module, and that module hands it to one of several
+     * action handlers, each of which has its own flags. So the unit here is the
+     * FUNCTION, and it is derived from the source rather than listed — a
+     * handler added tomorrow with no parse fails on the commit that adds it.
+     *
+     * The rule: a function that takes `rawArgs` either calls `parseCloudArgs`
+     * itself, or hands `rawArgs` to one in its own module that does. Anything
+     * else reaches the network with an undeclared flag dropped on the floor,
+     * which is how `rebase cloud logout --frobnicate` signed the session out and
+     * exited 0.
+     */
+    describe("every cloud action parses its own line", () => {
+        const cloudDir = path.join(here, "cloud");
+
+        /**
+         * Functions that are handed `rawArgs` but are not the thing that decides
+         * whether the LINE is acceptable, each with the reason. A named list, so
+         * a tenth is a decision somebody writes down rather than a regex
+         * loophole.
+         */
+        const PARSED_ELSEWHERE: Record<string, string> = {
+            "index.ts:positionals": "the dispatcher's own group/action resolver",
+            "index.ts:cloudCommand": "the dispatcher; it resolves the group and hands rawArgs to a module",
+            "index.ts:projectsGroup": "the same, one level down",
+            "index.ts:deploymentsGroup": "the same, one level down",
+            "debug.ts:resolveOrigin": "a helper of `debug health`, which declares --host and parses it",
+            "link.ts:linkDirect": "the self-hosted branch of `linkCommand`, which parsed before choosing it",
+            "projects.ts:projectInfo": "its line is parsed by `resolveProjectArg` at the dispatch site",
+            "resources.ts:buildDialPatch": "reads the dials' VALUES; `computeCommand` is what accepts the line"
+        };
+
+        /** `function name(params)` and its body, by brace matching. */
+        function functionsIn(source: string): Array<{ name: string; params: string; body: string }> {
+            const found: Array<{ name: string; params: string; body: string }> = [];
+            const matchFrom = (start: number): number => {
+                let depth = 0;
+                for (let i = start; i < source.length; i++) {
+                    if (source[i] === "{") depth++;
+                    else if (source[i] === "}" && --depth === 0) return i;
+                }
+                return -1;
+            };
+            for (const m of source.matchAll(/(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(([^)]*)\)/g)) {
+                let open = source.indexOf("{", (m.index ?? 0) + m[0].length);
+                if (open === -1) continue;
+                let end = matchFrom(open);
+                if (end === -1) continue;
+                // That `{` may have opened a RETURN TYPE — `(): { id?: string } {`
+                // — in which case the body is the one after it.
+                if (/^\s*\{/.test(source.slice(end + 1))) {
+                    open = source.indexOf("{", end + 1);
+                    end = matchFrom(open);
+                    if (end === -1) continue;
+                }
+                found.push({ name: m[1],
+params: m[2],
+body: source.slice(open, end + 1) });
+            }
+            return found;
+        }
+
+        /** Modules that hold no command handler at all. */
+        const NOT_HANDLERS = new Set(["context.ts", "action-help.ts", "errors.ts"]);
+
+        function cloudFunctions(): Map<string, { file: string; name: string; params: string; body: string }> {
+            const all = new Map<string, { file: string; name: string; params: string; body: string }>();
+            for (const file of fs.readdirSync(cloudDir)) {
+                if (!file.endsWith(".ts") || file.includes(".test.") || NOT_HANDLERS.has(file)) continue;
+                const source = fs.readFileSync(path.join(cloudDir, file), "utf8");
+                for (const fn of functionsIn(source)) all.set(`${file}:${fn.name}`, { file,
+...fn });
+            }
+            return all;
+        }
+
+        it("finds the handlers it is checking, so an empty sweep cannot pass", () => {
+            const taking = [...cloudFunctions().values()]
+                .filter(f => /rawArgs\s*:\s*string\[\]/.test(f.params));
+            expect(taking.length).toBeGreaterThan(50);
+        });
+
+        it("routes every one of them through parseCloudArgs", () => {
+            const all = cloudFunctions();
+            const covered = (
+                fn: { file: string; name: string; body: string },
+                seen = new Set<string>()
+            ): boolean => {
+                if (fn.body.includes("parseCloudArgs(")) return true;
+                for (const call of fn.body.matchAll(/\b([A-Za-z0-9_]+)\s*\(\s*rawArgs\b/g)) {
+                    const key = `${fn.file}:${call[1]}`;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    const target = all.get(key);
+                    if (target && covered(target, seen)) return true;
+                }
+                return false;
+            };
+
+            const unparsed = [...all.entries()]
+                .filter(([key, fn]) =>
+                    /rawArgs\s*:\s*string\[\]/.test(fn.params)
+                    && !PARSED_ELSEWHERE[key]
+                    && !covered(fn))
+                .map(([key]) => key);
+
+            expect(
+                unparsed,
+                "these take the user's line and never parse it, so an undeclared flag is dropped and "
+                + "the command runs anyway"
+            ).toEqual([]);
+        });
+
+        it("keeps no exception for a function that has since started parsing", () => {
+            const all = cloudFunctions();
+            const stale = Object.keys(PARSED_ELSEWHERE)
+                .filter(key => all.get(key)?.body.includes("parseCloudArgs("));
+            expect(
+                stale,
+                "these are excused from the sweep and no longer need to be"
+            ).toEqual([]);
+        });
     });
 });
