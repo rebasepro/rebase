@@ -17,6 +17,7 @@ import {
     getTableIncludes,
     getDevDatabaseUrl,
     ensureDevDatabaseExists,
+    dropDevDatabase,
     applySearchDdl,
     getSearchExcludes,
     readSearchDdl,
@@ -487,6 +488,13 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 await reconcilePolicies(databaseUrl, collectionsPath);
                 await ensureRlsUserRole(databaseUrl);
                 await retireLegacyAuthSchema(databaseUrl);
+
+                // The push worked, so the throwaway schema copy Atlas planned
+                // against has nothing left to say. It was kept forever, one per
+                // target, and the only notice was `rebase db branch prune`
+                // reporting them. On a failed push we never reach this line —
+                // deliberately: there the scratch database is the evidence.
+                await dropDevDatabase(databaseUrl, getDevDatabaseUrl(databaseUrl));
             } else {
                 outWarn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
             }
