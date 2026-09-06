@@ -17,34 +17,83 @@ if (!existsSync(DIST)) {
     process.exit(2);
 }
 
-/** Every generated page, as a route string -> file path. */
+/**
+ * Every generated page, as a route string -> file path, and every emitted file
+ * as its `dist`-relative path.
+ *
+ * The file set is what makes the link check honest. `existsSync(join(DIST, r))`
+ * — what this used to ask — says `true` for a *directory*, so `/docs/deployment`
+ * "resolved" for the eleven months it had sub-pages and no `index.html`, and
+ * `0 failures` was printed over a 404 that was live on the home page. It is
+ * also case-insensitive on macOS, so `/docs/ui/components/Card` passed here and
+ * 404ed on the Linux host that serves the site.
+ */
 const pages = new Map();
+const files = new Set();
 (function walk(dir) {
     for (const e of readdirSync(dir)) {
         const p = join(dir, e);
         if (statSync(p).isDirectory()) walk(p);
-        else if (e === "index.html") {
-            const route = "/" + relative(DIST, dir).split("\\").join("/");
-            pages.set(route === "/." ? "/" : route, p);
+        else {
+            files.add(relative(DIST, p).split("\\").join("/"));
+            if (e === "index.html") {
+                const route = "/" + relative(DIST, dir).split("\\").join("/");
+                pages.set(route === "/." ? "/" : route, p);
+            }
         }
     }
 })(DIST);
 
 /* Marketing pages only. `/docs/**` is generated from the packages' AST and is
    gated by `pnpm verify:docs`; component reference pages legitimately share a
-   title across locales because a component name is a proper noun. */
+   title across locales because a component name is a proper noun.
+
+   The link check is the exception: it runs over `linkPages` — every page in
+   `dist` — because the site chrome a docs page renders (the logo, the language
+   picker, the footer) is hand-written, is on 1100 pages nobody was reading, and
+   is exactly where the dead `/it` and `/pt` logo links lived. */
 const IGNORED = /^\/(?:[a-z]{2}\/)?(?:docs|pagefind|_astro|dev|404)(?:\/|$)/;
+const linkPages = new Map(pages);
 for (const r of [...pages.keys()]) if (IGNORED.test(r)) pages.delete(r);
 
 const failures = [];
 const fail = (route, check, detail) => failures.push({ route, check, detail });
 
-/** Routes that resolve: every index.html, plus any real file in dist. */
-const routeExists = (r) => {
-    if (pages.has(r) || pages.has(r.replace(/\/$/, ""))) return true;
-    const asFile = join(DIST, r.replace(/^\//, ""));
-    return existsSync(asFile);
+/**
+ * Routes that resolve: a page with an `index.html`, or a real *file* emitted at
+ * that exact path. Both tests are exact-match against what the build wrote, so
+ * a directory with no index and a link whose casing differs from the emitted
+ * one both read as broken — which is what the host does with them.
+ */
+const resolves = (r, pageRoutes, fileSet) => {
+    const route = r.replace(/\/$/, "") || "/";
+    if (pageRoutes.has(route)) return true;
+    return fileSet.has(route.replace(/^\//, ""));
 };
+const routeExists = (r) => resolves(r, linkPages, files);
+
+/* Self-test. Each case is a defect this gate has shipped: a link to a directory
+   with no `index.html`, and a link whose casing differs from the emitted path.
+   It runs on every invocation because a link checker that has quietly stopped
+   checking looks exactly like a site with no broken links. */
+{
+    const p = new Map([["/docs/ui/components/card", "x"]]);
+    const f = new Set(["docs/ui/components/card/index.html", "llms.txt"]);
+    const cases = [
+        ["/docs/deployment", false, "a directory with no index.html is not a route"],
+        ["/docs/ui/components/Card", false, "route casing must match the emitted path"],
+        ["/docs/ui/components/card", true, "a real page resolves"],
+        ["/docs/ui/components/card/", true, "a trailing slash resolves"],
+        ["/llms.txt", true, "an emitted file resolves"],
+        ["/LLMS.txt", false, "file casing must match too"],
+    ];
+    for (const [route, want, why] of cases) {
+        if (resolves(route, p, f) !== want) {
+            console.error(`check_site self-test failed: ${route} — ${why}`);
+            process.exit(2);
+        }
+    }
+}
 
 /* SITE-STORY §2, the naming sheet. Only phrases that can ONLY be naming Rebase's
    own product: a competitor keeps its own name, and the tree legitimately says
@@ -55,17 +104,22 @@ const BANNED = [
     /\bthe Rebase Studio\b/, /\badmin console\b/i, /\badmin scaffolding\b/i,
 ];
 
-for (const [route, file] of [...pages].sort()) {
+// 1. Internal links resolve, on every page in `dist`. The cookie banner
+//    shipped 114 404s this way: a localised prefix on a route that exists only
+//    at the root. The docs logo shipped 378 more, pointing at `/it` and `/pt`.
+for (const [route, file] of [...linkPages].sort()) {
     const html = readFileSync(file, "utf8");
     const body = html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "");
-
-    // 1. Internal links resolve. The cookie banner shipped 114 404s this way:
-    //    a localised prefix on a route that exists only at the root.
     for (const m of body.matchAll(/href="(\/[^"#?]*)/g)) {
         const href = m[1].replace(/\/$/, "") || "/";
         if (href.startsWith("/_astro") || href.startsWith("/pagefind")) continue;
         if (!routeExists(href)) fail(route, "broken-link", href);
     }
+}
+
+for (const [route, file] of [...pages].sort()) {
+    const html = readFileSync(file, "utf8");
+    const body = html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "");
 
     // 2. Exactly one <h1>. Two policy pages rendered their title in a <div>.
     const h1s = body.match(/<h1[\s>]/g) ?? [];
@@ -120,5 +174,8 @@ for (const [check, list] of Object.entries(byCheck)) {
     }
 }
 
-console.log(`\n${failures.length} failures across ${pages.size} pages.`);
+console.log(
+    `\n${failures.length} failures across ${pages.size} marketing pages ` +
+        `(links checked on all ${linkPages.size}).`
+);
 process.exit(failures.length ? 1 : 0);
