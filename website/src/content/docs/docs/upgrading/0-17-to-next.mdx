@@ -125,6 +125,15 @@ answers an engines mismatch with `[WARN] Unsupported engine` and installs
 anyway, so the failure does not arrive at install time; it arrives later,
 somewhere with no mention of Node in it.
 
+## 26. A project with only named buckets names its default
+
+`bucket("media")` alone used to be promoted to the default bucket at boot,
+with a warning. Boot now refuses when no bucket is the default.
+
+**What to change:** if every bucket in `config/resources.ts` is named, mark
+one — `bucket("media", { default: true })` — or add a `bucket("(default)")`
+beside it. A project that already declares a default needs nothing.
+
 ---
 
 **Next:** [the upgrade checklist](/docs/upgrading/#upgrade-checklist) ·

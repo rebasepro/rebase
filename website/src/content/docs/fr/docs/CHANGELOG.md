@@ -121,7 +121,22 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   `check:release-bump` now refuses a release that moves an `engines` field
   without saying so here.
 
+- **A project with only named buckets must say which one is the default.** A
+  single named bucket used to be promoted to the default at boot with a warning
+  nobody asked for — `bucket("media")` read `S3_BUCKET__MEDIA`, and unqualified
+  uploads went there anyway. Boot now refuses when no bucket is the default and
+  names both ways out: `bucket("media", { default: true })`, or a
+  `bucket("(default)")` beside it. A project whose *only* bucket was named
+  refuses to boot until one of those lines is added; a project that already
+  declared a default is unchanged.
+
 ### Added
+
+- **`rebase db migrate --baseline <version>`** records a version as applied on a
+  database that already carries the schema — every database Rebase has booted
+  against does, because boot provisions the tables — so the first `db migrate`
+  no longer dies on `type "posts_status" already exists`. That error now names
+  the version on disk and the command that records it.
 
 - **Every kind in one graph: crons, functions and queues join databases, buckets
   and topics.** A cron file is now also a declaration — the loader records it
