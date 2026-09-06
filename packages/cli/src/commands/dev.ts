@@ -86,6 +86,37 @@ export const WATCHER_RESTART_MARKER = /\[tsx\][^\n]*\b(?:Rerunning|Restarting)\b
 const LIVENESS_INTERVAL_MS = 5_000;
 
 /**
+ * Strip ANSI codes before matching.
+ *
+ * At module scope so `portMovedNotice` below can use the same one the stream
+ * handlers do: a second copy of this regex is a second thing to keep in step.
+ */
+// eslint-disable-next-line no-control-regex
+const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
+
+/**
+ * The corrected banner line, when the backend says it moved port.
+ *
+ * `↳ PORT = 3014` is printed before the server binds — the backend's
+ * environment has to be fixed before it spawns — so when the port turns out to
+ * be taken and the server moves, the banner two inches up is simply wrong. The
+ * true number then appears in a `[backend]` line a hundred lines of DDL later,
+ * which nobody scrolls back through, and the banner is where a reader looks for
+ * the port.
+ *
+ * A correction rather than a rewrite: the terminal is a transcript, and a line
+ * that changes after the fact is a line nobody can trust. So the old number is
+ * named too.
+ *
+ * Exported for its test.
+ */
+export function portMovedNotice(line: string): { from: string; to: string } | null {
+    const moved = stripAnsi(line).match(/Port (\d+) is in use — trying (\d+)/);
+
+    return moved ? { from: moved[1], to: moved[2] } : null;
+}
+
+/**
  * Quote a path for the shell `execa` runs the backend through.
  *
  * The dev runtime's path is absolute and therefore contains whatever the
@@ -627,10 +658,6 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
 
     /** Actual backend port, resolved once the server prints its URL. */
     let resolvedBackendPort: number | null = null;
-
-    // Use regex to strip ANSI codes before matching
-    // eslint-disable-next-line no-control-regex
-    const stripAnsi = (str: string) => str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
 
     /**
      * The connection string of the database this run started, when it started
@@ -1223,6 +1250,12 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         const readySeconds = Math.round(readyTimeoutMs / 1000);
         armReadyDeadline(`The backend has not started after ${readySeconds}s.`);
 
+        const noticePortMoved = (line: string): void => {
+            const moved = portMovedNotice(line);
+            if (!moved) return;
+            console.log(`  ${chalk.gray("↳ PORT")} = ${chalk.white(moved.to)} ${chalk.gray(`(${moved.from} was in use)`)}`);
+        };
+
         /**
          * The restart line, on either stream.
          *
@@ -1305,6 +1338,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             lines.forEach((line: string) => {
                 console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
                 noticeWatcherRestart(line);
+                noticePortMoved(line);
                 const cleanLine = stripAnsi(line);
                 const swaggerMatch = cleanLine.match(/Swagger UI available.*"path":"([^"]+)"/);
                 if (swaggerMatch) swaggerPath = swaggerMatch[1];
@@ -1348,6 +1382,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
 
                 noticeWatcherRestart(line);
+                noticePortMoved(line);
 
                 // Detect corrupted node_modules at runtime
                 // (covers tsx and any other dependency whose pnpm store entry is broken)
