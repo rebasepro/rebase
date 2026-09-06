@@ -700,6 +700,15 @@ export function collectDeclaredDependencies(projectRoot: string): Record<string,
             // the runtime cannot install it from the registry.
             if (resolvesToWorkspacePackage(projectRoot, name)) continue;
             const protocol = typeof version === "string" ? nonRegistrySpecifier(version) : null;
+            // The registry-install e2e stands packed tarballs in for versions
+            // that were never published, as `file:` ranges the scaffold and its
+            // Dockerfile both carry, and then builds and boots the result. The
+            // flag is the same one `init` reads to skip its release probe; it
+            // is set by that harness and by nothing a user runs.
+            if (protocol && process.env.REBASE_E2E === "true" && protocol === "file:") {
+                declared[name] = version;
+                continue;
+            }
             if (protocol) {
                 throw new Error(
                     `${relative} declares "${name}": "${version}", which the managed runtime `
