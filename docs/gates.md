@@ -65,7 +65,7 @@ this list, in this order.
 | `check:chart` | The Helm chart lints, renders its three documented topologies, and every refusal in `_validate.tpl` is still reachable. Needs Helm. | — |
 | `check:runtime-image:boots` | The image actually starts, both ways a bundle can arrive, and still refuses when given neither. Needs Docker. | — |
 | `check:names` | A package rename leaking into a bare string, a `.astro` file, an `.env.example` or a Tailwind `@source` path. | — |
-| `check:deps` | Every published package declares what it imports, so it resolves under pnpm's isolated layout and not only under hoisting. | — |
+| `check:deps` | Every published package declares what it imports, so it resolves under pnpm's isolated layout and not only under hoisting — and no two of them ask for majors of one dependency that a user cannot install together (chalk 4 and chalk 5 both reached a real install). | — |
 | `check:publishable-set` | The release derives its own package set from the workspace instead of enumerating it. | — |
 | `check:package-contents` | What each published tarball actually contains — tests shipped by accident, sources shipped on purpose. | — |
 | `check:lint` | ESLint errors (`--quiet`), which no pipeline ran at all until one sat on main. | — |
