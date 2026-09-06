@@ -4,7 +4,7 @@ import path from "path";
 import inquirer from "inquirer";
 import { createRequire } from "module";
 import { findProjectRoot } from "../utils/project";
-import { wantsHelp } from "../utils/args";
+import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 
 const require = createRequire(import.meta.url);
@@ -386,15 +386,23 @@ export async function skillsCommand(subcommand: string | undefined, rawArgs: str
  * (also accepts a comma-separated list, and `all`). Returns null when none were
  * given.
  */
-function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
-    const requested: string[] = [];
-    for (let i = 0; i < rawArgs.length; i++) {
-        if (rawArgs[i] !== "--agent" && rawArgs[i] !== "-a") continue;
-        const value = rawArgs[i + 1];
-        if (value && !value.startsWith("-")) {
-            requested.push(...value.split(",").map(v => v.trim()).filter(Boolean));
-        }
-    }
+export function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
+    // Strict, and before anything is written. This used to scan `rawArgs` for
+    // `--agent` and ignore every other token, so `rebase skills install
+    // --frobnicate --agent claude` exited 0 after writing 21 files — the CLI's
+    // other families reject an unknown flag, and an installer is the last place
+    // to guess what the person meant.
+    const { flags } = parseCommandArgs({
+        spec: { "--agent": [String], "-a": "--agent" },
+        rawArgs,
+        commandWords: 2,
+        command: "skills install",
+        maxPositionals: 0
+    });
+
+    const requested = (flags["--agent"] ?? [])
+        .flatMap(value => value.split(",").map(v => v.trim()))
+        .filter(Boolean);
     if (requested.length === 0) return null;
 
     // `all` exists for the non-interactive case. Detection cannot help there: a
@@ -416,6 +424,10 @@ function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
 }
 
 async function skillsInstall(rawArgs: string[] = []) {
+    // Parse the line before anything else touches the disk: a bad flag must
+    // cost nothing, and everything below this writes or resolves paths.
+    const namedAgents = parseAgentFlags(rawArgs);
+
     // The project root, not the cwd. Agent skills belong beside the repository's
     // other agent configuration — `.claude/`, `.cursor/` — which is both what
     // `detectAgents` looks for and where an assistant reads them from. Resolving
@@ -442,7 +454,7 @@ async function skillsInstall(rawArgs: string[] = []) {
     }
 
     // 2. Explicit --agent wins; otherwise detect existing agent environments
-    let agents = parseAgentFlags(rawArgs) ?? detectAgents(projectDir);
+    let agents = namedAgents ?? detectAgents(projectDir);
 
     // 3. If none detected, ask the user
     if (agents.length === 0) {

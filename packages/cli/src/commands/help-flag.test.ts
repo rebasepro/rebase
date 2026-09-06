@@ -239,3 +239,34 @@ describe("--help never runs the command", () => {
         expect(execaSpy).toHaveBeenCalled();
     });
 });
+
+/**
+ * An unknown flag is a typo, and a typo must cost nothing.
+ *
+ * `skills install` read only `--agent`/`-a` off the line and ignored every
+ * other token, so `rebase skills install --frobnicate --agent claude` exited 0
+ * after writing 21 skill files — while `rebase apps list --frobnicate` exits 1.
+ * One CLI, one policy: `parseCommandArgs` rejects it before the first write.
+ */
+describe("rebase skills rejects an unknown flag before writing anything", () => {
+    it("refuses --frobnicate and writes no file", async () => {
+        await expect(
+            skillsCommand("install", argv("skills", "install", "--frobnicate", "--agent", "claude"))
+        ).rejects.toThrow(/unknown or unexpected option/i);
+
+        expect(filesUnder(path.join(scratch, ".claude"))).toEqual([]);
+    });
+
+    it("refuses a stray positional and writes no file", async () => {
+        await expect(
+            skillsCommand("install", argv("skills", "install", "claude"))
+        ).rejects.toThrow(/takes 0 arguments/);
+
+        expect(filesUnder(path.join(scratch, ".claude"))).toEqual([]);
+    });
+
+    it("still installs when the line is right", async () => {
+        await skillsCommand("install", argv("skills", "install", "--agent", "claude"));
+        expect(filesUnder(path.join(scratch, ".claude")).length).toBeGreaterThan(0);
+    });
+});
