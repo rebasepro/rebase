@@ -224,9 +224,11 @@ search anyone ran, and an empty result reads exactly like "no matches".`
         why: `Six manifests said Node 20, four said 20.10, one said 20, seven said
 nothing, the dogfood app said 18 and five translated quickstarts told
 readers 18+ — while .nvmrc, which is what everyone installs, said
-22.22.0. pnpm enforces \`engines\` on install, so an understated floor is
-not cosmetic: it lets someone through on Node 20 and moves the failure
-into a transitive dependency. The React peer floor decayed the same way.`
+22.22.0. Neither manager enforces \`engines\` on its own (pnpm installs a
+\`>=99.0.0\` project and exits 0), so what makes the number load-bearing is
+\`bin/rebase.js\`'s own floor check and the scaffold's \`engineStrict\` —
+both of which read the declaration this gate keeps honest. The React peer
+floor decayed the same way.`
     },
     {
         run: "check:pnpm-settings",

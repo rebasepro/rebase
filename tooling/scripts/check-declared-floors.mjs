@@ -22,11 +22,20 @@
  * since installing them at the version they advertise produces a tree that
  * cannot run.
  *
- * A `>=20` that is really 22.22 is worse than no declaration. npm and pnpm
- * check `engines` on install, so the number is load-bearing: it is what tells
- * someone on Node 20 to stop *before* an obscure syntax error somewhere in a
- * transitive dependency. Understated, it lets them through and moves the
- * failure somewhere unrecognisable.
+ * A `>=20` that is really 22.22 is worse than no declaration. The number is
+ * what tells someone on Node 20 to stop *before* an obscure syntax error
+ * somewhere in a transitive dependency; understated, it lets them through and
+ * moves the failure somewhere unrecognisable.
+ *
+ * This used to say "npm and pnpm check `engines` on install, so the number is
+ * load-bearing". They do not, by default. pnpm 11 installs a project declaring
+ * `>=99.0.0` silently and exits 0; so does a *dependency* declaring it. npm
+ * prints `EBADENGINE` and also exits 0. So for as long as that sentence stood,
+ * this gate was keeping a number in step that nothing enforced. Two things
+ * enforce it now, and both read the same declaration: `bin/rebase.js` refuses
+ * to run below the CLI's own floor before it imports anything, and the
+ * scaffold sets `engineStrict` (`engine-strict` for npm), which turns both
+ * managers' shrug into a refusal.
  *
  * So: `.nvmrc` is the source, and this gate holds everything else to it.
  *
