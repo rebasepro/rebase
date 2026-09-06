@@ -1,5 +1,5 @@
 ---
-sourceHash: 81774bf42418ed00
+sourceHash: cf5bb8719ad9f47d
 title: Configurazione dell'archiviazione
 sidebar_label: Configurazione archiviazione
 description: Configura backend di archiviazione su filesystem locale, compatibili con S3 o GCS/Firebase Storage per caricamenti di file, immagini e media.
@@ -91,14 +91,27 @@ image: {
 |--------|------|-------------|
 | `POST` | `/api/storage/upload` | Caricamento diretto del file |
 | `POST` | `/api/storage/upload?storageId=<key>` | Caricare su un backend con nome specifico |
-| `GET` | `/api/storage/files/:path` | Recuperare un file |
-| `GET` | `/api/storage/files/:path?storageId=<key>` | Recuperare un file da un backend specifico |
-| `DELETE` | `/api/storage/files/:path` | Eliminare un file |
+| `GET` | `/api/storage/file/*` | Recuperare un file — tutto ciò che segue `/file/` è la chiave dell'oggetto |
+| `GET` | `/api/storage/file/*?storageId=<key>` | Recuperare un file da un backend specifico |
+| `GET` | `/api/storage/metadata/*` | Dimensione, content type e ultima modifica di un oggetto, senza i suoi byte |
+| `DELETE` | `/api/storage/file/*` | Eliminare un file |
+| `GET` | `/api/storage/list` | Elencare gli oggetti sotto un prefisso (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`) |
+| `POST` | `/api/storage/folder` | Creare un marcatore di cartella vuota |
+| `GET` | `/api/storage/sources` | Le sorgenti di storage servite da questo backend, per chiave |
 | `OPTIONS` | `/api/storage/tus` | Interrogare le funzionalità supportate del protocollo TUS |
 | `POST` | `/api/storage/tus` | Avviare una sessione di caricamento ripristinabile TUS |
 | `HEAD` | `/api/storage/tus/:id` | Controllare l'avanzamento del caricamento (offset in byte) |
 | `PATCH` | `/api/storage/tus/:id` | Aggiungere un blocco di dati al file temporaneo |
 | `DELETE` | `/api/storage/tus/:id` | Terminare/annullare la sessione di caricamento TUS |
+
+**Come viene autorizzata la lettura di un file.** Le rotte di lettura —
+`/api/storage/file/*` e `/api/storage/metadata/*` — accettano il token firmato e di
+breve durata emesso da [`getSignedUrl()`](/docs/sdk/storage), passato come
+`?token=<token>` o come `Bearer`. Un normale JWT di accesso viene **rifiutato** su
+`/file/*` con `401 Unauthorized: Access JWT not allowed on file routes`: il token che
+funziona su ogni altra rotta qui non funziona, di proposito, perché l'URL di un file lo
+si consegna a un browser, a una CDN o a un tag `<img>`. Ogni altra riga qui sopra
+accetta il JWT di accesso come sempre.
 
 ## Trasformazioni delle Immagini al Volo
 
@@ -106,7 +119,7 @@ Rebase include una pipeline di elaborazione delle immagini integrata basata su *
 
 ```bash
 # Serve image scaled to 300px width in webp format
-GET /api/storage/files/products/laptop.jpg?width=300&format=webp
+GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 ```
 
 ### Parametri Supportati

@@ -69,7 +69,7 @@ C'est tout. Rebase va :
 2. Enregistrer chaque exportation par défaut comme une tâche cron
 3. Créer automatiquement la table `rebase.cron_logs` dans PostgreSQL (si le pilote supporte SQL)
 4. Démarrer le planificateur et initialiser les compteurs à partir des journaux de BD existants
-5. Monter les routes REST d'administration à `/api/cron`
+5. Monter les routes REST d'administration à `/api/admin/cron`
 
 ## Syntaxe de planification
 
@@ -153,18 +153,18 @@ Toutes les routes cron nécessitent une **authentification administrateur** (`re
 
 | Méthode | Chemin | Description |
 |--------|------|-------------|
-| `GET` | `/api/cron` | Lister toutes les tâches cron enregistrées |
-| `GET` | `/api/cron/:id` | Obtenir le statut d'une tâche unique |
-| `POST` | `/api/cron/:id/trigger` | Déclencher manuellement une tâche |
-| `GET` | `/api/cron/:id/logs` | Obtenir l'historique d'exécution (`?limit=N`) |
-| `PUT` | `/api/cron/:id` | Activer/désactiver une tâche (`{ "enabled": true }`) |
+| `GET` | `/api/admin/cron` | Lister toutes les tâches cron enregistrées |
+| `GET` | `/api/admin/cron/:id` | Obtenir le statut d'une tâche unique |
+| `POST` | `/api/admin/cron/:id/trigger` | Déclencher manuellement une tâche |
+| `GET` | `/api/admin/cron/:id/logs` | Obtenir l'historique d'exécution (`?limit=N`) |
+| `PUT` | `/api/admin/cron/:id` | Activer/désactiver une tâche (`{ "enabled": true }`) |
 
 ### Exemple : Lister toutes les tâches
 
 `$TOKEN` est un jeton d'accès administrateur : connectez-vous et utilisez l'`accessToken` renvoyé par la réponse de connexion. `$API_URL` est l'URL affichée par `rebase dev` — le port est dérivé du projet et n'est pas fixe.
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"
+curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/admin/cron"
 ```
 
 ```json
@@ -190,7 +190,7 @@ curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    "$API_URL/api/cron/health-check/trigger"
+    "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
 ## SDK Client
@@ -237,7 +237,7 @@ Lorsque le pilote de base de données prend en charge SQL (par exemple, PostgreS
 
 - L'historique d'exécution **survit aux redémarrages** du serveur et aux déploiements
 - Les compteurs `totalRuns` et `totalFailures` sont **initialisés à partir de la base de données** au démarrage
-- Le point de terminaison `/api/cron/:id/logs` interroge la base de données, pas seulement la mémoire
+- Le point de terminaison `/api/admin/cron/:id/logs` interroge la base de données, pas seulement la mémoire
 - Plusieurs instances de serveur partagent le même historique d'exécution
 
 La table est créée automatiquement lors du premier démarrage — aucune migration n'est nécessaire.

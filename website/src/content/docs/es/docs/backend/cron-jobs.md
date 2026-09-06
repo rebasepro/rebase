@@ -69,7 +69,7 @@ Eso es todo. Rebase hará lo siguiente:
 2. Registrará cada exportación por defecto como un trabajo cron
 3. Creará automáticamente la tabla `rebase.cron_logs` en PostgreSQL (si el controlador soporta SQL)
 4. Iniciará el planificador y rellenará los contadores a partir de los registros existentes en la base de datos
-5. Montará las rutas REST de administración en `/api/cron`
+5. Montará las rutas REST de administración en `/api/admin/cron`
 
 ## Sintaxis de la programación
 
@@ -153,18 +153,18 @@ Todas las rutas cron requieren **autenticación de administrador** (`requireAuth
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `GET` | `/api/cron` | Lista todos los trabajos cron registrados |
-| `GET` | `/api/cron/:id` | Obtiene el estado de un único trabajo |
-| `POST` | `/api/cron/:id/trigger` | Dispara un trabajo manualmente |
-| `GET` | `/api/cron/:id/logs` | Obtiene el historial de ejecución (`?limit=N`) |
-| `PUT` | `/api/cron/:id` | Habilita/deshabilita un trabajo (`{ "enabled": true }`) |
+| `GET` | `/api/admin/cron` | Lista todos los trabajos cron registrados |
+| `GET` | `/api/admin/cron/:id` | Obtiene el estado de un único trabajo |
+| `POST` | `/api/admin/cron/:id/trigger` | Dispara un trabajo manualmente |
+| `GET` | `/api/admin/cron/:id/logs` | Obtiene el historial de ejecución (`?limit=N`) |
+| `PUT` | `/api/admin/cron/:id` | Habilita/deshabilita un trabajo (`{ "enabled": true }`) |
 
 ### Ejemplo: Listar todos los trabajos
 
 `$TOKEN` es un token de acceso de administrador: inicia sesión y usa el `accessToken` que devuelve la respuesta de login. `$API_URL` es la URL que imprimió `rebase dev` — el puerto se deriva del proyecto y no es fijo.
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"
+curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/admin/cron"
 ```
 
 ```json
@@ -190,7 +190,7 @@ curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    "$API_URL/api/cron/health-check/trigger"
+    "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
 ## SDK del cliente
@@ -237,7 +237,7 @@ Cuando el controlador de la base de datos soporta SQL (p. ej. PostgreSQL), los r
 
 - El historial de ejecución **sobrevive a los reinicios del servidor** y a las implementaciones
 - Los contadores `totalRuns` y `totalFailures` se **inicializan desde la base de datos** al iniciar
-- El endpoint `/api/cron/:id/logs` consulta la base de datos, no solo la memoria
+- El endpoint `/api/admin/cron/:id/logs` consulta la base de datos, no solo la memoria
 - Múltiples instancias de servidor comparten el mismo historial de ejecución
 
 La tabla se crea automáticamente en el primer inicio — no se necesitan migraciones.
