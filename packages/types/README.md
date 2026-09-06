@@ -8,6 +8,10 @@ Shared TypeScript type definitions and interfaces for the Rebase ecosystem.
 pnpm add @rebasepro/types
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 ## What This Package Does
 
 Provides the canonical type definitions used across all Rebase packages — both client-side and server-side. This is a **types-only** package with no runtime dependencies. Every other `@rebasepro/*` package depends on it.

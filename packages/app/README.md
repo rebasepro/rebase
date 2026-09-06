@@ -8,6 +8,10 @@ Framework-agnostic runtime for data-driven admin panels — React hooks, provide
 pnpm add @rebasepro/app
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 **Peer dependencies:** `react >= 19.2.7`, `react-dom >= 19.2.7`, `react-router ^8`
 
 ## What This Package Does

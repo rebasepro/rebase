@@ -8,6 +8,10 @@ Developer tools layer for Rebase — provides 9 lazy-loaded tools (SQL Console, 
 pnpm add @rebasepro/studio
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 ### Peer Dependencies
 
 - `react` >= 19.0.0

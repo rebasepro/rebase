@@ -8,6 +8,10 @@ Model Context Protocol (MCP) server that exposes Rebase schema, database, docume
 pnpm add @rebasepro/mcp
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 Or run directly:
 
 ```bash
