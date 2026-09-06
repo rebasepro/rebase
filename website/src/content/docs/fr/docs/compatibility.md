@@ -1,5 +1,5 @@
 ---
-sourceHash: 5de8d85cb2d31896
+sourceHash: 64da41d7e9319170
 slug: fr/docs/compatibility
 title: Compatibilité
 description: Ce que Rebase garantit ou non entre les versions — les six contrats versionnés, la façon dont chacun échoue, et ce qui peut encore changer dans une version mineure.
@@ -142,6 +142,30 @@ Un hash des définitions de collections compilées, émis dans le manifeste du b
 renvoyé par un SDK généré dans l'en-tête `x-rebase-schema` (`SCHEMA_VERSION_HEADER`).
 Il existe pour que la plateforme puisse indiquer « cette application a été construite
 avec un schéma plus ancien » au lieu d'échouer mystérieusement à la première requête.
+
+Le backend lit cet en-tête à chaque requête de données. Une dérive ne refuse jamais
+un appel — un SDK en retard d'un schéma reste le plus souvent compatible, et livrer
+le backend avant le frontend est l'ordre de déploiement habituel — mais lorsqu'une
+requête échoue en 400 ou en 404, l'erreur porte la dérive comme cause :
+
+```json
+{
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "Unknown field \"authorName\" on collection \"posts\"",
+    "cause": {
+      "code": "SCHEMA_DRIFT",
+      "clientSchema": "v1:0e1c…",
+      "serverSchema": "v1:9ab4…",
+      "message": "This client was generated against schema v1:0e1c…; this backend serves v1:9ab4…"
+    }
+  }
+}
+```
+
+Une colonne renommée se lit ainsi comme « votre SDK est périmé, régénérez-le »
+plutôt que comme un champ dont vos propres types affirment l'existence. Une
+requête qui aboutit n'en est jamais informée.
 
 Il couvre **les collections uniquement**. La modification d'un hook ou d'une fonction
 ne modifie pas le contrat d'un client et ne doit pas invalider tous les SDK générés.

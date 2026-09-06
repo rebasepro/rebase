@@ -4,6 +4,32 @@ import type { HonoEnv } from "./types";
 import { logger } from "../utils/logger";
 import { hostEnv } from "../utils/host";
 
+/**
+ * A stale caller's schema stamp, as the cause of the error it explains.
+ *
+ * `createSchemaDriftDetector` puts the two stamps on the context when a request
+ * carries an `x-rebase-schema` older than this backend's. It lives next door;
+ * this half is here because `errors.ts` is in the graph of
+ * `@rebasepro/server/functions` and may not reach `@rebasepro/types` at runtime.
+ */
+function schemaDriftCause(drift: { client: string; server: string } | undefined): {
+    code: string;
+    message: string;
+    clientSchema: string;
+    serverSchema: string;
+} | undefined {
+    if (!drift) return undefined;
+    return {
+        code: "SCHEMA_DRIFT",
+        message:
+            `This client was generated against schema ${drift.client}; this backend serves `
+            + `${drift.server}. If the field named above was renamed or removed, regenerate the `
+            + "SDK (`rebase generate-sdk`) and rebuild.",
+        clientSchema: drift.client,
+        serverSchema: drift.server
+    };
+}
+
 /** Tracks whether we've already shown the doctor hint (once per process). */
 let _schemaDriftHinted = false;
 
@@ -160,6 +186,20 @@ export interface ErrorResponse {
         details?: unknown;
         /** Request correlation ID for tracing (echoes X-Request-ID). */
         requestId?: string;
+        /**
+         * Why this request was going to fail whatever it asked for.
+         *
+         * Only `SCHEMA_DRIFT` today: the caller's `x-rebase-schema` stamp is
+         * older than this backend's, so a 400 naming an unknown field is very
+         * likely a rename the client has not regenerated for. The error itself
+         * is unchanged — this explains it, it does not cause it.
+         */
+        cause?: {
+            code: string;
+            message: string;
+            clientSchema: string;
+            serverSchema: string;
+        };
     };
 }
 
@@ -228,6 +268,19 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // Matched by name rather than `instanceof`: a monorepo can resolve two
     // copies of @rebasepro/types, and `instanceof` is false across them.
     const isBrowserSafeError = /^Rebase(Api|Client)Error$/.test(error.name);
+
+    /* A stale SDK, named on the errors it explains.
+
+       400 and 404 only: those are what a renamed or removed field produces —
+       an unknown filter field is a 400, a collection gone from under its slug
+       is a 404 — and they are the two a caller can act on by regenerating.
+       Attaching it to a 500 would be noise, since a server fault has nothing to
+       do with how old the caller's schema is. */
+    const driftFor = (status: number) =>
+        (status === 400 || status === 404) && typeof c.get === "function"
+            ? schemaDriftCause(c.get("schemaDrift"))
+            : undefined;
+
     if (isBrowserSafeError && error.statusCode === undefined) {
         const status = (error as unknown as { status?: unknown }).status;
         if (typeof status === "number") error.statusCode = status;
@@ -249,14 +302,17 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
                 logger.warn(`⚠️ ${line}`);
             }
         }
+        const apiErrorStatus = error.statusCode || 500;
+        const apiErrorDrift = driftFor(apiErrorStatus);
         return c.json({
             error: {
                 message: error.message,
                 code: error.code || "INTERNAL_ERROR",
                 ...(error.details !== undefined && { details: error.details }),
-                ...(reqId && { requestId: reqId })
+                ...(reqId && { requestId: reqId }),
+                ...(apiErrorDrift && { cause: apiErrorDrift })
             }
-        } satisfies ErrorResponse, (error.statusCode || 500) as ContentfulStatusCode);
+        } satisfies ErrorResponse, apiErrorStatus as ContentfulStatusCode);
     }
 
     let statusCode = error.statusCode || codeToStatus(error.code) || 500;
@@ -423,6 +479,8 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         })
     } : undefined;
 
+    const drift = driftFor(statusCode);
+
     return c.json({
         error: {
             message: clientMessage,
@@ -430,7 +488,8 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
             ...(error.details !== undefined
                 ? { details: error.details }
                 : dbDetails !== undefined ? { details: dbDetails } : {}),
-            ...(reqId && { requestId: reqId })
+            ...(reqId && { requestId: reqId }),
+            ...(drift && { cause: drift })
         }
     } satisfies ErrorResponse, statusCode as ContentfulStatusCode);
 };
