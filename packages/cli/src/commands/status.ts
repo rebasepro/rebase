@@ -21,7 +21,7 @@ import chalk from "chalk";
 import fs from "fs";
 import path from "path";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
-import { readEnvFile, requireProjectRoot } from "../utils/project";
+import { failAsJson, readEnvFile, requireProjectRoot } from "../utils/project";
 import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
 import { deriveOptionsFor, deriveResourceGraph, RESOURCE_GRAPH_FILENAME, readResourceGraphFile, serializeResourceGraph } from "../resources/derive";
 import { computeStatus, type ResourceStatus } from "../resources/status";
@@ -112,11 +112,25 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
 
     const projectRoot = requireProjectRoot();
 
+    // Every exit below has a `--json` arm, because `--json` means stdout holds
+    // one JSON object on *every* exit of the command. It used to mean that for
+    // the one failure `requireProjectRoot` owns and nothing else, so a caller
+    // parsing stdout got an envelope outside a project and an empty stream
+    // inside a broken one — the case it actually has to handle.
+    const asJson = Boolean(flags["--json"]);
+
     let backend: { name: string; app: RebaseBackendAppConfig };
     try {
         const loaded = loadManifest(projectRoot);
         const found = findBackendApp(loaded.manifest);
         if (!found) {
+            if (asJson) {
+                failAsJson(
+                    "This project declares no backend app, so it declares no resources.",
+                    "no_backend_app",
+                    "Add a backend app to rebase.json, or run `rebase apps init`."
+                );
+            }
             console.error(chalk.red("This project declares no backend app, so it declares no resources."));
             process.exitCode = 1;
             return;
@@ -124,6 +138,10 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
         backend = found;
     } catch (err) {
         if (err instanceof ManifestError) {
+            if (asJson) {
+                failAsJson(err.message, "manifest_invalid", "Fix rebase.json, then run this again.",
+                    err.issues.map(issue => ({ path: issue.path, message: issue.message })));
+            }
             console.error(chalk.red(err.message));
             for (const issue of err.issues) console.error(`  ${chalk.gray(issue.path)} ${issue.message}`);
             process.exitCode = 1;
@@ -137,6 +155,14 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
 
     const { graph, issues } = await deriveResourceGraph(deriveOptionsFor(projectRoot, backendApp));
     if (issues.length > 0) {
+        if (asJson) {
+            failAsJson(
+                `${issues.length} problem(s) in the declared resources.`,
+                "resource_declaration_invalid",
+                "Fix the declarations the issues name, then run this again.",
+                issues.map(issue => ({ path: issue.path, message: issue.message }))
+            );
+        }
         console.error(chalk.red(`\n✗ ${issues.length} problem(s) in the declared resources:\n`));
         for (const issue of issues) console.error(`  ${chalk.bold(issue.path)}  ${issue.message}`);
         console.error("");
@@ -180,7 +206,7 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
         ...(managedDatabase ? { managedDatabase } : {})
     });
 
-    if (flags["--json"]) {
+    if (asJson) {
         console.log(JSON.stringify({ backend: backendName, runtime: backendApp.runtime, resources, blocked }, null, 2));
         return;
     }
