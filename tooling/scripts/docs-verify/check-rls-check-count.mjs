@@ -42,7 +42,20 @@ const NUMBER_WORDS = new Map([
 /** "checks" in the four marketing locales plus the docs' six. */
 const CHECKS_WORD = "(?:checks|prüfungen|comprobaciones|contrôles|verifiche|verificações)";
 
-function countPackageChecks(root) {
+/**
+ * The count, from the package that ships it.
+ *
+ * Exported because the two generators that *print* the number —
+ * `website/scripts/generate_llms_txt.js` and `generate_og_images.mjs` — must
+ * derive it from the same place rather than restate it. They were the two
+ * artefacts a model and a social preview read, and both said "fourteen" for a
+ * week after the fifteenth check landed, because a generator's output is not
+ * prose anybody proofreads.
+ *
+ * @param {string} root Repository root.
+ * @returns {number | null} null when the array can no longer be found.
+ */
+export function countPackageChecks(root) {
     const source = readFileSync(
         path.join(root, "packages/rls-check/src/checks/index.ts"), "utf8");
     const block = source.match(/export const CHECKS: Check\[\] = \[([\s\S]*?)\]/);
@@ -63,18 +76,38 @@ function countWebsiteCatalogue(root) {
  * The CHANGELOG is excluded on purpose: "Fourteen checks" in the entry that
  * shipped the fourteenth was true when it was written, and a released changelog
  * is a record rather than a claim.
+ *
+ * The list is wider than "prose a human wrote". It missed `website/scripts/**`
+ * (the generators), `website/public/llms.txt` (their output, committed), the
+ * `.astro` pages under `src/pages/**` and every `.mdx`, and the count went on
+ * being wrong in the two artefacts an AI and a social preview read while this
+ * gate exited 0.
+ *
+ * `llms-full.txt` is deliberately NOT scanned: it is the whole documentation
+ * concatenated, CHANGELOG included, so scanning it would re-import the one
+ * exclusion above. Its inputs are all scanned individually.
  */
 function proseFiles(root) {
     return [
         ...globSync("website/src/i18n/*.ts", { cwd: root }),
         ...globSync("website/src/components/**/*.astro", { cwd: root }),
+        ...globSync("website/src/pages/**/*.astro", { cwd: root }),
+        ...globSync("website/src/pages/**/*.ts", { cwd: root }),
+        ...globSync("website/src/utils/**/*.ts", { cwd: root }),
         ...globSync("website/src/data/rls-checks.ts", { cwd: root }),
         ...globSync("website/src/content/docs/**/*.md", { cwd: root }),
+        ...globSync("website/src/**/*.mdx", { cwd: root }),
+        // The generators, and the file they write. A number typed into a
+        // generator is a number nobody proofreads.
+        ...globSync("website/scripts/**/*.js", { cwd: root }),
+        ...globSync("website/scripts/**/*.mjs", { cwd: root }),
+        ...globSync("website/public/llms.txt", { cwd: root }),
         // The root `docs/` is the SOURCE `copy_repo_docs.js` mirrors into the
         // website, so a stale count here is one that comes back on the next
         // mirror run. Scanning only the mirror would catch it once and then
         // watch it return.
         ...globSync("docs/**/*.md", { cwd: root }),
+        ...globSync("docs/**/*.mdx", { cwd: root }),
         ...globSync("README.md", { cwd: root }),
         ...globSync("packages/rls-check/README.md", { cwd: root })
     ].filter(rel => !/CHANGELOG/i.test(rel) && !rel.includes("/blog/") && !rel.startsWith("docs/audits/"));

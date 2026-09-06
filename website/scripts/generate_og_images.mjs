@@ -24,9 +24,20 @@ import { chromium } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mkdirSync } from "node:fs";
+// The same derivation the llms.txt generator and the count gate use. A number
+// baked into a PNG is the hardest kind to notice going stale: this card kept
+// the previous count for as long as nobody re-rendered it.
+import { countPackageChecks } from "../../tooling/scripts/docs-verify/check-rls-check-count.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(here, "..", "public", "img", "og");
+
+const RLS_CHECK_COUNT = countPackageChecks(path.resolve(here, "..", ".."));
+if (!RLS_CHECK_COUNT) {
+    throw new Error(
+        "Could not read the rls-check CHECKS array — refusing to render a count into a card."
+    );
+}
 
 /**
  * One card per route worth sharing.
@@ -60,7 +71,10 @@ const CARDS = [
         // Not the command as the title: `@rebasepro/rls-check` has no break
         // opportunity and wrapped mid-word at this size.
         title: "Find the tables anyone can read",
-        sub: "npx @rebasepro/rls-check $DATABASE_URL — fourteen checks, no signup."
+        // The command as the tool documents it: it reads `DATABASE_URL` from the
+        // environment. Spelling `$DATABASE_URL` on a shared card teaches people
+        // to put a connection string with a password into their shell history.
+        sub: `npx @rebasepro/rls-check — ${RLS_CHECK_COUNT} checks, no signup.`
     },
     {
         slug: "backend",
@@ -123,7 +137,13 @@ const html = ({ eyebrow, title, sub }) => `<!doctype html>
 </body></html>`;
 
 mkdirSync(OUT, { recursive: true });
-const browser = await chromium.launch();
+// Playwright's own Chromium is a `playwright install` away, which a checkout
+// that never runs the browser tests does not have. `OG_CHROME_CHANNEL=chrome`
+// renders through the Chrome already on the machine instead, so re-rendering a
+// card is never blocked on a 150 MB download.
+const browser = await chromium.launch(
+    process.env.OG_CHROME_CHANNEL ? { channel: process.env.OG_CHROME_CHANNEL } : {}
+);
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
 
 for (const card of CARDS) {
