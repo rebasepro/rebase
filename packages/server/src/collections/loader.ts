@@ -47,7 +47,18 @@ async function importModule(filePath: string): Promise<Record<string, unknown>> 
     return await import(pathToFileURL(filePath).href);
 }
 
-/** Read `defaultSecurityRules` from a collections directory's index module. */
+/**
+ * Read `defaultSecurityRules` from a collections directory's index module.
+ *
+ * An index that is not there at all is the ordinary case and means "no
+ * defaults". An index that IS there and cannot be imported is fatal, because
+ * the one thing it declares is the access rules every collection without its
+ * own inherits: swallowing the failure returned `{}`, every collection fell
+ * back to locked-by-default, and the boot went on to announce success while
+ * applying a different set of policies than the project asked for. A syntax
+ * error in this file changed the security posture of the whole API and the
+ * only trace was one warning line.
+ */
 async function readDefaults(directory: string): Promise<CollectionDefaults> {
     for (const name of ["index.ts", "index.js"]) {
         const indexPath = path.join(directory, name);
@@ -56,10 +67,15 @@ async function readDefaults(directory: string): Promise<CollectionDefaults> {
             const mod = await importModule(indexPath);
             return { defaultSecurityRules: mod.defaultSecurityRules as SecurityRule[] | undefined };
         } catch (err) {
-            // The index usually just re-exports the collections for the frontend;
-            // a failure to read it must not take the whole load down.
-            logger.warn(`[collections] Could not read defaults from ${name}: ${err instanceof Error ? err.message : String(err)}`);
-            return {};
+            throw new Error(
+                `Could not load ${indexPath}.\n\n` +
+                `${err instanceof Error ? err.message : String(err)}\n\n` +
+                "This file declares `defaultSecurityRules` — the access rules every collection " +
+                "that declares none of its own inherits. Loading the collections without it would " +
+                "serve them under a different authorization model than the project declares, so " +
+                "this is fatal. Fix the file, or delete it if the project has no defaults.",
+                { cause: err }
+            );
         }
     }
     return {};
