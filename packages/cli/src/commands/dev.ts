@@ -38,31 +38,52 @@ import {
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { affectsSqlSchema } from "../utils/collection-drift";
-import { ensureDevDatabase } from "../utils/dev-preflight";
+import { ensureDevDatabase, probeTcp } from "../utils/dev-preflight";
 import { runDriverDbCommand, runDriverSchemaCommand } from "./db";
 import dotenv from "dotenv";
 import { recordEvent } from "../telemetry";
 
 /**
- * The line the watcher prints when the entry it ran threw.
+ * The line the watcher prints when it is about to run the entry again.
  *
  * `rebase dev` has no exit code to read: the watcher outlives the process it
- * started, so a backend that dies on boot leaves it running and the CLI
- * printing "Press Ctrl+C to stop all servers." under the stack trace, as if
- * everything were fine. This string is the fastest signal that it is not.
+ * started, so a backend that dies leaves it running and the CLI printing
+ * "Press Ctrl+C to stop all servers." under the stack trace, as if everything
+ * were fine.
  *
- * It is Node's, not tsx's — `--watch="…"` in `watchArgs` is passed straight
- * through to Node, so Node's own watcher does the restarting and writes
- * "Failed running 'src/index.ts'. Waiting for file changes before
- * restarting...". Which means it appears on the default `rebase dev` path and
- * NOT under `--generate`, where tsx watches by itself and says nothing. The
- * readiness deadline below is what covers that half.
+ * What used to be here was `/Waiting for file changes before restarting/` —
+ * **Node's** message, on the theory that `--watch=…` was passed through to
+ * Node. It is not: the backend is spawned as `tsx watch …` (see `watchArgs`),
+ * so tsx does the watching and Node's line is never printed. The marker
+ * matched nothing at all — and the test guarding it ran `node --watch`
+ * directly, so it kept proving that Node's wording was intact while the CLI
+ * watched a stream that never contained it. That is precisely the silent death
+ * the old comment warned about, reached by a different route.
  *
- * Exported so `dev-crash-marker.test.ts` can hold the running Node to it. A
- * match on another tool's wording is exactly the check that dies silently on an
- * upgrade: nothing throws, and `rebase dev` quietly goes back to saying nothing.
+ * So this is tsx's, captured from tsx 4.23.1:
+ *
+ *     6:26:11 AM [tsx] change in ./src/index.ts Rerunning...
+ *     6:26:11 AM [tsx] change in ./src/index.ts Restarting...
+ *
+ * "Rerunning" when the previous run had already exited, "Restarting" when it
+ * was still up and had to be killed first. Both mean the same thing here: the
+ * backend that was announced is gone, and whether another one arrives is an
+ * open question again — so the readiness deadline is re-armed.
+ *
+ * Exported so `dev-crash-marker.test.ts` can hold the running tsx to it.
  */
-export const WATCHER_CRASH_MARKER = /Waiting for file changes before restarting/i;
+export const WATCHER_RESTART_MARKER = /\[tsx\][^\n]*\b(?:Rerunning|Restarting)\b/i;
+
+/**
+ * How often to ask whether the announced backend is still listening.
+ *
+ * The watcher says nothing when its child is killed outright, so a poll is the
+ * only signal there is. Five seconds is chosen against the thing it must not
+ * do — report a healthy server as dead — rather than against detection speed:
+ * two consecutive misses are needed, so it takes ten seconds of a genuinely
+ * closed port to say anything.
+ */
+const LIVENESS_INTERVAL_MS = 5_000;
 
 /**
  * Quote a path for the shell `execa` runs the backend through.
@@ -735,7 +756,11 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 }
             }
         });
-        process.exit(0);
+        // Not a hard-coded 0. Ctrl+C is how `rebase dev` normally ends, so
+        // exiting 0 unconditionally threw away the one thing `--backend-only`
+        // has to report: whether the backend it was asked to run is up. A
+        // healthy run still exits 0 — nothing sets the code in that case.
+        process.exit(typeof process.exitCode === "number" ? process.exitCode : 0);
     };
     process.on("SIGINT", cleanup);
     process.on("SIGTERM", cleanup);
@@ -1149,24 +1174,6 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
          */
         let backendAnnounced = false;
 
-        /**
-         * The watcher's verdict on a run that threw.
-         *
-         * The exact moment the backend stops being a thing that is starting and
-         * becomes a thing that failed — and it arrives as one `[backend]` line
-         * between a stack trace and the "Press Ctrl+C to stop all servers"
-         * footer, which is why a developer reads the footer and believes it.
-         *
-         * Checked on both streams: which pipe it lands on is Node's business,
-         * and a marker watched on the wrong one is a check that silently never
-         * fires.
-         */
-        const noticeWatcherVerdict = (line: string): void => {
-            if (!WATCHER_CRASH_MARKER.test(stripAnsi(line))) return;
-            // Deferred a tick so the marker prints above the verdict, not under it.
-            setTimeout(() => reportBackendDown("The backend crashed on startup."), 0);
-        };
-
         /** The verdict, printed once per failure rather than once per line. */
         let backendDownReported = false;
         const reportBackendDown = (headline: string) => {
@@ -1176,27 +1183,100 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             console.error(chalk.red(`  ✗ ${headline}`));
             console.error(chalk.gray("    Fix the error above; the watcher restarts it on the next change."));
             console.log("");
+            // With a frontend still running there is a server to keep serving,
+            // so the run continues and only the message is owed. `--backend-only`
+            // has nothing left to do, and a zero exit there tells a script the
+            // backend ran fine. Cleared again by the next "Server running at".
+            if (backendOnly) process.exitCode = 1;
         };
 
         /**
-         * Say so when the backend never came up.
+         * Say so when the backend is not up.
          *
-         * A deadline rather than an exit code, because there is often no exit to
-         * watch: the watcher survives its child and waits for a file change, so
-         * a crash is visible only as an absence. The marker above usually gets
-         * there first — but only on the default path, since `--generate` leaves
-         * tsx to watch on its own and tsx says nothing. This is the half that
-         * covers that, and a boot that hangs instead of throwing. Generous on
-         * purpose, and it neither kills anything nor changes what the watcher does.
+         * A deadline rather than an exit code, because there is usually no exit
+         * to watch: the watcher survives its child and waits for a file change,
+         * so a crash is visible only as an absence.
+         *
+         * Armed once at spawn and **re-armed on every restart**, which is the
+         * half that was missing. The old timer fired once, thirty seconds after
+         * start-up, and its body began `if (backendAnnounced) return` — so a
+         * backend that came up and then died on the next save was covered by
+         * nothing at all. Breaking `config/resources.ts` under a running
+         * `rebase dev` printed a stack trace, took `/health` to nothing, and
+         * left the CLI saying "Press Ctrl+C to stop all servers."
          */
         const readyTimeoutMs = Number(env.REBASE_DEV_READY_TIMEOUT_MS ?? process.env.REBASE_DEV_READY_TIMEOUT_MS ?? 30_000);
-        const readyDeadline = readyTimeoutMs > 0
-            ? setTimeout(() => {
+        let readyDeadline: NodeJS.Timeout | undefined;
+        const disarmReadyDeadline = () => {
+            if (readyDeadline) clearTimeout(readyDeadline);
+            readyDeadline = undefined;
+        };
+        const armReadyDeadline = (headline: string) => {
+            disarmReadyDeadline();
+            if (readyTimeoutMs <= 0) return;
+            readyDeadline = setTimeout(() => {
                 if (backendAnnounced) return;
-                reportBackendDown(`The backend has not started after ${Math.round(readyTimeoutMs / 1000)}s.`);
-            }, readyTimeoutMs)
-            : undefined;
-        readyDeadline?.unref?.();
+                reportBackendDown(headline);
+            }, readyTimeoutMs);
+            readyDeadline.unref?.();
+        };
+        const readySeconds = Math.round(readyTimeoutMs / 1000);
+        armReadyDeadline(`The backend has not started after ${readySeconds}s.`);
+
+        /**
+         * The restart line, on either stream.
+         *
+         * A restart means the announced backend is gone: it either exited on
+         * its own (tsx says "Rerunning") or is being killed (tsx says
+         * "Restarting"). Either way the question "is there a server?" is open
+         * again, so readiness is un-announced and the deadline re-armed. Without
+         * this the flag stayed true forever after the first successful boot.
+         *
+         * Checked on both streams because which pipe it lands on is tsx's
+         * business, and a marker watched on the wrong one never fires.
+         */
+        const noticeWatcherRestart = (line: string): void => {
+            if (!WATCHER_RESTART_MARKER.test(stripAnsi(line))) return;
+            backendAnnounced = false;
+            backendDownReported = false;
+            armReadyDeadline(`The backend did not come back up after ${readySeconds}s.`);
+        };
+
+        /**
+         * And notice a backend that dies without tsx saying anything.
+         *
+         * `kill -9` of the server process is the plain case: tsx stays alive,
+         * prints nothing, and waits for a file change that may never come.
+         * Measured on tsx 4.23.1 — the watcher's transcript after the kill is
+         * empty. So the only honest question left is whether anything is still
+         * listening on the port the backend announced, and this asks it.
+         *
+         * Only runs between an announcement and the next restart, so an
+         * ordinary restart (where the port is legitimately closed for a second)
+         * cannot trip it: `noticeWatcherRestart` clears `backendAnnounced`
+         * before the process is killed. Two misses rather than one, because a
+         * single refused connect under load is not yet news.
+         */
+        let missedProbes = 0;
+        const liveness = setInterval(() => {
+            if (shuttingDown || !backendAnnounced || !resolvedBackendPort) {
+                missedProbes = 0;
+                return;
+            }
+            const port = resolvedBackendPort;
+            void probeTcp("127.0.0.1", port, 1_000).then(alive => {
+                if (!backendAnnounced || resolvedBackendPort !== port) return;
+                if (alive) {
+                    missedProbes = 0;
+                    return;
+                }
+                if (++missedProbes < 2) return;
+                backendAnnounced = false;
+                missedProbes = 0;
+                reportBackendDown(`The backend stopped listening on port ${port}.`);
+            });
+        }, LIVENESS_INTERVAL_MS);
+        liveness.unref?.();
 
         /**
          * And say so when tsx itself gives up.
@@ -1208,17 +1288,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
          * exit code should say so.
          */
         backendChild.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
-            if (readyDeadline) clearTimeout(readyDeadline);
+            disarmReadyDeadline();
+            clearInterval(liveness);
+            backendAnnounced = false;
             // The watcher itself is gone, so this is terminal in a way a failed
             // run is not — worth saying even if a crash was already reported.
             backendDownReported = false;
             reportBackendDown(signal
                 ? `Backend was killed by ${signal}.`
                 : `Backend exited with code ${code ?? 1}.`);
-            // With a frontend still running there is a server to keep serving,
-            // so the run continues and only the message is owed. `--backend-only`
-            // has nothing left to do, and a zero exit there tells a script the
-            // backend ran fine.
             if (backendOnly) process.exitCode = code ?? 1;
         });
 
@@ -1226,7 +1304,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             const lines = data.toString().split("\n").filter(Boolean);
             lines.forEach((line: string) => {
                 console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
-                noticeWatcherVerdict(line);
+                noticeWatcherRestart(line);
                 const cleanLine = stripAnsi(line);
                 const swaggerMatch = cleanLine.match(/Swagger UI available.*"path":"([^"]+)"/);
                 if (swaggerMatch) swaggerPath = swaggerMatch[1];
@@ -1235,7 +1313,11 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 if (serverMatch) {
                     backendAnnounced = true;
                     backendDownReported = false;
-                    if (readyDeadline) clearTimeout(readyDeadline);
+                    missedProbes = 0;
+                    // The backend is up, so an earlier failure is no longer the
+                    // answer this run gives.
+                    if (backendOnly) process.exitCode = 0;
+                    disarmReadyDeadline();
                     resolvedBackendPort = parseInt(serverMatch[1], 10);
                     backendUrl = "started";
                     printSummary();
@@ -1265,7 +1347,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             lines.forEach((line: string) => {
                 console.log(`${chalk.cyan.bold("[backend]")}  ${line}`);
 
-                noticeWatcherVerdict(line);
+                noticeWatcherRestart(line);
 
                 // Detect corrupted node_modules at runtime
                 // (covers tsx and any other dependency whose pnpm store entry is broken)

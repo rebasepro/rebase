@@ -5,6 +5,13 @@
  * so that `@rebasepro/types` resolves from them the way it resolves from a real
  * project. A fixture under `os.tmpdir()` has no `node_modules` above it, so the
  * import would fail for a reason that has nothing to do with what is under test.
+ *
+ * At the package root, though, and not under `src/`: `printed-commands.test.ts`
+ * walks every file under `src/` and reads it, and vitest runs the two files
+ * concurrently, so a fixture that appeared and vanished mid-walk failed that
+ * suite with `ENOENT … .tmp-resources-oXbjTz/config/collections/facts.ts`
+ * about one full run in four. The `node_modules` these fixtures need is one
+ * directory further up either way.
  */
 import fs from "fs";
 import os from "os";
@@ -19,11 +26,13 @@ import {
 } from "./derive";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+/** `packages/cli` — inside the package, outside the tree other suites walk. */
+const PACKAGE_ROOT = path.resolve(HERE, "..", "..");
 let root: string;
 let configDir: string;
 
 beforeEach(() => {
-    root = fs.mkdtempSync(path.join(HERE, ".tmp-resources-"));
+    root = fs.mkdtempSync(path.join(PACKAGE_ROOT, ".tmp-resources-"));
     configDir = path.join(root, "config");
     fs.mkdirSync(configDir, { recursive: true });
 });
@@ -262,9 +271,12 @@ describe("the committed file", () => {
 });
 
 describe("temp fixtures", () => {
-    it("does not leave anything in the package", () => {
+    it("live at the package root, never under src/", () => {
+        // Under `src/` they raced `printed-commands.test.ts`, which reads every
+        // file it finds there while this suite is creating and deleting them.
         expect(fs.existsSync(root)).toBe(true);
-        expect(path.dirname(root)).toBe(HERE);
+        expect(path.dirname(root)).toBe(PACKAGE_ROOT);
+        expect(root.startsWith(path.join(PACKAGE_ROOT, "src"))).toBe(false);
         expect(os.tmpdir()).toBeTruthy();
     });
 });
