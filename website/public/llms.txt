@@ -110,6 +110,7 @@
 - [Schema as Code](https://rebase.pro/docs/architecture/schema-as-code): How Rebase uses TypeScript collections as the single source of truth for your database schema, UI, and API.
 - [Runtime and Bundles](https://rebase.pro/docs/architecture/runtime-and-bundles): How a Rebase project separates into a project bundle and a versioned runtime, and why that separation is what makes upgrades, multi-repo apps and managed hosting possible.
 - [Apps and Repositories](https://rebase.pro/docs/architecture/apps-and-repositories): A project is a backend plus the apps that talk to it, which can each live in their own repository.
+- [Deployment](https://rebase.pro/docs/deployment): Where a Rebase project can run — Rebase Cloud, your own server, Kubernetes, or a managed container platform — and which guide to open for each.
 - [Deployment](https://rebase.pro/docs/getting-started/deployment): Deploy your Rebase project to production using Docker, cloud platforms, or manual setups.
 - [Rebase Cloud](https://rebase.pro/docs/deployment/cloud): Rebase Cloud is the same Rebase, operated for you. What it is, how a project links and deploys, and what the private beta does not include yet.
 - [Self-Hosting](https://rebase.pro/docs/deployment/self-hosting): Run Rebase anywhere with the official runtime image and your project bundle — Docker Compose, Fly, Railway, or a plain VPS.
