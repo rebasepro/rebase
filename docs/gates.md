@@ -81,7 +81,7 @@ this list, in this order.
 | `check:deps` | Every published package declares what it imports, so it resolves under pnpm's isolated layout and not only under hoisting. | — |
 | `check:publishable-set` | The release derives its own package set from the workspace instead of enumerating it. | — |
 | `check:package-contents` | What each published tarball actually contains — tests shipped by accident, sources shipped on purpose. | — |
-| `check:lint` | ESLint errors (`--quiet`), which no pipeline ran at all until one sat on main. | — |
+| `check:lint` | ESLint errors (`--quiet`) over `packages/`, `app/`, `tests/` and `tooling/scripts/`, which no pipeline ran at all until one sat on main. `website/`, `examples/` and `tooling/videos/` are ignored, each with its reason and its measured error count in `eslint.config.mjs`. | — |
 | `check:hooks` | A ratchet over `exhaustive-deps` warnings: 183 candidate stale closures, and the 184th would have hidden among them. | `pnpm check:hooks --update` |
 | `check:unused` | A ratchet over values computed and discarded — where the bugs are, not the tidiness. | `pnpm check:unused --update` |
 | `check:test-scripts` | Every package declares `test` and `test:watch`. A package without one is not reported as skipped; it is not reported at all. | `KNOWN_WITHOUT_TESTS` in the script |
