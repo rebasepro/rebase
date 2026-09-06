@@ -169,6 +169,7 @@ function pendingBackgroundWork
 function pkceTokenParams
 function providerVerifiedEmail
 function raw
+function rawQueryLoggingEnabled
 function readBackupBytes
 function readBundleManifest
 function registerDevEmailSink

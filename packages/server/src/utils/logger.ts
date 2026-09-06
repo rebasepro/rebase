@@ -145,12 +145,21 @@ function isSensitiveKey(key: string): boolean {
 }
 
 /**
- * Local escape hatch for the `Failed query:` strip only — the statement is the
- * fastest way to diagnose a failing query on a developer machine. Ignored in
+ * Whether a SQL statement may be written out at all.
+ *
+ * The escape hatch for the `Failed query:` strip — the statement is the fastest
+ * way to diagnose a failing query on a developer machine. Ignored in
  * production, so a runtime that inherits the variable cannot leak because of
  * it, and it never re-enables the key deny-list.
+ *
+ * Exported because it is the *only* answer to "may this process print SQL", and
+ * a driver that wants to trace what it executes has to ask the same question.
+ * The Postgres driver used to decide for itself, with a `console.debug` gated
+ * on `NODE_ENV` alone: every statement went to stdout whatever `LOG_LEVEL`
+ * said, and it went there without passing through the redaction that lives in
+ * this file.
  */
-function rawQueriesAllowed(): boolean {
+export function rawQueryLoggingEnabled(): boolean {
     return hostEnv().NODE_ENV !== "production"
         && hostEnv().REBASE_LOG_RAW_QUERIES === "true";
 }
@@ -169,7 +178,7 @@ function rawQueriesAllowed(): boolean {
  * before persisting and then logs the result.
  */
 export function redactSensitiveText(text: string): string {
-    if (!text.includes(FAILED_QUERY_MARKER) || rawQueriesAllowed()) return text;
+    if (!text.includes(FAILED_QUERY_MARKER) || rawQueryLoggingEnabled()) return text;
 
     let out = text;
     let idx = out.indexOf(FAILED_QUERY_MARKER);
