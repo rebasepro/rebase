@@ -28,8 +28,9 @@ import { tempo, TEMPO } from "./beats";
  * when the picture arrives.
  */
 
-/** 10 frames a word at the original tempo; 11 at the film's. */
-export const DESK_FRAMES_PER_WORD = Math.round(10 * TEMPO);
+/** 10 frames a word at the original tempo, scaled with it. Fractional is
+ *  fine: the prompter compares frames, it does not count them. */
+export const DESK_FRAMES_PER_WORD = 10 * TEMPO;
 
 export const DESK_NARRATION: { at: number; words: string[] }[] = [
     // the question, to camera

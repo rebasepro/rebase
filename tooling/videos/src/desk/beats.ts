@@ -64,12 +64,13 @@ const cell = (col: number, row: number): View => ({ x: col * CELL.w, y: row * CE
  * re-time eleven beats and eleven lines by hand, the sheet keeps its
  * original numbers and everything after the cold open is stretched by
  * this factor — beats, moves and the narration's frames alike, so no
- * relationship between them changes. 1.1 is 86 seconds and a 164-word
+ * relationship between them changes. 1.1 played a shade slow once the
+ * lines had grown into full sentences; 1.05 is 91 seconds and a 171-word
  * read. What is NOT stretched is anything inside a window: typing speed,
  * a report streaming, a spring — those are how fast the product is, and
  * the product did not get slower.
  */
-export const TEMPO = 1.1;
+export const TEMPO = 1.05;
 const COLD_OPEN = 66;
 /** A frame from the original sheet, on the stretched timeline. */
 export const tempo = (raw: number): number => COLD_OPEN + Math.round((raw - COLD_OPEN) * TEMPO);

@@ -1,6 +1,6 @@
 # Rebase intro — the desk cut — voice-over script
 
-Read at **164 words per minute** (11 frames a word at 30fps). Say it the way
+Read at **171 words per minute** (10.5 frames a word at 30fps). Say it the way
 you would say it to one person across a desk.
 
 **Every line is a sentence** — a subject, a verb, and the thing the verb is
@@ -21,7 +21,7 @@ that file; you push it, so the same scan finds nothing; you run it, so the
 API answers Robert, Dana and an agent, and your team gets the panel. "Three
 commands" at the end is a count of what you watched.
 
-Total: **2853 frames = 95.1 seconds** at 30fps · 225 words · speech is
+Total: **2727 frames = 90.9 seconds** at 30fps · 225 words · speech is
 87% of the running time.
 
 ## The script
@@ -29,19 +29,19 @@ Total: **2853 frames = 95.1 seconds** at 30fps · 225 words · speech is
 | # | Beat | Starts | Words | Line | Join |
 |---|------|--------|-------|------|------|
 | 00 | Cold open | 0.0s | — | *(silent — the mark assembles)* | — |
-| 01 | You, to camera | 3.2s | 14 | You can build a backend in an afternoon now. But can you trust it? | 0.5s beat |
-| 02 | The evidence | 8.8s | 14 | An agent built this one. It works. A ten-second scan found three security holes. | 2.6s **pause** |
-| 03 | Point Rebase at it | 16.5s | 20 | So you point Rebase at the same database. It reads the tables and writes one file for each of them. | 0.6s beat |
-| 04 | The rule | 24.4s | 25 | The access rules go in that file. This one says customers can only see their own orders. Postgres enforces it. Your code doesn't have to. | 0.1s flow |
-| 05 | Push, and the same scan | 33.7s | 13 | You push it, and you run the same scan again. It finds nothing. | 0.2s flow |
-| 06 | Run it | 38.6s | 4 | Then you run it. | 2.1s **pause** — the terminal prints the ports |
-| 07 | Two people | 42.2s | 25 | Two people send the same request. Robert is a customer, so he sees his own orders. Dana works in support, so she sees every order. | 0.0s flow |
-| 08 | The agent | 51.3s | 18 | An agent works the same way. It gets a key with permissions, and it can't get around them. | 0.4s flow |
-| 09 | The panel | 58.3s | 19 | Your team also gets an admin panel. It is generated from the same files, so the same rules apply. | 2.6s **pause** — the montage plays |
-| 10 | Every view | 67.9s | 11 | Every collection gets its own views: boards, tables, cards and forms. | 0.0s flow |
-| 11 | The schema | 71.9s | 13 | The schema is read from the database, so it matches what is there. | 0.0s flow |
-| 12 | Studio | 76.7s | 11 | And you can edit the database itself from the same app. | 0.1s flow |
-| 13 | The whole desk | 80.7s | 38 | That was three commands. It is open source, and you can run it on your laptop, on your own servers, or on any cloud. If you want to know where your own database stands, the scan is free. | — |
+| 01 | You, to camera | 3.1s | 14 | You can build a backend in an afternoon now. But can you trust it? | 0.5s beat |
+| 02 | The evidence | 8.5s | 14 | An agent built this one. It works. A ten-second scan found three security holes. | 2.6s **pause** |
+| 03 | Point Rebase at it | 15.9s | 20 | So you point Rebase at the same database. It reads the tables and writes one file for each of them. | 0.6s beat |
+| 04 | The rule | 23.4s | 25 | The access rules go in that file. This one says customers can only see their own orders. Postgres enforces it. Your code doesn't have to. | 0.1s flow |
+| 05 | Push, and the same scan | 32.2s | 13 | You push it, and you run the same scan again. It finds nothing. | 0.2s flow |
+| 06 | Run it | 37.0s | 4 | Then you run it. | 2.1s **pause** — the terminal prints the ports |
+| 07 | Two people | 40.3s | 25 | Two people send the same request. Robert is a customer, so he sees his own orders. Dana works in support, so she sees every order. | 0.0s flow |
+| 08 | The agent | 49.1s | 18 | An agent works the same way. It gets a key with permissions, and it can't get around them. | 0.4s flow |
+| 09 | The panel | 55.7s | 19 | Your team also gets an admin panel. It is generated from the same files, so the same rules apply. | 2.6s **pause** — the montage plays |
+| 10 | Every view | 64.9s | 11 | Every collection gets its own views: boards, tables, cards and forms. | 0.0s flow |
+| 11 | The schema | 68.8s | 13 | The schema is read from the database, so it matches what is there. | 0.0s flow |
+| 12 | Studio | 73.3s | 11 | And you can edit the database itself from the same app. | 0.1s flow |
+| 13 | The whole desk | 77.2s | 38 | That was three commands. It is open source, and you can run it on your laptop, on your own servers, or on any cloud. If you want to know where your own database stands, the scan is free. | — |
 
 ## The presenter
 
@@ -89,6 +89,6 @@ line prints, then back to the lens for "Then you run it."
 - Every terminal line is what the tools print. Numbers are checked against
   the repo, not rounded for the read.
 - No line refers to Rebase Cloud. "Any cloud" means the viewer's own.
-- The timeline is the original sheet stretched by `TEMPO` (1.1) in
+- The timeline is the original sheet stretched by `TEMPO` (1.05) in
   `src/desk/beats.ts`. To slow it again, change one number; the beats, the
   moves and these frames all follow.

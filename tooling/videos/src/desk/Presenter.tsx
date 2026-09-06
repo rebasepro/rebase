@@ -54,7 +54,7 @@ const ALL = beat("all");
  *  trust it?", fourteen words to camera — then the window flies to the
  *  corner while the evidence arrives on the desk behind it. */
 export const PRESENTER_IN = 52;
-export const FLY_TO_CORNER = tempo(92) + 14 * Math.round(10 * TEMPO) + 5;
+export const FLY_TO_CORNER = tempo(92) + Math.round(14 * 10 * TEMPO) + 5;
 const FLY = 36;
 /** Lifts off the corner as the camera lifts off the desk. */
 export const FLY_TO_CLOSE = ALL.start + 4;
