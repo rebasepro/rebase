@@ -422,6 +422,49 @@ function checkEnvExampleCoversWhatWritesIt() {
     return problems;
 }
 
+/**
+ * The two install-script allowlists a scaffold ships must name the same
+ * packages.
+ *
+ * `pnpm.onlyBuiltDependencies` and npm 12's `allowScripts` answer the same
+ * question — which dependencies may run a lifecycle script — for two package
+ * managers a scaffold is free to use either of. They had drifted to three
+ * entries and one, so `npm install` in a fresh project printed
+ * `3 packages had install scripts blocked` for packages pnpm builds happily.
+ * Nothing broke, and that is the problem with it: the two lists disagreeing is
+ * a decision nobody made, and the next entry added to one of them will be a
+ * decision that matters.
+ */
+function checkInstallAllowlistsAgree() {
+    const problems = [];
+
+    for (const [label, root] of [["template", templateRoot], ["baas overlay", baasOverlay]]) {
+        const manifestPath = path.join(root, "package.json");
+        if (!fs.existsSync(manifestPath)) continue;
+        const pkg = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+
+        const pnpmList = [...(pkg.pnpm?.onlyBuiltDependencies ?? [])].sort();
+        const npmList = Object.keys(pkg.allowScripts ?? {}).sort();
+        if (pnpmList.length === 0 && npmList.length === 0) continue;
+
+        const onlyPnpm = pnpmList.filter(n => !npmList.includes(n));
+        const onlyNpm = npmList.filter(n => !pnpmList.includes(n));
+        for (const name of onlyPnpm) {
+            problems.push(
+                `${label}: pnpm.onlyBuiltDependencies allows ${name} to run its install script, `
+                + "but allowScripts does not — `npm install` blocks it"
+            );
+        }
+        for (const name of onlyNpm) {
+            problems.push(
+                `${label}: allowScripts allows ${name} to run its install script, `
+                + "but pnpm.onlyBuiltDependencies does not — `pnpm install` blocks it"
+            );
+        }
+    }
+    return problems;
+}
+
 function checkBaasHasNoAdminTypes() {
     const problems = [];
     const walk = (dir) => {
@@ -467,6 +510,15 @@ if (envProblems.length > 0) {
     for (const p of envProblems) console.error(`    ${p}`);
 } else {
     console.log("  ok   .env.example documents every key written into .env");
+}
+
+const allowlistProblems = checkInstallAllowlistsAgree();
+if (allowlistProblems.length > 0) {
+    failed++;
+    console.log("  FAIL the two install-script allowlists name the same packages");
+    for (const p of allowlistProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   the two install-script allowlists name the same packages");
 }
 
 const baasProblems = checkBaasHasNoAdminTypes();
