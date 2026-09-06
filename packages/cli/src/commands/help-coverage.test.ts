@@ -26,6 +26,7 @@ import { apiKeysCommand } from "./api-keys";
 import { appsCommand } from "./apps";
 import { authCommand } from "./auth";
 import { dbCommand } from "./db";
+import { doctorCommand, DOCTOR_FLAGS } from "./doctor";
 import { schemaCommand } from "./schema";
 import { skillsCommand } from "./skills";
 import { telemetryCommand } from "./telemetry";
@@ -158,6 +159,77 @@ describe("every command the dispatch answers appears in a help page", () => {
 
         for (const name of names) {
             expect(help, `rebase telemetry --help does not mention "${name}"`).toContain(name);
+        }
+    });
+
+    /**
+     * The third level, and the one `db branch` needed: the page is written by
+     * hand in `db.ts` while the actions are dispatched by the driver, so the
+     * two drift silently. `rebase db branch --help` went two releases without
+     * `prune`, which the dispatch answers and `backend/branching.md` teaches.
+     *
+     * `switch` is the exception in the other direction — the CLI answers it
+     * before the driver is spawned — so the expected set is the union.
+     */
+    it("rebase db branch --help lists every action the dispatch answers", async () => {
+        const driverSource = fs.readFileSync(
+            path.join(here, "..", "..", "..", "server-postgres", "src", "cli.ts"),
+            "utf8"
+        );
+        const start = driverSource.indexOf("async function branchCommand(");
+        expect(start, "branchCommand moved; this guard needs its new name").toBeGreaterThan(-1);
+        const body = driverSource.slice(start, driverSource.indexOf("\n}\n", start));
+        const actions = [...body.matchAll(/case "([a-z][a-z0-9-]*)":/g)].map(m => m[1]);
+        expect(actions, "the driver dispatch was not read").toContain("prune");
+
+        await dbCommand("branch", ["node", "rebase", "db", "branch", "--help"]);
+        const help = helpText();
+
+        // `switch` is answered CLI-side (`db.ts`), so it is in the page and not
+        // in the driver's switch. Both belong on the one help page.
+        for (const action of new Set([...actions, "switch"])) {
+            expect(help, `rebase db branch --help does not mention "${action}"`).toContain(action);
+        }
+    });
+
+    it("rebase db branch --help lists every flag its specs declare", async () => {
+        const driverSource = fs.readFileSync(
+            path.join(here, "..", "..", "..", "server-postgres", "src", "cli.ts"),
+            "utf8"
+        );
+        const declared = driverSource.match(/const BRANCH_FLAGS = \{([\s\S]*?)\n\} as const;/);
+        expect(declared, "BRANCH_FLAGS moved; this guard needs its new shape").not.toBeNull();
+        // Long flags only: a short alias is documented next to the long one it
+        // resolves to, not on a line of its own.
+        const flags = [...declared![1].matchAll(/"(--[a-z-]+)":\s*(?!")/g)].map(m => m[1]);
+        expect(flags).toContain("--older-than");
+
+        await dbCommand("branch", ["node", "rebase", "db", "branch", "--help"]);
+        const help = helpText();
+
+        // `--force` is read straight off the line rather than through the spec
+        // (`rawArgs.includes("--force")`), which is exactly why it has to be
+        // named here: nothing else in the tree records that it exists.
+        for (const flag of new Set([...flags, "--force"])) {
+            expect(help, `rebase db branch --help does not mention "${flag}"`).toContain(flag);
+        }
+    });
+
+    it("rebase doctor --help lists every flag its spec declares", async () => {
+        // The command's one flag is the documented CI gate — `cli/index.md`
+        // calls `rebase doctor --policies` "the form to use as a CI gate" — and
+        // the page had no Options section at all, so the only way to find it was
+        // to read the driver.
+        await doctorCommand(["node", "rebase", "doctor", "--help"]);
+        const help = helpText();
+
+        const longFlags = Object.entries(DOCTOR_FLAGS)
+            .filter(([name, spec]) => name.startsWith("--") && typeof spec !== "string")
+            .map(([name]) => name);
+        expect(longFlags).toContain("--policies");
+
+        for (const flag of longFlags) {
+            expect(help, `rebase doctor --help does not mention "${flag}"`).toContain(flag);
         }
     });
 });

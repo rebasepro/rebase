@@ -1024,6 +1024,11 @@ ${chalk.green.bold("Options")}
                                     Postgres refuses to copy or drop a database
                                     anything else is connected to — usually your
                                     own \`rebase dev\`.
+  ${chalk.blue.bold("--include-dev-diff")}                Also prune the Atlas scratch databases
+                                    \`db push\` leaves behind.
+  ${chalk.blue.bold("--yes, -y")}                         Skip prune's confirmation prompt. Dropping a
+                                    branch is not undoable, so this is the flag
+                                    a CI job passes and a person usually should not.
 
 ${chalk.green.bold("Examples")}
   ${chalk.gray("# Create a branch and work on it")}
