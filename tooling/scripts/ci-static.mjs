@@ -242,6 +242,13 @@ of the ten were declared on RebaseProps and never read by Rebase.tsx. A
 hand-written table drifts the moment a prop is added.`
     },
     {
+        run: "check:property-options",
+        why: `The properties page listed 30 of the 36 keys the \`Admin*Options\`
+interfaces declare, and four of the six it missed — \`locale\`,
+\`minimumFractionDigits\`, \`maximumFractionDigits\`, \`notation\` — were in
+no English page at all. The sibling of check:rebase-props, same reason.`
+    },
+    {
         run: "check:subpath-imports",
         why: `Two places recommended \`@rebasepro/studio/components/SQLEditor/SQLEditor\`
 as a deep import. That package exports \`.\` and nothing else, so following

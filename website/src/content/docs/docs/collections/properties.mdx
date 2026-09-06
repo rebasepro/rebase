@@ -77,6 +77,18 @@ price: {
 | `admin.filterOperators` | `WhereFilterOp[]` | Narrow the operators offered when filtering on this property. The offered set is the **intersection** of the engine's capabilities, the type's defaults and this list — you can only restrict, never add an operator the engine cannot run. `[]` disables filtering on the property |
 | `admin.customProps` | `unknown` | Anything your own `Field` or `Preview` needs. Rebase passes it through untouched |
 
+#### `PropertyDisabledConfig`
+
+The object form of `admin.disabled`. The control stays visible and greyed out,
+which is the difference from `admin.readOnly` — a reader can see the shape of
+what they are not allowed to fill in.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `disabledMessage` | `string` | Why this property is disabled, shown to the reader. Without it a greyed-out control explains nothing |
+| `clearOnDisabled` | `boolean` | Set the value to `null` when the property becomes disabled, so a stale answer is not saved with the entity |
+| `hidden` | `boolean` | Hide the field entirely while it is disabled, rather than greying it out |
+
 ## String Properties
 
 The `string` type is the most versatile — depending on the options you set, it renders as different widgets.
@@ -260,6 +272,20 @@ Number fields render as a standard text input with numeric validation.
 | `isId` | `string` | ID generation strategy |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 | `admin.format` | `NumberFormatOptions` | Write the number out as currency, a percentage, or with fixed decimals. Omitted, the raw value renders — a number in the database is shown as the number in the database |
+
+#### `NumberFormatOptions`
+
+Presentation only. The stored value never changes — a rounded display is still
+the full number in the column, and in the API.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `style` | `"decimal" \| "currency" \| "percent"` | Defaults to `"decimal"`. `"currency"` requires `currency` |
+| `currency` | `string` | ISO 4217 code — `"EUR"`, `"USD"`. Setting it implies `style: "currency"`, so the common case is one key |
+| `locale` | `string` | BCP 47 tag. Defaults to the panel's locale, which is what makes the same amount read `1,234.50` for one reader and `1.234,50` for another |
+| `minimumFractionDigits` | `number` | Pad to at least this many decimals — `2` writes `5` as `5.00` |
+| `maximumFractionDigits` | `number` | Round to at most this many decimals. Does not change the stored value |
+| `notation` | `"standard" \| "compact"` | `"compact"` renders `12000` as `12K`. Useful in a narrow table column |
 
 ## Boolean Properties
 

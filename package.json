@@ -67,6 +67,7 @@
     "check:untranslated": "node tooling/scripts/check-untranslated.mjs",
     "check:jsdoc-coverage": "node tooling/scripts/check-jsdoc-coverage.mjs",
     "check:rebase-props": "node tooling/scripts/check-rebase-props-table.mjs",
+    "check:property-options": "node tooling/scripts/check-property-options-table.mjs",
     "check:subpath-imports": "node tooling/scripts/check-subpath-imports.mjs",
     "check:studio-tools": "node tooling/scripts/check-studio-tools-table.mjs",
     "check:ui-string-paths": "node tooling/scripts/check-ui-string-paths.mjs",
