@@ -26,6 +26,23 @@ const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const DOC = "docs/gates.md";
 
 /**
+ * The other file that says where a gate runs.
+ *
+ * `docs-verify/README.md` had its own three sentences about it, and all three
+ * were wrong: it named a stage of a shell script that has no docs stage, a
+ * workflow file that never mentions the command, and a warn-only local run that
+ * has been strict since the sweep started delegating to `pnpm ci:static`. The
+ * remedy it gave — "add `--strict` to that call" — pointed at a call that does
+ * not exist.
+ *
+ * The section is now delimited, and every backticked `pnpm`-script name inside
+ * it has to be a real script that `ci:static` actually runs. Prose still drifts;
+ * a sentence naming a command nobody runs no longer can.
+ */
+const VERIFIER_README = "tooling/scripts/docs-verify/README.md";
+const VERIFIER_README_SECTION = /<!-- gates:start -->([\s\S]*?)<!-- gates:end -->/;
+
+/**
  * Scripts that are gates but do not carry a gate prefix.
  *
  * `typecheck` predates the convention and is the single most-run command in the
@@ -99,17 +116,81 @@ const writersAsGates = [...documented].filter((name) =>
     WRITER_PREFIXES.some((p) => name.startsWith(p))
 );
 
-const problems = undocumented.length + phantom.length + misnamed.length + writersAsGates.length;
+/**
+ * The scripts `pnpm ci:static` runs, from its own list.
+ */
+function ciStaticGates() {
+    const source = fs.readFileSync(path.join(ROOT, "tooling/scripts/ci-static.mjs"), "utf8");
+    return new Set([...source.matchAll(/^\s*run:\s*"([^"]+)"/gm)].map((m) => m[1]));
+}
+
+/** Script names the verifier README's "Where it blocks" section claims. */
+const readmeProblems = [];
+{
+    const readmePath = path.join(ROOT, VERIFIER_README);
+    if (!fs.existsSync(readmePath)) {
+        readmeProblems.push(`${VERIFIER_README} is missing — it is where the docs verifier says where it runs.`);
+    } else {
+        const section = fs.readFileSync(readmePath, "utf8").match(VERIFIER_README_SECTION);
+        if (!section) {
+            readmeProblems.push(
+                `${VERIFIER_README} has no <!-- gates:start --> / <!-- gates:end --> section. ` +
+                "That section is what this check holds; without the markers it cannot."
+            );
+        } else {
+            const staticGates = ciStaticGates();
+            const claimed = [...section[1].matchAll(/`(?:pnpm\s+)?((?:check|verify|test):[\w:-]+)`/g)]
+                .map((m) => m[1]);
+            if (claimed.length === 0) {
+                readmeProblems.push(
+                    `${VERIFIER_README}'s "Where it blocks" names no gate at all — it is supposed to ` +
+                    "say which command makes a finding fail the build."
+                );
+            }
+            for (const name of new Set(claimed)) {
+                if (!scripts.includes(name)) {
+                    readmeProblems.push(`${VERIFIER_README} names \`${name}\`, which is not a script in package.json.`);
+                } else if (!staticGates.has(name) && !name.endsWith(":strict")) {
+                    readmeProblems.push(
+                        `${VERIFIER_README} names \`${name}\` as where it blocks, and ` +
+                        "tooling/scripts/ci-static.mjs does not run it."
+                    );
+                }
+            }
+            const blocking = [...new Set(claimed)].filter((n) => staticGates.has(n));
+            if (blocking.length === 0) {
+                readmeProblems.push(
+                    `${VERIFIER_README}'s "Where it blocks" names no gate that ci:static runs, so it ` +
+                    "does not say where a finding actually fails the build."
+                );
+            }
+        }
+    }
+}
+
+const problems = undocumented.length + phantom.length + misnamed.length
+    + writersAsGates.length + readmeProblems.length;
 
 if (problems === 0) {
     console.log(green(
         `✓ ${gates.length} gate(s), every one with a row in ${DOC}` +
-        ` (${Object.keys(NAMED_EXCEPTIONS).length} named naming-rule exceptions).`
+        ` (${Object.keys(NAMED_EXCEPTIONS).length} named naming-rule exceptions),` +
+        ` and ${VERIFIER_README} says where it blocks.`
     ));
     process.exit(0);
 }
 
-console.error(red(`\n✗ ${DOC} and package.json disagree.\n`));
+console.error(red("\n✗ The gate map is out of step with the repository.\n"));
+
+if (readmeProblems.length > 0) {
+    console.error(red(`  ${readmeProblems.length} stale sentence(s) about where the docs verifier runs:`));
+    for (const p of readmeProblems) console.error(`    ${p}`);
+    console.error(dim(
+        `\n    ${VERIFIER_README}, between the gates markers. A remedy naming a command\n` +
+        "    that does not exist is worse than none: the reader follows it and nothing\n" +
+        "    changes.\n"
+    ));
+}
 
 if (undocumented.length > 0) {
     console.error(red(`  ${undocumented.length} gate(s) with no row:`));
