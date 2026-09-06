@@ -873,6 +873,8 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     const { branchDatabaseName, clearActiveBranch, databaseNameOf, readActiveBranch, writeActiveBranch } =
         await import("../dev-db/branch-pointer");
     const { readEnvFile } = await import("../utils/project");
+    const { resolveDevDatabase } = await import("../dev-db/resolve");
+    const { resolveComposeUrl } = await import("../dev-db/prepare");
 
     // Read as a flag rather than as the name in the third position, so
     // `switch --off` and `switch feature --off` mean the same thing. The doc
@@ -884,7 +886,28 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     // ["db", "branch", "switch", <name>], with any flags taken back out —
     // `rebase --debug db branch switch feature` read the name as "switch".
     const name = commandWords(rawArgs, "db")[3];
-    const base = readEnvFile(projectRoot).DATABASE_URL?.trim();
+
+    // The database to branch from, resolved by the ordered rule every sibling
+    // uses. This read `readEnvFile(projectRoot).DATABASE_URL` and nothing else,
+    // so `export DATABASE_URL=…; rebase db branch create x` created a branch and
+    // `rebase db branch switch x` then answered "This project has no
+    // DATABASE_URL, so there is no database to branch from" — about a project
+    // that had one, in the shell, where `branching.md` documents it as rule (2)
+    // and `create` had just read it.
+    //
+    // `branch: null`, deliberately: this command is what sets the pointer, and
+    // the pointer that exists must never become the base of the next switch —
+    // that is how a branch of a branch of a branch happens by accident.
+    const envFile = readEnvFile(projectRoot);
+    const resolved = resolveDevDatabase({
+        flagUrl: readFlagValue(rawArgs, "--database-url"),
+        flagDocker: rawArgs.includes("--docker"),
+        env: process.env,
+        envFile,
+        branch: null,
+        composeUrl: resolveComposeUrl(projectRoot, envFile)
+    });
+    const base = (resolved.kind === "managed" ? null : resolved.url)?.trim() || undefined;
 
     // `switch` with no argument reports rather than changes. "Which branch am I
     // on" is asked far more often than "move me", and answering it should not
@@ -918,9 +941,12 @@ async function switchBranch(projectRoot: string, rawArgs: readonly string[]): Pr
     }
 
     if (!base) {
-        console.error(chalk.red("✗ This project has no DATABASE_URL, so there is no database to branch from."));
-        console.error(chalk.gray("  Branching needs a real Postgres — the managed development database serves"));
-        console.error(chalk.gray("  exactly one. Set DATABASE_URL in .env, or run `rebase dev --docker`."));
+        console.error(chalk.red("✗ There is no database to branch from."));
+        console.error(chalk.gray(resolved.kind === "managed"
+            ? "  This project is on the managed development database, which serves exactly one —"
+            : "  --docker needs a docker-compose.yml with a db service, and this project has none —"));
+        console.error(chalk.gray("  and branching copies a database. Set DATABASE_URL in .env or in your"));
+        console.error(chalk.gray("  shell, or run `rebase dev --docker`."));
         process.exit(1);
     }
 
