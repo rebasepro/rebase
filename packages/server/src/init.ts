@@ -46,7 +46,7 @@ import { scopeDataDriver, SERVICE_IDENTITY } from "./auth/rls-scope";
 import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
 import { ApiError, errorHandler } from "./api/errors";
 import { createSchemaDriftDetector } from "./api/schema-drift";
-import { installRootErrorHandler } from "./api/root-error-handler";
+import { installRootErrorHandler, installUnmatchedApiEnvelope } from "./api/root-error-handler";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HonoEnv } from "./api/types";
@@ -1058,6 +1058,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // reads one. An app that already has its own handler keeps it — see
     // `installRootErrorHandler`.
     installRootErrorHandler(config.app);
+
+    // The other half of it: a path under `basePath` that matches no route is not
+    // a throw, so `onError` never sees it and it came back `404 Not Found` as
+    // `text/plain` — the one shape no caller handles, on the 404 a typo'd
+    // collection or function name produces.
+    installUnmatchedApiEnvelope(config.app, basePath);
 
     // Configure Hono middlewares (Request ID, body limit, CSRF, CORS warning, logging)
     configureMiddlewares(config.app, basePath, isProduction, config);
@@ -2833,7 +2839,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }));
         }
 
-        const fnRoutes = createFunctionRoutes(loadedFunctions, problems.length, `${basePath}/functions`);
+        const fnRoutes = createFunctionRoutes(loadedFunctions, problems, `${basePath}/functions`);
         functionsRouter.route("/", fnRoutes);
         config.app.route(`${basePath}/functions`, functionsRouter);
 

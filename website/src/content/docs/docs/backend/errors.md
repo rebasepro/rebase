@@ -219,6 +219,7 @@ the message names the constraint.
 
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
+| `FUNCTION_NOT_FOUND` | 404 | No function of that name is served — or one is, and its own routes do not cover the path after it. A signed-in caller is also told what *is* served; an anonymous one is not, because that list is an inventory of every custom endpoint. When a file of that name failed to load, the message says so: that is the difference between a typo and a broken deploy. | Check the name against `GET /api/functions`, or the boot log for a file that did not load. |
 | `FUNCTION_TIMEOUT` | 504 | The handler exceeded its timeout. It is still running; it cannot be cancelled from here. | Give outbound calls an `AbortSignal`, or raise `REBASE_FUNCTIONS_TIMEOUT_MS`. |
 | `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | This process proxies functions to another one, which did not answer. | Check that the functions unit is running. |
 
