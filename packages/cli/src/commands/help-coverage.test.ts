@@ -235,6 +235,77 @@ describe("every command the dispatch answers appears in a help page", () => {
 });
 
 /**
+ * A mistyped subcommand answers the same way in every family: one red line on
+ * stderr, nothing on stdout, exit 1.
+ *
+ * `api-keys` was the one that did not. It printed a bare `Unknown api-keys
+ * command: frobnicate` to stderr — no `✗`, no did-you-mean, no pointer at
+ * `--help` — and then the *whole help page to stdout*, so a typo wrote twenty
+ * lines to the stream a `--json` caller parses. The rule is asserted over the
+ * families rather than case by case, because this one was missed when the
+ * shared helper landed for the other five.
+ */
+describe("a mistyped subcommand", () => {
+    const FAMILIES = [
+        ["auth", authCommand],
+        ["apps", appsCommand],
+        ["skills", skillsCommand],
+        ["api-keys", apiKeysCommand]
+    ] as const;
+
+    it.each(FAMILIES)("in `rebase %s` is one stderr line and an empty stdout", async (family, command) => {
+        const errors: string[] = [];
+        const consoleError = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+            errors.push(args.map(String).join(" "));
+        });
+        const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Error(`exit:${code}`);
+        }) as never);
+
+        try {
+            await command("frobnicate", ["node", "rebase", family, "frobnicate"]);
+            throw new Error(`rebase ${family} frobnicate did not exit`);
+        } catch (err) {
+            expect((err as Error).message, `rebase ${family} frobnicate exited 0`).toBe("exit:1");
+        } finally {
+            consoleError.mockRestore();
+            exit.mockRestore();
+        }
+
+        expect(helpText(), `rebase ${family} frobnicate wrote to stdout`).toBe("");
+        expect(errors).toHaveLength(1);
+        expect(errors[0].replace(ANSI, "")).toMatch(
+            new RegExp(`^✗ Unknown ${family} command "frobnicate"\\.? `)
+        );
+        expect(errors[0]).toContain(`rebase ${family} --help`);
+    });
+
+    it("in `rebase telemetry` is the same, though its dispatcher takes only rawArgs", async () => {
+        const errors: string[] = [];
+        const consoleError = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+            errors.push(args.map(String).join(" "));
+        });
+        const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Error(`exit:${code}`);
+        }) as never);
+
+        try {
+            await telemetryCommand(["node", "rebase", "telemetry", "frobnicate"]);
+            throw new Error("rebase telemetry frobnicate did not exit");
+        } catch (err) {
+            expect((err as Error).message).toBe("exit:1");
+        } finally {
+            consoleError.mockRestore();
+            exit.mockRestore();
+        }
+
+        expect(helpText()).toBe("");
+        expect(errors).toHaveLength(1);
+        expect(errors[0].replace(ANSI, "")).toContain('Unknown telemetry command "frobnicate"');
+    });
+});
+
+/**
  * A dispatched command with no strict flag parser accepts a typo and runs.
  *
  * `arg(..., { permissive: true })` — and the hand-rolled `filter(a =>
