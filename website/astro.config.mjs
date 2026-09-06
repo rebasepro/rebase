@@ -10,6 +10,20 @@ import mdx from "@astrojs/mdx";
 import yaml from "@rollup/plugin-yaml";
 import tailwindcss from "@tailwindcss/vite";
 
+/**
+ * Marketing routes that ask engines not to index them, read off the pages.
+ *
+ * A slug appears here iff its `.astro` source sets `robots` to `noindex`, so
+ * the sitemap `filter` below and the pages cannot disagree.
+ */
+const NOINDEX = new Set(
+    fs
+        .readdirSync("./src/pages/[...lang]")
+        .filter(file => file.endsWith(".astro"))
+        .filter(file => /content="noindex/.test(fs.readFileSync(`./src/pages/[...lang]/${file}`, "utf8")))
+        .map(file => file.replace(/\.astro$/, ""))
+);
+
 // https://astro.build/config
 export default defineConfig({
     site: "https://rebase.pro",
@@ -278,6 +292,22 @@ export default defineConfig({
         }),
         mdx(),
         sitemap({
+            /*
+             * A page we ask engines not to index does not belong in the file we
+             * hand them. `/pitch` sets `<meta name="robots" content="noindex,
+             * nofollow">` and had four rows here — the two halves of the same
+             * instruction contradicting each other, in the two places a crawler
+             * reads first.
+             *
+             * The source is the page, not a list: `NOINDEX` is derived from the
+             * routes that actually set the meta tag, so adding a second private
+             * page needs nothing here.
+             */
+            filter: (page) => {
+                const route = new URL(page).pathname.replace(/\/$/, "").replace(/^\//, "");
+                const slug = route.replace(/^(?:es|de|fr|it|pt)\//, "");
+                return !NOINDEX.has(slug);
+            },
             i18n: {
                 defaultLocale: 'en',
                 locales: {

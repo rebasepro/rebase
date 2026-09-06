@@ -197,6 +197,43 @@ for (const [route, file] of pages) {
     }
 }
 
+/* 8. Every localised marketing route declares its translations in the HTML,
+      and no `noindex` page is in the sitemap.
+
+      The docs emit six `<link rel="alternate">` per page and the marketing
+      pages emitted none, so the signal existed only in `sitemap-0.xml` — the
+      weaker of the two places — and the two halves of the site disagreed about
+      the convention. `/pitch` had the opposite problem: `noindex, nofollow` in
+      the page and four rows in the sitemap. */
+{
+    const marketingLocales = ["en", "es", "de", "fr"];
+    const sitemapFiles = [...files].filter((f) => /^sitemap-\d+\.xml$/.test(f));
+    const sitemap = sitemapFiles
+        .map((f) => readFileSync(join(DIST, f), "utf8"))
+        .join("");
+
+    for (const [route, file] of pages) {
+        const html = readFileSync(file, "utf8");
+        const noindex = /content="noindex/i.test(html);
+        const inSitemap = sitemap.includes(`<loc>https://rebase.pro${route === "/" ? "/" : route + "/"}</loc>`);
+
+        if (noindex && inSitemap) fail(route, "noindex-in-sitemap", route);
+        if (noindex) continue;
+
+        // `/blog/**` and `/policy/**` are English-only routes: they have no
+        // translation, and an alternate at `/de/blog/…` would be a 404 in an
+        // index. A route is localised iff its Spanish twin was built.
+        const english = route.replace(/^\/(es|de|fr)(?=\/|$)/, "") || "/";
+        if (!pages.has(english === "/" ? "/es" : `/es${english}`)) continue;
+
+        const alternates = new Set(
+            [...html.matchAll(/rel="alternate"\s+hreflang="([^"]+)"/g)].map((m) => m[1])
+        );
+        const missing = [...marketingLocales, "x-default"].filter((l) => !alternates.has(l));
+        if (missing.length) fail(route, "missing-hreflang", missing.join(", "));
+    }
+}
+
 const byCheck = {};
 for (const f of failures) (byCheck[f.check] ??= []).push(f);
 
