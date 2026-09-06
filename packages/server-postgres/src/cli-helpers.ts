@@ -130,6 +130,25 @@ export function describeBuildScriptRemedy(
     }
 }
 
+/**
+ * "Install again, from scratch", in the reader's own package manager.
+ *
+ * For the `bin-link-missing` state: the tree is half-written, and re-resolving
+ * it is what recreates the `.bin` shim. `--force` on pnpm is what makes it
+ * relink rather than decide the tree is already up to date.
+ */
+export function describeReinstallCommand(
+    manager: ProjectPackageManager = detectProjectPackageManager()
+): string {
+    switch (manager) {
+        case "npm": return "rm -rf node_modules && npm install";
+        case "yarn": return "yarn install --force";
+        case "bun": return "rm -rf node_modules && bun install";
+        case "pnpm":
+        default: return "pnpm install --force";
+    }
+}
+
 /** `add <pkg>` as a dev dependency, in the reader's own package manager. */
 export function describeDevAddCommand(
     packageName: string,
@@ -144,24 +163,77 @@ export function describeDevAddCommand(
     }
 }
 
-export function diagnoseMissingBin(packageName: string): "not-installed" | "build-script-blocked" {
+/**
+ * Why a dependency's binary is not on `PATH`.
+ *
+ * `bin-link-missing` is the third state, and the reason this is not a boolean.
+ * The `preinstall` did run and the binary IS on disk — only the
+ * `node_modules/.bin` shim that points at it is absent. pnpm produces exactly
+ * that when it writes the link before the script that creates the target
+ * ("Failed to create bin … ENOENT"), and so does a tree copied without its
+ * symlinks. Telling that reader their build scripts are blocked sends them to
+ * `approve-builds`, which does nothing, because nothing is blocked.
+ */
+export type MissingBinDiagnosis = "not-installed" | "build-script-blocked" | "bin-link-missing";
+
+/**
+ * Where a package's own manifest lives, or null if it is not installed here.
+ *
+ * `package.json` rather than the package root: a package with an `exports` map
+ * that omits `.` is unresolvable by name even when it is perfectly installed,
+ * which would misreport it as absent.
+ */
+function resolvePackageManifest(packageName: string): string | null {
     const bases = [
         pathToFileURL(path.join(process.cwd(), "package.json")),
         pathToFileURL(path.join(__helpersDirname, "package.json"))
     ];
-
     for (const base of bases) {
         try {
-            // `package.json` rather than the package root: a package with an
-            // `exports` map that omits `.` is unresolvable by name even when it
-            // is perfectly installed, which would misreport it as absent.
-            createRequire(base).resolve(`${packageName}/package.json`);
-            return "build-script-blocked";
+            return createRequire(base).resolve(`${packageName}/package.json`);
         } catch {
             // Try the next base.
         }
     }
-    return "not-installed";
+    return null;
+}
+
+/**
+ * The binaries a package's own manifest declares, as absolute paths.
+ *
+ * `bin` is a string for a single binary named after the package, or a map.
+ * Both forms appear in the wild and `@ariga/atlas` uses the map.
+ */
+export function declaredBinaries(manifestPath: string): string[] {
+    let manifest: { name?: string; bin?: string | Record<string, string> };
+    try {
+        manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as typeof manifest;
+    } catch {
+        return [];
+    }
+    const dir = path.dirname(manifestPath);
+    if (typeof manifest.bin === "string") return [path.resolve(dir, manifest.bin)];
+    if (manifest.bin && typeof manifest.bin === "object") {
+        return Object.values(manifest.bin)
+            .filter((target): target is string => typeof target === "string")
+            .map(target => path.resolve(dir, target));
+    }
+    return [];
+}
+
+export function diagnoseMissingBin(packageName: string): MissingBinDiagnosis {
+    const manifestPath = resolvePackageManifest(packageName);
+    if (!manifestPath) return "not-installed";
+
+    // Installed — but "installed" was the whole verdict, and it is not enough.
+    // `@ariga/atlas` downloads its platform binary in `preinstall`, so a blocked
+    // script leaves the package on disk with its `install.js` and manifest and
+    // no binary: the state this branch was written for. It is NOT the state of
+    // a tree whose binary exists and whose `.bin` shim does not, and those two
+    // need opposite advice. Ask the manifest which file the binary is, and look.
+    const binaries = declaredBinaries(manifestPath);
+    if (binaries.length === 0) return "build-script-blocked";
+    return binaries.some(file => fs.existsSync(file)) ? "bin-link-missing" : "build-script-blocked";
 }
 
 export function resolveLocalBin(binName: string): string | null {

@@ -26,11 +26,13 @@ import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
 import {
     checkDuplicateSlugs,
     checkEnvSanity,
+    checkAtlasBinary,
     checkNodeVersion,
     checkPackageManager,
     checkVersionSkew,
     LOCKFILES,
     parseEnvFile,
+    type AtlasBinaryState,
     type DeclaredDependency,
     type EnvironmentFinding
 } from "../doctor-environment";
@@ -190,7 +192,70 @@ export function collectEnvironmentFindings(
     // One `@rebasepro/*` package, two versions.
     findings.push(...checkVersionSkew(readDeclaredRebaseDeps(projectRoot)));
 
+    // The atlas binary, which every schema command shells out to and whose
+    // absence is invisible until one of them is run.
+    findings.push(...checkAtlasBinary(readAtlasBinaryState(projectRoot)));
+
     return findings;
+}
+
+/**
+ * What is actually on disk for `@ariga/atlas`, from the project's point of view.
+ *
+ * Three separate questions, because the three states they distinguish need
+ * three different remedies — see `checkAtlasBinary`. Directories are searched
+ * from the project root upwards and through the workspaces a scaffold has,
+ * because `db push` runs from `backend/` and the install may be hoisted to the
+ * root.
+ */
+function readAtlasBinaryState(projectRoot: string): AtlasBinaryState | null {
+    const roots = [projectRoot, path.join(projectRoot, "backend"), path.join(projectRoot, "config")];
+
+    const findUpwards = (relative: string): string | null => {
+        for (const start of roots) {
+            let dir = start;
+            for (let i = 0; i < 8; i++) {
+                const candidate = path.join(dir, "node_modules", relative);
+                if (fs.existsSync(candidate)) return candidate;
+                const parent = path.dirname(dir);
+                if (parent === dir) break;
+                dir = parent;
+            }
+        }
+        return null;
+    };
+
+    const manifest = findUpwards(path.join("@ariga", "atlas", "package.json"));
+    const onPath = findUpwards(path.join(".bin", "atlas")) !== null;
+
+    let binaryOnDisk = false;
+    if (manifest) {
+        try {
+            const pkg = JSON.parse(fs.readFileSync(manifest, "utf-8")) as {
+                bin?: string | Record<string, string>;
+            };
+            const dir = path.dirname(manifest);
+            const targets = typeof pkg.bin === "string"
+                ? [pkg.bin]
+                : Object.values(pkg.bin ?? {}).filter((t): t is string => typeof t === "string");
+            binaryOnDisk = targets.some(target => fs.existsSync(path.resolve(dir, target)));
+        } catch { /* unreadable manifest: treat the binary as absent */ }
+    }
+
+    return {
+        onPath,
+        packageInstalled: manifest !== null,
+        binaryOnDisk,
+        manager: readPackageManagerName(projectRoot)
+    };
+}
+
+/** The reader's own package manager, from the lockfile beside their project. */
+function readPackageManagerName(projectRoot: string): string {
+    for (const [file, manager] of Object.entries(LOCKFILES)) {
+        if (fs.existsSync(path.join(projectRoot, file))) return manager;
+    }
+    return "pnpm";
 }
 
 /** The `engines.node` range of the CLI actually running. */

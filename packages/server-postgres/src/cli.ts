@@ -12,6 +12,7 @@ import {
     detectProjectPackageManager,
     describeBuildScriptRemedy,
     describeDevAddCommand,
+    describeReinstallCommand,
     resolveLocalBin,
     getTableIncludes,
     getDevDatabaseUrl,
@@ -1080,7 +1081,25 @@ async function runAtlas(
         // somebody else. Read the lockfile and answer the reader in front of us.
         const manager = detectProjectPackageManager();
 
-        if (diagnoseMissingBin("@ariga/atlas") === "build-script-blocked") {
+        const diagnosis = diagnoseMissingBin("@ariga/atlas");
+
+        if (diagnosis === "bin-link-missing") {
+            // The binary IS on disk; only the `node_modules/.bin` shim that
+            // points at it is not. pnpm produces this when it writes the link
+            // before the script that creates the target ("Failed to create bin
+            // … ENOENT"), and so does a tree copied without its symlinks.
+            // Sending this reader to `approve-builds` does nothing: nothing is
+            // blocked.
+            outError(chalk.yellow("  @ariga/atlas and its binary are both on disk — only the\n"
+                + "  node_modules/.bin/atlas link that puts it on PATH is missing.\n"));
+            outError(chalk.gray(
+                "  Usually a half-written install: the link is created before the script that\n"
+                + "  downloads the target, so an interrupted or copied tree keeps the binary and\n"
+                + "  loses the shim.\n"
+            ));
+            outError("  Fix it with:\n");
+            outError(chalk.bold(`    ${describeReinstallCommand(manager)}\n`));
+        } else if (diagnosis === "build-script-blocked") {
             outError(chalk.yellow("  @ariga/atlas IS installed — only its binary is missing.\n"));
             outError(chalk.gray(
                 "  It downloads that binary in a `preinstall` script, and pnpm 10+ and npm 12+\n" +
