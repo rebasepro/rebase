@@ -54,7 +54,10 @@ export function checkLlmsCoverage(root = ROOT) {
     const pages = walk(path.join(root, "website/src/content/docs/docs"))
         .map(p => path.relative(contentRoot, p).split(path.sep).join("/")
             .replace(/\.(mdx|md)$/, "")
-            .replace(/\/index$/, ""))
+            .replace(/\/index$/, "")
+            // Same rule as website/scripts/sidebar-slugs.js: the served route
+            // is lowercase, so that is the URL to look for in the mirrors.
+            .toLowerCase())
         .filter(slug => !EXCLUDED.has(slug))
         .sort();
 

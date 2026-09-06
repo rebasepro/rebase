@@ -160,7 +160,7 @@ quel `DATABASE_URL` résolu par le projet.
 
 ### Lui attribuer un identifiant restreint à la place
 
-Enregistrez une [clé API](/docs/backend/api#api-keys) restreinte et le modèle à
+Enregistrez une [clé API](/docs/backend/api-keys) restreinte et le modèle à
 double barrière s'applique réellement. Une clé non-admin s'exécute avec les rôles
 `["service"]`, que les politiques d'administration injectées ne mentionnent **pas** —
 ainsi, le RLS ne lui accorde rien à moins que l'une de vos propres politiques n'en
@@ -210,7 +210,7 @@ plus, c'est qu'elle est **révocable, expirante et soumise à une limitation de 
 clé**, ce qui n'est pas le cas de la clé de service — faire tourner cette dernière
 nécessite de modifier `.env` et de redémarrer le serveur.
 
-Consultez [Agents et serveurs MCP](/docs/backend/api#agents-and-mcp-servers) pour le
+Consultez [Agents et serveurs MCP](/docs/backend/api-keys#agents-and-mcp-servers) pour le
 guide complet sur la restriction des clés.
 
 ### Rendre une collection totalement inaccessible

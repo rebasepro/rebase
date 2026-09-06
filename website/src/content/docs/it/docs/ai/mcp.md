@@ -157,7 +157,7 @@ funzione di backend ed eseguire DDL su qualsiasi `DATABASE_URL` a cui il progett
 
 ### Assegnare una credenziale con ambito ristretto
 
-Registrando una [chiave API](/docs/backend/api#api-keys) con ambito ristretto (scoped), il modello a
+Registrando una [chiave API](/docs/backend/api-keys) con ambito ristretto (scoped), il modello a
 doppio gate viene applicato realmente. Una chiave non-admin viene eseguita con i ruoli `["service"]`, che le
 policy di amministrazione predefinite iniettate **non** includono: di conseguenza, l'RLS non le concede nulla a meno che una delle
 tue policy non specifichi diversamente, e l'elenco dei permessi la restringe ulteriormente:
@@ -204,7 +204,7 @@ chiave di servizio. Sul piano dei dati, la sua portata è identica a quella dell
 che risulta **revocabile, con scadenza e soggetta a rate limiting per singola chiave**, nessuna delle quali
 caratteristiche si applica alla chiave di servizio — ruotare quest'ultima richiede infatti la modifica di `.env` e il riavvio del server.
 
-Consulta [Agenti e Server MCP](/docs/backend/api#agents-and-mcp-servers) per la
+Consulta [Agenti e Server MCP](/docs/backend/api-keys#agents-and-mcp-servers) per la
 guida completa sulla definizione degli ambiti delle chiavi.
 
 ### Rendere una collezione del tutto inaccessibile

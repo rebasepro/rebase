@@ -161,7 +161,7 @@ zurücksetzen, jede Backend-Funktion aufrufen und DDL für die aufgelöste
 
 ### Stattdessen einen eingeschränkten Berechtigungsnachweis vergeben
 
-Registrieren Sie einen bereichsbezogenen [API-Schlüssel](/docs/backend/api#api-keys),
+Registrieren Sie einen bereichsbezogenen [API-Schlüssel](/docs/backend/api-keys),
 und das Zwei-Gate-Modell greift wirklich. Ein Nicht-Admin-Schlüssel läuft mit den
 Rollen `["service"]`, die von den injizierten Admin-Richtlinien **nicht** benannt
 werden – RLS gewährt ihm also nichts, es sei denn, eine Ihrer eigenen
@@ -214,7 +214,7 @@ pro Schlüssel ratenbegrenzt** ist, was auf den Service-Schlüssel alles nicht
 zutrifft – dessen Rotation erfordert die Bearbeitung der `.env` und einen Neustart
 des Servers.
 
-Siehe [Agenten und MCP-Server](/docs/backend/api#agents-and-mcp-servers) für die
+Siehe [Agenten und MCP-Server](/docs/backend/api-keys#agents-and-mcp-servers) für die
 vollständige Anleitung zum Scopen von Schlüsseln.
 
 ### Eine Collection vollständig unerreichbar machen

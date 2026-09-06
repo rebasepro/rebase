@@ -219,7 +219,10 @@ async function buildSlugMap(directoryPath, slugMap) {
                         } else {
                             slug = path.relative(contentRoot, fullPath)
                                 .replace(/\.(mdx?|md)$/, "")
-                                .replace(/\/index$/, "");
+                                .replace(/\/index$/, "")
+                                // Same rule as sidebar-slugs.js: Astro serves a
+                                // filename-derived slug in lowercase.
+                                .toLowerCase();
                         }
 
                         slugMap[slug] = {

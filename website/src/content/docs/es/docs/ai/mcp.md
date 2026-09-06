@@ -158,7 +158,7 @@ cualquier `DATABASE_URL` que el proyecto resuelva.
 
 ### Proporcionarle una credencial restringida en su lugar
 
-Registra una [API key](/docs/backend/api#api-keys) con alcance limitado y el modelo
+Registra una [API key](/docs/backend/api-keys) con alcance limitado y el modelo
 de dos compuertas se aplicará de verdad. Una clave que no es de administrador se ejecuta
 con los roles `["service"]`, los cuales las políticas de administración inyectadas
 **no** nombran —por lo que RLS no le otorga nada a menos que una de tus propias políticas
@@ -207,7 +207,7 @@ La ventaja que añade es que es **revocable, con fecha de expiración y limitada
 (rate-limited) por clave**, nada de lo cual aplica a la clave de servicio —rotar esa
 última implica editar `.env` y reiniciar el servidor.
 
-Consulta [Agentes y Servidores MCP](/docs/backend/api#agents-and-mcp-servers) para
+Consulta [Agentes y Servidores MCP](/docs/backend/api-keys#agents-and-mcp-servers) para
 ver la guía completa sobre el alcance de claves.
 
 ### Dejar una colección completamente fuera de su alcance

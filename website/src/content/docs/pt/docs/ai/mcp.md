@@ -157,7 +157,7 @@ função de backend e executar DDL contra qualquer `DATABASE_URL` que o projeto 
 
 ### Fornecendo uma credencial restrita em vez disso
 
-Registre uma [chave de API](/docs/backend/api#api-keys) com escopo e o modelo de duas
+Registre uma [chave de API](/docs/backend/api-keys) com escopo e o modelo de duas
 proteções se aplicará de verdade. Uma chave que não seja de administrador é executada com as roles `["service"]`, que
 as políticas de administração injetadas **não** nomeiam — portanto, o RLS não concede nada a ela, a menos que uma de
 suas próprias políticas determine o contrário, e a lista de permissões a restringe ainda mais:
@@ -204,7 +204,7 @@ key atende. No plano de dados, seu alcance é o mesmo da service key. O que ela 
 ela é **revogável, expirável e possui limitação de taxa (*rate-limited*) por chave**, nada
 disso sendo verdade para a service key — rotacionar a service key significa editar o `.env` e reiniciar o servidor.
 
-Consulte [Agentes e Servidores MCP](/docs/backend/api#agents-and-mcp-servers) para
+Consulte [Agentes e Servidores MCP](/docs/backend/api-keys#agents-and-mcp-servers) para
 obter o guia completo de escopo de chaves.
 
 ### Colocando uma coleção totalmente fora de alcance

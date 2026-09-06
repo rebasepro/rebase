@@ -135,6 +135,45 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
         }
     }
     
+
+    /*
+     * A docs entry is titled by the page's own frontmatter when it has one.
+     * The slug is lowercase because that is what Astro serves, so a title
+     * derived from it would read "Virtualtableswitch" where the page says
+     * "VirtualTableSwitch"; the path segments above the page keep the old
+     * capitalised-word form.
+     */
+    const docsContentRoot = path.resolve(__dirname, "../src/content/docs");
+    const frontmatterTitle = (slug) => {
+        for (const candidate of [`${slug}.mdx`, `${slug}.md`, `${slug}/index.mdx`, `${slug}/index.md`]) {
+            const file = path.join(docsContentRoot, candidate);
+            const found = findCaseInsensitive(file);
+            if (!found) continue;
+            const head = fs.readFileSync(found, "utf-8").slice(0, 2000);
+            const m = head.match(/^---[\s\S]*?^title:\s*["']?([^"'\n]+?)["']?\s*$/m);
+            if (m) return m[1].trim();
+        }
+        return null;
+    };
+    // The files keep their CamelCase names while the served slug is lowercase.
+    const findCaseInsensitive = (file) => {
+        if (fs.existsSync(file)) return file;
+        const dir = path.dirname(file);
+        if (!fs.existsSync(dir)) return null;
+        const want = path.basename(file).toLowerCase();
+        const hit = fs.readdirSync(dir).find(name => name.toLowerCase() === want);
+        return hit ? path.join(dir, hit) : null;
+    };
+    const titleForDocsSlug = (slug) => {
+        const parts = slug.split("/");
+        const crumbs = parts.slice(0, -1)
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).replace("-", " "));
+        const last = parts[parts.length - 1];
+        const own = frontmatterTitle(slug)
+            ?? (last.charAt(0).toUpperCase() + last.slice(1).replace("-", " "));
+        return [...crumbs, own].join(" > ");
+    };
+
     mdContent += `\n## Documentation (Multilingual)\n`;
     
     for (const lang of languages) {
@@ -143,11 +182,7 @@ This sitemap lists all pages of the Rebase website and documentation. It is form
         mdContent += `\n### ${langName} Documentation\n`;
         for (const slug of slugs) {
             const fullUrl = `https://rebase.pro${langPrefix}/${slug}`;
-            const cleanTitle = slug
-                .split("/")
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1).replace("-", " "))
-                .join(" > ");
-            mdContent += `- [${cleanTitle} (${langName})](${fullUrl})\n`;
+            mdContent += `- [${titleForDocsSlug(slug)} (${langName})](${fullUrl})\n`;
         }
     }
     

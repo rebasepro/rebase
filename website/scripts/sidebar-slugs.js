@@ -42,7 +42,14 @@ export function slugForFile(contentRoot, fullPath) {
         .split(path.sep)
         .join("/")
         .replace(/\.(mdx|md)$/, "")
-        .replace(/\/index$/, "");
+        .replace(/\/index$/, "")
+        // Astro lowercases a slug it derives from a filename, so `Card.mdx` is
+        // served at `/docs/ui/components/card`. The expansion below is the only
+        // place a slug comes from a filename rather than from an explicit
+        // `slug:` in the sidebar, and every one of the 99 UI reference pages is
+        // named for its component — so without this the mirrors advertise 95
+        // URLs the host answers with a redirect at best.
+        .toLowerCase();
 }
 
 /** Every `.md`/`.mdx` under `dir`, recursively, as absolute paths. */

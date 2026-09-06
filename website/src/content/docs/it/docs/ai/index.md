@@ -12,7 +12,7 @@ Rebase include quattro elementi distinti per gli assistenti IA, ciascuno pensato
 | [**Server MCP**](/docs/ai/mcp) | Un server Model Context Protocol stdio con 40 tool su schema, dati, utenti, storage, cron e dev server | Un assistente, a runtime |
 | [**Agent skill**](/docs/ai/skills) | 20 file di skill in formato Markdown scritti nel tuo repository da `rebase skills install` | Un assistente, come materiale di riferimento |
 | [**File di istruzioni**](/docs/ai/instruction-files) | `ai-instructions.md` insieme ai file puntatore specifici per assistente, creati da `rebase init` | Un assistente, come regole sempre attive |
-| [**Chiavi API**](/docs/backend/api#api-keys) | Credenziali macchina con permessi specifici (scoped), per collezione e per operazione | Qualsiasi client che effettua chiamate alle API HTTP |
+| [**Chiavi API**](/docs/backend/api-keys) | Credenziali macchina con permessi specifici (scoped), per collezione e per operazione | Qualsiasi client che effettua chiamate alle API HTTP |
 
 I primi tre servono a fornire a un assistente *conoscenza* e *strumenti*. Il
 quarto è l'unico che decide cosa può effettivamente fare.
@@ -34,7 +34,7 @@ Entrambi i controlli devono autorizzare la richiesta. Nessuno dei due sostituisc
 
 Un dettaglio che spesso trae in inganno: l'impostazione `access: "public"` di una collezione estende **quali righe un chiamante può vedere**, non **chi può effettuare la chiamata**. È una dichiarazione sulla visibilità delle righe, non sull'autenticazione. Concederla non aggiunge un chiamante all'elenco dei permessi, e revocarla non gli impedisce di effettuare chiamate.
 
-I dettagli tecnici — creazione delle chiavi, JSON dei permessi, rotazione, scadenza, rate limit — sono trattati in [REST API → API Key](/docs/backend/api#api-keys).
+I dettagli tecnici — creazione delle chiavi, JSON dei permessi, rotazione, scadenza, rate limit — sono trattati in [REST API → API Key](/docs/backend/api-keys).
 Non tralasciare [Security Rules (RLS)](/docs/collections/security-rules); il secondo livello di controllo è efficace solo quanto le policy che hai definito.
 
 :::caution[Il server MCP non utilizza di default una chiave con permessi limitati]
@@ -47,10 +47,10 @@ Il modello a due livelli descritto sopra si applica all'uso di una chiave API. *
 Rebase offre un tipo di proprietà nativo `vector` su Postgres e un metodo di query `.vectorSearch()` con supporto per le distanze `cosine`, `l2` e `inner_product`.
 La funzionalità è già documentata in due sezioni distinte:
 
-- [Interrogare i dati → Ricerca vettoriale](/docs/sdk/querying#vector-search) — il metodo SDK, il campo `_distance` che viene aggiunto a ogni riga e le avvertenze
+- [Interrogare i dati → Ricerca vettoriale](/docs/sdk/aggregates-and-search#vector-search) — il metodo SDK, il campo `_distance` che viene aggiunto a ogni riga e le avvertenze
 - [REST API → Ricerca vettoriale](/docs/backend/api#vector-search) — i parametri di query `vector_search`, `vector`, `vector_distance` e `vector_threshold`
 
-Tre aspetti fondamentali da considerare prima della progettazione: **Rebase archivia ed esegue ricerche sugli embedding, ma non li calcola** — non è presente alcun provider di embedding, impostazione di modello o chiave API all'interno di Rebase, quindi la generazione dei vettori è a tuo carico. **pgvector è un prerequisito, e la sua installazione va richiesta esplicitamente.** `database({ extensions: ["vector"] })` in `config/resources.ts` consente a `rebase db push` e alla verifica dello schema all'avvio di eseguire `CREATE EXTENSION IF NOT EXISTS vector`; senza quella riga creano la colonna e lasciano l'estensione a te. In entrambi i casi il server richiede un'immagine che porti la libreria e un ruolo autorizzato a installarla. Inoltre, **ogni colonna vettoriale riceve un indice HNSW per la distanza coseno**, perché è con il coseno che `vectorSearch` misura se non passi `distance`: un indice serve esattamente un operatore. Puoi regolarlo, o disattivarlo, sulla proprietà: vedi [L'indice](/docs/sdk/querying#the-index).
+Tre aspetti fondamentali da considerare prima della progettazione: **Rebase archivia ed esegue ricerche sugli embedding, ma non li calcola** — non è presente alcun provider di embedding, impostazione di modello o chiave API all'interno di Rebase, quindi la generazione dei vettori è a tuo carico. **pgvector è un prerequisito, e la sua installazione va richiesta esplicitamente.** `database({ extensions: ["vector"] })` in `config/resources.ts` consente a `rebase db push` e alla verifica dello schema all'avvio di eseguire `CREATE EXTENSION IF NOT EXISTS vector`; senza quella riga creano la colonna e lasciano l'estensione a te. In entrambi i casi il server richiede un'immagine che porti la libreria e un ruolo autorizzato a installarla. Inoltre, **ogni colonna vettoriale riceve un indice HNSW per la distanza coseno**, perché è con il coseno che `vectorSearch` misura se non passi `distance`: un indice serve esattamente un operatore. Puoi regolarlo, o disattivarlo, sulla proprietà: vedi [L'indice](/docs/sdk/aggregates-and-search#the-index).
 
 Non è inoltre possibile sottoscrivere query vettoriali in tempo reale; `.vectorSearch(...).listen()` viene rifiutato con l'errore `VECTOR_SEARCH_NOT_LIVE`.
 

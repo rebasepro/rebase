@@ -13,7 +13,7 @@ Rebase fournit quatre éléments distincts pour les assistants IA, et ils répon
 | [**Serveur MCP**](/docs/ai/mcp) | Un serveur stdio Model Context Protocol avec 41 outils couvrant votre schéma, vos données, utilisateurs, stockage, cron et serveur de dev | Un assistant, au runtime |
 | [**Compétences d'agent**](/docs/ai/skills) | 20 fichiers de compétences Markdown écrits dans votre dépôt par `rebase skills install` | Un assistant, en tant que documentation de référence |
 | [**Fichiers d'instructions**](/docs/ai/instruction-files) | `ai-instructions.md` ainsi que des fichiers pointeurs par assistant, générés par `rebase init` | Un assistant, en tant que règles permanentes |
-| [**Clés d'API**](/docs/backend/api#api-keys) | Identifiants machine délimités, par collection et par opération | Tout ce qui appelle l'API HTTP |
+| [**Clés d'API**](/docs/backend/api-keys) | Identifiants machine délimités, par collection et par opération | Tout ce qui appelle l'API HTTP |
 
 Les trois premiers visent à fournir à un assistant des *connaissances* et des
 *outils*. Le quatrième est le seul qui détermine ce qu'il est réellement autorisé à
@@ -49,7 +49,7 @@ n'ajoute pas un appelant à la liste des permissions, et le refuser ne bloque pa
 un appelant.
 
 Le fonctionnement — création de clés, JSON des permissions, rotation,
-expiration, limites de débit — est détaillé dans [REST API → API Keys](/docs/backend/api#api-keys).
+expiration, limites de débit — est détaillé dans [REST API → API Keys](/docs/backend/api-keys).
 Ne négligez pas [Security Rules (RLS)](/docs/collections/security-rules) au passage ;
 la seconde barrière ne vaut que ce que valent les stratégies que vous avez écrites.
 
@@ -69,7 +69,7 @@ Rebase propose un type de propriété natif `vector` sur Postgres et une méthod
 de requête `.vectorSearch()` avec les distances `cosine`, `l2` et `inner_product`.
 Cela est déjà documenté à deux endroits différents :
 
-- [Querying Data → Vector Search](/docs/sdk/querying#vector-search) — la méthode
+- [Querying Data → Vector Search](/docs/sdk/aggregates-and-search#vector-search) — la méthode
   du SDK, le champ `_distance` qu'elle ajoute à chaque ligne et les mises en garde
 - [REST API → Vector Search](/docs/backend/api#vector-search) — les paramètres
   de requête `vector_search`, `vector`, `vector_distance` et `vector_threshold`
@@ -87,7 +87,7 @@ Et **chaque colonne vectorielle reçoit un index HNSW
 pour la distance cosinus**, car c'est avec le cosinus que `vectorSearch` mesure
 sauf si vous passez `distance` — un index ne sert qu'un seul opérateur. Réglez-le,
 ou désactivez-le, sur la propriété : voir
-[L'index](/docs/sdk/querying#the-index).
+[L'index](/docs/sdk/aggregates-and-search#the-index).
 
 Il n'est pas non plus possible de s'abonner aux requêtes vectorielles ;
 `.vectorSearch(...).listen()` est refusé avec l'erreur `VECTOR_SEARCH_NOT_LIVE`.

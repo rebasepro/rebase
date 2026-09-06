@@ -42,7 +42,7 @@ silently ignored.
 The DDL generator has always emitted index statements for exactly two things,
 and both are structures a *feature* owns rather than queries you wrote: the GIN
 index behind a [`search` block](/docs/backend/search), and the ANN index behind
-a [`vector` property](/docs/sdk/querying#the-index). The plain case — the btree
+a [`vector` property](/docs/sdk/aggregates-and-search#the-index). The plain case — the btree
 behind a `where` clause — had no declaration site at all.
 
 So the only way to have one was to write it by hand. And:
@@ -186,7 +186,7 @@ restriction is what keeps the whole model on the Atlas path — `rebase db push`
 materialises the desired state in a bare scratch database to plan against, and
 `CREATE EXTENSION` cannot go in that file. **Trigram search is
 [`search:`](/docs/backend/search); ANN is a
-[`vector` property](/docs/sdk/querying#the-index).** An index needing
+[`vector` property](/docs/sdk/aggregates-and-search#the-index).** An index needing
 `gin_trgm_ops` or `vector_cosine_ops` is refused at build time rather than
 emitted to fail later against a database you have never seen.
 
@@ -277,7 +277,7 @@ removes:
 
 - [Search](/docs/backend/search) — ranked full-text, which builds its own GIN
   index over a generated `tsvector`
-- [Vector search](/docs/sdk/querying#vector-search) — the ANN index over an
+- [Vector search](/docs/sdk/aggregates-and-search#vector-search) — the ANN index over an
   embedding column, configured on the property
 - [Schema as code](/docs/architecture/schema-as-code) — how declarations reach
   the database, and what a derived name is
