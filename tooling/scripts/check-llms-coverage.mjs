@@ -31,7 +31,7 @@ const SITEMAP = "website/public/sitemap.md";
  * corpus and answers no question a reader brings to `llms-full.txt`. Everything
  * else on the site is in.
  */
-const EXCLUDED = new Set(["docs/CHANGELOG"]);
+const EXCLUDED = new Set(["docs/changelog"]);
 
 const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const green = (s) => `\x1b[32m${s}\x1b[0m`;
@@ -51,15 +51,21 @@ function walk(dir) {
 
 export function checkLlmsCoverage(root = ROOT) {
     const contentRoot = path.join(root, "website/src/content/docs");
+    // The slug is the served route — lowercase, the same rule as
+    // website/scripts/sidebar-slugs.js — and the file keeps its own name, which
+    // is CamelCase for every UI reference page. Both travel together: a path
+    // rebuilt from the slug resolves only on a case-insensitive filesystem,
+    // which is how this gate passed on a Mac and failed on the Linux runner.
     const pages = walk(path.join(root, "website/src/content/docs/docs"))
-        .map(p => path.relative(contentRoot, p).split(path.sep).join("/")
-            .replace(/\.(mdx|md)$/, "")
-            .replace(/\/index$/, "")
-            // Same rule as website/scripts/sidebar-slugs.js: the served route
-            // is lowercase, so that is the URL to look for in the mirrors.
-            .toLowerCase())
-        .filter(slug => !EXCLUDED.has(slug))
-        .sort();
+        .map(file => ({
+            file,
+            slug: path.relative(contentRoot, file).split(path.sep).join("/")
+                .replace(/\.(mdx|md)$/, "")
+                .replace(/\/index$/, "")
+                .toLowerCase()
+        }))
+        .filter(page => !EXCLUDED.has(page.slug))
+        .sort((a, b) => a.slug.localeCompare(b.slug));
 
     if (pages.length === 0) {
         throw new Error(`No documentation pages under ${CONTENT} — the guard is checking nothing.`);
@@ -75,13 +81,13 @@ export function checkLlmsCoverage(root = ROOT) {
         [INDEX, fs.readFileSync(path.join(root, INDEX), "utf8")],
         [SITEMAP, fs.readFileSync(path.join(root, SITEMAP), "utf8")]
     ];
-    for (const slug of pages) {
+    for (const { slug, file } of pages) {
         const url = `https://rebase.pro/${slug}`;
         for (const [name, text] of mirrors) {
             // `llms-full.txt` carries the prose rather than a link per page, so
             // it is checked by the H2 the generator writes for each one.
             const present = name === FULL
-                ? text.includes(`](${url}`) || hasHeadingFor(text, root, contentRoot, slug)
+                ? text.includes(`](${url}`) || hasHeadingFor(text, file)
                 : text.includes(url);
             if (!present) findings.push({ slug, mirror: name });
         }
@@ -91,16 +97,11 @@ export function checkLlmsCoverage(root = ROOT) {
 }
 
 /** `llms-full.txt` writes `## <title>` for each page it includes. */
-function hasHeadingFor(text, root, contentRoot, slug) {
-    for (const ext of [".mdx", ".md", "/index.mdx", "/index.md"]) {
-        const file = path.join(contentRoot, slug + ext);
-        if (!fs.existsSync(file)) continue;
-        const title = fs.readFileSync(file, "utf8").match(/^title:\s*(.+)$/m);
-        if (!title) continue;
-        const heading = `## ${title[1].trim().replace(/^["']|["']$/g, "")}\n`;
-        return text.includes(heading);
-    }
-    return false;
+function hasHeadingFor(text, file) {
+    const title = fs.readFileSync(file, "utf8").match(/^title:\s*(.+)$/m);
+    if (!title) return false;
+    const heading = `## ${title[1].trim().replace(/^["']|["']$/g, "")}\n`;
+    return text.includes(heading);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) {

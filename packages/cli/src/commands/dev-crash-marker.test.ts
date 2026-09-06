@@ -38,26 +38,40 @@ describe("the watcher's restart marker", () => {
 
         const child = spawn(process.execPath, [tsxCli, "watch", entry], { stdio: ["ignore", "pipe", "pipe"] });
         const seen = await new Promise<boolean>(resolve => {
+            let touches = 0;
+            let touching: NodeJS.Timeout | undefined;
             const finish = (value: boolean) => {
                 clearTimeout(timer);
-                clearTimeout(touch);
+                if (touching) clearInterval(touching);
                 child.kill("SIGKILL");
                 resolve(value);
             };
-            const timer = setTimeout(() => finish(false), 20_000);
-            // The first run has already thrown by now; the write is what makes
-            // tsx announce the next one.
-            const touch = setTimeout(() => {
-                writeFileSync(entry, 'throw new Error("boom again");\n', "utf8");
-            }, 3_000);
-            const scan = (chunk: Buffer) => { if (WATCHER_RESTART_MARKER.test(chunk.toString())) finish(true); };
+            const timer = setTimeout(() => finish(false), 45_000);
+            // Write only once the first run has printed its throw — that is
+            // when tsx has the watcher armed. A write on a fixed timer landed
+            // before the watcher on a cold CI runner, and nothing was announced.
+            // Then keep writing every two seconds: a change is what makes tsx
+            // announce the next run, and one write can still fall between two
+            // polls of the file system.
+            const startTouching = () => {
+                if (touching) return;
+                touching = setInterval(() => {
+                    touches += 1;
+                    writeFileSync(entry, `throw new Error("boom again ${touches}");\n`, "utf8");
+                }, 2_000);
+            };
+            const scan = (chunk: Buffer) => {
+                const text = chunk.toString();
+                if (WATCHER_RESTART_MARKER.test(text)) { finish(true); return; }
+                if (text.includes("boom")) startTouching();
+            };
             child.stdout.on("data", scan);
             child.stderr.on("data", scan);
             child.on("error", () => finish(false));
         });
 
         expect(seen).toBe(true);
-    }, 30_000);
+    }, 60_000);
 
     it("matches both wordings tsx uses", () => {
         // "Rerunning" when the previous run had already exited, "Restarting"

@@ -104,6 +104,42 @@ for (const dir of COLLECTION_DIRS) {
     }
 }
 
+// The reference app ships to the runtime image with nothing vendored: its
+// `@rebasepro/*` dependencies are `workspace:*`, which the bundle's
+// `deps.declared` filters out, so whatever its config graph imports must be a
+// package the image itself supplies. `@rebasepro/cms-types` is not one — the
+// image stitches the runtime packages and nothing from the panel — and a
+// `defineCollection` import from it loaded fine in every test here and
+// failed the self-host acceptance boot with "Cannot find package". A scaffold
+// is different: it pins a registry version, which is declared and installed.
+console.log("Checking the reference app imports only what the runtime image ships...");
+{
+    const src = fs.readFileSync(path.join(repoRoot, "packages/cli/src/bundle.ts"), "utf8");
+    const block = /const RUNTIME_PROVIDED = new Set\(\[([\s\S]*?)\]\)/.exec(src);
+    if (!block) throw new Error("could not find RUNTIME_PROVIDED in packages/cli/src/bundle.ts");
+    const provided = new Set([...block[1].matchAll(/"([^"]+)"/g)].map(m => m[1]));
+    const appConfig = path.join(repoRoot, "app", "config");
+    const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) return entry.name === "node_modules" || entry.name === "dist" ? [] : walk(full);
+        return /\.(ts|js|mts|mjs)$/.test(entry.name) && !/\.(test|spec)\./.test(entry.name) ? [full] : [];
+    });
+    for (const file of walk(appConfig)) {
+        const text = fs.readFileSync(file, "utf8");
+        for (const m of text.matchAll(/^\s*import\s+(?!type\s)[^;]*?from\s+["'](@rebasepro\/[a-z-]+)(?:\/[^"']*)?["']/gm)) {
+            if (provided.has(m[1])) continue;
+            const label = path.relative(repoRoot, file);
+            failures.push({
+                label,
+                message: `imports ${m[1]}, which the runtime image does not ship (RUNTIME_PROVIDED in packages/cli/src/bundle.ts) — ` +
+                    "the reference app is deployed without vendoring, so this boots here and fails the self-host acceptance boot with \"Cannot find package\". " +
+                    "Use a runtime-provided package (an annotation from @rebasepro/types, or defineCollection from @rebasepro/common)."
+            });
+            console.log(`  ERR  ${label}`);
+        }
+    }
+}
+
 console.log("Checking server packages are UI-free...");
 for (const pkg of SERVER_PACKAGES) {
     const entry = path.join(repoRoot, pkg);
