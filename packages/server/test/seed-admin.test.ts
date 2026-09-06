@@ -1,5 +1,6 @@
 import { describe, it, expect, jest } from "@jest/globals";
 import { seedInitialAdmin } from "../src/auth/seed-admin";
+import { isBootstrapWindowOpen, isRegistrationOpen } from "../src/auth/registration-policy";
 import { logger } from "../src/utils/logger";
 import type { UserManagementAdapter, AuthUserData } from "@rebasepro/types";
 
@@ -31,7 +32,16 @@ describe("seeding the initial admin from the environment", () => {
         return { adapter, roles, users };
     }
 
-    const creds = { REBASE_ADMIN_EMAIL: "ops@acme.test", REBASE_ADMIN_PASSWORD: "a-long-enough-secret" };
+    /**
+     * `NODE_ENV: "production"` is part of the credential, not decoration: the
+     * seed is the production half of the contract, and outside production the
+     * first registration is still the way in. See the last two cases.
+     */
+    const creds = {
+        REBASE_ADMIN_EMAIL: "ops@acme.test",
+        REBASE_ADMIN_PASSWORD: "a-long-enough-secret",
+        NODE_ENV: "production"
+    };
 
     it("creates the admin on an empty user table", async () => {
         const { adapter, roles } = mockUsers();
@@ -95,7 +105,10 @@ describe("seeding the initial admin from the environment", () => {
     it("refuses half a credential rather than guessing", async () => {
         const { adapter } = mockUsers();
 
-        const outcome = await seedInitialAdmin(adapter, { REBASE_ADMIN_EMAIL: "ops@acme.test" });
+        const outcome = await seedInitialAdmin(adapter, {
+            REBASE_ADMIN_EMAIL: "ops@acme.test",
+            NODE_ENV: "production"
+        });
 
         expect(outcome.status).toBe("skipped");
         expect(adapter.createUser).not.toHaveBeenCalled();
@@ -106,7 +119,8 @@ describe("seeding the initial admin from the environment", () => {
 
         const outcome = await seedInitialAdmin(adapter, {
             REBASE_ADMIN_EMAIL: "ops@acme.test",
-            REBASE_ADMIN_PASSWORD: "short"
+            REBASE_ADMIN_PASSWORD: "short",
+            NODE_ENV: "production"
         });
 
         expect(outcome.status).toBe("skipped");
@@ -129,7 +143,8 @@ describe("seeding the initial admin from the environment", () => {
 
         const outcome = await seedInitialAdmin(adapter, {
             REBASE_ADMIN_EMAIL: "admin@localhost",
-            REBASE_ADMIN_PASSWORD: "a-perfectly-long-password"
+            REBASE_ADMIN_PASSWORD: "a-perfectly-long-password",
+            NODE_ENV: "production"
         });
 
         expect(outcome.status).toBe("skipped");
@@ -141,7 +156,8 @@ describe("seeding the initial admin from the environment", () => {
 
         const outcome = await seedInitialAdmin(adapter, {
             REBASE_ADMIN_EMAIL: "ops@acme.test",
-            REBASE_ADMIN_PASSWORD: "a-perfectly-long-password"
+            REBASE_ADMIN_PASSWORD: "a-perfectly-long-password",
+            NODE_ENV: "production"
         });
 
         expect(outcome.status).toBe("created");
@@ -165,5 +181,86 @@ describe("seeding the initial admin from the environment", () => {
 
     it("says so when there is no user store to seed into", async () => {
         expect((await seedInitialAdmin(undefined, creds)).status).toBe("skipped");
+    });
+
+    /**
+     * The regression this half of the contract exists for.
+     *
+     * `rebase init` writes `REBASE_ADMIN_EMAIL` and a generated password into
+     * `.env` — for the compose stack, which runs `NODE_ENV=production`. But
+     * `rebase dev` reads the same `.env`, so an unconditional seed created that
+     * account at the first boot, the user table stopped being empty, and the
+     * quickstart's own first step — register, become the admin — produced a
+     * role-less account. Nothing in the first-run path named the credentials
+     * that had taken its place.
+     */
+    it("does not seed where the first registration is still the way in", async () => {
+        const info = jest.spyOn(logger, "info").mockImplementation(() => undefined);
+        try {
+            const { adapter } = mockUsers();
+
+            const outcome = await seedInitialAdmin(adapter, {
+                ...creds,
+                NODE_ENV: "development"
+            });
+
+            expect(outcome).toEqual({ status: "window-open" });
+            expect(adapter.createUser).not.toHaveBeenCalled();
+            // Announced, not silent: the variables are in the `.env` the
+            // scaffold generated, and an operator who set them is owed the
+            // reason the account they named is not there.
+            expect(info).toHaveBeenCalledWith(expect.stringContaining("REBASE_ADMIN_EMAIL"));
+        } finally {
+            info.mockRestore();
+        }
+    });
+
+    /**
+     * The two halves are one mechanism, so they are asserted together: exactly
+     * one way in exists at a time. Separately, each half has passed while the
+     * pair produced a deployment with two ways in (development) or none
+     * (production, nothing named).
+     */
+    it("is the only way in where the window is shut, and no way in where it is open", async () => {
+        const production = { NODE_ENV: "production" };
+        const development = { NODE_ENV: "development" };
+
+        expect(isBootstrapWindowOpen(production)).toBe(false);
+        expect(isRegistrationOpen({
+            needsSetup: true,
+            bootstrapWindowOpen: isBootstrapWindowOpen(production)
+        })).toBe(false);
+        expect((await seedInitialAdmin(mockUsers().adapter, { ...creds, ...production })).status)
+            .toBe("created");
+
+        expect(isBootstrapWindowOpen(development)).toBe(true);
+        expect(isRegistrationOpen({
+            needsSetup: true,
+            bootstrapWindowOpen: isBootstrapWindowOpen(development)
+        })).toBe(true);
+        const info = jest.spyOn(logger, "info").mockImplementation(() => undefined);
+        try {
+            expect((await seedInitialAdmin(mockUsers().adapter, { ...creds, ...development })).status)
+                .toBe("window-open");
+        } finally {
+            info.mockRestore();
+        }
+    });
+
+    it("treats an absent NODE_ENV as development, like every other window check", async () => {
+        const info = jest.spyOn(logger, "info").mockImplementation(() => undefined);
+        try {
+            const { adapter } = mockUsers();
+
+            const outcome = await seedInitialAdmin(adapter, {
+                REBASE_ADMIN_EMAIL: "ops@acme.test",
+                REBASE_ADMIN_PASSWORD: "a-long-enough-secret"
+            });
+
+            expect(outcome).toEqual({ status: "window-open" });
+            expect(adapter.createUser).not.toHaveBeenCalled();
+        } finally {
+            info.mockRestore();
+        }
     });
 });

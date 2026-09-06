@@ -119,6 +119,10 @@ Quando apri l'URL del frontend stampato da `rebase dev`, vedrai la schermata di 
 2. Inserisci la tua email e password
 3. Sei dentro — con accesso amministrativo completo
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+`rebase init` ha scritto anche `REBASE_ADMIN_EMAIL` e una `REBASE_ADMIN_PASSWORD` generata dentro `.env`. Qui **non** sono le tue credenziali: `rebase dev` le ignora e lo dice all'avvio. Appartengono a un avvio di produzione — `docker compose up`, o qualsiasi cosa con `NODE_ENV=production` — dove questa finestra di bootstrap è chiusa, perché il server risponde su un hostname prima che tu abbia digitato qualcosa. Vedi [Il tuo primo amministratore](/it/docs/getting-started/deployment#il-tuo-primo-amministratore).
+
 ## Definisci la Tua Prima Collezione
 
 Apri `config/collections/` e crea un nuovo file. Esporta la collezione come **export di default** — è così che il registry la rileva:

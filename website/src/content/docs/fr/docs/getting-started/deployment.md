@@ -86,6 +86,39 @@ avec `pnpm run db:generate` et exécutez `pnpm run db:migrate` comme étape de r
 depuis un checkout du projet (ou votre job CI), et non à l'intérieur du conteneur en cours d'exécution —
 l'image de production est livrée sans la CLI.
 
+## Votre premier administrateur
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+**Définissez `REBASE_ADMIN_EMAIL` et `REBASE_ADMIN_PASSWORD` avant le premier démarrage.** C'est la seule étape qui n'a aucun recours depuis l'extérieur.
+
+Une base de données neuve n'a aucun utilisateur, et hors production la politique d'inscription accepte la première création de compte et la promeut administrateur. Il le faut : nommer un administrateur exige un appelant déjà authentifié, donc une base vide sans cette règle est une impasse. Sur un portable, la personne au clavier est l'exploitant, et c'est exactement ce qu'il faut.
+
+C'est exactement ce qu'il ne faut pas sur un hôte au nom public. Les artefacts livrés montent le DNS et TLS avant que l'exploitant ait tapé quoi que ce soit : la fenêtre est donc ouverte sur internet dès la première seconde, et la première personne à atteindre le formulaire d'inscription possède le déploiement.
+
+Sous `NODE_ENV=production`, cette fenêtre est donc fermée. Une table d'utilisateurs vide refuse l'inscription d'amorçage avec `SETUP_REQUIRED`, un compte créé par inscription ouverte est un compte ordinaire, `GET /api/auth/config` n'annonce jamais `needsSetup`, et `POST /api/admin/bootstrap` refuse. En 0.17.3 et avant, la fenêtre était ouverte en production aussi : mettez à jour avant d'exposer un déploiement neuf.
+
+`rebase dev` lit le même `.env` mais ignore délibérément les deux variables, et le dit au démarrage : en local, la première inscription reste la porte d'entrée. Les valeurs écrites par `rebase init` appartiennent au démarrage de production.
+
+Restent deux portes d'entrée, dont aucune n'est une course :
+
+```bash
+REBASE_ADMIN_EMAIL=vous@example.com
+REBASE_ADMIN_PASSWORD=<au moins 12 caractères>
+DISABLE_SELF_REGISTRATION=true
+```
+
+Le runtime crée ce compte une fois, tant que la table des utilisateurs est vide, et ne fait rien à chaque démarrage suivant. Ou attribuez le rôle à un utilisateur existant avec la clé de service, si vous provisionnez les comptes par ailleurs.
+
+Le runtime impose deux règles au démarrage, faute de quoi le compte obtenu est inutilisable :
+
+- Le mot de passe doit faire **au moins 12 caractères**, sinon il est refusé et aucun compte n'est créé.
+- L'adresse doit être acceptée par `POST /api/auth/login` : cette route analyse son corps avec `z.string().email()`, si bien qu'un domaine sans point (`admin@localhost`) se crée sans broncher puis répond 400 à chaque connexion. Le démarrage refuse aussi cette adresse.
+
+Définissez les deux ou aucune : une demi-information d'identification est une faute de frappe, et le déploiement qu'elle laisse — auto-inscription fermée, aucun administrateur — ne se récupère qu'à une console `psql`. Le démarrage avertit quand la table est vide en production et qu'aucun administrateur n'est nommé.
+
+Connectez-vous et changez le mot de passe. Il est en clair là où vous avez déposé votre environnement.
+
 ## Liste de contrôle pour la production
 
 Avant de déployer en production, assurez-vous de :
@@ -98,7 +131,7 @@ Avant de déployer en production, assurez-vous de :
 | **CORS** | Configurez les origines autorisées sur votre backend si le frontend et le backend sont sur des domaines différents |
 | **Volumes de stockage** | Montez des volumes persistants pour les téléversements de fichiers. Ou passez à S3 pour la production. |
 | **HTTPS** | Terminez TLS au niveau de votre reverse proxy (nginx, Cloudflare, équilibreur de charge) |
-| **Inscription** | Définissez `ALLOW_REGISTRATION=false` après avoir créé votre compte administrateur |
+| **Premier administrateur** | Définissez `REBASE_ADMIN_EMAIL` et `REBASE_ADMIN_PASSWORD` **avant le premier démarrage**, ainsi que `DISABLE_SELF_REGISTRATION=true`. En production, le premier compte inscrit n'est pas promu — voir [Votre premier administrateur](#votre-premier-administrateur). |
 
 | **Les lectures publiques ont quand même besoin d'un appelant** | `access: "public"` élargit les *lignes* qu'un appelant voit, pas qui a le droit d'appeler : une requête anonyme vers `/api/data/*` répond 401 tant que `AUTH_REQUIRE` est actif. Mettez `AUTH_REQUIRE=false` pour un site public qui lit son propre backend, et laissez RLS seul décider. C'est une variable d'environnement : un `.env` local qui la définit ne voyage **pas** avec votre déploiement. |
 

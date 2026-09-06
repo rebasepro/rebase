@@ -148,6 +148,12 @@ advertises `needsSetup`, and `POST /api/admin/bootstrap` refuses. In 0.17.3 and
 earlier the window was open in production too, so upgrade before you expose a
 fresh deployment.
 
+`rebase dev` reads the same `.env` and deliberately ignores both variables, and
+says so at boot: locally the first registration is still the way in. The values
+`rebase init` wrote belong to the production boot. Seeding on both sides would
+spend the window before the developer had opened the app, which is what made the
+quickstart's own first step produce a role-less account.
+
 That leaves two ways in, neither of which is a race:
 
 ```bash
