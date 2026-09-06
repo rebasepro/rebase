@@ -162,6 +162,42 @@
 
 ### Fixed
 
+- **A tenant whose pods could not boot reported healthy for six and a half
+  days.** Tenant Deployments run `maxUnavailable: 0`, so a failed move surges a
+  new pod and leaves the previous ReplicaSet serving. `Available` stays `True`
+  and `readyReplicas` stays at the desired count — both sum over every
+  ReplicaSet, and both were describing the pod that was *not* being rolled out.
+  The rollout controller does read the Deployment when a health scrape comes back
+  empty, but it only ever looks at projects named in an active `rollouts` row, so
+  a tenant moved by hand or by a fleet script got no supervision at all. Two of
+  them crash-looped 222 times while every check called them fine.
+
+  A new `fleet-health-guard` cron reads every tenant Deployment on every cluster
+  each ten minutes, regardless of how it got into the state it is in, and judges
+  it by exactly the reading a rollout uses — `Progressing: False` plus the
+  per-template counters, never the sums. A tenant Kubernetes has given up on is
+  named with the image it could not move onto and returned to the ReplicaSet it
+  is actually serving, which ends the crash loop without changing what is served.
+  It stands down while a supervised rollout is in flight, so it cannot race the
+  controller for a tenant that is legitimately moving.
+
+- **The alert for tenant application errors could not describe one.** Its filter
+  matched every container in a tenant namespace and its label extractors read
+  `jsonPayload.msg`, `.error` and `.logger` — CloudNativePG's field names. The
+  application logger emits `{severity, message, timestamp}` and has never had a
+  `msg`, so every notification about an application error rendered
+  `Error: (null) Detail: (null) Component: (null)`. It is now scoped to the app
+  container and reads `jsonPayload.message`; the database half it was silently
+  covering became its own policy, keeping CloudNativePG's names.
+
+  The policies lived only in the Cloud console, where no test could see them and
+  no review could read them. They are checked in under `saas/infra/monitoring/`
+  with an idempotent `apply.sh`, and a gate asserts that every extractor names a
+  field the containers it matches actually emit, and that every
+  `${log.extracted_label.…}` in a notification is a label some condition
+  extracts.
+
+
 - **A collection routed to a second database got its table in the first.**
   Provisioning filtered collections by *engine*, so `dataSource: "analytics"` on
   a Postgres collection handed it to the default Postgres database: the table was
