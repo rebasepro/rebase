@@ -164,6 +164,13 @@ for (const file of found) {
  * The English one carried a carve-out ("a headless project needs only 20") that
  * stopped being true the moment the CLI itself moved to 22.22; the five
  * translations were three majors behind it.
+ *
+ * Containing the right number is not enough, and that is the half this gate
+ * used to miss: the sentence with the carve-out in it contained `22.22`, so it
+ * passed for months while telling `--headless` readers a second, wrong number.
+ * A prerequisite line naming two Node versions cannot be right — the reader has
+ * to decide which applies to them, and the scaffold they get declares one — so
+ * any version number on that line other than the floor is a finding.
  */
 const quickstarts = fs
     .globSync("website/src/content/docs/**/getting-started/quickstart.md", { cwd: root })
@@ -186,6 +193,28 @@ for (const file of quickstarts) {
     }
     if (!line.includes(prosefloor)) {
         problems.push(`${rel}: prerequisite says ${JSON.stringify(line.trim())}, expected it to name ${prosefloor}`);
+        continue;
+    }
+
+    // Every version-shaped number on the line, with the floor's own spellings
+    // removed first — `22.22+`, `>=22.22.0` and `22.22.0` are all the floor.
+    // What is left is a second version somebody added, which is exactly how the
+    // headless carve-out survived a gate that only looked for the right number.
+    // A bare major counts: the carve-out that survived for months read "needs
+    // only 20", and refusing to call that a version claim is precisely the
+    // leniency that let it through.
+    const others = [...line
+        .replaceAll(`${floor}`, "")
+        .replaceAll(prosefloor, "")
+        .matchAll(/\b(\d+(?:\.\d+){0,2})\b/g)]
+        .map((m) => m[1]);
+
+    if (others.length > 0) {
+        problems.push(
+            `${rel}: prerequisite names ${others.length} other Node version(s) (${others.join(", ")}) `
+            + `besides ${prosefloor} — ${JSON.stringify(line.trim())}. One floor, or the reader has `
+            + "to guess which one is theirs."
+        );
     }
 }
 
