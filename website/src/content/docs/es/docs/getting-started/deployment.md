@@ -1,4 +1,5 @@
 ---
+sourceHash: 215da7d8e962efb0
 title: Despliegue
 sidebar_label: Despliegue
 description: Despliega tu proyecto Rebase a producción usando Docker, plataformas en la nube o configuraciones manuales.
@@ -41,9 +42,8 @@ services:
       - "5432:5432"
 
   app:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    # La imagen de runtime publicada. Actualizar Rebase es un cambio de etiqueta, no una recompilación.
+    image: rebasepro/server:${REBASE_VERSION:-latest}
     ports:
       - "3001:3001"
     environment:
@@ -53,6 +53,8 @@ services:
     depends_on:
       - postgres
     volumes:
+      # Tu proyecto construido, desde `rebase build`.
+      - ./dist-bundle:/bundle:ro
       - uploads:/app/uploads
 
 volumes:
@@ -61,11 +63,18 @@ volumes:
 ```
 
 ```bash
+rebase build
 docker compose up -d
 ```
 
+El bundle se monta en solo lectura. `rebase build` instala las dependencias
+declaradas del proyecto en `dist-bundle` salvo que pases `--no-vendor`, en cuyo
+caso el runtime las instala en cada arranque y el montaje tiene que ser
+escribible: quita entonces el `:ro`. Consulta
+[Autoalojamiento](/docs/deployment/self-hosting/).
+
 :::note
-El `docker-compose.yml` generado por Rebase es la fuente de verdad y ya usa este contexto de compilación (la raíz del proyecto con `dockerfile: backend/Dockerfile`); el ejemplo anterior solo lo reproduce. El Dockerfile del backend necesita todo el workspace como contexto (`pnpm-workspace.yaml`, `backend/`, `config/`), por lo que `build: ./backend` fallaría.
+El `docker-compose.yml` generado por Rebase es la fuente de verdad; el ejemplo anterior solo lo reproduce. No construye ninguna imagen a partir de tu código: arranca la imagen de runtime publicada y monta el `dist-bundle` que produjo `rebase build`.
 :::
 
 ## Crear el Esquema de la Base de Datos

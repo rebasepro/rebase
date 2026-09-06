@@ -1,4 +1,5 @@
 ---
+sourceHash: c719f1cf36899c0a
 title: Relazioni
 sidebar_label: Relazioni
 description: Definisci relazioni SQL uno-a-uno, uno-a-molti e molti-a-molti tra collezioni con chiavi esterne, tabelle di giunzione e join multi-hop.
@@ -222,6 +223,14 @@ relations: [
 | `"set default"` | Imposta la colonna FK al suo valore predefinito |
 
 ### Cosa ottieni se non dici nulla
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+Il valore predefinito per un `belongsTo` **obbligatorio** è cambiato. In 0.17.3 è
+`ON DELETE CASCADE` — eliminare un padre elimina i suoi figli — e da 0.18 è
+`RESTRICT`: l'eliminazione fallisce e nomina il vincolo. Tutto il resto di questa
+sezione è invariato, e `db push` pianifica la riscrittura del vincolo
+all'aggiornamento.
 
 `onDelete` è opzionale, quindi la maggior parte delle relazioni non lo nomina
 mai. Il valore predefinito dipende dal fatto che la relazione sia obbligatoria:

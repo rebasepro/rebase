@@ -1,4 +1,5 @@
 ---
+sourceHash: 24ecb93e6262aeca
 title: Slots
 sidebar_label: Slots
 description: Referenz für alle UI-Erweiterungspunkt-Slots, die in Rebase verfügbar sind — benannte Stellen, an denen Sie benutzerdefinierte Komponenten einfügen können.

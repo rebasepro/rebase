@@ -110,6 +110,22 @@ function headingSlug(text) {
         .replace(/\s+/g, "-");
 }
 
+/**
+ * How long an English documentation page may be.
+ *
+ * Not a style rule. A page this size has stopped being one thing: `sdk/querying`
+ * reached 957 lines holding CRUD, batch writes, the query builder, pagination,
+ * aggregates, JSON filtering, two kinds of search and two kinds of relation
+ * read — and the parts drifted from each other, because nobody reviewing a
+ * change to one of them reads the other eight. Splitting at a `##` seam is
+ * cheap; the split is what was skipped twice before this became a number.
+ *
+ * The changelog is the one exemption: it is a mirror of the release record,
+ * generated on every build, and there is nothing to split it into.
+ */
+const MAX_LINES = 600;
+const LENGTH_EXEMPT = [/\/CHANGELOG\.md$/];
+
 export function checkDocsLinks(root) {
     const files = [...new Set(DOC_GLOBS.flatMap(g => globSync(g, { cwd: root })))].sort();
 
@@ -187,6 +203,18 @@ export function checkDocsLinks(root) {
         // The outbound minimum is a claim about English editorial, not about
         // five machine translations of it.
         if (!file.startsWith("website/src/content/docs/docs/")) continue;
+
+        const lineCount = raw.split("\n").length;
+        if (lineCount > MAX_LINES && !LENGTH_EXEMPT.some(re => re.test(file))) {
+            findings.push({
+                file, line: 1,
+                message:
+                    `${lineCount} lines, budget ${MAX_LINES} — split it at a \`##\` seam into a ` +
+                    "sibling page named after the heading, and add the sidebar entry. A page this " +
+                    "long has stopped being one thing, and its parts drift from each other."
+            });
+        }
+
         if (NO_OUTBOUND_RULE.some(re => re.test(file))) continue;
         if (outbound < MIN_OUTBOUND) {
             findings.push({

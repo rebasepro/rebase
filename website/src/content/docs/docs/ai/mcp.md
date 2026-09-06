@@ -134,7 +134,7 @@ function, and run DDL against whatever `DATABASE_URL` the project resolves.
 
 ### Giving it a narrow credential instead
 
-Register a scoped [API key](/docs/backend/api#api-keys) and the two-gate model
+Register a scoped [API key](/docs/backend/api-keys) and the two-gate model
 applies for real. A non-admin key runs with the roles `["service"]`, which the
 injected admin policies do **not** name — so RLS grants it nothing unless one of
 your own policies says otherwise, and the permission list narrows it further:
@@ -181,7 +181,7 @@ key does. On the data plane its reach is the service key's. What it adds is that
 it is **revocable, expirable and rate-limited per key**, none of which is true of
 the service key — rotating that means editing `.env` and restarting the server.
 
-See [Agents and MCP Servers](/docs/backend/api#agents-and-mcp-servers) for the
+See [Agents and MCP Servers](/docs/backend/api-keys#agents-and-mcp-servers) for the
 key-scoping guidance in full.
 
 ### Putting a collection out of reach entirely

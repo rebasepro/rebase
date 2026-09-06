@@ -1,4 +1,5 @@
 ---
+sourceHash: af85efb5a9d69006
 title: Viste Entità
 sidebar_label: Viste Entità
 description: Aggiungi schede e viste personalizzate alle pagine di dettaglio delle entità per anteprime, analisi, dati correlati o UI personalizzate.

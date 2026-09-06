@@ -1,4 +1,5 @@
 ---
+sourceHash: 2cf8f0e1f2cb33d7
 title: Modos de Visualização
 sidebar_label: Modos de Visualização
 description: Configure as visualizações de tabela, cartões e quadro Kanban para suas coleções.

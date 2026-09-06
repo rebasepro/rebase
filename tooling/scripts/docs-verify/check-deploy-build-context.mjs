@@ -65,12 +65,10 @@ const RULES = [
         // `rebase eject`, at the project root. Six guides told the reader to
         // build one anyway — `docker build -f backend/Dockerfile .` against a
         // path that does not exist, which is where every one of them stopped.
+        // All six locales. This was English-only while the translations still
+        // carried the recipe — failing on them would have blocked the fix to
+        // the page they were made from — and the replay landed with W5-07.
         re: /backend\/Dockerfile/,
-        // English only: the five other locales are machine-translated from
-        // these files and are refreshed by `website/scripts/translate_docs.mjs`,
-        // not by hand. Failing on a stale translation would block the fix to
-        // the page it was translated from.
-        only: /^website\/src\/content\/docs\/docs\//,
         hint: "the scaffold ships no backend/Dockerfile — use `rebase build` plus " +
             "`FROM rebasepro/server:<version>` / `COPY dist-bundle /bundle`, the shape " +
             "self-hosting.md and hetzner.md use"
@@ -98,7 +96,6 @@ export function checkDeployBuildContext(root) {
         const lines = readFileSync(path.join(root, rel), "utf8").split("\n");
         lines.forEach((text, i) => {
             for (const rule of RULES) {
-                if (rule.only && !rule.only.test(rel)) continue;
                 if (rule.re.test(text)) {
                     findings.push({ file: rel, line: i + 1, text: text.trim(), rule: rule.id, hint: rule.hint });
                 }

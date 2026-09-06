@@ -1,4 +1,5 @@
 ---
+sourceHash: 6fe5b7b2b7ed27d2
 title: Echtzeit & WebSocket
 sidebar_label: Echtzeit
 description: Echtzeit-Datensynchronisation, Broadcast-Kanäle und Präsenz-Tracking über WebSocket.

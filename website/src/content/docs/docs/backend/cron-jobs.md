@@ -113,6 +113,9 @@ Step values (`*/n`), ranges (`a-b`), and lists (`a,b,c`) are all supported.
 
 ## CronJobDefinition Reference
 
+`timezone` is new <span class="since-badge" data-since="0.18">Since 0.18</span> — on 0.17.3 a schedule is always read in the
+host's own zone. Everything else on this interface has shipped.
+
 ```typescript
 interface CronJobDefinition {
     // Cron schedule expression (5-field format)
@@ -288,7 +291,8 @@ All cron routes require **admin authentication** (`requireAuth` + `requireAdmin`
 
 ### Example: List All Jobs
 
-`$API_URL` is whatever `rebase dev` printed — the port is derived from the
+`$TOKEN` is an admin access token: sign in and use the `accessToken` the login
+response returns. `$API_URL` is whatever `rebase dev` printed — the port is derived from the
 project's path, so there is no fixed one.
 
 ```bash

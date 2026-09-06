@@ -1,4 +1,5 @@
 ---
+sourceHash: b39ae0ea2de335df
 title: Colonne Aggiuntive
 sidebar_label: Colonne Aggiuntive
 description: Aggiungi colonne calcolate/virtuali alle tabelle di collezione che derivano valori dai dati dell'entità.

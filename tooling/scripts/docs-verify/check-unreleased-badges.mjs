@@ -51,12 +51,41 @@ const EXCLUDED = [
     "website/src/content/docs/docs/upgrading.mdx"
 ];
 
-/** What a feature name looks like. Anything else in a lead-in is prose. */
+/**
+ * Pages nobody can badge, because nobody writes them.
+ *
+ * `docs/ui/**` is generated from the components' own props by
+ * `website/scripts/`, and every version-to-version guide under `upgrading/`
+ * describes the release it is named after. Asking either for a hand-written
+ * badge is asking for an edit that the next regeneration deletes.
+ */
+const EXCLUDED_PREFIXES = [
+    "website/src/content/docs/docs/ui/",
+    "website/src/content/docs/docs/upgrading/"
+];
+
+/**
+ * What a feature name looks like. Anything else in a lead-in is prose.
+ *
+ * These were four narrow shapes — a `rebase …` command, an `ALL_CAPS` env var
+ * with an underscore in it, `foo.bar()`, a three-word hyphenated id — and they
+ * matched 14 of the 80 bullets under `## [Unreleased]`. The other 66 yielded no
+ * token at all, so the gate reported "9 unreleased features", passed, and said
+ * nothing about `timezone` on a cron job (documented as current, in no released
+ * section) or about a `belongsTo` delete default that the docs already taught.
+ * A gate whose input is empty reads exactly like a gate with nothing to say.
+ *
+ * Now: any backticked identifier. That is a wider net than the feature names,
+ * which is the point — the filtering is done by the "absent from every released
+ * section" rule below, and what that rule lets through and should not goes on
+ * {@link NOT_NEW} with its reason.
+ */
 const SHAPES = [
-    /^rebase [a-z][a-z0-9-]*(?: [a-z][a-z0-9-]*){0,2}$/,     // rebase db branch switch
-    /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/,                        // REBASE_ADMIN_EMAIL
-    /^[a-z][a-zA-Z0-9]*\.[a-zA-Z][a-zA-Z0-9]*\(\)$/,          // policy.registered()
-    /^[a-z]+(?:-[a-z]+){2,}$/                                 // policy-authenticated-tautology
+    // `timezone`, `belongsTo`, `RESTRICT`, `policy.registered()`, `rls-check`,
+    // `admin.browserCallbacks`, `boot/sources.ts`
+    /^[A-Za-z_$][\w$]*(?:[.\-/][A-Za-z_$][\w$]*)*(?:\(\))?$/,
+    // `rebase db branch switch`, `rebase db pull --database-url`
+    /^rebase [a-z][a-z0-9-]*(?:[ ][A-Za-z0-9.\-]+)*$/
 ];
 
 /**
@@ -66,8 +95,54 @@ const SHAPES = [
  */
 const NOT_NEW = new Map([
     ["rebase db branch info", "a subcommand of `rebase db branch`, released in 0.17"],
-    ["rebase auth reset-password", "shipped 2026-04, before the CHANGELOG quoted it"]
+    ["rebase auth reset-password", "shipped 2026-04, before the CHANGELOG quoted it"],
+    // Widening the grammar turned these from prose into tokens. Each is an old
+    // surface that the release notes happened never to quote in backticks.
+    ["callbacks", "the collection callbacks map, released well before 0.17"],
+    ["storagePublicRead", "an `initializeRebaseBackend` option since 0.14"],
+    ["zod", "the validation library the runtime has always used"],
+    ["alpha", "a sample branch name in a `rebase db branch` example, not an API"],
+    ["belongsTo", "the relation kind is old; what changed is its `onDelete` default, and `RESTRICT` is the token for that"],
+    ["saveEntityWithCallbacks", "an internal service method, unchanged; the Unreleased note is about where it is called from"],
+    ["deleteEntityWithCallbacks", "same service, same note"],
+    ["loadDeclaredStorageSources", "an internal loader being deleted, not a surface anyone can write"],
+    ["admin.browserCallbacks", "the admin build's own option, released in 0.16"],
+    // One-word names of surfaces the product has had for releases. The wide
+    // grammar turns each of them into a token, and each of them appears on
+    // dozens of pages that are describing the released behaviour.
+    ["admin", "the `admin` block on a collection and on a property, since 0.12"],
+    ["kind", "a relation's `kind`, since relations were authored"],
+    ["required", "`validation: { required }`, since 0.12"],
+    ["validation", "the property `validation` block, since 0.12"],
+    ["defineCollection", "the collection factory, since 0.12"]
 ]);
+
+/**
+ * Tokens that name two different things, with the page pattern that means the
+ * unreleased one.
+ *
+ * `timezone` is the whole entry for a cron job's IANA zone, and it is also a
+ * date property's option and a `DateTimeField` prop, both of which have shipped
+ * for releases. A one-word token cannot tell them apart, and the answer is not
+ * to drop it — the cron page is the one that was documenting an unreleased
+ * option as current. Keep the list this short: an entry is a name the CHANGELOG
+ * gave without enough context to be looked up.
+ */
+const SCOPED = new Map([
+    ["timezone", { pattern: /\/backend\/cron-jobs\.md$|\/cli\/cron/, why: "a cron job's IANA zone; a date property's `timezone` is older" }]
+]);
+
+/**
+ * `### ` headings whose bullets describe a change to something that already
+ * shipped.
+ *
+ * The "new means absent from every released section" rule is right for an
+ * addition and backwards for a breaking change: `RESTRICT` is quoted in a 0.15
+ * note about dropping a schema, so the rule filed the `belongsTo` delete default
+ * as old and skipped the page teaching the *previous* default as current. Under
+ * a Breaking heading the token being old is the whole point of the entry.
+ */
+const CHANGES_AN_OLD_SURFACE = new Set(["Breaking", "Changed", "Removed"]);
 
 /**
  * Features that are unreleased but whose CHANGELOG entry names them only in
@@ -108,12 +183,18 @@ export function checkUnreleasedBadges(root) {
 
     // ── 1 + 2: the tokens that are new ────────────────────────────────────
     const tokens = new Set();
-    for (const bullet of unreleased.matchAll(/^- \*\*(.+?)\*\*/gms)) {
-        for (const [, token] of bullet[1].matchAll(/`([^`\n]+)`/g)) {
+    let heading = "";
+    const suppressed = new Set();
+    for (const bullet of unreleased.matchAll(/^(?:### ([^\n]+))|^- \*\*(.+?)\*\*/gms)) {
+        // The regex alternates between the `### ` headings and the bullets, in
+        // document order, so the last heading seen is the bullet's own.
+        if (bullet[1] !== undefined) { heading = bullet[1].trim(); continue; }
+        const changesAnOldSurface = CHANGES_AN_OLD_SURFACE.has(heading);
+        for (const [, token] of bullet[2].matchAll(/`([^`\n]+)`/g)) {
             const t = token.trim();
             if (!SHAPES.some(shape => shape.test(t))) continue;
-            if (released.includes(`\`${t}\``)) continue; // shipped already
-            if (NOT_NEW.has(t)) continue;
+            if (!changesAnOldSurface && released.includes(`\`${t}\``)) continue; // shipped already
+            if (NOT_NEW.has(t)) { suppressed.add(t); continue; }
             tokens.add(t);
         }
     }
@@ -121,14 +202,19 @@ export function checkUnreleasedBadges(root) {
         if (!released.includes(`\`${t}\``)) tokens.add(t);
     }
 
-    // A `NOT_NEW` entry that the released notes now quote is dead weight, and a
-    // dead exemption is how a real finding gets silently absorbed later.
+    // A `NOT_NEW` entry nothing suppressed this run is dead weight, and a dead
+    // exemption is how a real finding gets silently absorbed later. Usage
+    // rather than "a released section quotes it": under a Breaking heading a
+    // released quote no longer filters the token, so that test would call a
+    // live exemption dead.
     for (const [t, why] of NOT_NEW) {
-        if (released.includes(`\`${t}\``)) {
+        if (!suppressed.has(t)) {
             findings.push({
                 file: "tooling/scripts/docs-verify/check-unreleased-badges.mjs",
                 line: 0,
-                message: `NOT_NEW no longer needs \`${t}\` (${why}) — a released section quotes it now. Delete the entry.`
+                message:
+                    `NOT_NEW exempts \`${t}\` (${why}) and nothing under ## [Unreleased] ` +
+                    "produces that token any more. Delete the entry."
             });
         }
     }
@@ -137,6 +223,7 @@ export function checkUnreleasedBadges(root) {
     const versions = releasedVersions(released);
     const files = [...new Set(DOC_GLOBS.flatMap(g => globSync(g, { cwd: root })))]
         .filter(f => !EXCLUDED.includes(f))
+        .filter(f => !EXCLUDED_PREFIXES.some(p => f.startsWith(p)))
         .sort();
 
     for (const file of files) {
@@ -149,6 +236,8 @@ export function checkUnreleasedBadges(root) {
         let sectionStart = 0;
         let inFence = false;
         let inFrontmatter = lines[0] === "---";
+        /** Which lines are inside a code fence, so a reference block can be read on its own. */
+        const isCode = new Array(lines.length).fill(false);
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             if (inFrontmatter) {
@@ -156,7 +245,7 @@ export function checkUnreleasedBadges(root) {
                 continue;
             }
             if (/^\s*(?:`{3,}|~{3,})/.test(line)) { inFence = !inFence; continue; }
-            if (inFence) continue;
+            if (inFence) { isCode[i] = true; continue; }
             if (/^#{1,6}\s/.test(line)) {
                 if (i > sectionStart) sections.push({ start: sectionStart, end: i });
                 sectionStart = i;
@@ -166,6 +255,7 @@ export function checkUnreleasedBadges(root) {
 
         for (const { start, end } of sections) {
             const body = lines.slice(start, end).join("\n");
+            const fenced = lines.slice(start, end).filter((_, i) => isCode[start + i]).join("\n");
             const badged = [...body.matchAll(BADGE)].map(m => m[1] || m[2]);
 
             // A badge *inside* a heading joins the heading's text, so
@@ -198,12 +288,18 @@ export function checkUnreleasedBadges(root) {
             if (badged.length) continue;
 
             for (const token of tokens) {
-                const quoted = token.includes("(")
-                    ? `\`${token}\``
-                    : new RegExp(`\`${token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\``);
-                const mentioned = typeof quoted === "string"
-                    ? body.includes(quoted)
-                    : quoted.test(body);
+                const scope = SCOPED.get(token);
+                if (scope && !scope.pattern.test(`/${file}`)) continue;
+                const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                const mentioned = token.includes("(")
+                    ? body.includes(`\`${token}\``)
+                    : new RegExp(`\`${escaped}\``).test(body)
+                        // A reference page documents an option by putting it in
+                        // an interface fence, not in backticked prose:
+                        // `cron-jobs.md` names `timezone` exactly once, on the
+                        // `timezone?: string;` line of `CronJobDefinition`. A
+                        // token seen only there is still a section teaching it.
+                        || new RegExp(`(^|[^\\w$.])${escaped}\\b`).test(fenced);
                 if (!mentioned) continue;
                 const heading = lines[start]?.trim().replace(/^#+\s*/, "") || "(page intro)";
                 findings.push({

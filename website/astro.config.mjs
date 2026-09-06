@@ -135,6 +135,7 @@ export default defineConfig({
                     items: [
                         { label: "Defining Collections", slug: "docs/collections" },
                         { label: "Properties", slug: "docs/collections/properties" },
+                        { label: "Validation & conditions", slug: "docs/collections/validation-and-conditions" },
                         { label: "Relations", slug: "docs/collections/relations" },
                         { label: "Entity Callbacks", slug: "docs/collections/callbacks" },
                         { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" }
@@ -146,6 +147,7 @@ export default defineConfig({
                     items: [
                         { label: "Backend Setup", slug: "docs/backend" },
                         { label: "REST API", slug: "docs/backend/api" },
+                        { label: "API keys", slug: "docs/backend/api-keys" },
                         { label: "Error codes", slug: "docs/backend/errors" },
                         { label: "Endpoint index", slug: "docs/backend/endpoints" },
                         { label: "Live schema editing", slug: "docs/backend/live-schema-editing" },
@@ -156,6 +158,7 @@ export default defineConfig({
                         { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },
                         { label: "MongoDB", slug: "docs/backend/mongodb" },
                         { label: "Realtime & WebSocket", slug: "docs/backend/realtime" },
+                        { label: "Realtime across instances", slug: "docs/backend/realtime-transports" },
                         { label: "Search", slug: "docs/backend/search" },
                         { label: "Indexes", slug: "docs/backend/indexes" },
                         { label: "Cron Jobs", slug: "docs/backend/cron-jobs" },
@@ -219,6 +222,8 @@ export default defineConfig({
                     items: [
                         { label: "Getting Started", slug: "docs/sdk" },
                         { label: "Querying Data", slug: "docs/sdk/querying" },
+                        { label: "Aggregates & search", slug: "docs/sdk/aggregates-and-search" },
+                        { label: "Relations", slug: "docs/sdk/relations" },
                         { label: "Authentication", slug: "docs/sdk/authentication" },
                         { label: "Realtime Subscriptions", slug: "docs/sdk/realtime" },
                         { label: "Offline & Local-First", slug: "docs/sdk/offline" },

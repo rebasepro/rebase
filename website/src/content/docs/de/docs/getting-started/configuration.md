@@ -1,4 +1,5 @@
 ---
+sourceHash: 3346d2728eb8f2e4
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -8,7 +9,16 @@ description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Proj
 
 Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei im Projekt-Stammverzeichnis.
 
-> **Wichtig**: Rebase verwendet **Zod**, um Umgebungsvariablen beim Start in `src/env.ts` zu validieren. Wenn erforderliche Variablen fehlen oder falsch formatiert sind (z. B. URLs oder Ports), schlägt der Serverstart fehl und liefert eine klare Fehlermeldung.
+> **Wichtig**: Rebase validiert Umgebungsvariablen beim Start mit **Zod**. Fehlt
+> etwas Erforderliches oder ist es falsch formatiert (eine URL, die keine ist, ein
+> Port, der keine Zahl ist), verweigert der Server den Start und nennt die Variable.
+>
+> Wo das Schema liegt, hängt davon ab, wie Sie das Backend betreiben. Ein von der
+> Runtime gebootetes Projekt — `rebase dev`, `rebase start`, das veröffentlichte
+> Image — verwendet das Schema der Runtime (`loadBootEnv` in `@rebasepro/server`),
+> die Vereinigung aller Tabellen unten. Ein Projekt, das [`rebase eject`](/docs/cli)
+> ausgeführt hat, besitzt eine eigene `backend/src/env.ts` mit
+> `loadEnv({ extend })` und kann dort eigene typisierte Variablen ergänzen.
 
 ### Erforderlich
 
@@ -21,7 +31,7 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei
 
 | Variable | Beschreibung | Standard |
 |----------|-------------|---------|
-| `VITE_API_URL` | Backend-API-URL. Wird vom Client-SDK verwendet. | `http://localhost:3001` |
+| `VITE_API_URL` | Backend-API-URL für das Client-SDK. **Nur in der Entwicklung setzen.** | Ursprung der Seite |
 | `VITE_GOOGLE_CLIENT_ID` | Google OAuth Client-ID. Ermöglicht "Mit Google anmelden". | — |
 
 ### Backend

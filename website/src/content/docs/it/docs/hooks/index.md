@@ -1,4 +1,5 @@
 ---
+sourceHash: f54d8319cbbee30f
 title: Riferimento agli Hook
 sidebar_label: Hook
 description: Hook React forniti da Rebase per accedere all'autenticazione, ai dati, alla navigazione, ai pannelli laterali, allo storage e allo stato dell'interfaccia utente.

@@ -1,4 +1,5 @@
 ---
+sourceHash: 2cf8f0e1f2cb33d7
 title: Modos de Vista
 sidebar_label: Modos de Vista
 description: Configure vistas de tabla, tarjetas y tablero Kanban para sus colecciones.

@@ -1,4 +1,5 @@
 ---
+sourceHash: b39ae0ea2de335df
 title: Colunas Adicionais
 sidebar_label: Colunas Adicionais
 description: Adicione colunas computadas/virtuais a tabelas de coleção que derivam valores dos dados da entidade.

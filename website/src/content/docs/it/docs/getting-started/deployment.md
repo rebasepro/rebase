@@ -1,4 +1,5 @@
 ---
+sourceHash: 215da7d8e962efb0
 title: Distribuzione
 sidebar_label: Distribuzione
 description: Distribuisci il tuo progetto Rebase in produzione utilizzando Docker, piattaforme cloud o configurazioni manuali.
@@ -41,9 +42,8 @@ services:
       - "5432:5432"
 
   app:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    # L'immagine di runtime pubblicata. Aggiornare Rebase è un cambio di tag, non una ricostruzione.
+    image: rebasepro/server:${REBASE_VERSION:-latest}
     ports:
       - "3001:3001"
     environment:
@@ -53,6 +53,8 @@ services:
     depends_on:
       - postgres
     volumes:
+      # Il tuo progetto costruito, da `rebase build`.
+      - ./dist-bundle:/bundle:ro
       - uploads:/app/uploads
 
 volumes:
@@ -61,8 +63,15 @@ volumes:
 ```
 
 ```bash
+rebase build
 docker compose up -d
 ```
+
+Il bundle è montato in sola lettura. `rebase build` installa le dipendenze
+dichiarate del progetto in `dist-bundle`, a meno che tu non passi `--no-vendor`:
+in quel caso il runtime le installa a ogni avvio e il mount deve essere
+scrivibile, quindi togli il `:ro`. Vedi
+[Self-hosting](/docs/deployment/self-hosting/).
 
 ## Crea lo Schema del Database
 

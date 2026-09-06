@@ -1,4 +1,5 @@
 ---
+sourceHash: a82dd911da9d58ef
 title: Assinaturas em Tempo Real
 sidebar_label: Tempo Real
 description: Assine mudanças de dados ao vivo com o SDK Cliente da Rebase usando listeners em tempo real baseados em WebSocket.

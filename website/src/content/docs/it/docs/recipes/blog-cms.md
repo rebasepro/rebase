@@ -1,4 +1,5 @@
 ---
+sourceHash: b2d69a15f60b73b7
 title: "Ricetta: CMS per Blog"
 sidebar_label: CMS per Blog
 description: Costruisci un CMS per blog completo con articoli, autori, categorie, editing di testo ricco e caricamento di immagini.

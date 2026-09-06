@@ -1,4 +1,5 @@
 ---
+sourceHash: af85efb5a9d69006
 title: Entitätsansichten
 sidebar_label: Entitätsansichten
 description: Fügen Sie benutzerdefinierte Tabs und Ansichten zu Entitätsdetailseiten für Vorschauen, Analysen, verknüpfte Daten oder benutzerdefinierte Benutzeroberflächen hinzu.

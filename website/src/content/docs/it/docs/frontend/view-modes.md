@@ -1,4 +1,5 @@
 ---
+sourceHash: 2cf8f0e1f2cb33d7
 title: Modalità di Visualizzazione
 sidebar_label: Modalità di Visualizzazione
 description: Configura le visualizzazioni tabella, schede e bacheca Kanban per le tue collezioni.

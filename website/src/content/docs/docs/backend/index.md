@@ -21,12 +21,14 @@ Everything is initialized with a single function:
 :::note[Where this goes]
 The call below is what an **ejected** backend has, in `backend/src/index.ts`. On
 the **managed runtime** there is no such file: the runtime makes the call, and
-you configure it through environment variables and the four exports it reads
-from `config/index.ts` (`dataSources`, `storageSources`, `storageAuthorize`,
-`callbacks`). Every page in this section says which of the two applies to the
-option it documents, and names the ones that have no managed form. Export an
-option the runtime does not read and it warns you at boot rather than dropping
-it in silence.
+you configure it through environment variables, the resources you declare in
+`config/resources.ts` (`database()`, `bucket()`), and the two exports it reads
+from `config/index.ts` (`storageAuthorize`, `callbacks`). Every page in this
+section says which of the two applies to the option it documents, and names the
+ones that have no managed form. Export an option the runtime does not read and
+it warns you at boot rather than dropping it in silence; export one that a
+resource declaration replaced and boot refuses it by name, with the
+`config/resources.ts` line to write instead.
 :::
 
 ```typescript
@@ -67,9 +69,9 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 | `collections`, `collectionsDir` | the `config/collections/` directory, declared by `rebase.json` |
 | `functionsDir` | `backend/functions/` |
 | `cronsDir` | `backend/crons/` |
-| `bootstrappers`, `database` | `DATABASE_URL`, plus `export const dataSources` from `config/index.ts` |
+| `bootstrappers`, `database` | `DATABASE_URL`, plus a `database("<key>")` declaration in `config/resources.ts` for every database beyond the default |
 | `auth` | `JWT_SECRET`, the `OAUTH_*` variables, and `config/collections/users` |
-| `storage` | the `STORAGE_*` variables, plus `export const storageSources` from `config/index.ts` |
+| `storage` | the `STORAGE_*` variables, plus a `bucket("<key>")` declaration in `config/resources.ts` for every bucket beyond the default |
 | `storageAuthorize` | `export const storageAuthorize` from `config/index.ts` |
 | `storagePublicRead` | `STORAGE_PUBLIC_READ` |
 | `storageRenditionCache` | `STORAGE_RENDITION_CACHE` |
@@ -278,21 +280,28 @@ The REST API is auto-generated from your collections. Every collection gets thes
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/data/:slug` | List entities (with filter, sort, limit, search) |
+| `GET` | `/api/data/:slug` | List entities — filtering, sorting, paging and search are query parameters |
+| `GET` | `/api/data/:slug/count` | How many rows the same query matches |
+| `GET` | `/api/data/:slug/aggregate` | `count`/`sum`/`avg`/`min`/`max`, optionally grouped |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
 | `POST` | `/api/data/:slug` | Create a new entity |
+| `PATCH` | `/api/data/:slug/:id` | Update the fields you send |
 | `DELETE` | `/api/data/:slug/:id` | Delete a record |
+| `POST` | `/api/data/:slug/bulk` | Create many rows in one transaction |
+| `PATCH` | `/api/data/:slug/bulk` | Update many rows in one transaction |
+| `POST` | `/api/data/:slug/bulk/delete` | Delete many rows in one transaction |
 
-### Query Parameters
+### Query parameters
 
-| Param | Description | Example |
-|-------|-------------|---------|
-| `filter` | JSON-encoded filter conditions | `?filter={"active":["==",true]}` |
-| `orderBy` | Sort field | `?orderBy=createdAt` |
-| `order` | Sort direction | `?order=desc` |
-| `limit` | Page size | `?limit=25` |
-| `startAfter` | Cursor for pagination | `?startAfter=encodedCursor` |
-| `search` | Full-text search | `?search=laptop` |
+There is one reference for them and it is not this page. [REST
+API](/docs/backend/api/) documents both query dialects the server accepts — the
+PostgREST-style `?column=op.value` form and the JSON `?where=` form — along with
+`orderBy`, `limit`/`offset`, `include`, `fields`, `searchString` and vector
+search. [Endpoints](/docs/backend/endpoints/) is the index of every route the
+server mounts, generated ones included.
+
+A parameter the server does not reserve is read as a filter on the column of
+that name, so an invented one does not fail: it silently matches nothing.
 
 ## WebSocket
 
@@ -346,8 +355,6 @@ async function setPrice(id: string, price: number) {
 }
 ```
 
-If initialization fails (e.g., database connection error), the server still starts but returns 503 for all API requests, with a descriptive error message in the logs.
-
 ## Next Steps
 
 - **[Authentication](/docs/backend/authentication)** — JWT, OAuth and OIDC providers, MFA, API keys, user management
@@ -357,3 +364,4 @@ If initialization fails (e.g., database connection error), the server still star
 - **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints
 - **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks
 - **[Database Branching](/docs/backend/branching)** — Instant database copies for dev/staging
+- **[Deployment](/docs/getting-started/deployment)** — Take the backend to production

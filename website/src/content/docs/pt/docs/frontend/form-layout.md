@@ -1,4 +1,5 @@
 ---
+sourceHash: 3830846c0457a79f
 title: Layout do Formulário
 sidebar_label: Layout do Formulário
 description: Controle como o formulário da entidade é organizado — larguras de colunas, seções e o painel lateral de metadados.

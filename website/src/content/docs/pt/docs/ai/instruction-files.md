@@ -1,4 +1,5 @@
 ---
+sourceHash: ba0337fd764eebaa
 title: Arquivos de Instruções de IA
 sidebar_label: Arquivos de Instruções de IA
 description: Todo projeto Rebase estruturado inclui ai-instructions.md mais arquivos de ponteiro de uma linha para Claude, Cursor, Windsurf, Copilot e AGENTS.md — uma única fonte de verdade, muitos nomes de arquivo.

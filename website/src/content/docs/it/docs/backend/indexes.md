@@ -1,4 +1,5 @@
 ---
+sourceHash: 5b3faf351da73329
 title: Indexes
 sidebar_label: Indexes
 description: Declare ordinary Postgres indexes on a collection — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.

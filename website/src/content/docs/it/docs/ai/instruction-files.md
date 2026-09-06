@@ -1,4 +1,5 @@
 ---
+sourceHash: ba0337fd764eebaa
 title: File di Istruzioni AI
 sidebar_label: File di Istruzioni AI
 description: Ogni progetto Rebase scaffoldato include ai-instructions.md più file puntatore di una riga per Claude, Cursor, Windsurf, Copilot e AGENTS.md — un'unica fonte di verità, molti nomi di file.

@@ -1,4 +1,5 @@
 ---
+sourceHash: 961bf86d4efda8bf
 title: Compétences d'agent (Agent Skills)
 sidebar_label: Agent Skills
 description: rebase skills install écrit 21 compétences de référence Rebase dans votre dépôt, dans la structure attendue par votre assistant IA — Cursor, Claude Code, Windsurf, Gemini CLI et Antigravity.

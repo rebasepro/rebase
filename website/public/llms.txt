@@ -50,11 +50,13 @@
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Collections](https://rebase.pro/docs/collections): Collections are the core building block of Rebase — each collection maps to a database table and defines its schema, relations, security, and UI behavior.
 - [Properties](https://rebase.pro/docs/collections/properties): Property types define the data type, validation, and UI rendering for each field in a collection. Rebase supports string, number, boolean, date, array, map, reference, relation, and geopoint types.
+- [Validation and conditions](https://rebase.pro/docs/collections/validation-and-conditions): Enum values, per-property validation rules, and the conditional fields that make a property required, disabled or hidden based on the entity's own values.
 - [Relations](https://rebase.pro/docs/collections/relations): Define one-to-one, one-to-many, and many-to-many SQL relations between collections with foreign keys, junction tables, and multi-hop joins.
 - [Entity Callbacks](https://rebase.pro/docs/collections/callbacks): Use lifecycle callbacks to run custom logic when entities are created, updated, read, or deleted. Includes the context.data API for cross-collection operations.
 - [Security Rules (RLS)](https://rebase.pro/docs/collections/security-rules): Define Row Level Security policies for your collections using convenience shortcuts or raw SQL expressions.
 - [Backend Overview](https://rebase.pro/docs/backend): The Rebase backend provides a complete server with REST API, authentication, storage, WebSocket real-time, and entity history — all initialized with a single function call.
 - [REST API](https://rebase.pro/docs/backend/api): Auto-generated REST API endpoints for every collection, with filtering, sorting, pagination, and relation inclusion.
+- [API keys](https://rebase.pro/docs/backend/api-keys): Scoped, revocable keys for machine callers: what a key can reach, how scopes compose with row-level security, and the admin endpoints that manage them.
 - [Error codes](https://rebase.pro/docs/backend/errors): Every error code a Rebase backend can return, with its HTTP status, what it means and what to do about it — plus the response envelope, X-Request-ID and the details rules.
 - [Endpoint index](https://rebase.pro/docs/backend/endpoints): Every HTTP route a Rebase backend mounts — data, auth, storage, admin, meta — with the gate on each one and the page that explains it.
 - [Live schema editing](https://rebase.pro/docs/backend/live-schema-editing): Create and alter collections against a running backend — committed to your repository first, then applied.
@@ -65,6 +67,7 @@
 - [Multiple Databases and Buckets](https://rebase.pro/docs/backend/multiple-sources): Route collections to different databases and properties to different storage buckets, and configure each one from the environment.
 - [MongoDB](https://rebase.pro/docs/backend/mongodb): @rebasepro/server-mongo runs Rebase on MongoDB: a complete data driver, change-stream realtime and snapshot history — and no row-level security.
 - [Realtime & WebSocket](https://rebase.pro/docs/backend/realtime): Real-time data synchronization, broadcast channels, and presence tracking via WebSocket.
+- [Realtime across instances](https://rebase.pro/docs/backend/realtime-transports): How broadcast channels and presence survive more than one server process: the LISTEN/NOTIFY bus, what each instance owns, and writing your own transport.
 - [Search](https://rebase.pro/docs/backend/search): How .search() behaves by default, and how to opt a Postgres collection in to ranked full-text search over the fields you name — including JSONB and array content.
 - [Indexes](https://rebase.pro/docs/backend/indexes): Declare ordinary Postgres indexes on a collection — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.
 - [Cron Jobs](https://rebase.pro/docs/backend/cron-jobs): Schedule recurring background tasks with Rebase's built-in cron job system. Define jobs as TypeScript files, monitor them in Studio, and manage them via the REST API.
@@ -93,8 +96,109 @@
 - [Plugin System](https://rebase.pro/docs/plugins): Extend Rebase with plugins — inject UI components, modify collections, add toolbar actions, and create custom field builders.
 - [Hooks Reference](https://rebase.pro/docs/hooks): React hooks provided by Rebase for accessing auth, data, navigation, side panels, storage, and UI state.
 - [Studio Tools](https://rebase.pro/docs/studio): Rebase Studio provides developer tools for visual schema editing, SQL queries, JavaScript scripting, RLS policy management, and storage browsing.
+- [Components](https://rebase.pro/docs/ui/components): Components in @rebasepro/ui — the component library the Rebase admin panel is built from.
+- [Alert](https://rebase.pro/docs/ui/components/Alert): Alert — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Autocomplete](https://rebase.pro/docs/ui/components/Autocomplete): Autocomplete — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [AutocompleteItem](https://rebase.pro/docs/ui/components/AutocompleteItem): AutocompleteItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Avatar](https://rebase.pro/docs/ui/components/Avatar): Avatar — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Badge](https://rebase.pro/docs/ui/components/Badge): Badge — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [BooleanSwitch](https://rebase.pro/docs/ui/components/BooleanSwitch): BooleanSwitch — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [BooleanSwitchWithLabel](https://rebase.pro/docs/ui/components/BooleanSwitchWithLabel): BooleanSwitchWithLabel — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Button](https://rebase.pro/docs/ui/components/Button): Button — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Card](https://rebase.pro/docs/ui/components/Card): Card — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [CenteredView](https://rebase.pro/docs/ui/components/CenteredView): CenteredView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Checkbox](https://rebase.pro/docs/ui/components/Checkbox): Checkbox — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Chip](https://rebase.pro/docs/ui/components/Chip): Chip — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [CircularProgress](https://rebase.pro/docs/ui/components/CircularProgress): CircularProgress — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [CircularProgressCenter](https://rebase.pro/docs/ui/components/CircularProgressCenter): CircularProgressCenter — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Collapse](https://rebase.pro/docs/ui/components/Collapse): Collapse — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [ColorPicker](https://rebase.pro/docs/ui/components/ColorPicker): ColorPicker — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Container](https://rebase.pro/docs/ui/components/Container): Container — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [DateTimeField](https://rebase.pro/docs/ui/components/DateTimeField): DateTimeField — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [DebouncedTextField](https://rebase.pro/docs/ui/components/DebouncedTextField): DebouncedTextField — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Dialog](https://rebase.pro/docs/ui/components/Dialog): Dialog — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [DialogActions](https://rebase.pro/docs/ui/components/DialogActions): DialogActions — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [DialogContent](https://rebase.pro/docs/ui/components/DialogContent): DialogContent — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [DialogTitle](https://rebase.pro/docs/ui/components/DialogTitle): DialogTitle — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [ErrorBoundary](https://rebase.pro/docs/ui/components/ErrorBoundary): ErrorBoundary — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [ExpandablePanel](https://rebase.pro/docs/ui/components/ExpandablePanel): ExpandablePanel — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [FileUpload](https://rebase.pro/docs/ui/components/FileUpload): FileUpload — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [FilterChip](https://rebase.pro/docs/ui/components/FilterChip): FilterChip — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [IconButton](https://rebase.pro/docs/ui/components/IconButton): IconButton — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [InfoLabel](https://rebase.pro/docs/ui/components/InfoLabel): InfoLabel — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [InputLabel](https://rebase.pro/docs/ui/components/InputLabel): InputLabel — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Label](https://rebase.pro/docs/ui/components/Label): Label — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [LoadingButton](https://rebase.pro/docs/ui/components/LoadingButton): LoadingButton — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Markdown](https://rebase.pro/docs/ui/components/Markdown): Markdown — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Menu](https://rebase.pro/docs/ui/components/Menu): Menu — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Menubar](https://rebase.pro/docs/ui/components/Menubar): Menubar — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarCheckboxItem](https://rebase.pro/docs/ui/components/MenubarCheckboxItem): MenubarCheckboxItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarContent](https://rebase.pro/docs/ui/components/MenubarContent): MenubarContent — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarItem](https://rebase.pro/docs/ui/components/MenubarItem): MenubarItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarItemIndicator](https://rebase.pro/docs/ui/components/MenubarItemIndicator): MenubarItemIndicator — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarMenu](https://rebase.pro/docs/ui/components/MenubarMenu): MenubarMenu — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarPortal](https://rebase.pro/docs/ui/components/MenubarPortal): MenubarPortal — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarRadioGroup](https://rebase.pro/docs/ui/components/MenubarRadioGroup): MenubarRadioGroup — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarRadioItem](https://rebase.pro/docs/ui/components/MenubarRadioItem): MenubarRadioItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarSeparator](https://rebase.pro/docs/ui/components/MenubarSeparator): MenubarSeparator — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarShortcut](https://rebase.pro/docs/ui/components/MenubarShortcut): MenubarShortcut — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarSub](https://rebase.pro/docs/ui/components/MenubarSub): MenubarSub — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarSubContent](https://rebase.pro/docs/ui/components/MenubarSubContent): MenubarSubContent — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarSubTrigger](https://rebase.pro/docs/ui/components/MenubarSubTrigger): MenubarSubTrigger — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarSubTriggerIndicator](https://rebase.pro/docs/ui/components/MenubarSubTriggerIndicator): MenubarSubTriggerIndicator — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenubarTrigger](https://rebase.pro/docs/ui/components/MenubarTrigger): MenubarTrigger — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MenuItem](https://rebase.pro/docs/ui/components/MenuItem): MenuItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MultiSelect](https://rebase.pro/docs/ui/components/MultiSelect): MultiSelect — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [MultiSelectItem](https://rebase.pro/docs/ui/components/MultiSelectItem): MultiSelectItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Paper](https://rebase.pro/docs/ui/components/Paper): Paper — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Popover](https://rebase.pro/docs/ui/components/Popover): Popover — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [PopoverPrimitive](https://rebase.pro/docs/ui/components/PopoverPrimitive): PopoverPrimitive — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Portal](https://rebase.pro/docs/ui/components/Portal): Portal — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [PortalContainerProvider](https://rebase.pro/docs/ui/components/PortalContainerProvider): PortalContainerProvider — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [RadioGroup](https://rebase.pro/docs/ui/components/RadioGroup): RadioGroup — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [RadioGroupItem](https://rebase.pro/docs/ui/components/RadioGroupItem): RadioGroupItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [ResizablePanels](https://rebase.pro/docs/ui/components/ResizablePanels): ResizablePanels — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [SearchBar](https://rebase.pro/docs/ui/components/SearchBar): SearchBar — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Select](https://rebase.pro/docs/ui/components/Select): Select — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [SelectGroup](https://rebase.pro/docs/ui/components/SelectGroup): SelectGroup — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [SelectItem](https://rebase.pro/docs/ui/components/SelectItem): SelectItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Separator](https://rebase.pro/docs/ui/components/Separator): Separator — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Sheet](https://rebase.pro/docs/ui/components/Sheet): Sheet — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Skeleton](https://rebase.pro/docs/ui/components/Skeleton): Skeleton — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Slider](https://rebase.pro/docs/ui/components/Slider): Slider — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Slot](https://rebase.pro/docs/ui/components/Slot): Slot — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Tab](https://rebase.pro/docs/ui/components/Tab): Tab — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Table](https://rebase.pro/docs/ui/components/Table): Table — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [TableBody](https://rebase.pro/docs/ui/components/TableBody): TableBody — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [TableCell](https://rebase.pro/docs/ui/components/TableCell): TableCell — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [TableHeader](https://rebase.pro/docs/ui/components/TableHeader): TableHeader — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [TableRow](https://rebase.pro/docs/ui/components/TableRow): TableRow — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Tabs](https://rebase.pro/docs/ui/components/Tabs): Tabs — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [TextareaAutosize](https://rebase.pro/docs/ui/components/TextareaAutosize): TextareaAutosize — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [TextField](https://rebase.pro/docs/ui/components/TextField): TextField — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [ToggleButtonGroup](https://rebase.pro/docs/ui/components/ToggleButtonGroup): ToggleButtonGroup — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Tooltip](https://rebase.pro/docs/ui/components/Tooltip): Tooltip — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Typography](https://rebase.pro/docs/ui/components/Typography): Typography — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [VirtualTable](https://rebase.pro/docs/ui/components/VirtualTable): VirtualTable — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [VirtualTableSelectionProvider](https://rebase.pro/docs/ui/components/VirtualTableSelectionProvider): VirtualTableSelectionProvider — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Data views](https://rebase.pro/docs/ui/data-views): Data views in @rebasepro/ui — the component library the Rebase admin panel is built from.
+- [CardView](https://rebase.pro/docs/ui/data-views/CardView): CardView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [CollectionView](https://rebase.pro/docs/ui/data-views/CollectionView): CollectionView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [KanbanView](https://rebase.pro/docs/ui/data-views/KanbanView): KanbanView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [ListView](https://rebase.pro/docs/ui/data-views/ListView): ListView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Table field editors](https://rebase.pro/docs/ui/field-editors): Table field editors in @rebasepro/ui — the component library the Rebase admin panel is built from.
+- [VirtualTableDateField](https://rebase.pro/docs/ui/field-editors/VirtualTableDateField): VirtualTableDateField — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [VirtualTableInput](https://rebase.pro/docs/ui/field-editors/VirtualTableInput): VirtualTableInput — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [VirtualTableNumberInput](https://rebase.pro/docs/ui/field-editors/VirtualTableNumberInput): VirtualTableNumberInput — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [VirtualTableSelect](https://rebase.pro/docs/ui/field-editors/VirtualTableSelect): VirtualTableSelect — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [VirtualTableSwitch](https://rebase.pro/docs/ui/field-editors/VirtualTableSwitch): VirtualTableSwitch — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [Icons](https://rebase.pro/docs/ui/icons): Icons in @rebasepro/ui — the component library the Rebase admin panel is built from.
+- [GitHubIcon](https://rebase.pro/docs/ui/icons/GitHubIcon): GitHubIcon — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+- [HandleIcon](https://rebase.pro/docs/ui/icons/HandleIcon): HandleIcon — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
 - [Client SDK — Getting Started](https://rebase.pro/docs/sdk): Install and configure the Rebase Client SDK to interact with your backend from any JavaScript or TypeScript application.
 - [Querying Data](https://rebase.pro/docs/sdk/querying): CRUD operations, fluent query builder, filter operators, pagination, sorting, and relation fetching with the Rebase Client SDK.
+- [Aggregates and search](https://rebase.pro/docs/sdk/aggregates-and-search): Count, sum and group with the SDK, filter inside JSON columns, and run full-text and vector search from the client.
+- [Querying relations](https://rebase.pro/docs/sdk/relations): Include related entities in a query, and read a child collection through its parent with the SDK's relation accessors.
 - [Authentication](https://rebase.pro/docs/sdk/authentication): Client-side authentication with the Rebase SDK — email/password sign-in, OAuth providers, session management, and auth state listeners.
 - [Realtime Subscriptions](https://rebase.pro/docs/sdk/realtime): Subscribe to live data changes with the Rebase Client SDK using WebSocket-based realtime listeners.
 - [Offline & Local-First Sync](https://rebase.pro/docs/sdk/offline): Enable the Rebase Client SDK's local-first sync engine — a local row database, instant offline writes with rollback, and reactive live queries.

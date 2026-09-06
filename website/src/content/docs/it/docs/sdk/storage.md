@@ -1,4 +1,5 @@
 ---
+sourceHash: 8e6b49d8e91f586c
 title: Archiviazione e file
 sidebar_label: Archiviazione
 description: Carica, scarica, elenca ed elimina file usando il modulo di archiviazione dell'SDK Client di Rebase.

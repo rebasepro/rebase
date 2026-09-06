@@ -1,4 +1,5 @@
 ---
+sourceHash: c933db5cdbb2cfc2
 title: IA & Agentes
 sidebar_label: Visão Geral
 description: O que o Rebase oferece para assistentes de código com IA e agentes autônomos — um servidor MCP, agent skills locais no projeto, arquivos de instruções gerados e o modelo de credenciais que decide o que um agente pode realmente acessar.

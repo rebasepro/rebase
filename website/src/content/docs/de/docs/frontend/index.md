@@ -1,4 +1,5 @@
 ---
+sourceHash: 03d03e9fa055a194
 title: Frontend-Übersicht
 sidebar_label: Frontend
 description: Erstellen und anpassen Sie das Rebase-Admin-Panel mit React — Controller, Scaffold, Routing und Ansichten.

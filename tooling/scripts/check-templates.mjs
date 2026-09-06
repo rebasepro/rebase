@@ -381,7 +381,103 @@ function checkBaasHasNoAdminTypes() {
     return problems;
 }
 
+/**
+ * Every file path a getting-started page names exists in the scaffold.
+ *
+ * Quickstart's prerequisites read "Node.js 22.22+, the version in `.nvmrc`" for
+ * two releases. There is no `.nvmrc`: `ls -a packages/cli/templates/template |
+ * grep nvmrc` is empty, and the version floor lives in `package.json`'s
+ * `engines`. It is the first line of the first page, and nothing could have
+ * caught it — the snippet verifier compiles TypeScript, and a path in prose is
+ * neither a snippet nor an identifier.
+ *
+ * All six locales, because a translation names the same paths.
+ *
+ * A path is a backticked token with a file extension and at least one `/`. A
+ * bare `App.tsx` is a filename in a sentence rather than a location, and
+ * flagging every one of those would make this noisy enough to switch off.
+ */
+function checkGettingStartedPathsExist() {
+    const docsRoot = path.join(repoRoot, "website/src/content/docs");
+    const pages = [];
+    for (const locale of ["docs", "de", "es", "fr", "it", "pt"]) {
+        const dir = locale === "docs"
+            ? path.join(docsRoot, "docs/getting-started")
+            : path.join(docsRoot, locale, "docs/getting-started");
+        if (!fs.existsSync(dir)) continue;
+        for (const name of fs.readdirSync(dir)) {
+            if (/\.mdx?$/.test(name)) pages.push(path.join(dir, name));
+        }
+    }
+
+    /**
+     * Paths that are correct and are not in the template.
+     *
+     * Two kinds: files `rebase init` or `rebase dev` *writes* at runtime, and
+     * files that exist only after `rebase eject` — which the pages name in
+     * order to say the scaffold has none.
+     */
+    const NOT_SHIPPED = new Map([
+        ["backend/src/index.ts", "only after `rebase eject`; the pages name it to say a scaffold has none"],
+        ["backend/src/env.ts", "only after `rebase eject`, where the project owns its own env schema"]
+    ]);
+
+    const EXT = /\.(ts|tsx|json|md|mdx|mjs|cjs|js|yml|yaml|example|toml)$/;
+    /** The template ships these without their leading dot; `rebase init` renames them. */
+    const ALIAS = { ".gitignore": "gitignore", ".npmrc": "npmrc" };
+
+    const problems = [];
+    let checked = 0;
+    for (const page of pages) {
+        const rel = path.relative(repoRoot, page);
+        const lines = fs.readFileSync(page, "utf8").split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            for (const m of lines[i].matchAll(/`([^`\n]+)`/g)) {
+                const token = m[1].trim();
+                if (!/^\.?[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.*-]+)+\/?$/.test(token)) continue;
+                if (!EXT.test(token)) continue;
+                checked++;
+                if (NOT_SHIPPED.has(token)) continue;
+                const candidate = ALIAS[token] || token.replace(/\/$/, "");
+                const found = [templateRoot, baasOverlay, repoRoot]
+                    .some(base => fs.existsSync(path.join(base, candidate)));
+                if (found) continue;
+                problems.push(
+                    `${rel}:${i + 1} names \`${token}\`, which is in neither ` +
+                    "packages/cli/templates/template, packages/cli/templates/overlays/baas, " +
+                    "nor the repository. Fix the page, ship the file, or add it to NOT_SHIPPED " +
+                    "with the reason it is correct."
+                );
+            }
+        }
+    }
+
+    // A NOT_SHIPPED entry nothing names any more is dead weight.
+    const named = new Set();
+    for (const page of pages) {
+        const text = fs.readFileSync(page, "utf8");
+        for (const key of NOT_SHIPPED.keys()) if (text.includes(`\`${key}\``)) named.add(key);
+    }
+    for (const [key, why] of NOT_SHIPPED) {
+        if (!named.has(key)) {
+            problems.push(`NOT_SHIPPED exempts \`${key}\` (${why}) and no getting-started page names it — delete the entry.`);
+        }
+    }
+
+    if (checked === 0) problems.push("Read no paths out of the getting-started pages — the guard is checking nothing.");
+    return problems;
+}
+
 let failed = 0;
+const gettingStartedPathProblems = checkGettingStartedPathsExist();
+if (gettingStartedPathProblems.length > 0) {
+    failed++;
+    console.log("  FAIL getting-started pages name files the scaffold ships");
+    for (const p of gettingStartedPathProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   getting-started pages name files the scaffold ships");
+}
+
 const baasProblems = checkBaasHasNoAdminTypes();
 if (baasProblems.length > 0) {
     failed++;

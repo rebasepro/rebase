@@ -1,4 +1,5 @@
 ---
+sourceHash: 29a546b753005a42
 title: Stilizzare la UI personalizzata
 sidebar_label: Stilizzare la UI personalizzata
 description: Costruisci viste personalizzate, home page e azioni a partire dagli stessi componenti e token di tema del resto dell'admin, in modo che appaiano native e rispettino il tema.

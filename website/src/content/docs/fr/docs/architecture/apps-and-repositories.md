@@ -1,4 +1,5 @@
 ---
+sourceHash: ee6fa328c0acbd31
 title: Applications et dépôts
 sidebar_label: Applications & dépôts
 description: Un projet se compose d'un backend et des applications qui interagissent avec lui, chacune pouvant résider dans son propre dépôt.

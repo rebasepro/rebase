@@ -1,4 +1,5 @@
 ---
+sourceHash: c719f1cf36899c0a
 title: Relations
 sidebar_label: Relations
 description: Définir les relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre les collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.
@@ -222,6 +223,14 @@ relations: [
 | `"set default"` | Définir la colonne de clé étrangère à sa valeur par défaut |
 
 ### Ce que vous obtenez si vous ne dites rien
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+La valeur par défaut d'un `belongsTo` **obligatoire** a changé. En 0.17.3 c'est
+`ON DELETE CASCADE` — supprimer un parent supprime ses enfants — et à partir de
+0.18 c'est `RESTRICT` : la suppression échoue et nomme la contrainte. Le reste de
+cette section est inchangé, et `db push` planifie la réécriture de la contrainte
+lors de la mise à niveau.
 
 `onDelete` est optionnel, donc la plupart des relations n'en nomment jamais. La
 valeur par défaut dépend du caractère obligatoire de la relation :

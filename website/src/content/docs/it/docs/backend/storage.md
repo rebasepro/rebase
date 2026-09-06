@@ -1,4 +1,5 @@
 ---
+sourceHash: 81774bf42418ed00
 title: Configurazione dell'archiviazione
 sidebar_label: Configurazione archiviazione
 description: Configura backend di archiviazione su filesystem locale, compatibili con S3 o GCS/Firebase Storage per caricamenti di file, immagini e media.

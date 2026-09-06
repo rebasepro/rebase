@@ -318,6 +318,9 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
+`rebase resources --check` is new <span class="since-badge" data-since="0.18">Since 0.18</span> — the flag a CI job uses to fail
+on a `rebase.resources.json` that no longer matches the config code.
+
 A resource is declared in config code — `database("analytics")`,
 `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — or is a file
 under `backend/crons` or `backend/functions`, and never written by hand in

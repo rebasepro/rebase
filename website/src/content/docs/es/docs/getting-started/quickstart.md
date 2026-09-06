@@ -1,4 +1,5 @@
 ---
+sourceHash: 6463f2ed4a86c836
 title: Inicio Rápido
 sidebar_label: Inicio Rápido
 description: Crea un nuevo proyecto Rebase y ejecútalo localmente en menos de 2 minutos.
@@ -20,7 +21,7 @@ Esto genera la estructura de un proyecto con tres paquetes:
 
 ## Requisitos Previos
 
-- **Node.js** 22.22 o posterior (la versión en `.nvmrc`)
+- **Node.js** 22.22+ — todos los andamiajes, incluido el headless, declaran `"node": ">=22.22.0"`
 - **pnpm** (recomendado) o npm
 
 Nada de base de datos que instalar, y sin Docker. `rebase dev` ejecuta un PostgreSQL gestionado para el proyecto, con sus datos en `.rebase/`. Consulta [Variante: usar tu propia PostgreSQL](#variante-usar-tu-propia-postgresql) si prefieres aportar el tuyo — una instalación local, Neon, Supabase o el contenedor que incluye esta estructura.

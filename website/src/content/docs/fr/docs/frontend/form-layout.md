@@ -1,4 +1,5 @@
 ---
+sourceHash: 3830846c0457a79f
 title: Disposition du formulaire
 sidebar_label: Disposition du formulaire
 description: Contrôlez l'agencement du formulaire d'entité — largeur de colonnes, sections et volet de métadonnées.

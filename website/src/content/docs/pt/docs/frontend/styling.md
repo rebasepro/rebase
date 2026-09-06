@@ -1,4 +1,5 @@
 ---
+sourceHash: 29a546b753005a42
 title: Estilizando UI personalizada
 sidebar_label: Estilizando UI personalizada
 description: Crie visualizações personalizadas, páginas iniciais e ações a partir dos mesmos componentes e tokens de tema do restante do admin, para que pareçam nativos e sigam o tema.

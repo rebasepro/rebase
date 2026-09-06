@@ -1,4 +1,5 @@
 ---
+sourceHash: e9ad0454af0a8497
 title: Colecciones
 sidebar_label: Colecciones
 description: "Las colecciones son el componente fundamental de Rebase: cada colección se asigna a una tabla de base de datos y define su esquema, relaciones, seguridad y comportamiento de la interfaz de usuario."

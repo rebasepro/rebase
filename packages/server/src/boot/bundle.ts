@@ -375,7 +375,14 @@ createdAt: new Date().toISOString() }
  * is known from the bundle, without reading anyone's secrets.
  */
 export interface BundleConfigExports {
+    /**
+     * Read only so that `assertNoReplacedResourceConfig` can refuse a bundle
+     * still carrying them. Databases and buckets are declared with `database()`
+     * and `bucket()` in `config/resources.ts`; nothing downstream consumes these
+     * two fields.
+     */
     dataSources?: DataSourceDefinition[];
+    /** See `dataSources` — present only so boot can refuse it by name. */
     storageSources?: StorageSourceDefinition[];
     /**
      * Per-object storage access control.
@@ -460,10 +467,16 @@ export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<Bun
     };
 }
 
-/** Everything the managed runtime reads out of `config/index.ts`. */
+/**
+ * Everything the managed runtime reads out of `config/index.ts`.
+ *
+ * `dataSources` and `storageSources` are deliberately absent: they are read out
+ * of the module only so `assertNoReplacedResourceConfig` can refuse them by
+ * name, and the topology they used to carry now lives in `config/resources.ts`.
+ * Listing them here would make the docs gate that reads this set say they are
+ * still a supported export.
+ */
 const READ_CONFIG_EXPORTS = new Set([
-    "dataSources",
-    "storageSources",
     "storageAuthorize",
     "callbacks",
     // Not read here, but a legitimate export of this module: the admin build and
@@ -516,8 +529,9 @@ function warnOnUnreadConfigExports(mod: Record<string, unknown>, indexPath: stri
         "runtime does not read " + (known.length === 1 ? "it" : "them") + ".\n" +
         known.map(name => `  • ${name}: ${NO_MANAGED_ROUTE[name]}`).join("\n") + "\n" +
         "  The runtime reads only: " +
-        ["dataSources", "storageSources", "storageAuthorize", "callbacks"].map(n => `\`${n}\``).join(", ") +
-        ". Everything else is configured with environment variables, or by ejecting."
+        ["storageAuthorize", "callbacks"].map(n => `\`${n}\``).join(", ") +
+        ". Databases and buckets are declared in `config/resources.ts`; everything " +
+        "else is configured with environment variables, or by ejecting."
     );
 }
 

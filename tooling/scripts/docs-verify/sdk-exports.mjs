@@ -10,44 +10,121 @@
  *   - the locale API-name check, as the allowlist of symbols docs may mention.
  */
 import path from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 
-/** Package entry points, relative to the monorepo root. */
-export const PACKAGE_ENTRIES = {
-    "@rebasepro/client": "packages/client/src/index.ts",
-    "@rebasepro/server": "packages/server/src/index.ts",
-    // A published subpath, and the one the documentation tells people to import
-    // in a function file — so its named imports need checking like any package
-    // root's. Keyed by the full specifier: `byPackage` is looked up by whatever
-    // the snippet wrote.
-    "@rebasepro/server/functions": "packages/server/src/functions/index.ts",
-    "@rebasepro/server-postgres": "packages/server-postgres/src/index.ts",
-    "@rebasepro/server-mongo": "packages/server-mongo/src/index.ts",
-    "@rebasepro/types": "packages/types/src/index.ts",
-    "@rebasepro/common": "packages/common/src/index.ts",
-    "@rebasepro/utils": "packages/utils/src/index.ts",
-    "@rebasepro/ui": "packages/ui/src/index.ts",
-    "@rebasepro/app": "packages/app/src/index.ts",
-    "@rebasepro/cms": "packages/cms/src/index.ts",
+/**
+ * The packages the docs may import from, SDK-first.
+ *
+ * The order is the contract: when two packages export the same name, `ownerOf`
+ * keeps the first, and "import `EntityCollection` from `@rebasepro/client`" is
+ * better advice than "from `@rebasepro/inference`". Membership is not a
+ * contract — {@link packageEntries} derives the actual map from each package's
+ * own `exports`, so a published subpath cannot be absent from it.
+ */
+const PACKAGE_ORDER = [
+    "@rebasepro/client",
+    "@rebasepro/server",
+    "@rebasepro/server-postgres",
+    "@rebasepro/server-mongo",
+    "@rebasepro/types",
+    "@rebasepro/common",
+    "@rebasepro/utils",
+    "@rebasepro/ui",
+    "@rebasepro/app",
+    "@rebasepro/cms",
     // The React-flavoured half of the type surface, and the package a scaffold
     // actually installs: `AdminPropertyOptions`, `FieldProps`, `EntityCollection`
     // and the rest of the admin vocabulary live here, not in `@rebasepro/types`.
-    // It was missing from this map for as long as the map existed, which meant
-    // every `import { … } from "@rebasepro/cms-types"` in the docs asserted
-    // nothing at all — the name check skips a specifier it has no export set for.
-    "@rebasepro/cms-types": "packages/cms-types/src/index.ts",
-    "@rebasepro/forms": "packages/forms/src/index.ts",
-    "@rebasepro/studio": "packages/studio/src/index.ts",
-    "@rebasepro/codegen": "packages/codegen/src/index.ts",
-    "@rebasepro/inference": "packages/inference/src/index.ts",
-    "@rebasepro/firebase": "packages/firebase/src/index.ts",
-    "@rebasepro/plugin-ai": "packages/plugin-ai/src/index.ts",
-    "@rebasepro/plugin-insights": "packages/plugin-insights/src/index.ts",
-    "@rebasepro/mcp": "packages/mcp/src/index.ts"
-};
+    "@rebasepro/cms-types",
+    "@rebasepro/forms",
+    "@rebasepro/studio",
+    "@rebasepro/codegen",
+    "@rebasepro/inference",
+    "@rebasepro/firebase",
+    "@rebasepro/plugin-ai",
+    "@rebasepro/plugin-insights",
+    "@rebasepro/mcp"
+];
+
+/**
+ * A published subpath's source file, from its `types` condition.
+ *
+ * `"./dist/editor/index.d.ts"` is built from `src/editor/index.ts`. Every
+ * package in this workspace builds `dist/` out of `src/` with the same layout,
+ * so the mapping is a rename rather than a lookup.
+ *
+ * @param {unknown} target the value of one `exports` key
+ * @returns {string | null} a path relative to the package, or null if this
+ *   subpath is not TypeScript the verifier could load
+ */
+function sourceOfSubpath(target) {
+    const types = typeof target === "string"
+        ? (target.endsWith(".d.ts") ? target : null)
+        : (target && typeof target === "object" ? target.types : null);
+    if (typeof types !== "string" || !types.endsWith(".d.ts")) return null;
+    return types.replace(/^\.\/dist\//, "src/").replace(/\.d\.ts$/, ".ts");
+}
+
+/**
+ * Package entry points, relative to the monorepo root, derived from each
+ * package's own `exports` map.
+ *
+ * Hand-written, this listed one of the workspace's published subpaths.
+ * `@rebasepro/cms/editor` and `@rebasepro/cms/collection_editor_ui` were not in
+ * it, and the name check *skips* a specifier it has no export set for — so four
+ * fences in the agent skills importing `RichTextEditor` from
+ * `@rebasepro/cms/editor` asserted nothing at all. Deriving the map means a new
+ * subpath is covered the day it is published rather than the day someone
+ * notices.
+ *
+ * A subpath with no `types` — `./package.json`, the `.css` bundles — is not a
+ * module anyone imports names from and is skipped.
+ */
+export const PACKAGE_ENTRIES = packageEntries();
+
+function packageEntries() {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+    /** @type {Record<string, string>} */
+    const entries = {};
+    const dirs = readdirSync(path.join(root, "packages"), { withFileTypes: true })
+        .filter(d => d.isDirectory())
+        .map(d => d.name);
+
+    /** @type {Map<string, { dir: string, manifest: any }>} */
+    const byName = new Map();
+    for (const dir of dirs) {
+        const manifestPath = path.join(root, "packages", dir, "package.json");
+        if (!existsSync(manifestPath)) continue;
+        const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+        if (manifest.name) byName.set(manifest.name, { dir, manifest });
+    }
+
+    // Ordered packages first, then anything else the workspace publishes, so a
+    // new package is covered without being ranked.
+    const names = [
+        ...PACKAGE_ORDER.filter(n => byName.has(n)),
+        ...[...byName.keys()].filter(n => !PACKAGE_ORDER.includes(n)).sort()
+    ];
+
+    for (const name of names) {
+        const { dir, manifest } = byName.get(name);
+        const rel = sub => `packages/${dir}/${sub}`;
+        entries[name] = rel("src/index.ts");
+        const exported = manifest.exports;
+        if (!exported || typeof exported !== "object") continue;
+        for (const [subpath, target] of Object.entries(exported)) {
+            if (subpath === ".") continue;
+            const source = sourceOfSubpath(target);
+            if (!source) continue;
+            entries[`${name}${subpath.slice(1)}`] = rel(source);
+        }
+    }
+    return entries;
+}
 
 /** Building the program costs ~15s; both verifier stages share one. */
 let cached = null;

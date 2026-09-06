@@ -55,6 +55,8 @@ import { checkRlsCheckFlags } from "./docs-verify/check-rls-check-flags.mjs";
 import { checkUnreleasedBadges } from "./docs-verify/check-unreleased-badges.mjs";
 import { checkDocsLinks } from "./docs-verify/check-docs-links.mjs";
 import { checkTranslationFreshness } from "./docs-verify/check-translation-freshness.mjs";
+import { checkConfigExports } from "./docs-verify/check-config-exports.mjs";
+import { checkChangelogSections } from "./docs-verify/check-changelog-sections.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -94,7 +96,9 @@ if (asJson) {
         out.skillClaims = checkSkillClaims(ROOT).findings;
         out.unreleasedBadges = checkUnreleasedBadges(ROOT).findings;
         out.docsLinks = checkDocsLinks(ROOT).findings;
-        out.translationFreshness = checkTranslationFreshness(ROOT).findings;
+        out.translationFreshness = checkTranslationFreshness(ROOT, { strict }).findings;
+        out.configExports = checkConfigExports(ROOT).findings;
+        out.changelogSections = checkChangelogSections(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -213,8 +217,8 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Translation freshness ━━━${NC}`);
-    const { findings: bad, missing, unstamped, fresh, sources, locales } =
-        checkTranslationFreshness(ROOT);
+    const { findings: bad, missing, unstamped, fresh, sources, locales, budget } =
+        checkTranslationFreshness(ROOT, { strict });
     console.log(
         `${DIM}${sources} translatable page(s) × ${locales} locales: ${fresh} fresh, ` +
             `${unstamped.length} unstamped, ${missing.length} missing.${NC}`
@@ -231,8 +235,9 @@ if (only === "both" || only === "names") {
     }
     if (missing.length || unstamped.length) {
         console.log(
-            `      ${DIM}${unstamped.length} predate the stamp and ${missing.length} do not exist ` +
-                `(Starlight falls back to English). Neither fails this check; ` +
+            `      ${DIM}${unstamped.length} carry no stamp (budget ${budget}, a finding under ` +
+                `--strict) and ${missing.length} do not exist at all (Starlight falls back to ` +
+                `English, so that one is a coverage gap rather than a break). ` +
                 `\`node scripts/translate_docs.mjs --dry-run\` in website/ lists them.${NC}`
         );
     }
@@ -301,11 +306,43 @@ if (only === "both" || only === "names") {
 }
 
 if (only === "both" || only === "names") {
-    console.log(`\n${YELLOW}━━━ Endpoint index ━━━${NC}`);
-    const { findings: bad, routes, modules } = checkEndpointIndex(ROOT);
-    console.log(`${DIM}Extracted ${routes} route(s) from ${modules} router module(s).${NC}`);
+    console.log(`\n${YELLOW}━━━ Changelog sections ━━━${NC}`);
+    const { findings: bad, sections } = checkChangelogSections(ROOT);
+    console.log(`${DIM}## [Unreleased]: ${sections.join(", ") || "(no sections)"}.${NC}`);
     if (!bad.length) {
-        console.log(`${GREEN}✓ Every mounted route is in the endpoint index.${NC}`);
+        console.log(`${GREEN}\u2713 One section per heading, in order.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}\u2717 ${bad.length} changelog section problem(s):${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Config-package exports (all locales) ━━━${NC}`);
+    const { findings: bad, read, cells, scanned } = checkConfigExports(ROOT);
+    console.log(`${DIM}Checked ${cells} documented \`config/index.ts\` export(s) across ${scanned} file(s); the runtime reads ${read.join(", ")}.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}\u2713 Every export a page puts in \`config/index.ts\` is one the runtime reads.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}\u2717 ${bad.length} documented export(s) the runtime does not read:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Endpoint index ━━━${NC}`);
+    const { findings: bad, routes, modules, paramRows, reserved } = checkEndpointIndex(ROOT);
+    console.log(`${DIM}Extracted ${routes} route(s) from ${modules} router module(s); ${paramRows} declared query parameter(s) against ${reserved} reserved key(s).${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}\u2713 Every mounted route is in the endpoint index, and every documented query parameter is reserved.${NC}`);
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} route(s) the index does not account for:${NC}`);

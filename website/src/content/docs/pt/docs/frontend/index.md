@@ -1,4 +1,5 @@
 ---
+sourceHash: 03d03e9fa055a194
 title: Visão Geral do Frontend
 sidebar_label: Frontend
 description: Construa e personalize o painel de administração Rebase com React — controllers, scaffold, roteamento e views.
