@@ -126,21 +126,28 @@ A API REST é auto-gerada a partir das suas coleções. Cada coleção obtém es
 
 | Método | Caminho | Descrição |
 |---|---|---|
-| `GET` | `/api/data/:slug` | Listar entidades (com filtro, ordenação, limite, pesquisa) |
+| `GET` | `/api/data/:slug` | Listar entidades — filtrar, ordenar, paginar e pesquisar são parâmetros de consulta |
+| `GET` | `/api/data/:slug/count` | Quantas linhas essa mesma consulta corresponde |
+| `GET` | `/api/data/:slug/aggregate` | `count`/`sum`/`avg`/`min`/`max`, opcionalmente agrupados |
 | `GET` | `/api/data/:slug/:id` | Obter uma única entidade |
 | `POST` | `/api/data/:slug` | Criar uma nova entidade |
+| `PATCH` | `/api/data/:slug/:id` | Atualizar os campos que envia |
 | `DELETE` | `/api/data/:slug/:id` | Eliminar uma entidade |
+| `POST` | `/api/data/:slug/bulk` | Criar muitas linhas numa única transação |
+| `PATCH` | `/api/data/:slug/bulk` | Atualizar muitas linhas numa única transação |
+| `POST` | `/api/data/:slug/bulk/delete` | Eliminar muitas linhas numa única transação |
 
-### Parâmetros de Consulta
+### Parâmetros de consulta
 
-| Parâmetro | Descrição | Exemplo |
-|---|---|---|
-| `filter` | Condições de filtro codificadas em JSON | `?filter={"active":["==",true]}` |
-| `orderBy` | Campo de ordenação | `?orderBy=createdAt` |
-| `order` | Direção de ordenação | `?order=desc` |
-| `limit` | Tamanho da página | `?limit=25` |
-| `startAfter` | Cursor para paginação | `?startAfter=encodedCursor` |
-| `search` | Pesquisa de texto completo | `?search=laptop` |
+Existe uma referência para eles e não é esta página. [API REST](/docs/backend/api/) documenta
+os dois dialetos de consulta que o servidor aceita — a forma `?column=op.value` ao estilo
+PostgREST e a forma JSON `?where=` — juntamente com `orderBy`, `limit`/`offset`, `include`,
+`fields`, `searchString` e a pesquisa vetorial.
+[Endpoints](/docs/backend/endpoints/) é o índice de todas as rotas que o servidor monta,
+incluindo as geradas.
+
+Um parâmetro que o servidor não reserva é lido como um filtro sobre a coluna com esse nome,
+por isso um parâmetro inventado não falha: apenas não corresponde a nada, em silêncio.
 
 ## WebSocket
 

@@ -124,23 +124,30 @@ instance.cronScheduler       // Scheduler di cron job (quando cronsDir è impost
 
 L'API REST viene generata automaticamente dalle tue collezioni. Ogni collezione ottiene questi endpoint:
 
-| Method | Path | Description |
+| Metodo | Percorso | Descrizione |
 |--------|------|-------------|
-| `GET` | `/api/data/:slug` | Elenca entità (con filtro, ordinamento, limite, ricerca) |
+| `GET` | `/api/data/:slug` | Elenca entità — filtro, ordinamento, paginazione e ricerca sono parametri di query |
+| `GET` | `/api/data/:slug/count` | Quante righe corrispondono alla stessa query |
+| `GET` | `/api/data/:slug/aggregate` | `count`/`sum`/`avg`/`min`/`max`, facoltativamente raggruppati |
 | `GET` | `/api/data/:slug/:id` | Ottieni una singola entità |
 | `POST` | `/api/data/:slug` | Crea una nuova entità |
+| `PATCH` | `/api/data/:slug/:id` | Aggiorna i campi che invii |
 | `DELETE` | `/api/data/:slug/:id` | Elimina un'entità |
+| `POST` | `/api/data/:slug/bulk` | Crea molte righe in un'unica transazione |
+| `PATCH` | `/api/data/:slug/bulk` | Aggiorna molte righe in un'unica transazione |
+| `POST` | `/api/data/:slug/bulk/delete` | Elimina molte righe in un'unica transazione |
 
-### Parametri di Query
+### Parametri di query
 
-| Param | Description | Example |
-|-------|-------------|---------|
-| `filter` | Condizioni di filtro codificate in JSON | `?filter={"active":["==",true]}` |
-| `orderBy` | Campo di ordinamento | `?orderBy=createdAt` |
-| `order` | Direzione di ordinamento | `?order=desc` |
-| `limit` | Dimensione della pagina | `?limit=25` |
-| `startAfter` | Cursore per la paginazione | `?startAfter=encodedCursor` |
-| `search` | Ricerca full-text | `?search=laptop` |
+Esiste un unico riferimento per essi e non è questa pagina. [API REST](/docs/backend/api/)
+documenta entrambi i dialetti di query accettati dal server — la forma `?column=op.value` in
+stile PostgREST e la forma JSON `?where=` — insieme a `orderBy`, `limit`/`offset`, `include`,
+`fields`, `searchString` e la ricerca vettoriale.
+[Endpoint](/docs/backend/endpoints/) è l'indice di ogni rotta montata dal server, incluse
+quelle generate.
+
+Un parametro che il server non riserva viene letto come filtro sulla colonna con quel nome:
+uno inventato quindi non fallisce, semplicemente non corrisponde a nulla.
 
 ## WebSocket
 

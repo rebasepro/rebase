@@ -280,21 +280,28 @@ The REST API is auto-generated from your collections. Every collection gets thes
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/data/:slug` | List entities (with filter, sort, limit, search) |
+| `GET` | `/api/data/:slug` | List entities — filtering, sorting, paging and search are query parameters |
+| `GET` | `/api/data/:slug/count` | How many rows the same query matches |
+| `GET` | `/api/data/:slug/aggregate` | `count`/`sum`/`avg`/`min`/`max`, optionally grouped |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
 | `POST` | `/api/data/:slug` | Create a new entity |
+| `PATCH` | `/api/data/:slug/:id` | Update the fields you send |
 | `DELETE` | `/api/data/:slug/:id` | Delete a record |
+| `POST` | `/api/data/:slug/bulk` | Create many rows in one transaction |
+| `PATCH` | `/api/data/:slug/bulk` | Update many rows in one transaction |
+| `POST` | `/api/data/:slug/bulk/delete` | Delete many rows in one transaction |
 
-### Query Parameters
+### Query parameters
 
-| Param | Description | Example |
-|-------|-------------|---------|
-| `filter` | JSON-encoded filter conditions | `?filter={"active":["==",true]}` |
-| `orderBy` | Sort field | `?orderBy=createdAt` |
-| `order` | Sort direction | `?order=desc` |
-| `limit` | Page size | `?limit=25` |
-| `startAfter` | Cursor for pagination | `?startAfter=encodedCursor` |
-| `search` | Full-text search | `?search=laptop` |
+There is one reference for them and it is not this page. [REST
+API](/docs/backend/api/) documents both query dialects the server accepts — the
+PostgREST-style `?column=op.value` form and the JSON `?where=` form — along with
+`orderBy`, `limit`/`offset`, `include`, `fields`, `searchString` and vector
+search. [Endpoints](/docs/backend/endpoints/) is the index of every route the
+server mounts, generated ones included.
+
+A parameter the server does not reserve is read as a filter on the column of
+that name, so an invented one does not fail: it silently matches nothing.
 
 ## WebSocket
 

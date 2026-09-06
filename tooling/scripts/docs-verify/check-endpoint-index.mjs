@@ -36,6 +36,38 @@ import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(HERE, "..", "..", "..");
 const PAGE = "website/src/content/docs/docs/backend/endpoints.md";
+const QUERY_PARSER = "packages/server/src/api/rest/query-parser.ts";
+
+/**
+ * Every page that could declare a data-API query parameter, all six locales.
+ *
+ * A stale translation of a parameter table is the same lie in another language,
+ * and the table this half of the guard exists for lived in five of them.
+ */
+const PARAM_DOC_GLOBS = [
+    "website/src/content/docs/docs/**/*.md",
+    "website/src/content/docs/docs/**/*.mdx",
+    "website/src/content/docs/de/docs/**/*.md",
+    "website/src/content/docs/es/docs/**/*.md",
+    "website/src/content/docs/fr/docs/**/*.md",
+    "website/src/content/docs/it/docs/**/*.md",
+    "website/src/content/docs/pt/docs/**/*.md",
+    "tooling/rebase-agent-skills/**/*.md"
+];
+
+/**
+ * A table row that *declares* a query parameter: the first cell is a backticked
+ * identifier and a later cell writes `?<that same identifier>=`.
+ *
+ * Narrow on purpose. `GET /api/data/products?price=gt.100` is a **column**
+ * filter and correct — the parser falls through to a field filter for any key it
+ * does not reserve (`query-parser.ts`), so the operator tables in `backend/api.md`
+ * (`| `gt` | Greater than | `?price=gt.100` |`) must not be flagged. What is
+ * never correct is a row saying "the parameter is called `filter`" when the
+ * parser reserves no such key: `?filter=` was read as a filter on a column named
+ * `filter`, matched nothing, and returned 200.
+ */
+const PARAM_ROW = /^\|\s*`([A-Za-z_$][\w$]*)`\s*\|/;
 
 const GREEN = "[0;32m";
 const RED = "[0;31m";
@@ -153,7 +185,41 @@ export function checkEndpointIndex(root = DEFAULT_ROOT) {
         findings.push({ kind: "missing", message: `${route} is mounted and not in the index` });
     }
 
-    return { findings, routes: routes.size, modules: modules.length };
+    // ── every declared query parameter is one the parser reserves ─────────
+    const parser = readFileSync(path.join(root, QUERY_PARSER), "utf8");
+    const reservedLine = parser.match(/const reservedQueryKeys = \[([^\]]*)\]/);
+    if (!reservedLine) {
+        throw new Error(`Could not read reservedQueryKeys out of ${QUERY_PARSER} — the guard is checking nothing.`);
+    }
+    const reserved = new Set([...reservedLine[1].matchAll(/"([^"]+)"/g)].map(m => m[1]));
+    if (reserved.size === 0) {
+        throw new Error(`reservedQueryKeys parsed empty in ${QUERY_PARSER} — the guard is checking nothing.`);
+    }
+
+    let paramRows = 0;
+    const paramFiles = [...new Set(PARAM_DOC_GLOBS.flatMap(g => globSync(g, { cwd: root })))].sort();
+    for (const file of paramFiles) {
+        if (/CHANGELOG\.md$/.test(file)) continue;
+        const lines = readFileSync(path.join(root, file), "utf8").split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            const row = lines[i].match(PARAM_ROW);
+            if (!row) continue;
+            const name = row[1];
+            if (!lines[i].includes(`?${name}=`)) continue;
+            paramRows += 1;
+            if (reserved.has(name)) continue;
+            findings.push({
+                kind: "param",
+                message:
+                    `${file}:${i + 1} declares a query parameter \`${name}\`, which ` +
+                    `reservedQueryKeys does not contain. The parser reads an unreserved key as a ` +
+                    `filter on the column of that name, so \`?${name}=\` returns 200 and matches ` +
+                    "nothing. Reserved: " + [...reserved].join(", ") + "."
+            });
+        }
+    }
+
+    return { findings, routes: routes.size, modules: modules.length, paramRows, reserved: reserved.size };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -165,7 +231,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         process.exit(2);
     }
     if (!result.findings.length) {
-        console.log(`${GREEN}✓ All ${result.routes} mounted route(s) are in the endpoint index.${NC}`);
+        console.log(
+            `${GREEN}\u2713 All ${result.routes} mounted route(s) are in the endpoint index, and all ` +
+            `${result.paramRows} declared query parameter(s) are among the ${result.reserved} the parser reserves.${NC}`
+        );
         process.exit(0);
     }
     console.error(`${RED}✗ ${result.findings.length} finding(s):${NC}`);

@@ -126,21 +126,28 @@ La API REST se auto-genera a partir de tus colecciones. Cada colección obtiene 
 
 | Método | Path | Descripción |
 |--------|------|-------------|
-| `GET` | `/api/data/:slug` | Listar entidades (con filtro, orden, límite, búsqueda) |
+| `GET` | `/api/data/:slug` | Listar entidades — filtrar, ordenar, paginar y buscar son parámetros de consulta |
+| `GET` | `/api/data/:slug/count` | Cuántas filas coinciden con esa misma consulta |
+| `GET` | `/api/data/:slug/aggregate` | `count`/`sum`/`avg`/`min`/`max`, opcionalmente agrupados |
 | `GET` | `/api/data/:slug/:id` | Obtener una única entidad |
 | `POST` | `/api/data/:slug` | Crear una nueva entidad |
+| `PATCH` | `/api/data/:slug/:id` | Actualizar los campos que envías |
 | `DELETE` | `/api/data/:slug/:id` | Eliminar una entidad |
+| `POST` | `/api/data/:slug/bulk` | Crear muchas filas en una sola transacción |
+| `PATCH` | `/api/data/:slug/bulk` | Actualizar muchas filas en una sola transacción |
+| `POST` | `/api/data/:slug/bulk/delete` | Eliminar muchas filas en una sola transacción |
 
 ### Parámetros de consulta
 
-| Parámetro | Descripción | Ejemplo |
-|-------|-------------|---------|
-| `filter` | Condiciones de filtro codificadas en JSON | `?filter={"active":["==",true]}` |
-| `orderBy` | Campo de ordenación | `?orderBy=createdAt` |
-| `order` | Dirección de ordenación | `?order=desc` |
-| `limit` | Tamaño de página | `?limit=25` |
-| `startAfter` | Cursor para paginación | `?startAfter=encodedCursor` |
-| `search` | Búsqueda de texto completo | `?search=laptop` |
+Hay una referencia para ellos y no es esta página. [API REST](/docs/backend/api/) documenta
+los dos dialectos de consulta que el servidor acepta — la forma `?column=op.value` al estilo
+PostgREST y la forma JSON `?where=` — junto con `orderBy`, `limit`/`offset`, `include`,
+`fields`, `searchString` y la búsqueda vectorial.
+[Puntos finales](/docs/backend/endpoints/) es el índice de todas las rutas que monta el
+servidor, incluidas las generadas.
+
+Un parámetro que el servidor no reserva se lee como un filtro sobre la columna de ese
+nombre, así que uno inventado no falla: simplemente no coincide con nada.
 
 ## WebSocket
 

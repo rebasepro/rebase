@@ -126,21 +126,29 @@ Die REST-API wird automatisch aus Ihren Sammlungen generiert. Jede Sammlung erh�
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
-| `GET` | `/api/data/:slug` | Entitäten auflisten (mit Filter, Sortierung, Limit, Suche) |
+| `GET` | `/api/data/:slug` | Entitäten auflisten — Filtern, Sortieren, Paginieren und Suchen sind Abfrageparameter |
+| `GET` | `/api/data/:slug/count` | Wie viele Zeilen dieselbe Abfrage trifft |
+| `GET` | `/api/data/:slug/aggregate` | `count`/`sum`/`avg`/`min`/`max`, optional gruppiert |
 | `GET` | `/api/data/:slug/:id` | Eine einzelne Entität abrufen |
 | `POST` | `/api/data/:slug` | Eine neue Entität erstellen |
+| `PATCH` | `/api/data/:slug/:id` | Die gesendeten Felder aktualisieren |
 | `DELETE` | `/api/data/:slug/:id` | Eine Entität löschen |
+| `POST` | `/api/data/:slug/bulk` | Viele Zeilen in einer Transaktion erstellen |
+| `PATCH` | `/api/data/:slug/bulk` | Viele Zeilen in einer Transaktion aktualisieren |
+| `POST` | `/api/data/:slug/bulk/delete` | Viele Zeilen in einer Transaktion löschen |
 
 ### Abfrageparameter
 
-| Parameter | Beschreibung | Beispiel |
-|-------|-------------|---------|
-| `filter` | JSON-kodierte Filterbedingungen | `?filter={"active":["==",true]}` |
-| `orderBy` | Sortierfeld | `?orderBy=createdAt` |
-| `order` | Sortierrichtung | `?order=desc` |
-| `limit` | Seitengröße | `?limit=25` |
-| `startAfter` | Cursor für die Paginierung | `?startAfter=encodedCursor` |
-| `search` | Volltextsuche | `?search=laptop` |
+Es gibt eine Referenz dafür, und sie ist nicht diese Seite. [REST-API](/docs/backend/api/)
+dokumentiert beide Abfragedialekte, die der Server akzeptiert — die PostgREST-artige Form
+`?column=op.value` und die JSON-Form `?where=` — sowie `orderBy`, `limit`/`offset`,
+`include`, `fields`, `searchString` und die Vektorsuche.
+[Endpunkte](/docs/backend/endpoints/) ist das Verzeichnis jeder Route, die der Server
+einhängt, generierte eingeschlossen.
+
+Ein Parameter, den der Server nicht reserviert, wird als Filter auf die Spalte dieses
+Namens gelesen. Ein erfundener Parameter scheitert deshalb nicht: Er trifft stillschweigend
+nichts.
 
 ## WebSocket
 

@@ -320,10 +320,10 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Endpoint index ━━━${NC}`);
-    const { findings: bad, routes, modules } = checkEndpointIndex(ROOT);
-    console.log(`${DIM}Extracted ${routes} route(s) from ${modules} router module(s).${NC}`);
+    const { findings: bad, routes, modules, paramRows, reserved } = checkEndpointIndex(ROOT);
+    console.log(`${DIM}Extracted ${routes} route(s) from ${modules} router module(s); ${paramRows} declared query parameter(s) against ${reserved} reserved key(s).${NC}`);
     if (!bad.length) {
-        console.log(`${GREEN}✓ Every mounted route is in the endpoint index.${NC}`);
+        console.log(`${GREEN}\u2713 Every mounted route is in the endpoint index, and every documented query parameter is reserved.${NC}`);
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} route(s) the index does not account for:${NC}`);
