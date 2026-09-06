@@ -1,5 +1,5 @@
 ---
-sourceHash: 58ed48e92b8ff6cb
+sourceHash: 6463f2ed4a86c836
 title: Schnellstart
 sidebar_label: Schnellstart
 description: Erstellen Sie ein neues Rebase-Projekt und bringen Sie es in weniger als 2 Minuten lokal zum Laufen.
@@ -21,7 +21,7 @@ Dies erstellt ein Projekt mit drei Paketen:
 
 ## Voraussetzungen
 
-- **Node.js** 22.22 oder neuer (die Version in `.nvmrc`)
+- **Node.js** 22.22+ — jedes Scaffold, auch das headless, deklariert `"node": ">=22.22.0"`
 - **pnpm** (empfohlen) oder npm
 
 Keine Datenbank zu installieren, und kein Docker. `rebase dev` betreibt eine verwaltete PostgreSQL für das Projekt, deren Daten unter `.rebase/` liegen. Siehe [Variante: Ihre eigene PostgreSQL](#variante-ihre-eigene-postgresql), wenn Sie lieber selbst eine bereitstellen — eine lokale Installation, Neon, Supabase oder den Container, den dieser Scaffold mitliefert.

@@ -291,7 +291,8 @@ All cron routes require **admin authentication** (`requireAuth` + `requireAdmin`
 
 ### Example: List All Jobs
 
-`$API_URL` is whatever `rebase dev` printed — the port is derived from the
+`$TOKEN` is an admin access token: sign in and use the `accessToken` the login
+response returns. `$API_URL` is whatever `rebase dev` printed — the port is derived from the
 project's path, so there is no fixed one.
 
 ```bash

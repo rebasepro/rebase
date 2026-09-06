@@ -1,5 +1,5 @@
 ---
-sourceHash: c90a105840f07ad0
+sourceHash: 9df2202ffe55b40c
 title: Lavori Cron
 sidebar_label: Lavori Cron
 description: Pianifica attività in background ricorrenti con il sistema di lavori cron integrato di Rebase. Definisci i lavori come file TypeScript, monitorali in Studio e gestiscili tramite l'API REST.
@@ -161,7 +161,7 @@ Tutte le rotte cron richiedono **autenticazione amministrativa** (`requireAuth` 
 
 ### Esempio: Elenca tutti i lavori
 
-`$API_URL` è l'URL stampato da `rebase dev` — la porta è derivata dal progetto e non è fissa.
+`$TOKEN` è un token di accesso amministratore: accedi e usa l'`accessToken` restituito dalla risposta di login. `$API_URL` è l'URL stampato da `rebase dev` — la porta è derivata dal progetto e non è fissa.
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"

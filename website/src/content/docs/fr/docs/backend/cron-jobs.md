@@ -1,5 +1,5 @@
 ---
-sourceHash: c90a105840f07ad0
+sourceHash: 9df2202ffe55b40c
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes avec le système de tâches cron intégré de Rebase. Définissez les tâches comme des fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -161,7 +161,7 @@ Toutes les routes cron nécessitent une **authentification administrateur** (`re
 
 ### Exemple : Lister toutes les tâches
 
-`$API_URL` est l'URL affichée par `rebase dev` — le port est dérivé du projet et n'est pas fixe.
+`$TOKEN` est un jeton d'accès administrateur : connectez-vous et utilisez l'`accessToken` renvoyé par la réponse de connexion. `$API_URL` est l'URL affichée par `rebase dev` — le port est dérivé du projet et n'est pas fixe.
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"

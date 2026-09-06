@@ -336,10 +336,88 @@ function checkRunScripts(root, rel, text, findings, home = path.dirname(rel)) {
     }
 }
 
+/**
+ * Environment variables a scaffolded project actually has.
+ *
+ * The template's `.env.example`, plus every variable the scaffold's own files
+ * read — `scripts/example.ts` reads `REBASE_URL`, `docker-compose.yml`
+ * interpolates `${REBASE_VERSION}`, the frontend reads `import.meta.env.VITE_*`.
+ * A page telling a reader to paste `$SOMETHING` that is in none of these is
+ * telling them to paste an empty string.
+ *
+ * @param {string} root
+ * @returns {Set<string>}
+ */
+function loadScaffoldEnvKeys(root) {
+    const keys = new Set();
+    for (const rel of [
+        "packages/cli/templates/template/.env.example",
+        "packages/cli/templates/overlays/baas/.env.example"
+    ]) {
+        const file = path.join(root, rel);
+        if (!existsSync(file)) continue;
+        // Commented-out keys count: `rebase init` writes some of them commented
+        // and the reader uncomments them.
+        for (const m of readFileSync(file, "utf8").matchAll(/^#?\s*([A-Z][A-Z0-9_]*)=/gm)) keys.add(m[1]);
+    }
+    for (const rel of globSync("packages/cli/templates/**/*.{ts,tsx,js,mjs,json,yml,yaml}", { cwd: root })) {
+        const text = readFileSync(path.join(root, rel), "utf8");
+        for (const m of text.matchAll(/process\.env\.([A-Z][A-Z0-9_]*)/g)) keys.add(m[1]);
+        for (const m of text.matchAll(/process\.env\[["']([A-Z][A-Z0-9_]*)["']\]/g)) keys.add(m[1]);
+        for (const m of text.matchAll(/import\.meta\.env\.([A-Z][A-Z0-9_]*)/g)) keys.add(m[1]);
+        for (const m of text.matchAll(/\$\{?([A-Z][A-Z0-9_]*)[:}\s]/g)) keys.add(m[1]);
+    }
+    return keys;
+}
+
+/**
+ * Names the shell or the platform provides, which no project has to define.
+ */
+const SHELL_VARS = new Set([
+    "PATH", "HOME", "PWD", "OLDPWD", "USER", "SHELL", "EDITOR", "LANG", "LC_ALL",
+    "TMPDIR", "TERM", "CI", "OSTYPE", "RANDOM", "PS1", "SHLVL",
+    "GITHUB_TOKEN", "GITHUB_SHA", "GITHUB_REF", "GITHUB_REPOSITORY"
+]);
+
+/**
+ * `$VAR` references inside shell fences, with what the fence itself assigns.
+ *
+ * @param {string} text
+ * @returns {Array<{ line: number, name: string, assigned: Set<string> }>}
+ */
+function shellVariables(text) {
+    const lines = text.split("\n");
+    const out = [];
+    let fence = null;          // the delimiter that opened the current fence
+    let isShell = false;
+    let assigned = new Set();
+    for (let i = 0; i < lines.length; i++) {
+        const open = lines[i].match(/^\s*(`{3,}|~{3,})([A-Za-z0-9+#-]*)/);
+        if (open) {
+            if (fence && open[1][0] === fence[0] && open[1].length >= fence.length) {
+                fence = null;
+                isShell = false;
+            } else if (!fence) {
+                fence = open[1];
+                isShell = /^(bash|sh|shell|zsh|console)$/i.test(open[2]);
+                assigned = new Set();
+            }
+            continue;
+        }
+        if (!isShell) continue;
+        for (const m of lines[i].matchAll(/(?:^|[\s(;&|])(?:export\s+)?([A-Z][A-Z0-9_]*)=/g)) assigned.add(m[1]);
+        for (const m of lines[i].matchAll(/\$\{?([A-Z][A-Z0-9_]*)\}?/g)) {
+            out.push({ line: i + 1, name: m[1], assigned: new Set(assigned) });
+        }
+    }
+    return out;
+}
+
 export function checkDocCommands(root) {
     const cli = loadCliCommands(root);
     const flags = loadCliFlags(root);
     const bins = loadWorkspaceBins(root);
+    const envKeys = loadScaffoldEnvKeys(root);
     const findings = [];
     let scanned = 0;
 
@@ -417,6 +495,28 @@ export function checkDocCommands(root) {
                 lineAt(text, m.index),
                 `\`${pkg}\` is the *binary* name shipped by \`${owner}\`, not a package on npm — ` +
                     `installing or running it fetches an unrelated third party's package. Use \`${owner}\`.`
+            );
+        }
+
+        // 6. A `$VAR` a reader is told to paste, that nothing gives them.
+        //
+        // `getting-started/headless.md` had `curl "$API_URL/api/data/posts"` and
+        // `baseUrl: process.env.API_URL!` in a snippet titled with the name of a
+        // file the scaffold already ships — under `REBASE_URL`. Pasted as
+        // written, the URL is `undefined` and the page's own "use it" section is
+        // the first thing that does not work.
+        //
+        // Four ways to be fine: the fence assigns it, the scaffold defines it,
+        // the shell provides it, or the page says in prose what it is (`$TOKEN`
+        // is the reader's own JWT, and the pages that use it say so).
+        for (const { line, name, assigned } of shellVariables(text)) {
+            if (assigned.has(name) || envKeys.has(name) || SHELL_VARS.has(name)) continue;
+            if (text.includes(`\`$${name}\``) || text.includes(`\`\${${name}}\``)) continue;
+            report(
+                line,
+                `\`$${name}\` is not defined by any shipped \`.env*\` or scaffold file, not assigned ` +
+                    "in this block, and not explained on this page — pasted as written it expands to " +
+                    "the empty string. Name a variable the scaffold has, assign it above, or say what it is."
             );
         }
 

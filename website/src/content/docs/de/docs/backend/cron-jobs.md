@@ -1,5 +1,5 @@
 ---
-sourceHash: c90a105840f07ad0
+sourceHash: 9df2202ffe55b40c
 title: Cron-Jobs
 sidebar_label: Cron-Jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.
@@ -161,7 +161,7 @@ Alle Cron-Routen erfordern eine **Admin-Authentifizierung** (`requireAuth` + `re
 
 ### Beispiel: Alle Jobs auflisten
 
-`$API_URL` ist die URL, die `rebase dev` ausgegeben hat — der Port wird aus dem Projekt abgeleitet und ist nicht fest.
+`$TOKEN` ist ein Admin-Access-Token: melden Sie sich an und verwenden Sie das `accessToken` aus der Login-Antwort. `$API_URL` ist die URL, die `rebase dev` ausgegeben hat — der Port wird aus dem Projekt abgeleitet und ist nicht fest.
 
 ```bash
 curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/cron"

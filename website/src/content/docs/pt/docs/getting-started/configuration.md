@@ -9,7 +9,16 @@ description: Todas as variáveis de ambiente e opções de configuração para p
 
 Toda a configuração é feita através de variáveis de ambiente no seu arquivo `.env` na raiz do projeto.
 
-> **Importante**: Rebase utiliza **Zod** para validar variáveis de ambiente na inicialização em `src/env.ts`. Se alguma variável obrigatória estiver faltando ou formatada incorretamente (como URLs ou portas), o servidor não conseguirá iniciar e fornecerá uma mensagem de erro clara.
+> **Importante**: O Rebase valida as variáveis de ambiente com **Zod** no arranque.
+> Se faltar algo obrigatório ou estiver malformado (um URL que não é um URL, uma
+> porta que não é um número), o servidor recusa arrancar e nomeia a variável.
+>
+> Onde vive o esquema depende de como executa o backend. Um projeto arrancado pelo
+> runtime — `rebase dev`, `rebase start`, a imagem publicada — usa o esquema do
+> próprio runtime (`loadBootEnv` em `@rebasepro/server`), que é a união de todas as
+> tabelas abaixo. Um projeto que executou [`rebase eject`](/docs/cli) possui o seu
+> próprio `backend/src/env.ts` com `loadEnv({ extend })`, e pode acrescentar aí as
+> suas variáveis tipadas.
 
 ### Obrigatórias
 
