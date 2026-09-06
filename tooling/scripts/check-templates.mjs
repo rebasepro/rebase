@@ -423,17 +423,35 @@ function checkEnvExampleCoversWhatWritesIt() {
 }
 
 /**
- * The two install-script allowlists a scaffold ships must name the same
- * packages.
+ * Packages pnpm builds that npm deliberately does not, and why.
  *
- * `pnpm.onlyBuiltDependencies` and npm 12's `allowScripts` answer the same
- * question — which dependencies may run a lifecycle script — for two package
- * managers a scaffold is free to use either of. They had drifted to three
- * entries and one, so `npm install` in a fresh project printed
- * `3 packages had install scripts blocked` for packages pnpm builds happily.
- * Nothing broke, and that is the problem with it: the two lists disagreeing is
- * a decision nobody made, and the next entry added to one of them will be a
- * decision that matters.
+ * The two lists are NOT meant to match. Under npm these two arrive as platform
+ * `optionalDependencies` carrying a prebuilt binary, so the blocked
+ * `postinstall` is a fallback nothing reaches — verified on npm 12, where
+ * `esbuild --version` answers anyway. Allowing a script that is not needed is a
+ * grant with no benefit, so npm's list is the shorter one on purpose;
+ * `init.test.ts` pins it exactly for the same reason.
+ *
+ * What was missing is the other direction, which is where a real break hides: a
+ * package added to pnpm's list and forgotten in npm's installs *without* its
+ * binary, exits 0, and fails later at the command that needed it —
+ * `@ariga/atlas` did exactly that, and `db:push` failed on a binary nobody had
+ * been told was skipped.
+ */
+const NPM_NEEDS_NO_SCRIPT = new Map([
+    ["esbuild", "npm resolves the platform package, whose binary needs no postinstall"],
+    ["sharp", "same: prebuilt binaries arrive as platform optionalDependencies"]
+]);
+
+/**
+ * Every package pnpm may build is either allowed under npm too, or listed above
+ * with the reason it does not need to be.
+ *
+ * Both managers refuse a dependency's lifecycle scripts unless the project
+ * allowlists them, in each one's own dialect, and a scaffold is free to be
+ * installed with either. The failure is silent on whichever manager gets
+ * forgotten, and is only ever noticed by somebody who already has a broken
+ * project.
  */
 function checkInstallAllowlistsAgree() {
     const problems = [];
@@ -445,17 +463,18 @@ function checkInstallAllowlistsAgree() {
 
         const pnpmList = [...(pkg.pnpm?.onlyBuiltDependencies ?? [])].sort();
         const npmList = Object.keys(pkg.allowScripts ?? {}).sort();
-        if (pnpmList.length === 0 && npmList.length === 0) continue;
 
-        const onlyPnpm = pnpmList.filter(n => !npmList.includes(n));
-        const onlyNpm = npmList.filter(n => !pnpmList.includes(n));
-        for (const name of onlyPnpm) {
+        for (const name of pnpmList) {
+            if (npmList.includes(name) || NPM_NEEDS_NO_SCRIPT.has(name)) continue;
             problems.push(
-                `${label}: pnpm.onlyBuiltDependencies allows ${name} to run its install script, `
-                + "but allowScripts does not — `npm install` blocks it"
+                `${label}: pnpm.onlyBuiltDependencies allows ${name} to run its install script and `
+                + "allowScripts does not, so `npm install` blocks it and exits 0. Add it to "
+                + "allowScripts, or to NPM_NEEDS_NO_SCRIPT in this file with the reason npm does "
+                + "not need it."
             );
         }
-        for (const name of onlyNpm) {
+        for (const name of npmList) {
+            if (pnpmList.includes(name)) continue;
             problems.push(
                 `${label}: allowScripts allows ${name} to run its install script, `
                 + "but pnpm.onlyBuiltDependencies does not — `pnpm install` blocks it"
@@ -463,6 +482,37 @@ function checkInstallAllowlistsAgree() {
         }
     }
     return problems;
+}
+
+/**
+ * The PGlite stack a scaffold installs must be pinned exactly.
+ *
+ * These three packages peer-depend on each other at exact versions —
+ * `pglite-pgvector@0.0.7` wants `pglite@0.5.6`, not `^0.5.6` — so a caret range
+ * here is not flexibility, it is a guarantee of an unmet peer the first time any
+ * of them publishes. `@rebasepro/cli@0.17.3` shipped `^0.5.6` / `^0.0.7` /
+ * `^0.2.9`, and every `pnpm install` in a fresh project then printed two unmet
+ * peers before the reader had run anything. Nothing breaks; it is simply the
+ * first thing a new user sees.
+ *
+ * A range is the whole failure, so a range is what this refuses. Nothing here
+ * can check that the pinned set actually satisfies itself — that needs a
+ * resolve, and this gate runs offline — but a set that did when it was pinned
+ * cannot drift while the pins are exact.
+ */
+function checkPgliteStackIsPinned() {
+    const manifestPath = path.join(repoRoot, "packages/cli/package.json");
+    if (!fs.existsSync(manifestPath)) return [];
+    const optional = JSON.parse(fs.readFileSync(manifestPath, "utf8")).optionalDependencies ?? {};
+
+    return Object.entries(optional)
+        .filter(([name]) => name.startsWith("@electric-sql/pglite"))
+        .filter(([, range]) => !/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(range))
+        .map(([name, range]) => (
+            `packages/cli/package.json pins ${name} as "${range}" — these packages peer-depend on `
+            + "each other at exact versions, so a range guarantees an unmet peer on the first "
+            + "`pnpm install` of a scaffold after any of them publishes"
+        ));
 }
 
 function checkBaasHasNoAdminTypes() {
@@ -515,10 +565,19 @@ if (envProblems.length > 0) {
 const allowlistProblems = checkInstallAllowlistsAgree();
 if (allowlistProblems.length > 0) {
     failed++;
-    console.log("  FAIL the two install-script allowlists name the same packages");
+    console.log("  FAIL every package pnpm may build is allowed under npm, or excused");
     for (const p of allowlistProblems) console.error(`    ${p}`);
 } else {
-    console.log("  ok   the two install-script allowlists name the same packages");
+    console.log("  ok   every package pnpm may build is allowed under npm, or excused");
+}
+
+const pgliteProblems = checkPgliteStackIsPinned();
+if (pgliteProblems.length > 0) {
+    failed++;
+    console.log("  FAIL the PGlite stack a scaffold installs is pinned exactly");
+    for (const p of pgliteProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   the PGlite stack a scaffold installs is pinned exactly");
 }
 
 const baasProblems = checkBaasHasNoAdminTypes();
