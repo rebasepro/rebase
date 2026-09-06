@@ -11,5 +11,19 @@
  * settles still fails, and a timeout only has to stop a hang.
  */
 import { configure } from "@testing-library/react";
+import { TextDecoder, TextEncoder } from "node:util";
 
 configure({ asyncUtilTimeout: 15_000 });
+
+/**
+ * jsdom ships no `TextEncoder`, and every browser has one.
+ *
+ * `sha1Hex` — which the RLS editor uses to derive the policy names Rebase
+ * generates, so it can tell them from hand-written ones — calls it on the first
+ * render that has a rule to name. In jsdom that threw `TextEncoder is not
+ * defined` and took the whole component down, which reads as "the editor
+ * crashes" rather than "the test environment is missing a browser global".
+ */
+if (typeof globalThis.TextEncoder === "undefined") {
+    Object.assign(globalThis, { TextEncoder, TextDecoder });
+}

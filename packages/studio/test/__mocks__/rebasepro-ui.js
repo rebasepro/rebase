@@ -45,6 +45,22 @@ large: 32 },
 
     // Rendered as the native equivalents so component tests can query and drive
     // them by role, rather than by reaching for internals that only exist here.
+    //
+    // `Button` and `IconButton` are here rather than in the Proxy fallback
+    // because the fallback renders a `<div>` and drops every prop: a test could
+    // see the label and never be able to press it, which is the difference
+    // between asserting a component renders and asserting what it does.
+    // Panels arrive as props, not as children, so the Proxy fallback rendered
+    // an empty div — a pane laid out with this one had no DOM at all and every
+    // query against it failed as if the component were broken.
+    ResizablePanels: ({ firstPanel, secondPanel }) =>
+        React.createElement("div", { "data-testid": "resizable-panels" }, firstPanel, secondPanel),
+    Button: ({ children, startIcon, endIcon, variant: _v, color: _c, size: _s, ...props }) =>
+        React.createElement("button", { type: "button",
+            ...props }, startIcon, children, endIcon),
+    IconButton: ({ children, variant: _v, color: _c, size: _s, ...props }) =>
+        React.createElement("button", { type: "button",
+            ...props }, children),
     Select: ({ value, onValueChange, children, placeholder, ...props }) =>
         React.createElement(
             "select",
