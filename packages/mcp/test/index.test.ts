@@ -24,7 +24,7 @@ import {
 } from "../src/index";
 import type { PackageManager } from "../src/index";
 import { spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync, readFileSync, realpathSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -1163,12 +1163,123 @@ describe("the environment block outranks the persisted registry", () => {
                     prod: { name: "prod", projectDir: dir, baseUrl: "https://prod.example.com", token: "", addedAt: "2020-01-01T00:00:00.000Z" }
                 }
             },
-            { REBASE_BASE_URL: "http://localhost:4321" }
+            // Same `projectDir` as the remembered entry: the stickiness is
+            // legitimate here, which is what makes the warning the right answer
+            // rather than the reset the next test covers.
+            { REBASE_PROJECT_DIR: dir, REBASE_BASE_URL: "http://localhost:4321" }
         );
         const written = warn.mock.calls.map((c) => String(c[0])).join("");
         expect(written).toContain("\"prod\" is the active one");
         warn.mockRestore();
         rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("resolves the working directory, not another project's persisted default", async () => {
+        // The registry is machine-wide. Project A calling rebase_project_add
+        // used to persist a `default` carrying A's directory, URL and dev
+        // service key; every other project on the machine then resolved to it.
+        const a = mkdtempSync(join(tmpdir(), "rebase-mcp-projA-"));
+        const b = mkdtempSync(join(tmpdir(), "rebase-mcp-projB-"));
+        writeFileSync(join(b, "rebase.json"), JSON.stringify({ rebase: "^1", apps: {} }));
+        const cwd = process.cwd();
+        process.chdir(b);
+        try {
+            const mod = await bootWith(
+                {
+                    activeProject: "default",
+                    projects: {
+                        default: {
+                            name: "default",
+                            projectDir: a,
+                            baseUrl: "http://localhost:3070",
+                            token: "rk_a_service_key_0000000000000000",
+                            addedAt: "2020-01-01T00:00:00.000Z"
+                        }
+                    }
+                },
+                {}
+            );
+            const current = await currentProject(mod);
+            expect(current.projectDir).toBe(realpathSync(b));
+            expect(current.hasToken).toBe(false);
+        } finally {
+            process.chdir(cwd);
+            rmSync(a, { recursive: true, force: true });
+            rmSync(b, { recursive: true, force: true });
+        }
+    });
+
+    it("keeps the persisted default when the working directory is not a project", async () => {
+        const a = mkdtempSync(join(tmpdir(), "rebase-mcp-projA-"));
+        const plain = mkdtempSync(join(tmpdir(), "rebase-mcp-plain-"));
+        const cwd = process.cwd();
+        process.chdir(plain);
+        try {
+            const mod = await bootWith(persistedDefault(a), {});
+            const current = await currentProject(mod);
+            expect(current.projectDir).toBe(a);
+            expect(current.baseUrl).toBe("https://persisted.example.com");
+        } finally {
+            process.chdir(cwd);
+            rmSync(a, { recursive: true, force: true });
+            rmSync(plain, { recursive: true, force: true });
+        }
+    });
+
+    it("does not persist a derived default back into the machine-wide registry", async () => {
+        const b = mkdtempSync(join(tmpdir(), "rebase-mcp-projB-"));
+        writeFileSync(join(b, "rebase.json"), JSON.stringify({ rebase: "^1", apps: {} }));
+        const cwd = process.cwd();
+        process.chdir(b);
+        try {
+            const mod = await bootWith({ activeProject: null, projects: {} }, {});
+            const handler = (mod.server as any)._requestHandlers.get("tools/call");
+            await handler({
+                method: "tools/call",
+                params: {
+                    name: "rebase_project_add",
+                    arguments: { name: "staging", baseUrl: "https://staging.example.com", token: "rk_live_staging" }
+                }
+            });
+            const persisted = JSON.parse(readFileSync(registryPath, "utf8"));
+            expect(Object.keys(persisted.projects)).toEqual(["staging"]);
+            expect(persisted.projects.default).toBeUndefined();
+        } finally {
+            process.chdir(cwd);
+            rmSync(b, { recursive: true, force: true });
+        }
+    });
+
+    it("stops targeting a remembered project that belongs to another directory", async () => {
+        const a = mkdtempSync(join(tmpdir(), "rebase-mcp-projA-"));
+        const b = mkdtempSync(join(tmpdir(), "rebase-mcp-projB-"));
+        writeFileSync(join(b, "rebase.json"), JSON.stringify({ rebase: "^1", apps: {} }));
+        const cwd = process.cwd();
+        process.chdir(b);
+        try {
+            const mod = await bootWith(
+                {
+                    activeProject: "a-staging",
+                    projects: {
+                        "a-staging": {
+                            name: "a-staging",
+                            projectDir: a,
+                            baseUrl: "https://staging.example.com",
+                            token: "rk_live_projecta",
+                            addedAt: "2020-01-01T00:00:00.000Z"
+                        }
+                    }
+                },
+                {}
+            );
+            const current = await currentProject(mod);
+            expect(current.name).toBe("default");
+            expect(current.projectDir).toBe(realpathSync(b));
+        } finally {
+            process.chdir(cwd);
+            rmSync(a, { recursive: true, force: true });
+            rmSync(b, { recursive: true, force: true });
+        }
     });
 
     it("reports nothing when the environment is silent", () => {

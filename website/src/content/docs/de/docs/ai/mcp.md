@@ -28,7 +28,10 @@ Der Server ist auf npm veröffentlicht und braucht keinen Installationsschritt;
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -41,7 +44,10 @@ Der Server ist auf npm veröffentlicht und braucht keinen Installationsschritt;
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -54,7 +60,10 @@ Der Server ist auf npm veröffentlicht und braucht keinen Installationsschritt;
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -76,7 +85,10 @@ env = { REBASE_PROJECT_DIR = "/absolute/path/to/your/project" }
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -86,14 +98,25 @@ Jeder MCP-Client, der einen stdio-Server starten kann, funktioniert; die Form bl
 
 ### Auf welches Verzeichnis er wirkt
 
-`REBASE_PROJECT_DIR` sollte das Verzeichnis mit der `rebase.json` sein. Lassen
-Sie es weg, verwendet der Server sein Arbeitsverzeichnis — bei einer
-projektbezogenen Konfigurationsdatei ist das genau das Projekt, weshalb nur der
-benutzerweite Codex-Block es setzt.
+`REBASE_PROJECT_DIR` ist das Verzeichnis mit der `rebase.json`. Es gibt **eine**
+Rangfolge, und sie ist in jedem Client dieselbe:
 
-Gesetzt gewinnt es: Die Umgebung baut das Projekt `default` bei jedem Start neu
-auf, also schlägt ein absoluter Pfad in einer Benutzerkonfiguration alles, was
-in `~/.rebase/projects.json` gespeichert ist.
+1. **Der Umgebungsblock** — `REBASE_PROJECT_DIR`, `REBASE_BASE_URL`,
+   `REBASE_API_TOKEN`. Ist eine dieser Variablen gesetzt, wird das Projekt
+   `default` bei jedem Start daraus neu aufgebaut.
+2. **Das Arbeitsverzeichnis des Servers**, sofern es eine `rebase.json` enthält.
+   Ein Projekt, in dem Sie gerade stehen, schlägt alles, was in
+   `~/.rebase/projects.json` gespeichert ist.
+3. **Der persistierte `default`** in `~/.rebase/projects.json`, wenn keiner der
+   ersten beiden Punkte etwas sagt.
+
+Die automatische Erkennung aus `.rebase/state.json` füllt in allen drei Fällen
+nur Lücken und überschreibt nie einen Wert, den einer dieser Punkte geliefert hat.
+
+Die projektbezogenen Blöcke setzen `REBASE_PROJECT_DIR` auf `"."` — das
+Arbeitsverzeichnis des Clients ist das Projekt —, weil Punkt 3 eine Datei liest,
+die alle Projekte auf dem Rechner teilen. Der Codex-Block ist benutzerweit statt
+projektbezogen und nennt deshalb einen absoluten Pfad.
 
 ## Was der Server erreichen kann
 
@@ -322,18 +345,24 @@ Remote-Umgebungen hinweg arbeiten. Während `rebase dev` läuft, liest der Serve
 den aktiven Port und den Service-Schlüssel aus `.rebase/state.json` im
 Projektverzeichnis, was den lokalen Anwendungsfall zum Zero-Config-Erlebnis macht.
 
-:::note[Der Umgebungsblock hat Vorrang vor der Registry]
+:::note[Die Registry hat das letzte Wort, nicht das erste]
+Es gilt die Rangfolge von oben: Umgebungsblock, dann das Arbeitsverzeichnis,
+sofern es eine `rebase.json` enthält, dann der persistierte `default`.
+
 `REBASE_PROJECT_DIR`, `REBASE_BASE_URL` und `REBASE_API_TOKEN` bauen das Projekt
 `default` **bei jedem Start** neu auf, nicht nur beim ersten. Der Neuaufbau
 betrifft den gesamten Eintrag: Ein Token, das für das alte `projectDir`
 registriert wurde, wird verworfen statt in ein Verzeichnis übernommen zu werden,
-für das es nie ausgestellt wurde.
+für das es nie ausgestellt wurde. Ein so — oder aus dem Arbeitsverzeichnis —
+abgeleiteter `default` wird nie nach `~/.rebase/projects.json` zurückgeschrieben,
+damit der Dev-Service-Schlüssel des einen Projekts nicht zu dem eines anderen wird.
 
-Der persistierte `default` wird nur verwendet, wenn die Client-Konfiguration
-keine der drei Variablen setzt. `activeProject` bleibt weiterhin bestehen: Hat
-eine frühere Sitzung `rebase_project_switch` aufgerufen, richten sich die Tools
-auf dieses Projekt, und der Server meldet das auf stderr. Wenn ein Assistent die
-falsche Datenbank zu lesen scheint, rufe zuerst `rebase_project_current` auf.
+`activeProject` bleibt bestehen: Hat eine frühere Sitzung
+`rebase_project_switch` aufgerufen, richten sich die Tools auf dieses Projekt,
+und der Server meldet das auf stderr — es sei denn, dieses Projekt ist unter
+einem *anderen* Verzeichnis registriert als dem, in dem dieser Server läuft; dann
+fällt er auf `default` zurück und sagt es. Wenn ein Assistent die falsche
+Datenbank zu lesen scheint, rufe zuerst `rebase_project_current` auf.
 :::
 
 Tokens werden in dieser Registry **im Klartext** gespeichert. Es handelt sich um

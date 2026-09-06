@@ -172,6 +172,15 @@ const REGISTRY_PATH = resolve(homedir(), ".rebase", "projects.json");
 let registry: ProjectRegistryFile = { projects: {}, activeProject: null };
 
 /**
+ * Whether this run's `default` was computed from the environment or the
+ * working directory rather than read from disk. A derived `default` is never
+ * written back: it is recomputed at every start, and persisting it puts one
+ * project's directory, URL and dev service key in a machine-wide file that
+ * every other project on the machine reads.
+ */
+let defaultIsDerived = false;
+
+/**
  * Load the project registry from disk. Creates the file if it doesn't exist.
  */
 function loadRegistry(): ProjectRegistryFile {
@@ -192,6 +201,13 @@ function loadRegistry(): ProjectRegistryFile {
 
 /**
  * Save the project registry to disk.
+ *
+ * A `default` that this run derived (from the env block or from a `rebase.json`
+ * in the working directory) is left out. `~/.rebase/projects.json` is
+ * machine-wide, so persisting a derived `default` writes one project's
+ * directory, backend URL and dev service key into the file every other project
+ * on the machine reads at startup — which is how project A's admin key became
+ * project B's. It costs nothing to leave out: it is recomputed at every start.
  */
 function saveRegistry(): void {
     try {
@@ -199,9 +215,17 @@ function saveRegistry(): void {
         if (!existsSync(dir)) {
             mkdirSync(dir, { recursive: true });
         }
+        const onDisk: ProjectRegistryFile = defaultIsDerived
+            ? {
+                projects: Object.fromEntries(
+                    Object.entries(registry.projects).filter(([name]) => name !== "default")
+                ),
+                activeProject: registry.activeProject === "default" ? null : registry.activeProject
+            }
+            : registry;
         // Owner-only: this file holds bearer tokens (service keys / API keys).
         // `mode` only applies on create, so chmod covers pre-existing files.
-        writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2), { encoding: "utf-8", mode: 0o600 });
+        writeFileSync(REGISTRY_PATH, JSON.stringify(onDisk, null, 2), { encoding: "utf-8", mode: 0o600 });
         chmodSync(REGISTRY_PATH, 0o600);
     } catch {
         // Non-fatal — registry won't persist across restarts
@@ -342,7 +366,18 @@ function readServiceKeyFromEnv(projectDir: string): string | undefined {
 
 // ── Environment & Initialization ────────────────────────────────────────────
 
-const ENV_PROJECT_DIR = process.env.REBASE_PROJECT_DIR || process.cwd();
+/**
+ * The project this server run is about.
+ *
+ * `resolve` is not decoration: the scaffolded `.mcp.json` sets
+ * `REBASE_PROJECT_DIR: "."` — relative to the client's cwd, which for a
+ * project-level `.mcp.json` is the project — and a relative path stored in a
+ * machine-wide registry would mean a different directory in every terminal.
+ */
+const ENV_PROJECT_DIR = resolve(process.env.REBASE_PROJECT_DIR || process.cwd());
+
+/** `true` when the server's working directory is itself a Rebase project. */
+const CWD_IS_PROJECT = existsSync(resolve(process.cwd(), "rebase.json"));
 
 // Try to load .env from the project directory
 for (const envPath of [
@@ -379,14 +414,28 @@ export function envDeclaredProject(
 /**
  * Initialize the project registry.
  *
- * Priority:
+ * One precedence, and it holds everywhere this is written down (the docs, the
+ * README and this comment):
+ *
  * 1. `REBASE_PROJECT_DIR` / `REBASE_BASE_URL` / `REBASE_API_TOKEN` — the block
  *    in the client's own MCP config. If any of them is set, the `default`
  *    project is rebuilt from them on **every** start.
- * 2. The persisted `default` in `~/.rebase/projects.json`, when the client
- *    declared none of the three.
- * 3. Auto-discovery from `.rebase/state.json` in the project dir, which fills
- *    the gaps in either case.
+ * 2. The server's working directory, when it holds a `rebase.json`. That is a
+ *    project the person is standing in; nothing in a home-directory cache
+ *    outranks it.
+ * 3. The persisted `default` in `~/.rebase/projects.json`, when neither of the
+ *    first two says anything.
+ *
+ * Auto-discovery from `.rebase/state.json` fills the gaps in every case; it
+ * never overrules a value one of the three supplied.
+ *
+ * Step 2 exists because the registry is machine-wide and `default` is one
+ * entry in it. The scaffold shipped no env block, so the first project on the
+ * machine to call `rebase_project_add` persisted a `default` carrying *its*
+ * directory, URL and dev service key — and every other project on that machine
+ * then resolved to it, silently. A derived `default` is therefore also never
+ * written back to disk (`saveRegistry`): it is recomputed at every start, so
+ * persisting it only leaks one project's admin key into another's session.
  *
  * Step 1 used to be `if (!registry.projects["default"])` — the env vars seeded
  * the registry once and were dead ever after. That is the wrong way round:
@@ -406,7 +455,8 @@ function initializeRegistry(): void {
 
     const fromEnv = envDeclaredProject();
 
-    if (fromEnv || !registry.projects["default"]) {
+    if (fromEnv || CWD_IS_PROJECT || !registry.projects["default"]) {
+        defaultIsDerived = true;
         const envServiceKey = readServiceKeyFromEnv(ENV_PROJECT_DIR);
         registry.projects["default"] = {
             name: "default",
@@ -428,6 +478,26 @@ function initializeRegistry(): void {
     }
 
     if (!registry.activeProject || !registry.projects[registry.activeProject]) {
+        registry.activeProject = "default";
+    }
+
+    // A sticky `activeProject` is machine-wide too. Remembering that the last
+    // session switched to "staging" is the point of a registry — but only
+    // inside the project that registered it. When this run resolves a project
+    // of its own and the remembered entry belongs to a different directory,
+    // the remembered one is somebody else's backend and somebody else's token.
+    const active = registry.activeProject ? registry.projects[registry.activeProject] : undefined;
+    if (
+        defaultIsDerived &&
+        registry.activeProject !== "default" &&
+        active?.projectDir &&
+        resolve(active.projectDir) !== ENV_PROJECT_DIR
+    ) {
+        process.stderr.write(
+            `[rebase-mcp] the remembered project "${registry.activeProject}" is registered under ` +
+            `${active.projectDir}, but this server runs in ${ENV_PROJECT_DIR}. Targeting "default" ` +
+            `(this directory) instead; call rebase_project_switch to change that.\n`
+        );
         registry.activeProject = "default";
     }
 

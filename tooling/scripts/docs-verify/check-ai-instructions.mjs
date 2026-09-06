@@ -223,6 +223,23 @@ function checkScaffold(root, findings) {
             message: `\`mcpServers.rebase\` does not run \`@rebasepro/mcp\` (args: ${JSON.stringify(args)})`
         });
     }
+
+    // `~/.rebase/projects.json` is machine-wide and its `default` entry carries
+    // a project's directory, backend URL and dev service key. A scaffold that
+    // names no project of its own falls through to whatever the last project on
+    // this machine persisted — so the first project to register anything became
+    // every later project's backend, with its admin key. Naming the directory
+    // in the scaffold's own config block is what stops that.
+    const projectDir = mcp?.mcpServers?.rebase?.env?.REBASE_PROJECT_DIR;
+    if (projectDir !== ".") {
+        findings.push({
+            file: `${SCAFFOLD}/.mcp.json`,
+            line: 0,
+            message:
+                `\`mcpServers.rebase.env.REBASE_PROJECT_DIR\` is ${JSON.stringify(projectDir)}, expected ".". ` +
+                "Without it the server falls back to the machine-wide registry default, which is another project."
+        });
+    }
 }
 
 /**

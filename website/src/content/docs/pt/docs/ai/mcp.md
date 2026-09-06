@@ -27,7 +27,10 @@ Cada bloco abaixo é a integração inteira.
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -40,7 +43,10 @@ Cada bloco abaixo é a integração inteira.
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -53,7 +59,10 @@ Cada bloco abaixo é a integração inteira.
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -75,7 +84,10 @@ env = { REBASE_PROJECT_DIR = "/absolute/path/to/your/project" }
   "mcpServers": {
     "rebase": {
       "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"]
+      "args": ["-y", "@rebasepro/mcp"],
+      "env": {
+        "REBASE_PROJECT_DIR": "."
+      }
     }
   }
 }
@@ -85,14 +97,25 @@ Qualquer cliente MCP capaz de iniciar um servidor stdio funciona; o formato é o
 
 ### Em qual diretório ele age
 
-`REBASE_PROJECT_DIR` deve ser o diretório que contém `rebase.json`. Se você
-omiti-lo, o servidor usa seu diretório de trabalho, que para um arquivo de
-configuração de projeto é o próprio projeto — é por isso que só o bloco do
-Codex, que é por usuário, o define.
+`REBASE_PROJECT_DIR` é o diretório que contém `rebase.json`. Há **uma** ordem de
+precedência, e ela é a mesma em todos os clientes:
 
-Se você definir, ele vence: o ambiente reconstrói o projeto `default` a cada
-inicialização, então um caminho absoluto numa configuração de usuário prevalece
-sobre qualquer coisa lembrada em `~/.rebase/projects.json`.
+1. **O bloco de ambiente** — `REBASE_PROJECT_DIR`, `REBASE_BASE_URL`,
+   `REBASE_API_TOKEN`. Se alguma delas estiver definida, o projeto `default` é
+   reconstruído a partir delas a cada inicialização.
+2. **O diretório de trabalho do servidor**, quando contém um `rebase.json`. Um
+   projeto em que você está prevalece sobre qualquer coisa lembrada em
+   `~/.rebase/projects.json`.
+3. **O `default` persistido** em `~/.rebase/projects.json`, quando nenhum dos
+   dois primeiros diz nada.
+
+A detecção automática a partir de `.rebase/state.json` preenche lacunas nos três
+casos e nunca sobrepõe um valor fornecido por um deles.
+
+Os blocos de nível de projeto definem `REBASE_PROJECT_DIR` como `"."` — o
+diretório de trabalho do cliente é o projeto — porque a regra 3 lê um arquivo
+compartilhado por todos os projetos da máquina. O bloco do Codex é por usuário em
+vez de por projeto, então nomeia um caminho absoluto.
 
 ## O que o servidor pode acessar
 
@@ -301,18 +324,24 @@ remotos. Enquanto o `rebase dev` está em execução, o servidor lê a porta ati
 service key de `.rebase/state.json` no diretório do projeto, que é o que torna o
 caso local sem necessidade de configuração (*zero-config*).
 
-:::note[O bloco de ambiente prevalece sobre o registo]
+:::note[O registo é a última palavra, não a primeira]
+Vale a precedência acima: bloco de ambiente, depois o diretório de trabalho
+quando contém um `rebase.json`, depois o `default` persistido.
+
 `REBASE_PROJECT_DIR`, `REBASE_BASE_URL` e `REBASE_API_TOKEN` reconstroem o
 projeto `default` **em cada arranque**, não apenas no primeiro. A reconstrução
 abrange a entrada inteira: um token registado para o `projectDir` anterior é
 descartado em vez de ser transportado para um diretório para o qual nunca foi
-emitido.
+emitido. Um `default` derivado assim — ou do diretório de trabalho — nunca é
+reescrito em `~/.rebase/projects.json`, para que a chave de serviço de
+desenvolvimento de um projeto não passe a ser a de outro.
 
-O `default` persistido só é usado quando a configuração do cliente não define
-nenhuma das três variáveis. O `activeProject` continua persistente: se uma sessão
-anterior chamou `rebase_project_switch`, as ferramentas apontam para esse projeto
-e o servidor avisa no stderr. Se um assistente parecer estar a ler a base de
-dados errada, execute primeiro `rebase_project_current`.
+O `activeProject` continua persistente: se uma sessão anterior chamou
+`rebase_project_switch`, as ferramentas apontam para esse projeto e o servidor
+avisa no stderr — a não ser que esse projeto esteja registado sob um diretório
+*diferente* daquele em que este servidor corre, caso em que volta ao `default` e
+o diz. Se um assistente parecer estar a ler a base de dados errada, execute
+primeiro `rebase_project_current`.
 :::
 
 Os tokens são armazenados nesse registro **em texto simples (*plaintext*)**. É um arquivo no seu
