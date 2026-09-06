@@ -118,12 +118,12 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
         notes: ["--watch regenerates on every change to a collection file."]
     },
     introspect: {
-        usage: "rebase schema introspect [--output <dir>] [--schema <name>] [--force]",
+        usage: "rebase schema introspect [--collections <dir>] [--output <dir>] [--schema <name>] [--force]",
         summary: "Read an existing database and write Rebase collection definitions from it.",
         notes: ["--force overwrites collection files that are already there."]
     },
     stale: {
-        usage: "rebase schema stale [--fix]",
+        usage: "rebase schema stale [--collections <dir>] [--output <file>] [--fix]",
         summary: "Report generated schema files that no longer match the collections.",
         notes: ["--fix regenerates them instead of only reporting."]
     }

@@ -46,6 +46,7 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
     "db push": {
         "--collections": String,
         "-c": "--collections",
+        "--dry-run": Boolean,
         "--allow-destructive": Boolean,
         "--yes": Boolean,
         "-y": "--yes"
@@ -112,6 +113,69 @@ export function assertOutputAliasesPaired(specs: Record<string, arg.Spec>): stri
         if (present.length === 0 || present.length === OUTPUT_FLAG_ALIASES.length) continue;
         const missing = OUTPUT_FLAG_ALIASES.filter(flag => !(flag in spec));
         problems.push(`\`${command}\` takes ${present.join(", ")} but not ${missing.join(", ")}`);
+    }
+    return problems;
+}
+
+/**
+ * The long flags a `--help` usage line documents.
+ *
+ * `"rebase db push [--collections <dir>] [--dry-run] …"` → `["--collections",
+ * "--dry-run"]`. Placeholders (`<dir>`) and the alternation inside a positional
+ * (`<create|list|switch>`) are not flags and are not returned.
+ */
+export function flagsInUsage(usage: string): string[] {
+    return [...new Set(usage.match(/--[a-z][a-z0-9-]*/g) ?? [])];
+}
+
+/**
+ * Every flag the help documents is accepted, and every flag accepted is documented.
+ *
+ * The drift this catches shipped: `rebase db push --help` has printed
+ * `[--dry-run]` since the flag was written, `DRIVER_FLAG_SPECS["db push"]` never
+ * listed it, and {@link assertKnownFlags} — added later to stop typos being
+ * swallowed — turned the documented flag into `unknown or unexpected option`.
+ * The only way to see a push's SQL was to trip the destructive gate, which is
+ * the exact problem `--dry-run` was written to solve. Worse in a project on an
+ * older driver, whose permissive parser *applied* the schema on that line.
+ *
+ * Two hand-maintained lists in two packages cannot be kept in step by care, so
+ * they are held to each other instead: `usages` is keyed the way
+ * {@link DRIVER_FLAG_SPECS} is (`"db push"`), and comes from the CLI's own help
+ * pages. A key in only one of the two is not this function's business — the
+ * help covers commands that parse their own lines (`db branch`, `db backup`),
+ * and an absent spec entry means "not checked here".
+ *
+ * Aliases (`"-c": "--collections"`, `"--out": "--output"`) need no line of their
+ * own: they are spellings of a documented flag. Neither do {@link RELAYED_FLAGS},
+ * which every driver command accepts because the CLI relays them.
+ */
+export function assertSpecMatchesUsage(
+    specs: Record<string, arg.Spec>,
+    usages: Record<string, string>
+): string[] {
+    const problems: string[] = [];
+    for (const [command, spec] of Object.entries(specs)) {
+        const usage = usages[command];
+        if (usage === undefined) continue;
+
+        const documented = flagsInUsage(usage);
+        const accepted = Object.entries(spec);
+        // An alias resolves to the flag it spells; only the target needs a line.
+        const canonical = new Set(
+            accepted
+                .map(([flag, kind]) => (typeof kind === "string" ? kind : flag))
+                .filter(flag => flag.startsWith("--"))
+        );
+
+        for (const flag of documented) {
+            if (flag in spec || flag in RELAYED_FLAGS) continue;
+            problems.push(`\`${command}\` documents ${flag} in its usage line but the spec rejects it`);
+        }
+        for (const flag of canonical) {
+            if (documented.includes(flag) || flag in RELAYED_FLAGS) continue;
+            problems.push(`\`${command}\` accepts ${flag} but no usage line documents it`);
+        }
     }
     return problems;
 }
