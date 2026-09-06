@@ -168,6 +168,13 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                     id={id}
                     asChild={false}
                     type="button"
+                    // A `label` that is an element — which every entity form
+                    // passes, because the label carries the property's type
+                    // icon — fell through to a hard-coded English literal, so
+                    // every enum field in every form announced itself as
+                    // "Select an option". Callers pass `aria-label` now; the
+                    // literal stays as the last resort, and is unreachable for
+                    // anything that names itself.
                     aria-label={ariaLabel ?? (typeof label === "string" ? label : (typeof renderValue === "string" ? renderValue : "Select an option"))}
                     aria-invalid={error || undefined}
                     className={cls(

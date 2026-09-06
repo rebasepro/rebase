@@ -54,6 +54,11 @@ export function SelectFieldBinding({
 
             <Select
                 value={value !== undefined && value != null ? value.toString() : ""}
+                // The visible label is an element (icon + tooltip), which the
+                // control cannot read a name from, so it announced itself as
+                // "Select an option" — the same name for every enum field in
+                // every form. Named here, where the property is.
+                aria-label={property.name ?? propertyKey}
                 disabled={disabled}
                 size={size}
                 fullWidth={true}
