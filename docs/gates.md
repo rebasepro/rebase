@@ -117,6 +117,7 @@ this list, in this order.
 | `verify:selfhost` | A self-hosted deploy, built and booted from the repository. | — |
 | `verify:selfhost:docker` | The same, through the shipped compose file and image. | — |
 | `verify:corpus` | A corpus of bundles still loads under the current runtime contract. | — |
+| `check:contributor-setup:live` | The same three files, executed: compose is started and the documented URL has to reach *that* container, which a native Postgres on the same port silently prevents. Needs Docker. | `REBASE_DB_PORT` moves the port |
 | `rls:check` | A live database against the fifteen RLS checks, with table and policy floors so an empty database cannot pass. | `tooling/scripts/rls-baseline.json` |
 
 ## Release only

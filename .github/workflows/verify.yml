@@ -355,6 +355,22 @@ jobs:
             sleep 1
           done
 
+      # CONTRIBUTING's Getting Started, executed rather than compared.
+      # `check:contributor-setup` reads the compose file, `app/.env.example` and
+      # the steps and checks they agree; all three can agree on
+      # `localhost:5432` and the URL still not reach the container, because
+      # Docker publishes on `0.0.0.0` and a native Postgres binds the more
+      # specific `127.0.0.1`, which wins for `localhost`. Compose then reports
+      # `Up (healthy)` while `db push` writes the schema into the developer's
+      # own database, with no error anywhere on the path.
+      #
+      # `REBASE_DB_PORT` because the service above already holds 5432 — which
+      # also makes this the override the docs now teach, exercised.
+      - name: Contributor setup, live
+        run: pnpm run check:contributor-setup:live
+        env:
+          REBASE_DB_PORT: "5433"
+
       - name: Install Playwright Browsers
         run: pnpm exec playwright install chromium --with-deps
 

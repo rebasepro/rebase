@@ -46,6 +46,22 @@ pnpm run build
 cd app/backend && docker compose up -d db && cd ../..
 ```
 
+   **If you already run Postgres on 5432, start it somewhere else.** Docker
+   publishes on `0.0.0.0`; a native Postgres binds the more specific
+   `127.0.0.1`, which is what `localhost` resolves to first — so compose starts,
+   reports `Up (healthy) 0.0.0.0:5432->5432/tcp`, and the next two steps quietly
+   push a schema into *your* database instead of the container's. Nothing
+   errors. `lsof -iTCP:5432 -sTCP:LISTEN` tells you whether the port is taken;
+   if it is:
+
+```bash
+cd app/backend && REBASE_DB_PORT=5499 docker compose up -d db && cd ../..
+```
+
+   and change the port in the `DATABASE_URL` you copy in the next step.
+   `pnpm check:contributor-setup --live` starts the container and proves the URL
+   in `app/.env` reaches it rather than something else answering on that port.
+
 4. **Point the app at it**. Nothing creates `app/.env` for you, and without it
    `db:push` has no `DATABASE_URL` to push to. The example file already carries
    the compose credentials:

@@ -32,6 +32,7 @@
     "check:templates": "node tooling/scripts/check-templates.mjs",
     "check:template-pins": "node tooling/scripts/check-template-pins.mjs",
     "check:contributor-setup": "node tooling/scripts/check-contributor-setup.mjs",
+    "check:contributor-setup:live": "node tooling/scripts/check-contributor-setup.mjs --live",
     "check:gates-doc": "node tooling/scripts/check-gates-doc.mjs",
     "check:resource-graphs": "node tooling/scripts/check-resource-graphs.mjs",
     "check:eject": "TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx tooling/scripts/check-eject.mts",
