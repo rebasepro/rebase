@@ -271,8 +271,8 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Error-code reference ━━━${NC}`);
-    const { findings: bad, scanned, total } = checkErrorCodes(ROOT);
-    console.log(`${DIM}Found ${total} error code(s) across ${scanned} source file(s).${NC}`);
+    const { findings: bad, scanned, total, families } = checkErrorCodes(ROOT);
+    console.log(`${DIM}Found ${total} error code(s) and ${families} code ${families === 1 ? "family" : "families"} across ${scanned} source file(s).${NC}`);
     if (!bad.length) {
         console.log(`${GREEN}✓ Every code the server can raise is documented, and every documented code exists.${NC}`);
     } else {
