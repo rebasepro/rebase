@@ -1008,6 +1008,12 @@ export const it: RebaseTranslations = {
     history_no_more: "Nessun'altra cronologia",
 
     // ─── Studio: tools, groups and empty states ─────────────────
+    // The admin's own three groups, read by `useNavigationGroupLabel` the same
+    // way as the Studio ones below — the group *name* is an identifier the
+    // ordering and the icons key off, and only the heading is translated.
+    studio_group_views: "Viste",
+    studio_group_admin: "Amministrazione",
+    studio_group_settings: "Impostazioni",
     studio_group_database: "Database",
     studio_group_compute: "Elaborazione",
     studio_group_storage: "Archiviazione",

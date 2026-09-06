@@ -1099,6 +1099,12 @@ export interface RebaseTranslations {
     history_no_more?: string;
 
     // ─── Studio: tools, groups and empty states ─────────────────
+    /** Heading for the admin's default navigation group. */
+    studio_group_views?: string;
+    /** Heading for the admin's `Admin` navigation group. */
+    studio_group_admin?: string;
+    /** Heading for the admin's `Settings` navigation group. */
+    studio_group_settings?: string;
     studio_group_database?: string;
     studio_group_compute?: string;
     studio_group_storage?: string;

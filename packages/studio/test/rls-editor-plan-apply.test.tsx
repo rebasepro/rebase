@@ -153,19 +153,26 @@ describe("cancelling the plan dialog", () => {
  * is whether the host has source to write to.
  */
 describe("saving a policy on a mapped table", () => {
+    /** An `en` string, refused rather than searched for as `undefined`. */
+    function label(key: keyof typeof en): string {
+        const value = en[key];
+        if (typeof value !== "string") throw new Error(`en.${String(key)} is not a string`);
+        return value;
+    }
+
     /** Load the editor, open "Create Policy", name it, and press Save. */
     async function createPolicy(name: string): Promise<void> {
         render(<RLSEditor/>);
 
         // The first non-internal table is selected for us, so the toolbar's
         // "Create Policy" is the whole of the navigation.
-        const create = await screen.findByRole("button", { name: en.studio_rls_create_policy });
+        const create = await screen.findByRole("button", { name: label("studio_rls_create_policy") });
         fireEvent.click(create);
 
-        const nameField = await screen.findByLabelText(en.studio_policy_name);
+        const nameField = await screen.findByLabelText(label("studio_policy_name"));
         fireEvent.change(nameField, { target: { value: name } });
 
-        fireEvent.click(screen.getByRole("button", { name: en.studio_policy_save }));
+        fireEvent.click(screen.getByRole("button", { name: label("studio_policy_save") }));
     }
 
     it("goes through the plan/apply dialog when the host has the source", async () => {
