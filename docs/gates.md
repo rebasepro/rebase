@@ -123,7 +123,8 @@ Run by `publish.yml` and `release.sh`, not on a pull request.
 
 | Script | What it protects | Bank / fix |
 |---|---|---|
-| `check:release-bump` | The bump you asked for matches what `## [Unreleased]` says changed. | Edit the changelog |
+| `check:release-bump` | The bump you asked for matches what `## [Unreleased]` says changed, and the templates this release ships name only what it publishes. | Edit the changelog |
+| `check:template-pins` | Both halves of the above, standalone: every `@rebasepro` symbol the templates import, and every `${VAR:?}` the scaffold's compose file requires, exists in the version `rebase init` pins. `check:templates` runs the import half on every PR. | Fix the template, or bump the version |
 | `check:version-pins` | Version numbers written into the docs match the release. Also runs inside `verify:docs`. | `pnpm fix:version-pins` |
 | `check:runtime-image:live` | The published image tag actually answers, which the hermetic check deliberately does not ask. | — |
 | `verify:docs` | The non-strict form, for working locally before `verify:docs:strict` gates the PR. | — |

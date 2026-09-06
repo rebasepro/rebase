@@ -11,7 +11,7 @@
  * The runtime reads this file at boot and reports, for every declaration,
  * whether it is bound. Nothing here is silent.
  */
-import { bucket, database, queue, topic } from "@rebasepro/types";
+import { bucket, database } from "@rebasepro/types";
 
 /**
  * The project's database, bound from `DATABASE_URL`.
@@ -71,6 +71,12 @@ export const main = database();
  * job queue in this project's database, so declaring either turns it on, and
  * neither needs any environment configuration.
  *
+ * Add them to the import above when you declare one — they are named here, not
+ * imported, because an import of a symbol nothing uses is an import that breaks
+ * the moment the pinned `@rebasepro/types` predates it:
+ *
+ * import { topic, queue } from "@rebasepro/types";
+ *
  * export const signups = topic<{ userId: string }>("signups");
  * signups.subscription("send-welcome", async ({ userId }) => { … });
  *
@@ -81,5 +87,3 @@ export const main = database();
  * `backend/functions/<name>.ts`. They appear in `rebase resources` under the
  * name of the file.
  */
-void topic;
-void queue;

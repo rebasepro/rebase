@@ -24,6 +24,14 @@
  *   * BUNDLE_FORMAT_VERSION,         — either constant moving is a coordinated
  *     RUNTIME_CONTRACT_VERSION         release by definition.
  *
+ * A fourth axis asks a different question — not "what did this release break"
+ * but "is this release self-consistent". `rebase init` pins every `@rebasepro`
+ * dependency, and the scaffold's compose image tag, to the CLI's own version, so
+ * a release that ships a template naming something it does not publish produces
+ * projects that cannot boot. `check-template-pins.mjs` holds it; unlike the
+ * three above there is no deliberate version of it, so it refuses outright
+ * rather than asking for a minor and a note.
+ *
  * Then two things must be true or the release stops: the bump is at least a
  * minor, and the section about to be promoted out of `[Unreleased]` says so under
  * a `### Breaking` heading. The second is not bureaucracy — the GitHub release
@@ -52,6 +60,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { classify } from "./check-api-surface.mjs";
+import { checkTemplatePins } from "./check-template-pins.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -185,7 +194,8 @@ export function checkReleaseBump({
     readNow = file => {
         const abs = path.join(ROOT, file);
         return fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
-    }
+    },
+    templatePins = v => checkTemplatePins({ releasedAs: v })
 } = {}) {
     if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
         console.error("usage: node tooling/scripts/check-release-bump.mjs <version> [--from <tag>] [--allow-unguarded]");
@@ -248,7 +258,36 @@ export function checkReleaseBump({
         }
     }
 
+    // ── Axis 4: what the scaffold this release ships can import ─
+    //
+    // Not a diff between two baselines like the three above — a consistency
+    // question about the release itself. `rebase init` pins every `@rebasepro/*`
+    // dependency, and the compose file's image tag, to the CLI's own version. So
+    // a release must publish everything its own templates name, or every project
+    // scaffolded from it fails at `rebase dev` and at `docker compose up`, with
+    // a green build behind it. 0.17.3 is the release that proved it: the
+    // template's `docker-compose.yml` `:?`-requires `REBASE_ADMIN_EMAIL` and
+    // `REBASE_ADMIN_PASSWORD`, and the image at that tag has never heard of
+    // either — with `DISABLE_SELF_REGISTRATION` defaulting to `true` beside
+    // them, a self-host boots with no admin and no way to make one.
+    //
+    // `version` rather than the manifests: this step runs before "Bump
+    // versions", so the manifests still name the release being replaced.
+    //
+    // This one is not a `break` — a break is a thing you may ship deliberately
+    // as a minor with a `### Breaking` note. There is no deliberate version of
+    // publishing a scaffold that cannot boot, so it refuses outright.
     console.log(`\n${bold(`Release ${previous} → ${version}`)} (${level}), against ${from}\n`);
+    if (templatePins(version) !== 0) {
+        console.error(red(
+            "\n✗ The templates this release ships name something it does not publish.\n" +
+            "\n    `rebase init` pins every @rebasepro dependency, and the compose file's image tag, to\n" +
+            `    the CLI's own version — ${version} after this release. Every project scaffolded from it\n` +
+            "    would fail at `rebase dev` or at `docker compose up`, with a green build behind it.\n" +
+            "\n    Fix the template, or add what it names to this release.\n"
+        ));
+        return 1;
+    }
     for (const file of unguarded) {
         console.log(`  · ${file} did not exist at ${from} — that axis is unguarded for this release.`);
     }

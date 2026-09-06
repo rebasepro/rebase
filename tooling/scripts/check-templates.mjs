@@ -22,6 +22,8 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
+import { checkTemplatePins } from "./check-template-pins.mjs";
+
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 const templateRoot = path.join(repoRoot, "packages/cli/templates/template");
 const templateConfig = path.join(templateRoot, "config");
@@ -382,6 +384,23 @@ function checkBaasHasNoAdminTypes() {
 }
 
 let failed = 0;
+
+// ── The pin, not the working tree ────────────────────────────────────────────
+//
+// Everything below this line compiles the templates against `packages/*/src`
+// through tsconfig `paths` — the working tree, which is not what a scaffold
+// installs. `rebase init` pins the CLI's own version from the registry, and for
+// most of a release cycle that version is one already published, so the tree and
+// the pin disagree. That is how a template importing `queue` from
+// `@rebasepro/types@0.17.3` — which has no such export — compiled green here and
+// failed at `rebase dev` in every fresh project.
+//
+// So ask the other question first, and stop here if the answer is no: a
+// typecheck against the working tree has nothing useful to say about a template
+// that cannot resolve its own imports. The compose half belongs to the release
+// gate — see check-template-pins.mjs — and is not run here.
+if (checkTemplatePins({ axes: ["imports"] }) !== 0) process.exit(1);
+
 const baasProblems = checkBaasHasNoAdminTypes();
 if (baasProblems.length > 0) {
     failed++;
