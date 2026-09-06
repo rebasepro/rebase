@@ -1,5 +1,5 @@
 ---
-sourceHash: 2078e2f99041a59e
+sourceHash: 710f0740be4d1614
 title: Environnement et Configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -39,7 +39,7 @@ Toute la configuration est effectuée via des variables d'environnement dans vot
 
 | Variable | Description | Défaut |
 |----------|-------------|---------|
-| `PORT` | Port du serveur HTTP backend | `3001` |
+| `PORT` | Port du serveur HTTP backend. Lu par `rebase start`. `rebase dev` ne le lit **que depuis l'environnement du shell** — un `PORT` dans `.env` n'y est pas lu, car le port est résolu avant le chargement de ce fichier — et utilise sinon un port dérivé du chemin du projet, afin que plusieurs projets puissent tourner en même temps. `rebase dev --port` l'emporte sur les deux, et la bannière de démarrage indique le niveau utilisé. | `3001` |
 | `LOG_LEVEL` | Niveau de verbosité des logs : `error`, `warn`, `info`, `debug` | `info` |
 | `NODE_ENV` | Environnement : `development` ou `production` | `development` |
 

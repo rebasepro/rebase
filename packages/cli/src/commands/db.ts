@@ -48,7 +48,15 @@ const REMOTE_DESTINATION_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
  * is actually changed, and leaves the plugin usable on its own terms.
  */
 export function absolutizeLocalPathArgs(args: string[], cwd: string): string[] {
-    const takesPath = (flag: string) => flag === "--out" || flag === "-o";
+    /**
+     * All three spellings of the destination, because the driver accepts all
+     * three: `backup-cli.ts` maps `--output` and `-o` onto `--out`, and `rebase
+     * db backup --help` advertises `--output` as an alias. Only `--out` and
+     * `-o` were absolutised, so the one spelling the help page names was the
+     * one that landed in `backend/` — and the success line still echoed the
+     * path as typed.
+     */
+    const takesPath = (flag: string) => flag === "--out" || flag === "--output" || flag === "-o";
     /**
      * Flags whose next token is a value, not a positional.
      *
@@ -59,7 +67,7 @@ export function absolutizeLocalPathArgs(args: string[], cwd: string): string[] {
      * database name into a path while leaving the real dump path unresolved.
      */
     const VALUE_FLAGS = new Set([
-        "--out", "-o", "--target-db", "--exclude-schema", "--row-security-role"
+        "--out", "--output", "-o", "--target-db", "--exclude-schema", "--row-security-role"
     ]);
     const out = [...args];
 
@@ -1054,11 +1062,23 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         summary: "Run the pending migration files against the database."
     },
     branch: {
-        usage: "rebase db branch <create|list|switch|delete|info> [name]",
+        // Every action the dispatch answers and every flag its specs declare.
+        // The page is kept here rather than delegated because reaching the
+        // driver's own `printBranchHelp` means *running* the driver, which is
+        // what `--help` must not do — so `help-coverage.test.ts` holds the two
+        // to each other instead. It went two releases without learning `prune`,
+        // `--from`, `--force` or `--older-than`, all four of which the dispatch
+        // answers and the docs teach.
+        usage: "rebase db branch <create|list|switch|delete|info|prune> [name]",
         summary: "Database branching.",
         notes: [
+            "create <name> [--from <source>] copies an existing database, files and all.",
             "switch <name> points this checkout at a branch; every later command uses it.",
-            "switch with no name reports where you are; switch --off returns to the main database."
+            "switch with no name reports where you are; switch --off returns to the main database.",
+            "prune [--older-than <14|14d|2w>] removes branches nothing is using, and the entries that drifted.",
+            "prune --include-dev-diff also removes the Atlas scratch databases `db push` leaves behind.",
+            "prune asks before it drops anything; --yes, -y answers for you, which is the form a CI job wants.",
+            "--force disconnects other sessions first — Postgres refuses to copy or drop a database anything is connected to, usually your own `rebase dev`."
         ]
     },
     backup: {
@@ -1131,7 +1151,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("push")}       Apply schema directly to database (development)
   ${chalk.blue.bold("generate")}   Generate migration files
   ${chalk.blue.bold("migrate")}    Run pending migrations
-  ${chalk.blue.bold("branch")}     Database branching (create, list, switch, delete, info)
+  ${chalk.blue.bold("branch")}     Database branching (create, list, switch, delete, info, prune)
   ${chalk.blue.bold("backup")}     Create a backup with pg_dump (--out <path|s3://…>)
   ${chalk.blue.bold("restore")}    Restore a backup with pg_restore (destructive; needs --yes)
   ${chalk.blue.bold("backups")}    List stored backups (db backup list is the same)

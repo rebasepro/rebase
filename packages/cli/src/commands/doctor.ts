@@ -22,6 +22,7 @@ import { scanTextForLibpqUrls, type LibpqUrlFinding } from "../utils/libpq-url";
 import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
+import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
 import {
@@ -372,12 +373,57 @@ function reportEnvironmentFindings(findings: EnvironmentFinding[]): boolean {
     return findings.some(finding => finding.severity === "error");
 }
 
+/**
+ * The flags `rebase doctor` takes, and what each is for.
+ *
+ * One table, read by both the parser and the help page, because they were two
+ * things that had to agree and did not: the page listed no flags at all, so
+ * `--policies` — the form `cli/index.md` calls "the form to use as a CI gate" —
+ * was invisible to anyone who ran `rebase doctor --help` to find it. And with
+ * nothing parsing the line here, a typo travelled to the driver's permissive
+ * parser and was silently dropped, so `rebase doctor --polices` ran the ordinary
+ * doctor and reported success on a gate that never ran.
+ *
+ * The spec mirrors the driver's own (`doctorPluginCommand` in
+ * `server-postgres/src/cli.ts`), because the line is relayed to it verbatim.
+ */
+export const DOCTOR_FLAGS = {
+    "--policies": Boolean,
+    "--collections": String,
+    "-c": "--collections",
+    "--schema": String,
+    "-s": "--schema",
+    "--sdk": String,
+    "-k": "--sdk"
+} as const;
+
+/** What each long flag above does, for the Options block. */
+const DOCTOR_FLAG_HELP: Record<string, string> = {
+    "--policies": "Also audit the row-level security policies. The form to use as a CI gate.",
+    "--collections": "Path to the collections directory (default: ../config/collections)",
+    "--schema": "Path to the generated Drizzle schema (default: src/schema.generated.ts)",
+    "--sdk": "Path to the generated SDK types (default: ../generated/sdk/database.types.ts)"
+};
+
+/** `--collections, -c` — the aliases, resolved from the spec rather than retyped. */
+function doctorFlagLabel(flag: string): string {
+    const aliases = Object.entries(DOCTOR_FLAGS)
+        .filter(([, target]) => target === flag)
+        .map(([alias]) => alias);
+    return [flag, ...aliases].join(", ");
+}
+
 function printDoctorHelp(): void {
     console.log(`
 ${chalk.bold("rebase doctor")} — Check a project for drift and misconfiguration
 
 ${chalk.green.bold("Usage")}
-  rebase doctor
+  rebase doctor [options]
+
+${chalk.green.bold("Options")}
+${Object.keys(DOCTOR_FLAG_HELP)
+        .map(flag => `  ${chalk.blue(doctorFlagLabel(flag).padEnd(22))} ${DOCTOR_FLAG_HELP[flag]}`)
+        .join("\n")}
 
 Compares the collections you declare, the generated Drizzle schema, and the
 tables that actually exist, then reports what disagrees and how to reconcile it.
@@ -392,10 +438,23 @@ connects to its database.
 }
 
 export async function doctorCommand(rawArgs: string[]): Promise<void> {
-    if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
+    if (wantsHelp(rawArgs)) {
         printDoctorHelp();
         return;
     }
+
+    // Strictly, before the line is relayed. The driver's own parser is
+    // `permissive`, which turns an undeclared flag into a positional rather
+    // than an error, so `rebase doctor --polices` ran the ordinary doctor and
+    // exited 0 — a CI gate that reported success because the flag asking for it
+    // was dropped on the way.
+    parseCommandArgs({
+        spec: DOCTOR_FLAGS,
+        rawArgs,
+        commandWords: 1,
+        command: "doctor",
+        maxPositionals: 0
+    });
 
     const projectRoot = requireProjectRoot();
     const backendDir = requireBackendDir(projectRoot);

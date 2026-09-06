@@ -1,5 +1,5 @@
 ---
-sourceHash: 4e3fb1836c39f60c
+sourceHash: 95791116fe38fd07
 title: Referência da CLI
 sidebar_label: CLI
 description: Comandos da CLI Rebase para inicialização de projeto, geração de esquema, migrações de banco de dados e geração de SDK.
@@ -20,6 +20,22 @@ Ou use via `pnpm dlx`:
 ```bash
 pnpm dlx @rebasepro/cli <command>
 ```
+
+## Saída legível por máquina
+
+`--json` é o interruptor e, fora da família `cloud`, é o único:
+`rebase status --json`, `rebase resources --json` e `rebase apps list --json`
+escrevem **um único valor JSON no stdout** — o resultado quando têm sucesso e,
+quando recusam, um envelope `{"error": {"message", "code", "hint", "issues"}}`
+com saída diferente de zero. Isto vale em todas as saídas do comando, por isso
+quem chama pode analisar o stdout sem condições. Sem `--json`, estes comandos
+escrevem texto para pessoas e uma falha vai para o stderr.
+
+`rebase cloud` é a exceção, e é deliberada: usa o mesmo envelope, mas também
+muda para JSON por sua conta **quando o stdout não é um TTY**, ou quando
+`REBASE_JSON=1` está definida. Assim, `rebase cloud status | cat` é JSON e
+`rebase status | cat` não é. Se estiver a escrever um script, passe `--json`
+explicitamente em vez de confiar em qualquer uma das duas regras.
 
 ## Comandos
 

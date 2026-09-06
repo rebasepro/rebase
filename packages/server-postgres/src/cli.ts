@@ -1024,6 +1024,11 @@ ${chalk.green.bold("Options")}
                                     Postgres refuses to copy or drop a database
                                     anything else is connected to — usually your
                                     own \`rebase dev\`.
+  ${chalk.blue.bold("--include-dev-diff")}                Also prune the Atlas scratch databases
+                                    \`db push\` leaves behind.
+  ${chalk.blue.bold("--yes, -y")}                         Skip prune's confirmation prompt. Dropping a
+                                    branch is not undoable, so this is the flag
+                                    a CI job passes and a person usually should not.
 
 ${chalk.green.bold("Examples")}
   ${chalk.gray("# Create a branch and work on it")}
@@ -1333,7 +1338,10 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
             "--output": String,
             "--fix": Boolean,
             "-c": "--collections",
-            "-o": "--output"
+            "-o": "--output",
+            // Both spellings, on every command that writes a file. See
+            // `OUTPUT_FLAG_ALIASES` in cli-flags.ts.
+            "--out": "--output"
         },
         { argv: rawArgs.slice(2), permissive: true }
     );
@@ -1415,6 +1423,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 "--watch": Boolean,
                 "-c": "--collections",
                 "-o": "--output",
+                "--out": "--output",
                 "-w": "--watch"
             },
             {
@@ -1473,6 +1482,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 "--force": Boolean,
                 "--schema": String,
                 "-o": "--output",
+                "--out": "--output",
                 "-c": "--collections",
                 "-f": "--force"
             },

@@ -26,6 +26,7 @@ import { apiKeysCommand } from "./api-keys";
 import { appsCommand } from "./apps";
 import { authCommand } from "./auth";
 import { dbCommand } from "./db";
+import { doctorCommand, DOCTOR_FLAGS } from "./doctor";
 import { schemaCommand } from "./schema";
 import { skillsCommand } from "./skills";
 import { telemetryCommand } from "./telemetry";
@@ -159,5 +160,249 @@ describe("every command the dispatch answers appears in a help page", () => {
         for (const name of names) {
             expect(help, `rebase telemetry --help does not mention "${name}"`).toContain(name);
         }
+    });
+
+    /**
+     * The third level, and the one `db branch` needed: the page is written by
+     * hand in `db.ts` while the actions are dispatched by the driver, so the
+     * two drift silently. `rebase db branch --help` went two releases without
+     * `prune`, which the dispatch answers and `backend/branching.md` teaches.
+     *
+     * `switch` is the exception in the other direction — the CLI answers it
+     * before the driver is spawned — so the expected set is the union.
+     */
+    it("rebase db branch --help lists every action the dispatch answers", async () => {
+        const driverSource = fs.readFileSync(
+            path.join(here, "..", "..", "..", "server-postgres", "src", "cli.ts"),
+            "utf8"
+        );
+        const start = driverSource.indexOf("async function branchCommand(");
+        expect(start, "branchCommand moved; this guard needs its new name").toBeGreaterThan(-1);
+        const body = driverSource.slice(start, driverSource.indexOf("\n}\n", start));
+        const actions = [...body.matchAll(/case "([a-z][a-z0-9-]*)":/g)].map(m => m[1]);
+        expect(actions, "the driver dispatch was not read").toContain("prune");
+
+        await dbCommand("branch", ["node", "rebase", "db", "branch", "--help"]);
+        const help = helpText();
+
+        // `switch` is answered CLI-side (`db.ts`), so it is in the page and not
+        // in the driver's switch. Both belong on the one help page.
+        for (const action of new Set([...actions, "switch"])) {
+            expect(help, `rebase db branch --help does not mention "${action}"`).toContain(action);
+        }
+    });
+
+    it("rebase db branch --help lists every flag its specs declare", async () => {
+        const driverSource = fs.readFileSync(
+            path.join(here, "..", "..", "..", "server-postgres", "src", "cli.ts"),
+            "utf8"
+        );
+        const declared = driverSource.match(/const BRANCH_FLAGS = \{([\s\S]*?)\n\} as const;/);
+        expect(declared, "BRANCH_FLAGS moved; this guard needs its new shape").not.toBeNull();
+        // Long flags only: a short alias is documented next to the long one it
+        // resolves to, not on a line of its own.
+        const flags = [...declared![1].matchAll(/"(--[a-z-]+)":\s*(?!")/g)].map(m => m[1]);
+        expect(flags).toContain("--older-than");
+
+        await dbCommand("branch", ["node", "rebase", "db", "branch", "--help"]);
+        const help = helpText();
+
+        // `--force` is read straight off the line rather than through the spec
+        // (`rawArgs.includes("--force")`), which is exactly why it has to be
+        // named here: nothing else in the tree records that it exists.
+        for (const flag of new Set([...flags, "--force"])) {
+            expect(help, `rebase db branch --help does not mention "${flag}"`).toContain(flag);
+        }
+    });
+
+    it("rebase doctor --help lists every flag its spec declares", async () => {
+        // The command's one flag is the documented CI gate — `cli/index.md`
+        // calls `rebase doctor --policies` "the form to use as a CI gate" — and
+        // the page had no Options section at all, so the only way to find it was
+        // to read the driver.
+        await doctorCommand(["node", "rebase", "doctor", "--help"]);
+        const help = helpText();
+
+        const longFlags = Object.entries(DOCTOR_FLAGS)
+            .filter(([name, spec]) => name.startsWith("--") && typeof spec !== "string")
+            .map(([name]) => name);
+        expect(longFlags).toContain("--policies");
+
+        for (const flag of longFlags) {
+            expect(help, `rebase doctor --help does not mention "${flag}"`).toContain(flag);
+        }
+    });
+});
+
+/**
+ * A mistyped subcommand answers the same way in every family: one red line on
+ * stderr, nothing on stdout, exit 1.
+ *
+ * `api-keys` was the one that did not. It printed a bare `Unknown api-keys
+ * command: frobnicate` to stderr — no `✗`, no did-you-mean, no pointer at
+ * `--help` — and then the *whole help page to stdout*, so a typo wrote twenty
+ * lines to the stream a `--json` caller parses. The rule is asserted over the
+ * families rather than case by case, because this one was missed when the
+ * shared helper landed for the other five.
+ */
+describe("a mistyped subcommand", () => {
+    const FAMILIES = [
+        ["auth", authCommand],
+        ["apps", appsCommand],
+        ["skills", skillsCommand],
+        ["api-keys", apiKeysCommand]
+    ] as const;
+
+    it.each(FAMILIES)("in `rebase %s` is one stderr line and an empty stdout", async (family, command) => {
+        const errors: string[] = [];
+        const consoleError = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+            errors.push(args.map(String).join(" "));
+        });
+        const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Error(`exit:${code}`);
+        }) as never);
+
+        try {
+            await command("frobnicate", ["node", "rebase", family, "frobnicate"]);
+            throw new Error(`rebase ${family} frobnicate did not exit`);
+        } catch (err) {
+            expect((err as Error).message, `rebase ${family} frobnicate exited 0`).toBe("exit:1");
+        } finally {
+            consoleError.mockRestore();
+            exit.mockRestore();
+        }
+
+        expect(helpText(), `rebase ${family} frobnicate wrote to stdout`).toBe("");
+        expect(errors).toHaveLength(1);
+        expect(errors[0].replace(ANSI, "")).toMatch(
+            new RegExp(`^✗ Unknown ${family} command "frobnicate"\\.? `)
+        );
+        expect(errors[0]).toContain(`rebase ${family} --help`);
+    });
+
+    it("in `rebase telemetry` is the same, though its dispatcher takes only rawArgs", async () => {
+        const errors: string[] = [];
+        const consoleError = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+            errors.push(args.map(String).join(" "));
+        });
+        const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Error(`exit:${code}`);
+        }) as never);
+
+        try {
+            await telemetryCommand(["node", "rebase", "telemetry", "frobnicate"]);
+            throw new Error("rebase telemetry frobnicate did not exit");
+        } catch (err) {
+            expect((err as Error).message).toBe("exit:1");
+        } finally {
+            consoleError.mockRestore();
+            exit.mockRestore();
+        }
+
+        expect(helpText()).toBe("");
+        expect(errors).toHaveLength(1);
+        expect(errors[0].replace(ANSI, "")).toContain('Unknown telemetry command "frobnicate"');
+    });
+});
+
+/**
+ * A dispatched command with no strict flag parser accepts a typo and runs.
+ *
+ * `arg(..., { permissive: true })` — and the hand-rolled `filter(a =>
+ * !a.startsWith("-"))` that `telemetry` used — do not relax parsing: they turn
+ * an undeclared flag into a positional, or drop it entirely. So `rebase
+ * telemetry --frobnicate` exited 0 with the status page, and `rebase skills
+ * install --frobnicate --agent claude` exited 0 after writing 21 skill files.
+ * `utils/args.ts` states the rule the whole CLI is supposed to follow, and this
+ * derives the list it applies to from the **dispatch**, not from a list somebody
+ * remembered to update.
+ */
+describe("every command the dispatch answers parses its flags strictly", () => {
+    /**
+     * Families whose refusal is not yet `parseCommandArgs`, with the task that
+     * lands it. Not a skip: an entry here is a named, dated debt, and the test
+     * below fails if one of them starts parsing strictly and the entry is left
+     * behind.
+     *
+     * `cloud` — W8-12 of the 2026-09-06 DX sweep. Its actions that never call
+     * `parseCloudArgs` (`whoami`, `orgs`, `clusters`, `logout`, `projects list`)
+     * exit 0 on an unknown flag.
+     */
+    const PENDING: Record<string, string> = {
+        cloud: "W8-12 (2026-09-06 DX sweep) routes the cloud family through parseCloudArgs"
+    };
+
+    /** Where each dispatched command's line is parsed. */
+    const PARSER_FILE: Record<string, string> = {
+        init: "init.ts",
+        schema: "schema.ts",
+        db: "db.ts",
+        dev: "dev.ts",
+        build: "build.ts",
+        start: "start.ts",
+        auth: "auth.ts",
+        doctor: "doctor.ts",
+        skills: "skills.ts",
+        "api-keys": "api-keys.ts",
+        apps: "apps.ts",
+        eject: "eject.ts",
+        "generate-sdk": "../cli.ts",
+        telemetry: "telemetry.ts",
+        resources: "resources.ts",
+        status: "status.ts"
+    };
+
+    /**
+     * `schema` and `db` relay the user's line to the driver rather than reading
+     * it, so their gate is the driver's `assertKnownFlags` — one validation, at
+     * the entry point, against the spec for the command that was named. See
+     * `server-postgres/src/cli-flags.ts` for why it cannot live in the parsers.
+     */
+    const GATED_BY_DRIVER = new Set(["schema", "db"]);
+
+    it("has a parser named for every dispatched command", () => {
+        const source = fs.readFileSync(path.join(here, "..", "cli.ts"), "utf8");
+        const declared = source.match(/const namespacedCommands = \[([^\]]+)\]/);
+        expect(declared).not.toBeNull();
+        const commands = [...declared![1].matchAll(/"([^"]+)"/g)].map(m => m[1]);
+
+        for (const command of commands) {
+            expect(
+                PARSER_FILE[command] ?? PENDING[command],
+                `"${command}" is dispatched but this test does not say where its flags are parsed`
+            ).toBeTruthy();
+        }
+    });
+
+    it("rejects an unknown flag, or names the task that will", () => {
+        const driverSource = fs.readFileSync(
+            path.join(here, "..", "..", "..", "server-postgres", "src", "cli.ts"),
+            "utf8"
+        );
+
+        for (const [command, file] of Object.entries(PARSER_FILE)) {
+            if (PENDING[command]) continue;
+            const source = fs.readFileSync(path.join(here, file), "utf8");
+            const strict = source.includes("parseCommandArgs(");
+            const relayed = GATED_BY_DRIVER.has(command) && driverSource.includes("assertKnownFlags(");
+            expect(
+                strict || relayed,
+                `rebase ${command} does not parse its flags strictly — an unknown flag is accepted and ignored`
+            ).toBe(true);
+        }
+    });
+
+    it("still has the debt PENDING claims, so the entry is not decoration", () => {
+        // The other direction. An entry that outlives its fix turns the whole
+        // check into a comment, so the debt has to be observable: these four
+        // `cloud` actions take `rawArgs` and never hand it to `parseCloudArgs`,
+        // which is why `rebase cloud whoami --frobnicate` exits 0 with the
+        // session JSON. When W8-12 lands, this fails and PENDING loses its row.
+        expect(Object.keys(PENDING)).toEqual(["cloud"]);
+        const auth = fs.readFileSync(path.join(here, "cloud", "auth.ts"), "utf8");
+        expect(
+            auth.includes("parseCloudArgs("),
+            `cloud/auth.ts parses strictly now — drop "cloud" from PENDING (${PENDING.cloud})`
+        ).toBe(false);
     });
 });

@@ -15,7 +15,7 @@ import fs from "fs";
 import path from "path";
 import chalk from "chalk";
 import type { RebaseAppConfig } from "@rebasepro/types";
-import { requireProjectRoot } from "../utils/project";
+import { failAsJson, requireProjectRoot } from "../utils/project";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import {
     assessManagedCompatibility,
@@ -99,7 +99,7 @@ function describeApp(app: RebaseAppConfig): string {
 
 async function listApps(asJson: boolean): Promise<void> {
     const projectRoot = requireProjectRoot();
-    const loaded = loadManifestOrExit(projectRoot);
+    const loaded = loadManifestOrExit(projectRoot, asJson);
     const compatibility = assessManagedCompatibility(loaded.manifest);
 
     if (asJson) {
@@ -185,15 +185,23 @@ async function initManifest(force: boolean): Promise<void> {
  */
 async function printAppConfig(appName: string | undefined, asJson: boolean): Promise<void> {
     const projectRoot = requireProjectRoot();
-    const loaded = loadManifestOrExit(projectRoot);
+    const loaded = loadManifestOrExit(projectRoot, asJson);
 
     if (!appName) {
+        if (asJson) {
+            failAsJson("Which app? Usage: rebase apps config <app>", "app_not_named",
+                `Declared: ${Object.keys(loaded.manifest.apps).join(", ") || "(none)"}`);
+        }
         console.error(chalk.red("✗ Which app? Usage: rebase apps config <app>"));
         process.exit(1);
     }
 
     const app = loaded.manifest.apps[appName];
     if (!app) {
+        if (asJson) {
+            failAsJson(`No app named "${appName}" in rebase.json.`, "app_not_found",
+                `Declared: ${Object.keys(loaded.manifest.apps).join(", ") || "(none)"}`);
+        }
         console.error(chalk.red(`✗ No app named "${appName}" in rebase.json.`));
         console.error(chalk.dim(`  Declared: ${Object.keys(loaded.manifest.apps).join(", ") || "(none)"}`));
         process.exit(1);
@@ -255,11 +263,19 @@ function resolveApiUrl(projectRoot: string, link: ReturnType<typeof readLink>): 
     return undefined;
 }
 
-function loadManifestOrExit(projectRoot: string): ReturnType<typeof loadManifest> {
+function loadManifestOrExit(projectRoot: string, asJson = false): ReturnType<typeof loadManifest> {
     try {
         return loadManifest(projectRoot);
     } catch (err) {
         if (err instanceof ManifestError) {
+            // A caller that asked for JSON gets one on this exit too. It used
+            // to get the human bullet list on stderr and an empty stdout —
+            // `apps list --json` against the one manifest a caller most needs
+            // to be told about.
+            if (asJson) {
+                failAsJson(err.message, "manifest_invalid", "Fix rebase.json, then run this again.",
+                    err.issues.map(issue => ({ path: issue.path, message: issue.message })));
+            }
             console.error(chalk.red(`✗ ${err.message}`));
             for (const issue of err.issues) {
                 console.error(chalk.red(`    ${issue.path ? `${issue.path}: ` : ""}${issue.message}`));

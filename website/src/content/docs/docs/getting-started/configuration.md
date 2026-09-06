@@ -65,7 +65,7 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `PORT` | Port for the backend HTTP server. Read by `rebase start`; **`rebase dev` ignores it** and binds a port derived from the project path so several projects can run at once — use `rebase dev --port` to pin one. | `3001` |
+| `PORT` | Port for the backend HTTP server. Read by `rebase start`. `rebase dev` reads it **from the shell environment only** — a `PORT` in `.env` is not read there, because the port is resolved before that file is loaded — and otherwise binds a port derived from the project path, so several projects can run at once. `rebase dev --port` beats both, and the start banner names the rung it used. | `3001` |
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |

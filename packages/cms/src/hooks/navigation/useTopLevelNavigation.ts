@@ -16,7 +16,7 @@ export type UseTopLevelNavigationProps = {
     navigationGroupMappings?: NavigationGroupMapping[];
     viewsOrder?: string[];
     urlController: UrlController;
-    adminMode?: "cms" | "studio" | "settings";
+    adminMode?: "cms" | "studio";
     collectionRegistryController: CollectionRegistryController & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
 };
 

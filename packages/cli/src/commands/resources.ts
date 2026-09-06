@@ -11,7 +11,7 @@
  */
 import chalk from "chalk";
 import path from "path";
-import { requireProjectRoot } from "../utils/project";
+import { failAsJson, requireProjectRoot } from "../utils/project";
 import { findBackendApp, loadManifest, ManifestError } from "../manifest";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import {
@@ -107,11 +107,23 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
 
     const projectRoot = requireProjectRoot();
 
+    // Every exit below has a `--json` arm, for the reason in `failAsJson`:
+    // `--json` is a promise about stdout, and a promise kept on one exit of a
+    // command and broken on the next is not one.
+    const asJson = Boolean(flags["--json"]);
+
     let backendApp: RebaseBackendAppConfig;
     try {
         const loaded = loadManifest(projectRoot);
         const backend = findBackendApp(loaded.manifest);
         if (!backend) {
+            if (asJson) {
+                failAsJson(
+                    "This project declares no backend app, so it declares no resources.",
+                    "no_backend_app",
+                    "Add a backend app to rebase.json, or run `rebase apps init`."
+                );
+            }
             console.error(chalk.red("This project declares no backend app, so it declares no resources."));
             process.exitCode = 1;
             return;
@@ -119,6 +131,10 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
         backendApp = backend.app;
     } catch (err) {
         if (err instanceof ManifestError) {
+            if (asJson) {
+                failAsJson(err.message, "manifest_invalid", "Fix rebase.json, then run this again.",
+                    err.issues.map(issue => ({ path: issue.path, message: issue.message })));
+            }
             console.error(chalk.red(err.message));
             for (const issue of err.issues) console.error(`  ${chalk.gray(issue.path)} ${issue.message}`);
             process.exitCode = 1;
@@ -130,6 +146,14 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
     const { graph, issues } = await deriveResourceGraph(deriveOptionsFor(projectRoot, backendApp));
 
     if (issues.length > 0) {
+        if (asJson) {
+            failAsJson(
+                `${issues.length} problem(s) in the declared resources.`,
+                "resource_declaration_invalid",
+                "Fix the declarations the issues name, then run this again.",
+                issues.map(issue => ({ path: issue.path, message: issue.message }))
+            );
+        }
         console.error(chalk.red(`\n✗ ${issues.length} problem(s) in the declared resources:\n`));
         for (const issue of issues) console.error(`  ${chalk.bold(issue.path)}  ${issue.message}`);
         console.error("");
@@ -137,7 +161,7 @@ export async function resourcesCommand(rawArgs: string[]): Promise<void> {
         return;
     }
 
-    if (flags["--json"]) {
+    if (asJson) {
         // The projection, so this and `rebase status --json` describe the same
         // set. `version` is kept so a reader of either can tell them apart from
         // a future shape.

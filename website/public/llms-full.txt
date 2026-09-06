@@ -605,7 +605,7 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `PORT` | Port for the backend HTTP server. Read by `rebase start`; **`rebase dev` ignores it** and binds a port derived from the project path so several projects can run at once — use `rebase dev --port` to pin one. | `3001` |
+| `PORT` | Port for the backend HTTP server. Read by `rebase start`. `rebase dev` reads it **from the shell environment only** — a `PORT` in `.env` is not read there, because the port is resolved before that file is loaded — and otherwise binds a port derived from the project path, so several projects can run at once. `rebase dev --port` beats both, and the start banner names the rung it used. | `3001` |
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |
@@ -20112,18 +20112,12 @@ production otherwise means a database client, a copy of the connection string
 and an audit trail that ends at "someone with psql". Studio does all of it as
 the signed-in admin, through the same authorization the API uses.
 
-### The three modes
+### The two modes
 
-The panel has three modes — `"cms" | "studio" | "settings"`:
+The panel has two modes — `"cms" | "studio"`:
 
 - **CMS** (`"cms"`) — For content editors and operations teams. Shows collections and data management. This is the default.
 - **Studio** (`"studio"`) — For developers. Unlocks the tools below.
-- **Settings** (`"settings"`) — declared in the type, but nothing sets it and
-  nothing reads it. There is no way to enter this mode today. It is listed here
-  because it is part of the public `AdminModeController` type you will see in
-  your editor, not because it does anything.
-
-The drawer's toggle switches between the first two.
 
 Toggle between them with the admin mode controller or the drawer toggle. The
 chosen mode is persisted in `localStorage` under `rebase-admin-mode`; a browser
@@ -28480,6 +28474,12 @@ Or use via `pnpm dlx`:
 ```bash
 pnpm dlx @rebasepro/cli <command>
 ```
+
+### Machine-readable output
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+`--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources` and `rebase apps list` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
 
 ### Commands
 

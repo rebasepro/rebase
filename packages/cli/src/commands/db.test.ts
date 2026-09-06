@@ -18,35 +18,43 @@ import {
 
 const ROOT = path.resolve("/projects/my-app");
 
+/**
+ * Every spelling the driver's backup spec accepts — `backup-cli.ts` aliases
+ * `--output` and `-o` onto `--out`, and `rebase db backup --help` advertises
+ * `--output`. The suite used to cover two of the three, and the uncovered one
+ * was the one that was broken: `--output ./backups` reached the driver
+ * unresolved and wrote under `backend/`.
+ */
+const DESTINATION_FLAGS = ["--out", "--output", "-o"];
+
 describe("absolutizeLocalPathArgs", () => {
-    it("resolves a relative --out against the directory the user is standing in", () => {
-        /*
-         * The reported bug: `rebase db backup --out ./backups` from the project
-         * root wrote to `backend/backups` while the success line echoed the path
-         * as typed, so the file existed and the location printed was wrong. That
-         * exact invocation is in `rebase db --help`'s own examples.
-         */
-        const out = absolutizeLocalPathArgs(["db", "backup", "--out", "./backups"], ROOT);
-        expect(out).toEqual(["db", "backup", "--out", path.join(ROOT, "backups")]);
+    it.each(DESTINATION_FLAGS)(
+        "resolves a relative %s against the directory the user is standing in",
+        flag => {
+            /*
+             * The reported bug: `rebase db backup --out ./backups` from the
+             * project root wrote to `backend/backups` while the success line
+             * echoed the path as typed, so the file existed and the location
+             * printed was wrong. That exact invocation is in `rebase db
+             * --help`'s own examples.
+             */
+            const out = absolutizeLocalPathArgs(["db", "backup", flag, "./backups"], ROOT);
+            expect(out).toEqual(["db", "backup", flag, path.join(ROOT, "backups")]);
+        }
+    );
+
+    it.each(DESTINATION_FLAGS)("handles the %s=<value> spelling", flag => {
+        const out = absolutizeLocalPathArgs(["db", "backup", `${flag}=./backups`], ROOT);
+        expect(out).toEqual(["db", "backup", `${flag}=${path.join(ROOT, "backups")}`]);
     });
 
-    it("handles the --out=<value> spelling", () => {
-        const out = absolutizeLocalPathArgs(["db", "backup", "--out=./backups"], ROOT);
-        expect(out).toEqual(["db", "backup", `--out=${path.join(ROOT, "backups")}`]);
-    });
-
-    it("handles the -o alias", () => {
-        const out = absolutizeLocalPathArgs(["db", "backup", "-o", "backups"], ROOT);
-        expect(out).toEqual(["db", "backup", "-o", path.join(ROOT, "backups")]);
-    });
-
-    it("leaves an already-absolute path alone", () => {
+    it.each(DESTINATION_FLAGS)("leaves an already-absolute %s path alone", flag => {
         const abs = path.resolve("/var/backups");
-        expect(absolutizeLocalPathArgs(["db", "backup", "--out", abs], ROOT))
-            .toEqual(["db", "backup", "--out", abs]);
+        expect(absolutizeLocalPathArgs(["db", "backup", flag, abs], ROOT))
+            .toEqual(["db", "backup", flag, abs]);
     });
 
-    it("never touches a remote destination", () => {
+    it.each(DESTINATION_FLAGS)("never touches a remote %s destination", flag => {
         /*
          * The whole point of the fix is joining paths onto a cwd, and an
          * `s3://bucket/prefix` joined onto anything stops being a URL. Matched
@@ -54,14 +62,24 @@ describe("absolutizeLocalPathArgs", () => {
          * destination this build does not support yet still survives intact.
          */
         for (const url of ["s3://bucket/prefix", "gs://bucket/prefix", "https://example.com/x"]) {
-            expect(absolutizeLocalPathArgs(["db", "backup", "--out", url], ROOT))
-                .toEqual(["db", "backup", "--out", url]);
+            expect(absolutizeLocalPathArgs(["db", "backup", flag, url], ROOT))
+                .toEqual(["db", "backup", flag, url]);
         }
     });
 
-    it("does not mistake the next flag for the value of --out", () => {
-        const out = absolutizeLocalPathArgs(["db", "backup", "--out", "--no-owner"], ROOT);
-        expect(out).toEqual(["db", "backup", "--out", "--no-owner"]);
+    it.each(DESTINATION_FLAGS)("does not mistake the next flag for the value of %s", flag => {
+        const out = absolutizeLocalPathArgs(["db", "backup", flag, "--no-owner"], ROOT);
+        expect(out).toEqual(["db", "backup", flag, "--no-owner"]);
+    });
+
+    it.each(DESTINATION_FLAGS)("does not treat %s's value as the restore positional", flag => {
+        const out = absolutizeLocalPathArgs(
+            ["db", "restore", flag, "./copy", "./backups/x.dump"],
+            ROOT
+        );
+        expect(out).toEqual([
+            "db", "restore", flag, path.join(ROOT, "copy"), path.join(ROOT, "backups/x.dump")
+        ]);
     });
 
     it("resolves the dump file `db restore` reads", () => {

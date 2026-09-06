@@ -17,7 +17,7 @@ import net from "net";
 import os from "os";
 import path from "path";
 
-import { DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devWatchIncludes, getProjectPort, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv } from "./dev";
+import { DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devWatchIncludes, getProjectPort, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
 import type { PreparedDatabase } from "../dev-db/prepare";
 
 /**
@@ -143,37 +143,37 @@ force: true });
         fs.writeFileSync(path.join(projectRoot, DEV_PORT_FILENAME), port, "utf-8");
 
     it("falls back to the project hash when nothing else says otherwise", () => {
-        expect(resolveStartPort(projectRoot)).toBe(getProjectPort(projectRoot));
+        expect(resolveStartPort(projectRoot)).toEqual({ port: getProjectPort(projectRoot), source: "derived" });
     });
 
     it("prefers the saved port file over the hash", () => {
         writePortFile("4321");
-        expect(resolveStartPort(projectRoot)).toBe(4321);
+        expect(resolveStartPort(projectRoot)).toEqual({ port: 4321, source: "affinity" });
     });
 
     it("prefers PORT over the saved port file", () => {
         writePortFile("4321");
         process.env.PORT = "5555";
-        expect(resolveStartPort(projectRoot)).toBe(5555);
+        expect(resolveStartPort(projectRoot)).toEqual({ port: 5555, source: "PORT" });
     });
 
     it("prefers the explicit flag over everything", () => {
         writePortFile("4321");
         process.env.PORT = "5555";
-        expect(resolveStartPort(projectRoot, 6006)).toBe(6006);
+        expect(resolveStartPort(projectRoot, 6006)).toEqual({ port: 6006, source: "--port" });
     });
 
     it("ignores a port file holding an out-of-range or unparseable value", () => {
         const hashed = getProjectPort(projectRoot);
         for (const bad of ["0", "-1", "65536", "999999", "not-a-port", ""]) {
             writePortFile(bad);
-            expect(resolveStartPort(projectRoot)).toBe(hashed);
+            expect(resolveStartPort(projectRoot)).toEqual({ port: hashed, source: "derived" });
         }
     });
 
     it("tolerates trailing whitespace in the port file", () => {
         writePortFile("4321\n");
-        expect(resolveStartPort(projectRoot)).toBe(4321);
+        expect(resolveStartPort(projectRoot)).toEqual({ port: 4321, source: "affinity" });
     });
 
     // The twin of the port-file case above. It was the branch without the
@@ -184,25 +184,25 @@ force: true });
         for (const bad of ["0", "-1", "65536", "999999", "not-a-port", "80.5", "  "]) {
             process.env.PORT = bad;
             const resolved = resolveStartPort(projectRoot);
-            expect(Number.isInteger(resolved)).toBe(true);
-            expect(resolved).toBe(hashed);
+            expect(Number.isInteger(resolved.port)).toBe(true);
+            expect(resolved).toEqual({ port: hashed, source: "derived" });
         }
     });
 
     it("falls back to the port file, not the hash, when PORT is unusable", () => {
         writePortFile("4321");
         process.env.PORT = "not-a-port";
-        expect(resolveStartPort(projectRoot)).toBe(4321);
+        expect(resolveStartPort(projectRoot)).toEqual({ port: 4321, source: "affinity" });
     });
 
     it("tolerates surrounding whitespace in PORT", () => {
         process.env.PORT = " 5555 ";
-        expect(resolveStartPort(projectRoot)).toBe(5555);
+        expect(resolveStartPort(projectRoot)).toEqual({ port: 5555, source: "PORT" });
     });
 
     it("falls back to the hash when the project directory does not exist", () => {
         const missing = path.join(projectRoot, "gone");
-        expect(resolveStartPort(missing)).toBe(getProjectPort(missing));
+        expect(resolveStartPort(missing)).toEqual({ port: getProjectPort(missing), source: "derived" });
     });
 });
 
@@ -318,6 +318,46 @@ describe("the dev help and the dev flag spec", () => {
         const reads = source.match(/args\["--no-db"\]/g) ?? [];
         expect(reads).toHaveLength(1);
         expect(source).toContain("const noDb =");
+    });
+
+    it("names every rung of the port ladder, and which PORT is read", async () => {
+        // `getting-started/configuration.md` said `rebase dev` ignores `PORT`.
+        // It is precedence rung 2 — for a `PORT` in the *shell*; a `PORT` in
+        // `.env` really is ignored, because the port is resolved before the
+        // file is loaded. Neither the doc nor this page distinguished the two,
+        // so both readings of the sentence were available and one was wrong.
+        const printed: string[] = [];
+        const spy = vi.spyOn(console, "log").mockImplementation(message => {
+            printed.push(String(message));
+        });
+        try {
+            await devCommand(["node", "rebase", "dev", "--help"]);
+        } finally {
+            spy.mockRestore();
+        }
+
+        // eslint-disable-next-line no-control-regex
+        const help = printed.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+        expect(help).toContain("Which port");
+        expect(help).toContain("PORT");
+        expect(help).toContain("in the shell environment");
+        expect(help).toContain(".rebase-dev-port");
+        // The distinction the doc was missing, stated where the flag is read.
+        expect(help).toMatch(/PORT.* in the project's \.env is .*not.* read here/);
+    });
+
+    it("has a banner label for every rung the resolver can return", () => {
+        // The labels are what the start banner prints after the port. A rung
+        // added without one would print `undefined` next to the number.
+        const source = fs.readFileSync(path.join(import.meta.dirname, "dev.ts"), "utf8");
+        const declared = source.match(/export type StartPortSource = ([^;]+);/);
+        expect(declared).not.toBeNull();
+        const rungs = [...declared![1].matchAll(/"([^"]+)"/g)].map(match => match[1]);
+
+        expect(rungs).toEqual(expect.arrayContaining(["--port", "PORT", "derived"]));
+        for (const rung of rungs) {
+            expect(START_PORT_SOURCE_LABELS[rung as keyof typeof START_PORT_SOURCE_LABELS]).toBeTruthy();
+        }
     });
 
     it("no longer claims a docker-compose db service is started first", async () => {
