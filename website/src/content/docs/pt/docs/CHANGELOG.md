@@ -78,10 +78,11 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
   The boot validator refuses the old key by name rather than ignoring it: silence
   would have left the surviving `required` unset, quietly turning a required
-  relation optional in the generated types and nullable in the column. New in
-  `@rebasepro/common`: `isRelationRequired(collection, relation)` and
-  `relationDeclaringProperty(collection, relation)`, which are how every reader
-  now asks.
+  relation optional in the generated types and nullable in the column. How every
+  reader now asks is
+  `import { isRelationRequired, relationDeclaringProperty } from "@rebasepro/common"`:
+  `isRelationRequired(collection, relation)` for the answer,
+  `relationDeclaringProperty(collection, relation)` for the property that carries it.
 
   The runtime contract major is **not** bumped. What was removed is an optional
   member of a TypeScript interface — it has no runtime representation, so no
@@ -110,6 +111,16 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   so the default cannot differ between them and make every boot plan the same
   rewrite forever.
 
+- **The Node floor is `>=22.22.0`, on every published package.** It was `>=20`
+  (and `@rebasepro/cli@0.17.3` declared no `engines` at all), so a project on
+  Node 20 installed and ran. The single source is `.nvmrc`, and `check:floors`
+  holds every manifest to it — one floor, in one file, rather than a number
+  repeated in twenty-two. Move to 22.22.0 before upgrading: `pnpm install`
+  answers an engines mismatch with `[WARN] Unsupported engine` and carries on,
+  so the failure arrives later, somewhere with no mention of Node in it.
+  `check:release-bump` now refuses a release that moves an `engines` field
+  without saying so here.
+
 ### Added
 
 - **Every kind in one graph: crons, functions and queues join databases, buckets
@@ -117,10 +128,11 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   under the id the scheduler runs it as, with its schedule and zone — and a
   function is recorded from the bundler's analysis by filename. `rebase
   resources` lists them; a host reads a project's schedules before running it.
-  `queue<T>("thumbnails")` is the work-list shape of background work, one handler
-  per queue, on the same durable job queue topics ride on — and unlike
-  `jobs.tasks`, which needed an entrypoint a managed project does not have, a
-  declared queue is picked up by every boot path.
+  `import { queue } from "@rebasepro/types"` joins `database`, `bucket` and
+  `topic`: `queue<T>("thumbnails")` is the work-list shape of background work,
+  one handler per queue, on the same durable job queue topics ride on — and
+  unlike `jobs.tasks`, which needed an entrypoint a managed project does not
+  have, a declared queue is picked up by every boot path.
 
 - **Handles are the API.** `defineCollection({ dataSource: analytics })` and
   `storage: { storageSource: media }` take the handle a constructor returned —
@@ -617,13 +629,22 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   so the driver got the blame. The dedupe that exists to prevent this was
   unreachable on three of the four paths into a running pod. (#38)
 
+  The shipped kind literals are frozen at their 0.17.3 bytes now, because the
+  copy that compares them is inlined in every published driver and is in the
+  field. What a kind *binds* from is a per-copy overlay instead —
+  `import { amendResourceKind } from "@rebasepro/types"` — which an older inlined
+  copy never sees and therefore never compares.
+
 - **`zod` was missing from the runtime-provided list, so a managed app ran no
   crons and reported success.** A bundle shipped its own zod beside the image's;
   `loadEnv({ extend })` then parsed a schema built by a different module
   instance, and every field carrying a `.default()` was rejected. Nothing in
   that failure mentions zod. Added to all three lists, and the agreement test
   that should have caught it no longer filters to `@rebasepro/*` — which is why
-  a non-scoped entry could diverge for four releases unseen.
+  a non-scoped entry could diverge for four releases unseen. The runtime also
+  re-exports its own copy — `import { z } from "@rebasepro/server"` — so an
+  `extend` schema cannot be built from the wrong one; `loadEnv` refuses a foreign
+  schema by name rather than validating half of it.
 
 - **Every failure on a first cloud deploy said what it was, or said nothing.**
   The boot ensure built its message from `err.message`, which for drizzle is

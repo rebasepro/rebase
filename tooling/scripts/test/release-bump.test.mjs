@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 
 import {
     checkReleaseBump, bumpLevel, unreleasedSection, contractConstants,
+    enginesNode, mentionsEngines,
     SURFACE, DERIVED_NAMES, MANIFEST, CHANGELOG
 } from "../check-release-bump.mjs";
 
@@ -32,7 +33,7 @@ const MANIFEST_TEXT = "export const BUNDLE_FORMAT_VERSION = 2;\nexport const RUN
  * `before` overrides the previous tag's artifacts, for the cases where the
  * baseline itself is what the test is about rather than the change to it.
  */
-function run({ version, now, before: baseline, pins = 0 }) {
+function run({ version, now, before: baseline, pins = 0, manifests = () => [] }) {
     const before = {
         [SURFACE]: SURFACE_BEFORE,
         [DERIVED_NAMES]: "posts_pkey\nposts_author_id_fkey\n",
@@ -52,7 +53,11 @@ function run({ version, now, before: baseline, pins = 0 }) {
             // The template-pin axis has its own suite and its own repository
             // shape; here it is held at "consistent" so these cases stay about
             // the bump level.
-            templatePins: () => pins
+            templatePins: () => pins,
+            // Empty unless a case is about the Node floor, so the other cases do
+            // not read the real workspace to answer a question they are not
+            // asking.
+            manifests
         });
     } finally {
         console.log = log;
@@ -218,6 +223,69 @@ test("a template naming something the release does not publish stops it", () => 
         before: { [CHANGELOG]: "# Changelog\n\n## [Unreleased]\n\n### Breaking\n\n- a break\n" },
         pins: 1
     }), 1);
+});
+
+const PKG = "packages/client/package.json";
+const NEW_PKG = "packages/brand-new/package.json";
+const manifest = floor => JSON.stringify({ name: "@rebasepro/x", engines: { node: floor } });
+const BREAKING_NOTE = "# Changelog\n\n## [Unreleased]\n\n### Breaking\n\n- a break\n";
+const FLOOR_NOTE =
+    "# Changelog\n\n## [Unreleased]\n\n### Breaking\n\n"
+    + "- **The Node floor is `>=22.22.0`.** From `.nvmrc`, on every published package.\n";
+
+test("a Node floor that moved is a break, so a patch cannot carry it", () => {
+    // `engines` has no committed contract behind it — nothing generates it and
+    // nothing diffed it — which is how 21 packages went `>=20` → `>=22.22.0` in
+    // one commit with no release note. pnpm answers a mismatch with a warning,
+    // so nothing downstream fails at install either.
+    assert.equal(run({
+        version: "0.13.1",
+        before: { [PKG]: manifest(">=20") },
+        now: { [PKG]: manifest(">=22.22.0"), [CHANGELOG]: FLOOR_NOTE },
+        manifests: () => [PKG]
+    }), 1);
+});
+
+test("a moved floor needs a release note that names it", () => {
+    const asMinor = changelog => run({
+        version: "0.14.0",
+        before: { [PKG]: manifest(">=20"), [CHANGELOG]: BREAKING_NOTE },
+        now: { [PKG]: manifest(">=22.22.0"), [CHANGELOG]: changelog },
+        manifests: () => [PKG]
+    });
+    // A `### Breaking` heading about something else is not a note about this.
+    assert.equal(asMinor(BREAKING_NOTE), 1);
+    assert.equal(asMinor(FLOOR_NOTE), 0);
+});
+
+test("a package that did not exist at the tag has no floor to have moved", () => {
+    assert.equal(run({
+        version: "0.13.1",
+        now: { [NEW_PKG]: manifest(">=22.22.0") },
+        manifests: () => [NEW_PKG]
+    }), 0);
+});
+
+test("an unchanged floor is not a break", () => {
+    assert.equal(run({
+        version: "0.13.1",
+        before: { [PKG]: manifest(">=20") },
+        now: { [PKG]: manifest(">=20") },
+        manifests: () => [PKG]
+    }), 0);
+});
+
+test("the engines readers read what a manifest and a note actually look like", () => {
+    assert.equal(enginesNode(manifest(">=22.22.0")), ">=22.22.0");
+    assert.equal(enginesNode(JSON.stringify({ name: "x" })), null);   // cli@0.17.3 declared none
+    assert.equal(enginesNode("not json"), null);
+    assert.equal(enginesNode(null), null);
+
+    assert.equal(mentionsEngines("- the `engines` field moved"), true);
+    assert.equal(mentionsEngines("- needs Node 22.22.0"), true);
+    assert.equal(mentionsEngines("- the floor is >=22.22.0", ">=22.22.0"), true);
+    assert.equal(mentionsEngines("- a bundle vendored its own node_modules"), false);
+    assert.equal(mentionsEngines(null), false);
 });
 
 test("the check refuses to run without a version or a tag", () => {

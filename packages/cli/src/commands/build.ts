@@ -222,7 +222,14 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
             });
             const rel = path.relative(projectRoot, result.outDir);
             console.log(chalk.green(`  ✓ bundle → ${rel}/`));
-            console.log(chalk.dim(`    ${result.collectionCount} collection(s), schema ${result.manifest.schemaVersion}`));
+            // A headless build has no schema version — the API is introspected
+            // from the live database at boot — and interpolating it anyway left
+            // the summary ending in a dangling `schema `, which reads as a value
+            // that failed to render rather than one that does not exist.
+            const schemaVersion = result.manifest.schemaVersion;
+            console.log(chalk.dim(
+                `    ${result.collectionCount} collection(s)${schemaVersion ? `, schema ${schemaVersion}` : ""}`
+            ));
             /* Say what the bundle's cold start will be, at the one moment
                anyone is listening.
 
