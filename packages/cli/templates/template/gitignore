@@ -32,7 +32,11 @@ uploads/
 .rebase-dev-secrets.json
 
 # Built project bundle (`rebase build`)
-dist-bundle/
+#
+# The glob, not the one directory: a static app declared in `rebase.json` gets
+# its own `dist-bundle-<name>/` beside this one, so the stock scaffold's first
+# build left 307 untracked files behind `dist-bundle-admin/`.
+dist-bundle*/
 .rebase/
 
 # Generated SDK (`rebase generate-sdk`) — regenerated from the collections,

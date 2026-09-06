@@ -85,6 +85,39 @@ pnpm run db:push
 
 Andernfalls gibt jede Collection einen `missing table`-Fehler zurück — die Falle dabei: Die App startet trotzdem und die Anmeldung funktioniert (die Auth-Tabellen existieren), sodass die Bereitstellung zunächst gesund wirkt. Führen Sie den Befehl aus einem Projekt-Checkout oder aus CI aus, wobei `DATABASE_URL` auf die Produktionsdatenbank zeigt — **nicht** im Container, da das Produktions-Image ohne die CLI ausgeliefert wird. Für versionierte Migrationen verwenden Sie stattdessen `pnpm run db:generate` und `pnpm run db:migrate`.
 
+## Ihr erster Administrator
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+**Setzen Sie `REBASE_ADMIN_EMAIL` und `REBASE_ADMIN_PASSWORD` vor dem ersten Start.** Dies ist der eine Schritt, für den es von außen keine Reparatur gibt.
+
+Eine frische Datenbank hat keine Benutzer, und außerhalb der Produktion lässt die Registrierungsrichtlinie die erste Anmeldung zu und macht sie zum Administrator. Das muss so sein: Um einen Administrator zu ernennen, braucht es einen bereits angemeldeten Aufrufer — eine leere Datenbank ohne diese Regel ist eine Sackgasse. Auf einem Laptop ist die Person an der Tastatur der Betreiber, und genau das ist richtig so.
+
+Auf einem Host mit öffentlichem Namen ist es genau falsch. Die ausgelieferten Artefakte bringen DNS und TLS hoch, bevor der Betreiber irgendetwas getippt hat — das Fenster steht also ab der ersten Sekunde im Internet offen, und wer das Registrierungsformular zuerst erreicht, besitzt die Bereitstellung.
+
+Unter `NODE_ENV=production` ist dieses Fenster daher geschlossen. Eine leere Benutzertabelle weist die Bootstrap-Registrierung mit `SETUP_REQUIRED` ab, ein über offene Registrierung angelegtes Konto ist ein gewöhnliches Konto, `GET /api/auth/config` meldet nie `needsSetup`, und `POST /api/admin/bootstrap` verweigert. In 0.17.3 und früher war das Fenster auch in der Produktion offen — aktualisieren Sie, bevor Sie eine frische Bereitstellung öffentlich machen.
+
+`rebase dev` liest dieselbe `.env`, ignoriert beide Variablen aber bewusst und sagt es beim Start: lokal bleibt die erste Registrierung der Weg hinein. Die Werte, die `rebase init` geschrieben hat, gehören dem Produktionsstart.
+
+Damit bleiben zwei Wege hinein, von denen keiner ein Wettlauf ist:
+
+```bash
+REBASE_ADMIN_EMAIL=sie@example.com
+REBASE_ADMIN_PASSWORD=<mindestens 12 Zeichen>
+DISABLE_SELF_REGISTRATION=true
+```
+
+Die Laufzeitumgebung legt dieses Konto einmal an, solange die Benutzertabelle leer ist, und tut bei jedem weiteren Start nichts. Oder weisen Sie einem bestehenden Benutzer die Rolle mit dem Service-Key zu, wenn Sie Konten außerhalb der Anwendung bereitstellen.
+
+Zwei Regeln erzwingt die Laufzeitumgebung beim Start, und beide erzeugen sonst ein Konto, das niemand benutzen kann:
+
+- Das Passwort muss **mindestens 12 Zeichen** haben, sonst wird es abgelehnt und kein Konto angelegt.
+- Die Adresse muss eine sein, die `POST /api/auth/login` akzeptiert — die Route prüft ihren Body mit `z.string().email()`, sodass eine Domain ohne Punkt (`admin@localhost`) sauber angelegt wird und danach bei jeder Anmeldung mit 400 antwortet. Auch diese Adresse verweigert der Start.
+
+Setzen Sie beide oder keine: eine halbe Zugangsdatenangabe ist ein Tippfehler, und die daraus entstehende Bereitstellung — Selbstregistrierung aus, kein Administrator — lässt sich nur an einer `psql`-Konsole retten. Der Start warnt, wenn die Tabelle in der Produktion leer ist und kein Administrator benannt wurde.
+
+Melden Sie sich an und ändern Sie das Passwort. Es liegt im Klartext dort, wo Sie Ihre Umgebungsvariablen abgelegt haben.
+
 ## Produktions-Checkliste
 
 Bevor Sie in die Produktion bereitstellen, stellen Sie sicher:
@@ -97,7 +130,7 @@ Bevor Sie in die Produktion bereitstellen, stellen Sie sicher:
 | **CORS** | Konfigurieren Sie erlaubte Origins auf Ihrem Backend, wenn Frontend und Backend auf verschiedenen Domains liegen |
 | **Speicher-Volumes** | Binden Sie persistente Volumes für Datei-Uploads ein. Oder wechseln Sie für die Produktion zu S3. |
 | **HTTPS** | Terminieren Sie TLS an Ihrem Reverse-Proxy (nginx, Cloudflare, Load Balancer) |
-| **Registrierung** | Setzen Sie `ALLOW_REGISTRATION=false`, nachdem Sie Ihr Admin-Konto erstellt haben |
+| **Erster Administrator** | Setzen Sie `REBASE_ADMIN_EMAIL` und `REBASE_ADMIN_PASSWORD` **vor dem ersten Start**, dazu `DISABLE_SELF_REGISTRATION=true`. In der Produktion wird das erste registrierte Konto nicht befördert — siehe [Ihr erster Administrator](#ihr-erster-administrator). |
 
 | **Öffentliche Lesezugriffe brauchen trotzdem einen Aufrufer** | `access: "public"` erweitert, welche *Zeilen* ein Aufrufer sieht, nicht wer aufrufen darf: Eine anonyme Anfrage an `/api/data/*` antwortet mit 401, solange `AUTH_REQUIRE` aktiv ist. Setzen Sie `AUTH_REQUIRE=false` für eine öffentliche Website, die ihr eigenes Backend liest, und überlassen Sie die Entscheidung allein RLS. Es ist eine Umgebungsvariable — eine lokale `.env`, die sie setzt, reist also **nicht** mit Ihrer Bereitstellung mit. |
 

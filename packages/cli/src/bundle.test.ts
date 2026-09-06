@@ -122,6 +122,77 @@ describe("normalizeEsmSpecifiers", () => {
 
         expect(fs.readFileSync(vendored, "utf8")).toContain('"./other"');
     });
+
+    /**
+     * The stock template's own `config/resources.ts` documents
+     * `import { media } from "../resources";` inside a docblock, so every
+     * `rebase build` of an untouched scaffold warned about an import that is
+     * prose. A warning that is wrong on the default project is a warning nobody
+     * reads when it is right.
+     */
+    it("does not report a specifier written inside a comment", () => {
+        const file = write("resources.js", [
+            "/**",
+            " * Point a property at it by handle:",
+            " *",
+            ' * import { media } from "../resources";',
+            " */",
+            'export const media = {};',
+            '// import legacy from "./gone";'
+        ].join("\n"));
+
+        const result = normalizeEsmSpecifiers(scratch);
+
+        expect(result.unresolved).toEqual([]);
+        // And the comment is left exactly as written — a build must not edit
+        // the prose it declines to act on.
+        expect(fs.readFileSync(file, "utf8")).toContain('import { media } from "../resources";');
+    });
+
+    it("still rewrites a real import on a line that also carries a comment", () => {
+        write("dep.js", "export default {};");
+        const file = write("a.js", 'import dep from "./dep"; // was: import dep from "./old"\n');
+
+        const result = normalizeEsmSpecifiers(scratch);
+
+        expect(result.rewritten).toBe(1);
+        expect(result.unresolved).toEqual([]);
+        expect(fs.readFileSync(file, "utf8")).toContain('"./dep.js"');
+        expect(fs.readFileSync(file, "utf8")).toContain('"./old"');
+    });
+
+    /**
+     * A `//` inside a string is the common shape of this going wrong: every URL
+     * in the tree has one, and treating it as a comment would hide the rest of
+     * the line — including a real import.
+     */
+    it("does not mistake a URL in a string for a comment", () => {
+        write("dep.js", "export default {};");
+        const file = write("a.js", [
+            'export const docs = "https://rebase.pro/docs";',
+            'import dep from "./dep";'
+        ].join("\n"));
+
+        const result = normalizeEsmSpecifiers(scratch);
+
+        expect(result.rewritten).toBe(1);
+        expect(fs.readFileSync(file, "utf8")).toContain('"./dep.js"');
+    });
+
+    it("does not let an unterminated quote run past its line", () => {
+        // A regex literal holding a quote (`/["']/`) reads as an opening string
+        // to a scanner that does not parse regexes. Ending the span at the
+        // newline bounds the mistake to the line it started on.
+        write("dep.js", "export default {};");
+        const file = write("a.js", [
+            'export const quoted = /["]/;',
+            'import dep from "./dep";'
+        ].join("\n"));
+
+        normalizeEsmSpecifiers(scratch);
+
+        expect(fs.readFileSync(file, "utf8")).toContain('"./dep.js"');
+    });
 });
 
 describe("collectDeclaredDependencies", () => {

@@ -788,6 +788,58 @@ disagreeing: bounds.size > 1 ? [...bounds].sort() : [] };
 }
 
 /**
+ * The `[start, end)` ranges of `//` and block comments in JavaScript source.
+ *
+ * `normalizeEsmSpecifiers` scans emitted output with a regular expression, and a
+ * regular expression cannot tell a specifier from a specifier somebody wrote
+ * about. The stock template ships one: `config/resources.ts` documents
+ * `import { media } from "../resources";` inside a docblock, tsc preserves the
+ * comment, and every `rebase build` of an untouched scaffold printed
+ * `⚠ 1 import(s) could not be resolved`. A warning that is wrong on the default
+ * project teaches people to ignore the warning that predicts a boot failure.
+ *
+ * Strings are tracked only so a `//` inside one — every `http://` in the tree —
+ * does not open a comment that swallows the rest of the line. A `'` or `"` span
+ * ends at the newline as well as at its closing quote: a JavaScript string
+ * cannot contain a raw newline, so a quote that reaches one was never a string
+ * (a regex literal's, most likely) and the mistake must not run on.
+ */
+export function commentSpans(source: string): Array<[number, number]> {
+    const spans: Array<[number, number]> = [];
+    let quote: string | null = null;
+    let i = 0;
+
+    while (i < source.length) {
+        const c = source[i];
+
+        if (quote) {
+            if (c === "\\") { i += 2; continue; }
+            if (c === quote || (c === "\n" && quote !== "`")) quote = null;
+            i++;
+            continue;
+        }
+        if (c === "\"" || c === "'" || c === "`") { quote = c; i++; continue; }
+
+        if (c === "/" && source[i + 1] === "/") {
+            const newline = source.indexOf("\n", i);
+            const end = newline === -1 ? source.length : newline;
+            spans.push([i, end]);
+            i = end;
+            continue;
+        }
+        if (c === "/" && source[i + 1] === "*") {
+            const close = source.indexOf("*/", i + 2);
+            const end = close === -1 ? source.length : close + 2;
+            spans.push([i, end]);
+            i = end;
+            continue;
+        }
+        i++;
+    }
+    return spans;
+}
+
+/**
  * Rewrite relative import specifiers in emitted JavaScript so Node can resolve them.
  *
  * TypeScript deliberately does not touch specifiers: `moduleResolution: "bundler"`
@@ -825,8 +877,13 @@ export function normalizeEsmSpecifiers(outDir: string): { rewritten: number; unr
     const rewriteFile = (file: string): void => {
         const original = fs.readFileSync(file, "utf8");
         const dir = path.dirname(file);
+        const comments = commentSpans(original);
+        const inComment = (at: number) => comments.some(([start, end]) => at >= start && at < end);
 
-        const updated = original.replace(SPECIFIER, (match, prefix, quote, specifier) => {
+        const updated = original.replace(SPECIFIER, (match, prefix, quote, specifier, offset: number) => {
+            // Prose, not code. Neither rewritten nor reported — see commentSpans.
+            if (inComment(offset)) return match;
+
             // Already resolvable: has a real extension.
             if (/\.(js|mjs|cjs|json|node)$/.test(specifier)) return match;
 

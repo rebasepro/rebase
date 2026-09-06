@@ -32,7 +32,7 @@ const MANIFEST_TEXT = "export const BUNDLE_FORMAT_VERSION = 2;\nexport const RUN
  * `before` overrides the previous tag's artifacts, for the cases where the
  * baseline itself is what the test is about rather than the change to it.
  */
-function run({ version, now, before: baseline }) {
+function run({ version, now, before: baseline, pins = 0 }) {
     const before = {
         [SURFACE]: SURFACE_BEFORE,
         [DERIVED_NAMES]: "posts_pkey\nposts_author_id_fkey\n",
@@ -48,7 +48,11 @@ function run({ version, now, before: baseline }) {
             version,
             from: "v0.13.0",
             readAtTag: file => before[file] ?? null,
-            readNow: file => ({ ...before, ...now })[file] ?? null
+            readNow: file => ({ ...before, ...now })[file] ?? null,
+            // The template-pin axis has its own suite and its own repository
+            // shape; here it is held at "consistent" so these cases stay about
+            // the bump level.
+            templatePins: () => pins
         });
     } finally {
         console.log = log;
@@ -201,6 +205,19 @@ test("--allow-unguarded is how someone says they checked it another way", () => 
         console.log = log;
         console.error = error;
     }
+});
+
+test("a template naming something the release does not publish stops it", () => {
+    // Not a `break`: a break can ship deliberately as a minor with a note, and
+    // there is no deliberate version of publishing a scaffold that cannot boot.
+    // So neither the level nor the changelog can talk it round.
+    assert.equal(run({ version: "0.13.1", now: {}, pins: 1 }), 1);
+    assert.equal(run({
+        version: "0.14.0",
+        now: {},
+        before: { [CHANGELOG]: "# Changelog\n\n## [Unreleased]\n\n### Breaking\n\n- a break\n" },
+        pins: 1
+    }), 1);
 });
 
 test("the check refuses to run without a version or a tag", () => {

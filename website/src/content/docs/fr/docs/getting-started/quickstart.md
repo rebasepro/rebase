@@ -64,7 +64,7 @@ Fixez un port avec `rebase dev --port 3001`.
 
 | Option | Sur | Effet |
 |---|---|---|
-| `--yes` | `init` | Accepte toutes les valeurs par défaut. **Obligatoire quand aucun terminal ne peut répondre**, en CI par exemple |
+| `--yes` | `init` | Ne demande jamais rien. **Obligatoire quand aucun terminal ne peut répondre**, en CI par exemple. Il saute `git init` et l'installation des dépendances — en interactif les valeurs par défaut acceptent les deux, alors passez `--git` / `--install` si vous les voulez |
 | `--headless` | `init` | Un backend sans fichiers de collection et sans UI |
 | `--template <nom>` | `init` | Part d'un autre modèle que celui par défaut |
 | `--install` / `--no-install` | `init` | Lance le gestionnaire de paquets pour vous, ou non |
@@ -122,9 +122,13 @@ Lorsque vous ouvrez l'URL du frontend affichée par `rebase dev`, vous verrez l'
 2. Entrez votre adresse e-mail et votre mot de passe
 3. Vous êtes connecté — avec un accès administrateur complet
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+`rebase init` a aussi écrit `REBASE_ADMIN_EMAIL` et un `REBASE_ADMIN_PASSWORD` généré dans `.env`. Ce ne sont **pas** vos identifiants ici : `rebase dev` les ignore et le dit au démarrage. Ils appartiennent à un démarrage de production — `docker compose up`, ou tout ce qui tourne avec `NODE_ENV=production` — où cette fenêtre d'amorçage est fermée, parce que le serveur répond sur un nom d'hôte avant que vous ayez tapé quoi que ce soit. Voir [Votre premier administrateur](/fr/docs/getting-started/deployment#votre-premier-administrateur).
+
 ## Définir votre première collection
 
-Ouvrez `config/collections/` et créez un nouveau fichier. Exportez la collection en tant qu'**export par défaut** — c'est ainsi que le registre la détecte :
+Ouvrez `config/collections/` et créez un nouveau fichier. Exportez la collection en tant qu'**export par défaut** — c'est ainsi que le registre la détecte. Le nom de la table est optionnel : il vaut le slug par défaut, ne le définissez donc que s'ils diffèrent :
 
 ```typescript title="config/collections/products.ts"
 import { defineCollection } from "@rebasepro/cms-types";
@@ -132,8 +136,6 @@ import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
-    singularName: "Product",
-    table: "products",
     properties: {
         name: {
             type: "string",

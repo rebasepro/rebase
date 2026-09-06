@@ -63,7 +63,7 @@ produção, e são ignorados aqui.) Fixe uma porta com `rebase dev --port 3001`.
 
 | Flag | Em | O que faz |
 |---|---|---|
-| `--yes` | `init` | Aceita todos os padrões. **Obrigatório quando não há terminal para perguntar**, como em CI |
+| `--yes` | `init` | Nunca pergunta. **Obrigatório quando não há terminal para perguntar**, como em CI. Ele pula o `git init` e a instalação de dependências — de forma interativa os padrões dizem sim às duas, então passe `--git` / `--install` se as quiser |
 | `--headless` | `init` | Um backend sem arquivos de collection e sem UI |
 | `--template <nome>` | `init` | Parte de um template diferente do padrão |
 | `--install` / `--no-install` | `init` | Roda o gerenciador de pacotes por você, ou não |
@@ -120,9 +120,13 @@ Ao abrir a URL do frontend impressa pelo `rebase dev`, você verá a tela de log
 2. Digite seu e-mail e senha
 3. Você está dentro — com acesso total de administrador
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+O `rebase init` também escreveu `REBASE_ADMIN_EMAIL` e uma `REBASE_ADMIN_PASSWORD` gerada no `.env`. Aqui elas **não** são as suas credenciais: o `rebase dev` as ignora e diz isso no arranque. Elas pertencem a um arranque de produção — `docker compose up`, ou qualquer coisa com `NODE_ENV=production` —, onde essa janela de inicialização está fechada, porque o servidor responde num hostname antes de você ter digitado qualquer coisa. Veja [Seu primeiro administrador](/pt/docs/getting-started/deployment#seu-primeiro-administrador).
+
 ## Defina Sua Primeira Coleção
 
-Abra `config/collections/` e crie um novo arquivo. Exporte a coleção como **exportação padrão** (`default export`) — é assim que o registro a reconhece:
+Abra `config/collections/` e crie um novo arquivo. Exporte a coleção como **exportação padrão** (`default export`) — é assim que o registro a reconhece. O nome da tabela é opcional: por padrão é o slug, então defina-o apenas quando os dois divergirem:
 
 ```typescript title="config/collections/products.ts"
 import { defineCollection } from "@rebasepro/cms-types";
@@ -130,8 +134,6 @@ import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
-    singularName: "Product",
-    table: "products",
     properties: {
         name: {
             type: "string",

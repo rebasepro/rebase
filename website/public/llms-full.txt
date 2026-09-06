@@ -190,7 +190,7 @@ Pin a port with `rebase dev --port 3001`.
 
 | Flag | On | What it does |
 |---|---|---|
-| `--yes` | `init` | Accept every default. **Required when there is no terminal to prompt**, such as CI |
+| `--yes` | `init` | Never prompt. **Required when there is no terminal to answer**, such as CI. It skips git init and dependency install — the interactive defaults say yes to both, so pass `--git` / `--install` if you want them |
 | `--headless` | `init` | A backend with no collection files and no UI — see [Backend only](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Start from a template other than the default |
 | `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
@@ -250,6 +250,10 @@ When you open the frontend URL `rebase dev` printed, you'll see the login screen
 1. Click **Sign Up**
 2. Enter your email and password
 3. You're in — with full admin access
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+`rebase init` also wrote `REBASE_ADMIN_EMAIL` and a generated `REBASE_ADMIN_PASSWORD` into `.env`. Those are not your credentials here: `rebase dev` ignores them and says so at boot. They belong to a production boot — `docker compose up`, or anything with `NODE_ENV=production` — where this bootstrap window is closed, because the server answers on a hostname before you have typed anything. See [Your first admin](/docs/getting-started/deployment#your-first-admin).
 
 ### Define Your First Collection
 
@@ -28180,7 +28184,7 @@ Sets up the project structure with frontend, backend, and shared packages.
 |---|---|
 | `-t, --template <preset>` | `blog`, `ecommerce` or `blank`. Default `blog` |
 | `--headless` | Backend only — no admin panel and no collection files. `--template` has no effect, because there are no collections to seed |
-| `-y, --yes` | Accept every default and never prompt. **Required wherever there is no terminal to answer**, such as CI |
+| `-y, --yes` | Never prompt. **Required wherever there is no terminal to answer**, such as CI. It skips git init and dependency install — the interactive defaults say yes to both, so pass `--git` / `--install` if you want them |
 | `-i, --install` | Install dependencies after scaffolding |
 | `-g, --git` | Initialize a repository and make the first commit |
 | `--database-url <url>` | Use an existing database instead of the managed one |
@@ -30236,6 +30240,12 @@ through open registration is an ordinary account, `GET /api/auth/config` never
 advertises `needsSetup`, and `POST /api/admin/bootstrap` refuses. In 0.17.3 and
 earlier the window was open in production too, so upgrade before you expose a
 fresh deployment.
+
+`rebase dev` reads the same `.env` and deliberately ignores both variables, and
+says so at boot: locally the first registration is still the way in. The values
+`rebase init` wrote belong to the production boot. Seeding on both sides would
+spend the window before the developer had opened the app, which is what made the
+quickstart's own first step produce a role-less account.
 
 That leaves two ways in, neither of which is a race:
 

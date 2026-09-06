@@ -1806,6 +1806,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // the environment is what lets an artifact ship with self-registration
         // off and still be reachable by the person who deployed it.
         //
+        // Which makes this the production half of one contract, and it only acts
+        // there: `rebase dev` reads the same `.env` the compose stack does, so
+        // an unconditional seed spent the window before the developer had opened
+        // the app, and the documented first sign-up produced a role-less
+        // account. `seedInitialAdmin` announces the variables and declines while
+        // the window is open.
+        //
         // Awaited, so the account exists before the server accepts a request.
         // See ./auth/seed-admin.
         await seedInitialAdmin(authAdapter?.userManagement);

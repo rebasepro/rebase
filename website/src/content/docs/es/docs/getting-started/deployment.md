@@ -87,6 +87,39 @@ pnpm run db:push
 
 Si omites este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta. Ejecútalo desde un checkout del proyecto o desde CI con `DATABASE_URL` apuntando a producción, **no dentro del contenedor**: la imagen de producción se distribuye sin la CLI. Para migraciones versionadas, usa `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
 
+## Tu primer administrador
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+**Define `REBASE_ADMIN_EMAIL` y `REBASE_ADMIN_PASSWORD` antes del primer arranque.** Es el único paso que no tiene arreglo desde fuera.
+
+Una base de datos recién creada no tiene usuarios, y fuera de producción la política de registro admite el primer alta y la promueve a administrador. Tiene que hacerlo: nombrar a un administrador exige un llamante ya autenticado, así que una base de datos vacía sin esa regla es un callejón sin salida. En un portátil, quien está al teclado es el operador, y eso es exactamente lo correcto.
+
+Es exactamente lo incorrecto en un host con nombre público. Los artefactos publicados levantan DNS y TLS antes de que el operador haya escrito nada, así que la ventana está abierta a internet desde el primer segundo, y quien llegue primero al formulario de alta se queda con el despliegue.
+
+Por eso, bajo `NODE_ENV=production` esa ventana está cerrada. Una tabla de usuarios vacía rechaza el registro de arranque con `SETUP_REQUIRED`, una cuenta creada por registro abierto es una cuenta corriente, `GET /api/auth/config` nunca anuncia `needsSetup` y `POST /api/admin/bootstrap` se niega. En 0.17.3 y anteriores la ventana también estaba abierta en producción: actualiza antes de exponer un despliegue nuevo.
+
+`rebase dev` lee el mismo `.env`, pero ignora ambas variables a propósito y lo dice al arrancar: en local, el primer registro sigue siendo la forma de entrar. Los valores que escribió `rebase init` son del arranque de producción.
+
+Quedan dos formas de entrar, y ninguna es una carrera:
+
+```bash
+REBASE_ADMIN_EMAIL=tu@example.com
+REBASE_ADMIN_PASSWORD=<al menos 12 caracteres>
+DISABLE_SELF_REGISTRATION=true
+```
+
+El runtime crea esa cuenta una vez, mientras la tabla de usuarios está vacía, y no hace nada en los arranques siguientes. O asigna el rol a un usuario existente con la clave de servicio, si aprovisionas cuentas por otra vía.
+
+El runtime impone dos reglas al arrancar, y ambas producen si no una cuenta que nadie puede usar:
+
+- La contraseña debe tener **al menos 12 caracteres**, o se rechaza y no se crea ninguna cuenta.
+- La dirección debe ser una que acepte `POST /api/auth/login`: analiza su cuerpo con `z.string().email()`, así que un dominio sin punto (`admin@localhost`) se crea sin quejas y luego responde 400 en cada inicio de sesión. El arranque también rechaza esa dirección.
+
+Define ambas o ninguna: media credencial es una errata, y el despliegue que deja — autorregistro cerrado, sin administrador — sólo se recupera desde una consola `psql`. El arranque avisa cuando la tabla está vacía en producción y no se ha nombrado administrador.
+
+Inicia sesión y cambia la contraseña. Está en texto plano allí donde hayas puesto tu entorno.
+
 ## Lista de Verificación para Producción
 
 Antes de desplegar en producción, asegúrate de:
@@ -99,7 +132,7 @@ Antes de desplegar en producción, asegúrate de:
 | **CORS** | Configura los orígenes permitidos en tu backend si el frontend y el backend están en dominios diferentes |
 | **Volúmenes de almacenamiento** | Monta volúmenes persistentes para las subidas de archivos. O cambia a S3 para producción. |
 | **HTTPS** | Termina TLS en tu proxy inverso (nginx, Cloudflare, balanceador de carga) |
-| **Registro** | Establece `ALLOW_REGISTRATION=false` después de crear tu cuenta de administrador |
+| **Primer administrador** | Define `REBASE_ADMIN_EMAIL` y `REBASE_ADMIN_PASSWORD` **antes del primer arranque**, junto con `DISABLE_SELF_REGISTRATION=true`. En producción la primera cuenta registrada no se promueve — consulta [Tu primer administrador](#tu-primer-administrador). |
 
 | **Las lecturas públicas siguen necesitando un llamante** | `access: "public"` amplía qué *filas* ve un llamante, no quién puede llamar: una petición anónima a `/api/data/*` responde 401 mientras `AUTH_REQUIRE` esté activo. Pon `AUTH_REQUIRE=false` para un sitio público que lee su propio backend y deja que RLS decida por sí solo. Es una variable de entorno, así que un `.env` local que la defina **no** viaja con tu despliegue. |
 

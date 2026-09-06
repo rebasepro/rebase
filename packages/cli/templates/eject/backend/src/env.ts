@@ -2,10 +2,17 @@ import * as dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-// `z` comes from the runtime, not from "zod": `loadEnv({ extend })` composes
-// this schema with the framework's, and a schema built against a second copy
-// of zod fails the framework's instanceof checks and is silently dropped.
-import { loadEnv, z } from "@rebasepro/server";
+import { loadEnv } from "@rebasepro/server";
+// This should be `import { loadEnv, z } from "@rebasepro/server"`, and will be
+// in the first release that publishes that `z`. `loadEnv({ extend })` composes
+// the schema below with the framework's, and a schema built against a second
+// copy of zod fails the framework's instanceof checks and is silently dropped —
+// so taking `z` from the runtime is the only form that is reliably correct.
+// The `@rebasepro/server` version an ejected project pins does not export it
+// yet, and a template may only import what the version it pins publishes
+// (`pnpm check:templates`); an import of a symbol that is not there fails at
+// boot rather than at build. Switch both lines back when the version bumps.
+import { z } from "zod";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

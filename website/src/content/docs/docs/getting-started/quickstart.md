@@ -65,7 +65,7 @@ Pin a port with `rebase dev --port 3001`.
 
 | Flag | On | What it does |
 |---|---|---|
-| `--yes` | `init` | Accept every default. **Required when there is no terminal to prompt**, such as CI |
+| `--yes` | `init` | Never prompt. **Required when there is no terminal to answer**, such as CI. It skips git init and dependency install — the interactive defaults say yes to both, so pass `--git` / `--install` if you want them |
 | `--headless` | `init` | A backend with no collection files and no UI — see [Backend only](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Start from a template other than the default |
 | `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
@@ -125,6 +125,10 @@ When you open the frontend URL `rebase dev` printed, you'll see the login screen
 1. Click **Sign Up**
 2. Enter your email and password
 3. You're in — with full admin access
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+`rebase init` also wrote `REBASE_ADMIN_EMAIL` and a generated `REBASE_ADMIN_PASSWORD` into `.env`. Those are not your credentials here: `rebase dev` ignores them and says so at boot. They belong to a production boot — `docker compose up`, or anything with `NODE_ENV=production` — where this bootstrap window is closed, because the server answers on a hostname before you have typed anything. See [Your first admin](/docs/getting-started/deployment#your-first-admin).
 
 ## Define Your First Collection
 

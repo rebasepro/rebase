@@ -623,8 +623,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     // every SDK client, curl and Swagger link needs — and it is
                     // not derivable from the other, since the two ports are
                     // derived separately from this project's path.
-                    ["➜ API:   ", api],
-                    ["", ""]
+                    ["➜ API:   ", api]
                 ]
                 : [["", ""], ["✦ Rebase API is ready!", ""], ["➜ API:      ", api]];
 
@@ -647,8 +646,21 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                     lines.push(["  ", managedConnectionString]);
                     lines.push(["  ", "also: rebase db url"]);
                 }
-                lines.push(["", ""]);
             }
+
+            // Both halves of the first-admin rule, in the box the reader is
+            // looking at when they go to sign in.
+            //
+            // `rebase init` writes REBASE_ADMIN_EMAIL and a generated password
+            // into `.env` — for the compose stack, which runs in production,
+            // where the first-registration window is shut. Nothing said so, and
+            // `rebase dev` reads the same file, so the honest reading of that
+            // `.env` was "these are my credentials" and the documented first
+            // step — register, become the admin — looked broken.
+            lines.push(["", ""]);
+            lines.push(["First login: ", "the first account to register becomes admin"]);
+            lines.push(["  ", "(a production boot seeds REBASE_ADMIN_EMAIL from .env instead)"]);
+            lines.push(["", ""]);
 
             // Sized to its contents. A fixed width silently pushed the right
             // border off the moment a value was longer than the cell, and a
