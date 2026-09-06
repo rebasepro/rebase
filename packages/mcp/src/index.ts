@@ -239,26 +239,60 @@ function readDevState(projectDir: string): { baseUrl: string; serviceKey?: strin
     }
 }
 
+/** Warn about a discovered/registered `baseUrl` disagreement at most once. */
+const warnedBaseUrlMismatch = new Set<string>();
+
 /**
  * Try to auto-discover the backend from `.rebase/state.json` in the project dir.
  * Updates the project config in the registry if a running server is found.
+ *
+ * Discovery fills gaps. It never overrules what the operator wrote down —
+ * neither the token nor the URL. Overruling the URL was worse than overruling
+ * the token: a project registered against staging or production had its
+ * `baseUrl` replaced by `http://localhost:<devport>` for as long as
+ * `rebase dev` happened to be running in that directory, and every tool then
+ * delivered that project's `rk_live_` key to the local backend. The registered
+ * value is the deliberate one; the state file is a convenience.
+ *
+ * @param devState - Injected for tests; read from the project dir by default.
  */
-function autoDiscoverLocal(project: ProjectConfig): ProjectConfig {
-    if (!project.projectDir) return project;
+export function autoDiscoverLocal(
+    project: ProjectConfig,
+    devState: ReturnType<typeof readDevState> | undefined = undefined
+): ProjectConfig {
+    const state = devState !== undefined
+        ? devState
+        : project.projectDir
+            ? readDevState(project.projectDir)
+            : null;
+    if (!state) return project;
 
-    const devState = readDevState(project.projectDir);
-    if (!devState) return project;
+    if (project.baseUrl && state.baseUrl && project.baseUrl !== state.baseUrl) {
+        // stderr, not stdout: stdout is the MCP framing channel.
+        const key = `${project.name}::${project.baseUrl}::${state.baseUrl}`;
+        if (!warnedBaseUrlMismatch.has(key)) {
+            warnedBaseUrlMismatch.add(key);
+            process.stderr.write(
+                `[rebase-mcp] project "${project.name}" is registered against ${project.baseUrl}, ` +
+                `but a dev server is running at ${state.baseUrl}. The registered URL wins — ` +
+                `call rebase_project_switch with a project whose baseUrl is the dev server, ` +
+                `or rebase_project_add one, to target it.\n`
+            );
+        }
+    }
 
     return {
         ...project,
-        baseUrl: devState.baseUrl,
+        // A registered baseUrl wins over the discovered one, for the same
+        // reason the token does.
+        baseUrl: project.baseUrl || state.baseUrl,
         // A registered token wins over the discovered one. What discovery finds
         // is the dev server's *service key* — the unscoped admin secret — so
         // letting it win meant a deliberately narrow API key registered for
         // this project was silently upgraded to full admin on every call.
         // Discovery now only fills a gap, which is all the zero-config story
         // ever needed it to do.
-        token: project.token || devState.serviceKey || ""
+        token: project.token || state.serviceKey || ""
     };
 }
 
@@ -373,12 +407,16 @@ function initializeRegistry(): void {
     const fromEnv = envDeclaredProject();
 
     if (fromEnv || !registry.projects["default"]) {
-        const devState = readDevState(ENV_PROJECT_DIR);
         const envServiceKey = readServiceKeyFromEnv(ENV_PROJECT_DIR);
         registry.projects["default"] = {
             name: "default",
             projectDir: ENV_PROJECT_DIR,
-            baseUrl: ENV_BASE_URL || devState?.baseUrl || "http://localhost:3001",
+            // Deliberately no `devState.baseUrl` here either, for the same
+            // reason: `autoDiscoverLocal` fills an empty `baseUrl` per call, so
+            // a dev server started (or restarted on a new port) after this
+            // process booted is still found. `DEFAULT_BASE_URL` is applied by
+            // `getActiveProject` when discovery finds nothing.
+            baseUrl: ENV_BASE_URL || "",
             // Deliberately no `devState.serviceKey` here: this runs once, at
             // startup, and a key baked in now would outrank the freshly
             // discovered one for the rest of the process — so a dev server
@@ -483,6 +521,13 @@ type RebaseClient = {
 /** Client instances keyed by project name. */
 const clientCache = new Map<string, RebaseClient>();
 
+/**
+ * Where a project points when nobody said and no dev server is running.
+ * The last resort, applied after discovery — never written into the registry,
+ * because a stored value would then outrank the dev server discovery is for.
+ */
+export const DEFAULT_BASE_URL = "http://localhost:3001";
+
 /** Get the active project config, with auto-discovery applied. */
 function getActiveProject(): ProjectConfig {
     const name = registry.activeProject || "default";
@@ -490,7 +535,8 @@ function getActiveProject(): ProjectConfig {
     if (!project) {
         throw new Error(`No active project configured. Use rebase_project_add to register one.`);
     }
-    return autoDiscoverLocal(project);
+    const discovered = autoDiscoverLocal(project);
+    return discovered.baseUrl ? discovered : { ...discovered, baseUrl: DEFAULT_BASE_URL };
 }
 
 /** Get the project directory for the active project. */

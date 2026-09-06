@@ -17,6 +17,7 @@ import {
     findBackendDir,
     findDevDir,
     envDeclaredProject,
+    autoDiscoverLocal,
     explainToolError,
     answerCliFlags,
     lastLines
@@ -1177,6 +1178,44 @@ describe("the environment block outranks the persisted registry", () => {
             baseUrl: undefined,
             token: "rk_x"
         });
+    });
+});
+
+describe("local discovery fills gaps only", () => {
+    const registered = {
+        name: "staging",
+        projectDir: "/tmp/does-not-matter",
+        baseUrl: "https://staging.example.com",
+        token: "rk_live_default",
+        addedAt: "2020-01-01T00:00:00.000Z"
+    };
+    const devState = { baseUrl: "http://localhost:3070", serviceKey: "dev-service-key-000000000000000000", pid: process.pid };
+
+    it("keeps a registered baseUrl when a dev server is running", () => {
+        const resolved = autoDiscoverLocal({ ...registered }, devState);
+        expect(resolved.baseUrl).toBe("https://staging.example.com");
+        expect(resolved.token).toBe(registered.token);
+    });
+
+    it("fills an empty baseUrl and an empty token from the dev server", () => {
+        const resolved = autoDiscoverLocal({ ...registered, baseUrl: "", token: "" }, devState);
+        expect(resolved.baseUrl).toBe("http://localhost:3070");
+        expect(resolved.token).toBe(devState.serviceKey);
+    });
+
+    it("warns on stderr when the registered URL and the dev server disagree", () => {
+        const warn = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        autoDiscoverLocal({ ...registered, name: `staging-${Math.random()}` }, devState);
+        const written = warn.mock.calls.map((c) => String(c[0])).join("");
+        expect(written).toContain("https://staging.example.com");
+        expect(written).toContain("http://localhost:3070");
+        expect(written).toContain("registered URL wins");
+        warn.mockRestore();
+    });
+
+    it("leaves the project alone when no dev server is running", () => {
+        const resolved = autoDiscoverLocal({ ...registered }, null);
+        expect(resolved).toEqual(registered);
     });
 });
 
