@@ -388,6 +388,22 @@ export function rewritePackagesToTarballs(projectPath: string, packageTarballs: 
                 "drizzle-orm": "^0.44.4"
             };
 
+            // pnpm 11 no longer reads `pnpm.overrides` out of package.json — it
+            // warns and ignores the key — so the overrides that point every
+            // importer at the tarballs go into the scaffold's own
+            // `pnpm-workspace.yaml`, where pnpm reads them. The package.json
+            // copy stays for npm, which still honours `overrides` there.
+            const workspaceFile = path.join(projectPath, "pnpm-workspace.yaml");
+            if (fs.existsSync(workspaceFile)) {
+                const withoutOld = fs.readFileSync(workspaceFile, "utf-8")
+                    .replace(/\noverrides:\n(?:[ \t]+.*\n?)*/g, "\n")
+                    .replace(/\s*$/, "\n");
+                const block = Object.entries(pkg.pnpm.overrides)
+                    .map(([name, spec]) => `  "${name}": "${spec}"`)
+                    .join("\n");
+                fs.writeFileSync(workspaceFile, `${withoutOld}overrides:\n${block}\n`, "utf-8");
+            }
+
             if (!pkg.devDependencies) {
                 pkg.devDependencies = {};
             }
