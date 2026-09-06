@@ -1,5 +1,5 @@
 ---
-sourceHash: 36838c587151b5fb
+sourceHash: 18e92afb4a0b8644
 slug: fr/docs/upgrading/0-17-to-next
 title: Migrer de 0.17 vers la prochaine version
 sidebar_label: 0.17 → prochaine
@@ -95,6 +95,17 @@ le `.nvmrc` du dépôt.
 répond à une incompatibilité d'engines par `[WARN] Unsupported engine` et
 installe quand même : l'échec n'arrive donc pas à l'installation, mais plus tard,
 à un endroit où Node n'est jamais mentionné.
+
+## 26. Un projet avec seulement des buckets nommés nomme son défaut
+
+`bucket("media")` seul était auparavant promu bucket par défaut au démarrage,
+avec un avertissement. Le démarrage refuse désormais lorsqu'aucun bucket n'est le
+défaut.
+
+**À changer :** si tous les buckets de `config/resources.ts` sont nommés,
+marquez-en un — `bucket("media", { default: true })` — ou ajoutez un
+`bucket("(default)")` à côté. Un projet qui déclare déjà un défaut n'a rien à
+faire.
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: c719f1cf36899c0a
+sourceHash: b8fb2609d1a27893
 title: Beziehungen
 sidebar_label: Beziehungen
 description: Definieren Sie Eins-zu-Eins-, Eins-zu-Viele- und Viele-zu-Viele-SQL-Beziehungen zwischen Sammlungen mit Fremdschlüsseln, Verbindungstabellen und Multi-Hop-Joins.
@@ -18,7 +18,9 @@ Beziehungen können entweder inline innerhalb der Eigenschaft oder explizit im `
 
 ### 1. Inline-Beziehungen (Empfohlen)
 
-Sie können die Beziehung direkt in der Eigenschaft definieren. Das Framework extrahiert diese zur Normalisierungszeit automatisch in das `relations[]` der Sammlung, sodass Sie keinen separaten `relations[]`-Eintrag mehr für Eigenschaften benötigen.
+Deklarieren Sie die Verknüpfung an der Eigenschaft, verschachtelt unter
+`relation`. Wählen Sie die `kind`, und der Typ bietet genau die Felder an, die
+diese Art benötigt.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -34,8 +36,7 @@ const postsCollection = defineCollection({
             name: "Author",
             relation: {
                 kind: "belongsTo",
-                target: () => usersCollection,
-                localKey: "author_id"
+                target: () => usersCollection
             }
         }
     }
@@ -44,92 +45,146 @@ const postsCollection = defineCollection({
 
 ### 2. Explizites Beziehungen-Array
 
-Für fortgeschrittene Anwendungsfälle oder wenn eine Beziehung nicht direkt einem Formularfeld zugeordnet werden kann, können Sie sie im `relations`-Array definieren:
+Für eine Verknüpfung ohne eigene Eigenschaft — nichts, wonach sie im Formular
+oder in einer Tabellenspalte benannt werden könnte — deklarieren Sie sie in
+`relations`:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
-const postsCollection = defineCollection({
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
+const usersCollection = defineCollection({
+    slug: "users",
+    name: "Users",
+    table: "users",
     properties: {
-        title: { type: "string", name: "Title" },
-        content: { type: "string", name: "Content", admin: { multiline: true } },
-        author: { type: "relation", name: "Author", relationName: "author" }
+        name: { type: "string", name: "Name" }
     },
     relations: [
         {
-            kind: "belongsTo",
-            relationName: "author",
-            target: () => usersCollection,
-            localKey: "author_id"
+            kind: "hasMany",
+            relationName: "posts",
+            target: () => postsCollection
         }
     ]
 });
 ```
 
-## Beziehungstypen
+## Die fünf Arten
 
-### Eins-zu-Eins / Viele-zu-Eins
+Eine Beziehung ist eine von fünf Arten. Die Art entscheidet, wo der Schlüssel
+liegt, ob eine Zeile oder viele zurückkommen und was ein Schreibvorgang durch
+sie hindurch anfassen darf.
 
-Ein Fremdschlüssel in **dieser** Tabelle verweist auf den Primärschlüssel einer anderen Tabelle.
+| Art | Der Schlüssel liegt | Liefert | Hinweise |
+|---|---|---|---|
+| `belongsTo` | auf **dieser** Tabelle | eine | `localKey`, Standard `<relationName>_id` |
+| `hasOne` | auf der Tabelle des **Ziels** | eine | `foreignKeyOnTarget`, Standard `<thisCollection>_id` |
+| `hasMany` | auf der Tabelle des **Ziels** | viele | Kinder gehören allein zu diesem Elternteil |
+| `manyToMany` | in einer **Verbindungstabelle** | viele | Zeilen werden geteilt; Ihnen gehört die Verknüpfung |
+| `via` | ein expliziter `joinPath` | beides | schreibgeschützt; `cardinality` geben Sie selbst an |
+
+Jedes Feld außer `kind` und `target` ist optional — der Rest wird abgeleitet.
+
+### belongsTo — der Schlüssel liegt auf dieser Tabelle
+
+```typescript
+author: {
+    type: "relation",
+    name: "Author",
+    relation: { kind: "belongsTo", target: () => usersCollection }
+}
+// → posts.author_id
+```
+
+### hasMany / hasOne — der Schlüssel liegt auf ihrer
+
+```typescript
+relations: [
+    { kind: "hasMany", relationName: "posts", target: () => postsCollection }
+]
+// → reads posts.user_id
+```
+
+`hasOne` ist dieselbe Verknüpfung mit höchstens einer Zeile auf der Gegenseite.
+
+#### Join über einen natürlichen Schlüssel
+
+Standardmäßig hält der Fremdschlüssel des Ziels die **id** der Quellzeile.
+Werden die beiden Seiten über etwas anderes verbunden — eine externe
+Identitäts-Id, eine SKU, ein Mandanten-Slug —, benennen Sie diese Spalte mit
+`sourceKey`:
 
 ```typescript
 relations: [
     {
-        kind: "belongsTo",           // The FK is on THIS table
-        relationName: "author",
-        target: () => usersCollection,
-        localKey: "author_id"        // Column on the posts table
+        kind: "hasMany",
+        relationName: "applications",
+        target: () => applicationsCollection,
+        sourceKey: "auth_user_id",          // column on THIS table
+        foreignKeyOnTarget: "auth_user_id"  // column on the TARGET's table
     }
 ]
+// → reads applications.auth_user_id = talents.auth_user_id
 ```
 
-Dies erzeugt: `posts.authorId → users.id`
+`sourceKey` ist das Spiegelbild von `localKey` bei `belongsTo`: jenes benennt
+die Spalte, aus der diese Seite liest, dieses die Spalte, auf die die andere
+Seite zeigt. Ohne es ist eine Verknüpfung wie die obige als `hasMany` überhaupt
+nicht ausdrückbar und muss auf [`via`](#via--eine-explizite-join-kette)
+zurückfallen, das schreibgeschützt ist.
 
-### Eins-zu-Viele (Invers)
+Die Spalte muss eindeutig sein. Eine Verknüpfung, die mehr als eine Quellzeile
+adressiert, kann nicht sagen, zu welcher eine verwandte Zeile gehört, und
+Postgres akzeptiert einen Fremdschlüssel auf eine nicht-eindeutige Spalte
+ebenso wenig. Rebase prüft das zur Lesezeit und verweigert, statt eine
+auszuwählen.
 
-Der Fremdschlüssel befindet sich in der **Ziel**tabelle und verweist zurück auf diese Entität.
+Ein Elternteil, dessen `sourceKey` `NULL` ist, erreicht keine Zeilen, und das
+Schreiben durch die Beziehung ist ein Fehler — es gibt nichts, worauf die
+verwandten Zeilen zeigen könnten.
+
+### manyToMany — über eine Verbindungstabelle
 
 ```typescript
-// On the Users collection:
-relations: [
-    {
-        kind: "hasMany",                 // The FK is on the TARGET table
-        relationName: "posts",
-        target: () => postsCollection,
-        foreignKeyOnTarget: "authorId"  // Column on the posts table
-    }
-]
+tags: {
+    type: "relation",
+    name: "Tags",
+    relation: { kind: "manyToMany", target: () => tagsCollection }
+}
+// → junction `posts_tags` (both table names, sorted), columns post_id / tag_id
 ```
 
-### Viele-zu-Viele (Verbindungstabelle)
-
-Zwei Sammlungen, die über eine zwischengeschaltete Verbindungstabelle verbunden sind.
+Beide Seiten deklarieren ihre eigene, und jede schreibt `through` **aus ihrer
+eigenen Sicht** — `sourceColumn` benennt immer *diese* Sammlung:
 
 ```typescript
-// On the Users collection:
-relations: [
-    {
-        kind: "manyToMany",
-        relationName: "roles",
-        target: () => rolesCollection,
-        through: {
-            table: "user_roles",         // Junction table name
-            sourceColumn: "userId",     // FK to this collection
-            targetColumn: "role_id"      // FK to target collection
-        }
-    }
-]
+// on posts
+{ kind: "manyToMany", relationName: "tags", target: () => tagsCollection,
+  through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } }
+
+// on tags
+{ kind: "manyToMany", relationName: "posts", target: () => postsCollection,
+  through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" } }
 ```
 
-Dies erzeugt:
-```sql
-CREATE TABLE user_roles (
-    userId INTEGER REFERENCES users(id),
-    role_id INTEGER REFERENCES roles(id),
-    PRIMARY KEY (userId, role_id)
-);
+### via — eine explizite Join-Kette
+
+Für Verknüpfungen, die die vier obigen Formen nicht ausdrücken können:
+Multi-Hop-Pfade, zusammengesetzte Schlüssel oder ein Join, dessen Bedingung kein
+einfacher Fremdschlüssel ist. Schreibgeschützt — Rebase leitet nicht ab, wie
+durch eine beliebige Kette hindurch geschrieben werden soll.
+
+```typescript
+{
+    kind: "via",
+    relationName: "permissions",
+    target: () => permissionsCollection,
+    cardinality: "many",
+    joinPath: [
+        { table: "user_roles",       on: { from: "id",            to: "user_id" } },
+        { table: "role_permissions", on: { from: "role_id",       to: "role_id" } },
+        { table: "permissions",      on: { from: "permission_id", to: "id" } }
+    ]
+}
 ```
 
 ## Beziehungseigenschaften
@@ -141,7 +196,7 @@ properties: {
     author: {
         type: "relation",
         name: "Author",
-        target: () => usersCollection, // Target collection
+        relation: { kind: "belongsTo", target: () => usersCollection },
         widget: "select"           // "select" (dropdown) or "dialog" (full picker)
     }
 }
@@ -149,9 +204,51 @@ properties: {
 
 Beim Rendern einer Vorschau (z. B. in einer Tabellenzelle oder einem Referenz-Chip) übernimmt Rebase die Hydration automatisch.
 
+### Zu-eins bekommt einen Picker, viele einen Tab
+
+Die Kardinalität entscheidet über die Oberfläche, und es wird nur eine
+verwendet:
+
+- **`belongsTo` / `hasOne`** — eine Zeile, die Eigenschaft ist also ein
+  Fremdschlüssel, den der Autor bearbeitet. Sie wird als der obige Picker
+  gerendert.
+- **`hasMany` / `manyToMany`** — viele Zeilen, die Entitätsansicht listet sie
+  also in einem **eigenen Tab** auf. Die Eigenschaft wird nicht im Formular
+  gerendert: Die Kinder einer Sammlung sind eine Liste, kein Wert, den der
+  Datensatz hält, und sie aus einem Dropdown auszuwählen ist nichts, was das
+  Formular sinnvoll anbieten kann.
+
+Eine Viele-Beziehung dennoch als Eigenschaft zu deklarieren lohnt sich: Sie ist
+es, die den Tab benennt, und sie gibt der Beziehung eine Spalte in der
+Sammlungstabelle, die der Listen-Abruf hydriert, sodass die Kindzeilen als Chips
+in der Zeile erscheinen. Nur das Formularfeld entfällt.
+
+In der Tabelle bekommt eine Beziehung mit eigener Eigenschaft **eine** Spalte:
+ihre eigene. Jeder Tab hat außerdem eine Spalte mit einer Sprung-zum-Tab-Taste,
+aber bei einer per Eigenschaft deklarierten Beziehung wiederholte diese Taste
+dieselbe Überschrift neben einer Spalte, die die Kinder bereits zeigt — sie
+entfällt daher. Blenden Sie die Spalte der Beziehung aus
+(`admin: { hideFromCollection: true }`), und die Taste kommt zurück, sodass die
+Beziehung nie ganz aus der Tabelle fällt.
+
+Wenn Sie den Inline-Picker trotzdem wollen, verlangen Sie ihn:
+
+```typescript
+properties: {
+    tags: {
+        type: "relation",
+        name: "Tags",
+        relation: { kind: "manyToMany", target: () => tagsCollection },
+        admin: { renderInForm: true }   // off by default; the tab is the default treatment
+    }
+}
+```
+
 ## Multi-Hop-Joins
 
-Für komplexe Beziehungen, die mehrere Tabellen durchqueren, verwenden Sie `joinPath`:
+Für Beziehungen, die mehrere Tabellen durchqueren, verwenden Sie `kind: "via"`
+mit einem `joinPath`. Diese sind schreibgeschützt: Rebase leitet nicht ab, wie
+durch eine beliebige Kette hindurch geschrieben werden soll.
 
 ```typescript
 // Users → Permissions through Roles
@@ -164,7 +261,7 @@ relations: [
         joinPath: [
             {
                 table: "user_roles",
-                on: { from: "id", to: "userId" }
+                on: { from: "id", to: "user_id" }
             },
             {
                 table: "roles",
@@ -295,16 +392,19 @@ const { data } = await client.data.articles.find({
 Wenn enthalten, enthält die Antwort sowohl den **skalaren Fremdschlüssel** als auch das **hydrierte Beziehungsobjekt**:
 
 ```typescript
-const { data } = await client.data.articles
+const { data } = await client.data
+    .collection<{ id: string; authorId: string; author?: { name: string } }>("articles")
     .include("author")
     .find();
 
+// The SDK returns flat rows — there is no `.values` wrapper. (`Entity`, with
+// `id`/`path`/`values`, is an admin-UI view model, not what the client hands back.)
 for (const article of data) {
     // Scalar FK — always present
-    article.values.authorId;     // "uuid-1234"
+    article.authorId;     // "uuid-1234"
 
     // Hydrated relation — only present when included
-    article.values.author?.name;  // "Jane Doe"
+    article.author?.name;  // "Jane Doe"
 }
 ```
 
@@ -312,7 +412,97 @@ for (const article of data) {
 
 Für die vollständige Referenz zum Query Builder (Filtern, Sortieren, Paginierung, Echtzeit) siehe die [Client SDK-Dokumentation](/docs/sdk).
 
+## Beziehungen im Admin-Panel
+
+Jede Zu-viele-Beziehung — `hasMany`, `manyToMany` oder ein Zu-viele-`via` — wird
+im Admin-Panel zu einem **Tab** unter einem Datensatz, der die Zeilen auflistet,
+die dieser Datensatz erreicht.
+
+### Das Pfadsegment ist der Beziehungsname
+
+Eine Kindliste wird als `parent/parentId/relationName` adressiert:
+
+```
+/c/authors/a-1/posts          the posts of author a-1
+/c/posts/p-1/tags             the tags of post p-1
+```
+
+Das letzte Segment ist der **Beziehungsname**, nicht der Slug der Zielsammlung.
+Beide sind oft gleich, weil eine unbenannte Beziehung den Slug ihres Ziels
+übernimmt — eine Inline-Beziehungseigenschaft übernimmt jedoch den
+*Eigenschaftsschlüssel*:
+
+```typescript
+properties: {
+    featuredTags: {
+        type: "relation",
+        relation: { kind: "manyToMany", target: () => tagsCollection }
+    }
+}
+// tab and path segment: featuredTags   (not "tags")
+```
+
+Das ist auch der Grund, warum zwei Beziehungen zur selben Sammlung
+funktionieren: Jede hat ihren eigenen Namen, also ihren eigenen Tab und ihren
+eigenen Pfad.
+
+### Eigene Zeilen gegenüber geteilten Zeilen
+
+Was ein Tab Ihnen erlaubt, hängt davon ab, wie die Beziehung gespeichert ist,
+denn die beiden Fälle bedeuten Unterschiedliches:
+
+| | Eins-zu-viele (`foreignKeyOnTarget`) | Viele-zu-viele (`through`) |
+|---|---|---|
+| Das Kind gehört zu | allein diesem Elternteil | jedem Elternteil, das es verknüpft |
+| Anlegen | legt die Zeile unter diesem Elternteil an | legt die Zeile an und verknüpft sie |
+| Vorhandenes hinzufügen | — | verknüpft eine vorhandene Zeile |
+| Entfernen | **löscht** die Zeile | **löst** die Verknüpfung; die Zeile bleibt unberührt |
+
+Das Admin-Panel rendert das entsprechend: Ein Viele-zu-viele-Tab bietet
+**Vorhandenes hinzufügen** und **Aus diesem Datensatz entfernen** an, und nie ein
+Löschen, das die Zeile anderen Elternteilen wegnähme.
+
+### Dieselben Regeln über REST
+
+Kindlisten sind gewöhnliche Sammlungsabfragen, eingeschränkt auf einen
+Elternteil, und akzeptieren daher alles, was eine Wurzelliste akzeptiert —
+Filter, `orderBy`, `limit`, `offset`, `include` —, und `meta.total` zählt die
+gefilterten Zeilen. Filtern Sie entweder pro Feld (`?field=op.value`) oder mit
+einem ganzen Objekt `?where={"field":["op","value"]}`; beides erreicht dieselbe
+Abfrage:
+
+```
+GET    /api/data/authors/a-1/posts?status=eq.published&orderBy=title&limit=20
+GET    /api/data/authors/a-1/posts?where={"status":["==","published"]}&orderBy=title
+GET    /api/data/authors/a-1/posts/p-1
+POST   /api/data/authors/a-1/posts          create under this parent
+PATCH  /api/data/authors/a-1/posts/p-1      update; will not reparent
+DELETE /api/data/authors/a-1/posts/p-1      delete (one-to-many) / unlink (many-to-many)
+```
+
+Das Elternsegment wird durchgesetzt, es ist keine Dekoration. Eine Zeile zu
+adressieren, die nicht unter diesem Elternteil liegt, ergibt `404`, und `PATCH`
+verschiebt eine Zeile nie von einem Elternteil zu einem anderen — setzen Sie den
+Fremdschlüssel ausdrücklich, wenn Sie genau das wollen.
+
+Bei einer Viele-zu-viele-Beziehung ist `PATCH parent/id/child/childId`
+*Mengenzugehörigkeit*: Es verknüpft die Zeile, falls sie noch nicht verknüpft
+ist, und ist idempotent. So hängen Sie eine bereits vorhandene Zeile an.
+
+### Was nicht zu einem Tab wird
+
+- **Zu-eins-Beziehungen** — sie sind ein Feld am Datensatz, keine Liste. Das
+  Schreiben über einen Zu-eins-Pfad wird abgelehnt: Der Fremdschlüssel liegt auf
+  der Tabelle des Elternteils.
+- **Beziehungen, die innerhalb einer `map` deklariert sind** — sie sind ein Feld
+  dieser Map.
+
 ## Vollständige Beziehungsschnittstelle
+
+`Relation` ist eine geschlossene Union — ein Mitglied pro Art, das jeweils nur
+die Felder trägt, die diese Art hat. Es gibt keine Feldkombination, die zwei
+verschiedene Verknüpfungen beschreibt, und kein Feld, das Sie setzen können und
+das die Art nicht verwendet.
 
 ```typescript
 type Relation =
@@ -322,17 +512,16 @@ type Relation =
     | ManyToManyRelation
     | ViaRelation;
 
-// Every kind carries these:
 interface RelationBase {
-    relationName?: string;
+    relationName?: string;          // defaults to the property key, then the target's slug
     target: () => CollectionConfig;
-    inverseRelationName?: string;
-    onUpdate?: "cascade" | "restrict" | "no action" | "set null" | "set default";
-    onDelete?: "cascade" | "restrict" | "no action" | "set null" | "set default";
-    overrides?: Partial<CollectionConfig>;
+    onUpdate?: OnAction;
+    onDelete?: OnAction;
+    overrides?: Partial<CollectionConfig>;   // applied when rendered as a tab
 }
+// `required` is not here. It is `validation: { required: true }` on the
+// property that declares the relation, the same key every other field uses.
 
-// ...and only the fields its own kind uses:
 interface BelongsToRelation extends RelationBase {
     kind: "belongsTo";
     localKey?: string;              // column on THIS table
@@ -340,29 +529,45 @@ interface BelongsToRelation extends RelationBase {
 
 interface HasOneRelation extends RelationBase {
     kind: "hasOne";
-    foreignKeyOnTarget?: string;    // column on the TARGET table
+    foreignKeyOnTarget?: string;    // column on the TARGET's table
+    sourceKey?: string;             // column on THIS table; defaults to the primary key
 }
 
 interface HasManyRelation extends RelationBase {
     kind: "hasMany";
-    foreignKeyOnTarget?: string;    // column on the TARGET table
+    foreignKeyOnTarget?: string;    // column on the TARGET's table
+    sourceKey?: string;             // column on THIS table; defaults to the primary key
 }
 
 interface ManyToManyRelation extends RelationBase {
     kind: "manyToMany";
-    through?: {
-        table?: string;
-        sourceColumn?: string;      // FK naming THIS collection
-        targetColumn?: string;
-    };
+    through?: { table?: string; sourceColumn?: string; targetColumn?: string };
 }
 
 interface ViaRelation extends RelationBase {
     kind: "via";
     cardinality: "one" | "many";    // a join chain cannot imply it
-    joinPath: JoinStep[];           // read-only
+    joinPath: JoinStep[];
 }
 ```
+
+### Die aufgelöste Form
+
+Was Sie oben schreiben, ist die *Autoren*-Form. Intern arbeitet Rebase mit
+`ResolvedRelation`: dieselbe Verknüpfung mit allen eingesetzten Standardwerten
+und nichts Optionalem, dazu `cardinality`, `targetSlug` und zwei Flags —
+`writable` (nur bei `via` false) und `shared` (true, wenn die Zielzeilen auch
+anderen Elternteilen gehören, ein Entfernen also die Verknüpfung löst, statt zu
+löschen).
+
+`sourceKey` ist die eine Ausnahme von „nichts Optionales“: Sein Standardwert ist
+der Primärschlüssel der Quelle, und um den aufzulösen, bräuchte es das Schema des
+Treibers, das die Auflösung nicht hat. `undefined` bedeutet dort „der
+Primärschlüssel“ und sonst nichts.
+
+Sie schreiben nie eine `ResolvedRelation`. An einer Beziehungseigenschaft gehört
+`relation` Ihnen, und `resolvedRelation` ist die ausgefüllte, während der
+Normalisierung gestempelte Fassung.
 
 ## Nächste Schritte
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6463f2ed4a86c836
+sourceHash: 8375c766b4952cf8
 title: Início Rápido
 sidebar_label: Início Rápido
 description: Crie um novo projeto Rebase e execute-o localmente em menos de 2 minutos.
@@ -11,13 +11,18 @@ description: Crie um novo projeto Rebase e execute-o localmente em menos de 2 mi
 pnpm dlx @rebasepro/cli init my-app
 ```
 
-Isso estrutura um projeto com três pacotes:
+Isso estrutura um projeto com três pacotes. Se alguma das palavras *coleção*,
+*Studio*, *runtime gerenciado*, *bundle* ou *recurso* for nova para você, o
+quadro de cinco palavras em [Estrutura do
+Projeto](/docs/getting-started/project-structure/) as define.
+
+
 
 | Pasta | Descrição |
 |--------|-------------|
 | `frontend/` | SPA React — Vite + TypeScript com a interface de administração Rebase |
-| `backend/` | Servidor Node.js — Hono, PostgreSQL via Drizzle ORM, WebSocket |
-| `config/` | Definições de coleção TypeScript compartilhadas por ambos os lados |
+| `backend/` | As suas próprias funções e crons, mais o esquema Drizzle gerado. Não existe arquivo de servidor — é o runtime publicado que inicia o projeto |
+| `config/` | Arquivos de configuração e definições de coleção compartilhados por ambos os lados |
 
 ## Pré-requisitos
 
@@ -64,11 +69,11 @@ produção, e são ignorados aqui.) Fixe uma porta com `rebase dev --port 3001`.
 | Flag | Em | O que faz |
 |---|---|---|
 | `--yes` | `init` | Nunca pergunta. **Obrigatório quando não há terminal para perguntar**, como em CI. Ele pula o `git init` e a instalação de dependências — de forma interativa os padrões dizem sim às duas, então passe `--git` / `--install` se as quiser |
-| `--headless` | `init` | Um backend sem arquivos de collection e sem UI |
+| `--headless` | `init` | Um backend sem arquivos de collection e sem UI — veja [Somente backend](/docs/getting-started/headless/) |
 | `--template <nome>` | `init` | Parte de um template diferente do padrão |
 | `--install` / `--no-install` | `init` | Roda o gerenciador de pacotes por você, ou não |
 | `--docker` | `dev` | Usa PostgreSQL em container em vez do gerenciado |
-| `--no-db` | `dev` | Não toca em banco nenhum; você traz o seu |
+| `--no-db` | `dev` | Não sobe banco nenhum — nem o container nem o gerenciado. Defina `DATABASE_URL` você mesmo |
 
 ## Variante: seu próprio PostgreSQL
 
@@ -83,7 +88,8 @@ Depois suba os servidores como acima. Uma `DATABASE_URL` já definida nunca é
 tocada, e uma que aponta para fora desta máquina é deixada inteiramente em paz.
 
 Com um banco seu você ainda ganha os comandos de migração, que o gerenciado não
-pode oferecer: eles planejam as mudanças com o Atlas, que precisa de um segundo
+pode oferecer: eles planejam as mudanças com o [Atlas](https://atlasgo.io/), o
+motor de migração de esquema com que o Rebase planeja, que precisa de um segundo
 banco vazio para comparar, e o PGlite serve exatamente um:
 
 ```bash
@@ -91,9 +97,11 @@ pnpm run db:push
 ```
 
 O boot já cria as tabelas que faltam de forma aditiva, então `db push` é para as
-duas coisas que ele deixa de lado de propósito: a RLS das tabelas de junção em
-relações muitos-para-muitos e qualquer mudança que não seja puramente aditiva —
-uma coluna renomeada, um tipo restringido, um campo removido.
+duas coisas que ele deixa de lado de propósito: a
+[RLS](/docs/collections/security-rules/) das tabelas de junção — a segurança em
+nível de linha do PostgreSQL, que é como o Rebase impõe quem pode ler uma linha —
+em relações muitos-para-muitos, e qualquer mudança que não seja puramente
+aditiva: uma coluna renomeada, um tipo restringido, um campo removido.
 
 O scaffold também traz um `docker-compose.yml` com um serviço PostgreSQL, caso
 você prefira um container a um Postgres instalado:
@@ -179,13 +187,21 @@ export const collections = [
 
 ## Crie a Tabela
 
-Envie a nova coleção para o banco de dados:
+Salve o arquivo. O passo é esse: o `rebase dev` regenera
+`backend/src/schema.generated.ts` a partir das suas coleções, reinicia o backend,
+e o boot cria a nova tabela — então a sua coleção **Products** aparece na
+navegação.
+
+O mesmo vale para uma propriedade adicionada a uma coleção que você já tem:
+salve, e a coluna está lá.
+
+`rebase db push` é para as mudanças que o boot deixa de lado de propósito — uma
+coluna renomeada, um tipo restringido, um campo removido, e a RLS das tabelas de
+junção em relações muitos-para-muitos. Ele precisa do seu próprio PostgreSQL:
 
 ```bash
 pnpm run db:push
 ```
-
-Isso regenera o esquema a partir das suas coleções e o aplica. Reinicie os servidores de desenvolvimento e sua nova coleção de **Produtos** aparecerá na navegação.
 
 ## Referência de Comandos do Banco de Dados
 

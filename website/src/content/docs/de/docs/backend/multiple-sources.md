@@ -1,5 +1,5 @@
 ---
-sourceHash: b2263faa9ec92398
+sourceHash: 7dadf2d57e6bfecf
 title: Mehrere Datenbanken und Buckets
 sidebar_label: Mehrere Quellen
 description: Leiten Sie Collections an verschiedene Datenbanken und Properties an verschiedene Storage-Buckets weiter und konfigurieren Sie jede einzelne über die Umgebung.
@@ -7,23 +7,25 @@ description: Leiten Sie Collections an verschiedene Datenbanken und Properties a
 
 ## Übersicht
 
-Ein Projekt ist nicht auf eine Datenbank und einen Bucket beschränkt. Collections
-leiten bereits über `dataSource` weiter und Datei-Properties über `storageSource`; auf dieser Seite geht
-es darum, wie jede benannte Quelle ihre Konfiguration erhält.
+Ein Projekt ist nicht auf eine Datenbank und einen Bucket beschränkt. Alles, was
+ein Projekt benötigt und einen Namen hat — eine Datenbank, ein Bucket, ein
+Topic, eine Queue — wird **mit einem Konstruktor in Ihrer Konfiguration
+deklariert** und über eine aus seinem Schlüssel abgeleitete Umgebungsvariable
+konfiguriert. Crons und Functions sind Dateien, und sie gelangen unter dem Namen
+der Datei in denselben Graphen.
 
-Zwei Schritte: **Deklarieren** Sie die Quellen in Ihrem Konfigurationspaket und **konfigurieren** Sie
-dann jede einzelne mit Umgebungsvariablen, die von ihrem Schlüssel abgeleitet werden.
+Eine Regel, unabhängig von der Art: Es gibt keine zweite Stelle, an der man
+nachsehen müsste, und nichts, was von Hand synchron gehalten werden muss.
 
 ## Ressourcen deklarieren
 
-Alles, was ein Projekt benötigt und einen Namen hat — eine Datenbank, ein
-Bucket, ein Topic — wird **mit einem Konstruktor deklariert**, in
-`config/resources.ts`. Eine Regel, unabhängig von der Art: es gibt keine zweite
-Stelle, an der man nachsehen müsste.
+Legen Sie sie in `config/resources.ts` ab. Sie zu exportieren ist gute Praxis —
+so haben Sie etwas zum Importieren —, aber registriert werden sie durch die
+Deklaration selbst.
 
 ```ts
 // config/resources.ts
-import { bucket, database, topic } from "@rebasepro/types";
+import { bucket, database, queue, topic } from "@rebasepro/types";
 
 /** Die Datenbank des Projekts. Liest DATABASE_URL, wie bisher. */
 export const main = database();
@@ -36,16 +38,102 @@ export const media = bucket("media", { engine: "s3", label: "Public media" });
 
 /** Ein Topic, zugestellt über die dauerhafte Job-Queue. */
 export const signups = topic<{ userId: string }>("signups");
+
+signups.subscription("send-welcome", async (event) => {
+    // …
+});
 ```
 
-`rebase resources` listet auf, was ein Projekt deklariert, `--write` erzeugt
-`rebase.resources.json` neu, und `--check` schlägt fehl, wenn diese Datei
-veraltet ist. Sie wird **generiert** und eingecheckt: ein Host liest sie, um zu
-entscheiden, was bereitzustellen ist, *bevor* irgendetwas ausgeführt wird.
+`queue()` ist neu <span class="since-badge" data-since="0.18">Since 0.18</span>. `database()`, `bucket()` und `topic()`
+lassen sich seit 0.17 deklarieren; ein Projekt auf der veröffentlichten Version
+deklariert also diese drei und erreicht Hintergrundarbeit stattdessen über
+`jobs.tasks`.
 
-Eine unbekannte Engine wird an der Aufrufstelle abgelehnt, nicht später. Für
-eine, die dieser Build nicht kennt, schreibt man `custom:` — etwa
-`bucket("objects", { engine: "custom:minio" })`.
+Richten Sie dann eine Collection über das Handle auf eine davon aus — derselbe
+Name, einmal geschrieben:
+
+```ts
+import { defineCollection } from "@rebasepro/cms-types";
+import { analytics } from "../resources";
+
+const pageViewsCollection = defineCollection({
+    name: "Page Views",
+    slug: "page_views",
+    table: "page_views",
+    dataSource: analytics,
+    properties: { /* … */ }
+});
+```
+
+...oder eine Datei-Property:
+
+```ts
+import { media } from "../resources";
+
+coverImage: {
+    name: "Cover image",
+    type: "string",
+    storage: { storageSource: media, acceptedFiles: ["image/*"] }
+}
+```
+
+`defineCollection` hält den Schlüssel des Handles fest; ab diesem Punkt ist eine
+Collection also einfache Daten — sie serialisiert, sie lässt sich vergleichen,
+sie erreicht die Admin-UI. Die String-Form (`dataSource: "analytics"`)
+funktioniert weiterhin; dem Handle folgt eine Umbenennung, und „Gehe zu
+Definition“ landet dort.
+
+In einer Function erreichen dieselben Handles die Ressource:
+
+```ts
+import { defineFunction } from "@rebasepro/server/functions";
+import { analytics, media } from "../../config/resources";
+
+export default defineFunction((app, { rebase }) => {
+    app.post("/report", async (c) => {
+        const rows = await rebase.sql("select count(*) from page_views", { database: analytics });
+        const file = new File([JSON.stringify(rows)], "report.json", { type: "application/json" });
+        await rebase.bucket(media).putObject({ key: "report.json", file });
+        return c.json({ ok: true });
+    });
+});
+```
+
+### Sehen, was Sie deklariert haben
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+```bash
+rebase resources            # auflisten
+rebase resources --write    # rebase.resources.json neu erzeugen
+rebase resources --check    # fehlschlagen, wenn diese Datei veraltet ist
+```
+
+`rebase.resources.json` wird **generiert** und eingecheckt. Ein Host liest sie,
+um zu entscheiden, was bereitzustellen ist, *bevor* er irgendetwas ausführt —
+so kann eine Konsole beim ersten Deploy sagen „dieses Projekt möchte einen
+`media`-Bucket und hat keinen“. Bearbeiten Sie die Deklarationen, nie die Datei;
+`--check` bricht einen Build ab, wenn beide auseinanderlaufen.
+
+Jeder Eintrag hält außerdem fest, **wer sie verwendet** — `collection:page_views`
+an einer Datenbank, `property:posts.cover` an einem Bucket, `function:report` an
+dem, was die Function aus `resources.ts` importiert. Das ist die Karte, die eine
+Konsole braucht, um „was geht kaputt, wenn ich das entferne“ zu beantworten.
+
+`rebase status` geht einen Schritt weiter: Für jede Deklaration sagt es, ob die
+Umgebung sie bindet, und zwar mit denselben Resolvern, die auch der Start
+verwendet — es kann Sie also nicht über eine Bereitstellung beruhigen, die
+gleich den Start verweigern wird.
+
+### Eine Engine, von der der Build nie gehört hat
+
+Jede Art besitzt ihre eigene Engine-Liste, und eine unbekannte wird an der
+Aufrufstelle abgelehnt, statt angenommen und später zum Fehler zu werden. Etwas,
+das wirklich außerhalb der Liste liegt, schreibt man `custom:`:
+
+```ts
+export const objects = bucket("objects", { engine: "custom:minio" });
+```
 
 ### Eine bereits ausgelieferte Kind-Definition korrigieren
 
@@ -76,55 +164,36 @@ bindet also weiter so wie zum Zeitpunkt seiner Veröffentlichung. Verwenden Sie
 sie für jede Korrektur an einer ausgelieferten Kind; `registerResourceKind` nur
 für eine Kind, die noch niemand veröffentlicht hat.
 
-### Welcher Bucket einen unqualifizierten Upload erhält
+### Sie dem Frontend übergeben
 
-Eine Storage-Eigenschaft, die keine `storageSource` nennt, schreibt in den
-**Standard**-Bucket, und ein Projekt mit benannten Buckets muss sagen, welcher
-das ist. Entweder deklarieren Sie den Standard-Bucket — `export const uploads =
-bucket();` — oder markieren einen der benannten:
+Der `<Rebase>`-Provider muss wissen, welche Quellen es gibt und wie jede erreicht
+wird — eine `direct`-Quelle ist eine, mit der der Browser selbst spricht. Er
+importiert dasselbe Konfigurationspaket wie das Backend und kann die
+Deklarationen daher wiederverwenden, statt sie zu wiederholen:
 
-```ts
-export const media = bucket("media", { engine: "s3", default: true });
+```tsx
+import "../config/resources";                 // registriert sie
+import { declaredDataSources, declaredStorageSources } from "@rebasepro/types";
+
+<Rebase
+    dataSources={declaredDataSources()}
+    storageSources={declaredStorageSources()}
+>
+    {children}
+</Rebase>
 ```
 
-Der Start wird verweigert, wenn ein Projekt benannte Buckets und keinen Standard
-hat, und nennt beide Auswege. Früher wurde der zuerst deklarierte gewählt, mit
-einer Warnung: das entschied anhand der Deklarationsreihenfolge, wo die Dateien
-eines Nutzers landen, und es fiel dies- und jenseits eines Deploys
-unterschiedlich aus, weil der lokale Bucket, mit dem die Entwicklung einspringt,
-in der Produktion entfällt — die Beförderung aber nicht.
-
-Richten Sie dann eine Collection auf eine davon aus:
-
-```ts
-import { defineCollection } from "@rebasepro/cms-types";
-const pageViewsCollection = defineCollection({
-    name: "Page Views",
-    slug: "page_views",
-    table: "page_views",
-    dataSource: "analytics",
-    properties: { /* … */ }
-});
-```
-
-...oder eine Datei-Property:
-
-```ts
-coverImage: {
-    name: "Cover image",
-    type: "string",
-    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
-}
-```
+Der Seiteneffekt-Import ist Absicht: Das Deklarieren ist es, was registriert —
+ein Bundler, der ein ungenutztes Modul entfernt, würde beide Listen leer lassen.
 
 ## Jede Quelle konfigurieren
 
-Die Namen der Umgebungsvariablen werden vom Quellschlüssel abgeleitet, sodass nichts
-manuell synchronisiert werden muss:
+Die Namen der Umgebungsvariablen werden vom Ressourcenschlüssel abgeleitet,
+sodass nichts manuell synchronisiert werden muss:
 
 ```
-<VARIABLE>              the default source     DATABASE_URL, S3_BUCKET
-<VARIABLE>__<KEY>       a named source         DATABASE_URL__ANALYTICS, S3_BUCKET__MEDIA
+<VARIABLE>              the default resource   DATABASE_URL, S3_BUCKET
+<VARIABLE>__<KEY>       a named resource       DATABASE_URL__ANALYTICS, S3_BUCKET__MEDIA
 ```
 
 Der Schlüssel wird in Großbuchstaben umgewandelt und nicht-alphanumerische Zeichen werden zu Unterstrichen, sodass
@@ -142,25 +211,52 @@ DATABASE_URL__ANALYTICS=postgres://warehouse.internal/analytics
 
 # Optional, per source:
 DB_POOL_MAX__ANALYTICS=5
-ADMIN_CONNECTION_STRING__ANALYTICS=postgres://…
 REBASE_DRIVER__ANALYTICS=@rebasepro/server-postgres
 ```
 
 Der Treiber wird aus dem deklarierten `engine` ausgewählt (`postgres` und `mongodb` sind
 bekannt), und `REBASE_DRIVER__<KEY>` überschreibt ihn für alles andere.
+`REBASE_DB_POOL_MAX` ist eine prozessweite Obergrenze, keine Bindung pro Quelle,
+und nimmt daher kein Suffix.
+
+In der Entwicklung stellen Sie davon nichts ein: `rebase dev` bedient jede
+deklarierte Datenbank aus seinem verwalteten Postgres — eine zweite Instanz für
+`analytics`, bei Bedarf gestartet — und exportiert `DATABASE_URL__ANALYTICS`
+selbst. Eine von Hand gesetzte Variable wird nie überschrieben.
+
+Tabellen und Row-Level-Security-Policies werden **pro Quelle** bereitgestellt:
+Eine an `analytics` geleitete Collection bekommt ihre Tabelle und ihre Policies
+in der Analytics-Datenbank.
 
 ### Storage
 
 ```bash
-STORAGE_TYPE__MEDIA=s3
 S3_BUCKET__MEDIA=my-media-bucket
 S3_REGION__MEDIA=eu-central-1
 S3_ACCESS_KEY_ID__MEDIA=…
 S3_SECRET_ACCESS_KEY__MEDIA=…
 ```
 
-`STORAGE_TYPE__<KEY>` kann weggelassen werden, wenn die Deklaration die Engine
-bereits benennt.
+Die Engine stammt aus der Deklaration, es gibt also kein `STORAGE_TYPE`, das
+gesetzt werden müsste.
+
+#### Welcher Bucket einen unqualifizierten Upload erhält
+
+Eine Storage-Eigenschaft, die keine `storageSource` nennt, schreibt in den
+**Standard**-Bucket, und ein Projekt mit benannten Buckets muss sagen, welcher
+das ist. Entweder deklarieren Sie den Bucket mit dem Standardschlüssel —
+`export const uploads = bucket();` — oder markieren einen der benannten:
+
+```ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+Der Start wird verweigert, wenn ein Projekt benannte Buckets und keinen Standard
+hat, und nennt beide Auswege. Früher wurde der zuerst deklarierte gewählt, mit
+einer Warnung: das entschied anhand der Deklarationsreihenfolge, wo die Dateien
+eines Nutzers landen, und es fiel dies- und jenseits eines Deploys
+unterschiedlich aus, weil der lokale Bucket, mit dem die Entwicklung einspringt,
+in der Produktion entfällt — die Beförderung aber nicht.
 
 ### Mehrere Buckets auf einem Konto
 
@@ -174,7 +270,7 @@ export const media   = bucket("media",   { engine: "s3", account: "minio" });
 export const avatars = bucket("avatars", { engine: "s3", account: "minio" });
 ```
 
-```
+```bash
 S3_BUCKET__MEDIA=project-media       # pro Bucket, nie geteilt
 S3_BUCKET__AVATARS=project-avatars
 S3_ACCESS_KEY_ID__MINIO=…            # einmal gelesen, von beiden
@@ -193,6 +289,64 @@ einem anderen Provider verschieben, ohne die übrigen von ihrem gemeinsamen Kont
 zu trennen. Auf die Variable ohne Suffix wird bewusst nicht zurückgegriffen: sie
 gehört der Standardquelle, und ließe man einen benannten Bucket sie erben, würde
 ein vertippter Schlüssel mit den Zugangsdaten einer anderen Quelle signieren.
+
+## Topics und Queues
+
+Ein Topic wird über die dauerhafte Job-Queue zugestellt: Das Publizieren schreibt
+**eine Zeile pro Subscription**, sodass jeder Abonnent nach seinem eigenen
+Zeitplan erneut versucht und ein defekter weder die anderen blockiert noch sie
+erneut laufen lässt.
+
+```ts
+await signups.publish({ userId });
+```
+
+Eine Queue ist die andere Form von Hintergrundarbeit: eine Arbeitsliste mit
+**einem Handler**, bei der der Aufrufer die Id des Jobs behält. Queues sind neu
+<span class="since-badge" data-since="0.18">Since 0.18</span> — Topics kamen mit 0.17.
+
+```ts
+export const thumbnails = queue<{ key: string }>("thumbnails");
+thumbnails.handler(async ({ key }, { attempt }) => { /* … */ });
+
+const { id } = await thumbnails.enqueue({ key }, { runAt: new Date(Date.now() + 60_000) });
+```
+
+Beide sind **at-least-once**. Ein Worker, der mit einem Job in der Hand stirbt,
+gibt ihn frei, und der nächste startet den Handler von vorn — ein Handler muss
+also vertragen, ein Ereignis zweimal zu sehen. In einer Transaktion, die
+zurückgerollt wird, publiziert oder eingereiht zu haben, ist nie geschehen: Es
+ist ein Zeilen-Insert.
+
+Eines von beiden zu deklarieren schaltet die Job-Queue von selbst ein, auf jedem
+Startpfad — ein Projekt auf der verwalteten Laufzeitumgebung, das keinen
+Einstiegspunkt hat, um `jobs.tasks` durchzureichen, bekommt seine Handler auf
+diesem Weg. In ein Topic zu publizieren, das niemand deklariert, oder in eine
+Queue ohne Handler einzureihen, wirft einen Fehler, statt Zeilen zu schreiben,
+die kein Worker abarbeitet.
+
+## Crons und Functions
+
+Beide sind Dateien — `backend/crons/<name>.ts`, `backend/functions/<name>.ts` —
+und beide gelangen unter dem Namen der Datei in den Graphen, der zugleich die Id
+ist, unter der der Scheduler einen Cron ausführt, und der Pfad, unter dem eine
+Function eingebunden wird. Keines von beiden bindet aus der Umgebung; sie stehen
+im Graphen, damit ein Host die Zeitpläne eines Projekts kennt, bevor er
+irgendetwas ausführt.
+
+```ts
+export default defineCron({
+    name: "Nightly cleanup",
+    schedule: "0 3 * * *",
+    timezone: "Europe/Madrid",
+    async handler({ rebase }) { /* … */ }
+});
+```
+
+Ohne `timezone` wird der Zeitplan in der Zone des Hosts gelesen — UTC in fast
+jedem Container, Ihre eigene auf einem Laptop —, sodass `0 3 * * *` dies- und
+jenseits eines Deploys eine andere Stunde bedeutet. Eine unbekannte Zone wird
+abgelehnt, wenn der Job geladen wird.
 
 ## Fehlerverhalten
 
@@ -245,9 +399,27 @@ beim nächsten Neustart — ein Upload, der mit einem deutlichen Fehler fehlschl
 einer Festplatte erfolgreich war, die kurz vor dem Löschen steht, nicht. Setzen Sie `FORCE_LOCAL_STORAGE=true` nur, wenn
 wirklich ein dauerhaftes Volume eingebunden ist.
 
-Eine Konsequenz, die Sie wissen sollten, wenn Sie Storage-Quellen explizit deklarieren: Es wird kein
-Standard-Bucket für Sie erstellt. Wenn Sie nur eine `media`-Quelle deklarieren, bedeutet das, dass es keine
-`(default)`-Quelle gibt, und eine Property, die keine benennt, hat keinen Zielort — beabsichtigt und
-identisch in Entwicklung und Produktion. Deklarieren Sie auch `(default)`, wenn Sie eine möchten.
+Eine Konsequenz, die Sie wissen sollten, wenn Sie Buckets explizit deklarieren:
+Es wird kein Standard-Bucket für Sie erfunden. Nur `bucket("media")` zu
+deklarieren bedeutet, dass es keinen Standard-Bucket gibt, und eine Property,
+die keinen benennt, hat keinen Zielort — beabsichtigt und identisch in
+Entwicklung und Produktion. Deklarieren Sie zusätzlich `bucket()`, wenn Sie
+einen möchten.
+
+In der Entwicklung ist ein deklarierter Bucket, den nichts bindet, ein lokales
+Verzeichnis — `uploads__media` neben dem Standard `uploads` —, welche Engine er
+auch deklariert; `bucket("media", { engine: "s3" })` plus `rebase dev` genügt
+also, um eine Datei hochzuladen. Der Start sagt, für welche Engine das
+Verzeichnis einspringt, und `rebase status` zeigt es gelb neben dem Häkchen. In
+der Produktion geschieht das nie, ebenso wenig auf der verwalteten
+Laufzeitumgebung: Ein dort erfundener Bucket schriebe Uploads in ein
+Container-Dateisystem, das beim nächsten Rollout verschwindet — ein ungebundener
+Bucket bleibt daher ungebunden und antwortet mit 501.
+
+## Verwandte Themen
+
+- [Backend-Überblick](/docs/backend/) — `dataSources` und wo die Deklaration lebt
+- [Storage-Konfiguration](/docs/backend/storage/) — dieselbe Form für Buckets
+- [Umgebung & Konfiguration](/docs/getting-started/configuration/) — die `__SUFFIX`-Konvention, die eine Quelle an ihre Variablen bindet
 
 ---

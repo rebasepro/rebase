@@ -1,5 +1,5 @@
 ---
-sourceHash: 36838c587151b5fb
+sourceHash: 18e92afb4a0b8644
 slug: es/docs/upgrading/0-17-to-next
 title: Actualizar de 0.17 a la próxima versión
 sidebar_label: 0.17 → próxima
@@ -94,6 +94,17 @@ fuente es el `.nvmrc` del repositorio.
 responde a un desajuste de engines con `[WARN] Unsupported engine` e instala
 igualmente, así que el fallo no llega al instalar: llega más tarde, en un sitio
 donde no se menciona Node.
+
+## 26. Un proyecto con solo buckets nombrados nombra su predeterminado
+
+`bucket("media")` a solas se promovía antes a bucket por defecto en el arranque,
+con un aviso. Ahora el arranque rechaza cuando ningún bucket es el
+predeterminado.
+
+**Qué cambiar:** si todos los buckets de `config/resources.ts` están nombrados,
+marca uno — `bucket("media", { default: true })` — o añade un
+`bucket("(default)")` al lado. Un proyecto que ya declara uno por defecto no
+necesita nada.
 
 ---
 

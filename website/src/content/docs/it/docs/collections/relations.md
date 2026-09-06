@@ -1,5 +1,5 @@
 ---
-sourceHash: c719f1cf36899c0a
+sourceHash: b8fb2609d1a27893
 title: Relazioni
 sidebar_label: Relazioni
 description: Definisci relazioni SQL uno-a-uno, uno-a-molti e molti-a-molti tra collezioni con chiavi esterne, tabelle di giunzione e join multi-hop.
@@ -18,7 +18,8 @@ Le relazioni possono essere definite in linea all'interno della proprietà, o es
 
 ### 1. Relazioni Inline (Consigliato)
 
-Puoi definire la relazione direttamente sulla proprietà. Il framework le estrae automaticamente nell'array `relations[]` della collezione al momento della normalizzazione, quindi non hai più bisogno di una voce `relations[]` separata per le proprietà.
+Dichiara il collegamento sulla proprietà, annidato sotto `relation`. Scegli il
+`kind` e il tipo offre esattamente i campi di cui quel kind ha bisogno.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -34,8 +35,7 @@ const postsCollection = defineCollection({
             name: "Author",
             relation: {
                 kind: "belongsTo",
-                target: () => usersCollection,
-                localKey: "author_id"
+                target: () => usersCollection
             }
         }
     }
@@ -44,92 +44,144 @@ const postsCollection = defineCollection({
 
 ### 2. Array di Relazioni Esplicite
 
-Per casi d'uso avanzati o quando una relazione non mappa direttamente a un campo del form, puoi definirla nell'array `relations`:
+Per un collegamento senza una proprietà propria — nulla con cui nominarlo nel
+form o in una colonna di tabella — dichiaralo in `relations`:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
-const postsCollection = defineCollection({
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
+const usersCollection = defineCollection({
+    slug: "users",
+    name: "Users",
+    table: "users",
     properties: {
-        title: { type: "string", name: "Title" },
-        content: { type: "string", name: "Content", admin: { multiline: true } },
-        author: { type: "relation", name: "Author", relationName: "author" }
+        name: { type: "string", name: "Name" }
     },
     relations: [
         {
-            kind: "belongsTo",
-            relationName: "author",
-            target: () => usersCollection,
-            localKey: "author_id"
+            kind: "hasMany",
+            relationName: "posts",
+            target: () => postsCollection
         }
     ]
 });
 ```
 
-## Tipi di Relazione
+## I cinque kind
 
-### Uno-a-Uno / Molti-a-Uno
+Una relazione è di uno dei cinque kind. Il kind decide dove vive la chiave, se
+torna una riga o molte, e cosa può toccare una scrittura che vi passa
+attraverso.
 
-Una chiave esterna su **questa** tabella punta alla chiave primaria di un'altra tabella.
+| Kind | La chiave vive | Restituisce | Note |
+|---|---|---|---|
+| `belongsTo` | su **questa** tabella | una | `localKey`, predefinito `<relationName>_id` |
+| `hasOne` | sulla tabella della **destinazione** | una | `foreignKeyOnTarget`, predefinito `<thisCollection>_id` |
+| `hasMany` | sulla tabella della **destinazione** | molte | i figli appartengono a questo solo padre |
+| `manyToMany` | in una **tabella di giunzione** | molte | le righe sono condivise; il collegamento è tuo |
+| `via` | un `joinPath` esplicito | l'una o l'altra | in sola lettura; la `cardinality` la dichiari tu |
+
+Ogni campo è opzionale tranne `kind` e `target` — il resto è derivato.
+
+### belongsTo — la chiave è su questa tabella
+
+```typescript
+author: {
+    type: "relation",
+    name: "Author",
+    relation: { kind: "belongsTo", target: () => usersCollection }
+}
+// → posts.author_id
+```
+
+### hasMany / hasOne — la chiave è sulla loro
+
+```typescript
+relations: [
+    { kind: "hasMany", relationName: "posts", target: () => postsCollection }
+]
+// → reads posts.user_id
+```
+
+`hasOne` è lo stesso collegamento con al massimo una riga dall'altra parte.
+
+#### Join su una chiave naturale
+
+Per impostazione predefinita la chiave esterna della destinazione contiene l'**id**
+della riga di origine. Quando i due lati sono uniti su qualcos'altro — un id di
+identità esterna, uno SKU, uno slug di tenant — nomina quella colonna con
+`sourceKey`:
 
 ```typescript
 relations: [
     {
-        kind: "belongsTo",           // The FK is on THIS table
-        relationName: "author",
-        target: () => usersCollection,
-        localKey: "author_id"        // Column on the posts table
+        kind: "hasMany",
+        relationName: "applications",
+        target: () => applicationsCollection,
+        sourceKey: "auth_user_id",          // column on THIS table
+        foreignKeyOnTarget: "auth_user_id"  // column on the TARGET's table
     }
 ]
+// → reads applications.auth_user_id = talents.auth_user_id
 ```
 
-Questo crea: `posts.authorId → users.id`
+`sourceKey` è lo specchio di `localKey` su `belongsTo`: quello nomina la colonna
+da cui questo lato legge, questo nomina la colonna a cui punta l'altro lato.
+Senza di esso un collegamento come quello sopra non è affatto esprimibile come
+`hasMany` e deve ripiegare su [`via`](#via--una-catena-di-join-esplicita), che è
+in sola lettura.
 
-### Uno-a-Molti (Inverso)
+La colonna deve essere univoca. Un collegamento che indirizza più di una riga di
+origine non può dire a quale appartiene una riga correlata, e nemmeno Postgres
+accetta una chiave esterna verso una colonna non univoca. Rebase lo controlla in
+lettura e rifiuta invece di sceglierne una.
 
-La chiave esterna si trova sulla tabella **target**, puntando a questa entità.
+Un padre il cui `sourceKey` è `NULL` non raggiunge alcuna riga, e scrivere
+attraverso la relazione è un errore — non c'è nulla a cui le righe correlate
+possano puntare.
+
+### manyToMany — attraverso una giunzione
 
 ```typescript
-// On the Users collection:
-relations: [
-    {
-        kind: "hasMany",                 // The FK is on the TARGET table
-        relationName: "posts",
-        target: () => postsCollection,
-        foreignKeyOnTarget: "authorId"  // Column on the posts table
-    }
-]
+tags: {
+    type: "relation",
+    name: "Tags",
+    relation: { kind: "manyToMany", target: () => tagsCollection }
+}
+// → junction `posts_tags` (both table names, sorted), columns post_id / tag_id
 ```
 
-### Molti-a-Molti (Tabella di Giunzione)
-
-Due collezioni connesse tramite una tabella di giunzione intermedia.
+Entrambi i lati dichiarano il proprio, e ciascuno scrive `through` **dal proprio
+punto di vista** — `sourceColumn` nomina sempre *questa* collezione:
 
 ```typescript
-// On the Users collection:
-relations: [
-    {
-        kind: "manyToMany",
-        relationName: "roles",
-        target: () => rolesCollection,
-        through: {
-            table: "user_roles",         // Junction table name
-            sourceColumn: "userId",     // FK to this collection
-            targetColumn: "role_id"      // FK to target collection
-        }
-    }
-]
+// on posts
+{ kind: "manyToMany", relationName: "tags", target: () => tagsCollection,
+  through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } }
+
+// on tags
+{ kind: "manyToMany", relationName: "posts", target: () => postsCollection,
+  through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" } }
 ```
 
-Questo crea:
-```sql
-CREATE TABLE user_roles (
-    userId INTEGER REFERENCES users(id),
-    role_id INTEGER REFERENCES roles(id),
-    PRIMARY KEY (userId, role_id)
-);
+### via — una catena di join esplicita
+
+Per collegamenti che le quattro forme precedenti non riescono a esprimere:
+percorsi multi-hop, chiavi composite, o un join la cui condizione non è una
+semplice chiave esterna. In sola lettura — Rebase non dedurrà come scrivere
+attraverso una catena arbitraria.
+
+```typescript
+{
+    kind: "via",
+    relationName: "permissions",
+    target: () => permissionsCollection,
+    cardinality: "many",
+    joinPath: [
+        { table: "user_roles",       on: { from: "id",            to: "user_id" } },
+        { table: "role_permissions", on: { from: "role_id",       to: "role_id" } },
+        { table: "permissions",      on: { from: "permission_id", to: "id" } }
+    ]
+}
 ```
 
 ## Proprietà delle Relazioni
@@ -141,7 +193,7 @@ properties: {
     author: {
         type: "relation",
         name: "Author",
-        target: () => usersCollection, // Target collection
+        relation: { kind: "belongsTo", target: () => usersCollection },
         widget: "select"           // "select" (dropdown) or "dialog" (full picker)
     }
 }
@@ -149,9 +201,49 @@ properties: {
 
 Quando si renderizza un'anteprima (come in una cella di tabella o un chip di riferimento), Rebase gestisce automaticamente l'idratazione.
 
+### A-uno ottiene un selettore, a-molti una scheda
+
+La cardinalità decide la superficie, e ne viene usata una sola:
+
+- **`belongsTo` / `hasOne`** — una riga, quindi la proprietà è una chiave esterna
+  che l'autore modifica. Viene resa come il selettore qui sopra.
+- **`hasMany` / `manyToMany`** — molte righe, quindi la vista dell'entità le
+  elenca in una **scheda** a parte. La proprietà non viene resa nel form: i figli
+  di una collezione sono un elenco, non un valore che il record contiene, e
+  sceglierli da un menu a discesa non è qualcosa che il form possa offrire in
+  modo sensato.
+
+Dichiarare comunque una relazione a-molti come proprietà conviene: è ciò che dà
+il nome alla scheda, e ciò che dà alla relazione una colonna nella tabella della
+collezione, che il caricamento dell'elenco idrata così che le righe figlie
+compaiano come chip sulla riga. Viene abbandonato solo il campo del form.
+
+Nella tabella, una relazione con una proprietà propria ottiene **una** colonna:
+la sua. Ogni scheda ha anche una colonna con un pulsante di salto alla scheda,
+ma per una relazione dichiarata come proprietà quel pulsante ripeteva la stessa
+intestazione accanto a una colonna che già mostrava i figli, quindi viene
+eliminato. Nascondi la colonna della relazione
+(`admin: { hideFromCollection: true }`) e il pulsante torna, così la relazione
+non esce mai del tutto dalla tabella.
+
+Se vuoi comunque il selettore in linea, chiedilo:
+
+```typescript
+properties: {
+    tags: {
+        type: "relation",
+        name: "Tags",
+        relation: { kind: "manyToMany", target: () => tagsCollection },
+        admin: { renderInForm: true }   // off by default; the tab is the default treatment
+    }
+}
+```
+
 ## Join Multi-Salto
 
-Per relazioni complesse che attraversano più tabelle, usa `joinPath`:
+Per relazioni che attraversano più tabelle, usa `kind: "via"` con un `joinPath`.
+Sono in sola lettura: Rebase non dedurrà come scrivere attraverso una catena
+arbitraria.
 
 ```typescript
 // Users → Permissions through Roles
@@ -164,7 +256,7 @@ relations: [
         joinPath: [
             {
                 table: "user_roles",
-                on: { from: "id", to: "userId" }
+                on: { from: "id", to: "user_id" }
             },
             {
                 table: "roles",
@@ -296,16 +388,19 @@ const { data } = await client.data.articles.find({
 Quando incluse, la risposta contiene sia la **chiave esterna scalare** che l'**oggetto relazione idratato**:
 
 ```typescript
-const { data } = await client.data.articles
+const { data } = await client.data
+    .collection<{ id: string; authorId: string; author?: { name: string } }>("articles")
     .include("author")
     .find();
 
+// The SDK returns flat rows — there is no `.values` wrapper. (`Entity`, with
+// `id`/`path`/`values`, is an admin-UI view model, not what the client hands back.)
 for (const article of data) {
     // Scalar FK — always present
-    article.values.authorId;     // "uuid-1234"
+    article.authorId;     // "uuid-1234"
 
     // Hydrated relation — only present when included
-    article.values.author?.name;  // "Jane Doe"
+    article.author?.name;  // "Jane Doe"
 }
 ```
 
@@ -313,7 +408,92 @@ for (const article of data) {
 
 Per la documentazione completa del query builder (filtro, ordinamento, paginazione, real-time), consulta la [documentazione dell'SDK Client](/docs/sdk).
 
+## Relazioni nel pannello di amministrazione
+
+Ogni relazione a-molti — `hasMany`, `manyToMany` o un `via` a-molti — diventa una
+**scheda** sotto un record nel pannello di amministrazione, che elenca le righe
+che quel record raggiunge.
+
+### Il segmento di percorso è il nome della relazione
+
+Un elenco di figli si indirizza come `parent/parentId/relationName`:
+
+```
+/c/authors/a-1/posts          the posts of author a-1
+/c/posts/p-1/tags             the tags of post p-1
+```
+
+L'ultimo segmento è il **nome della relazione**, non lo slug della collezione di
+destinazione. Spesso coincidono, perché una relazione senza nome prende lo slug
+della sua destinazione — ma una proprietà di relazione inline prende la *chiave
+della proprietà*:
+
+```typescript
+properties: {
+    featuredTags: {
+        type: "relation",
+        relation: { kind: "manyToMany", target: () => tagsCollection }
+    }
+}
+// tab and path segment: featuredTags   (not "tags")
+```
+
+È anche ciò che fa funzionare due relazioni verso la stessa collezione: ognuna ha
+il proprio nome, quindi ognuna ha la propria scheda e il proprio percorso.
+
+### Righe possedute contro righe condivise
+
+Ciò che una scheda ti permette di fare dipende da come la relazione è
+memorizzata, perché i due casi significano cose diverse:
+
+| | Uno-a-molti (`foreignKeyOnTarget`) | Molti-a-molti (`through`) |
+|---|---|---|
+| Il figlio appartiene a | questo solo padre | ogni padre che lo collega |
+| Creare | crea la riga sotto questo padre | crea la riga e la collega |
+| Aggiungi esistente | — | collega una riga esistente |
+| Rimuovi | **elimina** la riga | **scollega**; la riga resta intatta |
+
+Il pannello di amministrazione rende ciascun caso di conseguenza: una scheda
+molti-a-molti offre **Aggiungi esistente** e **Rimuovi da questo record**, e mai
+un'eliminazione che toglierebbe la riga agli altri padri.
+
+### Le stesse regole via REST
+
+Gli elenchi di figli sono normali query di collezione ristrette a un padre,
+quindi accettano tutto ciò che accetta un elenco radice — filtri, `orderBy`,
+`limit`, `offset`, `include` — e `meta.total` conta le righe filtrate. Filtra per
+campo (`?field=op.value`) oppure con un oggetto intero
+`?where={"field":["op","value"]}`; entrambi raggiungono la stessa query:
+
+```
+GET    /api/data/authors/a-1/posts?status=eq.published&orderBy=title&limit=20
+GET    /api/data/authors/a-1/posts?where={"status":["==","published"]}&orderBy=title
+GET    /api/data/authors/a-1/posts/p-1
+POST   /api/data/authors/a-1/posts          create under this parent
+PATCH  /api/data/authors/a-1/posts/p-1      update; will not reparent
+DELETE /api/data/authors/a-1/posts/p-1      delete (one-to-many) / unlink (many-to-many)
+```
+
+Il segmento del padre è imposto, non decorativo. Indirizzare una riga che non sta
+sotto quel padre restituisce `404`, e `PATCH` non sposta mai una riga da un padre
+a un altro — imposta esplicitamente la chiave esterna se è quello che vuoi.
+
+Per un molti-a-molti, `PATCH parent/id/child/childId` è *appartenenza
+all'insieme*: collega la riga se non è ancora collegata, ed è idempotente. È così
+che alleghi una riga che esiste già.
+
+### Cosa non diventa una scheda
+
+- **Relazioni a-uno** — sono un campo del record, non un elenco. Scrivere
+  attraverso un percorso a-uno viene rifiutato: la chiave esterna vive sulla
+  tabella del padre.
+- **Relazioni dichiarate dentro una `map`** — sono un campo di quella map.
+
 ## Interfaccia Completa della Relazione
+
+`Relation` è un'unione chiusa — un membro per kind, ognuno con i soli campi che
+quel kind possiede. Non esiste combinazione di campi che descriva due
+collegamenti diversi, né un campo che tu possa impostare e che il kind non usi.
 
 ```typescript
 type Relation =
@@ -323,17 +503,16 @@ type Relation =
     | ManyToManyRelation
     | ViaRelation;
 
-// Every kind carries these:
 interface RelationBase {
-    relationName?: string;
+    relationName?: string;          // defaults to the property key, then the target's slug
     target: () => CollectionConfig;
-    inverseRelationName?: string;
-    onUpdate?: "cascade" | "restrict" | "no action" | "set null" | "set default";
-    onDelete?: "cascade" | "restrict" | "no action" | "set null" | "set default";
-    overrides?: Partial<CollectionConfig>;
+    onUpdate?: OnAction;
+    onDelete?: OnAction;
+    overrides?: Partial<CollectionConfig>;   // applied when rendered as a tab
 }
+// `required` is not here. It is `validation: { required: true }` on the
+// property that declares the relation, the same key every other field uses.
 
-// ...and only the fields its own kind uses:
 interface BelongsToRelation extends RelationBase {
     kind: "belongsTo";
     localKey?: string;              // column on THIS table
@@ -341,29 +520,45 @@ interface BelongsToRelation extends RelationBase {
 
 interface HasOneRelation extends RelationBase {
     kind: "hasOne";
-    foreignKeyOnTarget?: string;    // column on the TARGET table
+    foreignKeyOnTarget?: string;    // column on the TARGET's table
+    sourceKey?: string;             // column on THIS table; defaults to the primary key
 }
 
 interface HasManyRelation extends RelationBase {
     kind: "hasMany";
-    foreignKeyOnTarget?: string;    // column on the TARGET table
+    foreignKeyOnTarget?: string;    // column on the TARGET's table
+    sourceKey?: string;             // column on THIS table; defaults to the primary key
 }
 
 interface ManyToManyRelation extends RelationBase {
     kind: "manyToMany";
-    through?: {
-        table?: string;
-        sourceColumn?: string;      // FK naming THIS collection
-        targetColumn?: string;
-    };
+    through?: { table?: string; sourceColumn?: string; targetColumn?: string };
 }
 
 interface ViaRelation extends RelationBase {
     kind: "via";
     cardinality: "one" | "many";    // a join chain cannot imply it
-    joinPath: JoinStep[];           // read-only
+    joinPath: JoinStep[];
 }
 ```
+
+### La forma risolta
+
+Quello che scrivi sopra è la forma di *autore*. Internamente Rebase lavora con
+`ResolvedRelation`: lo stesso collegamento con ogni valore predefinito riempito e
+niente di opzionale, più `cardinality`, `targetSlug` e due flag — `writable`
+(falso solo per `via`) e `shared` (vero quando le righe di destinazione
+appartengono anche ad altri padri, così che una rimozione scolleghi invece di
+eliminare).
+
+`sourceKey` è l'unica eccezione a «niente di opzionale»: il suo valore
+predefinito è la chiave primaria dell'origine, e risolverla richiede lo schema
+del driver, che la risoluzione non ha. Lì `undefined` significa «la chiave
+primaria» e nient'altro.
+
+Non scrivi mai una `ResolvedRelation`. Su una proprietà di relazione, `relation`
+è la tua e `resolvedRelation` è quella riempita, timbrata durante la
+normalizzazione.
 
 ## Passi Successivi
 
