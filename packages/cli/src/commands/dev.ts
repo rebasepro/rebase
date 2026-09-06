@@ -18,7 +18,13 @@ import chalk from "chalk";
 import { DEFAULT_RESOURCE_KEY } from "@rebasepro/types";
 import { execa, execaCommandSync, type ResultPromise } from "execa";
 
-import { managedNotices, prepareDatabaseEnv, resolveComposeUrl, type PreparedDatabase } from "../dev-db/prepare";
+import {
+    DEV_DATABASE_KIND_ENV,
+    managedNotices,
+    prepareDatabaseEnv,
+    resolveComposeUrl,
+    type PreparedDatabase
+} from "../dev-db/prepare";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -1074,6 +1080,12 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
          */
         const managed = prepared?.database.kind === "managed";
         if (managed) managedConnectionString = prepared?.env.DATABASE_URL ?? null;
+        // …and the backend needs the same answer, for the same reason. Its
+        // schema-drift remedy said `pnpm db:push` whatever database it was
+        // serving, and on the managed one that command is refused. `db`,
+        // `schema` and `doctor` already pass this to their driver children;
+        // the backend is the one that had to guess.
+        if (prepared) env[DEV_DATABASE_KIND_ENV] = prepared.database.kind;
 
         // Always inject PORT so the backend uses our resolved port instead of
         // its hardcoded default (3001). This prevents cross-project collisions

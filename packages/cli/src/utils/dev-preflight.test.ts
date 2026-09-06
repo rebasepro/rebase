@@ -11,6 +11,7 @@ import path from "path";
 import {
     composeDatabaseUrl,
     composeDeclaresDbService,
+    composeHostPort,
     ensureDevDatabase,
     parseLoopbackDsn,
     probeTcp,
@@ -155,6 +156,30 @@ describe("composeDatabaseUrl", () => {
     });
 });
 
+describe("composeHostPort", () => {
+    it("reads the db service's published port", () => {
+        expect(composeHostPort([
+            "services:",
+            "  db:",
+            "    ports:",
+            '      - "5435:5432"',
+            "  api:",
+            "    ports:",
+            '      - "3001:3001"'
+        ].join("\n"))).toBe(5435);
+    });
+
+    it("answers even when the file names no user or password", () => {
+        // The whole reason it is not `composeDatabaseUrl`: the question "would
+        // starting this container answer that DSN?" needs only the port.
+        expect(composeHostPort("services:\n  db:\n    ports:\n      - \"5436:5432\"\n")).toBe(5436);
+    });
+
+    it("is null when nothing is published", () => {
+        expect(composeHostPort("services:\n  db:\n    image: postgres:18-alpine\n")).toBeNull();
+    });
+});
+
 describe("probeTcp", () => {
     it("is true for a port that is listening, false once it closes", async () => {
         const server = net.createServer();
@@ -287,6 +312,78 @@ describe("ensureDevDatabase", () => {
             pushSchema: vi.fn()
         });
         expect(outcome).toEqual({ action: "no-compose" });
+    });
+
+    it("starts nothing when .env names a port the compose file does not publish", async () => {
+        /**
+         * The failure this is the guard for: `DATABASE_URL=…@127.0.0.1:3139`
+         * in `.env`, a compose file publishing 5436. `rebase dev` said
+         * `Database not running — starting it…`, started `app1-db-1` on 5436,
+         * waited on 3139, and then reported `⚠ The database container did not
+         * begin listening on port 3139. Run docker compose up -d db then rebase
+         * db push to see why.` The container was up and healthy; the port in
+         * `.env` was what was wrong, and the remedy said the opposite. A
+         * container nobody had asked for was left running.
+         */
+        fs.writeFileSync(
+            path.join(projectRoot, "docker-compose.yml"),
+            [
+                "services:",
+                "  db:",
+                "    image: postgres:18-alpine",
+                "    ports:",
+                '      - "5436:5432"'
+            ].join("\n")
+        );
+        const started = vi.fn();
+
+        const outcome = await ensureDevDatabase({
+            ...base,
+            projectRoot,
+            databaseUrl: "postgres://u@127.0.0.1:3139/db",
+            startDatabase: started,
+            pushSchema: vi.fn()
+        });
+
+        expect(started).not.toHaveBeenCalled();
+        expect(outcome.action).toBe("wrong-port");
+        expect(outcome).toMatchObject({ port: 3139, composePort: 5436 });
+        if (outcome.action !== "wrong-port") throw new Error("narrowing");
+        expect(outcome.hint).toContain("127.0.0.1:3139");
+        expect(outcome.hint).toContain("publishes 5436");
+        expect(outcome.hint).toContain("nothing was started");
+    });
+
+    it("starts it when the ports do agree", async () => {
+        // The counter-check: the guard must not stop the case it was written
+        // around, which is a `.env` that matches the compose file.
+        const free = net.createServer();
+        await new Promise<void>(resolve => free.listen(0, "127.0.0.1", resolve));
+        const port = (free.address() as net.AddressInfo).port;
+        await new Promise<void>(resolve => free.close(() => resolve()));
+
+        const server = net.createServer();
+        fs.writeFileSync(
+            path.join(projectRoot, "docker-compose.yml"),
+            ["services:", "  db:", "    image: postgres:18-alpine", "    ports:", `      - "${port}:5432"`].join("\n")
+        );
+
+        try {
+            const outcome = await ensureDevDatabase({
+                ...base,
+                hasCollections: false,
+                projectRoot,
+                databaseUrl: `postgres://u@127.0.0.1:${port}/db`,
+                startDatabase: async () => {
+                    await new Promise<void>(resolve => server.listen(port, "127.0.0.1", resolve));
+                },
+                pushSchema: vi.fn()
+            });
+
+            expect(outcome).toEqual({ action: "started", port, pushed: false });
+        } finally {
+            await new Promise<void>(resolve => server.close(() => resolve()));
+        }
     });
 
     it("survives a schema push that fails, and says the database is up anyway", async () => {

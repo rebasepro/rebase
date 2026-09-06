@@ -26,6 +26,16 @@ drizzle/meta/
 # Uploads
 uploads/
 
+# Database dumps (`rebase db backup`)
+#
+# The default destination is `backups/` under wherever the command was run, and
+# `rebase db --help`'s own example (`--out ./backups`) lands in the tree too. A
+# dump carries every row, including `rebase.users` password hashes, so this is
+# not tidiness. `*.dump` covers the ones written somewhere else; the
+# `.globals.sql` roles sidecar beside them carries no passwords.
+backups/
+*.dump
+
 # Rebase dev
 .rebase-dev-url
 .rebase-dev-port
