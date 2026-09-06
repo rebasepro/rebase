@@ -1,5 +1,5 @@
 ---
-sourceHash: 3e7cee199ce0ba69
+sourceHash: 45912133a3586b34
 slug: de/docs/rls-check
 title: rls-check
 description: Überprüfe Row-Level Security auf jeder PostgreSQL-Datenbank — Supabase, Neon, RDS oder deinem eigenen Server. Schreibgeschützt, keine Registrierung, kein Rebase erforderlich.
@@ -37,7 +37,9 @@ DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
 npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 
-Wenn dein Passwort `@`, `:`, `/`, `?` oder `#` enthält, kodierte es als Percent-Encoding (Prozent-Kodierung). Das ist bei weitem die häufigste Ursache für einen Authentifizierungsfehler an dieser Stelle, und `rls-check` weist darauf hin, anstatt dich raten zu lassen.
+Wenn dein Passwort `/`, `?` oder `#` enthält, kodiere es als Percent-Encoding (Prozent-Kodierung). Diese drei Zeichen beenden den Authority-Teil der URL, sodass die Trennung mitten in den Zugangsdaten landet — statt Bruchstücke eines Passworts auszugeben, weist `rls-check` die Zeichenkette zurück und sagt das auch.
+
+`@` und `:` brauchen keine Kodierung: Der Userinfo-Teil wird am **letzten** `@` getrennt und der Benutzername am **ersten** `:`, genau wie `pg` es macht — `postgres://user:pa@ss@host:5432/db` verbindet sich also mit `host` und dem Passwort `pa@ss`. Sie trotzdem zu kodieren ist nie falsch.
 
 ### Optionen
 
@@ -84,6 +86,13 @@ Verbindet sich der Scan mit einer Rolle, die Row-Level Security tatsächlich ein
     DATABASE_URL: ${{ secrets.DATABASE_URL }}
 ```
 
+**Ein neues Rebase-Projekt besteht das am ersten Tag nicht, und das ist Absicht.** Die `defaultSecurityRules` des Scaffolds öffnen Lesezugriffe für alle — `{ operation: "select", access: "public" }` in `config/collections/index.ts` —, sodass `posts`, `authors` und `tags` jeweils ein kritisches `policy-always-true` melden. `access: "public"` betrifft *Zeilen*, nicht die Frage, wer die API aufrufen darf: Eine Anfrage ohne Token wird weiterhin mit 401 beantwortet, solange `AUTH_REQUIRE` aktiv ist. Der Befund ist trotzdem richtig, denn das ist das Einzige, was vor den Daten steht.
+
+Entscheide, welcher der beiden Fälle vorliegt, bevor du das in CI einbaust:
+
+- **Die Regeln sind ein Platzhalter** — ersetze sie durch die, die deine Daten wirklich brauchen ([Sicherheitsregeln](/docs/collections/security-rules)), und die Befunde verschwinden;
+- **Die Zeilen sind wirklich für alle lesbar** — sage das einmal, mit `npx @rebasepro/rls-check --fail-on high --skip policy-always-true`, und wisse, was du aufgibst: `--skip` schaltet die Prüfung überall ab, auch für die Tabelle, die du nächsten Monat hinzufügst.
+
 ### JSON-Ausgabe
 
 `--json` gibt ein stabiles Objekt aus: `scannedAt`, `database` (nur Host und Name — niemals Zugangsdaten), `serverVersion`, `platform`, `scannerIsPrivileged`, `exposedRoles`, `stats`, `findings` und `diagnostics`. Jedes Ergebnis (Finding) enthält `id`, `severity`, `title`, `target`, `detail`, `impact`, `fix`, `docs` und `confidence`.
@@ -95,6 +104,19 @@ Verbindet sich der Scan mit einer Rolle, die Row-Level Security tatsächlich ein
 **Bestätigte Ergebnisse kommen zuerst; heuristische befinden sich in einem separaten Abschnitt „Prüfung wert“ (worth checking).** Eine heuristische Prüfung kann die Absicht nicht erkennen — eine Verknüpfungstabelle (Junction Table), die du absichtlich offen gelassen hast, ist kein Fehler —, daher sind diese als Fragen formuliert und werden niemals mit den definitiven Befunden vermischt.
 
 **Achte auf den Hinweis zu Berechtigungen.** Wenn der Scan als Superuser, Tabelleneigentümer oder als Rolle mit `BYPASSRLS` eine Verbindung herstellt, wird dies gemeldet. Diese Rolle sieht den tatsächlichen Katalog, was das Audit überhaupt erst möglich macht, bedeutet aber auch, dass nichts im Bericht das beschreibt, was *diese* Verbindung erlebt. Die Ergebnisse beziehen sich darauf, was andere Rollen erhalten.
+
+### Auf einer Rebase-Datenbank die Regel ändern, nicht die Policy
+
+Jede Policy in einem Rebase-Deployment wird aus den `securityRules` einer Collection kompiliert, und die Runtime **wendet sie bei jedem Start erneut an**: Sie verwirft jede generierte Policy und erstellt sie aus der Konfiguration neu. Ein `ALTER POLICY` gegen eine davon überlebt daher genau bis zum nächsten Neustart, und der Befund kommt mit zurück — nachdem du zugesehen hast, wie er verschwand.
+
+`rls-check` erkennt diese Policies (ein Name der Form `<tabelle>_<operation>_<hash>` oder ein Aufruf von `rebase.uid()` / `rebase.roles()` im Ausdruck) und schlägt statt SQL die Regel vor. Wenn ein Fix das sagt:
+
+1. Suche die Collection, deren Tabelle er nennt, unter `config/collections/`;
+2. ändere ihre `securityRules` — siehe [Sicherheitsregeln](/docs/collections/security-rules);
+3. deklariert die Collection keine eigenen, erbt sie `defaultSecurityRules` aus `config/collections/index.ts`, und das ist die Datei, die du bearbeiten musst;
+4. deploye neu — der Start wendet die Policies erneut an — oder führe `rebase db push` aus.
+
+Eine Policy, die du selbst in einer Migration geschrieben hast, wird davon nicht berührt, und ihr Fix bleibt das auszuführende SQL.
 
 ## Die Prüfungen
 
@@ -126,6 +148,8 @@ Wenn eine `RESTRICTIVE`-Policy denselben Befehl abdeckt, wird dies auf „Mittel
 ALTER POLICY "your_policy" ON "public"."your_table"
     USING (user_id = rebase.uid());
 ```
+
+Auf einer Rebase-Datenbank ist der Fix die Regel der Collection statt dieses Statements — siehe „Auf einer Rebase-Datenbank die Regel ändern, nicht die Policy“. Ein unverändertes Scaffold meldet diese Prüfung bewusst für `posts`, `authors` und `tags`.
 
 ### policy-anonymous-tautology
 

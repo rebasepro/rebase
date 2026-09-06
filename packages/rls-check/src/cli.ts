@@ -546,7 +546,7 @@ export function explainError(
         case "28P01":
             return friendly(
                 `Password authentication failed on ${at}.`,
-                "Check the password. If it contains @ : / ? or #, it has to be percent-encoded inside a URL — that is the single most common cause of this error."
+                "Check the password. If it contains / ? or #, it has to be percent-encoded inside a URL — that is the single most common cause of this error. An @ or a : needs no encoding: the userinfo is split at the last @ and the user at the first :."
             );
         case "28000":
             return friendly(

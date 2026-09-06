@@ -204,10 +204,16 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ rls-check flags ━━━${NC}`);
-    const { findings: bad, flags, scanned } = checkRlsCheckFlags(ROOT);
-    console.log(`${DIM}rls-check accepts ${flags.length} flag(s); checked --help and ${scanned} option table(s).${NC}`);
+    const { findings: bad, flags, scanned, connectionPages } = checkRlsCheckFlags(ROOT);
+    console.log(
+        `${DIM}rls-check accepts ${flags.length} flag(s); checked --help, ${scanned} option table(s) ` +
+            `and the connection-string paragraph on ${connectionPages} page(s).${NC}`
+    );
     if (!bad.length) {
-        console.log(`${GREEN}✓ Every flag the CLI accepts is in --help and both option tables.${NC}`);
+        console.log(
+            `${GREEN}✓ Every flag the CLI accepts is in --help and both option tables, and no page ` +
+                `demands encoding the tool does not.${NC}`
+        );
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} flag documentation mismatch(es):${NC}`);

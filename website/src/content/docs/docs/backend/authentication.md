@@ -24,7 +24,7 @@ Rebase includes a complete backend authentication system:
 ## Configuration
 
 :::note[Where this goes]
-**Managed runtime:** environment — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` and the provider `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs. The users collection is whichever one the bundle names (`collections/users` by convention).
+**Managed runtime:** environment — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` and the provider `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs, one for each of the twelve providers ([the spellings](#the-environment-spellings); Apple's is four keys, not a pair). The users collection is whichever one the bundle names (`collections/users` by convention).
 **No managed route:** `auth.hooks`. They are functions; eject to pass them.
 **Ejected:** `initializeRebaseBackend({ auth })` in `backend/src/index.ts`.
 :::
@@ -115,7 +115,16 @@ because the client has to put it in an `Authorization` header.
 Two things have to follow, or sign-in breaks rather than degrades: client fetches
 to the auth endpoints need `credentials: "include"`, and CORS has to allow
 credentials — which means an explicit origin list, never `origin: "*"`.
-`AUTH_COOKIE_SAME_SITE` is the environment spelling of `sameSite`.
+`AUTH_COOKIE_SAME_SITE` is the environment spelling of `sameSite`, and
+`AUTH_COOKIE_SECURE` of `secure`.
+
+The cookie carries `Secure` unless you turn it off, and nothing about the request
+can: the flag used to be read from the request protocol, which is `http` behind
+any TLS-terminating proxy, so the refresh token travelled in cleartext in the
+commonest production topology. `AUTH_COOKIE_SECURE=false` is the one way out, for
+a deployment genuinely served over plain http — a LAN address, an appliance — and
+it warns at boot. `http://localhost` does not need it: browsers treat it as a
+trustworthy origin and accept `Secure` cookies there.
 
 | Key | Default | |
 |-----|---------|--|
@@ -123,7 +132,7 @@ credentials — which means an explicit origin list, never `origin: "*"`.
 | `domain` | current domain | |
 | `path` | `/` | |
 | `sameSite` | `Lax` | `None` is only for a genuinely cross-site frontend |
-| `secure` | auto | Forced on when `sameSite` is `None`; otherwise taken from the request protocol |
+| `secure` | `true` | Secure by default; `AUTH_COOKIE_SECURE=false` for plain http |
 
 :::caution[Collection callbacks do not fire for auth users]
 User creation and updates through the auth system — registration, admin user
@@ -325,6 +334,31 @@ auth: {
 ```
 
 `gitlab` also takes an optional `baseUrl`, for a self-hosted GitLab instance.
+
+#### The environment spellings
+
+A managed or bundle deployment has no `auth` block to write in — it configures
+the server entirely through the environment — so every provider above has a
+`<PROVIDER>_CLIENT_ID` / `<PROVIDER>_CLIENT_SECRET` pair, and both halves have to
+be set before the provider is configured at all:
+
+```bash
+DISCORD_CLIENT_ID=…
+DISCORD_CLIENT_SECRET=…
+```
+
+`GET /api/auth/config` then lists `discord` in `enabledProviders`, which is how
+to check that a pair arrived.
+
+Apple is the exception: it has no static client secret, because Rebase signs a
+short-lived ES256 JWT for each token exchange. It needs all four of
+`APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` — the
+`.p8` file's contents, newlines and all.
+
+Two options have no environment spelling and need the `auth` block (so, an
+ejected or code-configured backend): `microsoft.tenantId`, which otherwise
+defaults to `common` and reports every address as unverified, and
+`gitlab.baseUrl`, for a self-hosted instance.
 
 Each named field is resolved at startup into `auth.providers`, which is the
 canonical array and the extension point for anything the named fields do not

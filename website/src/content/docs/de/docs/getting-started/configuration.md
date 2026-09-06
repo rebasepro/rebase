@@ -1,5 +1,5 @@
 ---
-sourceHash: 3346d2728eb8f2e4
+sourceHash: 2078e2f99041a59e
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -50,6 +50,7 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei
 | `JWT_ACCESS_EXPIRES_IN` | Lebensdauer des Zugriffstokens | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Lebensdauer des Refresh-Tokens | `30d` |
 | `ALLOW_REGISTRATION` | Ermöglicht neuen Benutzern die Registrierung (`true`/`false`). Der erste Benutzer kann sich immer registrieren. | `true` |
+| `AUTH_COOKIE_SECURE` | `Secure` am Refresh-Cookie. Standardmäßig an; `AUTH_COOKIE_SECURE=false` für einfaches HTTP — etwa eine Bereitstellung unter einer LAN-Adresse, bei der der Browser das Cookie sonst verwirft und die Sitzung beim Ablauf des Access-Tokens ohne Fehlermeldung endet. Der Start warnt dann. `http://localhost` braucht das nicht. | `true` |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client-ID (Backend-Validierung) | — |
 
 ### Speicher

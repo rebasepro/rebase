@@ -248,6 +248,12 @@ To keep the machine-readable result as an artifact:
         run: npx --yes @rebasepro/rls-check --json > rls-report.json
 ```
 
+### On a Rebase database, change the rule, not the policy
+
+Every policy on a Rebase deployment is compiled from a collection's `securityRules`, and the runtime re-applies them on every boot — it drops each generated policy and creates it again from the config. SQL run against one of them survives exactly until the next restart, so `rls-check` recognises those policies (a `<table>_<operation>_<hash>` name, or a call to `rebase.uid()` / `rebase.roles()` in the expression) and prescribes the rule instead: edit the collection under `config/collections/`, or `defaultSecurityRules` in `config/collections/index.ts` when the collection declares none of its own, then redeploy. A policy you wrote by hand in a migration is untouched by this, and its fix is still the SQL.
+
+A stock Rebase scaffold reports three `policy-always-true` criticals on its first scan — `posts`, `authors` and `tags` inherit a `{ operation: "select", access: "public" }` rule — so decide whether to replace those rules or to `--skip policy-always-true` before you make this a gate.
+
 ## JSON output
 
 `--json` writes a single `ScanResult` object to stdout and nothing else. Errors still go to stderr.

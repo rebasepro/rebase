@@ -1,5 +1,5 @@
 ---
-sourceHash: 3e7cee199ce0ba69
+sourceHash: 45912133a3586b34
 slug: es/docs/rls-check
 title: rls-check
 description: "Audita la seguridad a nivel de fila (RLS) en cualquier base de datos PostgreSQL: Supabase, Neon, RDS o tu propio servidor. Solo lectura, sin registro, sin necesidad de Rebase."
@@ -42,9 +42,13 @@ DATABASE_URL="postgres://user:pass@host:5432/dbname" npx @rebasepro/rls-check
 npx @rebasepro/rls-check "postgres://user:pass@host:5432/dbname"
 ```
 
-Si tu contraseña contiene `@`, `:`, `/`, `?` o `#`, codifícala en formato percent-encoding. Esa es, con diferencia,
-la causa más común de fallos de autenticación aquí, y `rls-check` lo indicará claramente en lugar de
-dejarte adivinar.
+Si tu contraseña contiene `/`, `?` o `#`, codifícala en formato percent-encoding. Esos tres caracteres
+terminan la sección de autoridad de la URL, así que la división cae dentro de la credencial: en lugar de
+imprimir fragmentos de una contraseña, `rls-check` rechaza la cadena y lo dice.
+
+`@` y `:` no necesitan codificación: la userinfo se divide en la **última** `@` y el usuario en el
+**primer** `:`, que es lo que hace también `pg`, de modo que `postgres://user:pa@ss@host:5432/db` conecta
+con `host` usando la contraseña `pa@ss`. Codificarlos de todos modos nunca está mal.
 
 ### Opciones
 
@@ -98,6 +102,13 @@ de datos limpia.
     DATABASE_URL: ${{ secrets.DATABASE_URL }}
 ```
 
+**Un proyecto Rebase recién creado no pasa eso el primer día, y no se pretende que lo haga.** Las `defaultSecurityRules` del andamiaje abren la lectura a todo el mundo — `{ operation: "select", access: "public" }` en `config/collections/index.ts` —, de modo que `posts`, `authors` y `tags` informan cada uno de un `policy-always-true` crítico. `access: "public"` trata de *filas*, no de quién puede llamar a la API: una petición sin token sigue recibiendo un 401 mientras `AUTH_REQUIRE` esté activo. Aun así el hallazgo es correcto, porque eso es lo único que hay delante de los datos.
+
+Decide cuál de los dos casos es el tuyo antes de conectar esto a CI:
+
+- **las reglas son un marcador de posición** — sustitúyelas por las que tus datos necesitan de verdad ([reglas de seguridad](/docs/collections/security-rules)) y los hallazgos desaparecen;
+- **las filas son realmente públicas** — dilo una vez, con `npx @rebasepro/rls-check --fail-on high --skip policy-always-true`, y ten claro a qué renuncias: `--skip` desactiva la comprobación en todas partes, incluida la tabla que añadas el mes que viene.
+
 ### Salida JSON
 
 `--json` emite un objeto estable: `scannedAt`, `database` (solo host y nombre, nunca
@@ -114,6 +125,19 @@ consumidor distinguir «no había nada mal» de «el escaneo no pudo mirar».
 **Los hallazgos confirmados aparecen primero; los heurísticos están en una sección separada "vale la pena comprobar".** Una comprobación heurística no puede interpretar la intencionalidad (una tabla de unión que dejaste abierta deliberadamente no es un error), por lo que se formulan como preguntas y nunca se mezclan con las certezas.
 
 **Presta atención a la nota sobre privilegios.** Si el escaneo se conecta como superusuario, propietario de la tabla o un rol con `BYPASSRLS`, así lo indicará. Ese rol ve el catálogo completo, que es lo que hace posible la auditoría, pero también significa que nada en el informe describe lo que experimenta *esa* conexión. Los hallazgos se refieren a lo que obtienen otros roles.
+
+### En una base de datos Rebase, cambia la regla, no la política
+
+Cada política de un despliegue de Rebase se compila a partir de las `securityRules` de una colección, y el runtime **las vuelve a aplicar en cada arranque**: elimina cada política generada y la crea de nuevo a partir de la configuración. Por tanto, un `ALTER POLICY` sobre una de ellas sobrevive exactamente hasta el siguiente reinicio, y el hallazgo vuelve con él, después de que lo hayas visto desaparecer.
+
+`rls-check` reconoce esas políticas (un nombre con la forma `<tabla>_<operación>_<hash>`, o una llamada a `rebase.uid()` / `rebase.roles()` en la expresión) y prescribe la regla en lugar de SQL. Cuando veas un arreglo que dice eso:
+
+1. busca la colección cuya tabla nombra, dentro de `config/collections/`;
+2. cambia sus `securityRules` — consulta [reglas de seguridad](/docs/collections/security-rules);
+3. si la colección no declara ninguna propia, hereda `defaultSecurityRules` de `config/collections/index.ts`, y ese es el archivo que hay que editar;
+4. vuelve a desplegar — el arranque reaplica las políticas — o ejecuta `rebase db push`.
+
+Una política que escribiste a mano, en una migración, no se ve afectada por nada de esto, y su arreglo sigue siendo el SQL que hay que ejecutar.
 
 ## Las comprobaciones
 
@@ -145,6 +169,8 @@ Si una política `RESTRICTIVE` cubre el mismo comando, esta severidad se degrada
 ALTER POLICY "your_policy" ON "public"."your_table"
     USING (user_id = rebase.uid());
 ```
+
+En una base de datos Rebase el arreglo es la regla de la colección, no esa sentencia: consulta «En una base de datos Rebase, cambia la regla, no la política». Un andamiaje recién creado informa de esta comprobación en `posts`, `authors` y `tags` por diseño.
 
 ### policy-anonymous-tautology
 

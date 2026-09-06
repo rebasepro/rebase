@@ -1,7 +1,7 @@
 import type { Check, DbPolicy, DbRelation, DbSnapshot, Finding } from "../types";
 
 import { SQL_KEYWORDS, findSubqueries, isBareIdent, matchParen, tokenize, type SqlToken } from "./sql";
-import { finding, hasColumn, qi, qrel, relationAt } from "./util";
+import { finding, hasColumn, isRebaseManagedPolicy, managedPolicyFix, qi, qrel, relationAt } from "./util";
 
 const ID = "unqualified-column-in-subquery";
 
@@ -57,7 +57,7 @@ export const unqualifiedColumnInSubquery: Check = {
                 if (!expr) continue;
 
                 for (const hit of scanExpression(snapshot, outer, expr)) {
-                    findings.push(buildFinding(policy, outer, clause, hit));
+                    findings.push(buildFinding(snapshot, policy, outer, clause, hit));
                 }
             }
         }
@@ -296,6 +296,7 @@ function resolveRelation(
 }
 
 function buildFinding(
+    snapshot: DbSnapshot,
     policy: DbPolicy,
     outer: DbRelation,
     clause: "USING" | "WITH CHECK",
@@ -330,8 +331,14 @@ function buildFinding(
             `far more rows than intended — exposing other users' or tenants' rows to anyone the policy ` +
             `applies to — or, if the inner comparison is never satisfiable, matches none, and the table ` +
             `silently returns empty results.`,
-        fix:
-            `-- Qualify every reference so the binding is explicit:\n` +
+        fix: isRebaseManagedPolicy(snapshot, policy)
+            ? managedPolicyFix(
+                policy,
+                `qualify every reference in the rule's condition so the binding is explicit — ` +
+                `\`${hit.inner}.${hit.column}\` and \`${policy.table}.${hit.column}\` are different columns, ` +
+                `and the bare name binds to the inner one`
+            )
+            : `-- Qualify every reference so the binding is explicit:\n` +
             `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
             `    ${clause === "USING" ? "USING" : "WITH CHECK"} (EXISTS (\n` +
             `        SELECT 1 FROM ${hit.inner}\n` +
