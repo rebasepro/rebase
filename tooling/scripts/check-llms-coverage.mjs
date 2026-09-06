@@ -20,7 +20,6 @@ import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const CONTENT = path.join(ROOT, "website/src/content/docs/docs");
-const CONTENT_ROOT = path.join(ROOT, "website/src/content/docs");
 const FULL = "website/public/llms-full.txt";
 const INDEX = "website/public/llms.txt";
 const SITEMAP = "website/public/sitemap.md";
