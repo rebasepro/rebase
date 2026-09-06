@@ -159,6 +159,32 @@ for (const [route, file] of pages) {
         fail(route, "untranslated-title", got);
 }
 
+/* 7. Every English marketing route has a `.md` mirror.
+      `[page].md.ts` derives its slug list from the routes, so this is the
+      assertion that the derivation still sees them all — the hand-kept list it
+      replaced was sixteen slugs against thirty-one routes, and `/pricing`,
+      `/rls-check` and all eight comparison pages had no mirror at all. */
+{
+    const routeDir = new URL("../src/pages/[...lang]/", import.meta.url);
+    const wanted = readdirSync(routeDir)
+        .filter((f) => f.endsWith(".astro"))
+        .map((f) => f.replace(/\.astro$/, ""));
+    for (const slug of wanted) {
+        if (!files.has(`${slug}.md`))
+            fail(`/${slug}`, "missing-md-mirror", `${slug}.md is not in dist/`);
+    }
+    // `public/` is copied verbatim into `dist`, so a `.md` that came from there
+    // (`sitemap.md`) is an asset, not a route mirror.
+    const assets = new Set(
+        readdirSync(new URL("../public/", import.meta.url)).filter((f) => f.endsWith(".md"))
+    );
+    for (const f of files) {
+        const m = /^([a-z0-9-]+)\.md$/.exec(f);
+        if (m && m[1] !== "index" && !assets.has(f) && !wanted.includes(m[1]))
+            fail(`/${m[1]}`, "orphan-md-mirror", `${f} mirrors no route`);
+    }
+}
+
 const byCheck = {};
 for (const f of failures) (byCheck[f.check] ??= []).push(f);
 
