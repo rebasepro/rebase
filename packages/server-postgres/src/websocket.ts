@@ -171,8 +171,26 @@ export function createPostgresWebSocket(
     const clientSessions = new Map<string, ClientSession>();
 
     const isProduction = process.env.NODE_ENV === "production";
-    /** Debug logger that is suppressed in production to prevent PII/data leaks */
-    const wsDebug = (...args: unknown[]) => { if (!isProduction) console.debug(...args); };
+    /**
+     * Debug tracing for this socket.
+     *
+     * Through `logger.debug`, not `console.debug`. A bare console call sits
+     * outside the one level system, so `LOG_LEVEL=warn` — a line the scaffold's
+     * own `.env.example` ships — silenced every structured line in the process
+     * and left these ones printing; the deletion of the old `console.debug`
+     * override is what exposed that. It also skipped the redactor, and the
+     * extras these calls carry are rows.
+     *
+     * The production guard stays on top of the level gate rather than being
+     * replaced by it: these lines trace requests and their payloads, and
+     * `LOG_LEVEL=debug` on a deployment is not consent to put a user's row on
+     * stdout.
+     */
+    const wsDebug = (message: string, ...extras: unknown[]) => {
+        if (isProduction) return;
+        if (extras.length === 0) logger.debug(message);
+        else logger.debug(message, { details: extras.length === 1 ? extras[0] : extras });
+    };
     const wss = new WebSocketServer({ server });
 
     // Handle errors on the WSS so that EADDRINUSE from the underlying HTTP
