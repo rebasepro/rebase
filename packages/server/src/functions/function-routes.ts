@@ -79,7 +79,7 @@ export function createFunctionRoutes(
     const mounted = new Set(functions.map(fn => fn.name));
     const failedToLoad = new Map(problems.map(p => [problemName(p), p.split(" ")[0]]));
 
-    router.all("/:name{.*}", (c) => {
+    router.all("/:name{.*}", (c): never => {
         const requested = (c.req.param("name") ?? "").split("/").filter(Boolean);
         const name = requested[0] ?? "";
         const rest = requested.slice(1).join("/");
@@ -105,7 +105,7 @@ export function createFunctionRoutes(
                 "The server log records why, at boot."
             );
         }
-        refuse(
+        return refuse(
             `No function named '${name}' on this backend.` +
             (identified
                 ? (mounted.size > 0
