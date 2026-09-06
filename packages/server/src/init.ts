@@ -44,7 +44,7 @@ import { createAuthMiddleware } from "./auth/middleware";
 import { createAdapterAuthMiddleware } from "./auth/adapter-middleware";
 import { scopeDataDriver, SERVICE_IDENTITY } from "./auth/rls-scope";
 import { createBuiltinAuthAdapter } from "./auth/builtin-auth-adapter";
-import { errorHandler } from "./api/errors";
+import { ApiError, errorHandler } from "./api/errors";
 import { createSchemaDriftDetector } from "./api/schema-drift";
 import { installRootErrorHandler } from "./api/root-error-handler";
 import { Hono } from "hono";
@@ -2311,14 +2311,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // Apply a permissive body limit specifically for the upload endpoint
         storageRouter.use("/upload", bodyLimit({
             maxSize: storageMaxSize,
-            onError: (c) => {
-                return c.json({
-                    error: {
-                        message: `File too large. Maximum upload size is ${Math.round(storageMaxSize / 1024 / 1024)}MB.`,
-                        code: "PAYLOAD_TOO_LARGE"
-                    }
-                }, 413);
-            }
+            onError: (c) => errorHandler(
+                new ApiError(
+                    413,
+                    "PAYLOAD_TOO_LARGE",
+                    `File too large. Maximum upload size is ${Math.round(storageMaxSize / 1024 / 1024)}MB.`
+                ),
+                c
+            ) as Response
         }));
 
         storageRouter.route("/", storageRoutes);
