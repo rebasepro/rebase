@@ -1,0 +1,91 @@
+---
+sourceHash: aaf8b8e73bc43c87
+slug: de/docs/upgrading/0-17-to-next
+title: Upgrade von 0.17 auf das nächste Release
+sidebar_label: 0.17 → nächstes
+description: Die Breaking Changes, die bereits auf main liegen und in dieser Dokumentation beschrieben sind, bevor das Release existiert, das sie enthält.
+---
+
+# Upgrade 0.17 → nächstes Release
+
+**Nichts davon ist veröffentlicht.** Dies sind die `### Breaking`-Einträge aus dem
+Abschnitt [`[Unreleased]`](/de/docs/changelog/) des Changelogs: Sie liegen auf
+`main`, und diese Dokumentationsseite wird aus `main` veröffentlicht — also
+Wochen bevor die Version existiert, die sie enthält. Wenn Sie von npm
+installiert haben, sind Sie auf 0.17.3 und nichts davon hat Sie erreicht.
+
+## 20. `defineCollection` hat eine einzige Signatur
+
+Aus drei Überladungen (Postgres, Firestore, MongoDB) wurde eine, unterschieden
+über `engine` (Postgres, wenn nicht angegeben).
+
+**Zu ändern:** nichts an einem Aufruf, der bereits kompilierte — nur die
+Fehlermeldungen landen jetzt auf dem falschen Schlüssel statt auf
+`defineCollection(`. `UnknownPropertyKey` heißt jetzt `NoSuchKey`; nur Code, der
+den alten Namen importiert hat, muss angepasst werden.
+
+## 21. `defineCollection` prüft nach der ersten fehlerhaften Property weiter
+
+Eine einzige fehlerhafte Property ließ den abgeleiteten Entity-Typ auf
+`Record<string, unknown>` zusammenfallen und schaltete jede weitere Prüfung ab.
+
+**Zu ändern:** nichts zu schreiben, aber rechnen Sie mit *neuen* Fehlern in
+Collection-Dateien, die vorher kompilierten. Sie waren schon damals falsch — der
+Compiler hatte nur aufgehört hinzusehen.
+
+## 22. Das Verknüpfungsfeld einer Relation muss zu ihrer `kind` gehören
+
+`{ kind: "belongsTo", foreignKeyOnTarget: … }` kompiliert nicht mehr.
+
+**Zu ändern:** Schreiben Sie das Feld, das die Art besitzt.
+
+```diff lang="ts"
+  author: {
+      type: "relation",
+-     relation: { kind: "belongsTo", foreignKeyOnTarget: "author_id", target: () => authors }
++     relation: { kind: "belongsTo", localKey: "author_id", target: () => authors }
+  }
+```
+
+Der Boot-Validator hat das ohnehin schon abgelehnt: Wenn Ihr Projekt heute
+startet, kompiliert es auch heute.
+
+## 23. Die `validation` einer Relation wandert auf die Property
+
+`RelationBase.validation` und `ResolvedRelationBase.validation` sind entfernt.
+
+**Zu ändern:** Verschieben Sie den Eintrag eine Ebene nach oben.
+
+```diff lang="ts"
+  author: {
+      type: "relation",
++     validation: { required: true },
+-     relation: { kind: "belongsTo", validation: { required: true }, target: () => authors }
++     relation: { kind: "belongsTo", target: () => authors }
+  }
+```
+
+Der Boot-Vorgang lehnt den alten Schlüssel namentlich ab. Code, der eine Relation
+gefragt hat, ob sie erforderlich ist, fragt nun
+`import { isRelationRequired, relationDeclaringProperty } from "@rebasepro/common"`.
+
+## 24. Ein erforderliches `belongsTo` löscht mit `RESTRICT`, nicht `CASCADE`
+
+**Das ist eine DDL-Änderung.** Der nächste `rebase db push` plant für jede
+erforderliche Relation ohne ausdrückliches `onDelete` einen Constraint-Umbau, und
+danach schlagen Löschvorgänge am Elternobjekt fehl, wo sie vorher kaskadierten.
+
+**Zu ändern:** Wenn Sie das alte Verhalten behalten wollen, schreiben Sie es hin.
+
+```diff lang="ts"
+- relation: { kind: "belongsTo", target: () => authors }
++ relation: { kind: "belongsTo", onDelete: "cascade", target: () => authors }
+```
+
+Prüfen Sie danach den Plan, bevor Sie ihn anwenden — `rebase db push` gibt die
+Anweisungen aus.
+
+---
+
+**Weiter:** [Welcher Sprung](/de/docs/upgrading/) ·
+[Changelog](/de/docs/changelog/).

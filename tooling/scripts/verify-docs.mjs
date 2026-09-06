@@ -185,7 +185,9 @@ if (only === "both" || only === "names") {
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} breaking release(s) missing from the upgrade guide:${NC}`);
-        for (const b of bad) console.log(`  ${RED}${b.version}${NC} ${DIM}(${b.entries} breaking section)${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.version}${NC} ${DIM}${b.reason ?? `(${b.entries} breaking section)`}${NC}`);
+        }
     }
 }
 
