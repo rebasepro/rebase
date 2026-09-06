@@ -18,12 +18,22 @@
  * Statically, in two halves, because Hono's own route list needs a booted app
  * and a database.
  *
- *   1. {@link MOUNTS} maps a router module to the prefix `init.ts` mounts it
- *      at. It is hand-written — the mounts are conditional on `surfaces` and
- *      spread across three thousand lines — but it is *checked*: a
- *      `*route*.ts` module under `packages/server/src` that this map does not
- *      mention is a finding, so a new router cannot be added in silence.
- *   2. Inside each module, every `x.get("/path", …)` and friend is a route.
+ *   1. {@link MOUNTS} maps each `new Hono()` **receiver** to the prefix it is
+ *      mounted at. It is hand-written — the mounts are conditional on
+ *      `surfaces` and spread across three thousand lines — but it is *checked*:
+ *      a `new Hono()` anywhere under `packages/server/src` that this map does
+ *      not mention is a finding, so a new router cannot be added in silence.
+ *   2. Inside each module, every `x.get("/path", …)` and friend on a mapped
+ *      receiver is a route.
+ *
+ * The key is `<file>#<receiver>`, not the file, because the completeness rule
+ * used to glob `**\/*route*.ts` — a filename test. `boot.ts`, `metrics/index.ts`,
+ * `api/rest/api-generator.ts`, `functions/proxy.ts` and
+ * `auth/reset-password-admin.ts` are all routers that are not called one, so the
+ * gate printed "63/63" while `GET /livez` — the value of
+ * `RUNTIME_LIVENESS_PATH`, and what five deploy guides tell an operator to probe
+ * — was mounted and in no table. `init.ts` alone builds fourteen routers at
+ * eleven different prefixes, which a file-keyed map cannot express at all.
  *
  * Route families whose paths come from data rather than from source — a
  * collection's CRUD, a project's custom functions — are one row each, marked as
@@ -75,43 +85,96 @@ const DIM = "[2m";
 const NC = "[0m";
 
 /**
- * Where `init.ts` mounts each router, with `basePath` at its default `/api`.
+ * Where each `new Hono()` receiver is mounted, with `basePath` at `/api`.
  *
- * A `null` prefix means the module registers no routes of its own — it is a
- * factory, a middleware or a proxy — and is deliberately not in the index.
+ * Keyed `<file>#<receiver>`: `init.ts` builds fourteen routers at eleven
+ * prefixes and `boot.ts` two at the root, so a file-keyed map cannot say where
+ * any of them live. A module whose only router is a plain `const router = new
+ * Hono()` still reads as one line.
+ *
+ * A `null` prefix means the receiver mounts nothing this index should carry —
+ * a factory, a proxy, a stub whose only route is a catch-all error, or a family
+ * whose paths come from a project's own data.
  */
 const MOUNTS = new Map([
-    ["packages/server/src/auth/routes.ts", "/api/auth"],
-    ["packages/server/src/auth/api-keys/api-key-routes.ts", "/api/admin/api-keys"],
-    ["packages/server/src/auth/jwks-routes.ts", "/.well-known"],
-    ["packages/server/src/storage/routes.ts", "/api/storage"],
-    ["packages/server/src/history/history-routes.ts", "/api/data"],
-    ["packages/server/src/cron/cron-routes.ts", "/api/admin/cron"],
-    ["packages/server/src/backup/backup-routes.ts", "/api/admin/backups"],
-    ["packages/server/src/api/schema-editor-routes.ts", "/api/admin/schema-editor"],
-    ["packages/server/src/api/live-schema-routes.ts", "/api/admin/schema"],
-    ["packages/server/src/api/logs-routes.ts", "/api/admin/logs"],
-    ["packages/server/src/api/contract-routes.ts", "/api/meta"],
-    // Mounted into the auth router by `createAuthRoutes`, so they share its
-    // prefix rather than getting one of their own.
-    ["packages/server/src/auth/mfa-routes.ts", "/api/auth"],
-    ["packages/server/src/auth/session-routes.ts", "/api/auth"],
-    ["packages/server/src/auth/magic-link-routes.ts", "/api/auth"],
-    ["packages/server/src/auth/otp-routes.ts", "/api/auth"],
+    ["packages/server/src/auth/routes.ts#router", "/api/auth"],
+    ["packages/server/src/auth/api-keys/api-key-routes.ts#router", "/api/admin/api-keys"],
+    ["packages/server/src/auth/jwks-routes.ts#router", "/.well-known"],
+    ["packages/server/src/storage/routes.ts#router", "/api/storage"],
+    ["packages/server/src/history/history-routes.ts#router", "/api/data"],
+    ["packages/server/src/cron/cron-routes.ts#router", "/api/admin/cron"],
+    ["packages/server/src/backup/backup-routes.ts#router", "/api/admin/backups"],
+    ["packages/server/src/api/schema-editor-routes.ts#router", "/api/admin/schema-editor"],
+    ["packages/server/src/api/live-schema-routes.ts#router", "/api/admin/schema"],
+    ["packages/server/src/api/logs-routes.ts#app", "/api/admin/logs"],
+    ["packages/server/src/api/contract-routes.ts#router", "/api/meta"],
+    // These four build no router of their own: `createAuthRoutes` passes them
+    // its own, so they register on the caller's `router` and share its prefix.
+    ["packages/server/src/auth/mfa-routes.ts#router", "/api/auth"],
+    ["packages/server/src/auth/session-routes.ts#router", "/api/auth"],
+    ["packages/server/src/auth/magic-link-routes.ts#router", "/api/auth"],
+    ["packages/server/src/auth/otp-routes.ts#router", "/api/auth"],
     // The built-in adapter's admin half, mounted by `createAdminRoutes`.
-    ["packages/server/src/auth/admin-users-route.ts", "/api/admin"],
-    ["packages/server/src/auth/admin-roles-route.ts", "/api/admin"],
-    // Named for what it does rather than for being a router, so the glob above
-    // does not reach it — but it mounts a real route and belongs in the index.
-    ["packages/server/src/auth/reset-password-admin.ts", "/api/admin"],
-    // Routes a realtime *message* to a service; nothing HTTP.
-    ["packages/server/src/services/routed-realtime-service.ts", null],
+    ["packages/server/src/auth/admin-users-route.ts#router", "/api/admin"],
+    ["packages/server/src/auth/admin-roles-route.ts#router", "/api/admin"],
+    // Named for what it does rather than for being a router. The old glob was
+    // `**/*route*.ts`, so this file — which mounts a real admin route — was
+    // invisible to the completeness rule that was supposed to catch it.
+    ["packages/server/src/auth/reset-password-admin.ts#router", "/api/admin"],
+
+    // ── The root app ──────────────────────────────────────────────────────
+    // `boot.ts` builds the runtime's own Hono app twice: once for a backend
+    // bundle and once for a static-app bundle. Both mount `/livez` and
+    // `/health` at the root, outside `basePath`, because that is where an
+    // orchestrator probes. `RUNTIME_LIVENESS_PATH` is `/livez`, and five deploy
+    // guides tell operators to use it.
+    ["packages/server/src/boot/boot.ts#app", ""],
+    ["packages/server/src/metrics/index.ts#router", "/metrics"],
+
+    // ── init.ts, one line per router ──────────────────────────────────────
+    ["packages/server/src/init.ts#schemaEditorRouter", "/api/admin/schema-editor"],
+    ["packages/server/src/init.ts#liveSchemaRouter", "/api/admin/schema"],
+    ["packages/server/src/init.ts#storageRouter", "/api/storage"],
+    ["packages/server/src/init.ts#dataRouter", "/api/data"],
+    ["packages/server/src/init.ts#functionsRouter", "/api/functions"],
+    ["packages/server/src/init.ts#cronRouter", "/api/admin/cron"],
+    ["packages/server/src/init.ts#backupRouter", "/api/admin/backups"],
+    ["packages/server/src/init.ts#rlsAuditRouter", "/api/admin/rls-audit"],
+    ["packages/server/src/init.ts#devMailRouter", "/api/admin/dev/emails"],
+    ["packages/server/src/init.ts#logsRouter", "/api/admin/logs"],
+    ["packages/server/src/init.ts#contractRouter", "/api/meta"],
+    // Stubs: one `all("/*")` that answers with the reason the surface is off.
+    // A 501 explaining itself is not an endpoint anyone looks up.
+    ["packages/server/src/init.ts#unconfigured", null],
+    ["packages/server/src/init.ts#storageStub", null],
+    ["packages/server/src/init.ts#emptyDataStub", null],
+
+    // ── Families and machinery ────────────────────────────────────────────
     // Every route's path is a collection slug or a function name, so it comes
     // from a project's data rather than from this source. The index carries one
     // row for each family instead; enumerating them would mean enumerating
     // somebody's collections.
-    ["packages/server/src/functions/function-routes.ts", null]
+    ["packages/server/src/functions/function-routes.ts#router", null],
+    ["packages/server/src/api/rest/api-generator.ts#this.router", null],
+    // The router a *project's* own `defineFunction` returns, and the proxy that
+    // forwards to a functions process. Neither has a path of its own.
+    ["packages/server/src/functions/define-function.ts#app", null],
+    ["packages/server/src/functions/proxy.ts#router", null],
+    // `mountWithLegacyAlias`'s forwarder, and the adapter's optional extra
+    // router: both re-serve routes that are already counted where they are
+    // defined.
+    ["packages/server/src/api/mount.ts#alias", null],
+    ["packages/server/src/auth/builtin-auth-adapter.ts#router", null]
 ]);
+
+/**
+ * A `new Hono()` and the name it is assigned to.
+ *
+ * `const router = new Hono<HonoEnv>()`, `this.router = new Hono()`. An
+ * unassigned `new Hono()` — `root-error-handler.ts` builds one only to read its
+ * default error handler off it — has no receiver and registers nothing.
+ */
+const ROUTER = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new Hono|(this\.[A-Za-z_$][\w$]*)\s*=\s*new Hono/g;
 
 /**
  * A route registration: `router.get("/path", …)`.
@@ -121,7 +184,7 @@ const MOUNTS = new Map([
  * route. Left in, it produced twenty phantom endpoints with names like
  * `/api/authuser`, which is the sort of finding that gets a gate ignored.
  */
-const METHOD = /\b([A-Za-z_$][\w$]*)\.(get|post|put|patch|delete|all)\(\s*["'`](\/[^"'`]*)["'`]/g;
+const METHOD = /\b((?:this\.)?[A-Za-z_$][\w$]*)\.(get|post|put|patch|delete|all)\(\s*["'`](\/[^"'`]*)["'`]/g;
 
 /** Receivers that are a Hono context, not a router. */
 const NOT_A_ROUTER = new Set(["c", "ctx", "context"]);
@@ -129,26 +192,40 @@ const NOT_A_ROUTER = new Set(["c", "ctx", "context"]);
 export function checkEndpointIndex(root = DEFAULT_ROOT) {
     const findings = [];
 
-    // ── the map covers every router module ────────────────────────────────
-    const modules = globSync("packages/server/src/**/*route*.ts", { cwd: root })
+    // ── the map covers every router in the server ─────────────────────────
+    // Every `.ts`, not `**/*route*.ts`: the old glob was a filename test, and
+    // `boot.ts`, `metrics/index.ts` and `api-generator.ts` are routers that are
+    // not called one.
+    const modules = globSync("packages/server/src/**/*.ts", { cwd: root })
         .filter(f => !/\.test\.ts$|(^|\/)test\//.test(f))
         .sort();
+    /** @type {Map<string, string[]>} receivers declared per file */
+    const receivers = new Map();
     for (const file of modules) {
-        if (!MOUNTS.has(file)) {
+        const source = readFileSync(path.join(root, file), "utf8");
+        if (!source.includes("new Hono")) continue;
+        const names = [...new Set(
+            [...source.matchAll(ROUTER)].map(m => m[1] || m[2])
+        )];
+        if (names.length === 0) continue;   // an unassigned `new Hono()`
+        receivers.set(file, names);
+        for (const name of names) {
+            if (MOUNTS.has(`${file}#${name}`)) continue;
             findings.push({
                 kind: "unmapped",
                 message:
-                    `${file} registers routes and MOUNTS does not say where they are mounted — ` +
-                    "add it (or `null` if it mounts nothing), so the index cannot miss a surface."
+                    `${file} builds a router \`${name}\` and MOUNTS does not say where it is ` +
+                    "mounted — add `" + `${file}#${name}` + "` (or `null` if it mounts nothing), " +
+                    "so the index cannot miss a surface."
             });
         }
     }
 
-    // ── the routes each mapped module registers ───────────────────────────
+    // ── the routes each mapped receiver registers ─────────────────────────
     /** @type {Set<string>} */
     const routes = new Set();
-    for (const [file, prefix] of MOUNTS) {
-        if (prefix === null) continue;
+    for (const [key, prefix] of MOUNTS) {
+        const [file, receiver] = key.split("#");
         let source;
         try {
             source = readFileSync(path.join(root, file), "utf8");
@@ -159,12 +236,37 @@ export function checkEndpointIndex(root = DEFAULT_ROOT) {
             });
             continue;
         }
+        // A receiver is either built here or handed in: `createAuthRoutes`
+        // passes its own router to `mfa-routes.ts` and friends, which register
+        // on it and return nothing. Both are real; a name that is neither is a
+        // stale entry.
+        const built = (receivers.get(file) || []).includes(receiver);
+        const escaped = receiver.replace(/\./g, "\\.");
+        const registersOn = new RegExp(
+            `\\b${escaped}\\.(get|post|put|patch|delete|all|use|route)\\(`
+        ).test(source);
+        if (!built && !registersOn) {
+            findings.push({
+                kind: "gone",
+                message:
+                    `MOUNTS names ${key}, and ${file} neither builds a router by that name nor ` +
+                    "registers anything on one — delete the entry or fix the receiver."
+            });
+            continue;
+        }
+        if (prefix === null) continue;
         for (const m of source.matchAll(METHOD)) {
             if (NOT_A_ROUTER.has(m[1])) continue;
+            if (m[1] !== receiver) continue;
             // An interpolated segment is a family — the OAuth provider routes
             // are registered in a loop over the configured providers — so it
             // becomes a parameter, which is how the index writes it.
             const sub = m[3].replace(/\$\{[^}]*\}/g, ":provider");
+            // `all("/*")` is a fallback, not an endpoint: every admin surface
+            // that can be switched off mounts one so a disabled feature answers
+            // 501 with its reason instead of a 404 that reads as a broken
+            // deploy. There is nothing for a reader to look up.
+            if (m[2] === "all" && sub === "/*") continue;
             routes.add((prefix + (sub === "/" ? "" : sub)) || "/");
         }
     }
@@ -219,7 +321,7 @@ export function checkEndpointIndex(root = DEFAULT_ROOT) {
         }
     }
 
-    return { findings, routes: routes.size, modules: modules.length, paramRows, reserved: reserved.size };
+    return { findings, routes: routes.size, modules: receivers.size, paramRows, reserved: reserved.size };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

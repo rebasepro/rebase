@@ -118,6 +118,7 @@ reaches none of this.
 | `GET` | `/api/admin/schema/status` | admin | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | admin | Plans a change; never applies one |
 | `POST` | `/api/admin/schema/apply` | admin | Off unless `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
+| `GET` | `/api/admin/schema-editor/status` | admin | Whether the editor is available, and the reason when it is not |
 | `POST` | `/api/admin/schema-editor/collection/save` | admin | [Studio](/docs/studio/) — rewrites collection source |
 | `POST` | `/api/admin/schema-editor/collection/delete` | admin | [Studio](/docs/studio/) |
 | `POST` | `/api/admin/schema-editor/property/save` | admin | [Studio](/docs/studio/) |
@@ -161,12 +162,14 @@ deployment's custom endpoints is not public.
 
 | Method | Path | Gate | More |
 |---|---|---|---|
+| `GET` | `/livez` | none | Liveness alone: is this process running. Does not touch the database, which is why it is the probe path a container should use — `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Liveness and readiness. Reports every configured data source, not only the default |
 | `GET` | `/api/docs` | none (admin in production) | The OpenAPI 3.0 document |
 | `GET` | `/api/swagger` | none | Swagger UI. Development only unless `REBASE_ENABLE_SWAGGER` |
 | `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from, and nothing else |
 | `GET` | `/api/meta/contract` | admin | The full collection contract, for `rebase generate-sdk --from`. `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
+| `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN` when set | The recorded series behind the Studio charts. `501` on a runtime with no backend |
 
 WebSocket connections arrive as an HTTP upgrade on the same server rather than at
 a path of their own — see [Realtime](/docs/backend/realtime/).
