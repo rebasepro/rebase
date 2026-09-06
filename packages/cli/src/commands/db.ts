@@ -996,15 +996,19 @@ async function refuseDeletingActiveBranch(projectRoot: string, rawArgs: readonly
     const active = readActiveBranch(projectRoot);
     if (active?.name !== name) return;
 
+    const off = "rebase db branch switch --off";
+    const del = `rebase db branch delete ${name}`;
+    const column = Math.max(off.length, del.length) + 4;
+
     console.error("");
     console.error(chalk.red(`✗ You are on branch "${name}" — leave it before deleting it.`));
     console.error("");
-    console.error(chalk.gray(`  Every database command in this checkout is pointed at ${active.database}, `));
+    console.error(chalk.gray(`  Every database command in this checkout is pointed at ${active.database},`));
     console.error(chalk.gray("  including this one, so the delete would be asking that database to drop"));
     console.error(chalk.gray("  itself."));
     console.error("");
-    console.error(`  ${chalk.cyan("rebase db branch switch --off")}    back to the main database`);
-    console.error(`  ${chalk.cyan(`rebase db branch delete ${name}`)}${" ".repeat(Math.max(1, 20 - name.length))}then this works`);
+    console.error(`  ${chalk.cyan(off)}${" ".repeat(column - off.length)}back to the main database`);
+    console.error(`  ${chalk.cyan(del)}${" ".repeat(column - del.length)}then this works`);
     console.error("");
     process.exit(1);
 }
