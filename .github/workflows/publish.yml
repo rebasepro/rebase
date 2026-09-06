@@ -159,7 +159,14 @@ jobs:
           # 0946568. The prefix makes the identifier alphanumeric every time.
           SHORT_SHA="g$(echo "${{ github.sha }}" | cut -c1-7)"
 
-          LATEST_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          # The last release ON THIS HISTORY, not the highest version string in
+          # the tag namespace — the same derivation as tooling/scripts/release.sh,
+          # and `check:publishable-set` fails when the two expressions differ.
+          # This repository descends from a lineage that reached v3.x before
+          # versioning restarted at 0.x, and 436 of those tags still exist in
+          # clones. Sorted by version, v3.3.0 wins; `git describe` walks back
+          # from HEAD and can only return a tag this commit descends from.
+          LATEST_TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)
           if [ -z "$LATEST_TAG" ]; then
             # No release yet: 0.0.1-canary.x, which is what canary published
             # before it tracked releases at all.
@@ -168,6 +175,16 @@ jobs:
           else
             BASE="${LATEST_TAG#v}"
             echo "Last release: $LATEST_TAG"
+
+            # The tag and the packages are bumped by the same release, so they
+            # agree unless the tag came from somewhere else. release.sh refuses
+            # on this and the workflow did not.
+            PKG_VERSION=$(node -p "require('./packages/server/package.json').version")
+            if [ "$PKG_VERSION" != "$BASE" ]; then
+              echo "❌ Tag $LATEST_TAG disagrees with packages/server at $PKG_VERSION."
+              echo "   The canary would be numbered from the wrong baseline."
+              exit 1
+            fi
           fi
 
           IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
@@ -415,13 +432,34 @@ jobs:
       - name: Determine version
         id: version
         run: |
-          LATEST_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          # The last release ON THIS HISTORY — see the canary job's copy of this
+          # line, tooling/scripts/release.sh, and `check:publishable-set`, which
+          # fails when the three stop agreeing. Sorting the tag namespace by
+          # version answers a different question: the highest version string
+          # anywhere. With 436 FireCMS-era `v3.*` tags still in developer
+          # clones, that answer is v3.3.0, and `minor` computes 3.4.0 — a number
+          # that would reach npm and cannot be taken back.
+          LATEST_TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)
           if [ -z "$LATEST_TAG" ]; then
             echo "❌ No semver tags found. Create an initial tag first: git tag -a v0.0.0 -m 'Initial version'"
             exit 1
           fi
 
           CURRENT="${LATEST_TAG#v}"
+
+          # The tag and the packages are bumped by the same release, so they
+          # agree unless the tag came from somewhere else. Disagreeing means the
+          # version about to be computed is not this project's — stop before it
+          # reaches npm. Ported from release.sh, which has refused on this for
+          # months while the workflow did not.
+          PKG_VERSION=$(node -p "require('./packages/server/package.json').version")
+          if [ "$PKG_VERSION" != "$CURRENT" ]; then
+            echo "❌ Tag $LATEST_TAG disagrees with packages/server at $PKG_VERSION."
+            echo "   Releasing would compute the next version from the wrong baseline."
+            echo "   Check for stray tags: git tag -l 'v[0-9]*' --sort=-version:refname | head"
+            exit 1
+          fi
+
           BUMP="${{ inputs.version }}"
 
           if [[ "$BUMP" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
