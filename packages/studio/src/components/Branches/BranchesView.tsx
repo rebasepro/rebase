@@ -61,6 +61,16 @@ export function BranchesView() {
     const [newBranchName, setNewBranchName] = useState("");
     const [sourceBranch, setSourceBranch] = useState<string | undefined>(undefined);
     const [creating, setCreating] = useState(false);
+    /**
+     * Why the last create attempt was refused, kept on screen.
+     *
+     * The server refuses branching outright on the managed development
+     * database — PGlite serves one database, so the "branch" would be the
+     * parent. That refusal is the whole answer to what the reader just tried to
+     * do, and a snackbar is gone in four seconds; the same argument
+     * `load-failure.ts` makes for listings.
+     */
+    const [createError, setCreateError] = useState<string | null>(null);
 
     // Delete confirm
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -101,6 +111,7 @@ export function BranchesView() {
     const handleCreate = async () => {
         if (!branchAdmin || !newBranchName.trim()) return;
         setCreating(true);
+        setCreateError(null);
         try {
             await branchAdmin.createBranch(newBranchName.trim(), sourceBranch ? { source: sourceBranch } : undefined);
             snackbarRef.current.open({
@@ -112,10 +123,10 @@ export function BranchesView() {
             setSourceBranch(undefined);
             await loadBranches();
         } catch (e: unknown) {
-            snackbarRef.current.open({
-                type: "error",
-                message: e instanceof Error ? e.message : String(e)
-            });
+            const message = e instanceof Error ? e.message : String(e);
+            setCreateError(message);
+            snackbarRef.current.open({ type: "error",
+                message });
         } finally {
             setCreating(false);
         }
@@ -328,12 +339,20 @@ export function BranchesView() {
             </div>
 
             {/* ── Create Dialog ── */}
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <Dialog open={createOpen} onOpenChange={(open) => {
+                setCreateOpen(open);
+                if (!open) setCreateError(null);
+            }}>
                 <DialogTitle>Create New Branch</DialogTitle>
                 <DialogContent className="space-y-4 min-w-[400px]">
                     <Typography variant="body2" color="secondary" className="text-[13px]">
                         Create an isolated database copy. The branch will be a full clone of the source database at this point in time.
                     </Typography>
+                    {createError && (
+                        <Alert color="error">
+                            <Typography variant="body2" className="text-[13px]">{createError}</Typography>
+                        </Alert>
+                    )}
                     <div>
                         <TextField
                             label="Branch Name"

@@ -1,4 +1,5 @@
 import { RealtimeService } from "./services/realtimeService";
+import { BranchingUnsupportedError } from "./services/BranchService";
 import { PostgresBackendDriver, effectiveSqlRole } from "./PostgresBackendDriver";
 import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter } from "@rebasepro/types";
 import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
@@ -866,6 +867,23 @@ code: "INVALID_LIMIT" } }
                 // branch it becomes INTERNAL_ERROR with the text dropped in
                 // production, so the socket would refuse the write and decline
                 // to say why.
+                // "This server cannot branch" is a refusal too, and the same
+                // reasoning applies twice over: the generic branch would drop
+                // the text in production, and the text is the only thing that
+                // says what to do instead. Studio renders it where the success
+                // toast used to be.
+                if (error instanceof BranchingUnsupportedError
+                    || (error as Error)?.name === "BranchingUnsupportedError") {
+                    const refusal = error as BranchingUnsupportedError;
+                    logger.warn(`[WebSocket Server] Refused a branch operation: ${refusal.message}`);
+                    ws.send(JSON.stringify({
+                        type: "ERROR",
+                        requestId,
+                        payload: { error: { message: refusal.message,
+code: "BRANCHING_UNSUPPORTED" } }
+                    }));
+                    return;
+                }
                 if (error instanceof ApiError || (error as Error)?.name === "ApiError") {
                     const apiError = error as ApiError;
                     logger.warn(`[WebSocket Server] Refused a write: ${apiError.message}`);
