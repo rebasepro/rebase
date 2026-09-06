@@ -17233,7 +17233,7 @@ Toggles between Studio and Content modes:
 
 ```typescript
 const adminModeController = useBuildAdminModeController();
-// Provides: adminModeController.mode ("cms" | "studio" | "settings")
+// Provides: adminModeController.mode ("cms" | "studio")
 ```
 
 #### Scaffold Components
@@ -20045,7 +20045,7 @@ Switch the admin layout view modes within the admin panel.
 ```typescript
 
 function ModeToggle() {
-    const { mode, setMode } = useAdminModeController(); // mode is "cms" | "studio" | "settings"
+    const { mode, setMode } = useAdminModeController(); // mode is "cms" | "studio"
 
     return <button onClick={() => setMode("studio")}>Switch to Studio View</button>;
 }
