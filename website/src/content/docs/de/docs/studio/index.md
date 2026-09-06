@@ -22,11 +22,21 @@ Ein visueller Schema-Editor, mit dem Sie Sammlungen über eine Drag-and-Drop-Ben
 
 ![Sammlungs-Editor](/img/collection_editor.png)
 
+Der Editor ist überall dort aktiv, wo Studio eingebunden ist — das `<RebaseStudio/>` eines Scaffolds genügt, und es gibt keine Prop, die man hinzufügen müsste. `collectionEditor` stellt ihn ein, statt ihn einzuschalten:
+
 ```tsx
 import { RebaseCMS } from "@rebasepro/cms";
+import { RebaseStudio } from "@rebasepro/studio";
 
-// The Collection Editor is automatically enabled when you provide the 
-// collectionEditor configuration to your RebaseCMS component
+// Studio ist eingebunden, also steht der Sammlungs-Editor zur Verfügung.
+// Mehr ist dafür nicht nötig.
+<Rebase>
+    <RebaseCMS collections={collections}/>
+    <RebaseStudio/>
+</Rebase>
+
+// `collectionEditor` dient der Feinabstimmung — ein schreibgeschützter
+// Editor, ein anderes Token — nicht dem Einschalten.
 <RebaseCMS
     collections={collections}
     collectionEditor={{
@@ -34,6 +44,8 @@ import { RebaseCMS } from "@rebasepro/cms";
     }}
 />
 ```
+
+Ob ein *Speichern* ankommt, entscheidet der Server und nicht das Panel: Der Editor schreibt die Quelldateien der Sammlungen, also ist er unter `NODE_ENV=production`, im `baas`-Modus und auf einem Server ohne `collectionsDir` aus. Das Panel fragt `GET /api/schema-editor/status` ab und zeigt den zurückgegebenen Grund neben der deaktivierten Schaltfläche an.
 
 ### Integrierte Werkzeuge
 

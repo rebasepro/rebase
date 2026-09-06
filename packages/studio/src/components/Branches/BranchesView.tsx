@@ -30,6 +30,17 @@ import type { BranchInfo } from "@rebasepro/types";
 import { formatRelativeTime } from "@rebasepro/utils";
 
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+
+/**
+ * The prefix the driver puts on every branch database.
+ *
+ * Stated here rather than derived from the row, because `BranchInfo` carries
+ * the *name* a person typed and not the database it became — and the detail
+ * pane used to print the name under "Database:", which is a connection string
+ * to nothing. Kept in step with `BranchService.BRANCH_DB_PREFIX` and the CLI's
+ * `branch-pointer.ts`, which say the same thing for the same reason.
+ */
+const BRANCH_DB_PREFIX = "rb_";
 import { LoadFailureView } from "../load-failure-view";
 
 function formatSize(bytes: number | undefined): string {
@@ -307,17 +318,30 @@ export function BranchesView() {
                         <div className="flex-1 overflow-y-auto px-5 py-4">
                             <Alert color="info">
                                 <Typography variant="body2" className="text-[13px]">
-                                    <strong>How to use this branch:</strong> Switch your application&apos;s database connection to
-                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-950 font-mono text-[12px]">{selected.name}</code>
-                                    to work with an isolated copy of your data. Changes made to this branch won&apos;t affect your main database.
+                                    <strong>How to use this branch:</strong> point this checkout at it with
+                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-950 font-mono text-[12px]">rebase db branch switch {selected.name}</code>
+                                    — every later command uses it, and
+                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-950 font-mono text-[12px]">rebase db branch switch --off</code>
+                                    goes back to the main database. Changes made here don&apos;t affect it.
                                 </Typography>
                             </Alert>
                             <div className="mt-4 p-4 rounded-lg border bg-surface-50 dark:bg-surface-900 border-surface-200 dark:border-surface-700">
                                 <Typography variant="caption" className="text-[10px] uppercase tracking-wider text-surface-400 mb-2 block font-medium">Connection Details</Typography>
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2">
+                                        {/* The *database*, not the branch name. They are not the
+                                            same string — the driver prefixes every branch database
+                                            with `rb_` — and a connection string built from the name
+                                            on this pane pointed at a database that does not
+                                            exist. */}
                                         <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Database:</Typography>
-                                        <Typography variant="body2" className="font-mono text-[12px]">{selected.name}</Typography>
+                                        <Typography variant="body2" className="font-mono text-[12px]">{`${BRANCH_DB_PREFIX}${selected.name}`}</Typography>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Connect with:</Typography>
+                                        <Typography variant="body2" className="font-mono text-[12px] break-all">
+                                            {`DATABASE_URL=…/${BRANCH_DB_PREFIX}${selected.name}`}
+                                        </Typography>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Branched from:</Typography>

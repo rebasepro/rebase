@@ -38,11 +38,23 @@ migrated to `"cms"` on read.
 
 A visual schema editor that lets you create and modify collections through a drag-and-drop UI. When you save changes, it uses [ts-morph](https://ts-morph.com/) to update your TypeScript source files via AST manipulation — preserving all existing code and custom logic. It is the screenshot at the top of this page.
 
+The editor is on wherever Studio is mounted — a scaffold's `<RebaseStudio/>` is
+enough, and there is no prop to add. `collectionEditor` tunes it rather than
+turning it on:
+
 ```tsx
 import { RebaseCMS } from "@rebasepro/cms";
+import { RebaseStudio } from "@rebasepro/studio";
 
-// The Collection Editor is automatically enabled when you provide the 
-// collectionEditor configuration to your RebaseCMS component
+// Studio is mounted, so the Collection Editor is available. Nothing else
+// is needed for it.
+<Rebase>
+    <RebaseCMS collections={collections}/>
+    <RebaseStudio/>
+</Rebase>
+
+// `collectionEditor` is for fine-tuning — a read-only editor, a different
+// token — not for opting in.
 <RebaseCMS
     collections={collections}
     collectionEditor={{
@@ -50,6 +62,12 @@ import { RebaseCMS } from "@rebasepro/cms";
     }}
 />
 ```
+
+Whether a *save* lands is the server's decision, not the panel's: the editor
+rewrites collection source files, so it is off under `NODE_ENV=production`, in
+`baas` mode, and on a server with no `collectionsDir`. The panel asks
+`GET /api/schema-editor/status` and shows the reason it gets back beside the
+disabled button.
 
 ### Built-in tools
 
@@ -96,11 +114,11 @@ between replicas, and a restart empties it. For anything you need to keep, read
 the process's stdout, which carries the same lines and more.
 
 The **Collection Editor** is a Studio tool too, but it is not in this list because
-it is registered differently: `RebaseStudio` does not lazy-load it. The panel injects
-it when `RebaseCMS` is given a `collectionEditor` prop, because unlike the tools
-above it needs the project's collection source at hand to write back to. That is a
-difference in how it is mounted, not in what it is — it edits schema, and it belongs
-beside the SQL and RLS editors.
+it is registered differently: `RebaseStudio` does not lazy-load it. The panel mounts
+it wherever Studio is registered, because unlike the tools above it needs the
+project's collection source at hand to write back to. That is a difference in how it
+is mounted, not in what it is — it edits schema, and it belongs beside the SQL and
+RLS editors.
 
 ## Turning Studio on
 
