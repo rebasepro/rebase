@@ -17,7 +17,12 @@ linkWorkspacePackages: true
 preferWorkspacePackages: true
 autoInstallPeers: true
 saveExact: true
-nodeLinker: hoisted
+# `.npmrc` said `hoisted` for years and pnpm 11 never read it, so every install
+# since the pnpm 11 upgrade — and every green CI run — has been the isolated
+# layout. Making `hoisted` live here would change module resolution for the whole
+# tree in the same change that moved the keys; keep what is actually running.
+# Switching linkers is its own decision, made on purpose, with a full reinstall.
+nodeLinker: isolated
 hoist: true
 # Types hoisted to the root so every workspace compiles against one copy;
 # express because its types are resolved by name from several packages.
