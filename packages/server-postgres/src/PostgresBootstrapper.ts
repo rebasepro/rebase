@@ -403,6 +403,32 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
         };
     };
 
+    /**
+     * Create the `rebase` schema and the helper functions every generated
+     * policy calls — `rebase.uid()`, `rebase.roles()` and their siblings — on
+     * whichever database the queryable points at.
+     *
+     * Idempotent and cheap to repeat: `CREATE SCHEMA IF NOT EXISTS` plus a
+     * handful of `CREATE OR REPLACE FUNCTION`.
+     */
+    const provisionRlsRuntime = async (
+        queryable: { query<T>(text: string): Promise<{ rows: T[] }> }
+    ): Promise<void> => {
+        const { RLS_BOOTSTRAP_STATEMENTS } = await import("./schema/rls-bootstrap-sql");
+        // One statement per call — this handle speaks the extended query
+        // protocol, which rejects multi-command strings. Advisory-locked
+        // for the same reason the auth path is: two instances booting
+        // against one fresh database must not race on CREATE OR REPLACE.
+        await queryable.query("SELECT pg_advisory_lock(hashtext('rebase_auth_functions_init'))");
+        try {
+            for (const statement of RLS_BOOTSTRAP_STATEMENTS) {
+                await queryable.query(statement);
+            }
+        } finally {
+            await queryable.query("SELECT pg_advisory_unlock(hashtext('rebase_auth_functions_init'))");
+        }
+    };
+
     return {
         type: "postgres",
 
@@ -1212,20 +1238,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
          * as the auth path and the migration preamble, from the same constant.
          */
         async ensureRlsRuntime(driverResult?: InitializedDriver): Promise<void> {
-            const { RLS_BOOTSTRAP_STATEMENTS } = await import("./schema/rls-bootstrap-sql");
-            const queryable = provisioningQueryable(driverResult);
-            // One statement per call — this handle speaks the extended query
-            // protocol, which rejects multi-command strings. Advisory-locked
-            // for the same reason the auth path is: two instances booting
-            // against one fresh database must not race on CREATE OR REPLACE.
-            await queryable.query("SELECT pg_advisory_lock(hashtext('rebase_auth_functions_init'))");
-            try {
-                for (const statement of RLS_BOOTSTRAP_STATEMENTS) {
-                    await queryable.query(statement);
-                }
-            } finally {
-                await queryable.query("SELECT pg_advisory_unlock(hashtext('rebase_auth_functions_init'))");
-            }
+            await provisionRlsRuntime(provisioningQueryable(driverResult));
         },
 
         async ensureCollectionPolicies(
@@ -1235,6 +1248,19 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
         ): Promise<{ applied: number }> {
             const { ensureCollectionPolicies } = await import("./schema/ensure-collection-policies");
             const queryable = provisioningQueryable(driverResult);
+            // The order this depends on is set by the caller, and a caller that
+            // gets it wrong fails silently-but-permanently: `CREATE POLICY`
+            // validates the functions its expression calls, so every policy on
+            // the source is refused and the table stays RLS-enabled with no way
+            // in. That is what a second database did for a whole release — the
+            // helpers arrived with the auth tables, and auth lives on the
+            // default source only. So the invariant is checked here, where the
+            // policies are actually written, instead of being an ordering rule
+            // three modules away. One catalogue lookup when it already holds.
+            const { rows } = await queryable.query<{ present: boolean }>(
+                "SELECT to_regprocedure('rebase.roles()') IS NOT NULL AS present"
+            );
+            if (!rows[0]?.present) await provisionRlsRuntime(queryable);
             const outcome = await ensureCollectionPolicies(
                 queryable,
                 collections as CollectionConfig[],

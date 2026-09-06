@@ -19,6 +19,13 @@
  *   - the RLS/grants pass, which validated the default's policies against the
  *     analytics catalogue.
  *
+ * And one ordering invariant: `CREATE POLICY` validates the functions its USING
+ * clause calls, so `rebase.roles()` has to exist on a source before its first
+ * policy. On the default source it arrives with the auth tables; a second
+ * database has no auth tables, so every policy on it was refused and the table
+ * was left RLS-enabled and unreachable — permanently, since the next boot did
+ * exactly the same thing.
+ *
  * Requires Docker.
  */
 
@@ -191,4 +198,57 @@ describe("Two data sources, one routed collection (E2E)", () => {
         const missing = transcript.filter(line => line.includes("has no table yet for"));
         expect(missing, missing.join("\n")).toHaveLength(0);
     });
+
+    // ── The ordering invariant ──────────────────────────────────────────────
+    //
+    // Deliberately calls the policy hook with NO preceding `ensureRlsRuntime`:
+    // the guard being pinned is that the helpers exist before the first
+    // `CREATE POLICY` on this source whatever the caller's order, because the
+    // failure mode is a table that is RLS-enabled with no policy at all — it
+    // denies every request and no later boot repairs it.
+    it("creates rebase.roles() before the first CREATE POLICY on a second source", async () => {
+        // A database of its own, so "the helpers are not there yet" is a fact
+        // rather than an assumption about what the boot above left behind.
+        const admin = new pg.Client({ connectionString: defaultUrl });
+        await admin.connect();
+        await admin.query("CREATE DATABASE ordering");
+        await admin.end();
+        const orderingUrl = defaultUrl.replace("/rebase?", "/ordering?");
+        const conn = createPostgresDatabaseConnection(orderingUrl);
+        const probe = new pg.Client({ connectionString: orderingUrl });
+        await probe.connect();
+        try {
+            await ensureCollectionTables(queryableFor(conn.db as never), [eventsCollection] as never);
+
+            const before = await probe.query(
+                "SELECT to_regprocedure('rebase.roles()') IS NOT NULL AS present"
+            );
+            expect(before.rows[0].present).toBe(false);
+
+            const bootstrapper = createPostgresBootstrapper({
+                connectionString: orderingUrl,
+                connection: conn.db as never
+            });
+            const outcome = await bootstrapper.ensureCollectionPolicies!(
+                [eventsCollection],
+                undefined
+            );
+            expect(outcome.applied).toBeGreaterThan(0);
+
+            const after = await probe.query(
+                "SELECT to_regprocedure('rebase.roles()') IS NOT NULL AS present"
+            );
+            expect(after.rows[0].present).toBe(true);
+
+            // The whole point: the policies actually landed, rather than the
+            // table being left enabled-and-empty.
+            const policies = await probe.query(
+                "SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'events'"
+            );
+            expect(policies.rows.length).toBeGreaterThan(0);
+        } finally {
+            await probe.end().catch(() => {});
+            await conn.pool.end().catch(() => {});
+        }
+    }, 120_000);
 });
