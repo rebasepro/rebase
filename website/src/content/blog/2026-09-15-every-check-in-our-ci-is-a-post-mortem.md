@@ -1,15 +1,15 @@
 ---
 title: "Every check in our CI is a post-mortem, and that is the problem"
-description: "A gate added after an incident is scoped to that incident's exact shape, so the net grows one hole at a time. We keep a second document instead: fifty named bug classes, the sweep that finds each one, and a dated log of what every sweep turned up — including what came back clean."
+description: "A gate added after an incident is scoped to that incident's exact shape, so the net grows one hole at a time. We keep a second document instead: a catalogue of named bug classes, the sweep that finds each one, and a dated log of what every sweep turned up — including what came back clean."
 pubDate: 2026-09-15
 authors: francesco
 ---
 
-Open `.github/workflows/verify.yml` in the Rebase repo and every gate has a comment above it explaining why it exists. Each of those comments is a post-mortem. Fourteen gates, fourteen bugs that had already shipped.
+Open `.github/workflows/verify.yml` in the Rebase repo and gate after gate carries a comment above it explaining why it exists. Each of those comments is a post-mortem: a bug that had already shipped, turned into a check so it could not ship twice.
 
 That is a healthy reflex as far as it goes — a bug that becomes a gate cannot come back. But it is strictly reactive, and reactive nets have a specific failure mode: each gate is added *after* an incident and scoped to that incident's exact shape, so the net grows one hole at a time, and the next bug falls through a hole nobody has patched yet. You end up with a very thorough defence against things that have already happened once.
 
-So we keep a second document. `docs/bug-classes.md` is currently fifty entries long. Each one names a *shape* a bug can take, the sweep that finds its siblings, and a dated log of what the last sweep turned up.
+So we keep a second document. `docs/bug-classes.md` is a catalogue of bug classes. Each one names a *shape* a bug can take, the sweep that finds its siblings, and a dated log of what the last sweep turned up.
 
 ## The unit of work is the class, not the bug
 
@@ -25,7 +25,7 @@ Then log the sweep — including what came back clean, because that is the part 
 
 Almost every sweep we have run converted one fix into three to five. Not because we are unusually buggy, but because bugs arrive in shapes, and a shape that fit once fits again somewhere you were not looking.
 
-## Some of the fifty
+## A few of the classes
 
 A few entries, chosen because they generalise past this codebase.
 
@@ -45,7 +45,7 @@ The fix shape matters more than the fix: do not correct the outlier. Extract the
 
 Same shape wherever a `catch` logs and continues, and wherever a step may be skipped. `rls-check` had a "no Docker, skip" escape hatch that reported success for a scan that never ran, which is why CI now sets `RLS_CHECK_REQUIRE_DOCKER=1`. The sweep question is exact: for each one, *what test would fail if the guarded work silently did nothing?*
 
-**A completion check that the state before the change already passes.** My favourite of the fifty, because it is so plausible. Something is replaced — a Deployment's pods, a Knative revision — and the code waits for the replacement to be "ready" using a predicate the *outgoing* thing already satisfies. `readyReplicas >= desired` is a true statement about a healthy Deployment, and it is true one millisecond after an apply, when the only pod in existence is the old one.
+**A completion check that the state before the change already passes.** My favourite of them, because it is so plausible. Something is replaced — a Deployment's pods, a Knative revision — and the code waits for the replacement to be "ready" using a predicate the *outgoing* thing already satisfies. `readyReplicas >= desired` is a true statement about a healthy Deployment, and it is true one millisecond after an apply, when the only pod in existence is the old one.
 
 Nothing errors. The rollout is healthy, the pods are up, the log line is a green tick, and three separate commands agree the new release is live. The only disagreeing witness is the URL, which nobody consults because five other signals just said it was fine. It cost thirty minutes and two deploys to establish that a site had been serving a build from two days earlier.
 
@@ -84,7 +84,7 @@ One more, learned the hard way when we gated the rollout class: **the guard stri
 
 ## The honest limits
 
-The catalogue is a repo-specific artefact and reads like one. Fifty entries is well past the length anyone reads front to back, and its real use is as a thing you grep when a bug looks familiar, plus a place the sweep logs accumulate. If you copy the idea, copy the discipline and start your own list at one; copying ours would give you fifty shapes, most of which are about someone else's architecture.
+The catalogue is a repo-specific artefact and reads like one. It is long past the length anyone reads front to back, and its real use is as a thing you grep when a bug looks familiar, plus a place the sweep logs accumulate. If you copy the idea, copy the discipline and start your own list at one; copying ours would hand you a pile of shapes, most of which are about someone else's architecture.
 
 The classes are not disjoint, either. "A filter that matches nothing" and "a safety net that swallows its failure" are the same defect seen from two sides, and we have stopped trying to keep the taxonomy clean — a shape that helps you find things is doing its job even when it overlaps its neighbour.
 
