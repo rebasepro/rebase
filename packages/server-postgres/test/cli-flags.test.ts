@@ -17,7 +17,7 @@
  * *db* line, so a check placed in those generators would reject
  * `--allow-destructive` on a line where it is correct.
  */
-import { assertKnownFlags, DRIVER_FLAG_SPECS } from "../src/cli-flags";
+import { assertKnownFlags, assertOutputAliasesPaired, DRIVER_FLAG_SPECS, OUTPUT_FLAG_ALIASES } from "../src/cli-flags";
 
 /** The driver's own line: `["db", "push", …]`, as the CLI relays it. */
 const line = (...args: string[]) => args;
@@ -89,5 +89,37 @@ describe("assertKnownFlags", () => {
 
     it("says nothing when no subcommand was named", () => {
         expect(() => assertKnownFlags("db", undefined, line("db"))).not.toThrow();
+    });
+});
+
+/**
+ * One destination flag, two spellings, accepted everywhere either is.
+ *
+ * `--out` is the primary name on `rebase build`, an alias on `generate-sdk`,
+ * `db backup` and `cloud env pull`, and was refused outright by all three
+ * `schema` commands — so `rebase schema generate --out /tmp/x.ts`, typed by
+ * someone who had just used `--out` on `build`, answered "unknown or unexpected
+ * option". Neither name can be retired: both are shipped. The rule is that a
+ * spec naming one names both, and it is checked over the specs rather than
+ * asserted command by command, so the next `--output`-only command fails here.
+ */
+describe("the --out / --output pair", () => {
+    it("is complete in every driver spec that names either", () => {
+        expect(assertOutputAliasesPaired(DRIVER_FLAG_SPECS)).toEqual([]);
+    });
+
+    it("would report a spec that names only one", () => {
+        // The check has to be able to fail, or a green run means nothing.
+        const problems = assertOutputAliasesPaired({ "schema drift": { "--output": String } });
+        expect(problems).toHaveLength(1);
+        expect(problems[0]).toContain("schema drift");
+        expect(problems[0]).toContain("--out");
+    });
+
+    it.each(OUTPUT_FLAG_ALIASES)("is accepted by every schema command as %s", flag => {
+        for (const subcommand of ["generate", "introspect", "stale"]) {
+            expect(() => assertKnownFlags("schema", subcommand, line("schema", subcommand, flag, "/tmp/x.ts")))
+                .not.toThrow();
+        }
     });
 });

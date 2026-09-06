@@ -62,12 +62,14 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         "-c": "--collections",
         "--output": String,
         "-o": "--output",
+        "--out": "--output",
         "--watch": Boolean,
         "-w": "--watch"
     },
     "schema introspect": {
         "--output": String,
         "-o": "--output",
+        "--out": "--output",
         "--collections": String,
         "-c": "--collections",
         "--force": Boolean,
@@ -79,9 +81,40 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         "-c": "--collections",
         "--output": String,
         "-o": "--output",
+        "--out": "--output",
         "--fix": Boolean
     }
 };
+
+/**
+ * One destination flag, two spellings, everywhere.
+ *
+ * `--out` is the primary on `rebase build`, an alias on `generate-sdk`, `db
+ * backup` and `cloud env pull`, and was refused outright by the three `schema`
+ * commands — so the spelling a user learned on one command was an
+ * "unknown or unexpected option" on the next. Neither name can be retired (both
+ * are shipped), so both are accepted, and {@link assertOutputAliasesPaired}
+ * makes that the rule rather than a habit.
+ */
+export const OUTPUT_FLAG_ALIASES = ["--out", "--output"] as const;
+
+/**
+ * Every spec that names one of the pair names both.
+ *
+ * Exported so the CLI's own specs can be held to it too: the drift this fixes
+ * ran across two packages, and a check that only reads this file would let the
+ * next `--out`-only command through.
+ */
+export function assertOutputAliasesPaired(specs: Record<string, arg.Spec>): string[] {
+    const problems: string[] = [];
+    for (const [command, spec] of Object.entries(specs)) {
+        const present = OUTPUT_FLAG_ALIASES.filter(flag => flag in spec);
+        if (present.length === 0 || present.length === OUTPUT_FLAG_ALIASES.length) continue;
+        const missing = OUTPUT_FLAG_ALIASES.filter(flag => !(flag in spec));
+        problems.push(`\`${command}\` takes ${present.join(", ")} but not ${missing.join(", ")}`);
+    }
+    return problems;
+}
 
 /**
  * Reject a flag the named command does not take.

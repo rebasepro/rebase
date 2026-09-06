@@ -1333,7 +1333,10 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
             "--output": String,
             "--fix": Boolean,
             "-c": "--collections",
-            "-o": "--output"
+            "-o": "--output",
+            // Both spellings, on every command that writes a file. See
+            // `OUTPUT_FLAG_ALIASES` in cli-flags.ts.
+            "--out": "--output"
         },
         { argv: rawArgs.slice(2), permissive: true }
     );
@@ -1415,6 +1418,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 "--watch": Boolean,
                 "-c": "--collections",
                 "-o": "--output",
+                "--out": "--output",
                 "-w": "--watch"
             },
             {
@@ -1473,6 +1477,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 "--force": Boolean,
                 "--schema": String,
                 "-o": "--output",
+                "--out": "--output",
                 "-c": "--collections",
                 "-f": "--force"
             },

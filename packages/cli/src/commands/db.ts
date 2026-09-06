@@ -48,7 +48,15 @@ const REMOTE_DESTINATION_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
  * is actually changed, and leaves the plugin usable on its own terms.
  */
 export function absolutizeLocalPathArgs(args: string[], cwd: string): string[] {
-    const takesPath = (flag: string) => flag === "--out" || flag === "-o";
+    /**
+     * All three spellings of the destination, because the driver accepts all
+     * three: `backup-cli.ts` maps `--output` and `-o` onto `--out`, and `rebase
+     * db backup --help` advertises `--output` as an alias. Only `--out` and
+     * `-o` were absolutised, so the one spelling the help page names was the
+     * one that landed in `backend/` — and the success line still echoed the
+     * path as typed.
+     */
+    const takesPath = (flag: string) => flag === "--out" || flag === "--output" || flag === "-o";
     /**
      * Flags whose next token is a value, not a positional.
      *
@@ -59,7 +67,7 @@ export function absolutizeLocalPathArgs(args: string[], cwd: string): string[] {
      * database name into a path while leaving the real dump path unresolved.
      */
     const VALUE_FLAGS = new Set([
-        "--out", "-o", "--target-db", "--exclude-schema", "--row-security-role"
+        "--out", "--output", "-o", "--target-db", "--exclude-schema", "--row-security-role"
     ]);
     const out = [...args];
 
