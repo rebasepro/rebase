@@ -37,13 +37,9 @@ const productsCollection = defineCollection({
 
 ## Visualização em Lista
 
-![Espaço reservado para captura de tela de visualização em lista](/img/features/list-view.png)
-
 A visualização em lista é o modo de visualização padrão clássico e limpo do CMS, mostrando entidades em um formato de lista direta, sem a densidade de uma planilha.
 
 ## Visualização em Tabela
-
-![Espaço reservado para captura de tela de visualização em tabela](/img/features/table-view.png)
 
 A visualização padrão é uma planilha virtualizada de alto desempenho com:
 
@@ -68,8 +64,6 @@ Controle a altura da linha com `defaultSize`:
 | `"xl"`  | 260    | Pré-visualizações de conteúdo rico |
 
 ## Visualização Kanban
-
-![Espaço reservado para captura de tela de visualização Kanban](/img/features/kanban-view.png)
 
 Configure um quadro Kanban especificando qual propriedade enum usar como colunas:
 
@@ -170,8 +164,6 @@ await tasks.create({
 ```
 
 ## Visualização em Cartões
-
-![Espaço reservado para captura de tela de visualização em cartões](/img/features/cards-view.png)
 
 Os cartões exibem entidades como cartões visuais — úteis para conteúdo com muitas imagens:
 

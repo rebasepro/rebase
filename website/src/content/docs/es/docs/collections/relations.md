@@ -146,11 +146,7 @@ properties: {
 }
 ```
 
-![Campo de relación en formulario](/img/features/relation-form-field.png)
-
-Al renderizar una previsualización (como en una celda de tabla o un chip de referencia), Rebase maneja la hidratación automáticamente:
-
-![Previsualización de relación en tabla](/img/features/relation-table-preview.png)
+Al renderizar una previsualización (como en una celda de tabla o un chip de referencia), Rebase maneja la hidratación automáticamente.
 
 ## Uniones Multi-salto
 

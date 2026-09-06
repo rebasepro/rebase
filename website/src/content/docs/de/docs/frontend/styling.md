@@ -39,7 +39,7 @@ export function DashboardView() {
 }
 ```
 
-Jede Komponente im Kit ist unter [UI components](/docs/ui/components/Card) mit ihren echten, aus dem Quellcode generierten Props katalogisiert. Schauen Sie dort nach, bevor Sie etwas selbst bauen: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` und etwa vierzig weitere existieren bereits.
+Jede Komponente im Kit ist unter [UI components](/docs/ui/components/card/) mit ihren echten, aus dem Quellcode generierten Props katalogisiert. Schauen Sie dort nach, bevor Sie etwas selbst bauen: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` und etwa vierzig weitere existieren bereits.
 
 ## Farben: Verwenden Sie Tokens, niemals literale Werte
 

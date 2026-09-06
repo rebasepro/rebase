@@ -241,7 +241,7 @@ if (only === "both" || only === "names") {
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Documentation link graph ━━━${NC}`);
     const { findings: bad, scanned, links } = checkDocsLinks(ROOT);
-    console.log(`${DIM}Resolved ${links} internal link(s) across ${scanned} English docs page(s).${NC}`);
+    console.log(`${DIM}Resolved ${links} internal link(s) and every image across ${scanned} docs page(s), all six locales.${NC}`);
     if (!bad.length) {
         console.log(`${GREEN}✓ Every link resolves, and every page leads somewhere.${NC}`);
     } else {

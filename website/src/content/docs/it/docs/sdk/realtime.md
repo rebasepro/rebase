@@ -202,7 +202,7 @@ I canali sono leggeri ed effimeri — esistono finché almeno un client è sotto
 
 Un canale può essere configurato per conservare i suoi broadcast, così che un client che si riconnette recuperi ciò che ha perso invece di risincronizzarsi da zero. È questo che rende i canali utilizzabili come trasporto per l'editing collaborativo.
 
-La conservazione si configura **sul server**, per pattern di canale — vedi [Backend Realtime](/docs/backend/realtime#conservazione-dei-canali). Un client non può attivarla da sé, perché un canale è creato da chi lo nomina, e una profondità di cronologia scelta dal client permetterebbe a qualsiasi visitatore di impegnare il tuo backend in uno storage illimitato.
+La conservazione si configura **sul server**, per pattern di canale — vedi [Backend Realtime](/it/docs/backend/realtime#conservazione-dei-canali). Un client non può attivarla da sé, perché un canale è creato da chi lo nomina, e una profondità di cronologia scelta dal client permetterebbe a qualsiasi visitatore di impegnare il tuo backend in uno storage illimitato.
 
 Su un canale con conservazione, passa `{ history: true }` e il SDK fa il resto:
 

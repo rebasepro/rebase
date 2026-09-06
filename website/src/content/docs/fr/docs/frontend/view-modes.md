@@ -37,13 +37,9 @@ const productsCollection = defineCollection({
 
 ## Vue Liste
 
-![Espace réservé pour capture d'écran de vue en liste](/img/features/list-view.png)
-
 La vue liste est le mode d'affichage par défaut classique et épuré des CMS, présentant les entités sous forme de liste directe, sans la densité d'une feuille de calcul.
 
 ## Vue Tableau
-
-![Espace réservé pour capture d'écran de vue en tableau](/img/features/table-view.png)
 
 La vue par défaut est une feuille de calcul virtualisée haute performance avec :
 
@@ -68,8 +64,6 @@ Contrôlez la hauteur des lignes avec `defaultSize` :
 | `"xl"` | 260 | Aperçus de contenu riche |
 
 ## Vue Kanban
-
-![Espace réservé pour capture d'écran de vue Kanban](/img/features/kanban-view.png)
 
 Configurez un tableau Kanban en spécifiant la propriété d'énumération à utiliser comme colonnes :
 
@@ -172,8 +166,6 @@ await tasks.create({
 ```
 
 ## Vue Cartes
-
-![Espace réservé pour capture d'écran de vue en cartes](/img/features/cards-view.png)
 
 Les cartes affichent les entités sous forme de cartes visuelles — utile pour le contenu riche en images :
 

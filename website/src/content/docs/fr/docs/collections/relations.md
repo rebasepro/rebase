@@ -146,11 +146,7 @@ properties: {
 }
 ```
 
-![Champ de relation dans le formulaire](/img/features/relation-form-field.png)
-
-Lors de l'affichage d'un aperçu (comme dans une cellule de tableau ou une puce de référence), Rebase gère automatiquement l'hydratation :
-
-![Aperçu de la relation dans le tableau](/img/features/relation-table-preview.png)
+Lors de l'affichage d'un aperçu (comme dans une cellule de tableau ou une puce de référence), Rebase gère automatiquement l'hydratation.
 
 ## Jointures Multi-Sauts
 

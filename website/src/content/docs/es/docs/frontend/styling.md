@@ -39,7 +39,7 @@ export function DashboardView() {
 }
 ```
 
-Cada componente del kit está catalogado en [UI components](/docs/ui/components/Card) con sus props reales, generadas a partir del código fuente. Consulta allí antes de crearlos manualmente: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` y unos cuarenta más ya existen.
+Cada componente del kit está catalogado en [UI components](/docs/ui/components/card/) con sus props reales, generadas a partir del código fuente. Consulta allí antes de crearlos manualmente: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` y unos cuarenta más ya existen.
 
 ## Color: usa tokens, nunca literales
 
