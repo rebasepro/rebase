@@ -10,7 +10,8 @@ import {
     resetDeclaredResources
 } from "@rebasepro/types";
 import { resolveDataSources, resourceResolver } from "@rebasepro/server";
-import { computeStatus, withImplicitDefaults } from "./status";
+import { computeStatus } from "./status";
+import { projectResourceGraph, withImplicitDefaults } from "./derive";
 
 /**
  * Judged as production unless a test says otherwise: that is the deployment
@@ -237,5 +238,71 @@ describe("a project on the managed development database", () => {
         // managed URL is only ever handed to the resolvers.
         const db = find(managed(RUNNING), "database", "(default)");
         expect(db.bindings.find(b => b.name === "DATABASE_URL")!.set).toBe(false);
+    });
+});
+
+/**
+ * `rebase status` and `rebase resources` answer the same question and used to
+ * answer it differently.
+ *
+ * On the stock scaffold `status` listed `buckets ✓ (default) local · implicit`
+ * while `resources` and `resources --json` listed only the database and the
+ * function: `status` projected the graph through `withImplicitDefaults` and
+ * `resources` printed the raw graph. Two commands whose whole job is "what does
+ * this project need", disagreeing about a project neither of them had to
+ * interpret.
+ *
+ * Both go through `projectResourceGraph` now, and this is the assertion that
+ * keeps them there — set equality, not a spot check, so a kind added to one
+ * projection and not the other fails here.
+ */
+describe("status and resources project the same set", () => {
+    beforeEach(() => resetDeclaredResources());
+
+    const keysOfStatus = (production = true) =>
+        computeStatus(buildResourceGraph(), {}, resolvers(production))
+            .resources.map(r => `${r.kind}:${r.key}`).sort();
+
+    const keysOfResources = () =>
+        projectResourceGraph(buildResourceGraph()).map(r => `${r.kind}:${r.key}`).sort();
+
+    it("agrees on the stock scaffold, which declares nothing", () => {
+        // The implicit default database and the implicit default bucket. This
+        // is the project `rebase init` creates.
+        expect(keysOfResources()).toEqual(["bucket:(default)", "database:(default)"]);
+        expect(keysOfStatus()).toEqual(keysOfResources());
+    });
+
+    it("agrees when the project declares things of every kind", () => {
+        database("analytics");
+        bucket("media", { engine: "s3" });
+        declareResource("topic", "signups");
+        declareFunction("hello", { portable: true });
+        declareCron("nightly", { schedule: "0 3 * * *", timezone: "Europe/Madrid" });
+
+        expect(keysOfStatus()).toEqual(keysOfResources());
+    });
+
+    it("agrees when a declaration displaces an implicit default", () => {
+        // Declaring one bucket means there is no implicit one; both projections
+        // have to reach that conclusion, and only one of them used to.
+        bucket("media", { engine: "s3" });
+
+        expect(keysOfResources()).not.toContain("bucket:(default)");
+        expect(keysOfStatus()).toEqual(keysOfResources());
+    });
+
+    it("marks the implicit ones, in the projection resources prints", () => {
+        const projected = projectResourceGraph(buildResourceGraph());
+
+        expect(projected.every(r => r.implicit === true)).toBe(true);
+        expect(withImplicitDefaults(buildResourceGraph()).every(e => e.implicit)).toBe(true);
+    });
+
+    it("does not mark a declared resource implicit", () => {
+        database("analytics");
+
+        const analytics = projectResourceGraph(buildResourceGraph()).find(r => r.key === "analytics")!;
+        expect(analytics.implicit).toBeUndefined();
     });
 });

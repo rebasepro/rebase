@@ -46,6 +46,7 @@ import {
     resourceKeyOf,
     type CollectionConfig,
     type RebaseBackendAppConfig,
+    type ResourceDeclaration,
     type ResourceGraph
 } from "@rebasepro/types";
 import { analyseFunctionsDirectory } from "../function-portability";
@@ -510,4 +511,77 @@ export function parseResourceGraph(contents: string): ResourceGraph {
     // `options` is omitted from the file when empty; a reader of the graph
     // expects it present, so it is restored here.
     return { version: 1, resources: entries.map(r => ({ options: {}, ...r })) as ResourceGraph["resources"] };
+}
+
+/**
+ * Add the resources a project has without declaring them.
+ *
+ * A backend has a database whether or not anyone said so, and a project that
+ * declares no buckets still gets one default storage source from the plain
+ * unsuffixed variables. Both are load-bearing defaults and both are invisible
+ * in the graph, so a status view built only from declarations would show an
+ * empty screen to the majority of projects — the ones that most need to be told
+ * which variable their one database reads.
+ */
+export function withImplicitDefaults(graph: ResourceGraph): {
+    declaration: ResourceDeclaration;
+    implicit: boolean;
+}[] {
+    const entries = graph.resources.map(declaration => ({ declaration, implicit: false }));
+    const has = (kind: string) => graph.resources.some(r => r.kind === kind);
+
+    if (!has("database")) {
+        entries.unshift({
+            declaration: {
+                kind: "database",
+                key: DEFAULT_RESOURCE_KEY,
+                engine: "postgres",
+                transport: "server",
+                options: {}
+            },
+            implicit: true
+        });
+    }
+    if (!has("bucket")) {
+        entries.push({
+            declaration: {
+                kind: "bucket",
+                key: DEFAULT_RESOURCE_KEY,
+                // `local` is what an unconfigured default source resolves to,
+                // and naming it here keeps the row honest about what a project
+                // with no S3 variables actually gets: a directory that a
+                // container erases on restart, which production then drops.
+                engine: "local",
+                transport: "server",
+                options: {}
+            },
+            implicit: true
+        });
+    }
+    return entries;
+}
+
+/**
+ * The resources a project *has*, which is what a person is asking about.
+ *
+ * One projection, because two of them disagreed. `rebase status` built its
+ * rows from {@link withImplicitDefaults} and listed `buckets ✓ (default) local
+ * · implicit`; `rebase resources` and `rebase resources --json` built theirs
+ * from the raw graph and listed only the database and the function. Two
+ * commands whose whole job is to answer "what does this project need", on the
+ * same stock scaffold, giving different answers.
+ *
+ * The implicit entries are marked rather than hidden, because the distinction
+ * is real and load-bearing: a declared resource is recorded in
+ * `rebase.resources.json` for a host to provision, and an implicit one is a
+ * default the runtime supplies whether or not anyone wrote it down. That file
+ * still holds declarations only — it is a wire contract a host reads, and
+ * putting defaults in it would ask for something to be provisioned that
+ * nobody declared.
+ */
+export type ProjectedResource = ResourceDeclaration & { implicit?: true };
+
+export function projectResourceGraph(graph: ResourceGraph): ProjectedResource[] {
+    return withImplicitDefaults(graph).map(({ declaration, implicit }) =>
+        (implicit ? { ...declaration, implicit: true as const } : declaration));
 }

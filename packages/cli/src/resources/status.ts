@@ -26,6 +26,7 @@
  * held to `envBases` by `resource-env-bases.test.ts`. A kind this view has
  * never heard of is judged by whatever resolver its package registered.
  */
+import { withImplicitDefaults } from "./derive";
 import {
     DEFAULT_RESOURCE_KEY,
     envBasesForResource,
@@ -120,61 +121,6 @@ export function bindingsFor(
 }
 
 /**
- * Add the resources a project has without declaring them.
- *
- * A backend has a database whether or not anyone said so, and a project that
- * declares no buckets still gets one default storage source from the plain
- * unsuffixed variables. Both are load-bearing defaults and both are invisible
- * in the graph, so a status view built only from declarations would show an
- * empty screen to the majority of projects — the ones that most need to be told
- * which variable their one database reads.
- */
-export function withImplicitDefaults(graph: ResourceGraph): {
-    declaration: ResourceDeclaration;
-    implicit: boolean;
-}[] {
-    const entries = graph.resources.map(declaration => ({ declaration, implicit: false }));
-    const has = (kind: string) => graph.resources.some(r => r.kind === kind);
-
-    if (!has("database")) {
-        entries.unshift({
-            declaration: {
-                kind: "database",
-                key: DEFAULT_RESOURCE_KEY,
-                engine: "postgres",
-                transport: "server",
-                options: {}
-            },
-            implicit: true
-        });
-    }
-    if (!has("bucket")) {
-        entries.push({
-            declaration: {
-                kind: "bucket",
-                key: DEFAULT_RESOURCE_KEY,
-                // `local` is what an unconfigured default source resolves to,
-                // and naming it here keeps the row honest about what a project
-                // with no S3 variables actually gets: a directory that a
-                // container erases on restart, which production then drops.
-                engine: "local",
-                transport: "server",
-                options: {}
-            },
-            implicit: true
-        });
-    }
-    return entries;
-}
-
-/**
- * The resolver-side of status, as `@rebasepro/server` registers it per kind.
- *
- * Passed in rather than imported so this module stays testable without a
- * server, and so a kind registered by a plugin is judged by the resolver the
- * plugin brought with it rather than by a switch here.
- */
-/**
  * What the managed development database covers, when a project is on it.
  *
  * `rebase init` leaves `DATABASE_URL` commented out on purpose and the managed
@@ -199,6 +145,13 @@ export interface ManagedDatabaseStatus {
     url: string | null;
 }
 
+/**
+ * The resolver-side of status, as `@rebasepro/server` registers it per kind.
+ *
+ * Passed in rather than imported so this module stays testable without a
+ * server, and so a kind registered by a plugin is judged by the resolver the
+ * plugin brought with it rather than by a switch here.
+ */
 export interface StatusResolvers {
     /** `resourceResolver(kind)` from `@rebasepro/server`. */
     resolverFor: (kind: string) => {
