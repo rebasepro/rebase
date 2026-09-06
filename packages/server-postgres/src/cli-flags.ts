@@ -56,8 +56,17 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         "-c": "--collections"
     },
     // Bare positionals still pass through to `atlas migrate apply`, which takes
-    // an optional amount; flags do not.
-    "db migrate": {},
+    // an optional amount; flags do not, apart from `--baseline`.
+    //
+    // `--baseline <version>` is the escape hatch for the normal case, not an
+    // exotic one: every Rebase boot ensures the schema, so a production
+    // database has the tables before its first migration ever runs, and
+    // `migrate apply` then dies on `type "…" already exists (42710)`. It maps
+    // onto Atlas's own `migrate apply --baseline`, which writes the revision
+    // row Atlas reads — no ledger of ours.
+    "db migrate": {
+        "--baseline": String
+    },
     "schema generate": {
         "--collections": String,
         "-c": "--collections",

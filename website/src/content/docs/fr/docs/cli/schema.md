@@ -1,5 +1,5 @@
 ---
-sourceHash: 8a90381a6f529677
+sourceHash: 03df1518e08ca072
 title: Génération de schéma
 sidebar_label: Génération de schéma
 description: Générez des schémas Drizzle ORM à partir des définitions de collections, créez des migrations SQL et gardez votre base de données synchronisée avec la CLI Rebase.
@@ -123,6 +123,21 @@ rebase db migrate
 - Les applique dans l'ordre à la base de données
 - Suit quelles migrations ont été appliquées
 
+#### Établir une baseline sur une base de données déjà démarrée par Rebase
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+Chaque démarrage de Rebase assure le schéma, et `rebase db push` l'applique directement. Une base de données sur laquelle l'un des deux a déjà tourné possède donc déjà les tables et les types que la première migration créerait, et `rebase db migrate` s'arrête sur `pq: type "posts_status" already exists (42710)`.
+
+La migration n'a rien d'incorrect : la base a été provisionnée autrement. Enregistrez où elle en est déjà, puis migrez normalement :
+
+```bash
+rebase db migrate --baseline 20260906101530
+rebase db migrate
+```
+
+La version est le préfixe numérique du fichier de migration qui décrit l'état *actuel* de la base. Cette migration et toutes celles qui la précèdent sont enregistrées comme appliquées ; tout ce qui suit s'exécute. Sur une base que rien n'a jamais démarrée, aucune baseline n'est nécessaire — migrez directement.
+
 ### `rebase db branch`
 
 Branchement de base de données pour le développement parallèle :
@@ -219,6 +234,8 @@ rebase db generate
 git add drizzle/
 
 # 6. Apply in production
+#    A database Rebase has already booted needs a baseline the first time —
+#    see the baselining section above.
 rebase db migrate
 ```
 
@@ -230,6 +247,7 @@ rebase db migrate
 | Le fichier de schéma ne se met pas à jour | Vérifiez que le chemin `--collections` pointe vers le bon répertoire |
 | La migration montre des changements inattendus | Exécutez `rebase doctor` pour identifier la dérive |
 | `db push` échoue en production | Utilisez `db generate` + `db migrate` à la place |
+| `db migrate` échoue sur `already exists (42710)` | Le démarrage ou `db push` a déjà provisionné le schéma — enregistrez-le avec `rebase db migrate --baseline <version>` |
 
 ## Étapes suivantes
 

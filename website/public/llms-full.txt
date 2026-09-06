@@ -29196,6 +29196,21 @@ rebase db migrate
 - Applies them in order to the database
 - Tracks which migrations have been applied
 
+##### Baselining a database Rebase has already booted
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+Every Rebase boot ensures the schema, and `rebase db push` applies it directly. So a database that has ever run either one already has the tables and types the first migration would create, and `rebase db migrate` stops on `pq: type "posts_status" already exists (42710)`.
+
+Nothing is wrong with the migration — the database was provisioned another way. Record where it already is, then migrate normally:
+
+```bash
+rebase db migrate --baseline 20260906101530
+rebase db migrate
+```
+
+The version is the numeric prefix of the migration file that describes what is in the database *now*. That migration and everything before it are recorded as applied; everything after it runs. On a database nothing has ever booted against, no baseline is needed — migrate straight away.
+
 #### `rebase db branch`
 
 Database branching for parallel development:
@@ -29311,6 +29326,8 @@ rebase db generate
 git add drizzle/
 
 # 6. Apply in production
+#    A database Rebase has already booted needs a baseline the first time —
+#    see "Baselining a database Rebase has already booted" above.
 rebase db migrate
 ```
 
@@ -29322,6 +29339,7 @@ rebase db migrate
 | Schema file not updating | Check the `--collections` path points to the right directory |
 | Migration shows unexpected changes | Run `rebase doctor` to identify drift |
 | `db push` fails on production | Use `db generate` + `db migrate` instead |
+| `db migrate` fails with `already exists (42710)` | Boot or `db push` already provisioned the schema — record it with `rebase db migrate --baseline <version>` |
 
 ### Next Steps
 

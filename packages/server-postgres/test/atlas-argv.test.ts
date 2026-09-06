@@ -100,6 +100,19 @@ describe("the connection flags each subcommand needs", () => {
         ]);
     });
 
+    it("`migrate apply --baseline` drops --allow-dirty, which Atlas refuses beside it", () => {
+        // Measured against the pinned binary: `sql/migrate: baseline and
+        // allow-dirty are mutually exclusive`, so sending both refuses the
+        // command outright — the same shape as the `--exclude` failure this
+        // whole module exists for.
+        const argv = build("migrate", ["apply", "--dir", "file://drizzle/migrations", "--baseline", "20260101000000"], []);
+        expect(argv).toEqual([
+            "migrate", "apply", "--dir", "file://drizzle/migrations", "--baseline", "20260101000000",
+            "--url", URL, "--revisions-schema", "rebase"
+        ]);
+        expect(argv).not.toContain("--allow-dirty");
+    });
+
     it("`migrate status` gets the revisions schema but not --allow-dirty", () => {
         const argv = build("migrate", ["status"], []);
         expect(argv).toEqual(["migrate", "status", "--url", URL, "--revisions-schema", "rebase"]);

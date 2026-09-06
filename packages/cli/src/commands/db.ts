@@ -1058,8 +1058,13 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         summary: "Generate the Drizzle schema, the Postgres DDL and a SQL migration file from the collections."
     },
     migrate: {
-        usage: "rebase db migrate",
-        summary: "Run the pending migration files against the database."
+        usage: "rebase db migrate [--baseline <version>] [amount]",
+        summary: "Run the pending migration files against the database.",
+        notes: [
+            "--baseline <version> records that version as already applied and starts from the next one.",
+            "It is what a database Rebase has already booted against needs: boot ensures the schema, so the first migration would try to create tables that are already there.",
+            "The version is the numeric prefix of a file in drizzle/migrations."
+        ]
     },
     branch: {
         // Every action the dispatch answers and every flag its specs declare.

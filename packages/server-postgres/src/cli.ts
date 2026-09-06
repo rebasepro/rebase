@@ -28,7 +28,7 @@ import {
     ExcludeIntrospectionError,
     promptConfirm
 } from "./cli-helpers";
-import { checkDatabaseConnectivity, diagnoseDbError, reportCommandFailure } from "./cli-errors";
+import { checkDatabaseConnectivity, diagnoseAtlasFailure, diagnoseDbError, reportCommandFailure } from "./cli-errors";
 import { forLibpq } from "./utils/connection-string";
 import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
 import { detectDestructiveStatements, decidePushSafety } from "./schema/destructive-sql";
@@ -108,6 +108,19 @@ function listMigrationFiles(): string[] {
     const dir = path.resolve(process.cwd(), "drizzle", "migrations");
     if (!fs.existsSync(dir)) return [];
     return fs.readdirSync(dir).filter(f => f.endsWith(".sql")).sort();
+}
+
+/**
+ * The newest migration's version — the numeric prefix Atlas records.
+ *
+ * `20260906101530_init.sql` → `20260906101530`. Named in the baseline remedy so
+ * the command it prints can be typed rather than worked out.
+ */
+function latestMigrationVersion(): string | null {
+    const newest = listMigrationFiles().at(-1);
+    if (!newest) return null;
+    const match = /^(\d+)/.exec(newest);
+    return match ? match[1] : newest.replace(/\.sql$/, "");
 }
 
 /**
@@ -231,6 +244,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             "--allow-destructive": Boolean,
             "--dry-run": Boolean,
             "--yes": Boolean,
+            "--baseline": String,
             "-c": "--collections",
             "-y": "--yes"
         },
@@ -482,7 +496,26 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 await ensureAuthSchemaAndFunctions(databaseUrl);
             }
             const extraArgs = argsList._.filter(arg => arg !== "migrate");
-            await runAtlas("migrate", ["apply", "--dir", "file://drizzle/migrations", ...extraArgs], collectionsPath);
+            // `--baseline <version>` is relayed to Atlas as its own: it records
+            // the version as already applied and starts from the next one. The
+            // database a Rebase boot has provisioned is exactly the case it is
+            // for, and without it `migrate apply` there is unusable — see
+            // `formatBaselineRemedy`, which is what prints when it is missing.
+            const baseline = argsList["--baseline"];
+            if (baseline) {
+                out(chalk.gray(`  Recording ${baseline} as already applied, then migrating from the next one.`));
+                out("");
+            }
+            await runAtlas(
+                "migrate",
+                [
+                    "apply",
+                    "--dir", "file://drizzle/migrations",
+                    ...(baseline ? ["--baseline", baseline] : []),
+                    ...extraArgs
+                ],
+                collectionsPath
+            );
             if (databaseUrl) {
                 await ensureRlsUserRole(databaseUrl);
                 await retireLegacyAuthSchema(databaseUrl);
@@ -1256,8 +1289,20 @@ async function runAtlas(
         await subprocess;
     } catch {
         outError(chalk.red(`\n✗ atlas ${domain} ${args.join(" ")} failed.\n`));
-        // Surface actionable recovery guidance for recognized failures.
-        const hint = diagnoseDbError({ message: stderrText }, databaseUrl);
+        // Surface actionable recovery guidance for recognized failures. The
+        // Atlas-shaped ones first: they read the invocation as well as the
+        // text, so they can tell `migrate apply` hitting an already-provisioned
+        // database (which wants a baseline) from `schema apply` hitting a real
+        // conflict. `diagnoseDbError` is the connection-level fallback, shared
+        // with the boot path.
+        const atlasHint = await diagnoseAtlasFailure({
+            domain,
+            args,
+            stderr: stderrText,
+            databaseUrl,
+            latestMigrationVersion: latestMigrationVersion()
+        });
+        const hint = atlasHint ?? diagnoseDbError({ message: stderrText }, databaseUrl);
         if (hint) {
             outError(hint);
         }
