@@ -159,4 +159,59 @@ describe("listenWithPortRetry", () => {
 
         expect(bound).toBe(previouslyBound);
     });
+
+    describe("a squatter on loopback only", () => {
+        /**
+         * The collision `listen` cannot see. Binding `0.0.0.0` over a listener
+         * that holds `127.0.0.1:<port>` **succeeds** on Linux and macOS — the
+         * two sockets coexist and the kernel routes loopback traffic to the
+         * more specific bind — so `EADDRINUSE` never fires and the retry above
+         * has nothing to retry on.
+         *
+         * Measured: with `node -e "…listen(3013,'127.0.0.1')"` running,
+         * `rebase dev --port 3013` announced `Server running at
+         * http://localhost:3013` and `curl localhost:3013` answered
+         * `squatter`. Vite's default bind is exactly this shape, which makes
+         * it the ordinary way for a developer to meet it.
+         */
+        it("is treated as in use, and the server moves to the next port", async () => {
+            const occupied = await freePort();
+            await new Promise<void>(r => track(createServer()).listen(occupied, "127.0.0.1", r));
+
+            const server = track(createServer());
+            const bound = await listenWithPortRetry(server, occupied, { portFileDir: dir });
+
+            const actual = server.address();
+            if (actual === null || typeof actual === "string") throw new Error("not listening on a TCP port");
+
+            expect(bound).toBeGreaterThan(occupied);
+            expect(bound).toBe(actual.port);
+        });
+
+        it("says so, in the same words as any other port collision", async () => {
+            const occupied = await freePort();
+            await new Promise<void>(r => track(createServer()).listen(occupied, "127.0.0.1", r));
+
+            const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
+            try {
+                const bound = await listenWithPortRetry(track(createServer()), occupied, { portFileDir: dir });
+
+                const said = warn.mock.calls.map(call => String(call[0])).join("\n");
+                expect(said).toContain(`Port ${occupied} is in use`);
+                expect(said).toContain(String(bound));
+            } finally {
+                warn.mockRestore();
+            }
+        });
+
+        it("leaves a genuinely free port alone", async () => {
+            // The probe must not cost anything on the ordinary path, and above
+            // all must not report a free port as taken.
+            const free = await freePort();
+
+            const bound = await listenWithPortRetry(track(createServer()), free, { portFileDir: dir });
+
+            expect(bound).toBe(free);
+        });
+    });
 });

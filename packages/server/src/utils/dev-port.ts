@@ -12,13 +12,54 @@
  * This module is dev-only and should never run in production.
  */
 import type { Server } from "http";
-import type { AddressInfo } from "net";
+import net, { type AddressInfo } from "net";
 import path from "path";
 import fs from "fs";
 
 import { logger } from "./logger";
 
 const MAX_PORT_ATTEMPTS = 20;
+
+/** How long to wait for a loopback squatter to answer before assuming there is none. */
+const LOOPBACK_PROBE_TIMEOUT_MS = 300;
+
+/**
+ * Is something already serving this port on loopback?
+ *
+ * Asked by *connecting*, not by binding, because binding cannot answer it.
+ * The dev server binds `0.0.0.0`, and on Linux and macOS that succeeds while
+ * another process holds `127.0.0.1:<port>` — the two sockets coexist, the
+ * kernel routes loopback traffic to the more specific bind, and `EADDRINUSE`
+ * never fires. Vite's default is exactly that bind.
+ *
+ * What it looked like: `node -e "…listen(3013,'127.0.0.1')"`, then
+ * `rebase dev --port 3013` announced `Server running at
+ * http://localhost:3013`, and `curl localhost:3013` answered from the other
+ * process. `lsof` showed both sockets. The retry the port-collision warning
+ * exists for could not fire, because from `listen`'s point of view nothing
+ * had collided.
+ *
+ * Both loopback addresses, because a listener on `::1` alone produces the
+ * identical failure and costs one more connect attempt to rule out.
+ */
+async function loopbackInUse(port: number, timeoutMs = LOOPBACK_PROBE_TIMEOUT_MS): Promise<boolean> {
+    const probe = (host: string) => new Promise<boolean>(resolve => {
+        const socket = new net.Socket();
+        const settle = (answer: boolean) => {
+            socket.removeAllListeners();
+            socket.destroy();
+            resolve(answer);
+        };
+        socket.setTimeout(timeoutMs);
+        // A refused connection is the answer we want: nothing is there.
+        socket.once("error", () => settle(false));
+        socket.once("timeout", () => settle(false));
+        socket.once("connect", () => settle(true));
+        socket.connect(port, host);
+    });
+
+    return (await Promise.all([probe("127.0.0.1"), probe("::1")])).some(Boolean);
+}
 
 /** Filename written next to the project `.env` so the CLI can read it. */
 export const DEV_PORT_FILENAME = ".rebase-dev-port";
@@ -180,26 +221,29 @@ export function listenWithPortRetry(
                 resolve(bound);
             };
 
+            /**
+             * Say which port was refused and which one is next.
+             *
+             * The retry is silent otherwise, and silence here is how a
+             * developer ends up staring at a server on 3002 while their
+             * frontend, their bookmark and their curl all point at 3001 — with
+             * nothing anywhere saying a port was ever skipped. The most common
+             * cause is the previous run still holding the socket, and that is
+             * worth knowing before the next twenty minutes go into a phantom
+             * bug.
+             */
+            const moveOn = () => {
+                const next = portsToTry[index + 1];
+                logger.warn(next !== undefined
+                    ? `Port ${port} is in use — trying ${next}.`
+                    : `Port ${port} is in use, and it was the last one to try.`);
+                tryNext(index + 1);
+            };
+
             const onError = (err: NodeJS.ErrnoException) => {
                 cleanup();
-                if (err.code === "EADDRINUSE") {
-                    // Say which port was refused and which one is next.
-                    //
-                    // The retry is silent otherwise, and silence here is how a
-                    // developer ends up staring at a server on 3002 while their
-                    // frontend, their bookmark and their curl all point at 3001
-                    // — with nothing anywhere saying a port was ever skipped.
-                    // The most common cause is the previous run still holding
-                    // the socket, and that is worth knowing before the next
-                    // twenty minutes go into a phantom bug.
-                    const next = portsToTry[index + 1];
-                    logger.warn(next !== undefined
-                        ? `Port ${port} is in use — trying ${next}.`
-                        : `Port ${port} is in use, and it was the last one to try.`);
-                    tryNext(index + 1);
-                } else {
-                    reject(err);
-                }
+                if (err.code === "EADDRINUSE") moveOn();
+                else reject(err);
             };
 
             function cleanup() {
@@ -207,9 +251,26 @@ export function listenWithPortRetry(
                 server.removeListener("error", onError);
             }
 
-            server.once("error", onError);
-            server.once("listening", onListening);
-            server.listen(port, host);
+            const bind = () => {
+                server.once("error", onError);
+                server.once("listening", onListening);
+                server.listen(port, host);
+            };
+
+            // Port 0 means "any free port", so there is nothing to be in use.
+            if (port === 0) {
+                bind();
+                return;
+            }
+
+            // Asked before binding, because binding cannot answer it — see
+            // `loopbackInUse`. A probe that itself fails is not evidence of a
+            // squatter, so the bind goes ahead and `EADDRINUSE` stays the
+            // authority for every collision it can actually see.
+            void loopbackInUse(port).then(
+                taken => (taken ? moveOn() : bind()),
+                () => bind()
+            );
         }
 
         tryNext(0);
