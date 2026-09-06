@@ -665,11 +665,31 @@ async function manageLocalDatabase(
     const { resetManagedDatabase, stopManagedDatabase, findRunningDaemon } = await import("../dev-db/daemon");
     const { dataDir } = await import("../dev-db/state");
 
+    // What "nothing here" means, in the words of the project it is said to.
+    //
+    // "No development database was running" / "No development database to
+    // reset" is true of the managed one and reads as being about the reader's
+    // own Postgres — which these commands do not touch and could not stop.
+    // On a project that named its own database, the sentence they need is that
+    // it was not what this command was about.
+    const nothingHere = (): string => {
+        const kind = devDatabaseKind(projectRoot);
+        const verb = subcommand === "stop" ? "was not running" : "does not exist";
+        if (kind && kind !== "managed") {
+            return `  The managed development database (PGlite) ${verb}; `
+                + `this project uses its own DATABASE_URL, which is untouched.`;
+        }
+
+        return subcommand === "stop"
+            ? "  The managed development database (PGlite) was not running."
+            : "  There is no managed development database (PGlite) to reset.";
+    };
+
     if (subcommand === "stop") {
         const stopped = await stopManagedDatabase(projectRoot);
         console.log(stopped
             ? chalk.green("✓ Development database stopped. Data is kept — `rebase dev` will start it again.")
-            : chalk.gray("  No development database was running."));
+            : chalk.gray(nothingHere()));
 
         return;
     }
@@ -677,7 +697,7 @@ async function manageLocalDatabase(
     const running = await findRunningDaemon(projectRoot);
     const hasData = fs.existsSync(dataDir(projectRoot));
     if (!running && !hasData) {
-        console.log(chalk.gray("  No development database to reset."));
+        console.log(chalk.gray(nothingHere()));
 
         return;
     }
