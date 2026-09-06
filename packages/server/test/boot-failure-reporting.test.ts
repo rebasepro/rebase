@@ -85,7 +85,7 @@ describe("reportBootFailure", () => {
         reportBootFailure(err, log, { NODE_ENV: "development" });
 
         const errors = lines.filter(l => l.level === "error").map(l => l.message);
-        expect(errors[0]).toBe("Failed to start the Rebase runtime");
+        expect(errors[0]).toContain("Failed to start the Rebase runtime");
         expect(errors.join("\n")).toContain("connect ECONNREFUSED 10.0.0.4:5432");
     });
 
@@ -153,5 +153,15 @@ describe("reportBootFailure", () => {
         const headline = lines.find(l => l.message === "Failed to start the Rebase runtime");
         expect(headline?.level).toBe("error");
         expect((headline?.data?.error as Error).cause).toBe(cause);
+    });
+
+    it("names the failure in development when there is no cause to name it", () => {
+        const { lines, log } = capture();
+
+        reportBootFailure(new Error("Cannot find package 'drizzle-orm'"), log,
+            { NODE_ENV: "development" });
+
+        const errors = lines.filter(l => l.level === "error").map(l => l.message);
+        expect(errors.join("\n")).toContain("Cannot find package 'drizzle-orm'");
     });
 });

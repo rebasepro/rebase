@@ -874,7 +874,12 @@ export function reportBootFailure(
     if (env.NODE_ENV === "production") {
         log.error("Failed to start the Rebase runtime", { error: failure });
     } else {
-        log.error("Failed to start the Rebase runtime");
+        // The message, not the object. `describeCauseChain` below renders only
+        // `.cause` links, so without this line an error that has no cause —
+        // `ERR_MODULE_NOT_FOUND` from a missing dependency, anything a config
+        // file throws at module scope — reaches the author as the headline and
+        // nothing else, under a dev-server that then says "fix the error above".
+        log.error(`Failed to start the Rebase runtime: ${failure.message}`);
         log.debug("Failed to start the Rebase runtime", { error: failure });
     }
     // The reason is almost never in the headline. Everything a driver

@@ -443,12 +443,17 @@ export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<Bun
     try {
         mod = await import(pathToFileURL(indexPath).href) as Record<string, unknown>;
     } catch (err) {
-        throw new Error(
+        // A `BundleError`, so the fatal path treats it as the configuration
+        // problem it is: the message below IS the answer, and a plain `Error`
+        // sends it down the "this is a bug" branch, where in development it is
+        // logged at `debug` and the author sees only the esbuild cause.
+        throw new BundleError(
             `Could not load ${indexPath}.\n\n` +
             `${err instanceof Error ? err.message : String(err)}\n\n` +
             "This file declares this project's data sources, storage sources and callbacks. " +
             "Booting without it would bind the server to a different set of databases and " +
             "buckets than the project declares, so this is fatal rather than a warning.",
+            undefined,
             { cause: err }
         );
     }
