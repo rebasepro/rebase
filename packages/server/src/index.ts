@@ -47,6 +47,7 @@ export {
 // report the same problems without booting a server.
 export {
     assertCollectionConfigs,
+    CollectionConfigError,
     findCollectionConfigProblems,
     unknownKeyPolicyFromEnv,
     type ConfigProblem,

@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
 import { logger } from "../utils/logger";
-import { assertCollectionConfigs, type ValidateCollectionConfigOptions } from "./validate-config";
+import { assertCollectionConfigs, CollectionConfigError, type ValidateCollectionConfigOptions } from "./validate-config";
 
 /**
  * The one definition of "the collections".
@@ -67,13 +67,14 @@ async function readDefaults(directory: string): Promise<CollectionDefaults> {
             const mod = await importModule(indexPath);
             return { defaultSecurityRules: mod.defaultSecurityRules as SecurityRule[] | undefined };
         } catch (err) {
-            throw new Error(
+            throw new CollectionConfigError(
                 `Could not load ${indexPath}.\n\n` +
                 `${err instanceof Error ? err.message : String(err)}\n\n` +
                 "This file declares `defaultSecurityRules` — the access rules every collection " +
                 "that declares none of its own inherits. Loading the collections without it would " +
                 "serve them under a different authorization model than the project declares, so " +
                 "this is fatal. Fix the file, or delete it if the project has no defaults.",
+                undefined,
                 { cause: err }
             );
         }
@@ -168,7 +169,7 @@ export async function loadCollectionsFromDirectory(
     }
 
     if (failures.length > 0) {
-        throw new Error(
+        throw new CollectionConfigError(
             `Could not load ${failures.length} collection file(s) from ${resolved}:\n` +
             failures.map((f) => `  • ${f}`).join("\n") +
             "\n\nEvery collection file must import cleanly and default-export a collection."

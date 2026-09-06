@@ -24,7 +24,7 @@ import { initializeRebaseBackend, type RebaseBackendInstance } from "../init";
 import { loadCollectionsFromDirectory } from "../collections/loader";
 import type { HonoEnv } from "../api/types";
 import { installRootErrorHandler } from "../api/root-error-handler";
-import { describeCauseChain, logger } from "../utils/logger";
+import { describeCauseChain, logger, type Logger } from "../utils/logger";
 import { serveSPA } from "../serve-spa";
 import { installShutdownHandlers } from "../init/shutdown";
 import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
@@ -32,6 +32,7 @@ import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
 import { loadBootEnv, resolveCorsOrigin, resolveEnableSwagger, type RebaseBootEnv } from "./env";
 import { resolveRole, RoleConfigurationError } from "./role";
 import { FunctionSelectionError } from "../functions/selection";
+import { CollectionConfigError } from "../collections/validate-config";
 import {
     BundleError,
     loadBundle,
@@ -803,27 +804,61 @@ export async function runFromBundle(options: BootOptions = {}): Promise<BootedRu
         }
         return booted;
     } catch (err) {
-        // Both of these are "your configuration says something that cannot
-        // work", so both get the message and the fix rather than a stack trace.
-        // The reader is looking at a container that will not start.
-        if (err instanceof BundleError || err instanceof RoleConfigurationError ||
-            err instanceof FunctionSelectionError) {
-            logger.error(err.message);
-            if (err.hint) logger.error(err.hint);
-        } else {
-            logger.error("Failed to start the Rebase runtime", {
-                error: err instanceof Error ? err : new Error(String(err))
-            });
-            // The reason is almost never in the headline. Everything a driver
-            // rethrows is a wrapper, so the sentence that says what is wrong —
-            // `connect ECONNREFUSED 10.0.0.4:5432` — is a `.cause` two links
-            // down, and putting it only in the structured payload leaves it
-            // inside an escaped JSON blob for whoever is reading `kubectl logs`
-            // on a container that will not start.
-            for (const line of describeCauseChain(err)) logger.error(line);
-        }
+        reportBootFailure(err);
         process.exit(1);
     }
+}
+
+/** The two logger methods {@link reportBootFailure} writes through. */
+export type BootFailureLog = Pick<Logger, "error" | "debug">;
+
+/**
+ * A configuration problem the project can fix, as opposed to a bug.
+ *
+ * These four have a message that IS the answer — it names the file, the key and
+ * the fix — so the fatal path prints it and nothing else. The reader is looking
+ * at a process that will not start; a stack through the framework's own frames
+ * is noise when the answer is "two of your collections claim the same slug".
+ */
+function isConfigurationFailure(err: unknown): err is Error & { hint?: string } {
+    return err instanceof BundleError
+        || err instanceof RoleConfigurationError
+        || err instanceof FunctionSelectionError
+        || err instanceof CollectionConfigError;
+}
+
+/**
+ * Say why the boot failed, in the form the reader can act on.
+ *
+ * Extracted from `runFromBundle` so it can be tested: the catch it came from
+ * ends in `process.exit(1)`, and what a dying process printed on its way out is
+ * exactly the thing nobody had a test for. `CollectionConfigError` spent a
+ * release on the wrong side of this branch, so a multi-line validator message —
+ * composed over several lines, naming both offending files — reached the author
+ * as `{"error":{"name":"Error","message":"1 problem(s) …\n\n…","stack":"… at
+ * assertCollectionConfigs (…/dist/index.es.js:727:8) …"}}`: the answer,
+ * `\n`-escaped, inside 3 KB of framework frames.
+ */
+export function reportBootFailure(err: unknown, log: BootFailureLog = logger): void {
+    if (isConfigurationFailure(err)) {
+        log.error(err.message);
+        if (err.hint) log.error(err.hint);
+        // Kept, and only for the reader who asks for it: the frames are the
+        // framework's, and the message already names the file.
+        if (err.stack) log.debug(err.stack);
+        return;
+    }
+
+    log.error("Failed to start the Rebase runtime", {
+        error: err instanceof Error ? err : new Error(String(err))
+    });
+    // The reason is almost never in the headline. Everything a driver
+    // rethrows is a wrapper, so the sentence that says what is wrong —
+    // `connect ECONNREFUSED 10.0.0.4:5432` — is a `.cause` two links
+    // down, and putting it only in the structured payload leaves it
+    // inside an escaped JSON blob for whoever is reading `kubectl logs`
+    // on a container that will not start.
+    for (const line of describeCauseChain(err)) log.error(line);
 }
 
 
