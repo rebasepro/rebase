@@ -531,6 +531,16 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         return;
     }
 
+    // `--docker` on a `db` subcommand meant "resolve the compose URL", and
+    // nothing started it: `rebase db branch list --docker` on a stock scaffold
+    // answered `✗ Failed query: CREATE SCHEMA IF NOT EXISTS rebase` and
+    // `connect ECONNREFUSED 127.0.0.1:5436` — two lines, no diagnosis — while
+    // the managed-database refusal that sends the reader here says "`rebase dev
+    // --docker` starts one, and branches work against it".
+    //
+    // The same ensure step `rebase dev --docker` runs, not a second one.
+    await ensureDockerDatabase(projectRoot, rawArgs);
+
     if (subcommand === "pull") {
         await pullIntoLocal(projectRoot, rawArgs);
 
@@ -905,6 +915,44 @@ async function restoreAppRole(target: string): Promise<void> {
     } finally {
         await client.end();
     }
+}
+
+/**
+ * Start the compose database a `db … --docker` was asked to talk to.
+ *
+ * `--docker` resolved the compose URL and stopped there, so every `db`
+ * subcommand carrying it reached a container nobody had started —
+ * `ECONNREFUSED 127.0.0.1:5436`, two lines, no diagnosis — including the
+ * commands the managed-database refusals send readers to `--docker` for.
+ *
+ * `rebase dev --docker`'s preflight, called with the compose URL and nothing
+ * to push: this is not a schema step, and `rebase db push --docker` is the
+ * push. A failure here is reported and not fatal — the command runs and its
+ * own connection error follows, which is the same contract `dev` keeps.
+ */
+async function ensureDockerDatabase(projectRoot: string, rawArgs: readonly string[]): Promise<void> {
+    if (!rawArgs.includes("--docker")) return;
+
+    const { ensureDevDatabase } = await import("../utils/dev-preflight");
+    const { readEnvFile } = await import("../utils/project");
+    const { resolveComposeUrl } = await import("../dev-db/prepare");
+
+    const composeUrl = resolveComposeUrl(projectRoot, readEnvFile(projectRoot));
+    if (!composeUrl) {
+        // `prepareDatabaseEnv` raises the full message a moment later; saying
+        // it twice would be worse than saying it once, in its own words.
+        return;
+    }
+
+    await ensureDevDatabase({
+        projectRoot,
+        databaseUrl: composeUrl,
+        disabled: false,
+        // Never a push. `rebase db push --docker` is one, and it runs next.
+        hasCollections: false,
+        pushSchema: async () => undefined,
+        log: message => console.log(message)
+    });
 }
 
 /**

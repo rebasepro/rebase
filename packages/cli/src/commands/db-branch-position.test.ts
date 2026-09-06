@@ -51,6 +51,13 @@ vi.mock("../dev-db/branch-pointer", () => ({
 }));
 
 vi.mock("execa", () => ({ execa: vi.fn(async () => ({ exitCode: 0 })) }));
+vi.mock("../utils/dev-preflight", async importOriginal => ({
+    ...(await importOriginal<typeof import("../utils/dev-preflight")>()),
+    ensureDevDatabase: vi.fn(async () => ({ action: "started" as const, port: 5435, pushed: false }))
+}));
+/** What the compose file resolves to. Null in the "no compose db service" case. */
+let composeUrl: string | null = "postgresql://u:p@127.0.0.1:5435/rebase";
+
 vi.mock("../dev-db/prepare", () => ({
     prepareDatabaseEnv: vi.fn(async () => ({
         env: {},
@@ -61,13 +68,15 @@ vi.mock("../dev-db/prepare", () => ({
     DEV_DATABASE_KIND_ENV: "REBASE_DEV_DATABASE_KIND",
     devDatabaseKind: () => "external" as const,
     resolveActiveBranch: () => null,
-    resolveComposeUrl: () => null
+    resolveComposeUrl: () => composeUrl
 }));
 
 import { dbCommand } from "./db";
 import { execa } from "execa";
+import { ensureDevDatabase } from "../utils/dev-preflight";
 
 const execaSpy = execa as unknown as ReturnType<typeof vi.fn>;
+const ensureSpy = ensureDevDatabase as unknown as ReturnType<typeof vi.fn>;
 const argv = (...line: string[]) => ["/usr/bin/node", "/usr/local/bin/rebase", ...line];
 
 const exits: number[] = [];
@@ -94,6 +103,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     exits.length = 0;
     active = { name: "feature_x", database: "rb_feature_x" };
+    composeUrl = "postgresql://u:p@127.0.0.1:5435/rebase";
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
@@ -187,5 +197,42 @@ describe("listing branches from a branch", () => {
         await dbCommand("branch", argv("db", "branch", "create", "another")).catch(() => undefined);
 
         expect(driverLine()).not.toContain("--database-url");
+    });
+});
+
+/**
+ * `--docker` on a `db` subcommand used to resolve a URL and start nothing.
+ *
+ * `rebase db branch list --docker` on a stock scaffold answered `✗ Failed
+ * query: CREATE SCHEMA IF NOT EXISTS rebase` and `connect ECONNREFUSED
+ * 127.0.0.1:5436` — two lines, no diagnosis box — while the managed-database
+ * refusal that sends the reader to `--docker` says "`rebase dev --docker`
+ * starts one, and branches work against it".
+ */
+describe("`db … --docker`", () => {
+    it("runs the same ensure step `rebase dev --docker` runs", async () => {
+        await dbCommand("branch", argv("db", "branch", "list", "--docker")).catch(() => undefined);
+
+        expect(ensureSpy).toHaveBeenCalledOnce();
+        expect(ensureSpy.mock.calls[0][0]).toMatchObject({
+            projectRoot: SCRATCH,
+            databaseUrl: "postgresql://u:p@127.0.0.1:5435/rebase",
+            disabled: false,
+            // Never a push: `rebase db push --docker` is one, and it runs next.
+            hasCollections: false
+        });
+    });
+
+    it("does nothing at all without the flag", async () => {
+        await dbCommand("branch", argv("db", "branch", "list")).catch(() => undefined);
+
+        expect(ensureSpy).not.toHaveBeenCalled();
+    });
+
+    it("leaves the compose refusal to `prepareDatabaseEnv`, which owns the wording", async () => {
+        composeUrl = null;
+        await dbCommand("branch", argv("db", "branch", "list", "--docker")).catch(() => undefined);
+
+        expect(ensureSpy).not.toHaveBeenCalled();
     });
 });
