@@ -41,7 +41,15 @@ export function normalizeOrderBy(orderBy?: OrderBySpec): OrderByTuple[] | undefi
         ? orderBy as OrderBySortTuple[]
         : [orderBy as OrderBySortTuple];
     if (list.length === 0) return undefined;
-    return list.map(([key, direction]) => [sortKeyToString(key), direction] as OrderByTuple);
+    // Through `toStrictTuple`, not a destructure. `([key, direction]) => …` over
+    // whatever it was handed is only safe for a caller the types checked, and
+    // this is reached straight from `find({ orderBy })` — where the plausible
+    // mistakes are an object (`{ title: "asc" }`, which is how every other
+    // query API spells a sort) and a bare number. Both used to come back as
+    // `TypeError: object is not iterable`, from a package the caller has never
+    // heard of, with no `code` and no field name, while the same call's `where`
+    // clause answers with a `RebaseClientError` naming the field and the fix.
+    return list.map((entry, index) => toStrictTuple(entry, index));
 }
 
 /**
@@ -180,20 +188,25 @@ direction })));
  * Lenient parsing (matches existing server behaviour):
  * - Bare field name (no colon): `"name"` → `["name", "asc"]`
  * - Unknown direction: `"name:foo"` → `["name", "asc"]`
- * - Empty / falsy input: → `undefined`
+ * - Empty / falsy input, or a blank field name: → `undefined`
+ *
+ * A blank field is `undefined` rather than `[" ", "asc"]`: whitespace is not a
+ * field name, and the tuple it used to produce could not be re-encoded — the
+ * only value in this codec that survived a decode and failed the next encode.
  *
  * Reads the single-key shorthand only. For a value that may carry several keys,
  * use {@link deserializeOrderByList} — handed a JSON array this returns the
  * whole array as one nonsensical field name.
  *
  * @param raw - The wire-format string from an HTTP query parameter.
- * @returns The canonical tuple, or `undefined` if the input is empty/falsy.
+ * @returns The canonical tuple, or `undefined` if the input names no field.
  */
 export function deserializeOrderBy(raw?: string): OrderByTuple | undefined {
     if (!raw) return undefined;
     const idx = raw.indexOf(":");
-    if (idx === -1) return [raw, "asc"];
+    if (idx === -1) return raw.trim() === "" ? undefined : [raw, "asc"];
     const field = raw.slice(0, idx);
+    if (field.trim() === "") return undefined;
     const dir = raw.slice(idx + 1);
     return [field, dir === "desc" ? "desc" : "asc"];
 }
