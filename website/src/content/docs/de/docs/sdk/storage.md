@@ -1,5 +1,5 @@
 ---
-sourceHash: ac8563166446ff44
+sourceHash: 7a0c74973860c714
 title: Speicher & Dateien
 sidebar_label: Speicher
 description: Dateien mit dem Speichermodul des Rebase Client SDK hochladen, herunterladen, auflisten und löschen.
@@ -61,6 +61,10 @@ if (url) {
     console.log("File not found");
 }
 ```
+
+:::caution[Das Argument `bucket` ist heute ein Pfadpräfix]
+Bei `getSignedUrl`, `getObject` und `deleteObject` wird das zweite Argument in den Objektschlüssel eingefaltet (`<bucket>/<key>`) und erreicht den Server nie als Bucket. Ein Name, den das Deployment nicht bedient, wird deshalb als fehlende *Datei* gemeldet, nicht als unbekannter Bucket — und eine mit `putObject({ bucket: "media" })` geschriebene Datei wird mit `getSignedUrl(key, "media")` nicht wieder gelesen. Lesen Sie eine Datei mit derselben Aufrufform zurück, die sie geschrieben hat. Die Serverseite antwortet auf `/api/storage/list` bereits mit `404 UNKNOWN_STORAGE_SOURCE`; das SDK-Argument wird entsprechend überarbeitet.
+:::
 
 Mit einem bestimmten Bucket:
 

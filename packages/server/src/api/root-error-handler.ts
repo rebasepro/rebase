@@ -76,6 +76,14 @@ export function installUnmatchedApiEnvelope(app: Hono<HonoEnv>, basePath: string
 
         if (c.res.status !== 404) return;
         if ((c.res.headers.get("content-type") ?? "").includes("application/json")) return;
+        // Only when nothing handled the request. A matched handler that
+        // deliberately answers a text or HTML 404 — a custom function serving
+        // pages, an XML feed — wrote that body on purpose, and replacing it
+        // discards it. Middleware registers as `ALL`; a route handler carries
+        // the method it answers, so its presence in the matched set is the
+        // signal. (The application's own `notFound`, if any, is not a route,
+        // so an unmatched path under the prefix still gets the envelope.)
+        if (c.req.matchedRoutes.some((route) => route.method !== "ALL")) return;
 
         // Assignment, not a fresh return: Hono's `c.res` setter copies the
         // headers of the response being replaced onto the new one, so the

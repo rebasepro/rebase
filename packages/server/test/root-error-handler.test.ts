@@ -138,6 +138,27 @@ describe("an unmatched route answers the envelope", () => {
         expect(await res.json()).toEqual({ success: true, data: null, fileNotFound: true });
     });
 
+    it("leaves a text or HTML 404 a matched handler wrote on purpose", async () => {
+        // A custom function serving pages answers its own 404. The envelope
+        // is for "nothing handled this", which is Hono's default answer and
+        // nothing else; a body a handler wrote is that handler's to keep.
+        const a = new Hono<HonoEnv>();
+        installRootErrorHandler(a);
+        installUnmatchedApiEnvelope(a, "/api");
+        a.get("/api/functions/texty", (c) => c.text("this function's own 404", 404));
+        a.get("/api/functions/pagey", (c) => c.html("<h1>gone</h1>", 404));
+
+        const text = await a.request("/api/functions/texty");
+        expect(text.status).toBe(404);
+        expect(await text.text()).toBe("this function's own 404");
+        const html = await a.request("/api/functions/pagey");
+        expect(await html.text()).toBe("<h1>gone</h1>");
+
+        // And the unmatched path beside them still gets the envelope.
+        const missing = await a.request("/api/functions/nope");
+        expect(missing.headers.get("content-type")).toContain("application/json");
+    });
+
     it("leaves paths outside basePath to the application's own 404", async () => {
         // An app that mounts a backend at `/api` and serves its own pages at
         // `/` keeps answering its own way for the pages — which is also why
