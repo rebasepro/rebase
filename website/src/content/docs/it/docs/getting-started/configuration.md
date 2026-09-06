@@ -1,5 +1,5 @@
 ---
-sourceHash: 710f0740be4d1614
+sourceHash: f6312cfcb6187cea
 title: Ambiente e Configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -40,6 +40,7 @@ Tutta la configurazione viene gestita tramite variabili d'ambiente nel tuo file 
 |----------|-------------|---------|
 | `PORT` | Porta per il server HTTP del backend. Letta da `rebase start`. `rebase dev` la legge **solo dall'ambiente della shell** — una `PORT` in `.env` lì non viene letta, perché la porta è risolta prima che quel file venga caricato — e altrimenti usa una porta derivata dal percorso del progetto, così più progetti possono girare insieme. `rebase dev --port` prevale su entrambe, e il banner di avvio indica quale livello ha usato. | `3001` |
 | `LOG_LEVEL` | Verbosità del logging: `error`, `warn`, `info`, `debug` | `info` |
+| `REBASE_LOG_RAW_QUERIES` | Mostra l'SQL dietro una riga `Failed query: [redacted]`. Ogni istruzione fallita è oscurata per impostazione predefinita, perché una query fallita si porta dietro i parametri associati — un'email, un hash di password. Impostalo a `true` mentre diagnostichi un errore di DDL, RLS o change capture. Ignorato quando `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Ambiente: `development` o `production` | `development` |
 
 ### Autenticazione

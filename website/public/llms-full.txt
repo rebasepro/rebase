@@ -607,6 +607,7 @@ All configuration is done via environment variables in your `.env` file at the p
 |----------|-------------|---------|
 | `PORT` | Port for the backend HTTP server. Read by `rebase start`. `rebase dev` reads it **from the shell environment only** — a `PORT` in `.env` is not read there, because the port is resolved before that file is loaded — and otherwise binds a port derived from the project path, so several projects can run at once. `rebase dev --port` beats both, and the start banner names the rung it used. | `3001` |
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
+| `REBASE_LOG_RAW_QUERIES` | Show the SQL behind a `Failed query: [redacted]` line. Every failing statement is redacted by default, because a failed query carries its bound parameters — an email, a password hash. Set it to `true` while diagnosing a DDL, RLS or change-capture failure. Ignored when `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |
 | `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS, in both environments. | — |
@@ -763,6 +764,12 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REALTIME_CHANNEL_BUS` | Cross-instance transport for broadcast channels and presence: `memory` or `postgres`. Ignored when `realtime.bus` was given a constructed transport. | `memory` |
 | `ALLOW_LOCALHOST_IN_PRODUCTION` | Permit `localhost`/loopback values under `NODE_ENV=production`. Off, so a production boot fails loudly rather than connecting to a database that is not there. | `false` |
 | `REBASE_STRICT_COLLECTION_CONFIG` | What boot does with a key in your collections that this version does not read: `warn`, `error` (refuse to boot — worth turning on in CI), or `off`. Only governs keys it does not *recognise*, which are usually a typo and occasionally deliberate metadata; a key it knows has moved is always fatal, because the feature it configured is silently absent otherwise. | `warn` |
+| `REBASE_PROVISION_ONLY` | `1`/`true` runs the schema pass and exits without opening a socket — the shape a migration Job wants, from the same image and the same bundle as the server that follows it. An empty value is *unset*, so an unsubstituted `${SOMETHING}` in a compose file cannot turn an ordinary deployment into one that migrates and refuses to serve. | — |
+| `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` lets a machine — an agent, a CI job — *apply* a schema change through `/api/admin/schema`, not only plan one. Off unless asked for: the credential that would make such a change is the one most likely to be sitting in a CI variable. | `false` |
+| `REBASE_FUNCTIONS_TIMEOUT_MS` | How long a custom function may run before its request is aborted. Same knob as the `functionsTimeoutMs` option. | — |
+| `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` makes an unhandled promise rejection terminate the process instead of logging it. On under an orchestrator that will restart you; off where a restart is worse than a leak. | `false` |
+| `REBASE_CRON_ALWAYS_ON` | Keeps the cron scheduler running on a platform the runtime otherwise detects as scale-to-zero, where a timer that fires in an idle instance fires in no instance. | — |
+| `TRUSTED_PROXY_HOPS` | How many proxies sit in front of this server, so the rate limiter can read the real client address out of `X-Forwarded-For`. Fail-safe default `0`: with no proxy, trusting the header would let any caller forge an identity. | `0` |
 
 :::note[Boot provisioning is additive, and is not a migration tool]
 The boot pass runs unattended with nobody reading a diff, so it will never drop
@@ -776,13 +783,6 @@ generate` + `rebase db migrate`, or `rebase db push` from a checkout or CI,
 which dry-runs the change, refuses destructive ones without confirmation, and
 can take a backup first.
 :::
-| `REBASE_PROVISION_ONLY` | `1`/`true` runs the schema pass and exits without opening a socket — the shape a migration Job wants, from the same image and the same bundle as the server that follows it. An empty value is *unset*, so an unsubstituted `${SOMETHING}` in a compose file cannot turn an ordinary deployment into one that migrates and refuses to serve. | — |
-| `REBASE_STRICT_COLLECTION_CONFIG` | What an unrecognised key in a collection config does. `error`/`strict`/`1`/`true` refuses the boot, `off`/`0`/`false` is silent, anything else warns. | warn |
-| `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` lets a machine — an agent, a CI job — *apply* a schema change through `/api/admin/schema`, not only plan one. Off unless asked for: the credential that would make such a change is the one most likely to be sitting in a CI variable. | `false` |
-| `REBASE_FUNCTIONS_TIMEOUT_MS` | How long a custom function may run before its request is aborted. Same knob as the `functionsTimeoutMs` option. | — |
-| `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` makes an unhandled promise rejection terminate the process instead of logging it. On under an orchestrator that will restart you; off where a restart is worse than a leak. | `false` |
-| `REBASE_CRON_ALWAYS_ON` | Keeps the cron scheduler running on a platform the runtime otherwise detects as scale-to-zero, where a timer that fires in an idle instance fires in no instance. | — |
-| `TRUSTED_PROXY_HOPS` | How many proxies sit in front of this server, so the rate limiter can read the real client address out of `X-Forwarded-For`. Fail-safe default `0`: with no proxy, trusting the header would let any caller forge an identity. | `0` |
 
 #### Split deployments
 
@@ -8296,6 +8296,10 @@ client: {
 }
 ```
 
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+On Postgres a `reference` is a foreign key like any other, so it follows the same `ON DELETE` rule as a `belongsTo` relation: optional is `SET NULL`, required is `RESTRICT`. See [Relations](/docs/collections/relations).
+
 #### Reference & Relation Options
 
 These apply to both `reference` and `relation` properties.
@@ -13486,6 +13490,30 @@ spelled `custom:`:
 export const objects = bucket("objects", { engine: "custom:minio" });
 ```
 
+#### Correcting a kind that has already shipped
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+For driver authors. A resource kind's registered definition is **frozen** once a
+package carrying it has been published: every published driver inlines its own
+copy of `@rebasepro/types`, and the copy compares the shared registry's entry
+against its own literal and throws on any difference. Editing the literal
+therefore kills every bundle built with an older driver at driver load.
+
+`amendResourceKind` corrects what a kind *binds* — its environment bases, its
+option keys — without touching the literal any older copy compares:
+
+```ts
+
+amendResourceKind("database", {
+    envBases: ["DATABASE_URL", "DATABASE_READ_URL", "ADMIN_CONNECTION_STRING"]
+});
+```
+
+The amendment applies to reads through this copy only, so an older driver keeps
+binding the way it did when it was published. Use it for every correction to a
+shipped kind; use `registerResourceKind` only for a kind nobody has published.
+
 #### Handing them to the frontend
 
 The `<Rebase>` provider needs to know which sources exist and how each is
@@ -13558,6 +13586,23 @@ S3_SECRET_ACCESS_KEY__MEDIA=…
 ```
 
 The engine comes from the declaration, so there is no `STORAGE_TYPE` to set.
+
+##### Which bucket receives an unqualified upload
+
+A storage property that names no `storageSource` writes to the **default**
+bucket, and a project of named buckets has to say which one that is. Either
+declare the default-keyed bucket — `export const uploads = bucket();` — or mark
+one of the named ones:
+
+```ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+Boot refuses a project with named buckets and no default, and names both fixes.
+It used to pick the first one declared, with a warning: that decided where a
+user's files land by declaration order, and it gave different answers either
+side of a deploy, because the local bucket development stands in with is dropped
+in production and the promotion was not.
 
 #### Many buckets on one account
 

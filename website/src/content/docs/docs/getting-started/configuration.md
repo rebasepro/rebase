@@ -67,6 +67,7 @@ All configuration is done via environment variables in your `.env` file at the p
 |----------|-------------|---------|
 | `PORT` | Port for the backend HTTP server. Read by `rebase start`. `rebase dev` reads it **from the shell environment only** — a `PORT` in `.env` is not read there, because the port is resolved before that file is loaded — and otherwise binds a port derived from the project path, so several projects can run at once. `rebase dev --port` beats both, and the start banner names the rung it used. | `3001` |
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
+| `REBASE_LOG_RAW_QUERIES` | Show the SQL behind a `Failed query: [redacted]` line. Every failing statement is redacted by default, because a failed query carries its bound parameters — an email, a password hash. Set it to `true` while diagnosing a DDL, RLS or change-capture failure. Ignored when `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
 | `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |
 | `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS, in both environments. | — |
@@ -223,6 +224,12 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REALTIME_CHANNEL_BUS` | Cross-instance transport for broadcast channels and presence: `memory` or `postgres`. Ignored when `realtime.bus` was given a constructed transport. | `memory` |
 | `ALLOW_LOCALHOST_IN_PRODUCTION` | Permit `localhost`/loopback values under `NODE_ENV=production`. Off, so a production boot fails loudly rather than connecting to a database that is not there. | `false` |
 | `REBASE_STRICT_COLLECTION_CONFIG` | What boot does with a key in your collections that this version does not read: `warn`, `error` (refuse to boot — worth turning on in CI), or `off`. Only governs keys it does not *recognise*, which are usually a typo and occasionally deliberate metadata; a key it knows has moved is always fatal, because the feature it configured is silently absent otherwise. | `warn` |
+| `REBASE_PROVISION_ONLY` | `1`/`true` runs the schema pass and exits without opening a socket — the shape a migration Job wants, from the same image and the same bundle as the server that follows it. An empty value is *unset*, so an unsubstituted `${SOMETHING}` in a compose file cannot turn an ordinary deployment into one that migrates and refuses to serve. | — |
+| `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` lets a machine — an agent, a CI job — *apply* a schema change through `/api/admin/schema`, not only plan one. Off unless asked for: the credential that would make such a change is the one most likely to be sitting in a CI variable. | `false` |
+| `REBASE_FUNCTIONS_TIMEOUT_MS` | How long a custom function may run before its request is aborted. Same knob as the `functionsTimeoutMs` option. | — |
+| `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` makes an unhandled promise rejection terminate the process instead of logging it. On under an orchestrator that will restart you; off where a restart is worse than a leak. | `false` |
+| `REBASE_CRON_ALWAYS_ON` | Keeps the cron scheduler running on a platform the runtime otherwise detects as scale-to-zero, where a timer that fires in an idle instance fires in no instance. | — |
+| `TRUSTED_PROXY_HOPS` | How many proxies sit in front of this server, so the rate limiter can read the real client address out of `X-Forwarded-For`. Fail-safe default `0`: with no proxy, trusting the header would let any caller forge an identity. | `0` |
 
 :::note[Boot provisioning is additive, and is not a migration tool]
 The boot pass runs unattended with nobody reading a diff, so it will never drop
@@ -236,13 +243,6 @@ generate` + `rebase db migrate`, or `rebase db push` from a checkout or CI,
 which dry-runs the change, refuses destructive ones without confirmation, and
 can take a backup first.
 :::
-| `REBASE_PROVISION_ONLY` | `1`/`true` runs the schema pass and exits without opening a socket — the shape a migration Job wants, from the same image and the same bundle as the server that follows it. An empty value is *unset*, so an unsubstituted `${SOMETHING}` in a compose file cannot turn an ordinary deployment into one that migrates and refuses to serve. | — |
-| `REBASE_STRICT_COLLECTION_CONFIG` | What an unrecognised key in a collection config does. `error`/`strict`/`1`/`true` refuses the boot, `off`/`0`/`false` is silent, anything else warns. | warn |
-| `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` lets a machine — an agent, a CI job — *apply* a schema change through `/api/admin/schema`, not only plan one. Off unless asked for: the credential that would make such a change is the one most likely to be sitting in a CI variable. | `false` |
-| `REBASE_FUNCTIONS_TIMEOUT_MS` | How long a custom function may run before its request is aborted. Same knob as the `functionsTimeoutMs` option. | — |
-| `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` makes an unhandled promise rejection terminate the process instead of logging it. On under an orchestrator that will restart you; off where a restart is worse than a leak. | `false` |
-| `REBASE_CRON_ALWAYS_ON` | Keeps the cron scheduler running on a platform the runtime otherwise detects as scale-to-zero, where a timer that fires in an idle instance fires in no instance. | — |
-| `TRUSTED_PROXY_HOPS` | How many proxies sit in front of this server, so the rate limiter can read the real client address out of `X-Forwarded-For`. Fail-safe default `0`: with no proxy, trusting the header would let any caller forge an identity. | `0` |
 
 ### Split deployments
 

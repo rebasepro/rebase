@@ -110,6 +110,38 @@ describe("deriving", () => {
         expect(fn?.options.requires).toEqual(["imports the Node built-in \"fs\""]);
     });
 
+    it("reports a cron that will not load as one sentence, not a Zod dump", async () => {
+        // A cron whose module scope validates the environment throws a
+        // `ZodError`, whose `.message` is the JSON array of its issues. That
+        // arrived here verbatim — ten lines of `{ "expected": "string", … }` —
+        // with the explanation underneath it, so the reader met "Invalid input"
+        // twice before reaching the sentence that says what to do.
+        const cronsDir = path.join(root, "backend", "crons");
+        fs.mkdirSync(cronsDir, { recursive: true });
+        fs.writeFileSync(path.join(cronsDir, `envcron_${process.pid}.ts`), `
+            import { defineCron } from "@rebasepro/server";
+            const issues = [
+                { expected: "string", code: "invalid_type", path: ["DATABASE_URL"],
+                  message: "Invalid input: expected string, received undefined" }
+            ];
+            throw new Error(JSON.stringify(issues, null, 2));
+            export default defineCron({ name: "Env", schedule: "0 3 * * *", async handler() {} });
+        `);
+        writeResources("export const nothing = 1;");
+
+        const { issues } = await deriveResourceGraph({ configDir, cronsDir, projectRoot: root });
+
+        expect(issues).toHaveLength(1);
+        const message = issues[0].message;
+        expect(message).toContain("Invalid input: expected string, received undefined");
+        expect(message).toContain(`envcron_${process.pid}.ts`);
+        // The serialisation itself is gone: no braces, no quoted keys.
+        expect(message).not.toContain('"expected"');
+        expect(message).not.toContain("invalid_type");
+        // And the remedy is still there, once.
+        expect(message).toContain("Move work that needs the deployment's environment inside the");
+    });
+
     it("records who uses what: collections by dataSource, properties by bucket, functions by import", async () => {
         // The map a split needs and a console needs for "what breaks if I
         // remove this". Recorded from the evaluated collections and the

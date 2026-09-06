@@ -128,6 +128,31 @@ spelled `custom:`:
 export const objects = bucket("objects", { engine: "custom:minio" });
 ```
 
+### Correcting a kind that has already shipped
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+For driver authors. A resource kind's registered definition is **frozen** once a
+package carrying it has been published: every published driver inlines its own
+copy of `@rebasepro/types`, and the copy compares the shared registry's entry
+against its own literal and throws on any difference. Editing the literal
+therefore kills every bundle built with an older driver at driver load.
+
+`amendResourceKind` corrects what a kind *binds* — its environment bases, its
+option keys — without touching the literal any older copy compares:
+
+```ts
+import { amendResourceKind } from "@rebasepro/types";
+
+amendResourceKind("database", {
+    envBases: ["DATABASE_URL", "DATABASE_READ_URL", "ADMIN_CONNECTION_STRING"]
+});
+```
+
+The amendment applies to reads through this copy only, so an older driver keeps
+binding the way it did when it was published. Use it for every correction to a
+shipped kind; use `registerResourceKind` only for a kind nobody has published.
+
 ### Handing them to the frontend
 
 The `<Rebase>` provider needs to know which sources exist and how each is
@@ -202,6 +227,23 @@ S3_SECRET_ACCESS_KEY__MEDIA=…
 ```
 
 The engine comes from the declaration, so there is no `STORAGE_TYPE` to set.
+
+#### Which bucket receives an unqualified upload
+
+A storage property that names no `storageSource` writes to the **default**
+bucket, and a project of named buckets has to say which one that is. Either
+declare the default-keyed bucket — `export const uploads = bucket();` — or mark
+one of the named ones:
+
+```ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+Boot refuses a project with named buckets and no default, and names both fixes.
+It used to pick the first one declared, with a warning: that decided where a
+user's files land by declaration order, and it gave different answers either
+side of a deploy, because the local bucket development stands in with is dropped
+in production and the promotion was not.
 
 ### Many buckets on one account
 

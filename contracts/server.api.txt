@@ -8,6 +8,7 @@
 class ApiError { badRequest, code, conflict, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
 class BlockedUrlError
 class BundleError { hint }
+class CollectionConfigError { hint }
 class CronScheduler { getJob, getJobLogs, getJobLogsFromDb, listJobs, listRejectedJobs, registerJobs, setClient, setJobEnabled, setStore, start, stop, triggerJob }
 class DefaultDriverRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
@@ -168,6 +169,7 @@ function pendingBackgroundWork
 function pkceTokenParams
 function providerVerifiedEmail
 function raw
+function rawQueryLoggingEnabled
 function readBackupBytes
 function readBundleManifest
 function registerDevEmailSink
@@ -532,7 +534,7 @@ interface BranchAdmin { createBranch, deleteBranch, getBranchInfo, listBranches 
 interface BranchInfo { createdAt, name, parentDatabase, sizeBytes }
 interface BrinIndex { on, reason, using, where }
 interface BtreeIndex { include, on, reason, unique, using, where }
-interface BucketOptions { account, engine, label, prefix, publicRead, transport }
+interface BucketOptions { account, default, engine, label, prefix, publicRead, transport }
 interface ChannelBus { kind, maxFrameBytes, publish, start, stop }
 interface ChannelHistoryEntry { at, event, payload, senderId, seq }
 interface ChannelHistoryMessage { channel, error, latestSeq, messages, payload, requestId, retained, row, rows, subscriptionId, type }
@@ -705,7 +707,7 @@ interface StorageAuthorizeUser { email, roles, uid }
 interface StorageListResult { items, nextPageToken, prefixes }
 interface StorageReference { bucket, fullPath, name, parent, root, toString }
 interface StorageSource { deleteObject, getObject, getSignedUrl, listObjects, putObject }
-interface StorageSourceDefinition { account, engine, key, label, transport }
+interface StorageSourceDefinition { account, default, engine, key, label, transport }
 interface StorageSourceRegistry { get, getDefault, getOrDefault, has, list }
 interface StringProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, email, enum, excludeFromApi, isId, metadata, name, propertyConfig, storage, type, url, userSelect, validation }
 interface StringPropertyValidationSchema { length, lowercase, matches, matchesMessage, max, min, required, requiredMessage, trim, unique, uniqueInArray, uppercase }

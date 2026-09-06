@@ -7,6 +7,28 @@ import { suggestNearMiss } from "@rebasepro/utils";
 import { logger } from "../utils/logger";
 
 /**
+ * A collection file the project wrote, and cannot work as written.
+ *
+ * Its own class so the boot's fatal path can tell it from a bug. A configuration
+ * problem's message *is* the answer — it names the files, the keys and the fix,
+ * composed over several lines to be read — and the fatal path used to hand a
+ * plain `Error` to the structured logger, which rendered exactly that message as
+ * an escaped JSON string with a stack through the bundled `dist/index.es.js`
+ * beside it. Nothing in there helps: the frames are the framework's, and the
+ * sentence the author needs is one `\n`-escaped field of a 3 KB blob.
+ *
+ * Same treatment as `BundleError`, and the same reason: the reader is looking at
+ * a process that will not start, and the stack is noise when the answer is "two
+ * of your collections claim the same slug".
+ */
+export class CollectionConfigError extends Error {
+    constructor(message: string, readonly hint?: string, options?: ErrorOptions) {
+        super(message, options);
+        this.name = "CollectionConfigError";
+    }
+}
+
+/**
  * A strict parse of every collection config, run at boot.
  *
  * Nothing used to check these files. A config written against an older version
@@ -1129,7 +1151,7 @@ export function assertCollectionConfigs(
             : undefined
     ].filter(Boolean);
 
-    throw new Error(
+    throw new CollectionConfigError(
         `${errors.length} problem(s) in the collection config.\n\n` +
         sections.join("\n\n") + "\n"
     );

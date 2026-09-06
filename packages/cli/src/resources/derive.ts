@@ -325,11 +325,52 @@ function collectionEdges(collection: CollectionConfig, declared: Set<string>): A
  * wrong" when the environment is not the point.
  */
 function cronLoadIssue(problem: string): string {
-    return `${problem}\n` +
+    return `${summariseCronProblem(problem)}\n` +
         "    `rebase resources` evaluates each cron file to read its schedule, and it is a build " +
         "step: no .env, no secrets. Move work that needs the deployment's environment inside the " +
         "handler — `const { x } = await import(\"…\")` — so the module scope imports nothing that " +
         "reads configuration.";
+}
+
+/**
+ * The cron loader's `<file> (threw: <message>)`, as one line.
+ *
+ * The message is whatever the module threw, and the common case is a schema
+ * validator: `loadEnv()` at module scope with no `.env` present throws a
+ * `ZodError`, whose `.message` is the JSON array of its issues. That arrived
+ * here verbatim — ten lines of `{ "expected": "string", "code":
+ * "invalid_type", … }` — with the sentence that says what to do underneath it,
+ * so the reader met "Invalid input: expected string, received undefined" twice
+ * before reaching the explanation.
+ *
+ * A validator's own sentences are the useful half of that object, so they are
+ * kept and the serialisation is dropped.
+ */
+function summariseCronProblem(problem: string): string {
+    const match = problem.match(/^(.*) \(threw: ([\s\S]*)\)$/);
+    if (!match) return problem.split("\n")[0];
+    const [, file, thrown] = match;
+    return `${file}: ${summariseThrownMessage(thrown)}`;
+}
+
+/** One sentence out of a thrown message, whatever shape it arrived in. */
+function summariseThrownMessage(message: string): string {
+    const trimmed = message.trim();
+    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+        try {
+            const parsed: unknown = JSON.parse(trimmed);
+            const issues = Array.isArray(parsed) ? parsed : [parsed];
+            const sentences = [...new Set(
+                issues
+                    .map(issue => (issue as { message?: unknown } | null)?.message)
+                    .filter((m): m is string => typeof m === "string" && m.length > 0)
+            )];
+            if (sentences.length > 0) return sentences.join("; ");
+        } catch {
+            // Not JSON after all — fall through to the first line.
+        }
+    }
+    return trimmed.split("\n")[0];
 }
 
 /**

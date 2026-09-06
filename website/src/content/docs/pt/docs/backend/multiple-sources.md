@@ -43,6 +43,51 @@ Um motor desconhecido é recusado no local da chamada, e não mais tarde. Para u
 que esta build não conhece, usa-se `custom:` — por exemplo
 `bucket("objects", { engine: "custom:minio" })`.
 
+### Corrigir um kind que já foi publicado
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+Para autores de drivers. A definição registada de um kind de recurso fica
+**congelada** assim que um pacote que a transporta é publicado: cada driver
+publicado inclui a sua própria cópia de `@rebasepro/types`, e essa cópia compara
+a entrada do registo partilhado com o seu próprio literal e lança um erro
+perante qualquer diferença. Editar o literal mata, por isso, todos os bundles
+construídos com um driver mais antigo, no carregamento do driver.
+
+`amendResourceKind` corrige aquilo a que um kind *se liga* — as suas bases de
+variáveis de ambiente, as suas chaves de opções — sem tocar no literal que uma
+cópia mais antiga compara:
+
+```ts
+import { amendResourceKind } from "@rebasepro/types";
+
+amendResourceKind("database", {
+    envBases: ["DATABASE_URL", "DATABASE_READ_URL", "ADMIN_CONNECTION_STRING"]
+});
+```
+
+A correção aplica-se apenas às leituras através desta cópia, por isso um driver
+mais antigo continua a ligar-se como o fazia quando foi publicado. Usa-a para
+qualquer correção a um kind publicado; usa `registerResourceKind` apenas para um
+kind que ninguém publicou.
+
+### Que bucket recebe um carregamento não qualificado
+
+Uma propriedade de armazenamento que não nomeia nenhuma `storageSource` escreve
+no bucket **predefinido**, e um projeto com buckets nomeados tem de dizer qual
+é. Ou declaras o bucket predefinido — `export const uploads = bucket();` — ou
+marcas um dos nomeados:
+
+```ts
+export const media = bucket("media", { engine: "s3", default: true });
+```
+
+O arranque recusa um projeto com buckets nomeados e nenhum predefinido, e nomeia
+as duas soluções. Antes escolhia o primeiro declarado, com um aviso: isso decidia
+por ordem de declaração onde acabam os ficheiros de um utilizador, e dava
+respostas diferentes de cada lado de um deploy, porque o bucket local com que o
+desenvolvimento faz de suplente é descartado em produção e a promoção não.
+
 Em seguida, aponte uma coleção para uma delas:
 
 ```ts

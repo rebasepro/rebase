@@ -1,7 +1,8 @@
 import postsCollection from "./posts";
+import { defineCollection } from "@rebasepro/cms-types";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 
-const tagsCollection: PostgresCollectionConfig = {
+const tagsCollection = defineCollection({
     name: "Tags",
     singularName: "Tag",
     slug: "tags",
@@ -28,7 +29,7 @@ const tagsCollection: PostgresCollectionConfig = {
         {
             kind: "manyToMany",
             relationName: "posts",
-            target: () => postsCollection,
+            target: (): PostgresCollectionConfig => postsCollection,
             }
     ],
     admin: {
@@ -41,7 +42,7 @@ const tagsCollection: PostgresCollectionConfig = {
         hideFromEntityViews: true,
         display: { title: "name" }
     }
-};
+});
 
 
 export default tagsCollection;

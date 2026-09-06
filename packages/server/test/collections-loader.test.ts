@@ -99,6 +99,18 @@ export const defaultSecurityRules = [{ operation: "select", access: "public" }];
         await expect(loadCollectionsFromDirectory(dir)).rejects.toThrow(/broken\.ts/);
     });
 
+    it("throws when the index exists and cannot be imported", async () => {
+        // The index declares `defaultSecurityRules`. Swallowing the failure
+        // returned no defaults, every collection fell back to
+        // locked-by-default, and the boot announced success while serving a
+        // different authorization model than the project declares.
+        fs.writeFileSync(path.join(dir, "posts.ts"), collectionFile("posts"));
+        fs.writeFileSync(path.join(dir, "index.ts"), "export const broken = {{{ ;");
+
+        await expect(loadCollectionsFromDirectory(dir)).rejects.toThrow(/index\.ts/);
+        await expect(loadCollectionsFromDirectory(dir)).rejects.toThrow(/defaultSecurityRules/);
+    });
+
     it("throws on a file with no default export", async () => {
         fs.writeFileSync(path.join(dir, "stray.ts"), "export const notDefault = 1;");
 

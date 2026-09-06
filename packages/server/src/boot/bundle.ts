@@ -416,11 +416,16 @@ export interface BundleConfigExports {
 /**
  * Read the config package's `index` for declarations.
  *
- * Absent, empty or unreadable all mean the same thing: a single default database
- * and a single default bucket. That is the overwhelmingly common project, and it
- * must not be required to say so. A malformed export is reported and ignored
- * rather than fatal — a typo in an optional declaration should not take down a
- * server whose collections are fine.
+ * Absent or empty mean the same thing: a single default database and a single
+ * default bucket. That is the overwhelmingly common project, and it must not be
+ * required to say so. A malformed export — `dataSources` that is not an array —
+ * is reported and ignored rather than fatal: a typo in one optional declaration
+ * should not take down a server whose collections are fine.
+ *
+ * A file that is THERE and cannot be imported is a different thing, and it is
+ * fatal. Every declaration in it is gone, so the process comes up bound to a
+ * different set of databases and buckets than the project declares, announcing
+ * success. That is not a degraded start, it is a different deployment.
  */
 export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<BundleConfigExports> {
     const configEntry = bundle.manifest.entry?.config;
@@ -438,12 +443,14 @@ export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<Bun
     try {
         mod = await import(pathToFileURL(indexPath).href) as Record<string, unknown>;
     } catch (err) {
-        logger.warn(
-            `Could not import the config index at ${indexPath}: ` +
-            `${err instanceof Error ? err.message : String(err)}. ` +
-            "Continuing with a single default data source and storage source."
+        throw new Error(
+            `Could not load ${indexPath}.\n\n` +
+            `${err instanceof Error ? err.message : String(err)}\n\n` +
+            "This file declares this project's data sources, storage sources and callbacks. " +
+            "Booting without it would bind the server to a different set of databases and " +
+            "buckets than the project declares, so this is fatal rather than a warning.",
+            { cause: err }
         );
-        return {};
     }
 
     const readArray = <T>(name: string): T[] | undefined => {

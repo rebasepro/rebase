@@ -161,8 +161,12 @@ registerResourceKind({
     optionKeys: ["publicRead", "prefix", "account"],
     implicitDefault: false
 });
-// What a bucket actually binds from, per engine (25f1a97e3).
+// What a bucket actually binds from, per engine (25f1a97e3), plus `default`:
+// the registry no longer promotes a lone named bucket, so a project needs a way
+// to say which one serves unqualified uploads. The literal above is frozen, so
+// the new option key arrives here.
 amendResourceKind("bucket", {
+    optionKeys: ["publicRead", "prefix", "account", "default"],
     envBases: [
         "STORAGE_TYPE",
         "STORAGE_PATH",
@@ -205,6 +209,20 @@ export interface BucketOptions extends DeclareOptions {
     publicRead?: boolean;
     /** Key prefix within the bucket, for sharing one bucket between sources. */
     prefix?: string;
+    /**
+     * Serve unqualified uploads — a storage property with no `storageSource` —
+     * from this bucket.
+     *
+     * A project that declares only `bucket("media")` has no default bucket, and
+     * the registry used to promote the one it found with a warning. That is a
+     * decision about where a user's files land, made by the framework, on the
+     * strength of declaration order; it also produced two different
+     * destinations either side of a deploy, because the synthesized local
+     * default is dropped in production and the promotion is not. So it is now
+     * a boot error, and this is one of the two ways to answer it — the other
+     * being `bucket()`, which declares the default bucket itself.
+     */
+    default?: boolean;
     /**
      * The credential set this bucket signs with, when several share one.
      *
@@ -681,6 +699,7 @@ export function resourceToStorageSource(declaration: ResourceDeclaration): Stora
         ...(typeof declaration.options.account === "string"
             ? { account: declaration.options.account }
             : {}),
+        ...(declaration.options.default === true ? { default: true } : {}),
         ...(declaration.label !== undefined ? { label: declaration.label } : {})
     };
 }

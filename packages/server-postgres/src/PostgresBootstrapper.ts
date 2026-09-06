@@ -15,6 +15,7 @@ import {
     DatabaseAdmin,
     type DataDriver,
     CollectionConfig,
+    DEFAULT_DATA_SOURCE_KEY,
     isRelationalCollectionConfig,
     type HistoryConfig,
     InitializedDriver,
@@ -403,6 +404,32 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
         };
     };
 
+    /**
+     * Create the `rebase` schema and the helper functions every generated
+     * policy calls — `rebase.uid()`, `rebase.roles()` and their siblings — on
+     * whichever database the queryable points at.
+     *
+     * Idempotent and cheap to repeat: `CREATE SCHEMA IF NOT EXISTS` plus a
+     * handful of `CREATE OR REPLACE FUNCTION`.
+     */
+    const provisionRlsRuntime = async (
+        queryable: { query<T>(text: string): Promise<{ rows: T[] }> }
+    ): Promise<void> => {
+        const { RLS_BOOTSTRAP_STATEMENTS } = await import("./schema/rls-bootstrap-sql");
+        // One statement per call — this handle speaks the extended query
+        // protocol, which rejects multi-command strings. Advisory-locked
+        // for the same reason the auth path is: two instances booting
+        // against one fresh database must not race on CREATE OR REPLACE.
+        await queryable.query("SELECT pg_advisory_lock(hashtext('rebase_auth_functions_init'))");
+        try {
+            for (const statement of RLS_BOOTSTRAP_STATEMENTS) {
+                await queryable.query(statement);
+            }
+        } finally {
+            await queryable.query("SELECT pg_advisory_unlock(hashtext('rebase_auth_functions_init'))");
+        }
+    };
+
     return {
         type: "postgres",
 
@@ -503,10 +530,10 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             // database that had the table.
             let ownTables: Record<string, PgTable> | undefined;
             let ownRelations: Record<string, Relations> | undefined;
-            const sourceKey = (config as { dataSourceKey?: string }).dataSourceKey ?? "(default)";
+            const sourceKey = (config as { dataSourceKey?: string }).dataSourceKey ?? DEFAULT_DATA_SOURCE_KEY;
             if (!introspectedCollections && !pgConfig.schema?.tables && collections && collections.length > 0) {
                 const own = collections.filter(c =>
-                    c.dataSource === sourceKey || (!c.dataSource && sourceKey === "(default)")
+                    c.dataSource === sourceKey || (!c.dataSource && sourceKey === DEFAULT_DATA_SOURCE_KEY)
                 );
                 if (own.length > 0) {
                     const pgSchemaName = pgConfig.introspectionSchema ?? "public";
@@ -569,6 +596,27 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 if (fatal) throw fatal;
                 logger.warn("⚠️ Continuing without initial database verification. Drizzle/PG will attempt to connect on subsequent queries.");
             }
+
+            // ── Which collections are THIS database's? ────────────────────────
+            //
+            // The driver is handed every collection the project declares —
+            // relations resolve across sources, and the API routes by slug — but
+            // three passes below speak about this database and only this one:
+            // the change-capture attach, the drift check and the RLS/grants
+            // pass. Reading the registry unfiltered made a second source
+            // (`database("analytics")`) report the default's tables as SCHEMA
+            // DRIFT, try to attach CDC triggers to tables it does not hold, and
+            // validate the default's policies against its own catalogue. Same
+            // rule as the table read-back above.
+            //
+            // In BaaS mode the registry holds what THIS database was introspected
+            // for, so every registered collection is already this source's.
+            const introspectedHere = Boolean(introspectedCollections);
+            const collectionsOnThisSource = (): CollectionConfig[] => {
+                const all = registry.getCollections() as CollectionConfig[];
+                if (introspectedHere) return all;
+                return all.filter(c => c.dataSource === sourceKey || (!c.dataSource && sourceKey === DEFAULT_DATA_SOURCE_KEY));
+            };
 
             // Create services
             const realtimeService = new RealtimeService(schemaAwareDb, registry);
@@ -688,19 +736,19 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 // role that matters is whichever one requests actually use.
                 await validatePolicyPgRoles(
                     runSql,
-                    registry.getCollections() as never,
+                    collectionsOnThisSource() as never,
                     driver.rlsUserRole ?? posture.role
                 );
 
                 // The same habit one surface over, and the dangerous direction:
                 // a rule that reads as "signed in only" but is true for every
                 // caller grants the data away rather than hiding it.
-                warnOnAnonymousGrants(registry.getCollections() as never);
+                warnOnAnonymousGrants(collectionsOnThisSource() as never);
 
                 // Raw policy SQL written against the pre-1.0 helper schema. It
                 // is rewritten on compile, so this is the only place the project
                 // is ever told the spelling moved.
-                warnOnLegacyRlsFunctions(registry.getCollections() as never);
+                warnOnLegacyRlsFunctions(collectionsOnThisSource() as never);
             }
 
             // Ensure branch metadata table exists when branching is available
@@ -801,7 +849,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                         const res = await schemaAwareDb.execute(sql.raw(text));
                         return (res.rows ?? []) as Record<string, unknown>[];
                     };
-                    const cdcTables: CdcTableRef[] = registry.getCollections()
+                    const cdcTables: CdcTableRef[] = collectionsOnThisSource()
                         .map((c) => ({
                             schema: (c as { schema?: string }).schema ?? "public",
                             table: getCollectionTableName(c)
@@ -811,7 +859,14 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     // them — and a link or unlink is a write nobody would hear
                     // about. Their rows are the contents of a child list, which is
                     // as much a change as a write to the rows themselves.
+                    // Filtered by the parent's source for the same reason as the
+                    // list above: `posts_tags` lives in the database `posts`
+                    // lives in, and asking a second database to instrument it
+                    // produced one "Could not attach change-capture trigger"
+                    // warning per junction on every boot.
+                    const ownSlugs = new Set(collectionsOnThisSource().map(c => c.slug));
                     for (const link of collectJunctionLinks(registry)) {
+                        if (!ownSlugs.has(link.parentCollection.slug)) continue;
                         cdcTables.push({ schema: link.schema,
 table: link.table });
                     }
@@ -869,7 +924,7 @@ table: link.table });
             // One-directional: only checks collections → DB (extra DB tables
             // that aren't mapped to collections are perfectly fine).
             try {
-                const registeredCollections = registry.getCollections();
+                const registeredCollections = collectionsOnThisSource();
                 if (registeredCollections.length > 0) {
                     // Deliberately unfiltered by schema: a table that is missing
                     // from where the collection says it lives is very often
@@ -1188,20 +1243,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
          * as the auth path and the migration preamble, from the same constant.
          */
         async ensureRlsRuntime(driverResult?: InitializedDriver): Promise<void> {
-            const { RLS_BOOTSTRAP_STATEMENTS } = await import("./schema/rls-bootstrap-sql");
-            const queryable = provisioningQueryable(driverResult);
-            // One statement per call — this handle speaks the extended query
-            // protocol, which rejects multi-command strings. Advisory-locked
-            // for the same reason the auth path is: two instances booting
-            // against one fresh database must not race on CREATE OR REPLACE.
-            await queryable.query("SELECT pg_advisory_lock(hashtext('rebase_auth_functions_init'))");
-            try {
-                for (const statement of RLS_BOOTSTRAP_STATEMENTS) {
-                    await queryable.query(statement);
-                }
-            } finally {
-                await queryable.query("SELECT pg_advisory_unlock(hashtext('rebase_auth_functions_init'))");
-            }
+            await provisionRlsRuntime(provisioningQueryable(driverResult));
         },
 
         async ensureCollectionPolicies(
@@ -1211,6 +1253,19 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
         ): Promise<{ applied: number }> {
             const { ensureCollectionPolicies } = await import("./schema/ensure-collection-policies");
             const queryable = provisioningQueryable(driverResult);
+            // The order this depends on is set by the caller, and a caller that
+            // gets it wrong fails silently-but-permanently: `CREATE POLICY`
+            // validates the functions its expression calls, so every policy on
+            // the source is refused and the table stays RLS-enabled with no way
+            // in. That is what a second database did for a whole release — the
+            // helpers arrived with the auth tables, and auth lives on the
+            // default source only. So the invariant is checked here, where the
+            // policies are actually written, instead of being an ordering rule
+            // three modules away. One catalogue lookup when it already holds.
+            const { rows } = await queryable.query<{ present: boolean }>(
+                "SELECT to_regprocedure('rebase.roles()') IS NOT NULL AS present"
+            );
+            if (!rows[0]?.present) await provisionRlsRuntime(queryable);
             const outcome = await ensureCollectionPolicies(
                 queryable,
                 collections as CollectionConfig[],

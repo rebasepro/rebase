@@ -1,5 +1,5 @@
 ---
-sourceHash: b44dea0812af2be0
+sourceHash: 7e1e3b2295eca6f1
 title: Propriedades
 sidebar_label: Propriedades
 description: Os tipos de propriedades definem o tipo de dado, validação e renderização da UI para cada campo em uma coleção. O Rebase suporta os tipos string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -456,6 +456,10 @@ client: {
 ```
 
 <FieldWidgetPreview client:only="react" variant="reference" />
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+No Postgres uma `reference` é uma chave estrangeira como qualquer outra, por isso segue a mesma regra de `ON DELETE` que uma relação `belongsTo`: opcional é `SET NULL`, obrigatória é `RESTRICT`. Ver [Relações](/docs/collections/relations).
 
 
 ### Opções de Referência e Relação

@@ -15,14 +15,27 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-/** Bare specifiers a backend must never import — matched exactly or as a subpath. */
+/**
+ * Bare specifiers a backend must never import — matched exactly or as a subpath.
+ *
+ * `@rebasepro/cms-types` is deliberately NOT on this list, and it used to be.
+ * That package is the type surface, not the panel: its build output has no React
+ * import in it at all, and `defineCollection` — the builder every scaffolded
+ * collection file imports, in the template and in 35 documentation snippets —
+ * lives there. Banning it by name made the guard refuse the way this project
+ * documents authoring a collection, which is how the example app ended up on the
+ * `const x: PostgresCollectionConfig` annotation the docs warn against.
+ *
+ * So the ban is on the evidence rather than the name: React itself is forbidden,
+ * and `check.mjs` loads this package's own entry point as a checked module, so a
+ * value import of React landing in its graph fails the guard the same day.
+ */
 const FORBIDDEN_PACKAGES = [
     "react",
     "react-dom",
     "react-router",
     "react-router-dom",
     "@rebasepro/cms",
-    "@rebasepro/cms-types",
     "@rebasepro/cms-common",
     "@rebasepro/ui",
     "@rebasepro/app",
@@ -37,7 +50,6 @@ const FORBIDDEN_PATHS = [
     "/node_modules/react-router/",
     "/node_modules/react-router-dom/",
     "/packages/cms/",
-    "/packages/cms-types/",
     "/packages/admin-common/",
     "/packages/ui/",
     "/packages/app/",

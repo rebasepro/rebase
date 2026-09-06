@@ -47,6 +47,7 @@ export {
 // report the same problems without booting a server.
 export {
     assertCollectionConfigs,
+    CollectionConfigError,
     findCollectionConfigProblems,
     unknownKeyPolicyFromEnv,
     type ConfigProblem,
@@ -277,7 +278,7 @@ export { authUid, authRoles, authJwt } from "./utils/sql";
 // =============================================================================
 // Logger
 // =============================================================================
-export { logger } from "./utils/logger";
+export { logger, rawQueryLoggingEnabled } from "./utils/logger";
 export type { Logger } from "./utils/logger";
 
 // =============================================================================
