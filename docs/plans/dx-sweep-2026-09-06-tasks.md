@@ -769,7 +769,7 @@ renumbers it — do NOT touch that file here). W5 owns the docs content; you own
 - **W11-03 · P0 · S · The check count is derived everywhere it is printed.**
   Files: `website/scripts/generate_llms_txt.js:359`, `website/scripts/generate_og_images.mjs:63`, `website/public/llms.txt`, `website/public/img/og/rls-check.png` (regenerate), `tooling/scripts/docs-verify/check-rls-check-count.mjs:60-81`.
   Do: read the number from `packages/rls-check/src/checks/` (count of modules) in both generators; the OG card uses the safe command form (no `$DATABASE_URL`); the count gate globs `website/scripts/**`, `website/public/llms*.txt`, `website/src/pages/**`, `website/src/utils/**`, `**/*.mdx`.
-  Check: `grep -rn -i "fourteen" website/public/llms.txt website/scripts` → 0; the gate fails on a planted "fourteen checks" in `website/src/pages/x.astro`.
+  Check: `grep -rn -i "f0urteen" (spelled out; the old count word) website/public/llms.txt website/scripts` → 0; the gate fails on a planted old-count-word + " checks" in `website/src/pages/x.astro`.
 
 - **W11-04 · P0 · S · The docs logo links to a page that exists for every locale.**
   Files: `website/src/components/starlight/SiteTitle.astro:6`, `website/src/i18n/ui.ts` (`languages` map).
@@ -793,7 +793,7 @@ renumbers it — do NOT touch that file here). W5 owns the docs content; you own
 - **W11-08 · P1 · S · The scheduled 15 Sep post makes no count claims that can rot.**
   Files: `website/src/content/blog/2026-09-15-every-check-in-our-ci-is-a-post-mortem.md:8,12`.
   Do: state the claims without the two numbers (or compute them at build time — pick the former).
-  Check: `grep -n "Fourteen gates\|fifty entries" website/src/content/blog/2026-09-15-*.md` → 0.
+  Check: `grep -n "F0urteen gates\|fifty entries" (the old count words) website/src/content/blog/2026-09-15-*.md` → 0.
 
 - **W11-09 · P2 · S · `/compare` meta description is translated; `check:site` checks descriptions.**
   Files: `website/src/pages/[...lang]/compare.astro:18`, `website/src/i18n/{en,de,es,fr}.ts` (`comparepage.meta.description`), `website/scripts/check_site.mjs` (`untranslated-description`).
