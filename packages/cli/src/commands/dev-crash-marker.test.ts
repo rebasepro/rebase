@@ -33,8 +33,13 @@ describe("the watcher's restart marker", () => {
 
     it("is still what tsx prints when it runs the entry again", async () => {
         const dir = mkdtempSync(path.join(tmpdir(), "rebase-watch-marker-"));
-        const entry = path.join(dir, "crash.ts");
-        writeFileSync(entry, 'throw new Error("boom");\n', "utf8");
+        const entry = path.join(dir, "loop.ts");
+        // A module that finishes loading and stays up. One that throws at load
+        // exits before tsx has learnt which files it imported, so on a Linux
+        // runner nothing was watched and no change was ever announced — the
+        // marker was fine, the fixture was not. The backend `rebase dev` runs
+        // is the loaded kind, so this is also the case that matters.
+        writeFileSync(entry, 'console.log("up");\nsetInterval(() => {}, 1000);\n', "utf8");
 
         const child = spawn(process.execPath, [tsxCli, "watch", entry], { stdio: ["ignore", "pipe", "pipe"] });
         const seen = await new Promise<boolean>(resolve => {
@@ -47,23 +52,23 @@ describe("the watcher's restart marker", () => {
                 resolve(value);
             };
             const timer = setTimeout(() => finish(false), 45_000);
-            // Write only once the first run has printed its throw — that is
-            // when tsx has the watcher armed. A write on a fixed timer landed
-            // before the watcher on a cold CI runner, and nothing was announced.
-            // Then keep writing every two seconds: a change is what makes tsx
-            // announce the next run, and one write can still fall between two
-            // polls of the file system.
+            // Write only once the first run has printed — that is when tsx has
+            // the module graph and the watcher armed. A write on a fixed timer
+            // landed before the watcher on a cold CI runner, and nothing was
+            // announced. Then keep writing every two seconds: a change is what
+            // makes tsx announce the next run, and one write can still fall
+            // between two polls of the file system.
             const startTouching = () => {
                 if (touching) return;
                 touching = setInterval(() => {
                     touches += 1;
-                    writeFileSync(entry, `throw new Error("boom again ${touches}");\n`, "utf8");
+                    writeFileSync(entry, `console.log("up ${touches}");\nsetInterval(() => {}, 1000);\n`, "utf8");
                 }, 2_000);
             };
             const scan = (chunk: Buffer) => {
                 const text = chunk.toString();
                 if (WATCHER_RESTART_MARKER.test(text)) { finish(true); return; }
-                if (text.includes("boom")) startTouching();
+                if (/^up/m.test(text)) startTouching();
             };
             child.stdout.on("data", scan);
             child.stderr.on("data", scan);
