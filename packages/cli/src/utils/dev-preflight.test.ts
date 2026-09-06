@@ -288,4 +288,58 @@ describe("ensureDevDatabase", () => {
         });
         expect(outcome).toEqual({ action: "no-compose" });
     });
+
+    it("survives a schema push that fails, and says the database is up anyway", async () => {
+        /**
+         * The failure this is the guard for: the push runs *in this process*,
+         * and `refuseAtlasOnManagedDatabase` used to answer it with
+         * `process.exit(1)`. So the first `rebase dev --docker` of a fresh
+         * scaffold started the container, hit the refusal inside the push, and
+         * exited — past the `catch` written expressly to prevent that, because
+         * an exit is not catchable. The container was left running with no
+         * server in front of it.
+         *
+         * `pushSchema` throwing is the whole test: the outcome must still be
+         * `started`, and the process must still be here to report it.
+         */
+        const exit = vi.spyOn(process, "exit").mockImplementation((() => {
+            throw new Error("the preflight must not exit the process");
+        }) as never);
+
+        // A port that is closed when the preflight probes it and open by the
+        // time it waits for it — which is what starting a container looks like.
+        const server = net.createServer();
+        const free = net.createServer();
+        await new Promise<void>(resolve => free.listen(0, "127.0.0.1", resolve));
+        const port = (free.address() as net.AddressInfo).port;
+        await new Promise<void>(resolve => free.close(() => resolve()));
+
+        const started = vi.fn(async () => {
+            await new Promise<void>(resolve => server.listen(port, "127.0.0.1", resolve));
+        });
+
+        fs.writeFileSync(
+            path.join(projectRoot, "docker-compose.yml"),
+            "services:\n  db:\n    image: postgres:18-alpine\n"
+        );
+
+        try {
+            const outcome = await ensureDevDatabase({
+                ...base,
+                projectRoot,
+                databaseUrl: `postgres://u@127.0.0.1:${port}/db`,
+                startDatabase: started,
+                pushSchema: async () => {
+                    throw new Error("rebase db push does not work on the managed development database.");
+                }
+            });
+
+            expect(started).toHaveBeenCalledOnce();
+            expect(outcome).toEqual({ action: "started", port, pushed: false });
+            expect(exit).not.toHaveBeenCalled();
+        } finally {
+            exit.mockRestore();
+            await new Promise<void>(resolve => server.close(() => resolve()));
+        }
+    });
 });

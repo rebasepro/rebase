@@ -147,6 +147,37 @@ function readFlagValue(rawArgs: readonly string[], flag: string): string | null 
 const ATLAS_BACKED_SUBCOMMANDS = new Set(["push", "generate", "migrate"]);
 
 /**
+ * A managed-database refusal, raised so the caller decides what it costs.
+ *
+ * These two guards used to `process.exit(1)` where they stood. That is right
+ * for `rebase db push`, typed by a person, and catastrophic for the same code
+ * reached from inside `rebase dev`: the dev server's first-boot schema push
+ * runs in-process, so an exit there took the whole dev server down — with a
+ * `try/catch` around it written expressly to prevent that, which could never
+ * run. The first `rebase dev --docker` of every scaffold died this way.
+ *
+ * So the refusal is a value now. It carries the block it wants printed rather
+ * than printing it, because who prints (and whether printing is even right) is
+ * the caller's question: `dbCommand` prints it and exits 1, and `rebase dev`
+ * keeps serving.
+ */
+export class ManagedDatabaseRefusal extends Error {
+    /** The lines to print, in order, already coloured. */
+    readonly lines: readonly string[];
+
+    constructor(summary: string, lines: readonly string[]) {
+        super(summary);
+        this.name = "ManagedDatabaseRefusal";
+        this.lines = lines;
+    }
+}
+
+/** Print a refusal exactly as the guards used to print it themselves. */
+export function printManagedDatabaseRefusal(refusal: ManagedDatabaseRefusal): void {
+    for (const line of refusal.lines) console.error(line);
+}
+
+/**
  * Stop an Atlas-backed subcommand before it fails inside Atlas on the managed
  * development database.
  *
@@ -175,19 +206,22 @@ export function refuseAtlasOnManagedDatabase(rawArgs: string[], kind: string): v
     const [domain, subcommand] = commandWords(rawArgs, "db");
     if (domain !== "db" || !ATLAS_BACKED_SUBCOMMANDS.has(subcommand ?? "")) return;
 
-    console.error("");
-    console.error(chalk.red(`  ✗ rebase db ${subcommand} does not work on the managed development database.`));
-    console.error("");
-    console.error(chalk.gray("  It plans changes with Atlas, which needs a second empty database to"));
-    console.error(chalk.gray("  compare against. The managed database is PGlite, which serves exactly one."));
-    console.error("");
-    console.error(chalk.gray("  You almost certainly do not need this command:"));
-    console.error(chalk.gray(`  ${chalk.cyan("rebase dev")} already applies your collections to it at boot, additively.`));
-    console.error("");
-    console.error(chalk.gray("  For migrations, or to drop and rename columns, point the project at a real"));
-    console.error(chalk.gray("  Postgres — uncomment DATABASE_URL in .env — and run this command again."));
-    console.error("");
-    process.exit(1);
+    const summary = `rebase db ${subcommand} does not work on the managed development database.`;
+
+    throw new ManagedDatabaseRefusal(summary, [
+        "",
+        chalk.red(`  ✗ ${summary}`),
+        "",
+        chalk.gray("  It plans changes with Atlas, which needs a second empty database to"),
+        chalk.gray("  compare against. The managed database is PGlite, which serves exactly one."),
+        "",
+        chalk.gray("  You almost certainly do not need this command:"),
+        chalk.gray(`  ${chalk.cyan("rebase dev")} already applies your collections to it at boot, additively.`),
+        "",
+        chalk.gray("  For migrations, or to drop and rename columns, point the project at a real"),
+        chalk.gray("  Postgres — uncomment DATABASE_URL in .env — and run this command again."),
+        ""
+    ]);
 }
 
 /**
@@ -227,18 +261,21 @@ export function refuseBranchOnManagedDatabase(rawArgs: string[], kind: string): 
     const [domain, subcommand] = commandWords(rawArgs, "db");
     if (domain !== "db" || subcommand !== "branch") return;
 
-    console.error("");
-    console.error(chalk.red("  ✗ rebase db branch does not work on the managed development database."));
-    console.error("");
-    console.error(chalk.gray("  Branching copies a database with CREATE DATABASE ... TEMPLATE. The managed"));
-    console.error(chalk.gray("  database is PGlite, which serves exactly one — the copy would be the"));
-    console.error(chalk.gray("  original, and every write you meant to sandbox would land in it."));
-    console.error("");
-    console.error(chalk.gray("  Branching needs a real Postgres. Either:"));
-    console.error(chalk.gray(`  ${chalk.cyan("rebase dev --docker")}    starts one, and branches work against it`));
-    console.error(chalk.gray("  or uncomment DATABASE_URL in .env to point at your own."));
-    console.error("");
-    process.exit(1);
+    const summary = "rebase db branch does not work on the managed development database.";
+
+    throw new ManagedDatabaseRefusal(summary, [
+        "",
+        chalk.red(`  ✗ ${summary}`),
+        "",
+        chalk.gray("  Branching copies a database with CREATE DATABASE ... TEMPLATE. The managed"),
+        chalk.gray("  database is PGlite, which serves exactly one — the copy would be the"),
+        chalk.gray("  original, and every write you meant to sandbox would land in it."),
+        "",
+        chalk.gray("  Branching needs a real Postgres. Either:"),
+        chalk.gray(`  ${chalk.cyan("rebase dev --docker")}    starts one, and branches work against it`),
+        chalk.gray("  or uncomment DATABASE_URL in .env to point at your own."),
+        ""
+    ]);
 }
 
 /**
@@ -459,6 +496,14 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         await runDriverDbCommand(rawArgs);
         await forgetDeletedBranch(projectRoot, rawArgs);
     } catch (error) {
+        // The CLI entry point is where a managed-database refusal becomes an
+        // exit code. The guards raise it instead of exiting so that `rebase dev`,
+        // which runs `db push` in-process, survives one; here, where a person
+        // typed the command, it is exactly as fatal as it always was.
+        if (error instanceof ManagedDatabaseRefusal) {
+            printManagedDatabaseRefusal(error);
+            process.exit(1);
+        }
         // A child that exited non-zero already printed its diagnostics through
         // inherited stdio; only the errors raised above have a message worth
         // adding here.

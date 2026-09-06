@@ -437,6 +437,26 @@ export function readEnvValue(envText: string, key: string): string | undefined {
 }
 
 /**
+ * The argv the first-boot schema push runs with.
+ *
+ * The database is named on the command line rather than left to be re-resolved.
+ * `runDriverDbCommand` runs the resolver again for whatever argv it is handed,
+ * and the argv it used to be handed (`["node","rebase","db","push"]`) carried
+ * nothing at all — so on the `--docker` path it read a `.env` whose
+ * `DATABASE_URL` is commented out, concluded "managed PGlite", and refused the
+ * push for a database that was not the one the preflight had just started.
+ *
+ * Exported for its test: the missing pair of arguments is the whole defect, and
+ * it is invisible in any assertion about the push's *outcome*.
+ */
+export function schemaPushArgv(databaseUrl: string | undefined): string[] {
+    const argv = ["node", "rebase", "db", "push"];
+    if (databaseUrl) argv.push("--database-url", databaseUrl);
+
+    return argv;
+}
+
+/**
  * The database half of `rebase dev` starting up.
  *
  * Separated from `ensureDevDatabase` so that everything needing a project on
@@ -457,18 +477,26 @@ async function runDatabasePreflight(options: {
 
     const hasCollections = projectHasCollections(projectRoot);
 
+    // The one DSN this preflight is about. `ensureDevDatabase` decides from it,
+    // and the push has to run against the same one — re-resolving inside the
+    // push saw a `.env` with DATABASE_URL commented out, chose the managed
+    // PGlite, and refused, on the first `rebase dev --docker` of every scaffold.
+    const databaseUrl = options.databaseUrl ?? readEnvVar(projectRoot, "DATABASE_URL");
+
     const outcome = await ensureDevDatabase({
         projectRoot,
-        databaseUrl: options.databaseUrl ?? readEnvVar(projectRoot, "DATABASE_URL"),
+        databaseUrl,
         disabled,
         hasCollections,
         pushSchema: async () => {
             // The same driver entry point `rebase db push` uses, called with the
             // argv layout every command in this CLI receives — the full process
-            // argument vector, which the callee slices. The throwing variant:
-            // a failed push must not take the dev server down with it.
+            // argument vector, which the callee slices. `--database-url` names
+            // the database the preflight just started, so the push cannot
+            // resolve its way to a different one. The throwing variant: a failed
+            // push must not take the dev server down with it.
             // Quiet: the database was resolved and announced in the banner above.
-            await runDriverDbCommand(["node", "rebase", "db", "push"], { quiet: true });
+            await runDriverDbCommand(schemaPushArgv(databaseUrl), { quiet: true });
         }
     });
 

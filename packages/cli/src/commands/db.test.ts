@@ -8,7 +8,12 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import path from "path";
-import { absolutizeLocalPathArgs, refuseAtlasOnManagedDatabase, refuseBranchOnManagedDatabase } from "./db.js";
+import {
+    absolutizeLocalPathArgs,
+    ManagedDatabaseRefusal,
+    refuseAtlasOnManagedDatabase,
+    refuseBranchOnManagedDatabase
+} from "./db.js";
 
 const ROOT = path.resolve("/projects/my-app");
 
@@ -109,19 +114,20 @@ describe("refuseAtlasOnManagedDatabase", () => {
      */
     const call = (args: string[], kind: string) => {
         const exit = vi.spyOn(process, "exit").mockImplementation((() => {
-            throw new Error("exited");
+            throw new Error("the guard must not exit the process");
         }) as never);
-        const err = vi.spyOn(console, "error").mockImplementation(() => {});
-        let threw = false;
         try {
             refuseAtlasOnManagedDatabase(args, kind);
-        } catch {
-            threw = true;
+        } catch (error) {
+            // The type is the assertion: an exit here would be the bug this
+            // guard caused in `rebase dev`, which runs `db push` in-process.
+            expect(error).toBeInstanceOf(ManagedDatabaseRefusal);
+            const refusal = error as ManagedDatabaseRefusal;
+            return { refused: true, output: refusal.lines.join("\n"), message: refusal.message };
+        } finally {
+            exit.mockRestore();
         }
-        const output = err.mock.calls.map(c => String(c[0] ?? "")).join("\n");
-        exit.mockRestore();
-        err.mockRestore();
-        return { refused: threw, output };
+        return { refused: false, output: "", message: "" };
     };
 
     it.each(["push", "generate", "migrate"])("refuses db %s on the managed database", (sub) => {
@@ -159,19 +165,17 @@ describe("refuseBranchOnManagedDatabase", () => {
      */
     const call = (args: string[], kind: string) => {
         const exit = vi.spyOn(process, "exit").mockImplementation((() => {
-            throw new Error("exited");
+            throw new Error("the guard must not exit the process");
         }) as never);
-        const err = vi.spyOn(console, "error").mockImplementation(() => {});
-        let threw = false;
         try {
             refuseBranchOnManagedDatabase(args, kind);
-        } catch {
-            threw = true;
+        } catch (error) {
+            expect(error).toBeInstanceOf(ManagedDatabaseRefusal);
+            return { refused: true, output: (error as ManagedDatabaseRefusal).lines.join("\n") };
+        } finally {
+            exit.mockRestore();
         }
-        const output = err.mock.calls.map(c => String(c[0] ?? "")).join("\n");
-        exit.mockRestore();
-        err.mockRestore();
-        return { refused: threw, output };
+        return { refused: false, output: "" };
     };
 
     it("refuses db branch on the managed database", () => {

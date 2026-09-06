@@ -16,7 +16,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
-import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, devWatchIncludes, getProjectPort, readEnvValue, resolveStartPort, SCAFFOLD_DEFAULT_PORT } from "./dev";
+import { DEV_FLAGS, DEV_PORT_FILENAME, devCommand, devWatchIncludes, getProjectPort, readEnvValue, resolveStartPort, SCAFFOLD_DEFAULT_PORT, schemaPushArgv } from "./dev";
 
 /**
  * `rebase dev` must notice a function or cron that did not exist when it
@@ -337,5 +337,34 @@ describe("the dev help and the dev flag spec", () => {
         const help = printed.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
         expect(help).not.toContain("service is started first");
         expect(help).toContain("the managed development database");
+    });
+});
+
+describe("schemaPushArgv", () => {
+    /**
+     * The first `rebase dev --docker` of a fresh scaffold used to start the
+     * container and then kill itself. The push ran in-process with
+     * `["node","rebase","db","push"]` — an argv naming no database — so
+     * `runDriverDbCommand` re-resolved from a `.env` whose `DATABASE_URL` is
+     * commented out, decided "managed PGlite", and refused a command that was
+     * never meant for PGlite. The container it had just started was two lines
+     * above in the same transcript.
+     */
+    it("names the database the preflight resolved", () => {
+        const url = "postgresql://rebase_app:pw@127.0.0.1:5435/rebase";
+
+        expect(schemaPushArgv(url)).toEqual(["node", "rebase", "db", "push", "--database-url", url]);
+    });
+
+    it("says nothing when there is no database to name", () => {
+        // `ensureDevDatabase` never reaches a push in this state; the argv stays
+        // the plain one rather than carrying an empty flag value.
+        expect(schemaPushArgv(undefined)).toEqual(["node", "rebase", "db", "push"]);
+    });
+
+    it("keeps the argv shape every command in this CLI receives", () => {
+        // The driver slices the process argument vector, so the first two
+        // entries are not decoration.
+        expect(schemaPushArgv("postgres://u@127.0.0.1:5432/db").slice(0, 2)).toEqual(["node", "rebase"]);
     });
 });
