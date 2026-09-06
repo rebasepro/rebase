@@ -331,10 +331,17 @@ export function diagnoseDbError(err: unknown, databaseUrl?: string): string | nu
  *   `Failed query: <sql> params:` and hides the real PostgreSQL error in
  *   `cause`, so the wrapper alone tells a reader nothing they can act on. The
  *   cause is appended when it says something the message does not.
+ *
+ * - **An error that has already printed its own diagnosis**, marked
+ *   `alreadyReported`. `CollectionsPathMissing` is one: it prints the path, what
+ *   it resolved to and the cwd it resolved against, and then throws so the entry
+ *   point owns the exit code. Repeating its one-line summary underneath would
+ *   undo the "printed once" this whole path exists for.
  */
 export function reportCommandFailure(error: unknown): void {
     const message = error instanceof Error ? error.message : String(error ?? "");
 
+    if ((error as { alreadyReported?: boolean } | null)?.alreadyReported) return;
     if (!message || /Command failed|exited with code/i.test(message)) return;
 
     outError("");

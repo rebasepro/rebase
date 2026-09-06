@@ -36,7 +36,8 @@ import { detectDestructiveStatements, decidePushSafety } from "./schema/destruct
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { acceptsExcludeFlag, buildAtlasArgs } from "./schema/atlas-argv";
 import { unexpectedBranchArgs } from "./branch-argv";
-import { assertKnownFlags } from "./cli-flags";
+import { assertKnownFlags, collectionsPathIn } from "./cli-flags";
+import { assertCollectionsPathExists } from "./cli-collections-path";
 import { backupActionOf } from "./backup-argv";
 
 import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
@@ -91,6 +92,20 @@ export async function runPluginCommand(args: string[]) {
     // and `schema generate --ouput x` wrote the default path in silence. See
     // cli-flags.ts for why the check has to be here and not in those parsers.
     assertKnownFlags(domain, subcommand, args);
+
+    // And before anything is generated: a `--collections` path that does not
+    // resolve used to warn and carry on, four times over, and the generators
+    // then wrote an *empty* schema over `drizzle/schema.sql` and
+    // `src/schema.generated.ts` — both committed artifacts — after which the
+    // push planned a DROP TABLE for every table in the database. Only the
+    // destructive gate stood between a typo and the whole schema.
+    //
+    // Checked here rather than in `loadCollectionsForCli`, which is
+    // deliberately forgiving: its callers use it to *narrow* what Atlas may
+    // touch, and a hard failure there would block a push over one broken file.
+    // This is a different question — "does the directory the user named
+    // exist" — and the answer was already known before the first write.
+    assertCollectionsPathExists(collectionsPathIn(args));
 
     if (domain === "db") {
         await dbCommand(subcommand, args);

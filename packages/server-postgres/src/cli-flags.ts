@@ -127,6 +127,31 @@ export function assertOutputAliasesPaired(specs: Record<string, arg.Spec>): stri
 }
 
 /**
+ * The `--collections` path the user typed, or `null` if they typed none.
+ *
+ * Read once, at the entry point, because every command that takes it re-enters
+ * the generators with the same line and each of them resolved it again — which
+ * is how "Collections path not found" came to be printed four times before the
+ * real output, and how a path that does not exist got as far as *writing* an
+ * empty schema.
+ *
+ * Permissive, and it has to be: {@link assertKnownFlags} has already judged the
+ * line, and `db push` carries flags the `--collections` spec does not name.
+ */
+export function collectionsPathIn(args: string[]): string | null {
+    try {
+        const parsed = arg(
+            { "--collections": String, "-c": "--collections" },
+            { argv: args.slice(2), permissive: true }
+        );
+
+        return parsed["--collections"] ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/**
  * The long flags a `--help` usage line documents.
  *
  * `"rebase db push [--collections <dir>] [--dry-run] …"` → `["--collections",

@@ -312,6 +312,9 @@ export async function getTableIncludes(collectionsPath: string): Promise<string[
  * that cannot tolerate a partial answer (the table excludes, which fail closed)
  * check the result themselves.
  */
+/** Paths this process has already complained about. See {@link loadCollectionsForCli}. */
+const warnedMissingCollectionsPaths = new Set<string>();
+
 export async function loadCollectionsForCli(collectionsPath: string): Promise<CollectionConfig[]> {
     // Note: a relative --collections path resolves against the *current working
     // directory*, not the backend package. When invoked via the generated npm
@@ -320,7 +323,17 @@ export async function loadCollectionsForCli(collectionsPath: string): Promise<Co
     // different relative path can silently point at the wrong place.
     const resolvedPath = path.resolve(collectionsPath);
     const collections: CollectionConfig[] = [];
-    if (!fs.existsSync(resolvedPath)) {
+    if (!fs.existsSync(resolvedPath) && !warnedMissingCollectionsPaths.has(resolvedPath)) {
+        // Once per path per process. `db push` re-enters this from
+        // `schemaCommand`, `generatePostgresDdlCommand` and the Atlas argv
+        // assembly, so the same four lines were printed four times — sixteen
+        // lines of identical text ahead of the real output.
+        //
+        // An explicitly typed `--collections` never reaches here at all: it is
+        // refused at the entry point, before anything is generated. See
+        // `cli-collections-path.ts`. What is left is the default, which a
+        // headless project legitimately does not have.
+        warnedMissingCollectionsPaths.add(resolvedPath);
         outWarn(chalk.yellow(
             `  ⚠  Collections path not found: "${collectionsPath}"\n` +
             `     Resolved to: ${resolvedPath}\n` +
