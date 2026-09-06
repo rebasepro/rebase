@@ -1,38 +1,46 @@
 ---
 name: rebase-local-env-setup
-description: Bare minimum INITIAL setup for getting started with Rebase (Node.js, pnpm, PostgreSQL, Docker). Use ONLY for first-time setup. For updating or troubleshooting an existing environment, use the rebase-basics skill instead.
+description: Bare minimum INITIAL setup for getting started with Rebase — Node.js and pnpm, and nothing else. Use ONLY for first-time setup. For updating or troubleshooting an existing environment, use the rebase-basics skill instead.
 ---
 
 # Rebase Local Environment Setup
 
-This skill documents the bare minimum setup required for a full Rebase development experience. Before starting to use any Rebase features, you MUST verify that each of the following steps has been completed.
+Everything a Rebase project needs to run is **Node.js and pnpm**. There is no
+database to install, no Docker to start and no connection string to write:
+`rebase dev` starts a managed PostgreSQL for the project when `DATABASE_URL` is
+unset, which is how `rebase init` leaves it.
 
-> **IMPORTANT FOR AGENTS:** This skill is for INITIAL setup only. For day-to-day development, CLI commands, schema workflow, and troubleshooting, use the `rebase-basics` skill instead.
+> **IMPORTANT FOR AGENTS:** This skill is for INITIAL setup only. For day-to-day
+> development, CLI commands, the schema workflow and troubleshooting, use the
+> `rebase-basics` skill instead.
 
-## Monorepo Structure
+> **IMPORTANT FOR AGENTS:** Do not install PostgreSQL, start a Docker container
+> or write a `DATABASE_URL` "to get started". Every one of those is a step the
+> managed database exists to remove, and a `DATABASE_URL` you set is never
+> overridden — so writing one is how a project ends up pointed at a database
+> nobody meant to use.
 
-Rebase is a **pnpm monorepo**. Understanding the layout is essential before setup:
+## What a scaffolded project looks like
+
+`rebase init <name>` writes a pnpm workspace. There is no monorepo to clone and
+no `app/` directory:
 
 ```
-rebase/
-├── app/                        # The main application
-│   ├── .env.example            # Full env var reference — copy to .env
-│   ├── .env                    # Your local env config (git-ignored)
-│   ├── backend/                # Hono API server (runs on port 3001)
-│   ├── frontend/               # Vite + React UI (runs on port 5173)
-│   ├── config/
-│   │   └── collections/        # Collection definitions (schema-as-code)
-│   └── generated/              # Auto-generated SDK, Drizzle schema, etc.
-├── packages/                   # Shared libraries (workspace packages)
-│   ├── cli/                    # @rebasepro/cli — provides the `rebase` binary
-│   ├── server/                 # Core server framework, env loading
-│   ├── server-postgres/        # PostgreSQL adapter (Drizzle ORM)
-│   ├── studio/                 # Studio admin panel
-│   ├── ui/                     # @rebasepro/ui component library
-│   ├── client/                 # Client SDK
-│   └── ...                     # Other packages (auth, types, utils, etc.)
-├── pnpm-workspace.yaml         # Workspace configuration
-└── package.json                # Root package.json
+<project-root>/
+├── frontend/             # React admin panel (Vite)
+├── backend/
+│   ├── functions/        # Custom backend functions, one file per function
+│   └── crons/            # Scheduled jobs, one file per job
+├── config/               # Collections and storageAuthorize, shared by both
+│   └── collections/
+├── scripts/              # Standalone SDK scripts
+├── .rebase/              # Dev-server state and the managed database's data
+├── rebase.json           # Which apps this project deploys, and how
+├── .env                  # Written by `rebase init`; DATABASE_URL commented out
+├── .env.example          # Every variable, documented inline
+├── docker-compose.yml    # Optional PostgreSQL container — not needed by default
+├── pnpm-workspace.yaml
+└── package.json
 ```
 
 ## 1. Verify Node.js
@@ -40,7 +48,7 @@ rebase/
 - **Action**: Run `node --version`.
 - **Required**: Node.js **>= 22.22.0** — what a scaffolded project's `engines` declares and
   what `.nvmrc` pins. Not a recommendation: an older runtime fails at install.
-- **Handling**: If Node.js is missing or < v22:
+- **Handling**: If Node.js is missing or below that:
 
   **Recommended: Use a Node Version Manager**
 
@@ -73,123 +81,96 @@ Rebase uses pnpm exclusively as its package manager. Never use npm or yarn.
   ```
 - **Verify**: Run `pnpm --version` again to confirm.
 
-## 3. Verify PostgreSQL
+## 3. The database — there is nothing to do
 
-Rebase's backend requires a PostgreSQL database (v14+).
+With `DATABASE_URL` unset, `rebase dev` starts a **managed PostgreSQL (PGlite)**
+for this project, with its data under `.rebase/`. It then generates the Drizzle
+schema from the project's collections and creates the missing tables at boot.
+The first run needs no schema command.
 
-### Option A: Docker (Recommended)
+**Do not run `rebase db push` on it.** `db push` plans changes with
+[Atlas](https://atlasgo.io/), which needs a second empty database to compare
+against, and the managed one serves exactly one — the command refuses, by
+design. Boot's additive apply is the development loop; see `rebase-basics` for
+what it deliberately leaves alone.
 
-> **IMPORTANT FOR AGENTS:** Docker requires **Docker Desktop** (macOS/Windows) or an alternative like **colima** (macOS). If `docker info` fails, guide the user to install [Docker Desktop](https://www.docker.com/products/docker-desktop/) or run `brew install colima && colima start`.
+`rebase db url` prints whichever database is in use, managed or not.
 
-```bash
-# Check if Docker is running
-docker info
+### Only if the user asks for their own PostgreSQL
 
-# Start a PostgreSQL container
-docker run --name rebase-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=rebase \
-  -p 5432:5432 \
-  -d pgvector/pgvector:pg18
-```
-
-> The image is `pgvector/pgvector:pg18`, not stock `postgres`. It is the official
-> Postgres image with the `vector` extension built in, and a `{ type: "vector" }`
-> property compiles to `VECTOR(n)`, which stock Postgres answers with
-> `type "vector" does not exist` — a boot failure whose cause is an image.
-
-### Option B: Local Installation
-
-- **macOS**: `brew install postgresql@17 && brew services start postgresql@17`
-  - If 17 is unavailable: `brew install postgresql@16 && brew services start postgresql@16`
-- **Linux**: `sudo apt-get install postgresql` (installs the distro default, typically 14–16)
-- **Windows**: Download from [postgresql.org](https://www.postgresql.org/download/)
-
-### Verify Connection
+Uncomment `DATABASE_URL` in `.env` and point it at a database you run:
 
 ```bash
-psql -h localhost -U postgres -d rebase -c "SELECT 1;"
+DATABASE_URL=postgresql://username:password@localhost:5432/your_database
 ```
 
-## 4. Configure Environment Variables
+A `DATABASE_URL` that is set always wins, and one pointing anywhere other than
+this machine is left alone entirely. With your own database you also get the
+migration commands the managed one cannot offer (`rebase db push`,
+`rebase db generate && rebase db migrate`).
 
-Rebase ships an `.env.example` in the `app/` directory with every variable documented. The recommended approach:
+The scaffold ships a `docker-compose.yml` if a container is what the user wants:
 
 ```bash
-cp app/.env.example app/.env
+docker compose up -d db
 ```
 
-Then edit `app/.env` with your local values. The **minimum** required variables for local dev:
+> The compose service uses `pgvector/pgvector`, not stock `postgres`. It is the
+> Postgres image with the `vector` extension built in, and a
+> `{ type: "vector" }` property compiles to `VECTOR(n)`, which stock Postgres
+> answers with `type "vector" does not exist` — a boot failure whose cause is an
+> image.
 
-| Variable | Example Value | Notes |
-|---|---|---|
-| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/rebase` | **Required.** Must be a valid URL. |
-| `JWT_SECRET` | *(any string ≥ 32 characters)* | If left blank, an ephemeral secret is auto-generated in dev mode — **sessions are invalidated on every server restart**. Set an explicit value for persistent sessions. |
-| `VITE_API_URL` | `http://localhost:3001` | Must match the backend URL. The backend defaults to port `3001`. |
-| `PORT` | `3001` | Backend listen port (default: `3001`). |
-| `FRONTEND_URL` | `http://localhost:5173` | Used in password-reset / verification emails. |
+`rebase dev --docker` uses that container instead of the managed database;
+`rebase dev --no-db` starts neither and expects you to set `DATABASE_URL`.
 
-> **WARNING FOR AGENTS:** `JWT_SECRET` must be ≥ 32 characters (enforced by Zod validation in `packages/server/src/env.ts`). In dev mode, if `JWT_SECRET` is empty the server auto-generates a random one — but this means **all user sessions are lost on every restart**. Always recommend setting an explicit value:
-> ```env
-> JWT_SECRET=change-me-to-a-random-string-at-least-32-chars-long!!
-> ```
+## 4. Environment variables
 
-A minimal `.env` looks like:
+`rebase init` already wrote `.env` from `.env.example`, with `DATABASE_URL`
+commented out. Nothing else is required for a first run — `JWT_SECRET` and the
+ports have working development defaults.
 
-```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rebase
-JWT_SECRET=change-me-to-a-random-string-at-least-32-chars-long!!
-VITE_API_URL=http://localhost:3001
-```
+| Variable | Notes |
+|---|---|
+| `DATABASE_URL` | **Leave it unset** for the managed database. Set it and yours wins, always. |
+| `JWT_SECRET` | Must be ≥ 32 characters. Left empty, dev mode auto-generates an ephemeral one — **every session is invalidated on each restart**. Set an explicit value for persistent sessions. |
+| `PORT` / `VITE_API_URL` | Configure `rebase start`, the production server. `rebase dev` derives its ports from the project path and ignores them. |
+| `FRONTEND_URL` | Used in password-reset and verification emails. |
 
-## 5. Install Dependencies
+> **WARNING FOR AGENTS:** `rebase dev` binds ports **derived from the project's
+> path**, not 3001/5173, so several Rebase projects can run side by side. Use the
+> two URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
 
-From the monorepo root:
+## 5. Install dependencies
+
+From the project root:
 
 ```bash
 pnpm install
 ```
 
-This installs all workspace packages (`packages/*`, `app/frontend`, `app/backend`).
+That installs the workspace: `frontend`, `backend` and `config`.
 
-## 6. The `rebase` CLI
-
-The `rebase` command comes from the `@rebasepro/cli` package (`packages/cli`). After `pnpm install`, it is available via the workspace `node_modules/.bin/rebase` binary.
-
-Run CLI commands from the **`app/`** directory (or monorepo root if configured):
-
-```bash
-# From the app/ directory:
-rebase schema generate   # Generate Drizzle schema from collection definitions
-rebase db push           # Push schema directly to the database (dev workflow)
-rebase dev               # Start the dev server (frontend + backend)
-rebase --help            # Show all available commands
-```
-
-## 7. Initialize the Database
-
-```bash
-rebase schema generate
-rebase db push
-```
-
-## 8. Start the Development Server
+## 6. Start the development server
 
 ```bash
 pnpm run dev
 ```
 
-This starts both:
-- **Frontend** (Vite) at `http://localhost:5173`
-- **Backend** (Hono) at `http://localhost:3001`
+This is `rebase dev`. It starts the managed database (if `DATABASE_URL` is
+unset), applies the schema, and runs both halves with hot reload:
 
-The frontend proxies API requests to the backend via `VITE_API_URL`.
+- **Backend** — REST API, auth, storage, WebSocket
+- **Frontend** — the Rebase admin panel
+
+The project's other scripts are `pnpm run build`, `pnpm run start`,
+`pnpm run schema:generate`, `pnpm run db:push`, `pnpm run db:generate`,
+`pnpm run db:migrate`, `pnpm run generate:sdk`, `pnpm run skills:install` and
+`pnpm run example`.
 
 ## References
 
 - **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
-- **Env reference:** `app/.env.example` (69 vars with inline documentation)
-- **Env validation:** `packages/server/src/env.ts` (Zod schema + auto-generated secrets logic)
-- **CLI source:** `packages/cli/src/cli.ts` (all commands and help text)
+- **Env reference:** the project's own `.env.example`, written by `rebase init`
+- **CLI reference:** `rebase --help`, and the tables in the `rebase-basics` skill

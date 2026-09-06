@@ -119,13 +119,21 @@ function rules(root) {
     }
 
     // ── Admin surfaces live under /api/admin ───────────────────────────────
+    //
+    // Every spelling of the legacy path, not just "mounted at": the narrow
+    // version was green while `rebase-cron-jobs` still told an agent to mount
+    // routes at `/api/cron` in one place and issue `POST /api/cron/:id/trigger`
+    // in twelve others. The one sentence that has to name the legacy path — the
+    // one calling it legacy — opts out with `<!-- docs-verify: ignore -->`.
     const init = read(root, "packages/server/src/init.ts");
     for (const surface of ["cron", "schema"]) {
         if (!init.includes(`/admin/${surface}\``)) continue;
         out.push({
             what: `the \`${surface}\` API path`,
             expected: `/api/admin/${surface}`,
-            forbid: new RegExp(`mounted at \`/api/${surface}\``),
+            // `(?![\w-])` rather than `\b`: `/api/schema-editor` is its own
+            // route and not the legacy spelling of this one.
+            forbid: new RegExp(`/api/${surface}(?![\\w-])`),
             hint: `init.ts mounts it canonically at \`/api/admin/${surface}\`; \`/api/${surface}\` is a deprecated alias`
         });
     }
@@ -197,7 +205,7 @@ function checkComponentNames(root, findings) {
     }
     if (!exported.size) return;
 
-    for (const rel of globSync(`${SKILLS}/*/*.md`, { cwd: root })) {
+    for (const rel of globSync(`${SKILLS}/**/*.md`, { cwd: root })) {
         const lines = read(root, rel).split("\n");
         const skip = ignoredLines(lines);
         lines.forEach((line, i) => {
@@ -220,12 +228,62 @@ function checkComponentNames(root, findings) {
     }
 }
 
+/**
+ * Paths a skill tells an agent to `cd` into or `cp` from, against the scaffold.
+ *
+ * `rebase-local-env-setup` opened with the *framework's* monorepo — `app/`,
+ * `packages/`, `app/generated/` — and told the agent to `cp app/.env.example
+ * app/.env`. None of those exists in a project `rebase init` writes, which is
+ * the only project an agent following that skill is ever standing in. The
+ * instruction failed, and the agent's next move was to invent a layout.
+ *
+ * Scope is deliberately narrow, because a false positive here teaches people to
+ * delete correct sentences:
+ *
+ *  - A `cp` **source** is always a claim that a file is there.
+ *  - A `cd` target is checked only when it contains a `/`. A bare `cd my-app`
+ *    is the directory `rebase init` just made, not a claim about the layout.
+ *  - Anything holding a placeholder (`<`, `$`, `{`, `*`, `~`) or an absolute
+ *    path is skipped: it is a shape, not a path.
+ */
+function checkScaffoldPaths(root, findings) {
+    const TEMPLATE = "packages/cli/templates/template";
+    if (!existsSync(path.join(root, TEMPLATE))) return;
+
+    const placeholder = /[<>${}*~]/;
+    for (const rel of globSync(`${SKILLS}/**/*.md`, { cwd: root })) {
+        const lines = read(root, rel).split("\n");
+        const skip = ignoredLines(lines);
+        lines.forEach((line, i) => {
+            if (skip.has(i + 1)) return;
+            const claimed = [];
+            const copy = /(?:^|[`;&|(]\s*|\s)cp\s+(?:-[\w-]+\s+)*([^\s`"']+)/.exec(line);
+            if (copy) claimed.push(copy[1]);
+            const enter = /(?:^|[`;&|(]\s*|\s)cd\s+([^\s`"';&|]+)/.exec(line);
+            if (enter && enter[1].includes("/")) claimed.push(enter[1]);
+
+            for (const claim of claimed) {
+                const clean = claim.replace(/\/$/, "");
+                if (!clean || clean === "." || clean === "..") continue;
+                if (placeholder.test(clean) || clean.startsWith("/")) continue;
+                if (existsSync(path.join(root, TEMPLATE, clean))) continue;
+                findings.push({
+                    file: `${rel}:${i + 1}`,
+                    message:
+                        `\`${claim}\` does not exist in the project \`rebase init\` writes ` +
+                        `(${TEMPLATE}/). A skill's paths are the ones the agent will type.`
+                });
+            }
+        });
+    }
+}
+
 /** Counts a skill states about something this repository can count. */
 function checkCounts(root, findings) {
     const studio = read(root, "packages/studio/src/components/RebaseStudio.tsx");
     const tools = [...studio.matchAll(/view:\s*suspense\(</g)].length;
     if (!tools) return;
-    for (const rel of globSync(`${SKILLS}/rebase-studio/*.md`, { cwd: root })) {
+    for (const rel of globSync(`${SKILLS}/rebase-studio/**/*.md`, { cwd: root })) {
         const lines = read(root, rel).split("\n");
         const skip = ignoredLines(lines);
         lines.forEach((line, i) => {
@@ -255,7 +313,7 @@ export function checkSkillClaims(root) {
         };
     }
 
-    for (const rel of globSync([`${SKILLS}/*/*.md`, `${SKILLS}/*/*/*.md`], { cwd: root })) {
+    for (const rel of globSync(`${SKILLS}/**/*.md`, { cwd: root })) {
         if (!existsSync(path.join(root, rel))) continue;
         scanned++;
         const lines = read(root, rel).split("\n");
@@ -275,6 +333,7 @@ export function checkSkillClaims(root) {
 
     checkComponentNames(root, findings);
     checkCounts(root, findings);
+    checkScaffoldPaths(root, findings);
 
     return { findings, scanned };
 }
