@@ -145,35 +145,50 @@ test("the build banner introduces no colliding identifiers", () => {
  * Fixing one copy would have left the other. The rule is: tsx if it is there,
  * because the project's code is TypeScript whatever the driver's entry is.
  */
-test("no driver spawn chooses its interpreter by file extension", () => {
-    const offenders = [];
-    const sources = [
-        "packages/cli/src/commands/db.ts",
-        "packages/cli/src/commands/schema.ts"
-    ];
-    for (const rel of sources) {
+/**
+ * The driver is spawned from exactly one place.
+ *
+ * Three places used to spawn it, each with its own copy of "tsx for a `.ts`
+ * entry, `node` otherwise". That was right only while the driver shipped
+ * `src/`; once it shipped `dist/cli.js` all three switched to plain `node`, and
+ * the driver loads the project's TypeScript in process — so `schema stale`
+ * silently checked nothing and `db push` could not create `rebase.users`,
+ * failing on a virgin database at "Applying RLS policies".
+ *
+ * Two were found and fixed; the third was missed, because a guard that asks
+ * "does a tsx lookup appear somewhere earlier in this file" is satisfied by an
+ * unrelated one. Counting copies is the check that cannot be fooled that way,
+ * and one copy is the number that makes the question unnecessary.
+ */
+test("the driver CLI is spawned from exactly one place", () => {
+    const sites = [];
+    for (const rel of ["packages/cli/src/commands/db.ts", "packages/cli/src/commands/schema.ts"]) {
         const file = path.join(ROOT, rel);
         if (!existsSync(file)) continue;
-        const source = readFileSync(file, "utf8");
-        // `const isTs = pluginCli.endsWith(".ts")` and friends: the shape that
-        // makes the interpreter a function of the artifact rather than of what
-        // the child has to load.
-        for (const [i, line] of source.split("\n").entries()) {
-            if (/pluginCli\s*\.endsWith\(\s*["']\.ts["']\s*\)/.test(line) && !/^\s*(\/\/|\*)/.test(line)) {
-                // Allowed only as a fallback guard AFTER tsx was looked for.
-                const before = source.split("\n").slice(0, i).join("\n");
-                if (!/resolveTsx\(/.test(before)) {
-                    offenders.push(`${rel}:${i + 1} → ${line.trim()}`);
-                }
-            }
-        }
+        readFileSync(file, "utf8").split("\n").forEach((line, i) => {
+            if (/execa\([^)]*\[\s*pluginCli/.test(line)) sites.push(`${rel}:${i + 1} → ${line.trim()}`);
+        });
     }
-    assert.deepEqual(
-        offenders,
-        [],
-        "These choose tsx-or-node from the driver entry's extension, before looking for tsx:\n  " +
-        offenders.join("\n  ") +
-        "\n\nThe driver loads the project's TypeScript in process, so the interpreter has to be " +
-        "tsx whenever it is installed — regardless of whether the driver's own entry is .ts or .js."
+    assert.equal(
+        sites.length,
+        1,
+        `The driver CLI is spawned from ${sites.length} place(s):\n  ${sites.join("\n  ")}\n\n` +
+        "It must be spawned from `spawnDriverCli` alone. A second copy is a second chance for " +
+        "the interpreter rule to drift, and the driver loads the project's TypeScript in process."
+    );
+});
+
+test("that one place reaches for tsx before falling back to node", () => {
+    const source = readFileSync(path.join(ROOT, "packages/cli/src/commands/db.ts"), "utf8");
+    const fn = source.slice(source.indexOf("export async function spawnDriverCli"));
+    const body = fn.slice(0, fn.indexOf("\n}"));
+    assert.match(
+        body,
+        /resolveTsx\(/,
+        "spawnDriverCli must look for tsx: the driver loads the project's TypeScript collections."
+    );
+    assert.ok(
+        body.indexOf("resolveTsx(") < body.indexOf("execa("),
+        "spawnDriverCli must look for tsx BEFORE it spawns, not as an afterthought."
     );
 });

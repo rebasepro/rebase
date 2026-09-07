@@ -359,8 +359,29 @@ async function resolveDriverCli(): Promise<{
     return { projectRoot, backendDir, pluginCli, env };
 }
 
-/** Run the resolved driver CLI with the given child arguments. */
-async function execDriverCli(
+/**
+ * The one place this CLI spawns the driver's own CLI.
+ *
+ * There were three, each with its own copy of "tsx for a `.ts` entry, `node`
+ * otherwise". That rule was right only while the driver shipped `src/`; once it
+ * shipped `dist/cli.js` all three quietly switched to plain `node`, and the
+ * driver loads the PROJECT's TypeScript in process:
+ *
+ *   - `schema stale` reads the collections, could not resolve `./authors` onto
+ *     `authors.ts`, and answered "⏭ Not checked" while exiting 0;
+ *   - `db push` does the same in `ensureAuthTables`, so `rebase.users` was never
+ *     created and the push died at "Applying RLS policies" with
+ *     `relation "rebase.users" does not exist` — on a virgin database, which is
+ *     the documented bring-your-own-Postgres first run.
+ *
+ * Two were fixed and the third was missed, because three copies of a decision
+ * are three chances to miss one. There is one now, and a gate holds it at one.
+ *
+ * tsx whenever it is installed — a devDependency of every scaffold, for exactly
+ * this reason. Without it a `.ts` entry cannot run at all; a built entry still
+ * runs, and the subcommands that never touch the project's TypeScript still work.
+ */
+export async function spawnDriverCli(
     resolved: { projectRoot: string; backendDir: string; pluginCli: string; env: Record<string, string> },
     childArgs: string[],
     options: { quiet?: boolean } = {}
@@ -368,33 +389,16 @@ async function execDriverCli(
     const { projectRoot, backendDir, pluginCli, env } = resolved;
     const stdio = options.quiet ? "pipe" : "inherit";
 
-    /**
-     * tsx, whether the driver CLI is source or built.
-     *
-     * It used to be tsx only for a `.ts` entry, which happened to be right for
-     * as long as the driver shipped `src/`. Once it shipped `dist/cli.js`
-     * instead, this ran the built CLI under plain `node` — and some of its
-     * subcommands load the PROJECT's collections in process. `schema stale`
-     * does, so on every scaffold whose collections import each other (the stock
-     * one does) it failed to resolve them and reported "⏭ Not checked": a
-     * command that answers "is the generated schema stale?" with nothing at all,
-     * exiting 0, on the default project.
-     *
-     * Node cannot load a `.ts` file, and cannot resolve `./authors` or
-     * `./authors.js` onto `authors.ts`. tsx does both. It is a devDependency of
-     * every scaffold for exactly this reason.
-     */
     const tsxBin = resolveTsx(projectRoot);
-    if (tsxBin) {
-        await execa(tsxBin, [pluginCli, ...childArgs], { cwd: backendDir, stdio, env });
-        return;
+    if (!tsxBin && pluginCli.endsWith(".ts")) {
+        throw new Error(dependenciesNotInstalled(projectRoot));
     }
 
-    // No tsx. A `.ts` entry cannot run at all; a built one still runs, and the
-    // subcommands that do not touch the project's TypeScript still work.
-    if (pluginCli.endsWith(".ts")) throw new Error(dependenciesNotInstalled(projectRoot));
-    await execa("node", [pluginCli, ...childArgs], { cwd: backendDir, stdio, env });
+    await execa(tsxBin ?? "node", [pluginCli, ...childArgs], { cwd: backendDir, stdio, env });
 }
+
+/** @deprecated Use {@link spawnDriverCli}. Kept as the internal name callers use. */
+const execDriverCli = spawnDriverCli;
 
 /**
  * Run a `schema` subcommand through the active driver's CLI.
@@ -485,14 +489,7 @@ export async function runDriverDbCommand(
     // flag this CLI prints after every failure as the thing to re-run with.
     const childArgs = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "db"), process.cwd());
 
-    const isTs = pluginCli.endsWith(".ts");
-    if (isTs) {
-        const tsxBin = resolveTsx(projectRoot);
-        if (!tsxBin) throw new Error(dependenciesNotInstalled(projectRoot));
-        await execa(tsxBin, [pluginCli, ...childArgs], { cwd: backendDir, stdio: "inherit", env });
-        return;
-    }
-    await execa("node", [pluginCli, ...childArgs], { cwd: backendDir, stdio: "inherit", env });
+    await spawnDriverCli({ projectRoot, backendDir, pluginCli, env }, childArgs, options);
 }
 
 export async function dbCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {

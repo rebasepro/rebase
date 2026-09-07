@@ -15,6 +15,20 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 Five defects an end-to-end pass over a freshly installed project turned up.
 
+- **`rebase db push` could not finish against a database that had never booted.**
+  It died at "Step 3/3: Applying RLS policies" with `relation "rebase.users"
+  does not exist` — which is the documented bring-your-own-Postgres first run:
+  set `DATABASE_URL`, then push. The step before it, `ensureAuthTables`, exists
+  precisely to create that table and had failed one line earlier with a warning
+  nobody would connect to the error: it loads the project's collections to find
+  the one flagged `auth`, and could not resolve `./authors` onto `authors.ts`.
+
+  Third copy of the same rule. Two spawns of the driver CLI were fixed to take
+  tsx; this one was missed, because a guard that asks "does a tsx lookup appear
+  earlier in this file" is satisfied by an unrelated one. There is now a single
+  `spawnDriverCli`, and the gate counts spawn sites rather than inspecting them
+  — one copy is the number that makes the question unnecessary.
+
 - **`.env.example` named a port the project does not publish, with its
   `DATABASE_URL` uncommented.** `rebase init` derives a per-project database port
   and rewrites `docker-compose.yml` and `.env` with it. It left `.env.example` at
