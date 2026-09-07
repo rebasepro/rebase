@@ -171,6 +171,14 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
         "item": item.url
     }))
 } : null;
+// `twitter:image` follows `ogImage`. It used to be hardcoded to the site-wide
+// teaser, so every per-route card `generate_og_images.mjs` renders — and every
+// per-post one from `generate_blog_images.mjs` — was honoured by Facebook,
+// Slack and LinkedIn and ignored by X, which showed one picture for the whole
+// site. The declared type has to follow the file too, or a JPEG card is served
+// to crawlers announced as a PNG.
+const twitterImageType = /\.jpe?g$/.test(ogImage) ? "image/jpeg" : "image/png";
+
 ---
 
 <!DOCTYPE html>
@@ -322,10 +330,10 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content={title}>
     <meta name="twitter:description" content={description}>
-    <meta name="twitter:image:type" content="image/png">
+    <meta name="twitter:image:type" content={twitterImageType}>
     <meta name="twitter:image:width" content="1200">
     <meta name="twitter:image:height" content="630">
-    <meta name="twitter:image" content="https://rebase.pro/img/twitter_teaser.png">
+    <meta name="twitter:image" content={ogImage}>
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json" set:html={JSON.stringify(siteSchema)} />

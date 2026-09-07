@@ -10,6 +10,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "check:site": "node scripts/check_site.mjs",
+    "check:blog-images": "node scripts/generate_blog_images.mjs --check",
+    "generate:blog-images": "node scripts/generate_blog_images.mjs",
     "astro": "astro",
     "deploy": "run-s build && firebase deploy --only hosting --project rebase-578f2",
     "generate-llms": "node scripts/generate_llms_txt.js",
