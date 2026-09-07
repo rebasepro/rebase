@@ -34,7 +34,7 @@ rebase build
 Container Apps pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.18.1
+FROM rebasepro/server:0.19.0
 COPY dist-bundle /bundle
 ```
 

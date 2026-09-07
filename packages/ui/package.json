@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/ui",
-  "version": "0.18.1",
+  "version": "0.19.0",
   "description": "Rebase design system — React components and design tokens built on Radix UI, Tailwind CSS and lucide-react",
   "keywords": [
     "rebase",

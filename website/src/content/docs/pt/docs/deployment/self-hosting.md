@@ -87,7 +87,7 @@ Para um deploy real, prefira assar os dois numa imagem, o que também fixa
 exatamente o que roda:
 
 ```dockerfile
-FROM rebasepro/server:0.18.1
+FROM rebasepro/server:0.19.0
 COPY dist-bundle /bundle
 ```
 
@@ -156,7 +156,7 @@ O runtime é um contêiner comum escutando na porta `$PORT`, portanto, qualquer 
 
 ```toml
 [build]
-  image = "rebasepro/server:0.18.1"
+  image = "rebasepro/server:0.19.0"
 
 [http_service]
   internal_port = 8080
@@ -210,7 +210,7 @@ processos que cooperam. Ver
 ## Atualizando
 
 ```yaml
-image: rebasepro/server:0.18.1
+image: rebasepro/server:0.19.0
 ```
 
 Reinicie. Seu bundle permanece inalterado. Dentro de uma versão major do contrato de runtime, um bundle validado continua funcionando — veja [Compatibilidade](/docs/architecture/runtime-and-bundles/#compatibility).

@@ -46,7 +46,7 @@ Il est important de comprendre le rôle du manifeste, car c'est ce qu'un runtime
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.18.1", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.19.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -81,7 +81,7 @@ Deux numéros de version déterminent si un bundle et un runtime peuvent fonctio
 C'est pourquoi la mise à niveau de Rebase dans un déploiement auto-hébergé se résume à un changement de tag :
 
 ```yaml
-image: rebasepro/server:0.18.1   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.19.0   # a newer tag — your bundle is untouched
 ```
 
 ## Le développement utilise le même chemin
