@@ -2628,6 +2628,22 @@ backfilled after the fact.
 
 Five defects an end-to-end pass over a freshly installed project turned up.
 
+- **`.env.example` named a port the project does not publish, with its
+  `DATABASE_URL` uncommented.** `rebase init` derives a per-project database port
+  and rewrites `docker-compose.yml` and `.env` with it. It left `.env.example` at
+  the template's `localhost:5432` — and left its `DATABASE_URL` *set*, which
+  contradicts the rule the rest of the scaffold states in three places: unset
+  means the managed database.
+
+  Copying `.env.example` to `.env` is a near-universal habit, and on a machine
+  already running Postgres on 5432 — most developer machines — the result is not
+  a connection error. It is a successful connection to a different database,
+  which boot then provisions. Found exactly that way: a test harness read the
+  example file and spent three runs talking to the wrong server.
+
+  `init` now comments the line out and writes this project's port into it, and
+  into the `sslmode` illustration further down, so the file names one port.
+
 - **A dev database that fails to start now says why.** The daemon is detached, so
   its output goes to `pglite.log` rather than to the terminal, and both failure
   messages named that path instead of carrying its contents. That is a fair

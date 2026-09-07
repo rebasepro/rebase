@@ -1427,6 +1427,47 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
                 ].join("\n")
             );
 
+            // `.env.example` is copied to `.env` and then kept, as the reference
+            // that gets committed — so it is the one file in the project that
+            // still carries the template's defaults after everything else has
+            // been rewritten. Two of them are actively dangerous once the port
+            // is derived per project:
+            //
+            //   - its `DATABASE_URL` is UNCOMMENTED, contradicting the rule the
+            //     rest of the scaffold now states ("unset means the managed
+            //     database"), and
+            //   - it names `localhost:5432`, while this project's compose
+            //     publishes ${dbPort}.
+            //
+            // Copying `.env.example` to `.env` is a near-universal habit, and on
+            // a machine that already runs Postgres on 5432 — most developer
+            // machines — the result is not a connection failure. It is a
+            // successful connection to somebody else's database, which boot will
+            // then provision. Comment it out and give it this project's port.
+            const envExampleReference = path.join(targetDirectory, ".env.example");
+            if (fs.existsSync(envExampleReference)) {
+                let exampleContent = fs.readFileSync(envExampleReference, "utf-8");
+                exampleContent = exampleContent.replace(
+                    /^DATABASE_URL=postgresql:\/\/[^\n]*$/m,
+                    [
+                        "# Commented out on purpose — that is what selects the managed database.",
+                        "# To use the docker-compose Postgres this project ships instead:",
+                        "#   docker compose up -d db, then uncomment the line below in .env",
+                        "#   (with DATABASE_PASSWORD from that file, not the placeholder here).",
+                        `# DATABASE_URL=postgresql://rebase_app:changeme@127.0.0.1:${dbPort}/rebase?options=-c%20search_path%3Dpublic&sslmode=disable`
+                    ].join("\n")
+                );
+                // The prose further down illustrates `sslmode=disable` with a
+                // full DSN. It is commented and not meant to be copied whole,
+                // but a file that names two different ports for one database
+                // teaches the reader to distrust both.
+                exampleContent = exampleContent.replaceAll(
+                    "@localhost:5432/rebase",
+                    `@127.0.0.1:${dbPort}/rebase`
+                );
+                fs.writeFileSync(envExampleReference, exampleContent, "utf-8");
+            }
+
             // Also update docker-compose.yml with the dynamic host port if it has the default 5432 port mapping
             const dockerComposePath = path.join(targetDirectory, "docker-compose.yml");
             if (fs.existsSync(dockerComposePath)) {
