@@ -1,5 +1,5 @@
 ---
-sourceHash: a83732a379b7739b
+sourceHash: 0c9a50f6b49b5470
 title: Despliegue de Rebase en Scaleway
 description: Aprende a desplegar Rebase en Scaleway para una infraestructura en la nube segura y con base en Francia utilizando Contenedores Serverless.
 sidebar_label: Scaleway

@@ -1,5 +1,5 @@
 ---
-sourceHash: b8fb2609d1a27893
+sourceHash: 8cb714b94b58f0a9
 title: Beziehungen
 sidebar_label: Beziehungen
 description: Definieren Sie Eins-zu-Eins-, Eins-zu-Viele- und Viele-zu-Viele-SQL-Beziehungen zwischen Sammlungen mit Fremdschlüsseln, Verbindungstabellen und Multi-Hop-Joins.
@@ -320,8 +320,6 @@ relations: [
 | `"set default"` | Die FK-Spalte auf ihren Standardwert setzen |
 
 ### Was gilt, wenn Sie nichts angeben
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Der Standardwert für ein **erforderliches** `belongsTo` hat sich geändert. In
 0.17.3 ist er `ON DELETE CASCADE` — das Löschen eines Elternteils löscht seine

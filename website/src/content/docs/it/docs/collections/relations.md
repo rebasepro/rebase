@@ -1,5 +1,5 @@
 ---
-sourceHash: b8fb2609d1a27893
+sourceHash: 8cb714b94b58f0a9
 title: Relazioni
 sidebar_label: Relazioni
 description: Definisci relazioni SQL uno-a-uno, uno-a-molti e molti-a-molti tra collezioni con chiavi esterne, tabelle di giunzione e join multi-hop.
@@ -315,8 +315,6 @@ relations: [
 | `"set default"` | Imposta la colonna FK al suo valore predefinito |
 
 ### Cosa ottieni se non dici nulla
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Il valore predefinito per un `belongsTo` **obbligatorio** è cambiato. In 0.17.3 è
 `ON DELETE CASCADE` — eliminare un padre elimina i suoi figli — e da 0.18 è

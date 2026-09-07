@@ -1,5 +1,5 @@
 ---
-sourceHash: b8fb2609d1a27893
+sourceHash: 8cb714b94b58f0a9
 title: Relations
 sidebar_label: Relations
 description: Définir les relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre les collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.
@@ -314,8 +314,6 @@ relations: [
 | `"set default"` | Définir la colonne de clé étrangère à sa valeur par défaut |
 
 ### Ce que vous obtenez si vous ne dites rien
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 La valeur par défaut d'un `belongsTo` **obligatoire** a changé. En 0.17.3 c'est
 `ON DELETE CASCADE` — supprimer un parent supprime ses enfants — et à partir de

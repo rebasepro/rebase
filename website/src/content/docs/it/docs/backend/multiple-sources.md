@@ -1,5 +1,5 @@
 ---
-sourceHash: ec729d5ce6fb4036
+sourceHash: 32b4fa7fcbf16375
 title: Database e Bucket Multipli
 sidebar_label: Origini Multiple
 description: Instrada le collezioni verso database diversi e le proprietà verso bucket di archiviazione diversi, e configura ciascuno di essi dall'ambiente.
@@ -37,7 +37,7 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` è nuovo <span class="since-badge" data-since="0.18">Since 0.18</span>. `database()`, `bucket()` e `topic()`
+`queue()` è nuovo. `database()`, `bucket()` e `topic()`
 sono dichiarabili dalla 0.17, quindi un progetto sulla versione rilasciata
 dichiara quei tre e raggiunge il lavoro in background tramite `jobs.tasks`.
 
@@ -89,8 +89,6 @@ export default defineFunction((app, { rebase }) => {
 
 ### Vedere ciò che hai dichiarato
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 ```bash
 rebase resources            # elencale
 rebase resources --write    # rigenera rebase.resources.json
@@ -112,8 +110,6 @@ export const objects = bucket("objects", { engine: "custom:minio" });
 ```
 
 ### Correggere un kind già pubblicato
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Per gli autori di driver. La definizione registrata di un kind di risorsa è
 **congelata** nel momento in cui viene pubblicato un pacchetto che la contiene:
@@ -257,7 +253,7 @@ await signups.publish({ userId });
 ```
 
 Una coda è l'altra forma del lavoro in background: una lista di lavori con **un solo handler**, in cui il chiamante conserva l'id del job. Le code sono nuove
-<span class="since-badge" data-since="0.18">Since 0.18</span> — i topic sono arrivati con la 0.17.
+ — i topic sono arrivati con la 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");

@@ -1,5 +1,5 @@
 ---
-sourceHash: a3fccf5118b08dd0
+sourceHash: 595031b868350f1c
 title: Riferimento della CLI
 sidebar_label: CLI
 description: Comandi della CLI di Rebase per inizializzare progetti, generare schemi, migrare database e generare l'SDK.
@@ -22,8 +22,6 @@ pnpm dlx @rebasepro/cli <command>
 ```
 
 ## Output leggibile dalle macchine
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 `--json` è l'interruttore, e fuori dalla famiglia `cloud` è l'unico:
 `rebase status`, `rebase resources` e `rebase apps list` scrivono allora un
@@ -259,13 +257,13 @@ PostgreSQL non copia né elimina un database a cui è connesso qualcos'altro, e
 quel «qualcos'altro» di solito è il tuo `rebase dev`. `create` e `delete` dicono
 cosa sta tenendo aperto il database; `--force` disconnette prima quelle sessioni.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> Ogni branch è una copia completa su disco, quindi vanno ripuliti. `prune` rimuove
+ Ogni branch è una copia completa su disco, quindi vanno ripuliti. `prune` rimuove
 tre cose: una voce il cui database è stato eliminato fuori da Rebase, un database
 di branch la cui voce non è mai stata scritta e — solo con `--older-than` — i
 branch più vecchi di un'età che indichi tu. Chiede conferma prima di rimuovere
 qualsiasi cosa, a meno che tu non passi `--yes`.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` registra il branch in `.rebase/branch.json` e non modifica mai `.env`.
+ `switch` registra il branch in `.rebase/branch.json` e non modifica mai `.env`.
 Ha la precedenza su `DATABASE_URL` in `.env` e cede a `--database-url` o a una
 `DATABASE_URL` nella shell, così un flag sulla riga di comando batte sempre uno
 switch fatto prima. Eliminare il branch su cui ti trovi ti riporta al database
@@ -295,8 +293,6 @@ rebase apps config <app>     # what one app resolves to
 ```
 
 ### `rebase status`
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Tutto ciò che questo progetto dichiara, e se l'ambiente lo lega davvero:
 
@@ -343,7 +339,7 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
-`rebase resources --check` è nuovo <span class="since-badge" data-since="0.18">Since 0.18</span> — il flag che un job di CI usa per fallire su un `rebase.resources.json` che non
+`rebase resources --check` è nuovo — il flag che un job di CI usa per fallire su un `rebase.resources.json` che non
 corrisponde più al codice di configurazione.
 
 Una risorsa viene dichiarata nel codice di configurazione —

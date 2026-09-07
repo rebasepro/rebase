@@ -1,5 +1,5 @@
 ---
-sourceHash: b48cc9bf8ad4dcf3
+sourceHash: 9a78fa791d3bc114
 title: Distribuzione
 sidebar_label: Distribuzione
 description: Distribuisci il tuo progetto Rebase in produzione utilizzando Docker, piattaforme cloud o configurazioni manuali.
@@ -90,7 +90,7 @@ volumes:
   postgres_data:
 ```
 
-Le tre righe `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` sono nuove <span class="since-badge" data-since="0.18">Since 0.18</span>
+Le tre righe `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` sono nuove
 — nella 0.17.3 il primo account registrato diventa l'amministratore, anche in
 produzione. Vedi [Il tuo primo amministratore](#il-tuo-primo-amministratore) più
 sotto.
@@ -140,8 +140,6 @@ CLI.
 
 ## Il tuo primo amministratore
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 **Imposta `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` prima del primo avvio.** Ogni guida per piattaforma di questo sito rimanda qui, perché è l'unico passo che dall'esterno non si può più rimediare.
 
 Un database appena creato non ha utenti e, fuori dalla produzione, la politica di registrazione ammette la prima iscrizione e la promuove ad amministratore. Deve farlo: nominare un amministratore richiede un chiamante già autenticato, quindi un database vuoto senza quella regola è un vicolo cieco. Su un portatile la persona alla tastiera è l'operatore, ed è esattamente giusto così.
@@ -172,8 +170,6 @@ Impostale entrambe o nessuna: mezza credenziale è un refuso, e la distribuzione
 Accedi e cambia la password. È in chiaro dove hai messo il tuo ambiente.
 
 ## Lista di Controllo per la Produzione
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Prima di distribuire in produzione, assicurati di:
 

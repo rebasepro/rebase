@@ -1,5 +1,5 @@
 ---
-sourceHash: 44b8d8c5aa0525b6
+sourceHash: 4e5bbb20c71aa1cc
 title: Implementación de Rebase en Microsoft Azure
 description: Implemente su instancia de Rebase de forma segura en Azure utilizando Azure Database for PostgreSQL y Azure Container Apps.
 sidebar_label: Azure

@@ -1,5 +1,5 @@
 ---
-sourceHash: ac69f91f756be451
+sourceHash: 1d05731788adcf3d
 title: Rebase auf Google Cloud Platform bereitstellen
 description: Stellen Sie Ihre Rebase-Instanz sicher auf GCP bereit, indem Sie Cloud SQL und Cloud Run nutzen, mit Fokus auf EU-Rechenzentrumsregionen.
 sidebar_label: Google Cloud

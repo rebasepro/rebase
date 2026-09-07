@@ -1,5 +1,5 @@
 ---
-sourceHash: f6312cfcb6187cea
+sourceHash: 19ae5aa65ad4194e
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -106,9 +106,9 @@ respostas.
 | `JWT_ACCESS_EXPIRES_IN` | Tempo de vida do token de acesso | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Tempo de vida do token de atualização. Deslizante — cada rotação o renova, então ele governa quanto tempo uma sessão sobrevive à **inatividade**. | `400d` |
 | `ALLOW_REGISTRATION` | Permitir que novos usuários se registrem (`true`/`false`). Fora de produção o **primeiro** usuário sempre pode se registrar, diga o que disser isto — uma tabela de usuários vazia tem de admitir alguém, e esse alguém vira o administrador. Em produção (`NODE_ENV=production`) essa janela está fechada: uma tabela vazia recusa o registro de bootstrap com `SETUP_REQUIRED`, uma primeira conta criada por registro aberto é uma conta comum, e o administrador é nomeado com `REBASE_ADMIN_EMAIL` abaixo ou atribuído com a chave de serviço. O `.env.example` do scaffold a define como `true`; o padrão do framework é desligado. | `false` |
-| `DISABLE_SELF_REGISTRATION` <span class="since-badge" data-since="0.18">Since 0.18</span> | Interruptor de emergência. Fecha a janela de bootstrap do primeiro usuário que `ALLOW_REGISTRATION=false` deixa deliberadamente aberta fora de produção, de modo que o registro fica fechado mesmo contra um banco vazio. Combine-a com `REBASE_ADMIN_EMAIL` abaixo, ou a implantação não terá como produzir o seu primeiro chamador autenticado. Todo artefato de implantação publicado a define. | — |
-| `REBASE_ADMIN_EMAIL` <span class="since-badge" data-since="0.18">Since 0.18</span> | E-mail da primeira conta de administrador, criada no arranque **enquanto a tabela de usuários ainda está vazia** e nunca depois. É assim que uma implantação de produção ganha o seu administrador: o operador nomeia a primeira conta em vez de disputá-la com a internet. O arranque avisa quando a tabela está vazia em produção e isto fica sem definir. | — |
-| `REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span> | Senha dessa conta. Pelo menos 12 caracteres, ou é recusada e a conta não é criada. Troque-a após o primeiro login. | — |
+| `DISABLE_SELF_REGISTRATION` | Interruptor de emergência. Fecha a janela de bootstrap do primeiro usuário que `ALLOW_REGISTRATION=false` deixa deliberadamente aberta fora de produção, de modo que o registro fica fechado mesmo contra um banco vazio. Combine-a com `REBASE_ADMIN_EMAIL` abaixo, ou a implantação não terá como produzir o seu primeiro chamador autenticado. Todo artefato de implantação publicado a define. | — |
+| `REBASE_ADMIN_EMAIL` | E-mail da primeira conta de administrador, criada no arranque **enquanto a tabela de usuários ainda está vazia** e nunca depois. É assim que uma implantação de produção ganha o seu administrador: o operador nomeia a primeira conta em vez de disputá-la com a internet. O arranque avisa quando a tabela está vazia em produção e isto fica sem definir. | — |
+| `REBASE_ADMIN_PASSWORD` | Senha dessa conta. Pelo menos 12 caracteres, ou é recusada e a conta não é criada. Troque-a após o primeiro login. | — |
 | `MFA_ENCRYPTION_KEY` | Cifra todos os segredos TOTP armazenados. Sem definir, os segredos são cifrados com `JWT_SECRET` e o arranque avisa uma vez — então rotacionar `JWT_SECRET` desconecta todo mundo *e* deixa indecifrável cada autenticador cadastrado. Defina uma chave dedicada (32+ caracteres aleatórios) antes que alguém se cadastre. | — |
 | `MFA_ENCRYPTION_KEY_PREVIOUS` | A chave da qual se está rotacionando *para longe*. Defina as duas durante uma rotação: os segredos novos são escritos com `MFA_ENCRYPTION_KEY` e os existentes continuam legíveis, então ninguém fica trancado para fora da própria conta no meio da rotação. Remova-a assim que todos os segredos forem recifrados. | — |
 | `ALLOW_ANONYMOUS` | Habilita o login anônimo (`POST /api/auth/anonymous`). É opt-in, e deliberadamente não condicionado a `ALLOW_REGISTRATION`. | `false` |
@@ -300,7 +300,7 @@ Cada banco de dados, bucket e tópico que um projeto declara em
 dele. Os nomes base estão abaixo; um recurso que não é o padrão acrescenta `__` e
 a sua chave em maiúsculas, então um bucket chamado `media` lê
 `S3_BUCKET__MEDIA`. O `rebase status`
-<span class="since-badge" data-since="0.18">Since 0.18</span> imprime, por
+ imprime, por
 recurso, a variável exata que está lendo e se ela está definida.
 
 | Variável | Descrição | Padrão |

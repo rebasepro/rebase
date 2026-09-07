@@ -1,5 +1,5 @@
 ---
-sourceHash: 8375c766b4952cf8
+sourceHash: 087b1aa353fab6b5
 title: Inicio Rápido
 sidebar_label: Inicio Rápido
 description: Crea un nuevo proyecto Rebase y ejecútalo localmente en menos de 2 minutos.
@@ -128,8 +128,6 @@ Cuando abras la URL del frontend que imprimió `rebase dev`, verás la pantalla 
 1. Haz clic en **Registrarse**
 2. Introduce tu correo electrónico y contraseña
 3. Estás dentro — con acceso completo de administrador
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 `rebase init` también escribió `REBASE_ADMIN_EMAIL` y una `REBASE_ADMIN_PASSWORD` generada en `.env`. Aquí **no** son tus credenciales: `rebase dev` las ignora y lo dice al arrancar. Pertenecen a un arranque de producción — `docker compose up`, o cualquier cosa con `NODE_ENV=production` —, donde esta ventana de arranque está cerrada, porque el servidor responde en un nombre de host antes de que hayas escrito nada. Consulta [Tu primer administrador](/es/docs/getting-started/deployment#tu-primer-administrador).
 

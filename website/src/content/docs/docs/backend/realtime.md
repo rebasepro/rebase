@@ -410,8 +410,6 @@ One-way messages that do not expect a response (like `subscribe_collection`, `su
 
 ### When a channel frame is refused
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 A channel frame is fire-and-forget: `await channel.broadcast(...)` resolves when
 the frame is written to the socket, **not** when the server has accepted it. That
 is deliberate — a collaborative app broadcasts a cursor position sixty times a

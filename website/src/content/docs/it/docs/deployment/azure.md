@@ -1,5 +1,5 @@
 ---
-sourceHash: 44b8d8c5aa0525b6
+sourceHash: 4e5bbb20c71aa1cc
 title: Distribuzione di Rebase su Microsoft Azure
 description: Distribuisci la tua istanza Rebase in modo sicuro su Azure utilizzando Azure Database for PostgreSQL e Azure Container Apps.
 sidebar_label: Azure

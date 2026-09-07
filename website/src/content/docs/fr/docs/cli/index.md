@@ -1,5 +1,5 @@
 ---
-sourceHash: a3fccf5118b08dd0
+sourceHash: 595031b868350f1c
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération du SDK.
@@ -22,8 +22,6 @@ pnpm dlx @rebasepro/cli <command>
 ```
 
 ## Sortie exploitable par une machine
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 `--json` est l'interrupteur, et en dehors de la famille `cloud` c'est le seul :
 `rebase status`, `rebase resources` et `rebase apps list` écrivent alors une
@@ -262,13 +260,13 @@ connecté, et ce « quelque chose d'autre » est d'ordinaire votre propre
 `rebase dev`. `create` et `delete` nomment ce qui maintient la base ouverte ;
 `--force` déconnecte d'abord ces sessions.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> Chaque branche est une copie complète sur disque : il faut donc faire le ménage.
+ Chaque branche est une copie complète sur disque : il faut donc faire le ménage.
 `prune` supprime trois choses : une entrée dont la base a été supprimée en dehors
 de Rebase, une base de branche dont l'entrée n'a jamais été écrite, et — seulement
 avec `--older-than` — les branches plus anciennes que l'âge que vous indiquez.
 Elle demande confirmation avant toute suppression, sauf si vous passez `--yes`.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` consigne la branche dans `.rebase/branch.json` et ne modifie jamais
+ `switch` consigne la branche dans `.rebase/branch.json` et ne modifie jamais
 `.env`. Elle l'emporte sur `DATABASE_URL` dans `.env` et cède devant
 `--database-url` ou une `DATABASE_URL` du shell, si bien qu'un flag en ligne de
 commande prime toujours sur un switch effectué plus tôt. Supprimer la branche sur
@@ -299,8 +297,6 @@ rebase apps config <app>     # what one app resolves to
 ```
 
 ### `rebase status`
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Tout ce que ce projet déclare, et si l'environnement le relie réellement :
 
@@ -348,7 +344,7 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
-`rebase resources --check` est nouveau <span class="since-badge" data-since="0.18">Since 0.18</span> — le flag qu'un job de CI utilise pour échouer sur un `rebase.resources.json` qui
+`rebase resources --check` est nouveau — le flag qu'un job de CI utilise pour échouer sur un `rebase.resources.json` qui
 ne correspond plus au code de configuration.
 
 Une ressource est déclarée dans le code de configuration —

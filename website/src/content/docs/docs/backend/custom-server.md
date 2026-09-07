@@ -36,7 +36,7 @@ export const env = loadEnv({
 // env.STRIPE_SECRET_KEY → string        (validated, required)
 ```
 
-Importing `z` from `@rebasepro/server` is new <span class="since-badge" data-since="0.18">Since 0.18</span>. On 0.17 and
+Importing `z` from `@rebasepro/server` is new. On 0.17 and
 earlier the package exported no `z`: import it from `zod`, matching the major the
 runtime uses, and let your bundler dedupe the two copies.
 

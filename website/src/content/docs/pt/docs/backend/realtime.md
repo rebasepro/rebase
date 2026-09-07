@@ -1,5 +1,5 @@
 ---
-sourceHash: 89070c45c986e9fa
+sourceHash: 4f7a93fd3a8e67c8
 title: Tempo Real e WebSocket
 sidebar_label: Tempo Real
 description: Sincronização de dados em tempo real, canais de broadcast e rastreamento de presença via WebSocket.
@@ -412,8 +412,6 @@ Se o servidor não responder dentro dessa janela de 30 segundos, o cliente exclu
 Mensagens unidirecionais que não esperam resposta (como `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack` e `presence_state`) são resolvidas imediatamente na transmissão e não acionam timeouts.
 
 ### Quando um frame de canal é recusado
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Um frame de canal é fire-and-forget: `await channel.broadcast(...)` é resolvido
 quando o frame é escrito no socket, **não** quando o servidor o aceitou. Isso é

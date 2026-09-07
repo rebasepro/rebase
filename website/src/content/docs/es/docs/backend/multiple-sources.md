@@ -1,5 +1,5 @@
 ---
-sourceHash: ec729d5ce6fb4036
+sourceHash: 32b4fa7fcbf16375
 title: Múltiples bases de datos y buckets
 sidebar_label: Múltiples fuentes
 description: Enruta colecciones a diferentes bases de datos y propiedades a diferentes buckets de almacenamiento, y configura cada uno desde el entorno.
@@ -42,7 +42,7 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` es nuevo <span class="since-badge" data-since="0.18">Since 0.18</span>. `database()`, `bucket()` y `topic()`
+`queue()` es nuevo. `database()`, `bucket()` y `topic()`
 se pueden declarar desde 0.17, así que un proyecto en la versión publicada
 declara esos tres y llega al trabajo en segundo plano a través de `jobs.tasks`.
 
@@ -98,8 +98,6 @@ export default defineFunction((app, { rebase }) => {
 
 ### Ver lo que has declarado
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 ```bash
 rebase resources            # enumerarlos
 rebase resources --write    # regenerar rebase.resources.json
@@ -132,8 +130,6 @@ export const objects = bucket("objects", { engine: "custom:minio" });
 ```
 
 ### Corregir un kind que ya se ha publicado
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Para autores de drivers. La definición registrada de un kind de recurso queda
 **congelada** en cuanto se publica un paquete que la lleva: cada driver
@@ -297,7 +293,7 @@ await signups.publish({ userId });
 
 Una cola es la otra forma del trabajo en segundo plano: una lista de tareas con
 **un solo handler**, en la que quien llama se queda con el id del trabajo. Las
-colas son nuevas <span class="since-badge" data-since="0.18">Since 0.18</span> — los topics llegaron en 0.17.
+colas son nuevas — los topics llegaron en 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");

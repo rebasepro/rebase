@@ -1,5 +1,5 @@
 ---
-sourceHash: 9df2202ffe55b40c
+sourceHash: 9f1b7d5235fc2510
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes avec le système de tâches cron intégré de Rebase. Définissez les tâches comme des fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -99,7 +99,7 @@ Les valeurs de pas (`*/n`), les plages (`a-b`) et les listes (`a,b,c`) sont tout
 
 ## Référence de CronJobDefinition
 
-`timezone` est nouveau <span class="since-badge" data-since="0.18">Since 0.18</span> — en 0.17.3, un planning est toujours lu dans le
+`timezone` est nouveau — en 0.17.3, un planning est toujours lu dans le
 fuseau de l'hôte. Tout le reste de cette interface est déjà livré.
 
 ```typescript

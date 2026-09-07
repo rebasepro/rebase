@@ -147,8 +147,6 @@ rebase db migrate
 
 #### Baselining a database Rebase has already booted
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 Every Rebase boot ensures the schema, and `rebase db push` applies it directly. So a database that has ever run either one already has the tables and types the first migration would create, and `rebase db migrate` stops on `pq: type "posts_status" already exists (42710)`.
 
 Nothing is wrong with the migration — the database was provisioned another way. Record where it already is, then migrate normally:
@@ -175,7 +173,7 @@ rebase db branch delete feature_auth
 ```
 
 `rebase db branch switch` (and `switch --off`) and `rebase db branch prune`
-are new <span class="since-badge" data-since="0.18">Since 0.18</span>. `create`, `list`, `info` and `delete` shipped in 0.17.
+are new. `create`, `list`, `info` and `delete` shipped in 0.17.
 
 Each branch is a full copy of the database made with `CREATE DATABASE ... TEMPLATE`,
 so it needs a real PostgreSQL server and it costs the same disk as its source.

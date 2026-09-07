@@ -134,44 +134,15 @@ export function importedIdentifiers(text) {
  * even though this spelling of it never appeared in a release note.
  */
 const NOT_NEW = new Map([
-    ["rebase db branch info", "a subcommand of `rebase db branch`, released in 0.17"],
-    ["rebase auth reset-password", "shipped 2026-04, before the CHANGELOG quoted it"],
     // Widening the grammar turned these from prose into tokens. Each is an old
     // surface that the release notes happened never to quote in backticks.
-    ["callbacks", "the collection callbacks map, released well before 0.17"],
-    ["storagePublicRead", "an `initializeRebaseBackend` option since 0.14"],
-    ["zod", "the validation library the runtime has always used"],
-    ["alpha", "a sample branch name in a `rebase db branch` example, not an API"],
-    ["belongsTo", "the relation kind is old; what changed is its `onDelete` default, and `RESTRICT` is the token for that"],
-    ["saveEntityWithCallbacks", "an internal service method, unchanged; the Unreleased note is about where it is called from"],
-    ["deleteEntityWithCallbacks", "same service, same note"],
-    ["loadDeclaredStorageSources", "an internal loader being deleted, not a surface anyone can write"],
-    ["admin.browserCallbacks", "the admin build's own option, released in 0.16"],
     // One-word names of surfaces the product has had for releases. The wide
     // grammar turns each of them into a token, and each of them appears on
     // dozens of pages that are describing the released behaviour.
-    ["admin", "the `admin` block on a collection and on a property, since 0.12"],
-    ["kind", "a relation's `kind`, since relations were authored"],
-    ["required", "`validation: { required }`, since 0.12"],
-    ["validation", "the property `validation` block, since 0.12"],
-    ["defineCollection", "the collection factory, since 0.12"],
     // Surfaces the 0.18 notes name because they were FIXED or REMOVED, not
     // introduced. A note about an old surface is not a new feature, and badging
     // the pages that describe it would tell a reader on 0.17 that something they
     // already have is unavailable to them.
-    ["CORS_ORIGINS", "read since before 0.6; 0.18 fixes it being ignored in development"],
-    ["rebase cloud login", "shipped with `rebase cloud` in 0.10; 0.18 adds a warning to --password"],
-    ["rebase cloud rollback", "shipped with `rebase cloud`; 0.18 stops it refusing managed deploys"],
-    ["rebase dev --docker", "the flag existed and did nothing; 0.18 makes it start and reach the container"],
-    ["rebase init", "the scaffolder, since 0.9"],
-    ["page", "the `page` list parameter, since the REST surface existed; 0.18 only validates it"],
-    ["count()", "an SDK method since 0.13; 0.18 fixes its de-duplication key"],
-    ["afterSaveError", "the callback has always existed; what is new is the `error` it is passed"],
-    ["rebase.email", "declared on `RebaseServerClient` all along; 0.18 makes it present when mail is unconfigured"],
-    ["rebase.data", "being REMOVED at runtime, not added"],
-    ["basePath", "a `<Rebase>` prop being REMOVED because it never did anything; `useBuildUrlController` still takes one"],
-    ["baseCollectionPath", "same removal, same surviving hook parameter"],
-    ["text/plain", "a content type, not a Rebase surface"]
 ]);
 
 /**

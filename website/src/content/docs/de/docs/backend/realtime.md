@@ -1,5 +1,5 @@
 ---
-sourceHash: 89070c45c986e9fa
+sourceHash: 4f7a93fd3a8e67c8
 title: Echtzeit & WebSocket
 sidebar_label: Echtzeit
 description: Echtzeit-Datensynchronisation, Broadcast-Kanäle und Präsenz-Tracking über WebSocket.
@@ -412,8 +412,6 @@ Antwortet der Server nicht innerhalb dieses 30-Sekunden-Fensters, löscht der Cl
 Einwegnachrichten, die keine Antwort erwarten (wie `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack` und `presence_state`), werden sofort bei der Übertragung aufgelöst und lösen keine Timeouts aus.
 
 ### Wenn ein Kanal-Frame abgelehnt wird
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Ein Kanal-Frame ist Fire-and-Forget: `await channel.broadcast(...)` wird
 aufgelöst, sobald der Frame in den Socket geschrieben ist, **nicht**, wenn der

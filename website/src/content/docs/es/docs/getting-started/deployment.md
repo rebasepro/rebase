@@ -1,5 +1,5 @@
 ---
-sourceHash: b48cc9bf8ad4dcf3
+sourceHash: 9a78fa791d3bc114
 title: Despliegue
 sidebar_label: Despliegue
 description: Despliega tu proyecto Rebase a producción usando Docker, plataformas en la nube o configuraciones manuales.
@@ -90,7 +90,7 @@ volumes:
   postgres_data:
 ```
 
-Las tres líneas `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` son nuevas <span class="since-badge" data-since="0.18">Since 0.18</span>
+Las tres líneas `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` son nuevas
 — en 0.17.3 la primera cuenta registrada se convierte en la administradora,
 también en producción. Consulta [Tu primer
 administrador](#tu-primer-administrador) más abajo.
@@ -140,8 +140,6 @@ dentro del contenedor en marcha: la imagen de runtime se distribuye sin la CLI.
 
 ## Tu primer administrador
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 **Define `REBASE_ADMIN_EMAIL` y `REBASE_ADMIN_PASSWORD` antes del primer arranque.** Todas las guías por plataforma de este sitio apuntan aquí, porque es el único paso que no tiene arreglo desde fuera.
 
 Una base de datos recién creada no tiene usuarios, y fuera de producción la política de registro admite el primer alta y la promueve a administrador. Tiene que hacerlo: nombrar a un administrador exige un llamante ya autenticado, así que una base de datos vacía sin esa regla es un callejón sin salida. En un portátil, quien está al teclado es el operador, y eso es exactamente lo correcto.
@@ -172,8 +170,6 @@ Define ambas o ninguna: media credencial es una errata, y el despliegue que deja
 Inicia sesión y cambia la contraseña. Está en texto plano allí donde hayas puesto tu entorno.
 
 ## Lista de Verificación para Producción
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Antes de desplegar en producción, asegúrate de:
 

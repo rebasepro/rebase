@@ -1,5 +1,5 @@
 ---
-sourceHash: b48cc9bf8ad4dcf3
+sourceHash: 9a78fa791d3bc114
 title: Implantação
 sidebar_label: Implantação
 description: Implante seu projeto Rebase em produção usando Docker, plataformas de nuvem ou configurações manuais.
@@ -91,7 +91,7 @@ volumes:
   postgres_data:
 ```
 
-As três linhas `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` são novas <span class="since-badge" data-since="0.18">Since 0.18</span>
+As três linhas `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` são novas
 — na 0.17.3 a primeira conta registrada vira a administradora, em produção
 também. Veja [Seu primeiro administrador](#seu-primeiro-administrador) abaixo.
 
@@ -138,8 +138,6 @@ do contêiner em execução — a imagem de runtime não inclui a CLI.
 
 ## Seu primeiro administrador
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 **Defina `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` antes do primeiro arranque.** Todo guia por plataforma deste site aponta para cá, porque é o único passo que não tem conserto a partir de fora.
 
 Um banco recém-criado não tem usuários e, fora de produção, a política de registro aceita o primeiro cadastro e o promove a administrador. Ela precisa: nomear um administrador exige um chamador já autenticado, então um banco vazio sem essa regra é um beco sem saída. Num notebook, quem está ao teclado é o operador, e isso está exatamente certo.
@@ -170,8 +168,6 @@ Defina as duas ou nenhuma: meia credencial é um erro de digitação, e a implan
 Entre e troque a senha. Ela está em texto puro onde quer que você tenha colocado seu ambiente.
 
 ## Lista de Verificação para Produção
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Antes de implantar em produção, garanta:
 

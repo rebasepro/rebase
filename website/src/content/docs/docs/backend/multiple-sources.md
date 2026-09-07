@@ -41,7 +41,7 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` is new <span class="since-badge" data-since="0.18">Since 0.18</span>. `database()`, `bucket()` and `topic()`
+`queue()` is new. `database()`, `bucket()` and `topic()`
 have been declarable since 0.17, so a project on the released version declares
 those three and reaches background work through `jobs.tasks` instead.
 
@@ -95,8 +95,6 @@ export default defineFunction((app, { rebase }) => {
 
 ### Seeing what you declared
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 ```bash
 rebase resources            # list them
 rebase resources --write    # regenerate rebase.resources.json
@@ -129,8 +127,6 @@ export const objects = bucket("objects", { engine: "custom:minio" });
 ```
 
 ### Correcting a kind that has already shipped
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 For driver authors. A resource kind's registered definition is **frozen** once a
 package carrying it has been published: every published driver inlines its own
@@ -289,7 +285,7 @@ await signups.publish({ userId });
 
 A queue is the other shape of background work: a work list with **one
 handler**, where the caller holds the job's id. Queues are new
-<span class="since-badge" data-since="0.18">Since 0.18</span> — topics shipped in 0.17.
+ — topics shipped in 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");

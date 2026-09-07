@@ -1,5 +1,5 @@
 ---
-sourceHash: b8fb2609d1a27893
+sourceHash: 8cb714b94b58f0a9
 title: Relações
 sidebar_label: Relações
 description: Defina relações SQL um-para-um, um-para-muitos e muitos-para-muitos entre coleções com chaves estrangeiras, tabelas de junção e junções multi-salto.
@@ -311,8 +311,6 @@ relations: [
 | `"set default"` | Define a coluna FK para seu valor padrão |
 
 ### O que você obtém se não disser nada
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 O padrão para um `belongsTo` **obrigatório** mudou. Em 0.17.3 é
 `ON DELETE CASCADE` — eliminar um pai elimina os seus filhos — e a partir de 0.18

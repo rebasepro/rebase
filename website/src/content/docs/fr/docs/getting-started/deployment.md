@@ -1,5 +1,5 @@
 ---
-sourceHash: b48cc9bf8ad4dcf3
+sourceHash: 9a78fa791d3bc114
 title: Déploiement
 sidebar_label: Déploiement
 description: Déployez votre projet Rebase en production à l'aide de Docker, de plateformes cloud ou de configurations manuelles.
@@ -90,7 +90,7 @@ volumes:
   postgres_data:
 ```
 
-Les trois lignes `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` sont nouvelles <span class="since-badge" data-since="0.18">Since 0.18</span>
+Les trois lignes `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` sont nouvelles
 — en 0.17.3, le premier compte inscrit devient l'administrateur, en production
 aussi. Voir [Votre premier administrateur](#votre-premier-administrateur)
 ci-dessous.
@@ -141,8 +141,6 @@ est livrée sans la CLI.
 
 ## Votre premier administrateur
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 **Définissez `REBASE_ADMIN_EMAIL` et `REBASE_ADMIN_PASSWORD` avant le premier démarrage.** Chaque guide par plateforme de ce site renvoie ici, car c'est la seule étape qui n'a aucun recours depuis l'extérieur.
 
 Une base de données neuve n'a aucun utilisateur, et hors production la politique d'inscription accepte la première création de compte et la promeut administrateur. Il le faut : nommer un administrateur exige un appelant déjà authentifié, donc une base vide sans cette règle est une impasse. Sur un portable, la personne au clavier est l'exploitant, et c'est exactement ce qu'il faut.
@@ -173,8 +171,6 @@ Définissez les deux ou aucune : une demi-information d'identification est une f
 Connectez-vous et changez le mot de passe. Il est en clair là où vous avez déposé votre environnement.
 
 ## Liste de contrôle pour la production
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Avant de déployer en production, assurez-vous de :
 

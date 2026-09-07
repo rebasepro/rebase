@@ -1,5 +1,5 @@
 ---
-sourceHash: f6312cfcb6187cea
+sourceHash: 19ae5aa65ad4194e
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -108,9 +108,9 @@ Anfragen mit ihrer Sitzung gegen den Dev-Server stellen und die Antworten lesen.
 | `JWT_ACCESS_EXPIRES_IN` | Lebensdauer des Access-Tokens | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Lebensdauer des Refresh-Tokens. Gleitend — jede Rotation setzt sie neu an, sie bestimmt also, wie lange eine Sitzung **Inaktivität** überlebt. | `400d` |
 | `ALLOW_REGISTRATION` | Ermöglicht neuen Benutzern die Registrierung (`true`/`false`). Außerhalb der Produktion kann sich der **erste** Benutzer immer registrieren, was hier auch stehen mag — eine leere Benutzertabelle muss jemanden hereinlassen, und dieser jemand wird Administrator. In der Produktion (`NODE_ENV=production`) ist dieses Fenster geschlossen: Eine leere Tabelle weist die Bootstrap-Registrierung mit `SETUP_REQUIRED` ab, ein über offene Registrierung angelegtes erstes Konto ist ein gewöhnliches Konto, und der Administrator wird unten mit `REBASE_ADMIN_EMAIL` benannt oder per Service-Key zugewiesen. Die `.env.example` des Scaffolds setzt sie auf `true`; der Framework-Standard ist aus. | `false` |
-| `DISABLE_SELF_REGISTRATION` <span class="since-badge" data-since="0.18">Since 0.18</span> | Notschalter. Schließt das Bootstrap-Fenster für den ersten Benutzer, das `ALLOW_REGISTRATION=false` außerhalb der Produktion bewusst offen lässt — die Registrierung ist damit auch gegen eine leere Datenbank zu. Kombinieren Sie ihn mit `REBASE_ADMIN_EMAIL` unten, sonst hat die Bereitstellung keine Möglichkeit, ihren ersten angemeldeten Aufrufer zu erzeugen. Jedes ausgelieferte Bereitstellungsartefakt setzt ihn. | — |
-| `REBASE_ADMIN_EMAIL` <span class="since-badge" data-since="0.18">Since 0.18</span> | E-Mail-Adresse des ersten Admin-Kontos, beim Start angelegt, **solange die Benutzertabelle noch leer ist**, und danach nie wieder. So bekommt eine Produktionsbereitstellung ihren Administrator: Die Betreiberin benennt das erste Konto, statt mit dem Internet darum zu rennen. Der Start warnt, wenn die Tabelle in der Produktion leer ist und dies ungesetzt bleibt. | — |
-| `REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span> | Passwort für dieses Konto. Mindestens 12 Zeichen, sonst wird es abgelehnt und das Konto nicht angelegt. Ändern Sie es nach der ersten Anmeldung. | — |
+| `DISABLE_SELF_REGISTRATION` | Notschalter. Schließt das Bootstrap-Fenster für den ersten Benutzer, das `ALLOW_REGISTRATION=false` außerhalb der Produktion bewusst offen lässt — die Registrierung ist damit auch gegen eine leere Datenbank zu. Kombinieren Sie ihn mit `REBASE_ADMIN_EMAIL` unten, sonst hat die Bereitstellung keine Möglichkeit, ihren ersten angemeldeten Aufrufer zu erzeugen. Jedes ausgelieferte Bereitstellungsartefakt setzt ihn. | — |
+| `REBASE_ADMIN_EMAIL` | E-Mail-Adresse des ersten Admin-Kontos, beim Start angelegt, **solange die Benutzertabelle noch leer ist**, und danach nie wieder. So bekommt eine Produktionsbereitstellung ihren Administrator: Die Betreiberin benennt das erste Konto, statt mit dem Internet darum zu rennen. Der Start warnt, wenn die Tabelle in der Produktion leer ist und dies ungesetzt bleibt. | — |
+| `REBASE_ADMIN_PASSWORD` | Passwort für dieses Konto. Mindestens 12 Zeichen, sonst wird es abgelehnt und das Konto nicht angelegt. Ändern Sie es nach der ersten Anmeldung. | — |
 | `MFA_ENCRYPTION_KEY` | Verschlüsselt jedes gespeicherte TOTP-Geheimnis. Ungesetzt werden die Geheimnisse stattdessen mit `JWT_SECRET` verschlüsselt und der Start warnt einmal — eine Rotation von `JWT_SECRET` meldet also alle ab *und* macht jeden eingerichteten Authenticator unentschlüsselbar. Setzen Sie einen eigenen Schlüssel (32+ zufällige Zeichen), bevor sich jemand einrichtet. | — |
 | `MFA_ENCRYPTION_KEY_PREVIOUS` | Der Schlüssel, *von dem weg* rotiert wird. Setzen Sie während einer Rotation beide: Neue Geheimnisse werden mit `MFA_ENCRYPTION_KEY` geschrieben, vorhandene bleiben lesbar, sodass niemand mitten in der Rotation aus dem eigenen Konto ausgesperrt wird. Entfernen Sie ihn, sobald jedes Geheimnis neu verschlüsselt ist. | — |
 | `ALLOW_ANONYMOUS` | Aktiviert die anonyme Anmeldung (`POST /api/auth/anonymous`). Opt-in, und bewusst nicht an `ALLOW_REGISTRATION` gekoppelt. | `false` |
@@ -304,7 +304,7 @@ Jede Datenbank, jeder Bucket und jedes Topic, das ein Projekt in
 ihm benannt sind. Die Basisnamen stehen unten; eine nicht-standardmäßige
 Ressource hängt `__` und ihren Schlüssel in Großbuchstaben an, ein Bucket namens
 `media` liest also `S3_BUCKET__MEDIA`. `rebase status`
-<span class="since-badge" data-since="0.18">Since 0.18</span> gibt pro Ressource
+ gibt pro Ressource
 die exakte Variable aus, die es liest, und ob sie gesetzt ist.
 
 | Variable | Beschreibung | Standard |

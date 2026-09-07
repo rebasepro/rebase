@@ -1,5 +1,5 @@
 ---
-sourceHash: a3fccf5118b08dd0
+sourceHash: 595031b868350f1c
 title: Referência da CLI
 sidebar_label: CLI
 description: Comandos da CLI do Rebase para inicializar projetos, gerar schemas, migrar bancos de dados e gerar o SDK.
@@ -22,8 +22,6 @@ pnpm dlx @rebasepro/cli <command>
 ```
 
 ## Saída legível por máquina
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 `--json` é a chave, e fora da família `cloud` é a única: `rebase status`,
 `rebase resources` e `rebase apps list` passam então a colocar um único valor
@@ -259,13 +257,13 @@ e essa «outra coisa» costuma ser o seu próprio `rebase dev`. `create` e `dele
 nomeiam o que está mantendo o banco aberto; `--force` desconecta essas sessões
 primeiro.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> Cada branch é uma cópia completa em disco, então é preciso limpá-los. `prune`
+ Cada branch é uma cópia completa em disco, então é preciso limpá-los. `prune`
 remove três coisas: uma entrada cujo banco foi descartado fora do Rebase, um banco
 de branch cuja entrada nunca foi escrita e — apenas com `--older-than` — branches
 mais antigos do que a idade que você indicar. Ele pergunta antes de remover
 qualquer coisa, a não ser que você passe `--yes`.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` registra o branch em `.rebase/branch.json` e nunca edita o `.env`. Ele
+ `switch` registra o branch em `.rebase/branch.json` e nunca edita o `.env`. Ele
 tem precedência sobre `DATABASE_URL` no `.env` e perde para `--database-url` ou
 para uma `DATABASE_URL` no shell, de modo que uma flag na linha de comando sempre
 supera um switch feito antes. Excluir o branch em que você está devolve você ao
@@ -296,8 +294,6 @@ rebase apps config <app>     # what one app resolves to
 ```
 
 ### `rebase status`
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Tudo o que este projeto declara, e se o ambiente realmente o vincula:
 
@@ -343,7 +339,7 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
-`rebase resources --check` é novo <span class="since-badge" data-since="0.18">Since 0.18</span> — a flag que um job de CI usa para falhar em um `rebase.resources.json` que não
+`rebase resources --check` é novo — a flag que um job de CI usa para falhar em um `rebase.resources.json` que não
 corresponde mais ao código de configuração.
 
 Um recurso é declarado no código de configuração — `database("analytics")`,

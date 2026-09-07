@@ -1,5 +1,5 @@
 ---
-sourceHash: ec729d5ce6fb4036
+sourceHash: 32b4fa7fcbf16375
 title: Múltiplos Bancos de Dados e Buckets
 sidebar_label: Múltiplas Fontes
 description: Especifique rotas de coleções para diferentes bancos de dados e propriedades para diferentes buckets de armazenamento, e configure cada um a partir do ambiente.
@@ -37,7 +37,7 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` é novo <span class="since-badge" data-since="0.18">Since 0.18</span>. `database()`, `bucket()` e `topic()`
+`queue()` é novo. `database()`, `bucket()` e `topic()`
 são declaráveis desde a 0.17, então um projeto na versão lançada declara esses
 três e alcança o trabalho em segundo plano através de `jobs.tasks`.
 
@@ -89,8 +89,6 @@ export default defineFunction((app, { rebase }) => {
 
 ### Ver o que você declarou
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 ```bash
 rebase resources            # listá-los
 rebase resources --write    # regerar rebase.resources.json
@@ -112,8 +110,6 @@ export const objects = bucket("objects", { engine: "custom:minio" });
 ```
 
 ### Corrigir um kind que já foi publicado
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Para autores de drivers. A definição registada de um kind de recurso fica
 **congelada** assim que um pacote que a transporta é publicado: cada driver
@@ -256,7 +252,7 @@ await signups.publish({ userId });
 ```
 
 Uma fila é a outra forma de trabalho em segundo plano: uma lista de trabalhos com **um único handler**, em que quem chama fica com o id do job. As filas são novas
-<span class="since-badge" data-since="0.18">Since 0.18</span> — os tópicos chegaram na 0.17.
+ — os tópicos chegaram na 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");

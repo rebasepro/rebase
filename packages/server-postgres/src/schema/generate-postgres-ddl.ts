@@ -138,7 +138,7 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
     }
 };
 
-const main = async () => {
+export const main = async () => {
     const collectionsFilePathArg = process.argv.find(arg => arg.startsWith("--collections="));
     const collectionsFilePath = collectionsFilePathArg ? collectionsFilePathArg.split("=")[1] : process.argv[2];
 

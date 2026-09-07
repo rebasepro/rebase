@@ -1,5 +1,5 @@
 ---
-sourceHash: 9df2202ffe55b40c
+sourceHash: 9f1b7d5235fc2510
 title: Cron-Jobs
 sidebar_label: Cron-Jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.
@@ -99,7 +99,7 @@ Schrittwerte (`*/n`), Bereiche (`a-b`) und Listen (`a,b,c`) werden alle unterst�
 
 ## CronJobDefinition Referenz
 
-`timezone` ist neu <span class="since-badge" data-since="0.18">Since 0.18</span> — in 0.17.3 wird ein Zeitplan immer in der Zone des
+`timezone` ist neu — in 0.17.3 wird ein Zeitplan immer in der Zone des
 Hosts gelesen. Alles Übrige an dieser Schnittstelle ist bereits ausgeliefert.
 
 ```typescript

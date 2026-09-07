@@ -1,5 +1,5 @@
 ---
-sourceHash: 03df1518e08ca072
+sourceHash: 4e456b0d449b82c5
 title: Geração de Esquema
 sidebar_label: Geração de Esquema
 description: Gere esquemas Drizzle ORM a partir das definições de coleções, crie migrações SQL e mantenha seu banco de dados sincronizado com a CLI da Rebase.
@@ -124,8 +124,6 @@ rebase db migrate
 - Rastreia quais migrações foram aplicadas
 
 #### Definir uma baseline num banco de dados que o Rebase já arrancou
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Cada arranque do Rebase assegura o esquema, e `rebase db push` aplica-o diretamente. Um banco de dados em que qualquer um dos dois já tenha corrido já tem as tabelas e os tipos que a primeira migração criaria, e `rebase db migrate` para em `pq: type "posts_status" already exists (42710)`.
 

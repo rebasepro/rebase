@@ -44,6 +44,55 @@ import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
 
 const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * A script this CLI spawns, and how to run it.
+ *
+ * Four commands — `schema generate`, the DDL plan, `introspect` and the schema
+ * doctor — run as child processes, located by path relative to this file. That
+ * path used to be `<dir>/schema/<name>.ts`, which worked only because `files`
+ * shipped `src`. When the tarball stopped shipping `src`, every one of those
+ * commands broke for every npm consumer at once: the file was simply absent,
+ * and the parent CLI reported the absence as "Dependencies are not installed"
+ * at projects that had installed perfectly. 0.18.0 shipped that way — a
+ * scaffolded project's first `rebase dev` could not regenerate its schema and
+ * every `GET /api/data/*` answered `Table not found for collection 'posts'`.
+ *
+ * The build emits each of them beside this file, so a published copy carries
+ * the command surface as an artifact. Source still wins where there is no
+ * build, which is how the monorepo runs before `pnpm build`.
+ *
+ * **The interpreter is tsx either way, and that is not incidental.** These
+ * scripts load the *project's* collection files, which are TypeScript and
+ * import each other as `./authors.js` — the extension TypeScript tells you to
+ * write. Node resolves that literally and fails on a file that does not exist;
+ * tsx maps it back. Running the built `.js` under plain `node` therefore fails
+ * on the user's code rather than on ours, one directory further from anything
+ * the error mentions.
+ */
+function resolveChildScript(name: string):
+    | { ok: true; bin: string; script: string }
+    | { ok: false; reason: "script" | "tsx" } {
+    const built = path.join(__cliDirname, "schema", `${name}.js`);
+    const source = path.join(__cliDirname, "schema", `${name}.ts`);
+    const script = fs.existsSync(built) ? built : fs.existsSync(source) ? source : null;
+    if (!script) return { ok: false, reason: "script" };
+
+    const tsxBin = resolveLocalBin("tsx");
+    if (!tsxBin) return { ok: false, reason: "tsx" };
+
+    return { ok: true, bin: tsxBin, script };
+}
+
+/** What to print when {@link resolveChildScript} cannot produce a command. */
+function childScriptError(what: string, reason: "script" | "tsx"): string {
+    if (reason === "tsx") {
+        return `✗ Could not find the tsx binary, which ${what} needs to read your collection files. `
+            + "Install your project's dependencies and try again.";
+    }
+    return `✗ The driver's ${what} is missing. This copy of @rebasepro/server-postgres is `
+        + "incomplete — reinstall it, or run its build if you are working in the monorepo.";
+}
+
 
 
 async function loadEnv(): Promise<void> {
@@ -1364,10 +1413,9 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
         }
     );
 
-    const ddlScript = path.join(__cliDirname, "schema", "generate-postgres-ddl.ts");
-    const tsxBin = resolveLocalBin("tsx");
-    if (!tsxBin) {
-        outError(chalk.red("✗ Could not find tsx binary."));
+    const ddl = resolveChildScript("generate-postgres-ddl");
+    if (!ddl.ok) {
+        outError(chalk.red(childScriptError("DDL generator", ddl.reason)));
         process.exit(1);
     }
 
@@ -1375,8 +1423,8 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
     const outputPath = argsList["--output"] || path.join("drizzle", "schema.sql");
 
     const cmdParts = [
-        tsxBin,
-        ddlScript,
+        ddl.bin,
+        ddl.script,
         `--collections=${collectionsPath}`,
         `--output=${outputPath}`
     ];
@@ -1520,15 +1568,9 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
 
         // Here we just invoke the local generate-drizzle-schema.ts since we are inside the postgresql-backend
         // If installed in node_modules, __cliDirname is node_modules/@rebasepro/server-postgres/dist or src.
-        const generatorScript = path.join(__cliDirname, "schema", "generate-drizzle-schema.ts");
-        if (!fs.existsSync(generatorScript)) {
-            outError(chalk.red(`✗ Could not find generate-drizzle-schema.ts at ${generatorScript}`));
-            process.exit(1);
-        }
-
-        const tsxBin = resolveLocalBin("tsx");
-        if (!tsxBin) {
-            outError(chalk.red("✗ Could not find tsx binary."));
+        const generator = resolveChildScript("generate-drizzle-schema");
+        if (!generator.ok) {
+            outError(chalk.red(childScriptError("schema generator", generator.reason)));
             process.exit(1);
         }
 
@@ -1541,8 +1583,8 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         out("");
 
         const cmdParts = [
-            tsxBin,
-            generatorScript,
+            generator.bin,
+            generator.script,
             `--collections=${collectionsPath}`,
             `--output=${outputPath}`
         ];
@@ -1584,15 +1626,9 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
             }
         );
 
-        const introspectScript = path.join(__cliDirname, "schema", "introspect-db.ts");
-        if (!fs.existsSync(introspectScript)) {
-            outError(chalk.red(`✗ Could not find introspect-db.ts at ${introspectScript}`));
-            process.exit(1);
-        }
-
-        const tsxBin = resolveLocalBin("tsx");
-        if (!tsxBin) {
-            outError(chalk.red("✗ Could not find tsx binary."));
+        const introspect = resolveChildScript("introspect-db");
+        if (!introspect.ok) {
+            outError(chalk.red(childScriptError("introspection script", introspect.reason)));
             process.exit(1);
         }
 
@@ -1603,8 +1639,8 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
         out("");
 
         const cmdParts = [
-            tsxBin,
-            introspectScript,
+            introspect.bin,
+            introspect.script,
             `--output=${outputPath}`,
             ...(argsList["--force"] ? ["--force"] : []),
             ...(argsList["--schema"] ? [`--schema=${argsList["--schema"]}`] : [])
@@ -1643,15 +1679,9 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
         }
     );
 
-    const doctorScript = path.join(__cliDirname, "schema", "doctor-cli.ts");
-    if (!fs.existsSync(doctorScript)) {
-        outError(chalk.red(`✗ Could not find doctor.ts at ${doctorScript}`));
-        process.exit(1);
-    }
-
-    const tsxBin = resolveLocalBin("tsx");
-    if (!tsxBin) {
-        outError(chalk.red("✗ Could not find tsx binary."));
+    const doctor = resolveChildScript("doctor-cli");
+    if (!doctor.ok) {
+        outError(chalk.red(childScriptError("doctor script", doctor.reason)));
         process.exit(1);
     }
 
@@ -1660,8 +1690,8 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
     const sdkPath = parsedArgs["--sdk"] || path.join("..", "generated", "sdk", "database.types.ts");
 
     const cmdParts = [
-        tsxBin,
-        doctorScript,
+        doctor.bin,
+        doctor.script,
         `--collections=${collectionsPath}`,
         `--schema=${schemaPath}`,
         `--sdk=${sdkPath}`,

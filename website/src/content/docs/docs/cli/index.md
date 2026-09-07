@@ -22,8 +22,6 @@ pnpm dlx @rebasepro/cli <command>
 
 ## Machine-readable output
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 `--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources` and `rebase apps list` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
 
 ## Commands
@@ -243,12 +241,12 @@ PostgreSQL will not copy or drop a database anything else is connected to, and
 the usual "anything else" is your own `rebase dev`. `create` and `delete` name
 what is holding the database open; `--force` disconnects those sessions first.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> Every branch is a full copy on disk, so they need clearing out. `prune` removes
+ Every branch is a full copy on disk, so they need clearing out. `prune` removes
 three things: an entry whose database was dropped outside Rebase, a branch
 database whose entry was never written, and — only with `--older-than` — branches
 past an age you name. It asks before removing anything unless you pass `--yes`.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
+ `switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
 takes precedence over `DATABASE_URL` in `.env` and loses to `--database-url` or a
 `DATABASE_URL` in the shell, so a flag on the command line always outranks a
 switch made earlier. Deleting the branch you are on returns you to the main
@@ -277,8 +275,6 @@ rebase apps config <app>     # what one app resolves to
 ```
 
 ### `rebase status`
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Everything this project declares, and whether the environment actually binds it:
 
@@ -324,7 +320,7 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
-`rebase resources --check` is new <span class="since-badge" data-since="0.18">Since 0.18</span> — the flag a CI job uses to fail
+`rebase resources --check` is new — the flag a CI job uses to fail
 on a `rebase.resources.json` that no longer matches the config code.
 
 A resource is declared in config code — `database("analytics")`,

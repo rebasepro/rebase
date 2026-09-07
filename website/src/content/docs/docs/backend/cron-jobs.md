@@ -113,7 +113,7 @@ Step values (`*/n`), ranges (`a-b`), and lists (`a,b,c`) are all supported.
 
 ## CronJobDefinition Reference
 
-`timezone` is new <span class="since-badge" data-since="0.18">Since 0.18</span> — on 0.17.3 a schedule is always read in the
+`timezone` is new — on 0.17.3 a schedule is always read in the
 host's own zone. Everything else on this interface has shipped.
 
 ```typescript
@@ -538,8 +538,6 @@ export default job;
 ```
 
 ## Crons in the resource graph
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Every cron file is also a declaration. `rebase resources` lists it under the
 name of the file — the same id the scheduler runs it as and the Studio shows —

@@ -89,7 +89,7 @@ volumes:
   postgres_data:
 ```
 
-The three `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` lines are new <span class="since-badge" data-since="0.18">Since 0.18</span>
+The three `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` lines are new
 — on 0.17.3 the first account to register becomes the administrator, in
 production too. See [Your first admin](#your-first-admin) below.
 
@@ -133,8 +133,6 @@ Either way it runs from a project checkout, not inside the running container —
 the runtime image ships without the CLI.
 
 ## Your first admin
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 **Set `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` before the first boot.**
 Every platform guide on this site points here, because this is the one step that
@@ -193,8 +191,6 @@ Sign in and change the password. It is sitting in plain text wherever you put
 your environment.
 
 ## Production Checklist
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Before deploying to production, ensure:
 

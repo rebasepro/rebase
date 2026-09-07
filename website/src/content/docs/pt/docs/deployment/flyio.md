@@ -1,5 +1,5 @@
 ---
-sourceHash: b4130f0ffba10745
+sourceHash: 837027696308134e
 title: Implementando Rebase no Fly.io
 description: Aprenda a implementar o Rebase globalmente ou a restringi-lo a centros de dados europeus usando o Fly.io.
 sidebar_label: Fly.io

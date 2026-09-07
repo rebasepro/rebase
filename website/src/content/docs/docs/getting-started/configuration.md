@@ -104,9 +104,9 @@ answers.
 | `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime. Sliding — every rotation re-ups it, so this governs how long a session survives **inactivity**. | `400d` |
 | `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). Outside production the **first** user can always register, whatever this says — an empty user table has to admit somebody, and that somebody becomes the admin. In production (`NODE_ENV=production`) that window is closed: an empty table refuses the bootstrap registration with `SETUP_REQUIRED`, a first account created through open registration is an ordinary account, and the admin is named with `REBASE_ADMIN_EMAIL` below or assigned with the service key. The scaffold's `.env.example` sets it to `true`; the framework default is off. | `false` |
-| `DISABLE_SELF_REGISTRATION` <span class="since-badge" data-since="0.18">Since 0.18</span> | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open outside production, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
-| `REBASE_ADMIN_EMAIL` <span class="since-badge" data-since="0.18">Since 0.18</span> | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a production deployment gets its admin: the operator names the first account instead of racing the internet for it. Boot warns when the table is empty in production and this is unset. | — |
-| `REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span> | Password for that account. At least 12 characters, or it is refused and the account is not created. Change it after the first sign-in. | — |
+| `DISABLE_SELF_REGISTRATION` | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open outside production, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
+| `REBASE_ADMIN_EMAIL` | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a production deployment gets its admin: the operator names the first account instead of racing the internet for it. Boot warns when the table is empty in production and this is unset. | — |
+| `REBASE_ADMIN_PASSWORD` | Password for that account. At least 12 characters, or it is refused and the account is not created. Change it after the first sign-in. | — |
 | `MFA_ENCRYPTION_KEY` | Encrypts every stored TOTP secret. Unset, the secrets are encrypted with `JWT_SECRET` instead and boot warns once — so rotating `JWT_SECRET` signs everybody out *and* leaves every enrolled authenticator undecryptable. Set a dedicated key (32+ random characters) before anyone enrols. | — |
 | `MFA_ENCRYPTION_KEY_PREVIOUS` | The key being rotated *away* from. Set both during a rotation: new secrets are written with `MFA_ENCRYPTION_KEY` and existing ones are still readable, so nobody is locked out of their own account mid-rotation. Remove it once every secret has been re-encrypted. | — |
 | `ALLOW_ANONYMOUS` | Enable anonymous sign-in (`POST /api/auth/anonymous`). Opt-in, and deliberately not gated by `ALLOW_REGISTRATION`. | `false` |
@@ -295,7 +295,7 @@ Every database, bucket and topic a project declares in `config/resources.ts` is
 bound by environment variables named after it. The base names are below; a
 non-default resource appends `__` and its key in upper case, so a bucket called
 `media` reads `S3_BUCKET__MEDIA`. `rebase status`
-<span class="since-badge" data-since="0.18">Since 0.18</span> prints, per resource,
+ prints, per resource,
 the exact variable it is reading and whether it is set.
 
 | Variable | Description | Default |

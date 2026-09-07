@@ -1,5 +1,5 @@
 ---
-sourceHash: a83732a379b7739b
+sourceHash: 0c9a50f6b49b5470
 title: Implementando Rebase no Scaleway
 description: Aprenda como implementar o Rebase no Scaleway para uma infraestrutura de nuvem segura e baseada na França usando Containers Serverless.
 sidebar_label: Scaleway

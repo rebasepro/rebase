@@ -1,5 +1,5 @@
 ---
-sourceHash: b48cc9bf8ad4dcf3
+sourceHash: 9a78fa791d3bc114
 title: Bereitstellung
 sidebar_label: Bereitstellung
 description: Stellen Sie Ihr Rebase-Projekt mit Docker, Cloud-Plattformen oder manuellen Setups in der Produktion bereit.
@@ -91,7 +91,7 @@ volumes:
   postgres_data:
 ```
 
-Die drei `REBASE_ADMIN_*`- / `DISABLE_SELF_REGISTRATION`-Zeilen sind neu <span class="since-badge" data-since="0.18">Since 0.18</span>
+Die drei `REBASE_ADMIN_*`- / `DISABLE_SELF_REGISTRATION`-Zeilen sind neu
 — in 0.17.3 wird das erste registrierte Konto zum Administrator, auch in der
 Produktion. Siehe [Ihr erster Administrator](#ihr-erster-administrator) weiter
 unten.
@@ -140,8 +140,6 @@ laufenden Container — das Runtime-Image wird ohne die CLI ausgeliefert.
 
 ## Ihr erster Administrator
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 **Setzen Sie `REBASE_ADMIN_EMAIL` und `REBASE_ADMIN_PASSWORD` vor dem ersten Start.** Jede Plattformanleitung auf dieser Seite verweist hierher, denn dies ist der eine Schritt, für den es von außen keine Reparatur gibt.
 
 Eine frische Datenbank hat keine Benutzer, und außerhalb der Produktion lässt die Registrierungsrichtlinie die erste Anmeldung zu und macht sie zum Administrator. Das muss so sein: Um einen Administrator zu ernennen, braucht es einen bereits angemeldeten Aufrufer — eine leere Datenbank ohne diese Regel ist eine Sackgasse. Auf einem Laptop ist die Person an der Tastatur der Betreiber, und genau das ist richtig so.
@@ -172,8 +170,6 @@ Setzen Sie beide oder keine: eine halbe Zugangsdatenangabe ist ein Tippfehler, u
 Melden Sie sich an und ändern Sie das Passwort. Es liegt im Klartext dort, wo Sie Ihre Umgebungsvariablen abgelegt haben.
 
 ## Produktions-Checkliste
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Bevor Sie in die Produktion bereitstellen, stellen Sie sicher:
 

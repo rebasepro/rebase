@@ -306,8 +306,6 @@ the pre-1.0 `auth` schema is still checked.
 
 ### policy-authenticated-tautology
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 **Policy admits every signed-in caller to every row.** High.
 
 The corrected form of the check above — `rebase.uid() IS NOT NULL AND rebase.uid() <>

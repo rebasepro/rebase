@@ -1,5 +1,5 @@
 ---
-sourceHash: 9df2202ffe55b40c
+sourceHash: 9f1b7d5235fc2510
 title: Tarefas Cron
 sidebar_label: Tarefas Cron
 description: Agende tarefas em segundo plano recorrentes com o sistema de tarefas cron integrado do Rebase. Defina tarefas como arquivos TypeScript, monitore-as no Studio e gerencie-as via API REST.
@@ -99,7 +99,7 @@ Valores de passo (`*/n`), intervalos (`a-b`) e listas (`a,b,c`) são todos supor
 
 ## Referência de CronJobDefinition
 
-`timezone` é novo <span class="since-badge" data-since="0.18">Since 0.18</span> — em 0.17.3 um agendamento é sempre lido no fuso do
+`timezone` é novo — em 0.17.3 um agendamento é sempre lido no fuso do
 anfitrião. Todo o resto desta interface já foi lançado.
 
 ```typescript

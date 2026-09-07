@@ -1,5 +1,5 @@
 ---
-sourceHash: ec729d5ce6fb4036
+sourceHash: 32b4fa7fcbf16375
 title: Bases de données et buckets multiples
 sidebar_label: Sources multiples
 description: Acheminez les collections vers différentes bases de données et les propriétés vers différents buckets de stockage, et configurez chacune d'elles depuis l'environnement.
@@ -44,7 +44,7 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` est nouveau <span class="since-badge" data-since="0.18">Since 0.18</span>. `database()`, `bucket()` et `topic()`
+`queue()` est nouveau. `database()`, `bucket()` et `topic()`
 sont déclarables depuis 0.17 : un projet sur la version publiée déclare donc ces
 trois-là et atteint le travail en arrière-plan via `jobs.tasks`.
 
@@ -100,8 +100,6 @@ export default defineFunction((app, { rebase }) => {
 
 ### Voir ce que vous avez déclaré
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 ```bash
 rebase resources            # les lister
 rebase resources --write    # régénérer rebase.resources.json
@@ -135,8 +133,6 @@ export const objects = bucket("objects", { engine: "custom:minio" });
 ```
 
 ### Corriger un kind déjà publié
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Pour les auteurs de drivers. La définition enregistrée d'un kind de ressource
 est **figée** dès qu'un paquet la contenant est publié : chaque driver publié
@@ -301,7 +297,7 @@ await signups.publish({ userId });
 
 Une file est l'autre forme du travail en arrière-plan : une liste de travaux
 avec **un seul handler**, où l'appelant conserve l'id de la tâche. Les files
-sont nouvelles <span class="since-badge" data-since="0.18">Since 0.18</span> — les topics sont arrivés en 0.17.
+sont nouvelles — les topics sont arrivés en 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");

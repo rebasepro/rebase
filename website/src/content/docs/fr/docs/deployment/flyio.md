@@ -1,5 +1,5 @@
 ---
-sourceHash: b4130f0ffba10745
+sourceHash: 837027696308134e
 title: Déploiement de Rebase sur Fly.io
 description: Découvrez comment déployer Rebase globalement ou le restreindre aux centres de données européens avec Fly.io.
 sidebar_label: Fly.io

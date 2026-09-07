@@ -85,7 +85,7 @@ the tables at boot.
 rather than fixed ones, so they differ between projects and between machines.
 The first account you register becomes the admin — on your machine. A
 production deployment names its admin instead, with `REBASE_ADMIN_EMAIL` and
-`REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span> (see [Configuration](/docs/getting-started/configuration/)).
+`REBASE_ADMIN_PASSWORD` (see [Configuration](/docs/getting-started/configuration/)).
 
 To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 `pnpm run dev` again.
@@ -250,8 +250,6 @@ When you open the frontend URL `rebase dev` printed, you'll see the login screen
 1. Click **Sign Up**
 2. Enter your email and password
 3. You're in — with full admin access
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 `rebase init` also wrote `REBASE_ADMIN_EMAIL` and a generated `REBASE_ADMIN_PASSWORD` into `.env`. Those are not your credentials here: `rebase dev` ignores them and says so at boot. They belong to a production boot — `docker compose up`, or anything with `NODE_ENV=production` — where this bootstrap window is closed, because the server answers on a hostname before you have typed anything. See [Your first admin](/docs/getting-started/deployment#your-first-admin).
 
@@ -644,9 +642,9 @@ answers.
 | `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime. Sliding — every rotation re-ups it, so this governs how long a session survives **inactivity**. | `400d` |
 | `ALLOW_REGISTRATION` | Allow new users to register (`true`/`false`). Outside production the **first** user can always register, whatever this says — an empty user table has to admit somebody, and that somebody becomes the admin. In production (`NODE_ENV=production`) that window is closed: an empty table refuses the bootstrap registration with `SETUP_REQUIRED`, a first account created through open registration is an ordinary account, and the admin is named with `REBASE_ADMIN_EMAIL` below or assigned with the service key. The scaffold's `.env.example` sets it to `true`; the framework default is off. | `false` |
-| `DISABLE_SELF_REGISTRATION` <span class="since-badge" data-since="0.18">Since 0.18</span> | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open outside production, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
-| `REBASE_ADMIN_EMAIL` <span class="since-badge" data-since="0.18">Since 0.18</span> | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a production deployment gets its admin: the operator names the first account instead of racing the internet for it. Boot warns when the table is empty in production and this is unset. | — |
-| `REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span> | Password for that account. At least 12 characters, or it is refused and the account is not created. Change it after the first sign-in. | — |
+| `DISABLE_SELF_REGISTRATION` | Kill switch. Closes the first-user bootstrap window that `ALLOW_REGISTRATION=false` deliberately leaves open outside production, so registration is shut even against an empty database. Pair it with `REBASE_ADMIN_EMAIL` below, or the deployment has no way to produce its first signed-in caller. Every shipped deployment artifact sets it. | — |
+| `REBASE_ADMIN_EMAIL` | Email of the first admin account, created at boot **while the user table is still empty** and never afterwards. This is how a production deployment gets its admin: the operator names the first account instead of racing the internet for it. Boot warns when the table is empty in production and this is unset. | — |
+| `REBASE_ADMIN_PASSWORD` | Password for that account. At least 12 characters, or it is refused and the account is not created. Change it after the first sign-in. | — |
 | `MFA_ENCRYPTION_KEY` | Encrypts every stored TOTP secret. Unset, the secrets are encrypted with `JWT_SECRET` instead and boot warns once — so rotating `JWT_SECRET` signs everybody out *and* leaves every enrolled authenticator undecryptable. Set a dedicated key (32+ random characters) before anyone enrols. | — |
 | `MFA_ENCRYPTION_KEY_PREVIOUS` | The key being rotated *away* from. Set both during a rotation: new secrets are written with `MFA_ENCRYPTION_KEY` and existing ones are still readable, so nobody is locked out of their own account mid-rotation. Remove it once every secret has been re-encrypted. | — |
 | `ALLOW_ANONYMOUS` | Enable anonymous sign-in (`POST /api/auth/anonymous`). Opt-in, and deliberately not gated by `ALLOW_REGISTRATION`. | `false` |
@@ -835,7 +833,7 @@ Every database, bucket and topic a project declares in `config/resources.ts` is
 bound by environment variables named after it. The base names are below; a
 non-default resource appends `__` and its key in upper case, so a bucket called
 `media` reads `S3_BUCKET__MEDIA`. `rebase status`
-<span class="since-badge" data-since="0.18">Since 0.18</span> prints, per resource,
+ prints, per resource,
 the exact variable it is reading and whether it is set.
 
 | Variable | Description | Default |
@@ -1240,7 +1238,7 @@ downwards — or, if you are coming from 0.12, start at the bottom and work up.
 
 | You are on | Read | What it does to you |
 |---|---|---|
-| **0.17** | [0.17 → next](/docs/upgrading/0-17-to-next/) | Not released yet. These docs publish from `main`, so the breaking changes merged since 0.17.3 are described here before the version that carries them exists. Read it to know what is coming. |
+| **0.17** | [0.17 → 0.18](/docs/upgrading/0-17-to-0-18/) | Eleven breaking changes, most of them compile errors rather than silent behaviour changes. `rebase.data` disappears at runtime, peer ranges narrow to carets, and the Node floor moves to 22.22.0. |
 | **0.14 – 0.16** | [0.14 → 0.17](/docs/upgrading/0-14-to-0-17/) | The admin packages are renamed, resources are declared rather than configured, and a bundle built before it will not boot on a current runtime. 0.15 and 0.16 break nothing, so this is one hop from 0.14. |
 | **0.13** | [0.13 → 0.14](/docs/upgrading/0-13-to-0-14/) | Every wire key is camelCase, and anonymous sign-in is opt-in. |
 | **0.12** | [0.12 → 0.13](/docs/upgrading/0-12-to-0-13/) | The largest hop, and the only one that changes **who can read your data**. It removes the `auth` schema, renames packages, changes what `id` means, drops CJS, moves the admin panel to react-router 8, and fixes three ways access could be granted that you did not ask for. |
@@ -1309,194 +1307,6 @@ packages nor the type system will tell you: the change lives in the database, an
 - [Changelog](/docs/changelog/) — the release notes each of these sections summarises
 - [Compatibility](/docs/compatibility/) — the six contracts, and which ones a version can break
 - [CLI Commands](/docs/cli/) — `rebase doctor` and the commands the checklists run
-
-## Upgrading 0.17 to the next release
-
-## Upgrading 0.17 → next
-
-**Nothing here is released yet.** These are the `#### Breaking` entries of the
-changelog's [`[Unreleased]`](/docs/changelog/) section: they are on `main`, and
-this documentation site publishes from `main`, so they are described here weeks
-before the version that carries them exists on npm. If you installed from npm
-you are on 0.17.3 and none of this has reached you — read it to know what is
-coming, and come back when you move.
-
-Every one of them is a compile error or a refused boot rather than a silent
-change of behaviour, except the last, which rewrites a constraint the next
-`db push` will plan for you.
-
----
-
-### 20. `defineCollection` is one signature
-
-It was three overloads — Postgres, Firestore, MongoDB — and a failing call
-produced one diagnostic on `defineCollection(`, listing each overload's first
-failure. There is one signature now, discriminated on `engine` (Postgres when
-absent), and errors are reported on the key that is wrong, all of them at once.
-
-**What to change:** nothing, in a call that already compiled. What changes is
-where the red squiggle lands. Two type exports moved with it: `UnknownPropertyKey`
-is now `NoSuchKey` (and carries a `didYouMean` member), and
-`PropertyTypeNotOnThisEngine` is new. Both are internal machinery of the builder,
-so only code that imported the old name has an edit to make.
-
-### 21. `defineCollection` keeps checking after the first bad property
-
-The builder constrained its property map, and a constraint TypeScript cannot
-satisfy is one it silently falls back from — so a single bad `defaultValue`
-widened the inferred entity to `Record<string, unknown>` and switched off every
-check on `display.title`, `listProperties`, `propertiesOrder` and
-`previewProperties`.
-
-**What to change:** nothing to write, but expect *new* errors in collection files
-that compiled before. They were wrong then too; the compiler had stopped looking.
-Fix the property the first error names and rebuild — the rest of that file is
-being checked for the first time.
-
-### 22. A relation's link field has to belong to its `kind`
-
-`Relation` has been a closed union since 0.11 — `belongsTo` owns `localKey`,
-`hasOne`/`hasMany` own `foreignKeyOnTarget`, `manyToMany` owns `through`, `via`
-owns `joinPath` — but excess-property checking ran against the union as a whole,
-so `{ kind: "belongsTo", foreignKeyOnTarget: "author_id" }` compiled and then
-resolved to a different link than the one written.
-
-**What to change:** put the link field the kind owns.
-
-```diff lang="ts"
-  author: {
-      type: "relation",
--     relation: { kind: "belongsTo", foreignKeyOnTarget: "author_id", target: () => authors }
-+     relation: { kind: "belongsTo", localKey: "author_id", target: () => authors }
-  }
-```
-
-The boot validator already refused these, so this moves the report from a failed
-deploy to a compile error. If your project boots today, it compiles today.
-
-### 23. A relation's `validation` moves up to the property
-
-`RelationBase.validation` and `ResolvedRelationBase.validation` are deleted.
-There were two places to write `required` and two generators reading different
-ones: the DDL asked the property (so the column came out `NOT NULL`) while the
-SDK type generator asked the relation (so the generated `Insert` type made the
-field optional), and a `create()` that omitted the relation typechecked and then
-failed at the database.
-
-**What to change:** move it one level up, beside every other field's.
-
-```diff lang="ts"
-  author: {
-      type: "relation",
-+     validation: { required: true },
--     relation: { kind: "belongsTo", validation: { required: true }, target: () => authors }
-+     relation: { kind: "belongsTo", target: () => authors }
-  }
-```
-
-Boot refuses the old key by name rather than ignoring it. Code that asked a
-relation whether it was required asks
-`import { isRelationRequired, relationDeclaringProperty } from "@rebasepro/common"`
-instead.
-
-### 24. A required `belongsTo` deletes with `RESTRICT`, not `CASCADE`
-
-`validation: { required: true }` says the child cannot exist without a parent. It
-does not say deleting the parent should delete the child — but that is what the
-generator inferred, so every `DELETE FROM authors` cascaded through posts, their
-comments, and whatever hung off those. The default is `RESTRICT` now: the delete
-fails and names the constraint. Optional relations are unchanged (`SET NULL`), and
-a `manyToMany` junction is unchanged (`CASCADE` — the row it deletes is the link).
-
-**This one is a DDL change.** The next `rebase db push` plans a `DROP CONSTRAINT` /
-`ADD CONSTRAINT` for every required relation that never named an `onDelete`, and
-after it those parent deletes start failing where they used to cascade.
-
-**What to change:** to keep the old behaviour, write it down.
-
-```diff lang="ts"
-- relation: { kind: "belongsTo", target: () => authors }
-+ relation: { kind: "belongsTo", onDelete: "cascade", target: () => authors }
-```
-
-Then read the plan before applying it — `rebase db push` prints the statements.
-
-### 25. The Node floor is `>=22.22.0`
-
-Every published package declared `>=20` at 0.17.3 — `@rebasepro/cli` declared no
-`engines` at all — and every one of them declares `>=22.22.0` on `main`. The
-single source is the repository's `.nvmrc`.
-
-**What to change:** move to Node 22.22.0 before you upgrade. `pnpm install`
-answers an engines mismatch with `[WARN] Unsupported engine` and installs
-anyway, so the failure does not arrive at install time; it arrives later,
-somewhere with no mention of Node in it.
-
-### 26. `rebase.data` is gone at runtime
-
-`RebaseServerClient` dropped `data` from its type so that server-side code has
-to say whose identity a read runs under, and the property was then left on the
-object as a runtime alias. It is deleted at boot: `rebase.data` is `undefined`.
-
-**What to change:** in server code — functions, crons, callbacks — write
-`rebase.dataAsAdmin` where you mean the admin plane and `context.data` where you
-mean the caller's. Typed code has been getting the error since the type changed;
-what breaks now is untyped code, and a scaffold's `ai-instructions.md` that
-still tells an assistant to reach for `rebase.data.<slug>` — `rebase init`
-rewrites that file, so regenerate it or edit the rule by hand. Browser code is
-untouched: `rebase.data` on the client SDK is the user-scoped plane and stays.
-
-### 27. `@rebasepro/cli` publishes three exports
-
-`src/index.ts` re-exported sixteen modules and put 95 names on npm. It exports
-`entry`, `manifest` and `bundle` now.
-
-**What to change:** nothing, unless you `import` from `@rebasepro/cli` — which
-is unlikely, since nothing in this repository or the control plane did. If you
-do, the CLI is a binary: shell out to `rebase <command>` rather than calling its
-command functions, whose signatures were never a contract.
-
-### 28. Peer ranges are carets
-
-`ui`, `forms`, `firebase`, `plugin-insights` and `cms-types` declared
-`react >=19.0.0`, a range whose lower half cannot satisfy `app` and `cms` at
-19.2.7 — so an installer that picked 19.0.0 produced a tree that resolved
-cleanly and broke at render. All five say `^19.2.7`. `@rebasepro/app`'s
-`typescript` peer moves from `>=5.0.0` to `^6.0.0`.
-
-**What to change:** be on React 19.2.7 or later, and on TypeScript 6 if you use
-`@rebasepro/app`'s Vite plugin. If your install previously resolved React 19.0.x
-you will now get a peer warning until you raise it; that warning is the tree you
-were already running, said out loud.
-
-### 29. `rebase cloud webhooks create` takes `--endpoint`
-
-`--url` names the control plane for every command in this family, so the second
-`--url` this one declared for the customer's endpoint could never win: the
-documented example sent the webhook URL to the client as the host to
-authenticate against.
-
-**What to change:** `rebase cloud webhooks create --endpoint https://…` in any
-script that creates one. The old spelling could not have worked, so there is no
-behaviour to preserve — only lines to correct.
-
-### 30. `serializeFilter` emits strictly
-
-The shared leaf encoder parses liberally, because a short code arrives off the
-wire, and emits strictly, because a caller handing one to the serializer built
-the condition by hand. `serializeFilter({ a: ["gt", 5] })` throws rather than
-round-tripping `gte`.
-
-**What to change:** only if you call `@rebasepro/common`'s serializers directly.
-Use the operator names the types declare (`gt`, `gte`, `lt`, `lte`, …) rather
-than REST short codes. Query builders and the SDK were already spelling them
-this way; what changes is that the wrong spelling now says so.
-
----
-
-**Next:** [the upgrade checklist](/docs/upgrading/#upgrade-checklist) ·
-[0.14 → 0.17](/docs/upgrading/0-14-to-0-17/), the hop before this one ·
-[Changelog](/docs/changelog/), the release notes these sections summarise.
 
 ## Upgrading 0.14 to 0.17
 
@@ -2627,6 +2437,62 @@ backfilled after the fact.
 ## Changelog
 
 ### [Unreleased]
+
+#### Fixed
+
+- **The published driver shipped no CLI, so a new project's first data read
+  returned 500.** `rebase init` → `pnpm install` → `pnpm run dev` → register →
+  `GET /api/data/posts` answered `500 Table not found for collection 'posts'` on
+  0.18.0, and the boot log said `Applied 30 additive schema change(s)` — the
+  table was there. The driver looks its columns up in
+  `backend/src/schema.generated.ts`, which the scaffold ships as a stub, and
+  `rebase dev` regenerates that file at startup for exactly this reason. It could
+  not: the regeneration shells into the driver's own CLI, and the published
+  tarball did not contain one.
+
+  `@rebasepro/server-postgres` runs four things as child processes — the Drizzle
+  generator, the DDL planner, the introspector, the schema doctor — located by
+  path relative to its CLI. Those paths named `.ts` files, and resolved only
+  because `files` listed `src`. `dff34e8688` removed `src` from sixteen tarballs
+  to stop shipping the same bytes twice; it was right about the bytes, and it
+  deleted this package's entire command surface, because no `dist/cli.js` had
+  ever been built. Every `rebase db …`, `rebase schema …` and `rebase introspect`
+  was broken for every npm consumer of 0.18.0. The parent CLI reports a driver
+  CLI it cannot find as *"Dependencies are not installed"*, so the message
+  blamed the user's install — at a project that had just installed cleanly.
+
+  The build emits `dist/cli.js` and the four child scripts. They still run under
+  `tsx`, which is not incidental: they load the *project's* collection files, and
+  those import each other as `./authors.js`, the extension TypeScript tells you
+  to write. Node resolves it literally and fails on the user's code rather than
+  on ours. The two generators are built from `src/schema/bin/*`, because their
+  own `import.meta.url.endsWith(process.argv[1])` guard is false once the module
+  is a shared chunk rather than the process entry — the built script otherwise
+  exits 0 having generated nothing, and the caller reports success over an
+  unwritten schema.
+
+  `tooling/scripts/test/driver-cli-surface.test.mjs` reads the spawn sites out of
+  `cli.ts` and requires each one in `dist`, so a fifth spawned script added
+  without a build entry fails on the commit that adds it. Verified end to end
+  against a project scaffolded by the published 0.18.0 CLI: `GET /api/data/posts`
+  returns 200.
+
+  The release pipeline's new smoke step is what caught this, on its first ever
+  run. 0.17.3 failed the same way and shipped, because nothing installed what had
+  been published.
+
+- **The driver's build banner made the runtime image's copy unparseable.** Adding
+  entries reshuffled the chunks, and the banner — prepended to *every* output
+  chunk — declared `import process from "process"` in one that also contained
+  chalk's `import process from "node:process"`. Two declarations in one module:
+  `SyntaxError: Identifier 'process' has already been declared`, and the driver
+  would not load. It appeared only in the image, from source identical to the
+  local build, because which modules share a chunk is a decision the bundler
+  remakes each time — the local dist parsed fine. `process` is a Node global and
+  the import bought nothing; it is gone. `check:runtime-image:boots` caught it,
+  and a new assertion in `driver-cli-surface.test.mjs` now refuses a banner that
+  binds any plain identifier, so the next one is caught on the host without
+  building an image.
 
 ### [0.18.0] - 2026-09-07
 
@@ -7391,7 +7257,7 @@ Three things resolve it, in the order worth checking:
 2. **The tables have no RLS policy**, so boot skipped them. The boot log names
    each one. Add a policy, as above.
 3. **`DATABASE_URL` points somewhere else** than you think. `rebase status`
-   <span class="since-badge" data-since="0.18">Since 0.18</span> prints the three files that decide what the backend reaches.
+   prints the three files that decide what the backend reaches.
 
 ### Adding an admin panel later
 
@@ -8069,7 +7935,7 @@ securityRules: [
 ```
 
 `policy.authenticated()` is true for anonymous *sign-in* too, which mints a real
-user row and a real session. Use `policy.registered()` <span class="since-badge" data-since="0.18">Since 0.18</span> where a guest should not
+user row and a real session. Use `policy.registered()` where a guest should not
 qualify — writing a review, joining an organization, spending money.
 
 #### Role-based Access
@@ -8129,7 +7995,7 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.rolesOverlap(roles)` | the caller has **any** of these app roles |
 | `policy.rolesContain(roles)` | the caller has **all** of these app roles |
 | `policy.authenticated()` | signed in — `rebase.uid()` is set **and is not an anonymous sentinel**. `IS NOT NULL` alone would be a tautology, since an anonymous request sets a sentinel rather than leaving it unset |
-| `policy.registered()` <span class="since-badge" data-since="0.18">Since 0.18</span> | signed in **with an account** — `authenticated()` and not a guest. See below |
+| `policy.registered()` | signed in **with an account** — `authenticated()` and not a guest. See below |
 | `policy.serverContext()` | `rebase.uid() IS NULL` — see the caution below |
 | `policy.existsIn({ collection, where })` | a correlated `EXISTS` subquery |
 | `policy.raw(sql)` | an escape hatch, inserted verbatim |
@@ -8143,8 +8009,6 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.authRoles()` | `rebase.roles()` |
 
 #### `authenticated()` and `registered()`
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Two different things are called anonymous, and it is worth being precise about
 which one a rule means.
@@ -9302,8 +9166,6 @@ client: {
 }
 ```
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 On Postgres a `reference` is a foreign key like any other, so it follows the same `ON DELETE` rule as a `belongsTo` relation: optional is `SET NULL`, required is `RESTRICT`. See [Relations](/docs/collections/relations).
 
 #### Reference & Relation Options
@@ -9779,8 +9641,6 @@ relations: [
 | `"set default"` | Set the FK column to its default value |
 
 #### What you get when you say nothing
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 The default for a **required** `belongsTo` changed. On 0.17.3 it is
 `ON DELETE CASCADE` — deleting a parent deletes its children — and from 0.18 it
@@ -10599,7 +10459,7 @@ securityRules: [
 ```
 
 `policy.authenticated()` is true for anonymous *sign-in* too, which mints a real
-user row and a real session. Use `policy.registered()` <span class="since-badge" data-since="0.18">Since 0.18</span> where a guest should not
+user row and a real session. Use `policy.registered()` where a guest should not
 qualify — writing a review, joining an organization, spending money.
 
 #### Role-based Access
@@ -10659,7 +10519,7 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.rolesOverlap(roles)` | the caller has **any** of these app roles |
 | `policy.rolesContain(roles)` | the caller has **all** of these app roles |
 | `policy.authenticated()` | signed in — `rebase.uid()` is set **and is not an anonymous sentinel**. `IS NOT NULL` alone would be a tautology, since an anonymous request sets a sentinel rather than leaving it unset |
-| `policy.registered()` <span class="since-badge" data-since="0.18">Since 0.18</span> | signed in **with an account** — `authenticated()` and not a guest. See below |
+| `policy.registered()` | signed in **with an account** — `authenticated()` and not a guest. See below |
 | `policy.serverContext()` | `rebase.uid() IS NULL` — see the caution below |
 | `policy.existsIn({ collection, where })` | a correlated `EXISTS` subquery |
 | `policy.raw(sql)` | an escape hatch, inserted verbatim |
@@ -10673,8 +10533,6 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.authRoles()` | `rebase.roles()` |
 
 #### `authenticated()` and `registered()`
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Two different things are called anonymous, and it is worth being precise about
 which one a rule means.
@@ -12734,7 +12592,7 @@ Rebase includes a complete backend authentication system:
 - **Auth hooks** — Lifecycle hooks for user creation and more
 - **Custom auth adapters** — Plug in Firebase Auth, Auth0, Clerk, or any external provider
 - **Service key** — Static key for server-to-server authentication
-- **Auto-bootstrapping** — Outside production, the first user automatically gets the admin role; a production deployment names its admin with `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span>
+- **Auto-bootstrapping** — Outside production, the first user automatically gets the admin role; a production deployment names its admin with `REBASE_ADMIN_EMAIL` / `REBASE_ADMIN_PASSWORD`
 
 ### Configuration
 
@@ -12802,7 +12660,7 @@ const backend = await initializeRebaseBackend({
 | `accessExpiresIn` | `string` | `1h` | Access-token lifetime |
 | `refreshExpiresIn` | `string` | `30d` | Refresh-token lifetime. Sliding: each rotation re-ups it. The runtime passes `JWT_REFRESH_EXPIRES_IN`, whose own default is `400d` |
 | `requireAuth` | `boolean` | `true` | Require a session for the data API |
-| `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` <span class="since-badge" data-since="0.18">Since 0.18</span> |
+| `allowRegistration` | `boolean` | `false` | Open `POST /api/auth/register`. Outside production the first user on an empty table is admitted either way; in production the admin is named with `REBASE_ADMIN_EMAIL` |
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
 | `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts |
 | `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` for invite-by-email flows |
@@ -13175,8 +13033,6 @@ On first startup, Rebase automatically provisions the `auth` schema and the foll
 - **`rebase.app_config`** — Key-value store for system configurations.
 
 ### First User Bootstrap
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 When no users exist in the database and the server is **not** running with `NODE_ENV=production`, the first person to register automatically becomes an admin. After that, registration is controlled by the `allowRegistration` setting.
 
@@ -14427,7 +14283,7 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` is new <span class="since-badge" data-since="0.18">Since 0.18</span>. `database()`, `bucket()` and `topic()`
+`queue()` is new. `database()`, `bucket()` and `topic()`
 have been declarable since 0.17, so a project on the released version declares
 those three and reaches background work through `jobs.tasks` instead.
 
@@ -14476,8 +14332,6 @@ export default defineFunction((app, { rebase }) => {
 
 #### Seeing what you declared
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 ```bash
 rebase resources            # list them
 rebase resources --write    # regenerate rebase.resources.json
@@ -14510,8 +14364,6 @@ export const objects = bucket("objects", { engine: "custom:minio" });
 ```
 
 #### Correcting a kind that has already shipped
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 For driver authors. A resource kind's registered definition is **frozen** once a
 package carrying it has been published: every published driver inlines its own
@@ -14667,7 +14519,7 @@ await signups.publish({ userId });
 
 A queue is the other shape of background work: a work list with **one
 handler**, where the caller holds the job's id. Queues are new
-<span class="since-badge" data-since="0.18">Since 0.18</span> — topics shipped in 0.17.
+ — topics shipped in 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");
@@ -15250,8 +15102,6 @@ If the server does not respond within this 30-second window, the client automati
 One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
 
 #### When a channel frame is refused
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 A channel frame is fire-and-forget: `await channel.broadcast(...)` resolves when
 the frame is written to the socket, **not** when the server has accepted it. That
@@ -16112,7 +15962,7 @@ Step values (`*/n`), ranges (`a-b`), and lists (`a,b,c`) are all supported.
 
 ### CronJobDefinition Reference
 
-`timezone` is new <span class="since-badge" data-since="0.18">Since 0.18</span> — on 0.17.3 a schedule is always read in the
+`timezone` is new — on 0.17.3 a schedule is always read in the
 host's own zone. Everything else on this interface has shipped.
 
 ```typescript
@@ -16533,8 +16383,6 @@ export default job;
 ```
 
 ### Crons in the resource graph
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Every cron file is also a declaration. `rebase resources` lists it under the
 name of the file — the same id the scheduler runs it as and the Studio shows —
@@ -17847,7 +17695,7 @@ rebase db branch info dev_sandbox
 rebase db branch delete dev_sandbox
 ```
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` is what makes a branch usable. It records the branch in
+ `switch` is what makes a branch usable. It records the branch in
 `.rebase/branch.json` — a name, never a connection string, so your credentials
 stay in `.env` alone — and every `rebase` command in that checkout then resolves
 the branch's database instead: `dev`, `db push`, `db migrate`, `db backup`.
@@ -17893,7 +17741,7 @@ Use branching against a real server — your own PostgreSQL via `DATABASE_URL`, 
 Because PostgreSQL duplicates the files on disk, each branch consumes space equal to the source database. If you have a 100GB production database, creating 5 branches will consume an additional 500GB of storage. 
 * *Recommendation*: Use subsetted databases or thin dev-templates as your clone sources instead of full production clones.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> `rebase db branch prune` is how you get the space back:
+ `rebase db branch prune` is how you get the space back:
 
 ```bash
 rebase db branch prune                      # orphans only — always safe
@@ -17955,7 +17803,7 @@ export const env = loadEnv({
 // env.STRIPE_SECRET_KEY → string        (validated, required)
 ```
 
-Importing `z` from `@rebasepro/server` is new <span class="since-badge" data-since="0.18">Since 0.18</span>. On 0.17 and
+Importing `z` from `@rebasepro/server` is new. On 0.17 and
 earlier the package exported no `z`: import it from `zod`, matching the major the
 runtime uses, and let your bundler dedupe the two copies.
 
@@ -29673,8 +29521,6 @@ pnpm dlx @rebasepro/cli <command>
 
 ### Machine-readable output
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 `--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources` and `rebase apps list` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
 
 ### Commands
@@ -29894,12 +29740,12 @@ PostgreSQL will not copy or drop a database anything else is connected to, and
 the usual "anything else" is your own `rebase dev`. `create` and `delete` name
 what is holding the database open; `--force` disconnects those sessions first.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> Every branch is a full copy on disk, so they need clearing out. `prune` removes
+ Every branch is a full copy on disk, so they need clearing out. `prune` removes
 three things: an entry whose database was dropped outside Rebase, a branch
 database whose entry was never written, and — only with `--older-than` — branches
 past an age you name. It asks before removing anything unless you pass `--yes`.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
+ `switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
 takes precedence over `DATABASE_URL` in `.env` and loses to `--database-url` or a
 `DATABASE_URL` in the shell, so a flag on the command line always outranks a
 switch made earlier. Deleting the branch you are on returns you to the main
@@ -29928,8 +29774,6 @@ rebase apps config <app>     # what one app resolves to
 ```
 
 #### `rebase status`
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Everything this project declares, and whether the environment actually binds it:
 
@@ -29975,7 +29819,7 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
-`rebase resources --check` is new <span class="since-badge" data-since="0.18">Since 0.18</span> — the flag a CI job uses to fail
+`rebase resources --check` is new — the flag a CI job uses to fail
 on a `rebase.resources.json` that no longer matches the config code.
 
 A resource is declared in config code — `database("analytics")`,
@@ -30394,8 +30238,6 @@ rebase db migrate
 
 ##### Baselining a database Rebase has already booted
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 Every Rebase boot ensures the schema, and `rebase db push` applies it directly. So a database that has ever run either one already has the tables and types the first migration would create, and `rebase db migrate` stops on `pq: type "posts_status" already exists (42710)`.
 
 Nothing is wrong with the migration — the database was provisioned another way. Record where it already is, then migrate normally:
@@ -30422,7 +30264,7 @@ rebase db branch delete feature_auth
 ```
 
 `rebase db branch switch` (and `switch --off`) and `rebase db branch prune`
-are new <span class="since-badge" data-since="0.18">Since 0.18</span>. `create`, `list`, `info` and `delete` shipped in 0.17.
+are new. `create`, `list`, `info` and `delete` shipped in 0.17.
 
 Each branch is a full copy of the database made with `CREATE DATABASE ... TEMPLATE`,
 so it needs a real PostgreSQL server and it costs the same disk as its source.
@@ -30844,8 +30686,6 @@ spellings are recognised when reading policies, so a Rebase database mid-migrati
 the pre-1.0 `auth` schema is still checked.
 
 #### policy-authenticated-tautology
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 **Policy admits every signed-in caller to every row.** High.
 
@@ -31747,7 +31587,7 @@ volumes:
   postgres_data:
 ```
 
-The three `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` lines are new <span class="since-badge" data-since="0.18">Since 0.18</span>
+The three `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` lines are new
 — on 0.17.3 the first account to register becomes the administrator, in
 production too. See [Your first admin](#your-first-admin) below.
 
@@ -31791,8 +31631,6 @@ Either way it runs from a project checkout, not inside the running container —
 the runtime image ships without the CLI.
 
 ### Your first admin
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 **Set `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` before the first boot.**
 Every platform guide on this site points here, because this is the one step that
@@ -31851,8 +31689,6 @@ Sign in and change the password. It is sitting in plain text wherever you put
 your environment.
 
 ### Production Checklist
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Before deploying to production, ensure:
 
@@ -32313,8 +32149,6 @@ healthcheck.
 
 #### The six values it needs
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 `quickstart.sh` generates these for you. To write the `.env` yourself:
 
 ```bash
@@ -32511,7 +32345,7 @@ rebase-server /srv/myapp/dist-bundle
 ```
 
 `rebase-server --help` lists the variables it reads. Under systemd — the
-three admin lines are new <span class="since-badge" data-since="0.18">Since 0.18</span>, and on 0.17.3 the first account to
+three admin lines are new, and on 0.17.3 the first account to
 register becomes the administrator instead:
 
 ```ini title="/etc/systemd/system/rebase.service"
@@ -32923,8 +32757,6 @@ order does not matter, because the schema step is additive and idempotent.
 
 ### Overview
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 The official chart is the Kubernetes peer of the Docker Compose self-hosting
 setup. Same idea, same image, same bundle: **the runtime is the image, your
 project is the bundle, and upgrading Rebase is a tag change.**
@@ -33149,8 +32981,6 @@ Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched
 
 ### 3. Deploy via AWS App Runner
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 App Runner is the simplest way to run containers on AWS without managing orchestrators.
 
 1. Navigate to **AWS App Runner** and click **Create service**.
@@ -33259,8 +33089,6 @@ Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched
 
 ### 3. Deploy to Cloud Run
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 ```bash
 gcloud run deploy rebase-backend \
   --image europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest \
@@ -33361,8 +33189,6 @@ COPY dist-bundle /bundle
 Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched.
 
 ### 3. Deploy the Container App
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Azure Container Apps provides a serverless container environment with built-in HTTPS ingress.
 
@@ -33491,7 +33317,7 @@ REBASE_ADMIN_EMAIL=you@yourdomain.com
 REBASE_ADMIN_PASSWORD=at_least_twelve_characters
 ```
 
-`REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` are new <span class="since-badge" data-since="0.18">Since 0.18</span>: on 0.17.3
+`REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` are new: on 0.17.3
 the first account to register becomes the administrator, in production too.
 
 All six are required — the Compose file declares them with `${VAR:?…}` and
@@ -33634,8 +33460,6 @@ Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched
 
 ### 3. Deploy the Serverless Container
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 1. Navigate to **Serverless Containers**.
 2. Click **Create a Container**.
 3. Choose the image you just pushed.
@@ -33740,8 +33564,6 @@ Build the bundle in CI and commit or upload it as part of your release, or run `
 Then: **New → GitHub Repo**, select your repository, and let Railway detect the Dockerfile at the root.
 
 ### 4. Set environment variables
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 1. Click the service card.
 2. Go to the **Variables** tab.
@@ -33857,7 +33679,7 @@ primary_region = "fra"
 
 `/livez` rather than `/health`: the second performs a database round-trip, so a liveness check on it restarts a healthy machine during a brief database hiccup.
 
-`DISABLE_SELF_REGISTRATION` is new <span class="since-badge" data-since="0.18">Since 0.18</span>: on 0.17.3 there is no such
+`DISABLE_SELF_REGISTRATION` is new: on 0.17.3 there is no such
 switch, and the first account to register becomes the administrator.
 
 Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched.
@@ -33875,7 +33697,7 @@ fly secrets set \
   -a my-rebase-app
 ```
 
-The last two are new <span class="since-badge" data-since="0.18">Since 0.18</span>, and are how this app gets an administrator at all: in production the first account to register is not promoted, so nothing else produces the first signed-in caller. Set them before the first deploy serves traffic — see [Your first admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` shows only digests, so keep the generated password from this command; there is no way to read it back.
+The last two are new, and are how this app gets an administrator at all: in production the first account to register is not promoted, so nothing else produces the first signed-in caller. Set them before the first deploy serves traffic — see [Your first admin](/docs/getting-started/deployment/#your-first-admin). `fly secrets list` shows only digests, so keep the generated password from this command; there is no way to read it back.
 
 ### 4. Deploy
 

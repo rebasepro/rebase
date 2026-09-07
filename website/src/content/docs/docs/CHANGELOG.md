@@ -7,6 +7,62 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Fixed
+
+- **The published driver shipped no CLI, so a new project's first data read
+  returned 500.** `rebase init` → `pnpm install` → `pnpm run dev` → register →
+  `GET /api/data/posts` answered `500 Table not found for collection 'posts'` on
+  0.18.0, and the boot log said `Applied 30 additive schema change(s)` — the
+  table was there. The driver looks its columns up in
+  `backend/src/schema.generated.ts`, which the scaffold ships as a stub, and
+  `rebase dev` regenerates that file at startup for exactly this reason. It could
+  not: the regeneration shells into the driver's own CLI, and the published
+  tarball did not contain one.
+
+  `@rebasepro/server-postgres` runs four things as child processes — the Drizzle
+  generator, the DDL planner, the introspector, the schema doctor — located by
+  path relative to its CLI. Those paths named `.ts` files, and resolved only
+  because `files` listed `src`. `dff34e8688` removed `src` from sixteen tarballs
+  to stop shipping the same bytes twice; it was right about the bytes, and it
+  deleted this package's entire command surface, because no `dist/cli.js` had
+  ever been built. Every `rebase db …`, `rebase schema …` and `rebase introspect`
+  was broken for every npm consumer of 0.18.0. The parent CLI reports a driver
+  CLI it cannot find as *"Dependencies are not installed"*, so the message
+  blamed the user's install — at a project that had just installed cleanly.
+
+  The build emits `dist/cli.js` and the four child scripts. They still run under
+  `tsx`, which is not incidental: they load the *project's* collection files, and
+  those import each other as `./authors.js`, the extension TypeScript tells you
+  to write. Node resolves it literally and fails on the user's code rather than
+  on ours. The two generators are built from `src/schema/bin/*`, because their
+  own `import.meta.url.endsWith(process.argv[1])` guard is false once the module
+  is a shared chunk rather than the process entry — the built script otherwise
+  exits 0 having generated nothing, and the caller reports success over an
+  unwritten schema.
+
+  `tooling/scripts/test/driver-cli-surface.test.mjs` reads the spawn sites out of
+  `cli.ts` and requires each one in `dist`, so a fifth spawned script added
+  without a build entry fails on the commit that adds it. Verified end to end
+  against a project scaffolded by the published 0.18.0 CLI: `GET /api/data/posts`
+  returns 200.
+
+  The release pipeline's new smoke step is what caught this, on its first ever
+  run. 0.17.3 failed the same way and shipped, because nothing installed what had
+  been published.
+
+- **The driver's build banner made the runtime image's copy unparseable.** Adding
+  entries reshuffled the chunks, and the banner — prepended to *every* output
+  chunk — declared `import process from "process"` in one that also contained
+  chalk's `import process from "node:process"`. Two declarations in one module:
+  `SyntaxError: Identifier 'process' has already been declared`, and the driver
+  would not load. It appeared only in the image, from source identical to the
+  local build, because which modules share a chunk is a decision the bundler
+  remakes each time — the local dist parsed fine. `process` is a Node global and
+  the import bought nothing; it is gone. `check:runtime-image:boots` caught it,
+  and a new assertion in `driver-cli-surface.test.mjs` now refuses a banner that
+  binds any plain identifier, so the next one is caught on the host without
+  building an image.
+
 ## [0.18.0] - 2026-09-07
 
 ### Breaking

@@ -1,5 +1,5 @@
 ---
-sourceHash: b8fb2609d1a27893
+sourceHash: 8cb714b94b58f0a9
 title: Relaciones
 sidebar_label: Relaciones
 description: Define relaciones SQL uno a uno, uno a muchos y muchos a muchos entre colecciones con claves foráneas, tablas de unión y uniones multi-salto.
@@ -312,8 +312,6 @@ relations: [
 | `"set default"` | Establecer la columna FK a su valor predeterminado |
 
 ### Qué obtienes si no dices nada
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 El valor predeterminado de un `belongsTo` **obligatorio** ha cambiado. En 0.17.3
 es `ON DELETE CASCADE` — borrar un padre borra sus hijos — y a partir de 0.18 es

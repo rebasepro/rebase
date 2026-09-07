@@ -1,5 +1,5 @@
 ---
-sourceHash: 03df1518e08ca072
+sourceHash: 4e456b0d449b82c5
 title: Génération de schéma
 sidebar_label: Génération de schéma
 description: Générez des schémas Drizzle ORM à partir des définitions de collections, créez des migrations SQL et gardez votre base de données synchronisée avec la CLI Rebase.
@@ -124,8 +124,6 @@ rebase db migrate
 - Suit quelles migrations ont été appliquées
 
 #### Établir une baseline sur une base de données déjà démarrée par Rebase
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Chaque démarrage de Rebase assure le schéma, et `rebase db push` l'applique directement. Une base de données sur laquelle l'un des deux a déjà tourné possède donc déjà les tables et les types que la première migration créerait, et `rebase db migrate` s'arrête sur `pq: type "posts_status" already exists (42710)`.
 

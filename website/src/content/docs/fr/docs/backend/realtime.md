@@ -1,5 +1,5 @@
 ---
-sourceHash: 89070c45c986e9fa
+sourceHash: 4f7a93fd3a8e67c8
 title: Temps réel et WebSocket
 sidebar_label: Temps réel
 description: Synchronisation des données en temps réel, canaux de diffusion et suivi de présence via WebSocket.
@@ -413,8 +413,6 @@ Si le serveur ne répond pas dans cette fenêtre de 30 secondes, le client suppr
 Les messages à sens unique qui n'attendent pas de réponse (comme `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack` et `presence_state`) se résolvent immédiatement lors de la transmission et ne déclenchent pas de délais d'expiration.
 
 ### Quand une trame de canal est refusée
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Une trame de canal fonctionne en fire-and-forget : `await channel.broadcast(...)`
 se résout lorsque la trame est écrite dans la socket, **pas** lorsque le serveur

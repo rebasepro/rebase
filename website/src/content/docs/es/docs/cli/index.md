@@ -1,5 +1,5 @@
 ---
-sourceHash: a3fccf5118b08dd0
+sourceHash: 595031b868350f1c
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de la CLI de Rebase para inicializar proyectos, generar esquemas, migrar bases de datos y generar el SDK.
@@ -22,8 +22,6 @@ pnpm dlx @rebasepro/cli <command>
 ```
 
 ## Salida legible por máquinas
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 `--json` es el interruptor, y fuera de la familia `cloud` es el único:
 `rebase status`, `rebase resources` y `rebase apps list` ponen entonces un único
@@ -261,13 +259,13 @@ conectado, y ese «algo más» suele ser tu propio `rebase dev`. `create` y `del
 nombran lo que mantiene abierta la base de datos; `--force` desconecta antes esas
 sesiones.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> Cada rama es una copia completa en disco, así que hay que ir limpiándolas.
+ Cada rama es una copia completa en disco, así que hay que ir limpiándolas.
 `prune` elimina tres cosas: una entrada cuya base de datos se borró fuera de
 Rebase, una base de datos de rama cuya entrada nunca se escribió y — solo con
 `--older-than` — ramas más antiguas que la edad que indiques. Pregunta antes de
 eliminar nada, salvo que pases `--yes`.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` registra la rama en `.rebase/branch.json` y nunca edita `.env`. Tiene
+ `switch` registra la rama en `.rebase/branch.json` y nunca edita `.env`. Tiene
 prioridad sobre `DATABASE_URL` en `.env` y pierde frente a `--database-url` o a
 una `DATABASE_URL` del shell, de modo que un flag en la línea de comandos siempre
 manda sobre un switch hecho antes. Borrar la rama en la que estás te devuelve a
@@ -298,8 +296,6 @@ rebase apps config <app>     # what one app resolves to
 ```
 
 ### `rebase status`
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Todo lo que este proyecto declara, y si el entorno lo enlaza de verdad:
 
@@ -346,7 +342,7 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
-`rebase resources --check` es nuevo <span class="since-badge" data-since="0.18">Since 0.18</span> — el flag que un job de CI usa para fallar ante un `rebase.resources.json` que ya
+`rebase resources --check` es nuevo — el flag que un job de CI usa para fallar ante un `rebase.resources.json` que ya
 no coincide con el código de configuración.
 
 Un recurso se declara en el código de configuración — `database("analytics")`,

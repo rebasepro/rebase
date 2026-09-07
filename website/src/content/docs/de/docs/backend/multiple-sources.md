@@ -1,5 +1,5 @@
 ---
-sourceHash: ec729d5ce6fb4036
+sourceHash: 32b4fa7fcbf16375
 title: Mehrere Datenbanken und Buckets
 sidebar_label: Mehrere Quellen
 description: Leiten Sie Collections an verschiedene Datenbanken und Properties an verschiedene Storage-Buckets weiter und konfigurieren Sie jede einzelne über die Umgebung.
@@ -44,7 +44,7 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` ist neu <span class="since-badge" data-since="0.18">Since 0.18</span>. `database()`, `bucket()` und `topic()`
+`queue()` ist neu. `database()`, `bucket()` und `topic()`
 lassen sich seit 0.17 deklarieren; ein Projekt auf der veröffentlichten Version
 deklariert also diese drei und erreicht Hintergrundarbeit stattdessen über
 `jobs.tasks`.
@@ -101,8 +101,6 @@ export default defineFunction((app, { rebase }) => {
 
 ### Sehen, was Sie deklariert haben
 
-<span class="since-badge" data-since="0.18">Since 0.18</span>
-
 ```bash
 rebase resources            # auflisten
 rebase resources --write    # rebase.resources.json neu erzeugen
@@ -136,8 +134,6 @@ export const objects = bucket("objects", { engine: "custom:minio" });
 ```
 
 ### Eine bereits ausgelieferte Kind-Definition korrigieren
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Für Treiber-Autoren. Die registrierte Definition einer Ressourcen-Kind ist
 **eingefroren**, sobald ein Paket damit veröffentlicht wurde: jeder
@@ -303,7 +299,7 @@ await signups.publish({ userId });
 
 Eine Queue ist die andere Form von Hintergrundarbeit: eine Arbeitsliste mit
 **einem Handler**, bei der der Aufrufer die Id des Jobs behält. Queues sind neu
-<span class="since-badge" data-since="0.18">Since 0.18</span> — Topics kamen mit 0.17.
+ — Topics kamen mit 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");

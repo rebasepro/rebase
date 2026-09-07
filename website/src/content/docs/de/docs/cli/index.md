@@ -1,5 +1,5 @@
 ---
-sourceHash: a3fccf5118b08dd0
+sourceHash: 595031b868350f1c
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase CLI-Befehle zur Projektinitialisierung, Schema-Generierung, Datenbankmigrationen und SDK-Generierung.
@@ -22,8 +22,6 @@ pnpm dlx @rebasepro/cli <command>
 ```
 
 ## Maschinenlesbare Ausgabe
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 `--json` ist der Schalter, und außerhalb der `cloud`-Familie ist er der einzige:
 `rebase status`, `rebase resources` und `rebase apps list` schreiben dann einen
@@ -262,14 +260,14 @@ verbunden ist, und dieses „etwas anderes“ ist meist Ihr eigenes `rebase dev`
 `create` und `delete` nennen, was die Datenbank offen hält; `--force` trennt
 diese Sitzungen zuerst.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> Jeder Branch ist eine vollständige Kopie auf der Platte, sie müssen also
+ Jeder Branch ist eine vollständige Kopie auf der Platte, sie müssen also
 aufgeräumt werden. `prune` entfernt dreierlei: einen Eintrag, dessen Datenbank
 außerhalb von Rebase gelöscht wurde, eine Branch-Datenbank, deren Eintrag nie
 geschrieben wurde, und — nur mit `--older-than` — Branches jenseits eines von
 Ihnen genannten Alters. Es fragt vor jeder Entfernung nach, sofern Sie nicht
 `--yes` übergeben.
 
-<span class="since-badge" data-since="0.18">Since 0.18</span> `switch` hält den Branch in `.rebase/branch.json` fest und bearbeitet nie `.env`.
+ `switch` hält den Branch in `.rebase/branch.json` fest und bearbeitet nie `.env`.
 Es hat Vorrang vor `DATABASE_URL` in `.env` und unterliegt `--database-url` oder
 einer `DATABASE_URL` in der Shell, sodass ein Flag auf der Kommandozeile immer
 einen früher gemachten Switch überstimmt. Löschen Sie den Branch, auf dem Sie
@@ -301,8 +299,6 @@ rebase apps config <app>     # what one app resolves to
 ```
 
 ### `rebase status`
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Alles, was dieses Projekt deklariert, und ob die Umgebung es tatsächlich bindet:
 
@@ -349,7 +345,7 @@ rebase resources --check    # fail if the committed graph is stale
 rebase resources --json     # machine-readable
 ```
 
-`rebase resources --check` ist neu <span class="since-badge" data-since="0.18">Since 0.18</span> — das Flag, mit dem ein CI-Job an einer `rebase.resources.json` scheitert, die
+`rebase resources --check` ist neu — das Flag, mit dem ein CI-Job an einer `rebase.resources.json` scheitert, die
 nicht mehr zum Konfigurationscode passt.
 
 Eine Ressource wird im Konfigurationscode deklariert — `database("analytics")`,

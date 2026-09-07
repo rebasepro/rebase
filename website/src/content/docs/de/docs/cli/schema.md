@@ -1,5 +1,5 @@
 ---
-sourceHash: 03df1518e08ca072
+sourceHash: 4e456b0d449b82c5
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus Collection-Definitionen, erstellen Sie SQL-Migrationen und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
@@ -124,8 +124,6 @@ rebase db migrate
 - Verfolgt, welche Migrationen angewendet wurden
 
 #### Baseline für eine Datenbank, gegen die Rebase bereits gebootet hat
-
-<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Jeder Rebase-Start stellt das Schema sicher, und `rebase db push` wendet es direkt an. Eine Datenbank, gegen die je eines von beiden gelaufen ist, hat die Tabellen und Typen also bereits, die die erste Migration anlegen würde — und `rebase db migrate` bricht mit `pq: type "posts_status" already exists (42710)` ab.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: f6312cfcb6187cea
+sourceHash: 19ae5aa65ad4194e
 title: Ambiente e Configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -106,9 +106,9 @@ sessione e ne legga le risposte.
 | `JWT_ACCESS_EXPIRES_IN` | Durata del token di accesso | `1h` |
 | `JWT_REFRESH_EXPIRES_IN` | Durata del token di refresh. Scorrevole: ogni rotazione la rinnova, quindi governa quanto a lungo una sessione sopravvive all'**inattività**. | `400d` |
 | `ALLOW_REGISTRATION` | Consente ai nuovi utenti di registrarsi (`true`/`false`). Fuori dalla produzione il **primo** utente può sempre registrarsi, qualunque cosa dica questa opzione — una tabella utenti vuota deve pur ammettere qualcuno, e quel qualcuno diventa l'amministratore. In produzione (`NODE_ENV=production`) quella finestra è chiusa: una tabella vuota rifiuta la registrazione di bootstrap con `SETUP_REQUIRED`, un primo account creato tramite registrazione aperta è un account ordinario, e l'amministratore viene indicato con `REBASE_ADMIN_EMAIL` più sotto oppure assegnato con la chiave di servizio. Il `.env.example` dello scaffold la imposta a `true`; il valore predefinito del framework è disattivato. | `false` |
-| `DISABLE_SELF_REGISTRATION` <span class="since-badge" data-since="0.18">Since 0.18</span> | Interruttore di emergenza. Chiude la finestra di bootstrap del primo utente che `ALLOW_REGISTRATION=false` lascia deliberatamente aperta fuori dalla produzione, così la registrazione è chiusa anche contro un database vuoto. Abbinala a `REBASE_ADMIN_EMAIL` più sotto, altrimenti il deployment non ha modo di produrre il suo primo chiamante autenticato. Ogni artefatto di deployment distribuito la imposta. | — |
-| `REBASE_ADMIN_EMAIL` <span class="since-badge" data-since="0.18">Since 0.18</span> | Email del primo account amministratore, creato all'avvio **finché la tabella utenti è ancora vuota** e mai in seguito. È così che un deployment di produzione ottiene il suo amministratore: l'operatore indica il primo account invece di gareggiare con internet per averlo. L'avvio avvisa quando in produzione la tabella è vuota e questa non è impostata. | — |
-| `REBASE_ADMIN_PASSWORD` <span class="since-badge" data-since="0.18">Since 0.18</span> | Password di quell'account. Almeno 12 caratteri, altrimenti viene rifiutata e l'account non viene creato. Cambiala dopo il primo accesso. | — |
+| `DISABLE_SELF_REGISTRATION` | Interruttore di emergenza. Chiude la finestra di bootstrap del primo utente che `ALLOW_REGISTRATION=false` lascia deliberatamente aperta fuori dalla produzione, così la registrazione è chiusa anche contro un database vuoto. Abbinala a `REBASE_ADMIN_EMAIL` più sotto, altrimenti il deployment non ha modo di produrre il suo primo chiamante autenticato. Ogni artefatto di deployment distribuito la imposta. | — |
+| `REBASE_ADMIN_EMAIL` | Email del primo account amministratore, creato all'avvio **finché la tabella utenti è ancora vuota** e mai in seguito. È così che un deployment di produzione ottiene il suo amministratore: l'operatore indica il primo account invece di gareggiare con internet per averlo. L'avvio avvisa quando in produzione la tabella è vuota e questa non è impostata. | — |
+| `REBASE_ADMIN_PASSWORD` | Password di quell'account. Almeno 12 caratteri, altrimenti viene rifiutata e l'account non viene creato. Cambiala dopo il primo accesso. | — |
 | `MFA_ENCRYPTION_KEY` | Cifra ogni segreto TOTP memorizzato. Se non impostata, i segreti vengono cifrati con `JWT_SECRET` e l'avvio avvisa una volta — ruotare `JWT_SECRET` disconnette quindi tutti *e* rende indecifrabile ogni autenticatore registrato. Imposta una chiave dedicata (32+ caratteri casuali) prima che qualcuno si registri. | — |
 | `MFA_ENCRYPTION_KEY_PREVIOUS` | La chiave *da cui* si sta ruotando. Imposta entrambe durante una rotazione: i nuovi segreti vengono scritti con `MFA_ENCRYPTION_KEY` e quelli esistenti restano leggibili, così nessuno resta chiuso fuori dal proprio account a metà rotazione. Rimuovila quando ogni segreto è stato ricifrato. | — |
 | `ALLOW_ANONYMOUS` | Abilita l'accesso anonimo (`POST /api/auth/anonymous`). È opt-in, e deliberatamente non subordinato a `ALLOW_REGISTRATION`. | `false` |
@@ -300,7 +300,7 @@ Ogni database, bucket e topic che un progetto dichiara in `config/resources.ts` 
 legato da variabili d'ambiente che portano il suo nome. I nomi base sono qui
 sotto; una risorsa non predefinita aggiunge `__` e la sua chiave in maiuscolo,
 così un bucket chiamato `media` legge `S3_BUCKET__MEDIA`. `rebase status`
-<span class="since-badge" data-since="0.18">Since 0.18</span> stampa, per ogni
+ stampa, per ogni
 risorsa, la variabile esatta che sta leggendo e se è impostata.
 
 | Variabile | Descrizione | Predefinito |

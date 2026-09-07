@@ -1,5 +1,5 @@
 ---
-sourceHash: 1c7b378353d6058e
+sourceHash: 487ad58f8760f9ac
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Stellen Sie Rebase mit dem offiziellen Helm-Chart auf einem Kubernetes-Cluster bereit – ein Deployment oder mehrere, ein Migrations-Job für das Schema und statische Apps auf demselben Host.

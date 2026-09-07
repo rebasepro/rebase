@@ -66,10 +66,48 @@ export default defineConfig(() => ({
     },
     build: {
         lib: {
-            entry: path.resolve(__dirname, "src/index.ts"),
+            /**
+             * Two entries, and `cli` is not optional.
+             *
+             * `rebase schema generate`, every `rebase db …` and `rebase
+             * introspect` shell into the driver's own CLI, which the parent CLI
+             * locates as `<pkg>/dist/cli.js` or `<pkg>/src/cli.ts`. Only the
+             * second ever existed, and it worked solely because `files` shipped
+             * `src` — so removing `src` from the tarball to halve its size
+             * (dff34e8688) deleted the driver's entire command surface from
+             * every published copy, in silence. 0.18.0 shipped that way: a
+             * scaffolded project's first `rebase dev` could not regenerate its
+             * schema, reported "Dependencies are not installed" at a project
+             * that had just installed cleanly, and answered every
+             * `GET /api/data/*` with `Table not found for collection 'posts'`.
+             *
+             * Building it means the tarball carries the command surface as an
+             * artifact rather than as source the consumer happens to be able to
+             * compile. `check:package-contents` fails without it.
+             */
+            entry: {
+                index: path.resolve(__dirname, "src/index.ts"),
+                cli: path.resolve(__dirname, "src/cli.ts"),
+                // The four scripts `cli.ts` spawns as child processes, by path.
+                // They are separate processes on purpose (the generators are
+                // long-running and the watch mode restarts them), so they have
+                // to exist as files — which is the second half of why `src` was
+                // being shipped. They still run under tsx: they load the
+                // project's own TypeScript collections, which import each other
+                // as `./authors.js`, and only tsx maps that back to `.ts`.
+                // These two go through `schema/bin/*`, which calls their exported
+                // `main`. Their own `import.meta.url` guard cannot fire once the
+                // module is a shared chunk rather than the process entry.
+                "schema/generate-drizzle-schema": path.resolve(__dirname, "src/schema/bin/generate-drizzle-schema.ts"),
+                "schema/generate-postgres-ddl": path.resolve(__dirname, "src/schema/bin/generate-postgres-ddl.ts"),
+                "schema/introspect-db": path.resolve(__dirname, "src/schema/introspect-db.ts"),
+                "schema/doctor-cli": path.resolve(__dirname, "src/schema/doctor-cli.ts")
+            },
             name: "Rebase Backend",
             formats: ["es"],
-            fileName: (format) => `index.${format}.js`
+            // `index.es.js` is named in `exports`, `main` and the runtime image's
+            // stitching; `cli.js` is what resolvePluginCliScript looks for.
+            fileName: (format, entryName) => (entryName === "index" ? `index.${format}.js` : `${entryName}.js`)
         },
         target: "ESNEXT",
         minify: false,
@@ -83,7 +121,21 @@ export default defineConfig(() => ({
                 warn(warning);
             },
             output: {
-                banner: 'import { createRequire as __createRequire } from "module"; import process from "process"; const require = __createRequire(import.meta.url);'
+                /**
+                 * `require` for the CJS dependencies rolled into this bundle.
+                 *
+                 * It does NOT import `process`. It used to, and that was a
+                 * latent syntax error waiting for the chunk layout to move:
+                 * the banner is prepended to EVERY chunk, so any chunk that
+                 * also contained a module importing `node:process` — chalk's
+                 * supports-color does — ended up declaring the identifier
+                 * twice and failed to parse. Splitting the CLI into its own
+                 * entries reshuffled the chunks and produced exactly that, and
+                 * only inside the image, where the grouping differed from the
+                 * local build. `process` is a Node global; the import bought
+                 * nothing and cost a driver that would not load.
+                 */
+                banner: 'import { createRequire as __createRequire } from "module"; const require = __createRequire(import.meta.url);'
             }
         }
     },

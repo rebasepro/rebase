@@ -1,5 +1,5 @@
 ---
-sourceHash: 67e5fa6384e4d04a
+sourceHash: 5f3f6e8bcd4db79e
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Configura l'autenticazione JWT, i provider OAuth, l'email SMTP, gli hook di autenticazione e gli adattatori di autenticazione personalizzati sul backend.

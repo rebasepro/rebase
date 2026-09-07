@@ -1,5 +1,5 @@
 ---
-sourceHash: 5f8b43fabd10eb86
+sourceHash: 992cde1e596553dd
 title: Implementando Rebase na Hetzner Cloud
 description: Implemente o Rebase na Hetzner Cloud com Terraform ou Docker Compose, para excelente desempenho europeu e soberania de dados.
 sidebar_label: Nuvem Hetzner

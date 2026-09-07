@@ -1,5 +1,5 @@
 ---
-sourceHash: 9df2202ffe55b40c
+sourceHash: 9f1b7d5235fc2510
 title: Lavori Cron
 sidebar_label: Lavori Cron
 description: Pianifica attività in background ricorrenti con il sistema di lavori cron integrato di Rebase. Definisci i lavori come file TypeScript, monitorali in Studio e gestiscili tramite l'API REST.
@@ -99,7 +99,7 @@ Sono supportati valori di passo (`*/n`), intervalli (`a-b`) ed elenchi (`a,b,c`)
 
 ## Riferimento CronJobDefinition
 
-`timezone` è nuovo <span class="since-badge" data-since="0.18">Since 0.18</span> — in 0.17.3 una pianificazione viene sempre letta nel
+`timezone` è nuovo — in 0.17.3 una pianificazione viene sempre letta nel
 fuso dell'host. Tutto il resto di questa interfaccia è già rilasciato.
 
 ```typescript

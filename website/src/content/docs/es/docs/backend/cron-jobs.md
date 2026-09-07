@@ -1,5 +1,5 @@
 ---
-sourceHash: 9df2202ffe55b40c
+sourceHash: 9f1b7d5235fc2510
 title: Trabajos Cron
 sidebar_label: Trabajos Cron
 description: Programa tareas en segundo plano recurrentes con el sistema de trabajos cron integrado de Rebase. Define trabajos como archivos TypeScript, monitorízalos en Studio y adminístralos a través de la API REST.
@@ -99,7 +99,7 @@ Los valores de paso (`*/n`), rangos (`a-b`) y listas (`a,b,c`) son todos compati
 
 ## Referencia de CronJobDefinition
 
-`timezone` es nuevo <span class="since-badge" data-since="0.18">Since 0.18</span> — en 0.17.3 un horario siempre se lee en la zona del
+`timezone` es nuevo — en 0.17.3 un horario siempre se lee en la zona del
 anfitrión. Todo lo demás de esta interfaz ya está publicado.
 
 ```typescript
