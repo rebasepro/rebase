@@ -16,7 +16,7 @@ from the first frame and the first word is half a second in.
 **Every line is a sentence.** A subject, a verb, and the thing the verb is
 about. Nothing here needs a second reading to parse.
 
-Total: **3000 frames = 100.0 seconds** at 30fps · 295 words · 177 words a
+Total: **3000 frames = 100.0 seconds** at 30fps · 300 words · 180 words a
 minute over the whole run, silences included.
 
 ## The script
@@ -24,18 +24,18 @@ minute over the whole run, silences included.
 | # | Beat | Starts | Words | Line | Gap after |
 |---|------|--------|-------|------|-----------|
 | 01 | You, to camera | 0.5s | 15 | It's 2026. Anyone can build a backend in an afternoon. But can you trust it? | 0.6s |
-| 02 | The evidence | 5.6s | 27 | This one was built by an agent over lunch. It works. And a ten-second scan found three security issues, including a customers table that anyone can read. | 1.3s |
-| 03 | Point Rebase at it | 15.0s | 28 | So you point Rebase at that same database. It reads the tables that are already there and writes a TypeScript file for each one. That's the whole setup. | 0.5s |
-| 04 | The rule | 23.9s | 35 | Access rules go in that same file. This one says customers can only see their own orders. It doesn't compile into middleware. It compiles into a Postgres row-level security policy, and the database enforces it. | 0.7s |
-| 05 | Push, and the same scan | 35.1s | 14 | You push it, you run the exact same scan again, and it finds nothing. | 0.6s |
-| 06 | Run it | 39.9s | 4 | Then you run it. | 2.0s — the terminal prints the ports |
-| 07 | Two people | 43.1s | 34 | Robert is a customer, so he gets his own orders. Dana works in support, so she gets all of them. It's the same query. The database decides who gets what, not your application code. | 0.5s |
-| 08 | The agent | 53.8s | 30 | And an agent works the same way. It gets a key with permissions on it, and it cannot get around them. The rules hold no matter what the prompt says. | 0.5s |
-| 09 | The panel | 63.4s | 25 | Your team also gets an admin panel. It is generated from the same files, with the same rules applied, and nobody had to build it. | 1.3s — the montage plays |
-| 10 | Every view | 72.2s | 12 | Every collection gets boards, tables, cards and forms, straight from its schema. | 0.4s |
-| 11 | The schema | 76.2s | 14 | The schema view is read from the live database, so it is always current. | 0.4s |
-| 12 | Studio | 80.8s | 12 | And you can work on the database itself from the same app. | 0.4s |
-| 13 | The whole desk | 84.8s | 45 | So that was three commands. It's open source, MIT licensed, and you can run it on your laptop, on your own servers, or on any cloud that can run a container. The scan works on any Postgres database, so it's a good place to start. | — |
+| 02 | The evidence | 5.6s | 32 | Take this one. The agent says it's done: auth, CRUD for nine tables, a REST API, deployed. And a ten-second scan of the same database finds two critical issues and one high. | 1.3s |
+| 03 | Point Rebase at it | 16.5s | 28 | So you point Rebase at that same database. It reads the tables that are already there and writes a TypeScript file for each one. That's the whole setup. | 0.5s |
+| 04 | The rule | 25.4s | 35 | Access rules go in that same file. This one says customers can only see their own orders. It doesn't compile into middleware. It compiles into a Postgres row-level security policy, and the database enforces it. | 0.7s |
+| 05 | Push, and the same scan | 36.6s | 14 | You push it, you run the exact same scan again, and it finds nothing. | 0.6s |
+| 06 | Run it | 41.4s | 4 | Then you run it. | 1.5s — the terminal prints the ports |
+| 07 | Two people | 44.1s | 34 | Robert is a customer, so he gets his own orders. Dana works in support, so she gets all of them. It's the same query. The database decides who gets what, not your application code. | 0.5s |
+| 08 | The agent | 54.8s | 30 | And an agent works the same way. It gets a key with permissions on it, and it cannot get around them. The rules hold no matter what the prompt says. | 0.5s |
+| 09 | The panel | 64.4s | 25 | Your team also gets an admin panel. It is generated from the same files, with the same rules applied, and nobody had to build it. | 0.7s — the montage plays |
+| 10 | Every view | 72.5s | 12 | Every collection gets boards, tables, cards and forms, straight from its schema. | 0.4s |
+| 11 | The schema | 76.5s | 14 | The schema view is read from the live database, so it is always current. | 0.4s |
+| 12 | Studio | 81.1s | 12 | And you can work on the database itself from the same app. | 0.4s |
+| 13 | The whole desk | 85.1s | 45 | So that was three commands. It's open source, MIT licensed, and you can run it on your laptop, on your own servers, or on any cloud that can run a container. The scan works on any Postgres database, so it's a good place to start. | — |
 
 ## The presenter
 

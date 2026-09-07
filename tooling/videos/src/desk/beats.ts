@@ -115,16 +115,16 @@ export const BEATS: Beat[] = [
        picture. The sheet is laid out from the script at nine frames a word
        with half-second gaps, and lands on 3000 frames — a hundred seconds. */
     { id: "hook", start: tempo(12), view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.3 },
-    { id: "init", start: tempo(454), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "rule", start: tempo(722), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
-    { id: "push", start: tempo(1057), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.3 },
-    { id: "users", start: tempo(1297), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
-    { id: "agent", start: tempo(1619), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
-    { id: "panel", start: tempo(1905), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "views", start: tempo(2170), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
-    { id: "schema", start: tempo(2290), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
-    { id: "studio", start: tempo(2428), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
-    { id: "all", start: tempo(2548), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "init", start: tempo(499), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "rule", start: tempo(767), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
+    { id: "push", start: tempo(1102), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.3 },
+    { id: "users", start: tempo(1327), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
+    { id: "agent", start: tempo(1649), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
+    { id: "panel", start: tempo(1935), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "views", start: tempo(2180), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "schema", start: tempo(2300), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
+    { id: "studio", start: tempo(2438), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
+    { id: "all", start: tempo(2558), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
 ];
 
 /** Where the camera starts: on the hook, which is where it stays until the
