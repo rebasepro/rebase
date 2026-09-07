@@ -84,9 +84,57 @@ const articleSchema = {
 		<script type="application/ld+json" set:html={JSON.stringify(articleSchema)} />
 	</Fragment>
 
-	<main class="min-h-screen py-24">
-		<article class="max-w-4xl mx-auto px-6">
-			{heroImage ? (
+	<main class="min-h-screen">
+		<!-- The hero is a full-bleed band, the same composition every other page on
+		     the site opens with: the gradient spans the viewport and the title sits
+		     on it, rather than a picture boxed inside the article column. -->
+		<section class="relative isolate overflow-hidden hero-under-nav flex min-h-[26rem] items-end pb-14 sm:min-h-[32rem] sm:pb-20">
+			{/* The canvas has to be taken out of flow. `variant="card"` renders a
+			    bare canvas sized to its parent, so left in the document it becomes
+			    a full-height block that pushes the title below the fold instead of
+			    sitting behind it.
+
+			    `poseKey` is the slug, not the pathname, so this lands on exactly
+			    the seat this post's card uses on /blog — the same picture in both
+			    places. Leaving it off would hash "/blog/<slug>" here and "<slug>"
+			    there. */}
+			<div class="absolute inset-0">
+				<NeatBackground client:idle variant="card" poseKey={slug} />
+			</div>
+			{/* The pose is a function of the slug, so where the bright part of the
+			    ribbon lands is not knowable when this is written. The scrim makes the
+			    title legible against any frame the orbit produces. */}
+			<div class="absolute inset-0 bg-gradient-to-t from-surface-950 via-surface-950/75 to-surface-950/30"></div>
+
+			<div class="relative z-10 max-w-4xl mx-auto px-6 text-center">
+				<div class="text-sm text-surface-300 mb-4">
+					<FormattedDate date={pubDate} />
+					{updatedDate && (
+						<div class="italic mt-2">
+							Last updated on <FormattedDate date={updatedDate} />
+						</div>
+					)}
+				</div>
+				<h1 class="text-4xl md:text-5xl lg:text-6xl text-white mb-6 [text-shadow:0_2px_30px_rgba(0,0,0,.55)]">{title}</h1>
+
+				{author && (
+					<div class="flex items-center justify-center gap-4">
+						<img
+							src={author.image_url}
+							alt={author.name}
+							class="w-12 h-12 rounded-full"
+						/>
+						<div class="text-left">
+							<div class="text-white font-semibold">{author.name}</div>
+							<div class="text-sm text-surface-300">{author.title}</div>
+						</div>
+					</div>
+				)}
+			</div>
+		</section>
+
+		<article class="max-w-4xl mx-auto px-6 pb-24">
+			{heroImage && (
 				<div class="mb-12 rounded-2xl overflow-hidden">
 					<Image
 						width={1020}
@@ -96,44 +144,7 @@ const articleSchema = {
 						class="w-full h-auto"
 					/>
 				</div>
-			) : (
-				<div class="mb-12 rounded-2xl overflow-hidden aspect-[2/1] relative isolate">
-					{/* `poseKey` is the slug, not the pathname, so this lands on
-					    exactly the seat this post's card uses on /blog — the
-					    artwork is the same picture in both places. Leaving it off
-					    would hash "/blog/<slug>" here and "<slug>" there, which
-					    are different keys and so different frames. */}
-					<NeatBackground client:idle variant="card" poseKey={slug} />
-				</div>
 			)}
-
-			<div class="mb-8 text-center">
-				<div class="text-sm text-surface-400 mb-4">
-					<FormattedDate date={pubDate} />
-					{updatedDate && (
-						<div class="italic mt-2">
-							Last updated on <FormattedDate date={updatedDate} />
-						</div>
-					)}
-				</div>
-				<h1 class="text-4xl md:text-5xl text-white mb-6">{title}</h1>
-
-				{author && (
-					<div class="flex items-center justify-center gap-4 mb-6">
-						<img
-							src={author.image_url}
-							alt={author.name}
-							class="w-12 h-12 rounded-full"
-						/>
-						<div class="text-left">
-							<div class="text-white font-semibold">{author.name}</div>
-							<div class="text-sm text-surface-400">{author.title}</div>
-						</div>
-					</div>
-				)}
-
-				<hr class="border-surface-800 max-w-xs mx-auto" />
-			</div>
 
 		<div class="prose prose-invert prose-lg max-w-3xl mx-auto [&_p]:my-3 [&_img]:my-8 [&_h1]:mt-8 [&_h1]:mb-4 [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:mt-6 [&_h3]:mb-2 [&_h4]:mt-4 [&_h4]:mb-2 [&_ul]:my-4 [&_ol]:my-4 [&_li]:my-1 [&_blockquote]:my-4 [&_pre]:my-4 [&_hr]:my-6 [&_table]:my-4 [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_figure]:my-4">
 			<slot />

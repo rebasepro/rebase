@@ -32,48 +32,44 @@ const breadcrumbs = [
 				{posts.map((post) => (
 					<a
 						href={`/blog/${post.id}/`}
-						class="group block bg-surface-900 rounded-2xl overflow-hidden border border-surface-800 hover:border-primary transition-all duration-300 hover:shadow-lg hover:shadow-primary/10"
+						class="group relative isolate flex min-h-[21rem] flex-col justify-end overflow-hidden rounded-2xl border border-surface-800 p-6 transition-all duration-300 hover:border-primary hover:shadow-lg hover:shadow-primary/10"
 					>
-						<div class="aspect-video overflow-hidden bg-surface-800">
+						{/* The artwork is the whole card, not a thumbnail band above the
+						    text — the same treatment the post's own hero gets, so a card
+						    and the page it opens read as one thing. */}
+						<div class="absolute inset-0 transition-transform duration-500 group-hover:scale-105">
 							{post.data.image ? (
 								post.data.image.endsWith('.webm') || post.data.image.endsWith('.mp4') ? (
-									<video
-										autoplay
-										loop
-										muted
-										playsinline
-										class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-									>
+									<video autoplay loop muted playsinline class="w-full h-full object-cover">
 										<source src={post.data.image} type="video/webm" />
 									</video>
 								) : (
-									<img
-										src={post.data.image}
-										alt={post.data.title}
-										class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-									/>
+									<img src={post.data.image} alt="" class="w-full h-full object-cover" aria-hidden="true" />
 								)
 							) : (
-								/* The site's own gradient, live. `poseKey` is the
-								   post slug, so each card gets its own seat on the
-								   orbit — and the same seat the post's own page
-								   derives from its pathname. What stood here was a
-								   grey box with a picture icon, on every card,
-								   which reads as an image that failed to load. */
-								<div class="w-full h-full group-hover:scale-105 transition-transform duration-300">
-									<NeatBackground client:visible variant="card" poseKey={post.id} />
-								</div>
+								/* `poseKey` is the post slug: every card on this page shares
+								   one pathname, so without it the orbit would seat them all
+								   identically. The slug is also what the post's own hero
+								   passes, so the two land on the same frame. */
+								<NeatBackground client:visible variant="card" poseKey={post.id} />
 							)}
 						</div>
-						<div class="p-6">
-							<div class="text-sm text-surface-400 mb-3">
+
+						{/* Where the bright part of the ribbon lands is a function of the
+						    slug and not knowable here, so the text gets its own ground
+						    rather than relying on the artwork to be dark in the right
+						    corner. */}
+						<div class="absolute inset-0 bg-gradient-to-t from-surface-950 via-surface-950/85 to-transparent"></div>
+
+						<div class="relative">
+							<div class="text-sm text-surface-300 mb-3">
 								<FormattedDate date={post.data.pubDate} />
 							</div>
-							<h2 class="text-xl text-white mb-2 group-hover:text-primary transition-colors">
+							<h2 class="text-xl text-white mb-2 group-hover:text-primary transition-colors [text-shadow:0_2px_20px_rgba(0,0,0,.6)]">
 								{post.data.title}
 							</h2>
 							{post.data.description && (
-								<p class="text-surface-400 text-sm line-clamp-2">
+								<p class="text-surface-300 text-sm line-clamp-2">
 									{post.data.description}
 								</p>
 							)}
