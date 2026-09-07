@@ -35,7 +35,7 @@ export const DESK_NARRATION: { at: number; words: string[] }[] = [
     // the question, to camera
     { at: 15, words: ["It's", "2026.", "Anyone", "can", "build", "a", "backend", "in", "an", "afternoon.", "You", "don't", "even", "need", "to", "know", "what", "one", "is.", "But", "can", "you", "trust", "it?"] },
     // the evidence
-    { at: 236, words: ["This", "one", "was", "vibe-coded", "by", "an", "agent", "in", "an", "afternoon.", "It", "works.", "And", "a", "ten-second", "scan", "found", "three", "holes,", "including", "a", "customers", "table", "that", "anyone", "can", "read."] },
+    { at: 236, words: ["This", "one", "was", "vibe-coded", "by", "an", "agent", "over", "lunch.", "It", "works.", "And", "a", "ten-second", "scan", "found", "three", "holes,", "including", "a", "customers", "table", "that", "anyone", "can", "read."] },
     // init
     { at: 496, words: ["So", "you", "point", "Rebase", "at", "that", "same", "database.", "It", "reads", "the", "tables", "that", "are", "already", "there", "and", "writes", "a", "TypeScript", "file", "for", "each", "one.", "That's", "the", "whole", "setup."] },
     // rule

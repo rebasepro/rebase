@@ -16,7 +16,7 @@ from the first frame and the first word is half a second in.
 **Every line is still a sentence.** "Zero findings." would have been on brand
 and is not one.
 
-Total: **3000 frames = 100.0 seconds** at 30fps · 324 words · 194 words a
+Total: **3000 frames = 100.0 seconds** at 30fps · 323 words · 194 words a
 minute over the whole run, silences included.
 
 ## The script
@@ -24,7 +24,7 @@ minute over the whole run, silences included.
 | # | Beat | Starts | Words | Line | Gap after |
 |---|------|--------|-------|------|-----------|
 | 01 | You, to camera | 0.5s | 24 | It's 2026. Anyone can build a backend in an afternoon. You don't even need to know what one is. But can you trust it? | 0.6s |
-| 02 | The evidence | 7.9s | 27 | This one was vibe-coded by an agent in an afternoon. It works. And a ten-second scan found three holes, including a customers table that anyone can read. | 1.0s |
+| 02 | The evidence | 7.9s | 26 | This one was vibe-coded by an agent over lunch. It works. And a ten-second scan found three holes, including a customers table that anyone can read. | 1.0s |
 | 03 | Point Rebase at it | 16.5s | 28 | So you point Rebase at that same database. It reads the tables that are already there and writes a TypeScript file for each one. That's the whole setup. | 0.4s |
 | 04 | The rule | 24.9s | 40 | Access rules go in that same file. This one says customers can only see their own orders. And it doesn't compile into middleware you might forget to call. It compiles into a Postgres row-level security policy. The database enforces it. | 0.7s |
 | 05 | Push, and the same scan | 36.9s | 14 | You push it, you run the exact same scan again, and it finds nothing. | 0.5s |
