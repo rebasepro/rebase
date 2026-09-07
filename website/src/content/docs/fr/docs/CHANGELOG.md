@@ -11,6 +11,8 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-07
+
 ### Changed
 
 - **The scaffold's imports lose the `.js` extension.** A new project's

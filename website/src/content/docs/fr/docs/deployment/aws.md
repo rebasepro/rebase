@@ -33,7 +33,7 @@ rebase build
 App Runner tire depuis un registre : intégrez donc le bundle dans une image dérivée. Trois lignes, et cela fige exactement ce qui tourne :
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.18.1
+FROM rebasepro/server:0.19.0
 COPY dist-bundle /bundle
 ```
 
