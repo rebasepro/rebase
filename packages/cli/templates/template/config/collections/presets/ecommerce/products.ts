@@ -1,5 +1,5 @@
 import { defineCollection } from "@rebasepro/cms-types";
-import categoriesCollection from "./categories.js";
+import categoriesCollection from "./categories";
 
 const productsCollection = defineCollection({
     name: "Products",

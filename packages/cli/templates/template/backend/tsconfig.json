@@ -5,6 +5,12 @@
     "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "outDir": "./dist",
+    // The program includes `../config/**`, so tsc's common source directory is
+    // the project root and the emit already lands at `dist/backend/src/…` —
+    // which is what `scripts.start` runs. Saying so explicitly is required from
+    // TypeScript 6, which refuses to infer it (TS5011), and changes nothing
+    // about the layout.
+    "rootDir": "..",
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,

@@ -4,7 +4,7 @@
     "description": "Rebase BaaS — headless PostgreSQL API",
     "type": "module",
     "scripts": {
-        "build": "tsc"
+        "build": "tsc && rebase normalize-imports dist"
     },
     "dependencies": {
         "@rebasepro/server": "workspace:*",

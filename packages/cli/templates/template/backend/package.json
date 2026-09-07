@@ -4,7 +4,7 @@
     "description": "Rebase backend with PostgreSQL",
     "type": "module",
     "scripts": {
-        "build": "rebase schema generate --collections ../config/collections && tsc"
+        "build": "rebase schema generate --collections ../config/collections && tsc && rebase normalize-imports dist"
     },
     "dependencies": {
         "{{PROJECT_NAME}}-config": "*",

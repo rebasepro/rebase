@@ -23,14 +23,14 @@ import {
 import { declaredDataSources, declaredStorageSources } from "@rebasepro/types";
 // Side-effect import: declaring is what registers, so anything that dropped
 // this as "unused" would leave the backend with no buckets — silently.
-import "../../config/resources.js";
+import "../../config/resources";
 // {{#collections}}
-import { enums, relations, tables } from "./schema.generated.js";
+import { enums, relations, tables } from "./schema.generated";
 // {{/collections}}
-import { storageAuthorize } from "../../config/storage.js";
-import { env } from "./env.js";
+import { storageAuthorize } from "../../config/storage";
+import { env } from "./env";
 // {{#collections}}
-import usersCollection from "../../config/collections/users.js";
+import usersCollection from "../../config/collections/users";
 // {{/collections}}
 
 const __filename = fileURLToPath(import.meta.url);

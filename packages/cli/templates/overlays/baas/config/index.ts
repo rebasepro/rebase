@@ -21,4 +21,4 @@
  * admin surface and no React.
  */
 
-export { storageAuthorize } from "./storage.js";
+export { storageAuthorize } from "./storage";

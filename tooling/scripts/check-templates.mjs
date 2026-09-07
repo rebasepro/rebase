@@ -40,6 +40,53 @@ const BAAS = "baas";
 /** Files the blog preset owns; other presets replace them. Mirrors applyPreset. */
 const BLOG_FILES = ["posts.ts", "authors.ts", "tags.ts", "index.ts"];
 
+
+/**
+ * JSONC → JSON, by scanning rather than by pattern.
+ *
+ * This was two regular expressions, and the block-comment one —
+ * `/\/\*[\s\S]*?\*\//g` — treats any `/*` as an opener. A tsconfig is full of
+ * them: `"src/**\/*"` in an `include`, and any comment that mentions a glob.
+ * One added comment saying `../config/**` made the regex swallow from there to
+ * the next `*\/` anywhere in the file, and the gate reported the tsconfig as
+ * unparseable at a line that was fine.
+ *
+ * A scanner cannot make that mistake, because it knows whether it is inside a
+ * string when it meets a slash. Strings are the only context that matters in
+ * JSON; there are no template literals or regex literals to worry about.
+ */
+function stripJsonComments(source) {
+    let out = "";
+    let inString = false;
+    let i = 0;
+    while (i < source.length) {
+        const char = source[i];
+        if (inString) {
+            out += char;
+            if (char === "\\") { out += source[i + 1] ?? ""; i += 2; continue; }
+            if (char === '"') inString = false;
+            i += 1;
+            continue;
+        }
+        if (char === '"') { inString = true; out += char; i += 1; continue; }
+        if (char === "/" && source[i + 1] === "/") {
+            while (i < source.length && source[i] !== "\n") i += 1;
+            continue;
+        }
+        if (char === "/" && source[i + 1] === "*") {
+            i += 2;
+            while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
+            i += 2;
+            continue;
+        }
+        out += char;
+        i += 1;
+    }
+    // A trailing comma left behind by a removed entry is not our problem, but a
+    // comment that ended a line often leaves one dangling before `}` or `]`.
+    return out.replace(/,(\s*[}\]])/g, "$1");
+}
+
 function copyDir(from, to) {
     fs.mkdirSync(to, { recursive: true });
     for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
@@ -273,9 +320,7 @@ function checkPinnedTypesAreDeclared() {
         if (!fs.existsSync(tsconfigPath) || !fs.existsSync(manifestPath)) continue;
 
         // The template tsconfigs carry explanatory comments, so this is JSONC.
-        const raw = fs.readFileSync(tsconfigPath, "utf8")
-            .replace(/\/\*[\s\S]*?\*\//g, "")
-            .replace(/(^|[^:])\/\/.*$/gm, "$1");
+        const raw = stripJsonComments(fs.readFileSync(tsconfigPath, "utf8"));
         let pinned;
         try {
             pinned = JSON.parse(raw).compilerOptions?.types;

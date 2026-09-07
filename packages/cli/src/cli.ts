@@ -12,6 +12,7 @@ import { authCommand } from "./commands/auth";
 import { doctorCommand } from "./commands/doctor";
 import { resourcesCommand } from "./commands/resources";
 import { statusCommand } from "./commands/status";
+import { normalizeImportsCommand } from "./commands/normalize-imports";
 import { skillsCommand } from "./commands/skills";
 import { apiKeysCommand } from "./commands/api-keys";
 import { telemetryCommand } from "./commands/telemetry";
@@ -193,6 +194,9 @@ export async function entry(args: string[]) {
             await devCommand(args);
             break;
 
+        case "normalize-imports":
+            await normalizeImportsCommand(args);
+            break;
         case "build":
             await buildCommand(args);
             break;
@@ -262,6 +266,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("init")}                    Create a new Rebase project
   ${chalk.blue.bold("dev")}                     Start the development server
   ${chalk.blue.bold("build")}                   Build the apps declared in rebase.json into a bundle
+  ${chalk.blue.bold("normalize-imports")}       Complete compiled output's relative imports for Node ESM
   ${chalk.blue.bold("start")}                   Start the backend server ${chalk.gray("(production)")}
   ${chalk.blue.bold("apps list")}               Show the apps this repository declares
 

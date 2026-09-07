@@ -440,9 +440,16 @@ force: true });
                 const content = fs.readFileSync(path.join(collectionsDir, file), "utf-8");
                 const specs = [...content.matchAll(/from\s+"(\.[^"]+)"/g)].map(m => m[1]);
                 for (const spec of specs) {
-                    const resolved = path.resolve(collectionsDir, spec.replace(/\.js$/, ".ts"));
+                    // The scaffold writes extensionless specifiers, which is
+                    // what `moduleResolution: "bundler"` asks for and what the
+                    // build completes for Node afterwards. A `.js` specifier
+                    // still resolves here, so this keeps working for a project
+                    // written the other way.
+                    const base = path.resolve(collectionsDir, spec.replace(/\.js$/, ""));
+                    const resolved = [`${base}.ts`, `${base}.tsx`, path.join(base, "index.ts")]
+                        .find(candidate => fs.existsSync(candidate));
                     expect(
-                        fs.existsSync(resolved),
+                        resolved !== undefined,
                         `${preset} preset: ${file} imports "${spec}", which does not exist after scaffolding`
                     ).toBe(true);
                 }

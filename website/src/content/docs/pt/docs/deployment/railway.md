@@ -1,5 +1,5 @@
 ---
-sourceHash: 8e03da22f74aa312
+sourceHash: ebbe1c02008ba7df
 title: Implementando o Rebase no Railway
 description: Implemente o Rebase sem esforço com o Railway, que oferece suporte nativo à análise de Dockerfile. Mantenha o foco na UE.
 sidebar_label: Railway

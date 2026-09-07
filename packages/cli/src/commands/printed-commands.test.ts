@@ -30,9 +30,19 @@ function dispatchedCommands(): Set<string> {
     const declared = /const namespacedCommands = \[([^\]]*)\]/.exec(source);
     if (!declared) throw new Error("namespacedCommands not found in cli.ts — this check is reading the wrong thing");
     const words = new Set([...declared[1].matchAll(/"([a-z][a-z0-9-]*)"/g)].map(m => m[1]));
-    // Dispatched by a `case` rather than listed, because they take no
-    // subcommand and so never need the `--help` special-casing the list drives.
-    for (const extra of ["init", "dev", "build", "start", "doctor", "eject", "generate-sdk"]) words.add(extra);
+
+    // The rest are dispatched by a bare `case` rather than listed, because they
+    // take no subcommand and so never need the `--help` special-casing the list
+    // drives. Read from the `case` labels, not from a copy kept here: this was a
+    // hand-written list of seven, and the eighth command added — `normalize-imports`
+    // — failed this check for existing rather than for being wrong. A guard whose
+    // answer depends on somebody remembering to update it reports the memory
+    // lapse, not the defect.
+    //
+    // `__dev-db-daemon` and friends are excluded by the pattern: an internal
+    // entry point is not a command anybody should be told to run.
+    for (const [, word] of source.matchAll(/^\s*case "([a-z][a-z0-9-]*)":/gm)) words.add(word);
+
     return words;
 }
 

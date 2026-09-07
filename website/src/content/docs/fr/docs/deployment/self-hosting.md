@@ -1,5 +1,5 @@
 ---
-sourceHash: 014571bd2ff1e258
+sourceHash: 59a28fdc4be60490
 title: Auto-hébergement
 sidebar_label: Auto-hébergement
 description: Exécutez Rebase n'importe où avec l'image d'exécution officielle et le bundle de votre projet — Docker Compose, Fly, Railway ou un simple VPS.

@@ -2,6 +2,46 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The scaffold's imports lose the `.js` extension.** A new project's
+  collections imported each other as `./authors.js` — an output extension in a
+  `.ts` file, on every relative import — and nothing in the scaffold asked for
+  it. Both its tsconfigs are `moduleResolution: "bundler"`, where extensionless
+  is correct; `normalizeEsmSpecifiers`' own docblock calls extensionless "the
+  extremely common style". The template was the thing out of step.
+
+  What the extension was really for is one step further on. TypeScript emits
+  module specifiers verbatim, by long-stated policy, and Node's ESM loader
+  resolves no extensions — so `./authors` compiles and then throws
+  `ERR_MODULE_NOT_FOUND` under `node dist/…`. `rebase build` has always closed
+  that gap for the bundle it writes. Nothing closed it for the plain `tsc`
+  output that `rebase eject` runs, or that a self-hoster runs after
+  `pnpm build`, so the templates paid the tax in source instead.
+
+  **`rebase normalize-imports <dir>`** is that step, made available to the
+  builds that need it: it rewrites each relative specifier in emitted JavaScript
+  to the file it actually resolves to. Only relative specifiers, only when the
+  target exists, idempotent, and skipping comments — the stock
+  `config/resources.ts` documents an import inside a docblock. Both scaffold
+  build scripts run it after `tsc`, so an ejected project and a hand-built one
+  get what `rebase build` already produced.
+
+  The scaffold's `backend/tsconfig.json` also gains the `rootDir: ".."` its
+  layout has always implied — the program includes `../config/**`, so the emit
+  already lands at `dist/backend/src/…`, which is what `scripts.start` runs.
+  TypeScript 6 refuses to infer that (TS5011).
+
+### Fixed
+
+- **`check:eject` never ran what it checked.** It typechecked the ejected
+  project with `noEmit`, which is blind to the only failure that path has:
+  Node resolving `./authors` to nothing at start-up. It now compiles each
+  package with the project's own tsconfig, runs the same normalization the build
+  runs, and asserts every relative specifier in the emitted output names a file
+  that exists. Mutation-tested by skipping the normalization: 25 dangling
+  imports across both flavours, where the old gate stayed green.
+
 ## [0.18.1] - 2026-09-07
 
 ### Fixed

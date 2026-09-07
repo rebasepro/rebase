@@ -55,7 +55,7 @@ describe("the scaffolded project declares a storage access model", () => {
             "utf8"
         );
         expect(backend).toMatch(/^\s*storageAuthorize,?\s*$/m);
-        expect(backend).toContain('from "../../config/storage.js"');
+        expect(backend).toContain('from "../../config/storage"');
     });
 
     it("still enables storage under NODE_ENV=production, so the guard does apply", () => {

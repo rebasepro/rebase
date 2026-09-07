@@ -1,7 +1,7 @@
-import postsCollection from "./posts.js";
-import authorsCollection from "./authors.js";
-import tagsCollection from "./tags.js";
-import usersCollection from "./users.js";
+import postsCollection from "./posts";
+import authorsCollection from "./authors";
+import tagsCollection from "./tags";
+import usersCollection from "./users";
 import type { SecurityRule } from "@rebasepro/types";
 
 export const collections = [postsCollection, authorsCollection, tagsCollection, usersCollection];

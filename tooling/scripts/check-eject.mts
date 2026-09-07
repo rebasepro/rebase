@@ -42,6 +42,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { ejectCommand } from "../../packages/cli/src/commands/eject";
 import { loadManifest } from "../../packages/cli/src/manifest";
+import { commentSpans, normalizeEsmSpecifiers } from "../../packages/cli/src/bundle";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const templateRoot = path.join(repoRoot, "packages/cli/templates/template");
@@ -472,6 +473,98 @@ function checkEmittedPaths(projectRoot: string, flavour: "cms" | "baas"): void {
     );
 }
 
+/**
+ * The emitted JavaScript actually resolves under Node's ESM loader.
+ *
+ * `typecheck` below runs with `noEmit`, which is the right shape for a type
+ * program and blind to the failure that matters here: an ejected project runs
+ * `node dist/backend/src/index.js`, and Node resolves no extensions. A relative
+ * specifier that TypeScript is perfectly happy with — `./authors`, under
+ * `moduleResolution: "bundler"` — throws `ERR_MODULE_NOT_FOUND` at start-up.
+ *
+ * The templates used to avoid that by writing `./authors.js` in the source, an
+ * output extension in a `.ts` file, on every relative import in the project.
+ * They no longer do; `rebase normalize-imports` completes the specifiers after
+ * `tsc`, on the same emitted tree, and both scaffold build scripts run it.
+ *
+ * So this emits for real, runs that same rewrite, and then asserts what the
+ * loader would assert: every relative specifier names a file that exists. It is
+ * the artifact check the gate never had — the reason removing the extensions
+ * looked safe right up until `pnpm start`.
+ */
+function checkEmittedImportsResolve(projectRoot: string, flavour: "cms" | "baas"): void {
+    // The project's OWN tsconfigs, which is what `pnpm build` runs — not a
+    // synthetic program. A generated one spans this repository through `paths`
+    // and cannot be given a `rootDir`, and its output layout would not be the
+    // layout `node dist/backend/src/index.js` walks.
+    const packages = ["config", "backend"].filter(
+        name => fs.existsSync(path.join(projectRoot, name, "tsconfig.json"))
+    );
+
+    for (const name of packages) {
+        const pkgRoot = path.join(projectRoot, name);
+        const tsconfig = readJsonc(path.join(pkgRoot, "tsconfig.json"));
+        const outDir = path.resolve(pkgRoot, tsconfig.compilerOptions?.outDir ?? "dist");
+
+        try {
+            execFileSync(tsc, ["-p", path.join(pkgRoot, "tsconfig.json")], { cwd: pkgRoot, stdio: "pipe" });
+        } catch (error) {
+            const output = String((error as { stdout?: Buffer }).stdout ?? "").trim();
+            problems.push(
+                `[${flavour}] ${name}/ does not emit:\n${output.split("\n").slice(0, 8).map(l => `      ${l}`).join("\n")}`
+            );
+            continue;
+        }
+
+        if (!fs.existsSync(outDir)) {
+            problems.push(`[${flavour}] ${name}/ emitted nothing into ${path.relative(projectRoot, outDir)}`);
+            continue;
+        }
+
+        // What that package's build script does, on the same tree.
+        normalizeEsmSpecifiers(outDir);
+
+        const dangling: string[] = [];
+        const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["'](\.[^"']*)["']/g;
+        const walk = (dir: string): void => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) { walk(full); continue; }
+                if (!entry.name.endsWith(".js")) continue;
+                const source = fs.readFileSync(full, "utf8");
+                // A regular expression cannot tell a specifier from a specifier
+                // somebody wrote about, and the stock template ships one:
+                // `config/resources.ts` documents an import inside a docblock,
+                // which tsc preserves. Same reason `normalizeEsmSpecifiers`
+                // takes these spans, and the same helper.
+                const comments = commentSpans(source);
+                const inComment = (at: number): boolean =>
+                    comments.some(([from, to]) => at >= from && at < to);
+                for (const match of source.matchAll(SPECIFIER)) {
+                    if (match.index !== undefined && inComment(match.index)) continue;
+                    const target = path.resolve(path.dirname(full), match[1]);
+                    // Node resolves a relative ESM specifier as a literal path:
+                    // no extension search, no directory index.
+                    if (!fs.existsSync(target) || fs.statSync(target).isDirectory()) {
+                        dangling.push(`${name}/${path.relative(outDir, full)} → ${match[1]}`);
+                    }
+                }
+            }
+        };
+        walk(outDir);
+
+        if (dangling.length > 0) {
+            problems.push(
+                `[${flavour}] ${dangling.length} relative import(s) in ${name}/'s emitted output resolve to no `
+                + `file, so \`node dist/…\` throws ERR_MODULE_NOT_FOUND at start-up:\n`
+                + dangling.slice(0, 8).map(d => `      ${d}`).join("\n")
+            );
+        }
+
+        fs.rmSync(outDir, { recursive: true, force: true });
+    }
+}
+
 /** The whole reason this file exists: compile the emitted server. */
 function typecheck(projectRoot: string, flavour: "cms" | "baas"): void {
     const include = flavour === "cms"
@@ -527,6 +620,7 @@ try {
         checkDockerfile(projectRoot, flavour);
         checkCompose(projectRoot, flavour);
         typecheck(projectRoot, flavour);
+        checkEmittedImportsResolve(projectRoot, flavour);
     }
 } finally {
     process.chdir(cwd);
@@ -542,4 +636,4 @@ if (problems.length > 0) {
 }
 
 fs.rmSync(workRoot, { recursive: true, force: true });
-console.log("  ok   what `rebase eject` emits compiles, and its image names only files that exist");
+console.log("  ok   what `rebase eject` emits compiles, resolves under Node ESM, and its image names only files that exist");

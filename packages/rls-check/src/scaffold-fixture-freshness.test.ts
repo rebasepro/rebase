@@ -24,7 +24,11 @@ const TEMPLATE = path.join(__dirname, "../../cli/templates/template/config/colle
  * Bump this ONLY together with a re-recorded `scaffold.sql` and a re-checked
  * `EXPECTED_BASELINE` — the header of that file has the recipe.
  */
-const RECORDED = "1559e12af3993ff5";
+// Moved 2026-09-07 for the extensionless-import change: the only edit to these
+// files was `from "./authors.js"` → `from "./authors"`, verified as the entire
+// diff. No collection, property or rule changed, so `scaffold.sql` and
+// `EXPECTED_BASELINE` still describe this template and were not re-recorded.
+const RECORDED = "1e83cf8922625194";
 
 describe("the recorded scaffold fixture", () => {
     it("was recorded from the template the CLI still ships", () => {

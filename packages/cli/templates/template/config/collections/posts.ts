@@ -1,6 +1,6 @@
 import { defineCollection } from "@rebasepro/cms-types";
-import authorsCollection from "./authors.js";
-import tagsCollection from "./tags.js";
+import authorsCollection from "./authors";
+import tagsCollection from "./tags";
 
 const postsCollection = defineCollection({
     name: "Posts",
