@@ -229,22 +229,83 @@ export function resolveResourceRefs<T>(value: T): T {
  * "JWT secret not configured" bug in this repo — would otherwise register into
  * one registry and read from the other, and see an empty graph with nothing
  * anywhere to explain it.
+ *
+ * `declarations` is that shared map, and stays shared: it is what a project
+ * writes and what every copy has to be able to read.
+ *
+ * `kinds` is NOT, and the distinction is the whole point of `KINDS_KEY` below.
  */
 interface Registry {
+    /** Kinds this copy and its peers agree on — the versioned map. */
     kinds: Map<string, ResourceKindSpec>;
+    /** Kinds written by a copy that predates the versioned map. Read-only here. */
+    legacyKinds: Map<string, ResourceKindSpec>;
     declarations: Map<string, ResourceDeclaration>;
 }
 
 const GLOBAL_KEY = Symbol.for("@rebasepro/types.resourceRegistry");
 
+/**
+ * Where kinds live, versioned — and why the version is in the symbol.
+ *
+ * Sharing one kinds map across copies means the copy that registers SECOND is
+ * the one that runs the comparison. That copy is whatever the bundle happens to
+ * carry, which for a driver is a build of this package frozen at its release —
+ * so the rule enforced is the rule that shipped THEN, not the one written here.
+ *
+ * `revision` (390bb03cd, applied to `database` in 346df48e2) was supposed to
+ * settle a disagreement between two copies, and it settles it only when the
+ * copy doing the arithmetic knows what `revision` is. 0.17.0–0.17.3 do not:
+ * they deep-equal the spec and throw. The runtime registers at import and a
+ * driver is imported after it, so the old copy is always second, always the
+ * judge, and always throws — verified by the bundle corpus on 2026-09-07,
+ * which reported v0.17.3's message verbatim ("Two packages cannot define the
+ * same kind.", no revision clause) while the runtime it ran on was 0.18.
+ *
+ * So copies that understand `revision` keep their kinds here, under a symbol
+ * no released copy looks at, and the legacy map is left to whoever still wants
+ * it. An old copy then registers into a map nobody contests, finds no existing
+ * entry, and cannot throw — in any load order, which is what the previous fix
+ * only claimed. Bumping this suffix again is how a future change to the
+ * REGISTRATION PROTOCOL is made; a change to a kind's own definition is still
+ * `revision`, among peers that share this map.
+ */
+const KINDS_KEY = Symbol.for("@rebasepro/types.resourceKinds.v2");
+
 function registry(): Registry {
-    const g = globalThis as unknown as Record<symbol, Registry | undefined>;
-    let existing = g[GLOBAL_KEY];
-    if (!existing) {
-        existing = { kinds: new Map(), declarations: new Map() };
-        g[GLOBAL_KEY] = existing;
+    const g = globalThis as unknown as Record<symbol, unknown>;
+    let shared = g[GLOBAL_KEY] as { kinds: Map<string, ResourceKindSpec>; declarations: Map<string, ResourceDeclaration> } | undefined;
+    if (!shared) {
+        // `kinds` is created but never written by this copy: an older copy's
+        // own `registry()` returns this object as-is once it exists, and would
+        // throw on `undefined.get` if the property were absent.
+        shared = { kinds: new Map(), declarations: new Map() };
+        g[GLOBAL_KEY] = shared;
     }
-    return existing;
+    let kinds = g[KINDS_KEY] as Map<string, ResourceKindSpec> | undefined;
+    if (!kinds) {
+        kinds = new Map();
+        g[KINDS_KEY] = kinds;
+    }
+    return { kinds, legacyKinds: shared.kinds, declarations: shared.declarations };
+}
+
+/**
+ * Every kind visible to this copy: the versioned map, plus anything only a
+ * legacy copy registered.
+ *
+ * The fallback is not for Rebase's own kinds — this copy defines all of those —
+ * but for a third-party driver built against an older `@rebasepro/types` that
+ * registers a kind of its own. Dropping it would make that kind invisible and
+ * turn `declareResource` into "unknown resource kind" for something genuinely
+ * registered.
+ */
+function visibleKinds(): Map<string, ResourceKindSpec> {
+    const { kinds, legacyKinds } = registry();
+    if (legacyKinds.size === 0) return kinds;
+    const merged = new Map(legacyKinds);
+    for (const [k, v] of kinds) merged.set(k, v);
+    return merged;
 }
 
 /**
@@ -291,11 +352,15 @@ function declarationId(kind: string, key: string): string {
  *
  * Idempotent for an identical spec. When a spec for the same kind is already
  * registered and differs, the `revision` decides: the higher one is kept and
- * the other copy is warned about, in either load order — the case where an
- * older inlined copy of this package (a driver built before the kind changed)
- * meets the runtime's current one. Two different specs at the SAME revision
- * are a genuine conflict — two packages defining one kind, or a change that
- * forgot to bump — and still throw.
+ * the other copy is warned about, in either load order. Two different specs at
+ * the SAME revision are a genuine conflict — two packages defining one kind, or
+ * a change that forgot to bump — and still throw.
+ *
+ * Both copies in that comparison are peers on `KINDS_KEY`, which is what makes
+ * the rule enforceable: a copy old enough not to know `revision` writes to the
+ * legacy map instead and never reaches this function's arithmetic. Registering
+ * a kind an older copy already put in the legacy map is therefore not a
+ * conflict — it is the ordinary case, and `visibleKinds` prefers this one.
  */
 export function registerResourceKind(spec: ResourceKindSpec): void {
     const kinds = registry().kinds;
@@ -326,12 +391,12 @@ export function registerResourceKind(spec: ResourceKindSpec): void {
 
 /** Every registered kind, for validators and for `rebase doctor`. */
 export function resourceKinds(): ResourceKindSpec[] {
-    return [...registry().kinds.values()].map(effectiveKind);
+    return [...visibleKinds().values()].map(effectiveKind);
 }
 
 /** One registered kind, or undefined. */
 export function resourceKind(kind: string): ResourceKindSpec | undefined {
-    const spec = registry().kinds.get(kind);
+    const spec = visibleKinds().get(kind);
     return spec && effectiveKind(spec);
 }
 
@@ -366,7 +431,7 @@ export function declareResource(
 ): ResourceHandle {
     const spec = resourceKind(kind);
     if (!spec) {
-        const known = [...registry().kinds.keys()].sort().join(", ") || "none";
+        const known = [...visibleKinds().keys()].sort().join(", ") || "none";
         throw new Error(
             `Unknown resource kind "${kind}". Registered kinds: ${known}. ` +
             "Call registerResourceKind() before declaring one."

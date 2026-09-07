@@ -164,7 +164,6 @@ const NOT_NEW = new Map([
     ["rebase cloud rollback", "shipped with `rebase cloud`; 0.18 stops it refusing managed deploys"],
     ["rebase dev --docker", "the flag existed and did nothing; 0.18 makes it start and reach the container"],
     ["rebase init", "the scaffolder, since 0.9"],
-    ["database", "the `database` resource and the word itself, since before 0.12"],
     ["page", "the `page` list parameter, since the REST surface existed; 0.18 only validates it"],
     ["count()", "an SDK method since 0.13; 0.18 fixes its de-duplication key"],
     ["afterSaveError", "the callback has always existed; what is new is the `error` it is passed"],

@@ -18,11 +18,39 @@ const CONSUMER_EXTERNALS = [
     "ws",
     "ts-morph"
 ];
+/**
+ * `@rebasepro/*` packages the runtime image supplies. Kept in step with
+ * `RUNTIME_PROVIDED` in packages/cli/src/bundle.ts and docker/entrypoint.mjs by
+ * `scripts/test/runtime-provided.test.mjs`.
+ */
+const RUNTIME_PROVIDED_SCOPED = [
+    "@rebasepro/types",
+    "@rebasepro/common",
+    "@rebasepro/utils"
+];
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
     // Externalize server to prevent singleton duplication (e.g. JWT config, etc)
     if (id === "@rebasepro/server" || id.startsWith("@rebasepro/server/")) return true;
-    // Inline other @rebasepro/* packages (like common, types)
+    // …and the rest of what the runtime image provides, for the same reason.
+    //
+    // Inlining `@rebasepro/types` put a whole second copy of the resource-kind
+    // registry inside this driver's dist. A tenant's pod then held two: the
+    // image's, and the one frozen into whatever driver the bundle was built
+    // with. They register into shared process state, so the older copy — always
+    // the second to load, because a driver is imported after the runtime — ran
+    // ITS release's comparison rule against the current definition. Kinds now
+    // live under a versioned symbol so that cannot throw (see
+    // `KINDS_KEY` in @rebasepro/types), but the duplication is the disease and
+    // that is the antidote: one copy per process, so there is nothing to
+    // reconcile.
+    //
+    // Safe to externalize precisely because each is declared in this package's
+    // `dependencies` AND is in the CLI's RUNTIME_PROVIDED set: an npm consumer
+    // installs them, a linked consumer resolves them through the workspace, and
+    // a managed bundle gets the image's. `@rebasepro/codegen` is in neither
+    // list, so it stays inlined.
+    if (RUNTIME_PROVIDED_SCOPED.some(pkg => id === pkg || id.startsWith(pkg + "/"))) return true;
 
     // Externalize only deps the consumer app explicitly installs
     if (CONSUMER_EXTERNALS.some(ext => id === ext || id.startsWith(ext + "/"))) return true;

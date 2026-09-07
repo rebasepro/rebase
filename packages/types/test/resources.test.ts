@@ -304,23 +304,40 @@ describe("kinds are registered, not hardcoded", () => {
             expect(resourceKind("bucket")?.envBasesByEngine?.local).toEqual(["STORAGE_TYPE", "STORAGE_PATH"]);
         });
 
-        it("the shared registry holds a frozen kind's shipped literal, byte for byte", () => {
-            // What the old copy compares: the raw entry, not the amended view.
-            const shared = (globalThis as Record<symbol, { kinds: Map<string, unknown> }>)[
-                Symbol.for("@rebasepro/types.resourceRegistry")
+        it("the kinds map holds a frozen kind's shipped literal, byte for byte", () => {
+            // The raw entry, not the amended view. Read from KINDS_KEY: kinds
+            // moved off the shared registry object so that a copy predating the
+            // registration protocol never meets a competing entry. What is
+            // asserted is unchanged — only where the entry lives.
+            const kinds = (globalThis as Record<symbol, Map<string, unknown>>)[
+                Symbol.for("@rebasepro/types.resourceKinds.v2")
             ];
             for (const [kind, literal] of Object.entries(frozen)) {
-                expect(JSON.stringify(shared.kinds.get(kind))).toBe(JSON.stringify(literal));
+                expect(JSON.stringify(kinds.get(kind))).toBe(JSON.stringify(literal));
             }
         });
 
         it("holds the database literal at a revision above every published one", () => {
-            const shared = (globalThis as Record<symbol, { kinds: Map<string, { revision?: number }> }>)[
-                Symbol.for("@rebasepro/types.resourceRegistry")
+            const kinds = (globalThis as Record<symbol, Map<string, { revision?: number }>>)[
+                Symbol.for("@rebasepro/types.resourceKinds.v2")
             ];
             // The literal itself may move now — that is what the revision buys —
             // but it may never sit at 0 again, because both published copies do.
-            expect(shared.kinds.get("database")?.revision ?? 0).toBeGreaterThan(0);
+            expect(kinds.get("database")?.revision ?? 0).toBeGreaterThan(0);
+        });
+
+        it("leaves the legacy registry's kinds map untouched", () => {
+            // The map an old inlined copy writes into. This copy creates it (an
+            // old `registry()` returns the object as-is once it exists, and would
+            // throw on `undefined.get` without it) and must never write to it,
+            // or the old copy is back to comparing against a competing entry.
+            const shared = (globalThis as Record<symbol, { kinds: Map<string, unknown> }>)[
+                Symbol.for("@rebasepro/types.resourceRegistry")
+            ];
+            expect(shared.kinds).toBeInstanceOf(Map);
+            for (const kind of Object.keys(frozen)) {
+                expect(shared.kinds.has(kind)).toBe(false);
+            }
         });
     });
 });

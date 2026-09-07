@@ -1801,6 +1801,43 @@ deployment you already run.
 
 ### Fixed
 
+- **A driver published before 0.18 could not load beside the 0.18 runtime, and
+  `revision` could not have fixed it.** `346df48e2` gave the `database` kind a
+  `revision` so that an older copy of `@rebasepro/types` would lose a
+  disagreement instead of throwing. The bundle corpus refused the 0.18.0 release
+  anyway, on the 0.17.3 row, with v0.17.3's message verbatim — *"Two packages
+  cannot define the same kind."*, no revision clause — which is the tell: the
+  throw came from the driver's inlined copy, not from the runtime.
+
+  The registry is process-global on purpose, but each copy calls **its own**
+  `registerResourceKind`, and the one that runs the comparison is whichever
+  registers *second*. The runtime registers at import and a driver is imported
+  after it, so the judge is always the bundle's copy, frozen at its release.
+  0.17.0–0.17.3 deep-equal the spec and throw; they have never heard of
+  `revision`, so no value this package writes can change what they do. The
+  previous fix was only ever reachable in the load order that does not happen.
+
+  Kinds now live under `Symbol.for("@rebasepro/types.resourceKinds.v2")`, which
+  no released copy looks at. An older copy registers into the legacy map alone,
+  finds nothing to contest, and cannot throw — in either order, which is what
+  the last fix only claimed. Declarations stay on the shared symbol, because
+  that sharing is real and load-bearing. `revision` keeps its job among copies
+  that understand it, and two current specs at one revision still throw.
+
+  The duplication itself is the disease: `@rebasepro/server-postgres` inlined
+  `@rebasepro/types` into its `dist`, so every pod held two registries. It is
+  externalized now, along with `@rebasepro/common` and `@rebasepro/utils` — all
+  three are `RUNTIME_PROVIDED`, so an npm consumer installs them, a linked
+  consumer resolves them through the workspace, and a managed bundle gets the
+  image's. One copy per process; nothing to reconcile.
+
+  Two gates hold it. `packages/types/test/kind-registration-protocol.test.ts`
+  reproduces v0.17.3's function verbatim rather than importing this build's —
+  the hole that let `shipped-kinds.test.ts` pass green on the commit the corpus
+  failed — and asserts both load orders. `tooling/scripts/test/driver-single-copy.test.mjs`
+  reads the built `dist` and refuses a driver that defines the registry instead
+  of importing it.
+
 - **Three releases published without `@rebasepro/agent-skills`, and nothing
   failed.** On 2026-08-24 `rebase-agent-skills/` moved under `tooling/`. Both
   release paths named their publishable packages as literal paths; the shell
