@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/plugin-ai",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "AI plugin for the Rebase admin panel: field generation and content assistance.",
   "keywords": [
     "rebase",

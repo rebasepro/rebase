@@ -11,6 +11,8 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-09-07
+
 ### Fixed
 
 - **The published driver shipped no CLI, so a new project's first data read

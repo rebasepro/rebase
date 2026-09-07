@@ -90,7 +90,7 @@ Für ein echtes Deployment ist es besser, beides in ein Image zu backen; das
 fixiert zugleich genau das, was läuft:
 
 ```dockerfile
-FROM rebasepro/server:0.18.0
+FROM rebasepro/server:0.18.1
 COPY dist-bundle /bundle
 ```
 
@@ -160,7 +160,7 @@ Die Runtime ist ein gewöhnlicher Container, der auf `$PORT` lauscht, sodass all
 
 ```toml
 [build]
-  image = "rebasepro/server:0.18.0"
+  image = "rebasepro/server:0.18.1"
 
 [http_service]
   internal_port = 8080
@@ -214,7 +214,7 @@ mehrere zusammenarbeitende Prozesse starten. Siehe
 ## Aktualisieren
 
 ```yaml
-image: rebasepro/server:0.18.0
+image: rebasepro/server:0.18.1
 ```
 
 Starten Sie neu. Ihr Bundle bleibt unverändert. Innerhalb einer Hauptversion (Major) des Runtime-Vertrags funktioniert ein validiertes Bundle weiterhin — siehe [Kompatibilität](/docs/architecture/runtime-and-bundles/#compatibility).

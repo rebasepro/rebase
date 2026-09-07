@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/common",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Rebase shared core — collection registry, data driver adapter and fluent query builder. No React dependency.",
   "keywords": [
     "rebase",
