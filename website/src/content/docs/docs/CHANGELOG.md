@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-09-07
+
 ### Fixed
 
 Five defects an end-to-end pass over a freshly installed project turned up.

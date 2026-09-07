@@ -44,7 +44,7 @@ rebase build
 Fly.io tire depuis un registre : intégrez donc le bundle dans une image dérivée. Trois lignes, et cela fige exactement ce qui tourne :
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.0
+FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 

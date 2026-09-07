@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/agent-skills",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "private": false,
   "description": "Bundled AI agent skills for Rebase",
   "keywords": [
