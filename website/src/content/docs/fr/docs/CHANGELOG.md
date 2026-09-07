@@ -11,6 +11,8 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-09-07
+
 ### Breaking
 - **`defineCollection` is one signature, and its errors land on the field.** It
   was three overloads — Postgres, Firestore, MongoDB — and when a call failed

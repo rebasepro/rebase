@@ -34,7 +34,7 @@ rebase build
 O Railway puxa de um registo, por isso incorpore o bundle numa imagem derivada. Três linhas, e fixa exatamente o que corre:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.17.3
+FROM rebasepro/server:0.18.0
 COPY dist-bundle /bundle
 ```
 

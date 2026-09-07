@@ -34,7 +34,7 @@ rebase build
 For App Runner, which pulls from a registry, bake the bundle into a derived image. That is three lines and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.17.3
+FROM rebasepro/server:0.18.0
 COPY dist-bundle /bundle
 ```
 

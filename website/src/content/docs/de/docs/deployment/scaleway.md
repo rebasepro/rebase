@@ -22,7 +22,7 @@ rebase build
 Serverless Containers zieht aus einer Registry, backen Sie das Bundle also in ein abgeleitetes Image. Drei Zeilen, und sie fixieren genau das, was läuft:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.17.3
+FROM rebasepro/server:0.18.0
 COPY dist-bundle /bundle
 ```
 

@@ -20,7 +20,7 @@ rebase build
 Container Apps tire depuis un registre : intégrez donc le bundle dans une image dérivée. Trois lignes, et cela fige exactement ce qui tourne :
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.17.3
+FROM rebasepro/server:0.18.0
 COPY dist-bundle /bundle
 ```
 

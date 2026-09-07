@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-09-07
+
 ### Breaking
 - **`defineCollection` is one signature, and its errors land on the field.** It
   was three overloads — Postgres, Firestore, MongoDB — and when a call failed

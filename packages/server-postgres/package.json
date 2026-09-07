@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/server-postgres",
-  "version": "0.17.3",
+  "version": "0.18.0",
   "description": "PostgreSQL data source backend implementation for Rebase with Drizzle ORM",
   "keywords": [
     "cms",
@@ -33,7 +33,7 @@
     "node": ">=22.22.0"
   },
   "scripts": {
-    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found \u2014 use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
+    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
     "watch": "vite build --watch",
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
     "test:lint": "eslint \"src/**\" --quiet",
@@ -70,7 +70,7 @@
     "ws": "^8.21.1"
   },
   "devDependencies": {
-      "@rebasepro/client": "workspace:*",
+    "@rebasepro/client": "workspace:*",
     "@hono/node-server": "^2.0.12",
     "@jest/globals": "^30.4.1",
     "@types/jest": "^30.0.0",
