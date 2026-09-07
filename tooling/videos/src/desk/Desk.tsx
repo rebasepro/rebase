@@ -119,7 +119,7 @@ export const Desk: React.FC = () => {
                     {/* Wide enough that the tool's own clean line — 70 characters
                         of it — sits on one row at 18px. Wrapped, it read as two
                         findings; wider, it ran under the presenter. */}
-                    <ScanWindow x={1010} y={530} w={820} at={FLY_TO_CORNER + 176} rerunAt={RERUN_AT} />
+                    <ScanWindow x={1010} y={530} w={820} at={FLY_TO_CORNER + 203} rerunAt={RERUN_AT} />
                     <ScanNote x={1010} y={846} at={RERUN_AT + 70} />
                 </On>
 

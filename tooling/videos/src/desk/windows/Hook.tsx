@@ -29,10 +29,48 @@ export const AgentSession: React.FC<{ x: number; y: number; w: number; at: numbe
     </div>
 );
 
+/** What was asked. Without it the window was a checklist that could have
+ *  come from anywhere; with it, it is unmistakably a coding agent's session:
+ *  a person asked for a backend in one sentence and got one. */
+const PROMPT = "Build a backend for this database. Auth, CRUD for every table, a REST API. Deploy it.";
+
+const Speaker: React.FC<{ who: string; at: number }> = ({ who, at }) => {
+    const frame = useCurrentFrame();
+    return (
+        <div
+            style={{
+                fontFamily: FONT.mono,
+                fontSize: 12,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                color: INK.muted,
+                marginBottom: 6,
+                opacity: ramp(frame, at, 10),
+            }}
+        >
+            {who}
+        </div>
+    );
+};
+
 const SessionBody: React.FC = () => {
     const frame = useCurrentFrame();
     return (
-        <Frame title="agent · session summary" delay={0} bodyStyle={{ padding: "26px 30px 30px" }}>
+        <Frame title="coding agent · session" delay={0} bodyStyle={{ padding: "22px 30px 24px" }}>
+            <Speaker who="you" at={6} />
+            <div
+                style={{
+                    fontFamily: FONT.mono,
+                    fontSize: 19,
+                    lineHeight: 1.5,
+                    color: INK.high,
+                    opacity: ramp(frame, 8, 12),
+                }}
+            >
+                {PROMPT}
+            </div>
+            <div style={{ height: 18 }} />
+            <Speaker who="agent" at={26} />
             {SHIPPED.map((line, i) => (
                 <div
                     key={line}
@@ -40,11 +78,11 @@ const SessionBody: React.FC = () => {
                         display: "flex",
                         gap: 14,
                         alignItems: "center",
-                        padding: "9px 0",
+                        padding: "7px 0",
                         fontFamily: FONT.mono,
-                        fontSize: 20,
+                        fontSize: 19,
                         color: INK.copy,
-                        opacity: ramp(frame, 12 + i * 9, 14),
+                        opacity: ramp(frame, 30 + i * 9, 14),
                     }}
                 >
                     <span style={{ color: CHROMA.cyan }}>✔</span>
@@ -53,11 +91,11 @@ const SessionBody: React.FC = () => {
             ))}
             <div
                 style={{
-                    marginTop: 18,
+                    marginTop: 14,
                     fontFamily: FONT.mono,
-                    fontSize: 20,
+                    fontSize: 19,
                     color: INK.high,
-                    opacity: ramp(frame, 54, 16),
+                    opacity: ramp(frame, 72, 16),
                 }}
             >
                 Done — your API is up.

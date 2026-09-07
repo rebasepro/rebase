@@ -33,7 +33,7 @@ export const DESK_NARRATION: { at: number; words: string[] }[] = [
     { at: 15, words: ["It's", "2026.", "Anyone", "can", "build", "a", "backend", "in", "an", "afternoon.", "But", "can", "you", "trust", "it?"] },
     // the evidence
     // reads the two windows: the agent's summary, then the scan's verdict
-    { at: 167, words: ["Take", "this", "one.", "The", "agent", "says", "it's", "done:", "auth,", "CRUD", "for", "nine", "tables,", "a", "REST", "API,", "deployed.", "And", "a", "ten-second", "scan", "of", "the", "same", "database", "finds", "two", "critical", "issues", "and", "one", "high."] },
+    { at: 167, words: ["A", "coding", "agent", "built", "this", "one.", "It", "says", "it's", "done:", "auth,", "CRUD", "for", "nine", "tables,", "a", "REST", "API,", "deployed.", "And", "a", "ten-second", "scan", "of", "the", "same", "database", "finds", "two", "critical", "issues", "and", "one", "high."] },
     // init
     { at: 495, words: ["So", "you", "point", "Rebase", "at", "that", "same", "database.", "It", "reads", "the", "tables", "that", "are", "already", "there", "and", "writes", "a", "TypeScript", "file", "for", "each", "one.", "That's", "the", "whole", "setup."] },
     // rule
