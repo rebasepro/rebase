@@ -71,7 +71,7 @@ export default function InteractiveDemo() {
     const sdkCode = `import { createRebaseClient } from "@rebasepro/client";
 
 const client = createRebaseClient<Database>({
-  baseUrl: "http://localhost:3001"
+  baseUrl: import.meta.env.VITE_API_URL
 });
 
 // 1. Fetch record
@@ -270,7 +270,7 @@ await client.data.orders.update("${activeOrder.id}", {
                         <pre className="whitespace-pre-wrap">
                             <span className="text-purple-400">import</span> &#123; <span className="text-blue-300">createRebaseClient</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"@rebasepro/client"</span>;{"\n\n"}
                             <span className="text-purple-400">const</span> client = <span className="text-blue-400">createRebaseClient</span>&lt;Database&gt;(&#123;{"\n"}
-                            {"  "}baseUrl: <span className="text-green-400">"http://localhost:3001"</span>{"\n"}
+                            {"  "}baseUrl: <span className="text-blue-300">import.meta.env.VITE_API_URL</span>{"\n"}
                             &#125;);{"\n\n"}
                             <span className="text-surface-500">// 1. Fetch record</span>{"\n"}
                             <span className="text-purple-400">const</span> order = <span className="text-purple-400">await</span> client.data.orders.<span className="text-blue-300">findById</span>(<span className="text-green-400">"{activeOrder.id}"</span>);{"\n\n"}

@@ -62,7 +62,7 @@ describe("planning a bare deploy", () => {
     });
 
     it("still says what a forced build would use, managed or not", () => {
-        // `--force` deploys anyway, so the source has to be named either way.
+        // `--eject` deploys anyway, so the source has to be named either way.
         const plan = planBareDeploy(
             { runtimeMode: "managed",
 gitRepoUrl: "https://github.com/acme/api.git" },
@@ -134,41 +134,41 @@ sourceRef: "gs://ctx/p/1.tar.gz" },
 describe("refusing to eject a managed project that did not ask to leave", () => {
     const ref = "acme-api";
 
-    it("refuses --source without --force, which is how the incident happened", () => {
+    it("refuses --source without --eject, which is how the incident happened", () => {
         // The whole point: `--source` answers "which source do I build", not
         // "take this project off the managed runtime".
         const r = ejectRefusal({ managed: true,
 source: true,
-force: false }, ref);
+eject: false }, ref);
         expect(r?.code).toBe("managed_project");
         expect(r?.message).toContain(ref);
         expect(r?.hint).toContain("--bundle");
-        expect(r?.hint).toContain("--force");
+        expect(r?.hint).toContain("--eject");
     });
 
-    it("still refuses a bare deploy without --force", () => {
+    it("still refuses a bare deploy without --eject", () => {
         expect(ejectRefusal({ managed: true,
 source: false,
-force: false }, ref)?.code).toBe("managed_project");
+eject: false }, ref)?.code).toBe("managed_project");
     });
 
-    it("lets --force through, however the build was asked for", () => {
-        // `--force` is the one flag that names the outcome, so it is the one
+    it("lets --eject through, however the build was asked for", () => {
+        // `--eject` is the one flag that names the outcome, so it is the one
         // flag that buys it — for both forms, which is the point of the change.
         expect(ejectRefusal({ managed: true,
 source: true,
-force: true }, ref)).toBeUndefined();
+eject: true }, ref)).toBeUndefined();
         expect(ejectRefusal({ managed: true,
 source: false,
-force: true }, ref)).toBeUndefined();
+eject: true }, ref)).toBeUndefined();
     });
 
     it("never stands in the way of a project that is not managed", () => {
         for (const source of [true, false]) {
-            for (const force of [true, false]) {
+            for (const eject of [true, false]) {
                 expect(ejectRefusal({ managed: false,
 source,
-force }, ref)).toBeUndefined();
+eject }, ref)).toBeUndefined();
             }
         }
     });
@@ -182,7 +182,7 @@ describe("warning that a deploy ejects a managed project", () => {
         for (const source of [true, false]) {
             const w = deployWarnings({ managed: true,
 source,
-force: true }, ref);
+eject: true }, ref);
             expect(w.map((x) => x.code)).toEqual([EJECTS_MANAGED_RUNTIME]);
             expect(w[0].message).toContain(ref);
             expect(w[0].hint).toContain("--bundle");
@@ -192,16 +192,16 @@ force: true }, ref);
     it("says nothing about a project that is not managed", () => {
         expect(deployWarnings({ managed: false,
 source: true,
-force: true }, ref)).toEqual([]);
+eject: true }, ref)).toEqual([]);
         expect(deployWarnings({ managed: false,
 source: false,
-force: true }, ref)).toEqual([]);
+eject: true }, ref)).toEqual([]);
     });
 
     it("puts the eject in the payload, as a flag CI can branch on", () => {
         const payload = warningPayload(deployWarnings({ managed: true,
 source: true,
-force: true }, ref));
+eject: true }, ref));
         expect(payload.ejectsManagedRuntime).toBe(true);
         expect(payload.warnings).toHaveLength(1);
         expect((payload.warnings as Array<{ code: string }>)[0].code).toBe(EJECTS_MANAGED_RUNTIME);

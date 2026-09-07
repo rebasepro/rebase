@@ -193,11 +193,7 @@ properties: {
 }
 ```
 
-![Relation field in form](/img/features/relation-form-field.png)
-
-When rendering a preview (like in a table cell or a reference chip), Rebase handles hydration automatically:
-
-![Relation preview in table](/img/features/relation-table-preview.png)
+When rendering a preview (like in a table cell or a reference chip), Rebase handles hydration automatically.
 
 ### To-one gets a picker, many gets a tab
 
@@ -310,6 +306,14 @@ relations: [
 | `"set default"` | Set the FK column to its default value |
 
 ### What you get when you say nothing
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+The default for a **required** `belongsTo` changed. On 0.17.3 it is
+`ON DELETE CASCADE` — deleting a parent deletes its children — and from 0.18 it
+is `RESTRICT`, so the delete fails and names the constraint. Everything else in
+this section is unchanged, and `db push` plans the constraint rewrite when you
+upgrade.
 
 `onDelete` is optional, so most relations never name one. The default depends on
 whether the relation is required:

@@ -1,4 +1,5 @@
 ---
+sourceHash: 3830846c0457a79f
 title: Diseño del formulario
 sidebar_label: Diseño del formulario
 description: "Controla cómo se organiza el formulario de la entidad: ancho de columnas, secciones y el panel lateral de metadatos."

@@ -40,13 +40,23 @@ force: true });
         processExitSpy.mockRestore();
     });
 
-    it("throws error if collections directory does not exist", async () => {
+    it("says what to run first when there is no collections directory, and exits 0", async () => {
+        // The headless scaffold has no `config/collections` by design — its API
+        // is introspected from the live database at boot — and it ships
+        // `pnpm generate:sdk` anyway. This used to throw `Collections directory
+        // not found: <path>`, which reads as a broken install rather than a
+        // question with an answer, on the documented headless path.
         const nonExistentDir = path.join(tmpDir, "does-not-exist");
-        await expect(generateSdkCommand({
+        await generateSdkCommand({
             collectionsDir: nonExistentDir,
             output: path.join(tmpDir, "out"),
             cwd: tmpDir
-        })).rejects.toThrow("Collections directory not found");
+        });
+        const printed = consoleLogSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+        expect(printed).toContain("derives its API from the database");
+        expect(printed).toContain("rebase schema introspect");
+        expect(processExitSpy).not.toHaveBeenCalled();
+        expect(sdkGen.generateSDK).not.toHaveBeenCalled();
     });
 
     it("orchestrates SDK generation and writes files to output directory", async () => {

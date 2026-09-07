@@ -1,10 +1,13 @@
 ---
+sourceHash: da0835832ae0b7c2
 slug: es/docs/upgrading
 title: Actualización
 description: Qué se rompe al migrar una aplicación existente a la versión actual y qué hacer en cada caso.
 ---
 
 # Actualizar una aplicación existente
+
+¿Ya estás en 0.17? El siguiente salto todavía no está publicado, pero ya está descrito: [0.17 → próxima](/es/docs/upgrading/0-17-to-next/).
 
 Esta versión elimina el esquema `auth`, renombra paquetes, cambia el significado de `id`, elimina CJS, mueve el panel de administración a react-router 8 y, lo más importante, **corrige tres formas en las que se podía conceder acceso sin haberlo solicitado**: una regla de seguridad que era silenciosamente permisiva y dos en el socket en tiempo real. Lee las tres primeras secciones antes de cualquier otra cosa. La Sección 0 es la que cambia el SQL que podrías haber escrito a mano; las secciones 1 y 2 alteran quién puede leer tus datos, y ninguna de ellas se anuncia por sí sola.
 

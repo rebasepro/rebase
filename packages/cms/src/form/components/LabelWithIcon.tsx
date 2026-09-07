@@ -7,6 +7,16 @@ interface LabelWithIconProps {
     small?: boolean;
     className?: string;
     required?: boolean;
+    /**
+     * `id` for the text of the label, so a control can point at it with
+     * `aria-labelledby`.
+     *
+     * On the *text*, not on the wrapper: the wrapper also holds the property's
+     * type icon, and an accessible name assembled from a decorative `<svg>` is
+     * a name nobody chose. Deliberately absent by default — an unused `id` is
+     * one more thing that can collide.
+     */
+    labelId?: string;
 }
 
 /**
@@ -19,7 +29,8 @@ export const LabelWithIcon = forwardRef<HTMLDivElement, LabelWithIconProps>(
         title,
         small,
         className,
-        required
+        required,
+        labelId
     }, ref) => {
         return (
             <div
@@ -30,6 +41,7 @@ export const LabelWithIcon = forwardRef<HTMLDivElement, LabelWithIconProps>(
             >
                 {icon}
                 <span
+                    id={labelId}
                     className={`text-start font-medium text-${small ? "base" : "sm"} origin-top-left transform ${small ? "translate-x-2 scale-75" : ""
                         }`}
                 >

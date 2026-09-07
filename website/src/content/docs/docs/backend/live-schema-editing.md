@@ -26,6 +26,9 @@ one thing more than being an admin — see [Who may apply](#who-may-apply).
 `/plan` has no side effects. Post the collection as it should end up, and it
 tells you what the change means:
 
+`$ADMIN_TOKEN` is an admin access token — the `accessToken` a sign-in returns
+for an account with the admin role. Nothing on the machine sets it for you.
+
 ```bash
 curl -X POST https://your-app/api/admin/schema/plan \
   -H "authorization: Bearer $ADMIN_TOKEN" \

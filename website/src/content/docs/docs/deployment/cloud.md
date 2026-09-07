@@ -86,6 +86,13 @@ rebase build
 rebase cloud deploy --bundle-dir dist-bundle
 ```
 
+Leaving the managed runtime is its own flag, `--eject`, and nothing else asks
+for it: a build that would move a managed project onto a container image it then
+owns is refused until you say so. `--force` used to mean this, which put the
+least reversible thing the CLI can do under the same word as "overwrite this
+file"; it is an unknown option now rather than an alias, so a script carrying it
+stops instead.
+
 Watch it:
 
 ```bash
@@ -180,13 +187,17 @@ except one that restarts the database, which waits for a maintenance window.
 | `db` | Attach or create a database, backups, restore, and point-in-time recovery |
 | `extensions` | The Postgres extension allowlist |
 | `storage` | The project's bucket |
-| `resources` | What the project reserves, what it costs, and how to change it |
+| `resources` | Which databases and buckets the platform holds, against what the code declares |
+| `compute` | What this project reserves, what it costs, and how to change it |
+| `clusters` | The clusters tenants run on. Platform-admin only |
 | `settings`, `orgs`, `webhooks`, `billing` | Project settings, organizations, deploy hooks, payment |
 
 Every group in that table answers `--help` with a page of its own — a usage line,
 its flags, and examples — and `--help` never runs the command. A test holds the
 index to the pages, so a group added without one fails the build rather than
-answering with the table of contents.
+answering with the table of contents. `verify:docs` holds the table itself to
+that index: every group the CLI dispatches appears here exactly once, so a group
+added without a row fails the build too.
 
 Piped, `--help` answers in JSON instead: the same usage line, flags and examples
 as a structure to read rather than sixty lines of terminal escapes.

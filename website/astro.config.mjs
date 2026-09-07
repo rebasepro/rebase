@@ -10,6 +10,20 @@ import mdx from "@astrojs/mdx";
 import yaml from "@rollup/plugin-yaml";
 import tailwindcss from "@tailwindcss/vite";
 
+/**
+ * Marketing routes that ask engines not to index them, read off the pages.
+ *
+ * A slug appears here iff its `.astro` source sets `robots` to `noindex`, so
+ * the sitemap `filter` below and the pages cannot disagree.
+ */
+const NOINDEX = new Set(
+    fs
+        .readdirSync("./src/pages/[...lang]")
+        .filter(file => file.endsWith(".astro"))
+        .filter(file => /content="noindex/.test(fs.readFileSync(`./src/pages/[...lang]/${file}`, "utf8")))
+        .map(file => file.replace(/\.astro$/, ""))
+);
+
 // https://astro.build/config
 export default defineConfig({
     site: "https://rebase.pro",
@@ -88,6 +102,7 @@ export default defineConfig({
                             collapsed: true,
                             items: [
                                 { label: "Which hop", slug: "docs/upgrading" },
+                                { label: "0.17 → next", slug: "docs/upgrading/0-17-to-next" },
                                 { label: "0.14 → 0.17", slug: "docs/upgrading/0-14-to-0-17" },
                                 { label: "0.13 → 0.14", slug: "docs/upgrading/0-13-to-0-14" },
                                 { label: "0.12 → 0.13", slug: "docs/upgrading/0-12-to-0-13" }
@@ -121,6 +136,7 @@ export default defineConfig({
                     items: [
                         { label: "Defining Collections", slug: "docs/collections" },
                         { label: "Properties", slug: "docs/collections/properties" },
+                        { label: "Validation & conditions", slug: "docs/collections/validation-and-conditions" },
                         { label: "Relations", slug: "docs/collections/relations" },
                         { label: "Entity Callbacks", slug: "docs/collections/callbacks" },
                         { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" }
@@ -132,6 +148,7 @@ export default defineConfig({
                     items: [
                         { label: "Backend Setup", slug: "docs/backend" },
                         { label: "REST API", slug: "docs/backend/api" },
+                        { label: "API keys", slug: "docs/backend/api-keys" },
                         { label: "Error codes", slug: "docs/backend/errors" },
                         { label: "Endpoint index", slug: "docs/backend/endpoints" },
                         { label: "Live schema editing", slug: "docs/backend/live-schema-editing" },
@@ -142,6 +159,7 @@ export default defineConfig({
                         { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },
                         { label: "MongoDB", slug: "docs/backend/mongodb" },
                         { label: "Realtime & WebSocket", slug: "docs/backend/realtime" },
+                        { label: "Realtime across instances", slug: "docs/backend/realtime-transports" },
                         { label: "Search", slug: "docs/backend/search" },
                         { label: "Indexes", slug: "docs/backend/indexes" },
                         { label: "Cron Jobs", slug: "docs/backend/cron-jobs" },
@@ -205,6 +223,8 @@ export default defineConfig({
                     items: [
                         { label: "Getting Started", slug: "docs/sdk" },
                         { label: "Querying Data", slug: "docs/sdk/querying" },
+                        { label: "Aggregates & search", slug: "docs/sdk/aggregates-and-search" },
+                        { label: "Relations", slug: "docs/sdk/relations" },
                         { label: "Authentication", slug: "docs/sdk/authentication" },
                         { label: "Realtime Subscriptions", slug: "docs/sdk/realtime" },
                         { label: "Offline & Local-First", slug: "docs/sdk/offline" },
@@ -244,6 +264,7 @@ export default defineConfig({
                     label: "Deployment",
                     collapsed: true,
                     items: [
+                        { label: "Overview", slug: "docs/deployment" },
                         { label: "Deployment Guide", slug: "docs/getting-started/deployment" },
                         { label: "Rebase Cloud", slug: "docs/deployment/cloud" },
                         { label: "Self-Hosting", slug: "docs/deployment/self-hosting" },
@@ -277,6 +298,22 @@ export default defineConfig({
         }),
         mdx(),
         sitemap({
+            /*
+             * A page we ask engines not to index does not belong in the file we
+             * hand them. `/pitch` sets `<meta name="robots" content="noindex,
+             * nofollow">` and had four rows here — the two halves of the same
+             * instruction contradicting each other, in the two places a crawler
+             * reads first.
+             *
+             * The source is the page, not a list: `NOINDEX` is derived from the
+             * routes that actually set the meta tag, so adding a second private
+             * page needs nothing here.
+             */
+            filter: (page) => {
+                const route = new URL(page).pathname.replace(/\/$/, "").replace(/^\//, "");
+                const slug = route.replace(/^(?:es|de|fr|it|pt)\//, "");
+                return !NOINDEX.has(slug);
+            },
             i18n: {
                 defaultLocale: 'en',
                 locales: {

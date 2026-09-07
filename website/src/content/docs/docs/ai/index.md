@@ -12,7 +12,7 @@ problems. It is worth knowing which one you are reaching for:
 | [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 41 tools over your schema, data, users, storage, cron and dev server | An assistant, at runtime |
 | [**Agent skills**](/docs/ai/skills) | 21 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
-| [**API keys**](/docs/backend/api#api-keys) | Scoped machine credentials, per collection and per operation | Anything calling the HTTP API |
+| [**API keys**](/docs/backend/api-keys) | Scoped machine credentials, per collection and per operation | Anything calling the HTTP API |
 
 The first three are about giving an assistant *knowledge* and *tools*. The
 fourth is the only one that decides what it may actually do.
@@ -44,7 +44,7 @@ visibility, not about authentication. Granting it does not add a caller to the
 permission list, and withholding it does not stop one.
 
 The mechanics — creating keys, the permission JSON, rotation, expiry, rate
-limits — are covered in [REST API → API Keys](/docs/backend/api#api-keys).
+limits — are covered in [REST API → API Keys](/docs/backend/api-keys).
 Do not skip [Security Rules (RLS)](/docs/collections/security-rules) on the way
 past; the second gate is only as good as the policies you wrote.
 
@@ -63,7 +63,7 @@ Rebase has a first-class `vector` property type on Postgres and a
 `.vectorSearch()` query method with `cosine`, `l2` and `inner_product` distance.
 It is already documented, in two places rather than one:
 
-- [Querying Data → Vector Search](/docs/sdk/querying#vector-search) — the SDK
+- [Querying Data → Vector Search](/docs/sdk/aggregates-and-search#vector-search) — the SDK
   method, the `_distance` field it adds to each row, and the caveats
 - [REST API → Vector Search](/docs/backend/api#vector-search) — the
   `vector_search`, `vector`, `vector_distance` and `vector_threshold` query
@@ -80,7 +80,7 @@ way the server needs an image carrying the library and a role allowed to install
 it. And **every vector column gets an HNSW index for
 cosine distance**, because cosine is what `vectorSearch` measures with unless
 you pass `distance` — an index serves exactly one operator. Tune it, or turn it
-off, on the property: see [The index](/docs/sdk/querying#the-index).
+off, on the property: see [The index](/docs/sdk/aggregates-and-search#the-index).
 
 Vector queries also cannot be subscribed to; `.vectorSearch(...).listen()` is
 refused with `VECTOR_SEARCH_NOT_LIVE`.

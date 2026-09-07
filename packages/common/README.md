@@ -8,6 +8,10 @@ Shared utilities, collection registry, data driver adapter, and fluent query bui
 pnpm add @rebasepro/common
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 ## What This Package Does
 
 `@rebasepro/common` is the lowest-level shared logic layer in the Rebase frontend stack. It provides:

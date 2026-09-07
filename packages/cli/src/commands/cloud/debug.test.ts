@@ -46,7 +46,6 @@ function verdictFor(id: string, status: number | null): Verdict {
 function captureStdout(): { output: () => string; restore: () => void } {
     const chunks: string[] = [];
     const orig = process.stdout.write.bind(process.stdout);
-    // @ts-expect-error test shim
     process.stdout.write = (s: string) => {
         chunks.push(typeof s === "string" ? s : String(s));
         return true;
@@ -270,11 +269,15 @@ fn: "health" });
     });
 
     it("posts a JSON body for the auth probe", async () => {
-        const fetchMock = vi.fn(async () => new Response("", { status: 400 }));
+        // Both parameters are declared because the assertion below reads the
+        // second: a bare `vi.fn()` types `mock.calls` as `[][]`, and "posts a
+        // JSON body" then compiles to a tuple index error rather than a check.
+        const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+            new Response("", { status: 400 }));
         vi.stubGlobal("fetch", fetchMock);
         await runProbe("https://app.example", probe("auth"), { collection: "users",
 fn: "health" });
-        const init = fetchMock.mock.calls[0][1] as RequestInit;
+        const init = fetchMock.mock.calls[0][1] ?? {};
         expect(init.method).toBe("POST");
         expect(init.body).toBe("{}");
     });

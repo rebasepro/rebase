@@ -311,12 +311,31 @@ separates a hand-rolled UTF-8 encoder from Node's. No divergence.
 
 ## Running them
 
-They run in the normal `pnpm test`, at a run count chosen to stay in CI. To
-spend more:
+Most of them run in the normal `pnpm test`, at a run count chosen to stay in CI.
+To spend more:
 
 ```bash
 FC_RUNS=200000 pnpm test
 ```
+
+**Three of the twelve are not in `pnpm test`**, and they are the three with the
+strongest claim on the list: `policy-agreement-exhaustive`,
+`exists-in-enforcement` and `offline-query-agreement`. They live under
+`packages/server-postgres/test/e2e/`, which the package's
+`jest.config.cjs` excludes by `testPathIgnorePatterns` — that directory is
+vitest's half of a two-runner split. They need a built `dist` and a database,
+which is why they are not in the unit lane:
+
+```bash
+pnpm --filter @rebasepro/server-postgres run build
+pnpm --filter @rebasepro/server-postgres test:e2e
+```
+
+Docker is what supplies the database: each file boots and tears down its own
+Postgres on a random host port. CI runs them in the `e2e-vitest` job.
+`FC_RUNS=200000 pnpm test` therefore does *not* reach the differential against
+real PostgreSQL — set `FC_RUNS` on the `test:e2e` command instead when that is
+the one you mean to spend on.
 
 Worth doing after changing a parser, a codec, or the policy compiler. The point
 of a property is that it keeps paying out when you spend more on it — which is

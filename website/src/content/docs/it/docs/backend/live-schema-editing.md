@@ -1,4 +1,5 @@
 ---
+sourceHash: 7253b4b5232fa542
 title: Live schema editing
 description: Create and alter collections against a running backend — committed to your repository first, then applied.
 ---
@@ -29,6 +30,10 @@ one thing more than being an admin — see [Who may apply](#who-may-apply).
 
 `/plan` has no side effects. Post the collection as it should end up, and it
 tells you what the change means:
+
+`$ADMIN_TOKEN` è un token di accesso amministratore — l'`accessToken` che
+restituisce l'accesso di un account con il ruolo admin. Nulla sulla macchina lo
+imposta al posto tuo.
 
 ```bash
 curl -X POST https://your-app/api/admin/schema/plan \

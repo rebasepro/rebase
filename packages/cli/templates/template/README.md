@@ -38,7 +38,9 @@ That is the whole first run. `rebase dev` generates the Drizzle schema from
 example `posts`, `authors` and `tags` — and serves the API and the admin panel.
 
 `rebase dev` prints the two URLs it actually bound. The first account you
-register becomes the admin.
+register becomes the admin. `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` in
+`.env` are ignored here and read by the production boot below, where that window
+is shut — see [Self-hosting](#self-hosting-with-docker).
 
 Ports are **derived from this project's path**, not fixed at 3001/5173, so
 several Rebase projects can run at once without colliding. That is why the URL
@@ -181,6 +183,14 @@ docker compose down -v
 
 One container now serves the API at `/api` and the admin at `/` — same origin,
 so there is no CORS between them and no second web server to run.
+
+Sign in as `REBASE_ADMIN_EMAIL` with `REBASE_ADMIN_PASSWORD`, both in `.env`.
+This stack runs with `NODE_ENV=production`, where the first-account-becomes-admin
+window is shut — it has to be, because the container answers on a hostname
+before you have typed anything, so whoever reached the sign-up form first would
+own the deployment. The runtime creates that one account while the user table is
+empty and never again. Change the email to yours before the first boot, and
+change the password after signing in.
 
 To upgrade Rebase, set `REBASE_VERSION` in `.env` and restart. Your bundle is
 untouched.

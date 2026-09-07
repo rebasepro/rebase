@@ -265,3 +265,60 @@ describe("sort-dialect — aggregate sort keys", () => {
         });
     });
 });
+
+/**
+ * Every rejection is an `OrderBySpecError`.
+ *
+ * `normalizeOrderBy` destructured `[key, direction]` over whatever it was
+ * handed, and it is reached straight from `find({ orderBy })` — so the two
+ * plausible mistakes, an object (`{ title: "asc" }`, which is how every other
+ * query API spells a sort) and a bare number, came back as `TypeError: object
+ * is not iterable` from a package the caller has never heard of, with no `code`
+ * and no field name. The same call's `where` clause answers with a named error
+ * and the fix. The strict tuple parser and its message were already in this
+ * file; only the typed path never reached them.
+ */
+describe("a sort whose shape is unusable", () => {
+    it.each([
+        ["an object", { title: "asc" } as never],
+        ["a number", 42 as never],
+        ["a list of objects", [{ field: "title", direction: "asc" }] as never],
+        ["a list of bare strings", ["title", "created_at"] as never]
+    ])("%s is an OrderBySpecError, not a TypeError", (_label, spec) => {
+        expect(() => normalizeOrderBy(spec)).toThrow(OrderBySpecError);
+    });
+
+    it("names the entry and carries a code a caller can branch on", () => {
+        try {
+            normalizeOrderBy([["title", "up"]] as never);
+            throw new Error("expected a rejection");
+        } catch (error) {
+            expect(error).toBeInstanceOf(OrderBySpecError);
+            expect((error as OrderBySpecError).code).toBe("INVALID_ORDER_BY");
+            expect((error as Error).message).toContain("entry 0 has direction 'up'");
+            expect((error as Error).message).toContain("[field, direction] pairs");
+        }
+    });
+
+    it("still accepts every shape a typed caller can write", () => {
+        expect(normalizeOrderBy(["title", "desc"])).toEqual([["title", "desc"]]);
+        expect(normalizeOrderBy([["title", "desc"], ["id", "asc"]]))
+            .toEqual([["title", "desc"], ["id", "asc"]]);
+        expect(normalizeOrderBy(undefined)).toBeUndefined();
+        expect(normalizeOrderBy([] as never)).toBeUndefined();
+    });
+
+    it("defaults a missing direction to ascending rather than leaving it undefined", () => {
+        expect(normalizeOrderBy([["title"]] as never)).toEqual([["title", "asc"]]);
+    });
+});
+
+describe("deserializeOrderBy", () => {
+    it("reads a blank field name as no sort", () => {
+        // The one value that survived a decode and failed the next encode:
+        // `[" ", "asc"]` is not a sort anything can serve.
+        expect(deserializeOrderBy(" ")).toBeUndefined();
+        expect(deserializeOrderBy("  :desc")).toBeUndefined();
+        expect(deserializeOrderBy("")).toBeUndefined();
+    });
+});

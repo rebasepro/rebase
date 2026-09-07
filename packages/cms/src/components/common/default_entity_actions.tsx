@@ -264,7 +264,7 @@ export function ResetPasswordActionDialog({
 
     const handleConfirm = async () => {
         if (mode === "manual" && !passwordsMatch) {
-            setError(t("passwords_dont_match") || "Passwords don't match");
+            setError(t("passwords_dont_match", { defaultValue: "Passwords don't match" }));
             return;
         }
         setLoading(true);
@@ -287,7 +287,7 @@ export function ResetPasswordActionDialog({
             const data = await response.json();
             snackbarController.open({
                 type: "success",
-                message: t("reset_password_success") || "Password reset successfully"
+                message: t("reset_password_success", { defaultValue: "Password reset successfully" })
             });
             // Setting a password directly returns neither an invitation nor a
             // temporary password, so there is no result to show.
@@ -302,7 +302,7 @@ export function ResetPasswordActionDialog({
                 onClose();
             }
         } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : (t("error_resetting_password") || "Error resetting password"));
+            setError(e instanceof Error ? e.message : t("error_resetting_password", { defaultValue: "Error resetting password" }));
         } finally {
             setLoading(false);
         }
@@ -323,7 +323,7 @@ export function ResetPasswordActionDialog({
     return (
         <Dialog open={open} onOpenChange={(o) => !o ? onClose() : undefined} maxWidth="xl">
             <DialogTitle variant="h5" gutterBottom={false}>
-                {t("reset_password") || "Reset Password"}
+                {t("reset_password", { defaultValue: "Reset Password" })}
             </DialogTitle>
             <DialogContent>
                 <div className="flex flex-col gap-4 py-2">
@@ -338,13 +338,13 @@ export function ResetPasswordActionDialog({
                         <div className="flex items-center gap-2">
                             <RadioGroupItem value="email" id="reset-password-mode-email"/>
                             <Label htmlFor="reset-password-mode-email">
-                                {t("reset_password_send_email") || "Send a password reset email"}
+                                {t("reset_password_send_email", { defaultValue: "Send a password reset email" })}
                             </Label>
                         </div>
                         <div className="flex items-center gap-2">
                             <RadioGroupItem value="manual" id="reset-password-mode-manual"/>
                             <Label htmlFor="reset-password-mode-manual">
-                                {t("reset_password_set_manually") || "Set a password manually"}
+                                {t("reset_password_set_manually", { defaultValue: "Set a password manually" })}
                             </Label>
                         </div>
                     </RadioGroup>
@@ -355,7 +355,7 @@ export function ResetPasswordActionDialog({
                             value={password}
                             autoFocus
                             autoComplete="new-password"
-                            label={t("new_password") || "New password"}
+                            label={t("new_password", { defaultValue: "New Password" })}
                             onChange={(e) => {
                                 setPassword(e.target.value);
                                 setError(null);
@@ -366,15 +366,16 @@ export function ResetPasswordActionDialog({
                             value={confirmPassword}
                             autoComplete="new-password"
                             error={confirmPassword.length > 0 && !passwordsMatch}
-                            label={t("confirm_password") || "Confirm password"}
+                            label={t("confirm_password", { defaultValue: "Confirm New Password" })}
                             onChange={(e) => {
                                 setConfirmPassword(e.target.value);
                                 setError(null);
                             }}
                         />
                         <Typography variant="caption" color="secondary">
-                            {t("reset_password_set_manually_description") ||
-                                "The password is updated immediately and no email is sent. Share it with the user securely."}
+                            {t("reset_password_set_manually_description", {
+                                defaultValue: "The password is updated immediately and no email is sent. Share it with the user securely."
+                            })}
                         </Typography>
                     </>}
 
@@ -388,7 +389,7 @@ export function ResetPasswordActionDialog({
                     {t("cancel")}
                 </Button>
                 <LoadingButton variant="filled" onClick={handleConfirm} loading={loading} disabled={!canSubmit}>
-                    {t("reset_password") || "Reset Password"}
+                    {t("reset_password", { defaultValue: "Reset Password" })}
                 </LoadingButton>
             </DialogActions>
         </Dialog>

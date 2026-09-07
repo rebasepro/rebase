@@ -1,5 +1,5 @@
-import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, isToMany, VectorProperty, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, isToMany, ResolvedRelation, VectorProperty, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
+import { fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations } from "@rebasepro/common";
 
 /**
  * OpenAPI 3.0.3 specification generator.
@@ -229,6 +229,13 @@ description: "Whether more records exist beyond this page" }
     // abort. Taken from the parameter list itself so the two cannot drift.
     const reservedParameterNames = new Set(listQueryParameters().map(p => p.name));
 
+    // Every component name this document will carry, known before the first
+    // schema is built: a relation may point at a collection that appears later
+    // in the list, or at one that is not documented here at all, and a `$ref`
+    // at a component that does not exist is a document Swagger UI renders empty
+    // and a strict generator refuses.
+    const registeredSchemas = new Set((collections || []).map(schemaNameFor));
+
     // ── Collection routes ────────────────────────────────────────────────
     for (const collection of (collections || [])) {
         const schemaName = schemaNameFor(collection);
@@ -240,7 +247,7 @@ description: "Whether more records exist beyond this page" }
         });
 
         // Build component schema for this collection
-        schemas[schemaName] = buildCollectionSchema(collection);
+        schemas[schemaName] = buildCollectionSchema(collection, registeredSchemas);
 
         // Build an "input" schema (no read-only/auto fields like autoValue dates)
         schemas[`${schemaName}Input`] = buildCollectionInputSchema(collection);
@@ -745,52 +752,221 @@ description: `${collection.singularName || collection.name} ID` },
 /**
  * Is this property part of the shape the document may describe?
  *
- * Two exclusions, and both are the document telling the truth about what the
- * server does:
+ * One exclusion, and it is the document telling the truth about what the server
+ * does: `excludeFromApi` is a server-side guarantee that the column "is
+ * stripped from every row the API serves, for every caller, including admins
+ * and service keys" — `stripExcluded` in the row pipeline enforces it. A schema
+ * that lists such a column describes a field that is never present, and it
+ * describes it to everyone: `/docs` is mounted on the app, not on the data
+ * router, so it carries none of the auth middleware `{basePath}/data` does.
+ * Every project scaffolded by `rebase init` published its `users` collection's
+ * `passwordHash` and `emailVerificationToken` this way.
  *
- * - a `relation` property is virtual: the row carries the owning side's foreign
- *   key column, never the property itself, so it is not a field of any payload.
- *   (The FK column *is* readable, writable and filterable and is still absent
- *   from every schema here — a separate gap, not this rule.)
- * - `excludeFromApi` is a server-side guarantee that the column "is stripped
- *   from every row the API serves, for every caller, including admins and
- *   service keys" — `stripExcluded` in the row pipeline enforces it. A schema
- *   that lists such a column describes a field that is never present, and it
- *   describes it to everyone: `/docs` is mounted on the app, not on the data
- *   router, so it carries none of the auth middleware `{basePath}/data` does.
- *   Every project scaffolded by `rebase init` published its `users`
- *   collection's `passwordHash` and `emailVerificationToken` this way.
+ * A `relation` property used to be excluded here too, on the reasoning that the
+ * property is virtual. It is — but the row is not empty where it stands: the
+ * owning side carries a foreign key under a *wire* name (`authorId`), and a
+ * read that includes the relation carries the target's row under the relation's
+ * own name. Excluding both left `/api/docs` describing a strictly smaller
+ * collection than `generated/sdk/database.types.ts` did for the same config.
+ * Relations are now emitted by {@link emitRelationProperties}, under the same
+ * keys and in the same order as the SDK's `Row`; the direct-property loops skip
+ * them so the two passes cannot emit one key twice.
  *
- * Written as one predicate rather than three `continue`s because it kept being
- * fixed in one loop at a time: this is the same rule the SDK generator applies
- * to its `Row` type (`packages/codegen/src/generate-types.ts`).
+ * Written as one predicate rather than a `continue` per loop because it kept
+ * being fixed in one loop at a time: this is the same rule the SDK generator
+ * applies to its `Row` type (`packages/codegen/src/generate-types.ts`).
  */
 function isDocumentedProperty(property: Property): boolean {
-    return property.type !== "relation" && !property.excludeFromApi;
+    return !property.excludeFromApi;
+}
+
+/**
+ * The keys `stripExcluded` deletes: the property name *and* its column name.
+ *
+ * Seeding the emitted set with both is what stops a foreign key derived from a
+ * relation putting an `excludeFromApi` column back on the surface under its
+ * other name. Same pair, same reason, as `excludedApiKeys` in the SDK
+ * generator.
+ */
+function excludedApiKeys(collection: CollectionConfig): Set<string> {
+    const excluded = new Set<string>();
+    for (const [key, property] of Object.entries(collection.properties ?? {})) {
+        if (!(property as Property)?.excludeFromApi) continue;
+        excluded.add(key);
+        const columnName = (property as { columnName?: unknown }).columnName;
+        if (typeof columnName === "string") excluded.add(columnName);
+    }
+    return excluded;
+}
+
+/**
+ * The collection's primary key, as the key it is addressed by on the wire and
+ * the property that declares it.
+ *
+ * `id` was a literal in three places — seeded before the read loop, assigned
+ * after the input loop, inherited by the update schema from the input one — and
+ * the two spellings disagreed: a declared `id: { type: "number" }` overwrote
+ * the read seed and was overwritten by the input assignment, so the same field
+ * was `integer` in `Post` and `string` in `PostInput`. One helper now answers
+ * the question for all three.
+ */
+function idPropertyEntry(collection: CollectionConfig | undefined): [string, Property] | undefined {
+    for (const [key, property] of Object.entries(collection?.properties ?? {})) {
+        if ((property as unknown as Record<string, unknown>)?.isId) return [key, property as Property];
+    }
+    return undefined;
+}
+
+/**
+ * The schema of a primary key or of a foreign key pointing at one: the declared
+ * property's own type, stripped of the field-level facts (description,
+ * validation bounds) that belong to the column and not to a reference to it.
+ *
+ * Falls back to `string` for a collection that declares no primary key, which
+ * is what every schema here assumed unconditionally before.
+ */
+function idSchemaFor(collection: CollectionConfig | undefined): Record<string, unknown> {
+    const declared = idPropertyEntry(collection);
+    if (!declared) return { type: "string" };
+    const converted = convertPropertyToSchema(declared[1]);
+    const schema: Record<string, unknown> = { type: converted.type ?? "string" };
+    if (converted.format) schema.format = converted.format;
+    return schema;
+}
+
+/**
+ * Relations resolve or they do not; a document is still owed for a collection
+ * whose target thunk throws (a circular import, usually). The SDK generator
+ * warns and carries on with no relation fields, and so does this — the
+ * alternative is `/api/docs` 500ing for the whole project.
+ */
+function resolveRelationsForDocument(collection: CollectionConfig): Record<string, ResolvedRelation> {
+    try {
+        return resolveCollectionRelations(collection);
+    } catch {
+        return {};
+    }
+}
+
+/** Unwrap a target handed back as a module namespace — `() => import("./authors")`. */
+function relationTarget(relation: ResolvedRelation): CollectionConfig | undefined {
+    try {
+        let target = relation.target() as CollectionConfig & { default?: CollectionConfig; __esModule?: boolean };
+        if (target && (target.default || target.__esModule)) {
+            target = (target.default ?? target) as typeof target;
+        }
+        return target;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * The schema an *included* relation arrives as: the target's own row.
+ *
+ * `$ref` when the target is one of the collections this document describes, and
+ * an open object when it is not — a dangling pointer makes Swagger UI render an
+ * empty model and makes a strict generator abort, which is worse than a vague
+ * one.
+ */
+function includedRelationSchema(
+    relation: ResolvedRelation,
+    registeredSchemas: ReadonlySet<string>
+): Record<string, unknown> {
+    const target = relationTarget(relation);
+    const targetSchema = target ? schemaNameFor(target) : undefined;
+    const item: Record<string, unknown> = targetSchema && registeredSchemas.has(targetSchema)
+        ? { $ref: `#/components/schemas/${targetSchema}` }
+        : { type: "object" };
+    return relation.cardinality === "many" ? { type: "array", items: item } : item;
+}
+
+/**
+ * Emit a collection's relations onto a read schema: the foreign keys first,
+ * then the relations themselves.
+ *
+ * The order and the keys are the SDK `Row`'s, deliberately — the parity test
+ * next door compares the two key sets, and the only way that stays true is for
+ * both to be derived the same way rather than kept in step by hand.
+ *
+ * A `belongsTo` reaches the wire under the *field* name of its local column
+ * (`author_id` → `authorId`), which is what `fieldKeyForColumn` answers; a
+ * relation addressed by the same name as its own foreign key is served as
+ * either the scalar or the nested row depending on `include`, so it is
+ * documented as both.
+ */
+function emitRelationProperties(
+    collection: CollectionConfig,
+    properties: Record<string, unknown>,
+    required: string[],
+    emitted: Set<string>,
+    registeredSchemas: ReadonlySet<string>
+): void {
+    const resolved = resolveRelationsForDocument(collection);
+
+    for (const [relationKey, relation] of Object.entries(resolved)) {
+        if (relation.kind !== "belongsTo" || !relation.localKey) continue;
+        const fieldKey = fieldKeyForColumn(collection, relation.localKey);
+        if (emitted.has(fieldKey)) continue;
+
+        const foreignKey = idSchemaFor(relationTarget(relation));
+        const shadowedByInclude = relationKey === fieldKey;
+        properties[fieldKey] = shadowedByInclude
+            ? { oneOf: [foreignKey, includedRelationSchema(relation, registeredSchemas)] }
+            : { ...foreignKey, description: `Foreign key into \`${relation.targetSlug}\`` };
+        emitted.add(fieldKey);
+
+        if (isRelationRequired(collection, relation) && !shadowedByInclude) required.push(fieldKey);
+    }
+
+    for (const [key, relation] of Object.entries(resolved)) {
+        if (emitted.has(key)) continue;
+        properties[key] = includedRelationSchema(relation, registeredSchemas);
+        emitted.add(key);
+    }
+
+    // A `relation` property whose relation did not resolve. Still a field of the
+    // row, just not a precisely describable one.
+    for (const [key, property] of Object.entries(collection.properties ?? {})) {
+        if ((property as Property)?.type !== "relation") continue;
+        if (emitted.has(key)) continue;
+        properties[key] = { type: "object" };
+        emitted.add(key);
+    }
 }
 
 /**
  * Build the component schema for a collection (output / read shape).
  *
  * Every declared property except the ones {@link isDocumentedProperty} rules
- * out.
+ * out, plus the foreign keys and relations {@link emitRelationProperties} adds.
  */
-function buildCollectionSchema(collection: CollectionConfig): Record<string, unknown> {
+function buildCollectionSchema(
+    collection: CollectionConfig,
+    registeredSchemas: ReadonlySet<string>
+): Record<string, unknown> {
+    const idKey = idPropertyEntry(collection)?.[0] ?? "id";
     const properties: Record<string, unknown> = {
-        id: { type: "string",
-description: "Unique identifier" }
+        [idKey]: { ...idSchemaFor(collection), description: "Unique identifier" }
     };
-    const required: string[] = ["id"];
+    const required: string[] = [idKey];
+    const excluded = excludedApiKeys(collection);
+    const emitted = new Set<string>(excluded);
+    emitted.add(idKey);
 
     for (const [key, property] of Object.entries(collection.properties)) {
+        if (property.type === "relation") continue;
         if (!isDocumentedProperty(property)) continue;
 
         properties[key] = convertPropertyToSchema(property);
+        emitted.add(key);
 
-        if (property.validation?.required) {
+        if (property.validation?.required && key !== idKey) {
             required.push(key);
         }
     }
+
+    emitRelationProperties(collection, properties, required, emitted, registeredSchemas);
 
     return {
         type: "object",
@@ -873,8 +1049,12 @@ function buildCollectionUpdateSchema(collection: CollectionConfig): Record<strin
 function buildCollectionInputSchema(collection: CollectionConfig): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
+    const excluded = excludedApiKeys(collection);
+    const emitted = new Set<string>(excluded);
+    const idKey = idPropertyEntry(collection)?.[0] ?? "id";
 
     for (const [key, property] of Object.entries(collection.properties)) {
+        if (property.type === "relation") continue;
         if (!isDocumentedProperty(property)) continue;
 
         // Skip auto-value date fields from the input schema
@@ -884,23 +1064,82 @@ function buildCollectionInputSchema(collection: CollectionConfig): Record<string
         if ("isId" in property && property.isId && property.isId !== "manual" && property.isId !== true) continue;
 
         properties[key] = convertPropertyToSchema(property);
+        emitted.add(key);
 
         if (property.validation?.required) {
             required.push(key);
         }
     }
 
-    // Allow explicit ID for create (optional)
-    properties["id"] = {
-        type: "string",
-        description: "Optional: client-assigned ID. If omitted, the server generates one."
-    };
+    // Allow explicit ID for create (optional). Typed from the declared primary
+    // key rather than as a `string` literal: a serial `id` was `integer` on the
+    // read schema and `string` here, for the same column, in every document the
+    // generator has ever produced.
+    if (!emitted.has(idKey)) {
+        properties[idKey] = {
+            ...idSchemaFor(collection),
+            description: "Optional: client-assigned ID. If omitted, the server generates one."
+        };
+        emitted.add(idKey);
+    }
+
+    // The two ways a write may name a `belongsTo` target, both of which the
+    // server accepts and the generated SDK's `Insert` already offered: the
+    // foreign key under its own wire name (`authorId`), and the relation
+    // property (`author`), which the write transformer maps onto that column.
+    // Neither reached the document, so the spec described a create that could
+    // not set a relation at all.
+    emitWritableRelations(collection, properties, emitted);
 
     return {
         type: "object",
         required: required.length > 0 ? required : undefined,
         properties
     };
+}
+
+/**
+ * The writable half of a collection's relations: `belongsTo` only.
+ *
+ * A to-many is not writable through the body — the server links rows through
+ * the nested routes — so offering `tags: [...]` on a create would describe a
+ * write that does nothing. Same rule, same reason, as `emitWritableRelations`
+ * in the SDK generator, whose `Insert` type this mirrors key for key.
+ *
+ * Neither spelling is listed in `required`, even for a relation the collection
+ * declares `validation: { required: true }` on: the two keys are alternatives,
+ * and a schema naming both would tell a spec-validating gateway to reject a
+ * create that the server accepts. (The SDK's `Insert` marks both non-optional
+ * for the same relation, which is the same fact stated less carefully; a
+ * document is the half that a gateway enforces.)
+ */
+function emitWritableRelations(
+    collection: CollectionConfig,
+    properties: Record<string, unknown>,
+    emitted: Set<string>
+): void {
+    const resolved = resolveRelationsForDocument(collection);
+
+    const emit = (key: string, relation: ResolvedRelation): void => {
+        if (emitted.has(key)) return;
+        properties[key] = {
+            ...idSchemaFor(relationTarget(relation)),
+            description: `The \`${relation.targetSlug}\` row this belongs to.`
+        };
+        emitted.add(key);
+    };
+
+    for (const relation of Object.values(resolved)) {
+        if (relation.kind === "belongsTo" && relation.localKey) {
+            emit(fieldKeyForColumn(collection, relation.localKey), relation);
+        }
+    }
+
+    for (const [key, property] of Object.entries(collection.properties ?? {})) {
+        if ((property as Property)?.type !== "relation") continue;
+        const relation = findRelation(resolved, key);
+        if (relation?.kind === "belongsTo" && relation.localKey) emit(key, relation);
+    }
 }
 
 /**
@@ -946,7 +1185,16 @@ function convertPropertyToSchema(property: Property): Record<string, unknown> {
 
         case "number": {
             const np = property as NumberProperty;
-            const isInteger = np.validation?.integer || np.columnType === "integer" || np.columnType === "serial" || np.columnType === "bigserial" || np.columnType === "bigint";
+            // `isId` is on this list because the DDL generator puts it there:
+            // a numeric primary key is `INTEGER GENERATED BY DEFAULT AS
+            // IDENTITY` for `"increment"` and `INTEGER` for every other form
+            // (`generate-postgres-ddl-logic.ts`), so the column the scaffold's
+            // `posts.id` creates is an integer and the document called it a
+            // `number` — which lets a generated client send `1.5` for a row id.
+            const isInteger = np.validation?.integer
+                || Boolean(np.isId)
+                || np.columnType === "integer" || np.columnType === "serial"
+                || np.columnType === "bigserial" || np.columnType === "bigint";
             base.type = isInteger ? "integer" : "number";
 
             if (np.enum) {
@@ -1119,6 +1367,11 @@ function buildFilterParameters(
 
     for (const [key, property] of Object.entries(collection.properties)) {
         if (!isDocumentedProperty(property)) continue;
+        // A `relation` property is not a column, so there is nothing to compare
+        // against. The foreign key beside it is filterable and is still not
+        // offered here — a separate gap from the schema one, and one the query
+        // layer has to answer first.
+        if (property.type === "relation") continue;
         if (property.type === "map" || property.type === "array" || property.type === "geopoint") {
             continue;
         }

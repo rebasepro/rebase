@@ -191,6 +191,29 @@ const rebase = createRebaseClient<Database>({
 });
 ```
 
+The backend reads that header on every data request. Drift never refuses a
+call — an SDK a schema behind is usually still compatible, and shipping the
+backend before the frontend is the normal deploy order — but when a request
+fails with a 400 or a 404, the error carries the drift as its cause:
+
+```json
+{
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "Unknown field \"authorName\" on collection \"posts\"",
+    "cause": {
+      "code": "SCHEMA_DRIFT",
+      "clientSchema": "v1:0e1c…",
+      "serverSchema": "v1:9ab4…",
+      "message": "This client was generated against schema v1:0e1c…; this backend serves v1:9ab4…"
+    }
+  }
+}
+```
+
+So a renamed column reads as "your SDK is stale, regenerate it" rather than as
+a field your own types insist exists. A request that succeeds is never told.
+
 It covers **collections only**. A hook or function edit does not change a
 client's contract and must not invalidate every generated SDK.
 

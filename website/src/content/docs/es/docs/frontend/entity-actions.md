@@ -1,4 +1,5 @@
 ---
+sourceHash: 3bf8656e3408eede
 title: Acciones de Entidad
 sidebar_label: Acciones de Entidad
 description: Añade botones de acción personalizados a las entidades para archivar, publicar, exportar, clonar y más.

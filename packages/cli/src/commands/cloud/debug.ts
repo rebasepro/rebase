@@ -39,6 +39,7 @@ import { unknownCommandMessage } from "../../utils/unknown-command";
 import {
     requireClient,
     requireProject,
+    parseCloudArgs,
     displayProjectRef,
     fetchTenantBaseDomain,
     projectHost,
@@ -602,12 +603,20 @@ permissive: true });
    ═══════════════════════════════════════════════════════════════ */
 
 async function healthCommand(rawArgs: string[]): Promise<void> {
-    const parsed = arg(
-        { "--collection": String,
-"--function": String },
-        { argv: rawArgs.slice(3),
-permissive: true }
-    );
+    // Strict: `--collecton users` used to be dropped and the probe then ran
+    // against the default collection while reporting on the one asked for.
+    const { flags: parsed } = parseCloudArgs({
+        // `--host` is read again inside `resolveOrigin`, which needs it before
+        // the client exists; declared here because THIS is the parse that
+        // decides whether the line is accepted at all.
+        spec: { "--collection": String,
+"--function": String,
+"--host": String },
+        rawArgs,
+        commandWords: 3, // cloud debug health
+        command: "cloud debug",
+        maxPositionals: 0
+    });
     const targets: ProbeTargets = {
         collection: parsed["--collection"] || "users",
         // Optional: the listing endpoint proves the mount on its own. A name
@@ -683,13 +692,15 @@ interface LogViewOptions {
 }
 
 async function logView(rawArgs: string[], view: LogViewOptions): Promise<void> {
-    const parsed = arg(
-        { "--since": String,
+    const { flags: parsed } = parseCloudArgs({
+        spec: { "--since": String,
 "--tail": Number,
 "--previous": Boolean },
-        { argv: rawArgs.slice(3),
-permissive: true }
-    );
+        rawArgs,
+        commandWords: 3, // cloud debug logs|errors|boot
+        command: "cloud debug",
+        maxPositionals: 0
+    });
 
     const sinceArg = parsed["--since"];
     if (sinceArg !== undefined && parseSince(sinceArg) === null) {
@@ -749,9 +760,14 @@ permissive: true }
 }
 
 async function requestsCommand(rawArgs: string[]): Promise<void> {
-    const parsed = arg({ "--since": String,
-"--tail": Number }, { argv: rawArgs.slice(3),
-permissive: true });
+    const { flags: parsed } = parseCloudArgs({
+        spec: { "--since": String,
+"--tail": Number },
+        rawArgs,
+        commandWords: 3, // cloud debug requests
+        command: "cloud debug",
+        maxPositionals: 0
+    });
     const sinceArg = parsed["--since"];
     if (sinceArg !== undefined && parseSince(sinceArg) === null) {
         fail(`--since must be a duration like 15m, 2h or 90s; received "${sinceArg}".`);
@@ -812,6 +828,11 @@ requests: shown }
    ═══════════════════════════════════════════════════════════════ */
 
 async function podCommand(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud debug",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
 
@@ -883,6 +904,11 @@ placement: p }
    ═══════════════════════════════════════════════════════════════ */
 
 async function dbDebugCommand(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud debug",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
 

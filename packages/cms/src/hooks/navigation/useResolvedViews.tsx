@@ -30,7 +30,7 @@ export type UseResolvedViewsProps<USER extends User> = {
     adminViews?: AppView[] | AppViewsBuilder;
     data: RebaseData;
     plugins?: RebasePlugin[];
-    adminMode?: "cms" | "studio" | "settings";
+    adminMode?: "cms" | "studio";
     effectiveRoleController?: EffectiveRoleController;
 };
 

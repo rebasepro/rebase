@@ -12,10 +12,12 @@ import {
     detectProjectPackageManager,
     describeBuildScriptRemedy,
     describeDevAddCommand,
+    describeReinstallCommand,
     resolveLocalBin,
     getTableIncludes,
     getDevDatabaseUrl,
     ensureDevDatabaseExists,
+    dropDevDatabase,
     applySearchDdl,
     getSearchExcludes,
     readSearchDdl,
@@ -27,14 +29,15 @@ import {
     ExcludeIntrospectionError,
     promptConfirm
 } from "./cli-helpers";
-import { checkDatabaseConnectivity, diagnoseDbError, reportCommandFailure } from "./cli-errors";
+import { checkDatabaseConnectivity, diagnoseAtlasFailure, diagnoseDbError, reportCommandFailure } from "./cli-errors";
 import { forLibpq } from "./utils/connection-string";
 import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
 import { detectDestructiveStatements, decidePushSafety } from "./schema/destructive-sql";
 import { stripCarvedOutStatements } from "./schema/carved-out-migration";
 import { acceptsExcludeFlag, buildAtlasArgs } from "./schema/atlas-argv";
 import { unexpectedBranchArgs } from "./branch-argv";
-import { assertKnownFlags } from "./cli-flags";
+import { assertKnownFlags, collectionsPathIn } from "./cli-flags";
+import { assertCollectionsPathExists } from "./cli-collections-path";
 import { backupActionOf } from "./backup-argv";
 
 import { planIsEmpty, planPrune, parseOlderThan } from "./branch-prune";
@@ -90,6 +93,20 @@ export async function runPluginCommand(args: string[]) {
     // cli-flags.ts for why the check has to be here and not in those parsers.
     assertKnownFlags(domain, subcommand, args);
 
+    // And before anything is generated: a `--collections` path that does not
+    // resolve used to warn and carry on, four times over, and the generators
+    // then wrote an *empty* schema over `drizzle/schema.sql` and
+    // `src/schema.generated.ts` — both committed artifacts — after which the
+    // push planned a DROP TABLE for every table in the database. Only the
+    // destructive gate stood between a typo and the whole schema.
+    //
+    // Checked here rather than in `loadCollectionsForCli`, which is
+    // deliberately forgiving: its callers use it to *narrow* what Atlas may
+    // touch, and a hard failure there would block a push over one broken file.
+    // This is a different question — "does the directory the user named
+    // exist" — and the answer was already known before the first write.
+    assertCollectionsPathExists(collectionsPathIn(args));
+
     if (domain === "db") {
         await dbCommand(subcommand, args);
     } else if (domain === "schema") {
@@ -107,6 +124,19 @@ function listMigrationFiles(): string[] {
     const dir = path.resolve(process.cwd(), "drizzle", "migrations");
     if (!fs.existsSync(dir)) return [];
     return fs.readdirSync(dir).filter(f => f.endsWith(".sql")).sort();
+}
+
+/**
+ * The newest migration's version — the numeric prefix Atlas records.
+ *
+ * `20260906101530_init.sql` → `20260906101530`. Named in the baseline remedy so
+ * the command it prints can be typed rather than worked out.
+ */
+function latestMigrationVersion(): string | null {
+    const newest = listMigrationFiles().at(-1);
+    if (!newest) return null;
+    const match = /^(\d+)/.exec(newest);
+    return match ? match[1] : newest.replace(/\.sql$/, "");
 }
 
 /**
@@ -230,6 +260,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             "--allow-destructive": Boolean,
             "--dry-run": Boolean,
             "--yes": Boolean,
+            "--baseline": String,
             "-c": "--collections",
             "-y": "--yes"
         },
@@ -472,6 +503,17 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 await reconcilePolicies(databaseUrl, collectionsPath);
                 await ensureRlsUserRole(databaseUrl);
                 await retireLegacyAuthSchema(databaseUrl);
+
+                // The push worked, so the throwaway schema copy Atlas planned
+                // against has nothing left to say. It was kept forever, one per
+                // target, and the only notice was `rebase db branch prune`
+                // reporting them. On a failed push we never reach this line —
+                // deliberately: there the scratch database is the evidence.
+                // And only the one this run created: a scratch database the
+                // user made by hand is theirs to keep.
+                if (scratchDatabaseCreatedHere) {
+                    await dropDevDatabase(databaseUrl, getDevDatabaseUrl(databaseUrl));
+                }
             } else {
                 outWarn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
             }
@@ -481,7 +523,26 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 await ensureAuthSchemaAndFunctions(databaseUrl);
             }
             const extraArgs = argsList._.filter(arg => arg !== "migrate");
-            await runAtlas("migrate", ["apply", "--dir", "file://drizzle/migrations", ...extraArgs], collectionsPath);
+            // `--baseline <version>` is relayed to Atlas as its own: it records
+            // the version as already applied and starts from the next one. The
+            // database a Rebase boot has provisioned is exactly the case it is
+            // for, and without it `migrate apply` there is unusable — see
+            // `formatBaselineRemedy`, which is what prints when it is missing.
+            const baseline = argsList["--baseline"];
+            if (baseline) {
+                out(chalk.gray(`  Recording ${baseline} as already applied, then migrating from the next one.`));
+                out("");
+            }
+            await runAtlas(
+                "migrate",
+                [
+                    "apply",
+                    "--dir", "file://drizzle/migrations",
+                    ...(baseline ? ["--baseline", baseline] : []),
+                    ...extraArgs
+                ],
+                collectionsPath
+            );
             if (databaseUrl) {
                 await ensureRlsUserRole(databaseUrl);
                 await retireLegacyAuthSchema(databaseUrl);
@@ -1023,6 +1084,11 @@ ${chalk.green.bold("Options")}
                                     Postgres refuses to copy or drop a database
                                     anything else is connected to — usually your
                                     own \`rebase dev\`.
+  ${chalk.blue.bold("--include-dev-diff")}                Also prune the Atlas scratch databases
+                                    \`db push\` leaves behind.
+  ${chalk.blue.bold("--yes, -y")}                         Skip prune's confirmation prompt. Dropping a
+                                    branch is not undoable, so this is the flag
+                                    a CI job passes and a person usually should not.
 
 ${chalk.green.bold("Examples")}
   ${chalk.gray("# Create a branch and work on it")}
@@ -1059,6 +1125,9 @@ function timeAgo(date: Date): string {
 
 
 
+/** Set when this process created the Atlas scratch database; see `ensureDevDatabaseExists`. */
+let scratchDatabaseCreatedHere = false;
+
 async function runAtlas(
     domain: "schema" | "migrate",
     args: string[],
@@ -1080,7 +1149,25 @@ async function runAtlas(
         // somebody else. Read the lockfile and answer the reader in front of us.
         const manager = detectProjectPackageManager();
 
-        if (diagnoseMissingBin("@ariga/atlas") === "build-script-blocked") {
+        const diagnosis = diagnoseMissingBin("@ariga/atlas");
+
+        if (diagnosis === "bin-link-missing") {
+            // The binary IS on disk; only the `node_modules/.bin` shim that
+            // points at it is not. pnpm produces this when it writes the link
+            // before the script that creates the target ("Failed to create bin
+            // … ENOENT"), and so does a tree copied without its symlinks.
+            // Sending this reader to `approve-builds` does nothing: nothing is
+            // blocked.
+            outError(chalk.yellow("  @ariga/atlas and its binary are both on disk — only the\n"
+                + "  node_modules/.bin/atlas link that puts it on PATH is missing.\n"));
+            outError(chalk.gray(
+                "  Usually a half-written install: the link is created before the script that\n"
+                + "  downloads the target, so an interrupted or copied tree keeps the binary and\n"
+                + "  loses the shim.\n"
+            ));
+            outError("  Fix it with:\n");
+            outError(chalk.bold(`    ${describeReinstallCommand(manager)}\n`));
+        } else if (diagnosis === "build-script-blocked") {
             outError(chalk.yellow("  @ariga/atlas IS installed — only its binary is missing.\n"));
             outError(chalk.gray(
                 "  It downloads that binary in a `preinstall` script, and pnpm 10+ and npm 12+\n" +
@@ -1144,7 +1231,10 @@ async function runAtlas(
     await checkDatabaseConnectivity(databaseUrl);
 
     const devDatabaseUrl = getDevDatabaseUrl(databaseUrl);
-    await ensureDevDatabaseExists(databaseUrl, devDatabaseUrl);
+    // Remember whether the scratch database is ours: one a user created by
+    // hand — the remedy for a role without CREATEDB — must survive the push,
+    // or that user is back at the same refusal next time.
+    if (await ensureDevDatabaseExists(databaseUrl, devDatabaseUrl)) scratchDatabaseCreatedHere = true;
 
     // Atlas speaks libpq, which rejects the `sslmode=no-verify` that
     // node-postgres accepts — see `forLibpq`. Rewritten only for the argv, so
@@ -1232,8 +1322,20 @@ async function runAtlas(
         await subprocess;
     } catch {
         outError(chalk.red(`\n✗ atlas ${domain} ${args.join(" ")} failed.\n`));
-        // Surface actionable recovery guidance for recognized failures.
-        const hint = diagnoseDbError({ message: stderrText }, databaseUrl);
+        // Surface actionable recovery guidance for recognized failures. The
+        // Atlas-shaped ones first: they read the invocation as well as the
+        // text, so they can tell `migrate apply` hitting an already-provisioned
+        // database (which wants a baseline) from `schema apply` hitting a real
+        // conflict. `diagnoseDbError` is the connection-level fallback, shared
+        // with the boot path.
+        const atlasHint = await diagnoseAtlasFailure({
+            domain,
+            args,
+            stderr: stderrText,
+            databaseUrl,
+            latestMigrationVersion: latestMigrationVersion()
+        });
+        const hint = atlasHint ?? diagnoseDbError({ message: stderrText }, databaseUrl);
         if (hint) {
             outError(hint);
         }
@@ -1286,7 +1388,15 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
             env: { ...process.env as Record<string, string> }
         });
     } catch (err: unknown) {
-        outError(chalk.red(`✗ Failed to run Postgres DDL generator: ${err instanceof Error ? err.message : String(err)}`));
+        // The generator runs with inherited stdio, so on a non-zero exit its
+        // own message is already the last useful thing on the terminal and
+        // execa's wrapper ("Command failed with exit code 1: …/tsx …") would
+        // bury it. Repeat it only when the child never got as far as speaking.
+        if (typeof (err as { exitCode?: number }).exitCode === "number") {
+            outError(chalk.red("✗ Postgres DDL generation failed — nothing was applied."));
+        } else {
+            outError(chalk.red(`✗ Failed to run Postgres DDL generator: ${err instanceof Error ? err.message : String(err)}`));
+        }
         process.exit(1);
     }
 }
@@ -1314,7 +1424,10 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
             "--output": String,
             "--fix": Boolean,
             "-c": "--collections",
-            "-o": "--output"
+            "-o": "--output",
+            // Both spellings, on every command that writes a file. See
+            // `OUTPUT_FLAG_ALIASES` in cli-flags.ts.
+            "--out": "--output"
         },
         { argv: rawArgs.slice(2), permissive: true }
     );
@@ -1323,45 +1436,45 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
     const outputPath = argsList["--output"] || path.join("src", "schema.generated.ts");
     const schemaFile = path.resolve(process.cwd(), outputPath);
 
-    // No generated schema yet is not staleness — a fresh project has not run the
-    // generator, and saying "stale" about a file that does not exist would send
-    // the reader looking for something to fix.
-    if (!fs.existsSync(schemaFile)) return;
+    const fix = Boolean(argsList["--fix"]);
+    const generatedExists = fs.existsSync(schemaFile);
 
     const { loadCollections } = await import("./schema/doctor");
-    const { findLegacyForeignKeyNames, describeLegacyForeignKeyNames } =
+    const { findLegacyForeignKeyNames, staleVerdict } =
         await import("./schema/generated-schema-staleness");
 
-    let stale;
-    try {
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
-        stale = findLegacyForeignKeyNames(fs.readFileSync(schemaFile, "utf8"), collections);
-    } catch (err) {
-        // Best-effort by design: a collections directory that will not load is a
-        // real error, but it is one the boot reports far better than this does.
-        logger.debug(`schema stale: skipped (${err instanceof Error ? err.message : String(err)})`);
-        return;
+    let stale: ReturnType<typeof findLegacyForeignKeyNames> = [];
+    let unreadable: string | undefined;
+    if (generatedExists) {
+        try {
+            const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+            stale = findLegacyForeignKeyNames(fs.readFileSync(schemaFile, "utf8"), collections);
+        } catch (err) {
+            // Best-effort by design: a collections directory that will not load
+            // is a real error, but it is one the boot reports far better than
+            // this does. Said out loud all the same — this command used to exit
+            // 0 in silence here, which is indistinguishable from a clean run.
+            unreadable = err instanceof Error ? err.message : String(err);
+            logger.debug(`schema stale: skipped (${unreadable})`);
+        }
     }
 
-    if (stale.length === 0) return;
+    // The decision lives in `generated-schema-staleness.ts` so it can be tested:
+    // this file uses `import.meta`, which the driver's jest suite cannot load,
+    // and three of this command's four paths were silent because of it.
+    const verdict = staleVerdict({ outputPath, generatedExists, stale, unreadable, fix });
 
-    out("");
-    outWarn(chalk.yellow(
-        `  ⚠️  ${outputPath} names ${stale.length} foreign key(s) the way an earlier release did:`
-    ));
-    out(chalk.gray(describeLegacyForeignKeyNames(stale)));
-    out("");
-
-    if (!argsList["--fix"]) {
-        outError(chalk.red(
-            "  The database column has already been renamed at boot, so the generated schema no " +
-            "longer matches it and the server will refuse to start."
-        ));
-        outError(chalk.red("  Run `rebase schema generate` to regenerate it."));
-        process.exit(1);
+    for (const line of verdict.lines) {
+        if (!line) out("");
+        else if (line.includes("⚠️")) outWarn(chalk.yellow(line));
+        else if (verdict.exitCode !== 0) outError(chalk.red(line));
+        else if (line.includes("✓")) out(chalk.green(line));
+        else out(chalk.gray(line));
     }
 
-    out(chalk.gray("  Regenerating the Drizzle schema so it matches..."));
+    if (verdict.exitCode !== 0) process.exit(verdict.exitCode);
+    if (!verdict.regenerate) return;
+
     await schemaCommand("generate", ["schema", "generate", `--collections=${collectionsPath}`, `--output=${outputPath}`]);
 }
 
@@ -1396,6 +1509,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 "--watch": Boolean,
                 "-c": "--collections",
                 "-o": "--output",
+                "--out": "--output",
                 "-w": "--watch"
             },
             {
@@ -1443,7 +1557,13 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 env: { ...process.env as Record<string, string> }
             });
         } catch (err: unknown) {
-            outError(chalk.red(`✗ Failed to run schema generator: ${err instanceof Error ? err.message : String(err)}`));
+            // Same contract as the DDL generator above: a child that exited
+            // non-zero has already printed the cause on inherited stdio.
+            if (typeof (err as { exitCode?: number }).exitCode === "number") {
+                outError(chalk.red("✗ Drizzle schema generation failed — nothing was applied."));
+            } else {
+                outError(chalk.red(`✗ Failed to run schema generator: ${err instanceof Error ? err.message : String(err)}`));
+            }
             process.exit(1);
         }
     } else if (subcommand === "introspect") {
@@ -1454,6 +1574,7 @@ async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<voi
                 "--force": Boolean,
                 "--schema": String,
                 "-o": "--output",
+                "--out": "--output",
                 "-c": "--collections",
                 "-f": "--force"
             },

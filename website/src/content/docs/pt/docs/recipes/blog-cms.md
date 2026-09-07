@@ -1,4 +1,5 @@
 ---
+sourceHash: b2d69a15f60b73b7
 title: "Receita: CMS de Blog"
 sidebar_label: CMS de Blog
 description: Crie um CMS de blog completo com artigos, autores, categorias, edição de texto rico e upload de imagens.

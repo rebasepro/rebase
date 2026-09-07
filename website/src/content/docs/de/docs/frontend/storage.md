@@ -1,4 +1,5 @@
 ---
+sourceHash: 1134b2a4207579d3
 title: Speicher & Datei-Uploads
 sidebar_label: Speicher & Datei-Uploads
 description: Fügen Sie Ihren Collections Datei-Upload-Felder hinzu, verwalten Sie Dateien programmatisch und leiten Sie Uploads an verschiedene Speicher-Backends weiter.

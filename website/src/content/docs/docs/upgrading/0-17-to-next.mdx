@@ -1,0 +1,132 @@
+---
+slug: docs/upgrading/0-17-to-next
+title: Upgrading 0.17 to the next release
+sidebar_label: 0.17 → next
+description: The breaking changes already merged on main and live in these docs, before the release that carries them exists.
+---
+
+# Upgrading 0.17 → next
+
+**Nothing here is released yet.** These are the `### Breaking` entries of the
+changelog's [`[Unreleased]`](/docs/changelog/) section: they are on `main`, and
+this documentation site publishes from `main`, so they are described here weeks
+before the version that carries them exists on npm. If you installed from npm
+you are on 0.17.3 and none of this has reached you — read it to know what is
+coming, and come back when you move.
+
+Every one of them is a compile error or a refused boot rather than a silent
+change of behaviour, except the last, which rewrites a constraint the next
+`db push` will plan for you.
+
+---
+
+## 20. `defineCollection` is one signature
+
+It was three overloads — Postgres, Firestore, MongoDB — and a failing call
+produced one diagnostic on `defineCollection(`, listing each overload's first
+failure. There is one signature now, discriminated on `engine` (Postgres when
+absent), and errors are reported on the key that is wrong, all of them at once.
+
+**What to change:** nothing, in a call that already compiled. What changes is
+where the red squiggle lands. Two type exports moved with it: `UnknownPropertyKey`
+is now `NoSuchKey` (and carries a `didYouMean` member), and
+`PropertyTypeNotOnThisEngine` is new. Both are internal machinery of the builder,
+so only code that imported the old name has an edit to make.
+
+## 21. `defineCollection` keeps checking after the first bad property
+
+The builder constrained its property map, and a constraint TypeScript cannot
+satisfy is one it silently falls back from — so a single bad `defaultValue`
+widened the inferred entity to `Record<string, unknown>` and switched off every
+check on `display.title`, `listProperties`, `propertiesOrder` and
+`previewProperties`.
+
+**What to change:** nothing to write, but expect *new* errors in collection files
+that compiled before. They were wrong then too; the compiler had stopped looking.
+Fix the property the first error names and rebuild — the rest of that file is
+being checked for the first time.
+
+## 22. A relation's link field has to belong to its `kind`
+
+`Relation` has been a closed union since 0.11 — `belongsTo` owns `localKey`,
+`hasOne`/`hasMany` own `foreignKeyOnTarget`, `manyToMany` owns `through`, `via`
+owns `joinPath` — but excess-property checking ran against the union as a whole,
+so `{ kind: "belongsTo", foreignKeyOnTarget: "author_id" }` compiled and then
+resolved to a different link than the one written.
+
+**What to change:** put the link field the kind owns.
+
+```diff lang="ts"
+  author: {
+      type: "relation",
+-     relation: { kind: "belongsTo", foreignKeyOnTarget: "author_id", target: () => authors }
++     relation: { kind: "belongsTo", localKey: "author_id", target: () => authors }
+  }
+```
+
+The boot validator already refused these, so this moves the report from a failed
+deploy to a compile error. If your project boots today, it compiles today.
+
+## 23. A relation's `validation` moves up to the property
+
+`RelationBase.validation` and `ResolvedRelationBase.validation` are deleted.
+There were two places to write `required` and two generators reading different
+ones: the DDL asked the property (so the column came out `NOT NULL`) while the
+SDK type generator asked the relation (so the generated `Insert` type made the
+field optional), and a `create()` that omitted the relation typechecked and then
+failed at the database.
+
+**What to change:** move it one level up, beside every other field's.
+
+```diff lang="ts"
+  author: {
+      type: "relation",
++     validation: { required: true },
+-     relation: { kind: "belongsTo", validation: { required: true }, target: () => authors }
++     relation: { kind: "belongsTo", target: () => authors }
+  }
+```
+
+Boot refuses the old key by name rather than ignoring it. Code that asked a
+relation whether it was required asks
+`import { isRelationRequired, relationDeclaringProperty } from "@rebasepro/common"`
+instead.
+
+## 24. A required `belongsTo` deletes with `RESTRICT`, not `CASCADE`
+
+`validation: { required: true }` says the child cannot exist without a parent. It
+does not say deleting the parent should delete the child — but that is what the
+generator inferred, so every `DELETE FROM authors` cascaded through posts, their
+comments, and whatever hung off those. The default is `RESTRICT` now: the delete
+fails and names the constraint. Optional relations are unchanged (`SET NULL`), and
+a `manyToMany` junction is unchanged (`CASCADE` — the row it deletes is the link).
+
+**This one is a DDL change.** The next `rebase db push` plans a `DROP CONSTRAINT` /
+`ADD CONSTRAINT` for every required relation that never named an `onDelete`, and
+after it those parent deletes start failing where they used to cascade.
+
+**What to change:** to keep the old behaviour, write it down.
+
+```diff lang="ts"
+- relation: { kind: "belongsTo", target: () => authors }
++ relation: { kind: "belongsTo", onDelete: "cascade", target: () => authors }
+```
+
+Then read the plan before applying it — `rebase db push` prints the statements.
+
+## 25. The Node floor is `>=22.22.0`
+
+Every published package declared `>=20` at 0.17.3 — `@rebasepro/cli` declared no
+`engines` at all — and every one of them declares `>=22.22.0` on `main`. The
+single source is the repository's `.nvmrc`.
+
+**What to change:** move to Node 22.22.0 before you upgrade. `pnpm install`
+answers an engines mismatch with `[WARN] Unsupported engine` and installs
+anyway, so the failure does not arrive at install time; it arrives later,
+somewhere with no mention of Node in it.
+
+---
+
+**Next:** [the upgrade checklist](/docs/upgrading/#upgrade-checklist) ·
+[0.14 → 0.17](/docs/upgrading/0-14-to-0-17/), the hop before this one ·
+[Changelog](/docs/changelog/), the release notes these sections summarise.

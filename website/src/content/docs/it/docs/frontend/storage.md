@@ -1,4 +1,5 @@
 ---
+sourceHash: 1134b2a4207579d3
 title: Archiviazione e Caricamento File
 sidebar_label: Archiviazione e Caricamento File
 description: Aggiungi campi di caricamento file alle tue collezioni, gestisci i file programmaticamente e indirizza i caricamenti verso backend di archiviazione diversi.

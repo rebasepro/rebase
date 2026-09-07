@@ -1,4 +1,5 @@
 ---
+sourceHash: 3bf8656e3408eede
 title: Entitätsaktionen
 sidebar_label: Entitätsaktionen
 description: Fügen Sie Entitäten benutzerdefinierte Aktionsschaltflächen für Archivierung, Veröffentlichung, Export, Klonen und mehr hinzu.

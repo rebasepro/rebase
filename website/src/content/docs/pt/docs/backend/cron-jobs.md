@@ -1,4 +1,5 @@
 ---
+sourceHash: 9df2202ffe55b40c
 title: Tarefas Cron
 sidebar_label: Tarefas Cron
 description: Agende tarefas em segundo plano recorrentes com o sistema de tarefas cron integrado do Rebase. Defina tarefas como arquivos TypeScript, monitore-as no Studio e gerencie-as via API REST.
@@ -68,7 +69,7 @@ const instance = await initializeRebaseBackend({
 2. Registrar cada exportação padrão como uma tarefa cron
 3. Criar automaticamente a tabela `rebase.cron_logs` no PostgreSQL (se o driver suportar SQL)
 4. Iniciar o agendador e preencher contadores a partir de logs de DB existentes
-5. Montar rotas REST de administração em `/api/cron`
+5. Montar rotas REST de administração em `/api/admin/cron`
 
 ## Sintaxe de Agendamento
 
@@ -97,6 +98,9 @@ As expressões cron usam o **formato padrão de 5 campos**:
 Valores de passo (`*/n`), intervalos (`a-b`) e listas (`a,b,c`) são todos suportados.
 
 ## Referência de CronJobDefinition
+
+`timezone` é novo <span class="since-badge" data-since="0.18">Since 0.18</span> — em 0.17.3 um agendamento é sempre lido no fuso do
+anfitrião. Todo o resto desta interface já foi lançado.
 
 ```typescript
 interface CronJobDefinition {
@@ -149,16 +153,18 @@ Todas as rotas cron exigem **autenticação de administrador** (`requireAuth` + 
 
 | Método | Caminho | Descrição |
 |--------|------|-------------|
-| `GET` | `/api/cron` | Listar todas as tarefas cron registradas |
-| `GET` | `/api/cron/:id` | Obter o status de uma única tarefa |
-| `POST` | `/api/cron/:id/trigger` | Acionar uma tarefa manualmente |
-| `GET` | `/api/cron/:id/logs` | Obter histórico de execução (`?limit=N`) |
-| `PUT` | `/api/cron/:id` | Habilitar/desabilitar uma tarefa (`{ "enabled": true }`) |
+| `GET` | `/api/admin/cron` | Listar todas as tarefas cron registradas |
+| `GET` | `/api/admin/cron/:id` | Obter o status de uma única tarefa |
+| `POST` | `/api/admin/cron/:id/trigger` | Acionar uma tarefa manualmente |
+| `GET` | `/api/admin/cron/:id/logs` | Obter histórico de execução (`?limit=N`) |
+| `PUT` | `/api/admin/cron/:id` | Habilitar/desabilitar uma tarefa (`{ "enabled": true }`) |
 
 ### Exemplo: Listar Todas as Tarefas
 
+`$TOKEN` é um token de acesso de administrador: inicie sessão e use o `accessToken` que a resposta de login devolve. `$API_URL` é o URL que o `rebase dev` imprimiu — a porta é derivada do projeto e não é fixa.
+
 ```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
+curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/admin/cron"
 ```
 
 ```json
@@ -184,7 +190,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3001/api/cron/health-check/trigger
+    "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
 ## SDK do Cliente
@@ -194,7 +200,7 @@ O SDK do cliente Rebase expõe um namespace `cron` para todas as operações:
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
 
-const client = createRebaseClient({ baseUrl: "http://localhost:3001" });
+const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
 
 // List all jobs
 const { jobs } = await client.cron.listJobs();
@@ -231,7 +237,7 @@ Quando o driver do banco de dados suporta SQL (por exemplo, PostgreSQL), os logs
 
 - O histórico de execução **sobrevive a reinicializações** de servidor e implantações
 - Os contadores `totalRuns` e `totalFailures` são **preenchidos a partir do banco de dados** na inicialização
-- O endpoint `/api/cron/:id/logs` consulta o banco de dados, não apenas a memória
+- O endpoint `/api/admin/cron/:id/logs` consulta o banco de dados, não apenas a memória
 - Múltiplas instâncias de servidor compartilham o mesmo histórico de execução
 
 A tabela é criada automaticamente na primeira inicialização — sem necessidade de migrações.

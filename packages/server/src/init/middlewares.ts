@@ -7,6 +7,7 @@ import { requestId } from "../utils/request-id";
 import { requestLogger } from "../utils/request-logger";
 import { logger } from "../utils/logger";
 import { logMiddleware } from "../api/logs-routes";
+import { ApiError, errorHandler } from "../api/errors";
 
 interface MiddlewareConfig {
     maxBodySize?: number;
@@ -50,14 +51,14 @@ export function configureMiddlewares(
     if (maxBodySize > 0) {
         app.use(`${basePath}/*`, bodyLimit({
             maxSize: maxBodySize,
-            onError: (c) => {
-                return c.json({
-                    error: {
-                        message: `Request body too large. Maximum size is ${Math.round(maxBodySize / 1024 / 1024)}MB.`,
-                        code: "PAYLOAD_TOO_LARGE"
-                    }
-                }, 413);
-            }
+            onError: (c) => errorHandler(
+                new ApiError(
+                    413,
+                    "PAYLOAD_TOO_LARGE",
+                    `Request body too large. Maximum size is ${Math.round(maxBodySize / 1024 / 1024)}MB.`
+                ),
+                c
+            ) as Response
         }));
         logger.debug("Request body limit configured", { maxSizeMB: Math.round(maxBodySize / 1024 / 1024) });
     }

@@ -1,4 +1,5 @@
 ---
+sourceHash: 64da41d7e9319170
 slug: it/docs/compatibility
 title: Compatibilità
 description: "Cosa garantisce Rebase tra le diverse versioni e cosa no: i sei contratti versionati, come ciascuno fallisce e cosa può ancora cambiare in una versione minor."
@@ -80,6 +81,25 @@ La migrazione in avanti è automatica: `ensureAuthTablesExist` aggiorna un datab
 ### 5 — `manifest.schemaVersion`
 
 Un hash delle definizioni compilate delle collezioni, emesso nel manifest del bundle e restituito da un SDK generato nell'header `x-rebase-schema` (`SCHEMA_VERSION_HEADER`). Esiste affinché la piattaforma possa segnalare "questa app è stata compilata su uno schema più vecchio" invece di fallire misteriosamente alla prima richiesta.
+
+Il backend legge quell'header a ogni richiesta di dati. Il disallineamento non rifiuta mai una chiamata — un SDK indietro di uno schema è di norma ancora compatibile, e rilasciare il backend prima del frontend è il consueto ordine di deploy — ma quando una richiesta fallisce con un 400 o un 404, l'errore porta con sé il disallineamento come causa:
+
+```json
+{
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "Unknown field \"authorName\" on collection \"posts\"",
+    "cause": {
+      "code": "SCHEMA_DRIFT",
+      "clientSchema": "v1:0e1c…",
+      "serverSchema": "v1:9ab4…",
+      "message": "This client was generated against schema v1:0e1c…; this backend serves v1:9ab4…"
+    }
+  }
+}
+```
+
+Così una colonna rinominata si legge come "il tuo SDK è obsoleto, rigeneralo" invece che come un campo la cui esistenza è affermata dai tuoi stessi tipi. A una richiesta che riesce non viene mai detto nulla.
 
 Riguarda **esclusivamente le collezioni**. La modifica di un hook o di una funzione non altera il contratto di un client e non deve invalidare ogni SDK generato.
 

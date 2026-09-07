@@ -23,6 +23,8 @@ import { fileURLToPath } from "node:url";
 import { builtinModules } from "node:module";
 import ts from "typescript";
 
+import { publishablePackages } from "./publishable-packages.mjs";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BUILTIN = new Set([...builtinModules, ...builtinModules.map((m) => `node:${m}`)]);
 /** Bare specifiers only; skips prose and SQL that a regex would mistake for one. */
@@ -107,6 +109,82 @@ function valueImports(file) {
     return out;
 }
 
+/**
+ * The span of MAJORS a range admits, as `[low, highExclusive]`, or null.
+ *
+ * Deliberately coarse and deliberately timid. Majors are the granularity that
+ * decides whether a user's `node_modules` holds one copy or two, and anything
+ * this cannot read with certainty — an alternation, a tag, a `*` — returns null
+ * so the pair is not compared at all. A gate that refuses a release over a
+ * range it merely failed to parse would be worse than the duplication.
+ */
+function majorSpan(range) {
+    if (typeof range !== "string") return null;
+    const text = range.trim();
+    if (text.includes("||")) return null;                 // `^4 || ^5` spans both
+    if (/^[a-z]+:/.test(text)) return null;               // workspace:, npm:, git:, file:
+    const low = text.match(/(\d+)/);
+    if (!low) return null;                                // `*`, `latest`, a dist-tag
+    const lowMajor = Number(low[1]);
+
+    const capped = text.match(/<(=?)\s*v?(\d+)/);
+    if (capped) return [lowMajor, Number(capped[2]) + (capped[1] === "=" ? 1 : 0)];
+    if (/^[\^~=]?v?\d/.test(text)) return [lowMajor, lowMajor + 1];
+    if (/^>/.test(text)) return [lowMajor, null];         // open above
+    return null;
+}
+
+/**
+ * Two publishable packages asking for majors that cannot both be satisfied.
+ *
+ * A user installing `@rebasepro/{server,server-postgres,client,cli}` got
+ * `chalk@4.1.2` AND `chalk@5.6.2` in their tree, because the CLI moved to 5 and
+ * the driver stayed on 4. Nothing was broken by it and nothing could see it
+ * either: each package's own manifest is internally consistent, every gate here
+ * asked about one package at a time, and the duplication is only visible in a
+ * consumer's `node_modules` — which nothing in CI builds.
+ *
+ * `dependencies` and `optionalDependencies` are what land in that tree.
+ * `peerDependencies` are included because a consumer cannot satisfy two
+ * disjoint peer ranges at all: that is an install error rather than a wasted
+ * megabyte.
+ */
+function disjointMajorRanges() {
+    const declarations = new Map();
+
+    for (const pkg of publishablePackages(ROOT)) {
+        const manifest = JSON.parse(readFileSync(path.join(ROOT, pkg.dir, "package.json"), "utf8"));
+        for (const block of ["dependencies", "optionalDependencies", "peerDependencies"]) {
+            for (const [dep, range] of Object.entries(manifest[block] || {})) {
+                // Framework packages travel in lockstep and are `workspace:*`
+                // in the tree; `check:publishable-set` owns that invariant.
+                if (dep.startsWith("@rebasepro/")) continue;
+                const span = majorSpan(range);
+                if (!span) continue;
+                if (!declarations.has(dep)) declarations.set(dep, []);
+                declarations.get(dep).push({ pkg: pkg.name, range, span });
+            }
+        }
+    }
+
+    const clashes = [];
+    for (const [dep, declared] of declarations) {
+        for (let i = 0; i < declared.length; i++) {
+            for (let j = i + 1; j < declared.length; j++) {
+                const [a, b] = [declared[i], declared[j]];
+                if (a.pkg === b.pkg) continue;
+                const overlap = (a.span[1] === null || a.span[1] > b.span[0])
+                    && (b.span[1] === null || b.span[1] > a.span[0]);
+                if (overlap) continue;
+                clashes.push({ dep, a, b });
+            }
+        }
+    }
+    return clashes;
+}
+
+const versionClashes = disjointMajorRanges();
+
 const findings = [];
 const usedAllowances = new Set();
 
@@ -180,9 +258,25 @@ for (const d of readdirSync(path.join(ROOT, "packages")).sort()) {
 // A stale allowance is a quiet hole in the gate.
 const stale = [...ALLOWED.keys()].filter((k) => !usedAllowances.has(k));
 
-if (findings.length === 0 && stale.length === 0) {
-    console.log(`${GREEN}✓ Every published package declares what it imports.${NC}`);
+if (findings.length === 0 && stale.length === 0 && versionClashes.length === 0) {
+    console.log(
+        `${GREEN}✓ Every published package declares what it imports, and no two ask for `
+        + `majors a user cannot install together.${NC}`
+    );
     process.exit(0);
+}
+
+if (versionClashes.length) {
+    console.error(`${RED}✗ ${versionClashes.length} dependency major(s) no single install can satisfy:${NC}\n`);
+    for (const { dep, a, b } of versionClashes) {
+        console.error(`  ${dep}`);
+        console.error(`    ${a.range} ${DIM}(${a.pkg})${NC}`);
+        console.error(`    ${b.range} ${DIM}(${b.pkg})${NC}`);
+    }
+    console.error(
+        `\n${DIM}A user installing both gets two copies in node_modules — or, for a peer`
+        + `\nrange, an install that cannot be satisfied at all. Move them onto one major.${NC}`
+    );
 }
 
 if (findings.length) {

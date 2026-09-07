@@ -96,6 +96,19 @@ export interface StorageSourceDefinition {
      */
     transport: StorageSourceTransport;
 
+    /**
+     * Serve unqualified uploads — a storage property naming no `storageSource`
+     * — from this source.
+     *
+     * Declared, never inferred. A project with named buckets and no default
+     * used to have one chosen for it by declaration order, with a warning, and
+     * the choice differed between development and production because the
+     * synthesized local default is dropped in production and the promotion was
+     * not. Where the files land is the author's decision; boot now fails
+     * without one.
+     */
+    default?: boolean;
+
     /** Human-readable label for the UI (e.g. "Firebase Storage", "S3 Media"). */
     label?: string;
 }

@@ -91,8 +91,12 @@ describe("a property marked excludeFromApi", () => {
 });
 
 describe("relation properties", () => {
-    // The exclusion the three loops did have, folded into the same predicate:
-    // a relation is virtual, the row carries the owning side's foreign key.
+    // A relation is virtual and the row carries the owning side's foreign key —
+    // which is why both are documented. The generator used to drop the property
+    // *and* never emit the key, so `/api/docs` described a strictly smaller
+    // `Post` than the SDK's `Row` for the same config. Filters are the one place
+    // the old exclusion still holds: a relation is not a column to compare
+    // against.
     const authors = {
         slug: "authors", name: "Authors", singularName: "Author", table: "authors",
         properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
@@ -106,11 +110,26 @@ describe("relation properties", () => {
         }
     } as unknown as CollectionConfig;
 
-    it("stay out of the schemas and the filters", () => {
+    it("reach the read schema as a foreign key and a resolved row", () => {
         const relSpec = generateOpenApiSpec([posts, authors]) as Record<string, any>;
 
-        expect(Object.keys(relSpec.components.schemas.Post.properties)).toEqual(["id", "title"]);
-        expect(Object.keys(relSpec.components.schemas.PostInput.properties)).toEqual(["title", "id"]);
+        expect(Object.keys(relSpec.components.schemas.Post.properties)).toEqual(["id", "title", "authorId", "author"]);
+        expect(relSpec.components.schemas.Post.properties.authorId.type).toBe("string");
+        expect(relSpec.components.schemas.Post.properties.author).toEqual({ $ref: "#/components/schemas/Author" });
+    });
+
+    it("reach the write schemas as the two keys the server accepts", () => {
+        const relSpec = generateOpenApiSpec([posts, authors]) as Record<string, any>;
+
+        expect(Object.keys(relSpec.components.schemas.PostInput.properties)).toEqual(["title", "id", "authorId", "author"]);
+        // The relation property is a foreign key on a write, not a nested row:
+        // `{ author: "…" }` is the id the write transformer maps onto the column.
+        expect(relSpec.components.schemas.PostInput.properties.author.type).toBe("string");
+    });
+
+    it("are not offered as filters — a relation is not a column", () => {
+        const relSpec = generateOpenApiSpec([posts, authors]) as Record<string, any>;
+
         expect((relSpec.paths["/data/posts"].get.parameters as { name: string }[])
             .map(p => p.name)).not.toContain("author");
     });

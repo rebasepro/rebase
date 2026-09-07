@@ -2,6 +2,7 @@ import type { NavigationEntry } from "@rebasepro/cms-types";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     Active,
+    DraggableAttributes,
     Over,
     closestCenter,
     closestCorners,
@@ -66,6 +67,30 @@ const cloneItemsForDnd = (items: { name: string; entries: NavigationEntry[] }[])
 /* Sortable card & group                                       */
 
 /* ─────────────────────────────────────────────────────────── */
+
+/**
+ * dnd-kit's `attributes`, minus the `role` it assumes.
+ *
+ * The wrapper these land on contains a `<Link>` and the card's own action
+ * buttons, and dnd-kit's `role: "button"` therefore declared a button
+ * containing a link containing more buttons. Measured on a scaffold's home
+ * page: 17 focusables for 5 destinations, 13 of the 17 `[role=button]` nested
+ * inside another — which is what a screen reader has to read through before it
+ * reaches the collection you wanted.
+ *
+ * The rest is kept, and it is the part that carries meaning:
+ * `aria-roledescription="sortable"`, the instructions dnd-kit points
+ * `aria-describedby` at, and the `tabIndex` its keyboard sensor needs — drag
+ * still works from the keyboard.
+ *
+ * A dedicated drag handle is the better answer and the one dnd-kit documents;
+ * it needs a control designed into the card, which is a visual change and not
+ * this one.
+ */
+function draggableAttributes(attributes: DraggableAttributes): Omit<DraggableAttributes, "role"> {
+    const { role: _role, ...rest } = attributes;
+    return rest;
+}
 export function SortableNavigationCard({
     entry,
     onClick
@@ -93,7 +118,7 @@ export function SortableNavigationCard({
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+        <div ref={setNodeRef} style={style} {...draggableAttributes(attributes)} {...listeners}>
             <NavigationCardBinding {...entry} onClick={onClick}/>
         </div>
     );
@@ -159,7 +184,7 @@ export function SortableNavigationGroup({
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+        <div ref={setNodeRef} style={style} {...draggableAttributes(attributes)} {...listeners}>
             {children}
         </div>
     );

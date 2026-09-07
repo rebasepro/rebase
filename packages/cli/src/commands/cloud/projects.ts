@@ -53,6 +53,11 @@ interface ProjectRow {
 /* ─── list ─────────────────────────────────────────────────────── */
 
 export async function listProjects(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud projects",
+maxPositionals: 0 });
     const { client, url } = await requireClient(rawArgs);
     const org = getContextOrg(url);
     try {

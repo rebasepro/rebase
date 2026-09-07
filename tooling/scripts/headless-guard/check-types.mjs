@@ -13,12 +13,32 @@
  * of the emitted declarations. A core package may not *name* a UI module, in any
  * position, including `import type`.
  *
- * Run: pnpm run check:types-headless
+ * It runs in two halves, because they need different things and ran in the wrong
+ * place for months:
+ *
+ *   pnpm check:types-headless        --src: sources and manifests. No build.
+ *   pnpm check:types-headless:dts    --dts: the built declarations. After a build.
+ *   node …/check-types.mjs           both, which is what you want locally.
+ *
+ * The split is the whole point. The gate lived in the `static` job, whose steps
+ * are checkout / install / helm / `ci:static` — no build — so no package's
+ * `dist` ever existed there and the half the rationale above is ACTUALLY about
+ * scanned nothing, while printing a byte-identical "passed" either way. The
+ * `--dts` half now runs in `build-gates`, and refuses to run at all when a core
+ * package has no `dist`, the way `rls:check` uses `--min-tables` to refuse a
+ * vacuous run.
  */
 import fs from "node:fs";
 import path from "node:path";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..", "..");
+
+const onlySrc = process.argv.includes("--src");
+const onlyDts = process.argv.includes("--dts");
+/** No flag means both, which is the useful thing to type by hand. */
+const scanSrc = !onlyDts;
+const scanDts = !onlySrc;
+const label = onlyDts ? "declaration" : onlySrc ? "source" : "type-level";
 
 /**
  * Packages that make up a BaaS install and its shared code. None of these may
@@ -125,10 +145,11 @@ function filesToCheck(packageDir) {
             if (isSource || isDeclaration) out.push(full);
         }
     };
-    walk(path.join(packageDir, "src"));
-    // dist is what a published consumer actually resolves. Absent before a
-    // build; that is fine, the src scan is the primary signal.
-    walk(path.join(packageDir, "dist"));
+    if (scanSrc) walk(path.join(packageDir, "src"));
+    // dist is what a published consumer actually resolves, and the only thing
+    // the rationale at the top is about. Its absence is a refusal, not a pass —
+    // see the `unbuilt` check below.
+    if (scanDts) walk(path.join(packageDir, "dist"));
     return out;
 }
 
@@ -165,6 +186,28 @@ function manifestViolations(packageDir) {
     return out;
 }
 
+// A declaration scan over packages that were never built finds nothing and
+// reports success in exactly the same words as a real pass. That is how this
+// gate spent its life in a job with no build step: `rm -rf packages/*/dist` and
+// `pnpm check:types-headless` printed the identical green line. Refuse instead,
+// naming the packages, before scanning anything.
+if (scanDts) {
+    const unbuilt = CORE_PACKAGES.filter((pkg) => {
+        const packageDir = path.join(repoRoot, "packages", pkg);
+        return fs.existsSync(packageDir) && !fs.existsSync(path.join(packageDir, "dist"));
+    });
+    if (unbuilt.length > 0) {
+        console.error(
+            `\nNo dist: ${unbuilt.map((pkg) => `@rebasepro/${pkg}`).join(", ")}.\n\n` +
+            "This half of the guard reads BUILT declarations — the thirteen shipped .d.ts\n" +
+            "files that began with `import React` are the reason it exists — so without a\n" +
+            "build it would scan nothing and pass. Run `pnpm run build` first; it runs in\n" +
+            "CI's `build-gates` job, after the build, for the same reason."
+        );
+        process.exit(1);
+    }
+}
+
 let fileFailures = 0;
 let manifestFailures = 0;
 const report = [];
@@ -182,7 +225,9 @@ for (const pkg of CORE_PACKAGES) {
         }
     }
 
-    const badDeps = manifestViolations(packageDir);
+    // Manifests are a source-side fact: `@types/react` as a devDependency is
+    // what let the rot go unnoticed, and reading it needs no build.
+    const badDeps = scanSrc ? manifestViolations(packageDir) : [];
     manifestFailures += badDeps.length;
 
     if (badFiles.length === 0 && badDeps.length === 0) {
@@ -217,4 +262,7 @@ if (report.length > 0) {
     process.exit(1);
 }
 
-console.log("\nType-level headless guard passed — no UI module named in any core type surface.");
+console.log(
+    `\nType-level headless guard passed (${label} scan) — no UI module named in any core ` +
+    `type surface.`
+);

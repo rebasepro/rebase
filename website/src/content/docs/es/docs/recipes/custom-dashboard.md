@@ -1,4 +1,5 @@
 ---
+sourceHash: 62363af9dfc94b45
 title: "Receta: Panel de Control Personalizado"
 sidebar_label: Panel de Control Personalizado
 description: Construya una vista de panel de control personalizada con gráficos, estadísticas y visualizaciones de datos utilizando los hooks de Rebase.

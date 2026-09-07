@@ -126,8 +126,7 @@ force: true });
             );
 
             expect(res.status).toBe(200);
-            const body = await res.json() as { success: boolean; data: { contentType: string } };
-            expect(body.success).toBe(true);
+            const body = await res.json() as { data: { contentType: string } };
             expect(body.data).toBeDefined();
             expect(body.data.contentType).toBe("text/plain");
         });
@@ -138,8 +137,7 @@ force: true });
             );
 
             expect(res.status).toBe(200);
-            const body = await res.json() as { success: boolean; data: { contentType: string } };
-            expect(body.success).toBe(true);
+            const body = await res.json() as { data: { contentType: string } };
             expect(body.data).toBeDefined();
         });
 
@@ -198,8 +196,7 @@ force: true });
         it("returns the default source in single-controller mode", async () => {
             const res = await app.fetch(new Request("http://localhost/api/storage/sources"));
             expect(res.status).toBe(200);
-            const body = await res.json() as { success: boolean; data: Array<{ key: string; engine: string; transport: string }> };
-            expect(body.success).toBe(true);
+            const body = await res.json() as { data: Array<{ key: string; engine: string; transport: string }> };
             expect(body.data).toEqual([
                 { key: "(default)", engine: "local", transport: "server" }
             ]);
@@ -220,7 +217,7 @@ force: true });
 
             const res = await declaredApp.fetch(new Request("http://localhost/api/storage/sources"));
             expect(res.status).toBe(200);
-            const body = await res.json() as { success: boolean; data: Array<{ key: string; engine: string; transport: string; label?: string }> };
+            const body = await res.json() as { data: Array<{ key: string; engine: string; transport: string; label?: string }> };
             expect(body.data).toContainEqual({ key: "(default)", engine: "local", transport: "server", label: "Local" });
             expect(body.data).toContainEqual({ key: "firebase", engine: "firebase", transport: "direct", label: "Firebase Storage" });
         });
@@ -238,8 +235,8 @@ key: "photos/deleteme.txt" });
             );
 
             expect(res.status).toBe(200);
-            const body = await res.json() as { success: boolean };
-            expect(body.success).toBe(true);
+            const body = await res.json() as { message: string };
+            expect(body.message).toBe("File deleted");
 
             // Verify the file is actually gone
             const filePath = path.join(tempDir, "default", "photos", "deleteme.txt");
@@ -383,8 +380,7 @@ describe("Storage routes — multi-backend routing (registry)", () => {
             new Request("http://localhost/api/storage/metadata/default/m.txt?storageId=secondary")
         );
         expect(res.status).toBe(200);
-        const body = await res.json() as { success: boolean; data: { contentType: string } };
-        expect(body.success).toBe(true);
+        const body = await res.json() as { data: { contentType: string } };
         expect(body.data.contentType).toBe("text/plain");
     });
 

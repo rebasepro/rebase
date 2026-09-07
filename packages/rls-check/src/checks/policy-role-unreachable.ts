@@ -1,6 +1,16 @@
 import type { Check, DbSnapshot, Finding } from "../types";
 
-import { finding, isPublicRole, policiesFor, qi, qrel, sameRole, scannedTables } from "./util";
+import {
+    finding,
+    isPublicRole,
+    isRebaseManagedPolicy,
+    managedPolicyFix,
+    policiesFor,
+    qi,
+    qrel,
+    sameRole,
+    scannedTables
+} from "./util";
 
 const ID = "policy-role-unreachable";
 
@@ -68,8 +78,13 @@ export const policyRoleUnreachable: Check = {
                         `identical to an empty table, which is why this usually goes unnoticed for a long ` +
                         `time. The owner (${rel.owner}) still sees everything` +
                         `${rel.rlsForced ? " unless FORCE ROW LEVEL SECURITY changes that" : ", since FORCE ROW LEVEL SECURITY is not set"}.`,
-                    fix:
-                        `-- Point the policies at the role your requests actually arrive as. Confirm it with:\n` +
+                    fix: policies.every((p) => isRebaseManagedPolicy(snapshot, p))
+                        ? managedPolicyFix(
+                            policies[0],
+                            `name the role your requests actually arrive as in the rules' \`roles\` — ` +
+                            `confirm it with \`SELECT current_user\` from the application's own connection`
+                        )
+                        : `-- Point the policies at the role your requests actually arrive as. Confirm it with:\n` +
                         `--     SELECT current_user;   -- run this from your application's connection\n` +
                         `ALTER POLICY ${qi(policies[0].name)} ON ${qrel(rel.schema, rel.name)} TO <that role>;\n` +
                         `-- Alternatively, if ${named[0]} is meant to be reachable, grant membership:\n` +

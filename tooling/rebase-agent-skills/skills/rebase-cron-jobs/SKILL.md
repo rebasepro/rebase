@@ -54,7 +54,7 @@ Rebase will:
 3. Register each default export as a cron job
 4. If a **duplicate job ID** is found, the previous job is overwritten with a warning
 5. Auto-create the `rebase.cron_logs` table in PostgreSQL (unless `cronPersistence: false`)
-6. Mount admin REST routes at `/api/cron` (protected by `requireAuth` + `requireAdmin`)
+6. Mount admin REST routes at `/api/admin/cron` (protected by `requireAuth` + `requireAdmin`)
 7. Seed in-memory counters (`totalRuns`, `totalFailures`, `lastRunAt`) from the database
 8. Start the scheduler
 
@@ -315,7 +315,7 @@ A **5-second minimum delay** is enforced between scheduled executions. Even if a
 
 > **WARNING FOR AGENTS**: A cron job **never** runs two instances concurrently. If a scheduled tick fires while the previous run is still executing, it is **skipped** (not queued). The scheduler re-schedules for the next tick.
 
-This also applies to **manual triggers** via `POST /api/cron/:id/trigger`. If the job is currently executing, the API returns immediately with a log entry containing:
+This also applies to **manual triggers** via `POST /api/admin/cron/:id/trigger`. If the job is currently executing, the API returns immediately with a log entry containing:
 
 ```json
 {
@@ -388,6 +388,7 @@ On startup, the scheduler seeds `totalRuns`, `totalFailures`, and `lastRunAt` co
 
 ## REST API
 
+<!-- docs-verify: ignore -->
 All routes are mounted at `/api/admin/cron` and **require admin authentication** (`requireAuth` + `requireAdmin` middleware). `/api/cron` is kept alive as a legacy alias and answers with a `Deprecation` header; write the `/api/admin` path.
 
 > **IMPORTANT FOR AGENTS**: All cron REST endpoints require an admin JWT or service key in the `Authorization` header. Unauthenticated requests will receive 401/403.
@@ -395,7 +396,7 @@ All routes are mounted at `/api/admin/cron` and **require admin authentication**
 ### List All Jobs
 
 ```
-GET /api/cron
+GET /api/admin/cron
 ```
 
 **Response:** `200 OK`
@@ -423,7 +424,7 @@ GET /api/cron
 ### Get Single Job
 
 ```
-GET /api/cron/:id
+GET /api/admin/cron/:id
 ```
 
 **Response:** `200 OK`
@@ -457,7 +458,7 @@ GET /api/cron/:id
 ### Trigger Job Manually
 
 ```
-POST /api/cron/:id/trigger
+POST /api/admin/cron/:id/trigger
 ```
 
 **Response:** `200 OK`
@@ -483,7 +484,7 @@ POST /api/cron/:id/trigger
 ### Get Job Logs
 
 ```
-GET /api/cron/:id/logs?limit=10
+GET /api/admin/cron/:id/logs?limit=10
 ```
 
 | Query Param | Type | Default | Description |
@@ -514,7 +515,7 @@ Logs are returned **newest first**. When a database store is available, logs are
 ### Enable/Disable a Job
 
 ```
-PUT /api/cron/:id
+PUT /api/admin/cron/:id
 Content-Type: application/json
 
 { "enabled": false }
@@ -545,11 +546,11 @@ Content-Type: application/json
 
 | Method | Path | Request Body | Response Shape |
 |--------|------|-------------|----------------|
-| `GET` | `/api/cron` | — | `{ jobs: CronJobStatus[] }` |
-| `GET` | `/api/cron/:id` | — | `{ job: CronJobStatus }` |
-| `POST` | `/api/cron/:id/trigger` | — | `{ log: CronJobLogEntry, job: CronJobStatus }` |
-| `GET` | `/api/cron/:id/logs` | — | `{ logs: CronJobLogEntry[] }` |
-| `PUT` | `/api/cron/:id` | `{ enabled: boolean }` | `{ job: CronJobStatus }` |
+| `GET` | `/api/admin/cron` | — | `{ jobs: CronJobStatus[] }` |
+| `GET` | `/api/admin/cron/:id` | — | `{ job: CronJobStatus }` |
+| `POST` | `/api/admin/cron/:id/trigger` | — | `{ log: CronJobLogEntry, job: CronJobStatus }` |
+| `GET` | `/api/admin/cron/:id/logs` | — | `{ logs: CronJobLogEntry[] }` |
+| `PUT` | `/api/admin/cron/:id` | `{ enabled: boolean }` | `{ job: CronJobStatus }` |
 
 ## Type Reference
 
@@ -633,7 +634,7 @@ interface CronJobLogEntry {
 | `error` | `string?` | Error message if the run failed (timeout, exception, etc.). |
 | `result` | `unknown?` | JSON-serialisable data returned by the handler. |
 | `logs` | `string[]` | Captured log lines from `ctx.log()`. |
-| `manual` | `boolean?` | `true` if triggered via `POST /api/cron/:id/trigger`. |
+| `manual` | `boolean?` | `true` if triggered via `POST /api/admin/cron/:id/trigger`. |
 
 ## Client SDK
 

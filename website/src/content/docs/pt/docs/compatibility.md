@@ -1,4 +1,5 @@
 ---
+sourceHash: 64da41d7e9319170
 slug: pt/docs/compatibility
 title: Compatibilidade
 description: O que o Rebase promete entre versões e o que não promete — os seis contratos versionados, como cada um falha e o que ainda pode mudar em uma minor.
@@ -137,6 +138,30 @@ Um hash das definições de collections compiladas, emitido no manifesto do bund
 e retornado por um SDK gerado no cabeçalho `x-rebase-schema` (`SCHEMA_VERSION_HEADER`).
 Ele existe para que a plataforma possa dizer "esta aplicação foi construída contra
 um schema mais antigo" em vez de falhar misteriosamente na primeira requisição.
+
+O backend lê esse cabeçalho em cada requisição de dados. A divergência nunca recusa
+uma chamada — um SDK atrasado em um schema costuma continuar compatível, e publicar
+o backend antes do frontend é a ordem de deploy habitual —, mas quando uma requisição
+falha com 400 ou 404, o erro carrega a divergência como sua causa:
+
+```json
+{
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "Unknown field \"authorName\" on collection \"posts\"",
+    "cause": {
+      "code": "SCHEMA_DRIFT",
+      "clientSchema": "v1:0e1c…",
+      "serverSchema": "v1:9ab4…",
+      "message": "This client was generated against schema v1:0e1c…; this backend serves v1:9ab4…"
+    }
+  }
+}
+```
+
+Assim, uma coluna renomeada se lê como "seu SDK está desatualizado, gere-o de novo"
+em vez de como um campo que os seus próprios tipos afirmam existir. Uma requisição
+bem-sucedida nunca é avisada.
 
 Ele cobre **apenas collections**. A edição de um hook ou função não altera o contrato
 de um cliente e não deve invalidar todos os SDKs gerados.

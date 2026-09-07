@@ -33,7 +33,8 @@ import {
     linkLocalPackages,
     startBackend,
     stopBackend,
-    loginSeededAdmin,
+    claimFirstAdmin,
+    readEnvVar,
     writeRow,
     readRows,
     type RunningBackend
@@ -44,7 +45,7 @@ const env = getCleanEnv();
 let tempDir: string;
 let projectDir: string;
 let backend: RunningBackend | undefined;
-let admin: { uid: string; roles: string[]; accessToken: string };
+let admin: { uid: string; roles: string[]; accessToken: string; needsSetupBefore: boolean };
 /** `backend/src/schema.generated.ts` as the scaffold shipped it, before `dev` ran. */
 let shippedSchema = "";
 
@@ -72,12 +73,14 @@ beforeAll(async () => {
     // `rebase dev --backend-only`, exactly as the printed next steps say — and
     // nothing between it and the install.
     backend = await startBackend(projectDir, env);
-    // Signed in, not registered. `rebase init` names the first admin in `.env`
-    // and the runtime creates it while the user table is empty, so the account
-    // this suite used to register itself is already there — and registering it
-    // answered `409 EMAIL_EXISTS`, which is what a reader following the
-    // quickstart would hit too if they typed the default address.
-    admin = await loginSeededAdmin(projectDir, backend.baseUrl);
+    // Registered, exactly as the quickstart's "First Login" says — and with
+    // `REBASE_ADMIN_EMAIL`/`_PASSWORD` sitting in the `.env` `init` just wrote.
+    // Both halves matter: this is the documented path, *and* it has to keep
+    // working while the production seed's variables are present, because they
+    // always are. For a while it did not — the seed ran in development too, the
+    // table was no longer empty when the reader arrived, and step 3 of the
+    // quickstart handed out an account with `roles: []`.
+    admin = await claimFirstAdmin(backend.baseUrl);
 }, 900_000);
 
 afterAll(async () => {
@@ -140,13 +143,26 @@ describe("the documented first run", () => {
         expect(read.rows.map((r: { title: string }) => r.title)).toContain("Hello from the first run");
     });
 
-    it("seeds the admin named in .env, with the admin role", () => {
-        // The scaffold's own account, on the managed-database path: `init`
-        // writes the address and a generated password, and boot creates it
-        // before anyone can register. That the role comes with it is the whole
-        // reason the account exists — a seeded user without it would leave a
-        // first run with no way into the admin panel at all.
+    it("hands the first registered account the admin role, as the quickstart says", () => {
+        // The precondition the rule rests on: an empty user table when the
+        // reader arrives. Asserting the role alone would still pass if some
+        // other account had already claimed the window and this one was merely
+        // second — which is precisely the failure that shipped.
+        expect(admin.needsSetupBefore).toBe(true);
         expect(admin.roles).toContain("admin");
+    });
+
+    it("ignores the production admin seed here, with both variables set", () => {
+        // `init` writes REBASE_ADMIN_EMAIL and a generated password into `.env`
+        // for the compose stack, which runs NODE_ENV=production. `rebase dev`
+        // reads the same file. Asserting they are present is what makes the
+        // test above mean something: the window stayed open *despite* them.
+        expect(readEnvVar(projectDir, "REBASE_ADMIN_EMAIL")).toBeTruthy();
+        expect(readEnvVar(projectDir, "REBASE_ADMIN_PASSWORD")).toBeTruthy();
+
+        // And said so, rather than leaving the operator to wonder why the
+        // account they named is not there.
+        expect(backend?.output()).toContain("REBASE_ADMIN_EMAIL");
     });
 });
 

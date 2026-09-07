@@ -1,4 +1,5 @@
 ---
+sourceHash: c6ff4a9052df3362
 title: Configuração de Armazenamento
 sidebar_label: Configuração de Armazenamento
 description: Configure backends de armazenamento em sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -90,14 +91,45 @@ image: {
 |--------|------|-------------|
 | `POST` | `/api/storage/upload` | Upload direto de arquivo |
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload para um backend nomeado específico |
-| `GET` | `/api/storage/files/:path` | Recuperar um arquivo |
-| `GET` | `/api/storage/files/:path?storageId=<key>` | Recuperar um arquivo de um backend específico |
-| `DELETE` | `/api/storage/files/:path` | Excluir um arquivo |
+| `GET` | `/api/storage/file/*` | Recuperar um arquivo — tudo o que vem depois de `/file/` é a chave do objeto |
+| `GET` | `/api/storage/file/*?storageId=<key>` | Recuperar um arquivo de um backend específico |
+| `GET` | `/api/storage/metadata/*` | Tamanho, tipo de conteúdo e última modificação de um objeto, sem os seus bytes |
+| `DELETE` | `/api/storage/file/*` | Excluir um arquivo |
+| `GET` | `/api/storage/list` | Listar objetos sob um prefixo (`prefix`, `bucket`, `maxResults`, `pageToken`, `storageId`) |
+| `POST` | `/api/storage/folder` | Criar um marcador de pasta vazia |
+| `GET` | `/api/storage/sources` | As fontes de armazenamento que este backend serve, por chave |
 | `OPTIONS` | `/api/storage/tus` | Consultar os recursos suportados do protocolo TUS |
 | `POST` | `/api/storage/tus` | Iniciar uma sessão de upload retomável TUS |
 | `HEAD` | `/api/storage/tus/:id` | Verificar o progresso do upload (offset de bytes) |
 | `PATCH` | `/api/storage/tus/:id` | Anexar um bloco de dados ao arquivo temporário |
 | `DELETE` | `/api/storage/tus/:id` | Encerrar/abortar a sessão de upload TUS |
+
+**O que respondem.** Um envelope, o mesmo que `/api/data` usa: a carga útil fica
+sob `data`, e uma falha é `{ "error": { message, code, requestId } }` com os
+códigos da [referência de erros](/docs/backend/errors/). `/api/storage/file/*` é a
+exceção, porque a sua carga útil é o ficheiro — responde com os bytes, com
+`Content-Type`, `Content-Length` e os cabeçalhos de cache.
+
+```json
+// GET /api/storage/list?prefix=products/images/
+{ "data": { "items": [ { "bucket": "default", "fullPath": "products/images/a.jpg", "name": "a.jpg" } ], "prefixes": [] } }
+```
+
+`POST /api/storage/upload` responde `201` com o `{ key, bucket, storageUrl }` do
+objeto guardado sob `data`; `GET /api/storage/metadata/*` os metadados do objeto
+e, para um objeto privado, o `token` de curta duração;
+`GET /api/storage/sources` o array das fontes configuradas.
+`DELETE /api/storage/file/*` e `POST /api/storage/folder` transportam apenas uma
+`message`, porque não há nada a devolver.
+
+**Como a leitura de um arquivo é autorizada.** As rotas de leitura —
+`/api/storage/file/*` e `/api/storage/metadata/*` — aceitam o token assinado e de curta
+duração que [`getSignedUrl()`](/docs/sdk/storage) emite, passado como `?token=<token>`
+ou como `Bearer`. Um JWT de acesso comum é **recusado** em `/file/*` com `401
+Unauthorized: Access JWT not allowed on file routes`: o token que funciona em todas as
+outras rotas não funciona aqui, de propósito, porque a URL de um arquivo é algo que se
+entrega a um navegador, a uma CDN ou a uma tag `<img>`. Todas as outras linhas acima
+aceitam o JWT de acesso como sempre.
 
 ## Transformações de Imagem em Tempo Real
 
@@ -105,7 +137,7 @@ A Rebase inclui um pipeline de processamento de imagens integrado, alimentado pe
 
 ```bash
 # Serve image scaled to 300px width in webp format
-GET /api/storage/files/products/laptop.jpg?width=300&format=webp
+GET /api/storage/file/products/laptop.jpg?width=300&format=webp
 ```
 
 ### Parâmetros Suportados

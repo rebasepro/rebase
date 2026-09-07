@@ -1,4 +1,5 @@
 ---
+sourceHash: 04421ade309db1ce
 title: Suche
 sidebar_label: Suche
 description: Wie sich .search() standardmäßig verhält und wie Sie eine Postgres-Collection für eine gerankte Volltextsuche über die von Ihnen benannten Felder aktivieren — einschließlich JSONB- und Array-Inhalten.

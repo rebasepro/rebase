@@ -1,4 +1,5 @@
 ---
+sourceHash: 9df2202ffe55b40c
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes avec le système de tâches cron intégré de Rebase. Définissez les tâches comme des fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -68,7 +69,7 @@ C'est tout. Rebase va :
 2. Enregistrer chaque exportation par défaut comme une tâche cron
 3. Créer automatiquement la table `rebase.cron_logs` dans PostgreSQL (si le pilote supporte SQL)
 4. Démarrer le planificateur et initialiser les compteurs à partir des journaux de BD existants
-5. Monter les routes REST d'administration à `/api/cron`
+5. Monter les routes REST d'administration à `/api/admin/cron`
 
 ## Syntaxe de planification
 
@@ -97,6 +98,9 @@ Les expressions cron utilisent le **format standard à 5 champs** :
 Les valeurs de pas (`*/n`), les plages (`a-b`) et les listes (`a,b,c`) sont toutes supportées.
 
 ## Référence de CronJobDefinition
+
+`timezone` est nouveau <span class="since-badge" data-since="0.18">Since 0.18</span> — en 0.17.3, un planning est toujours lu dans le
+fuseau de l'hôte. Tout le reste de cette interface est déjà livré.
 
 ```typescript
 interface CronJobDefinition {
@@ -149,16 +153,18 @@ Toutes les routes cron nécessitent une **authentification administrateur** (`re
 
 | Méthode | Chemin | Description |
 |--------|------|-------------|
-| `GET` | `/api/cron` | Lister toutes les tâches cron enregistrées |
-| `GET` | `/api/cron/:id` | Obtenir le statut d'une tâche unique |
-| `POST` | `/api/cron/:id/trigger` | Déclencher manuellement une tâche |
-| `GET` | `/api/cron/:id/logs` | Obtenir l'historique d'exécution (`?limit=N`) |
-| `PUT` | `/api/cron/:id` | Activer/désactiver une tâche (`{ "enabled": true }`) |
+| `GET` | `/api/admin/cron` | Lister toutes les tâches cron enregistrées |
+| `GET` | `/api/admin/cron/:id` | Obtenir le statut d'une tâche unique |
+| `POST` | `/api/admin/cron/:id/trigger` | Déclencher manuellement une tâche |
+| `GET` | `/api/admin/cron/:id/logs` | Obtenir l'historique d'exécution (`?limit=N`) |
+| `PUT` | `/api/admin/cron/:id` | Activer/désactiver une tâche (`{ "enabled": true }`) |
 
 ### Exemple : Lister toutes les tâches
 
+`$TOKEN` est un jeton d'accès administrateur : connectez-vous et utilisez l'`accessToken` renvoyé par la réponse de connexion. `$API_URL` est l'URL affichée par `rebase dev` — le port est dérivé du projet et n'est pas fixe.
+
 ```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
+curl -H "Authorization: Bearer $TOKEN" "$API_URL/api/admin/cron"
 ```
 
 ```json
@@ -184,7 +190,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/cron
 
 ```bash
 curl -X POST -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3001/api/cron/health-check/trigger
+    "$API_URL/api/admin/cron/health-check/trigger"
 ```
 
 ## SDK Client
@@ -194,7 +200,7 @@ Le SDK client Rebase expose un espace de noms `cron` pour toutes les opérations
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
 
-const client = createRebaseClient({ baseUrl: "http://localhost:3001" });
+const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
 
 // Lister toutes les tâches
 const { jobs } = await client.cron.listJobs();
@@ -231,7 +237,7 @@ Lorsque le pilote de base de données prend en charge SQL (par exemple, PostgreS
 
 - L'historique d'exécution **survit aux redémarrages** du serveur et aux déploiements
 - Les compteurs `totalRuns` et `totalFailures` sont **initialisés à partir de la base de données** au démarrage
-- Le point de terminaison `/api/cron/:id/logs` interroge la base de données, pas seulement la mémoire
+- Le point de terminaison `/api/admin/cron/:id/logs` interroge la base de données, pas seulement la mémoire
 - Plusieurs instances de serveur partagent le même historique d'exécution
 
 La table est créée automatiquement lors du premier démarrage — aucune migration n'est nécessaire.

@@ -1,4 +1,5 @@
 ---
+sourceHash: 08efd8549191e760
 title: Visão Geral da Arquitetura
 sidebar_label: Arquitetura
 description: Entenda como o backend, frontend, SDK do cliente e banco de dados do Rebase se integram para formar um Backend-as-a-Service completo.

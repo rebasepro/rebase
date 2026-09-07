@@ -1,4 +1,5 @@
 ---
+sourceHash: 3e8accd144f401d4
 title: Sustitución de Componentes (Swizzling)
 sidebar_label: Sustitución de Componentes
 description: Sustituya los componentes de UI predeterminados con implementaciones personalizadas a nivel de aplicación o de colección.

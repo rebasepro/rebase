@@ -1,4 +1,5 @@
 ---
+sourceHash: 35d04e650c33c5cb
 title: SDK do Cliente
 sidebar_label: SDK do Cliente
 description: Use o SDK do Cliente Rebase para interagir com o seu backend a partir de qualquer aplicação JavaScript — operações de dados, autenticação, armazenamento e subscrições em tempo real.
@@ -26,8 +27,7 @@ pnpm add @rebasepro/client
 import { createRebaseClient } from "@rebasepro/client";
 
 const client = createRebaseClient({
-    baseUrl: "http://localhost:3001",
-    websocketUrl: "ws://localhost:3001"
+    baseUrl: import.meta.env.VITE_API_URL
 });
 ```
 

@@ -1,4 +1,5 @@
 ---
+sourceHash: 1134b2a4207579d3
 title: Stockage et téléversements de fichiers
 sidebar_label: Stockage et téléversements de fichiers
 description: Ajoutez des champs de téléversement de fichiers à vos collections, gérez les fichiers par programmation et routez les téléversements vers différents backends de stockage.

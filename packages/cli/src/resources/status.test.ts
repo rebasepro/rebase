@@ -10,7 +10,8 @@ import {
     resetDeclaredResources
 } from "@rebasepro/types";
 import { resolveDataSources, resourceResolver } from "@rebasepro/server";
-import { computeStatus, withImplicitDefaults } from "./status";
+import { computeStatus } from "./status";
+import { projectResourceGraph, withImplicitDefaults } from "./derive";
 
 /**
  * Judged as production unless a test says otherwise: that is the deployment
@@ -155,5 +156,153 @@ describe("what a project declares, against what the environment binds", () => {
         // teaches nothing.
         database("analytics");
         expect(statusOf({ DATABASE_URL: "postgres://x/y" }).blocked).toBeUndefined();
+    });
+});
+
+/**
+ * The documented first run: `rebase init` comments `DATABASE_URL` out and the
+ * managed PGlite fills the vacuum.
+ *
+ * Judged by the environment alone, that state rendered as
+ * `○ (default) postgres · DATABASE_URL not set` with the remedy "set
+ * DATABASE_URL" — at the same moment `rebase db url` was printing a working
+ * connection string for the same project and `rebase dev` was serving from it.
+ * The view was reading the one place the answer deliberately is not.
+ */
+describe("a project on the managed development database", () => {
+    beforeEach(() => resetDeclaredResources());
+
+    const managed = (url: string | null, env: Record<string, string | undefined> = {}) =>
+        computeStatus(buildResourceGraph(), env, {
+            ...resolvers(false),
+            managedDatabase: { url }
+        });
+
+    const RUNNING = "postgresql://postgres@127.0.0.1:55775/postgres?sslmode=disable";
+
+    it("reports the default database as bound, not as unconfigured", () => {
+        const db = find(managed(RUNNING), "database", "(default)");
+
+        expect(db.state).toBe("ready");
+        expect(db.detail).toContain("managed development database");
+        expect(db.detail).toContain("this project only");
+        // The remedy for a project that has no database must not be offered to
+        // one whose database is running.
+        expect(db.detail).not.toContain("set DATABASE_URL");
+    });
+
+    it("says the daemon is down rather than that the project has no database", () => {
+        const db = find(managed(null), "database", "(default)");
+
+        expect(db.state).toBe("ready");
+        expect(db.detail).toContain("not running");
+        expect(db.detail).toContain("rebase dev");
+    });
+
+    it("does not run the whole-set check against a daemon that is not running", () => {
+        // Inventing a connection string to keep the check formally "run" is how
+        // a green tick gets printed for work nobody did.
+        expect(managed(null).blocked).toBeUndefined();
+    });
+
+    it("runs the whole-set check against the daemon that is", () => {
+        // `resolveDataSources` would otherwise throw "Data source "(default)"
+        // has no connection string" about a database that is up and reachable.
+        expect(managed(RUNNING).blocked).toBeUndefined();
+    });
+
+    it("covers every database the project declares, not only the default", () => {
+        // Each one gets its own PGlite instance on the managed path.
+        database("analytics");
+
+        expect(find(managed(RUNNING), "database", "analytics").state).toBe("ready");
+        expect(managed(RUNNING).blocked).toBeUndefined();
+    });
+
+    it("leaves a database the developer bound by hand alone", () => {
+        // Someone who set DATABASE_URL__ANALYTICS to a warehouse of their own
+        // has said which database that is. The managed one fills a vacuum,
+        // never a choice.
+        database("analytics");
+
+        const analytics = find(
+            managed(RUNNING, { DATABASE_URL__ANALYTICS: "postgres://warehouse/app" }),
+            "database",
+            "analytics"
+        );
+        expect(analytics.detail).not.toContain("managed development database");
+    });
+
+    it("claims no variable is set that is not", () => {
+        // The bindings a reader sees are computed against the real `.env`. The
+        // managed URL is only ever handed to the resolvers.
+        const db = find(managed(RUNNING), "database", "(default)");
+        expect(db.bindings.find(b => b.name === "DATABASE_URL")!.set).toBe(false);
+    });
+});
+
+/**
+ * `rebase status` and `rebase resources` answer the same question and used to
+ * answer it differently.
+ *
+ * On the stock scaffold `status` listed `buckets ✓ (default) local · implicit`
+ * while `resources` and `resources --json` listed only the database and the
+ * function: `status` projected the graph through `withImplicitDefaults` and
+ * `resources` printed the raw graph. Two commands whose whole job is "what does
+ * this project need", disagreeing about a project neither of them had to
+ * interpret.
+ *
+ * Both go through `projectResourceGraph` now, and this is the assertion that
+ * keeps them there — set equality, not a spot check, so a kind added to one
+ * projection and not the other fails here.
+ */
+describe("status and resources project the same set", () => {
+    beforeEach(() => resetDeclaredResources());
+
+    const keysOfStatus = (production = true) =>
+        computeStatus(buildResourceGraph(), {}, resolvers(production))
+            .resources.map(r => `${r.kind}:${r.key}`).sort();
+
+    const keysOfResources = () =>
+        projectResourceGraph(buildResourceGraph()).map(r => `${r.kind}:${r.key}`).sort();
+
+    it("agrees on the stock scaffold, which declares nothing", () => {
+        // The implicit default database and the implicit default bucket. This
+        // is the project `rebase init` creates.
+        expect(keysOfResources()).toEqual(["bucket:(default)", "database:(default)"]);
+        expect(keysOfStatus()).toEqual(keysOfResources());
+    });
+
+    it("agrees when the project declares things of every kind", () => {
+        database("analytics");
+        bucket("media", { engine: "s3" });
+        declareResource("topic", "signups");
+        declareFunction("hello", { portable: true });
+        declareCron("nightly", { schedule: "0 3 * * *", timezone: "Europe/Madrid" });
+
+        expect(keysOfStatus()).toEqual(keysOfResources());
+    });
+
+    it("agrees when a declaration displaces an implicit default", () => {
+        // Declaring one bucket means there is no implicit one; both projections
+        // have to reach that conclusion, and only one of them used to.
+        bucket("media", { engine: "s3" });
+
+        expect(keysOfResources()).not.toContain("bucket:(default)");
+        expect(keysOfStatus()).toEqual(keysOfResources());
+    });
+
+    it("marks the implicit ones, in the projection resources prints", () => {
+        const projected = projectResourceGraph(buildResourceGraph());
+
+        expect(projected.every(r => r.implicit === true)).toBe(true);
+        expect(withImplicitDefaults(buildResourceGraph()).every(e => e.implicit)).toBe(true);
+    });
+
+    it("does not mark a declared resource implicit", () => {
+        database("analytics");
+
+        const analytics = projectResourceGraph(buildResourceGraph()).find(r => r.key === "analytics")!;
+        expect(analytics.implicit).toBeUndefined();
     });
 });

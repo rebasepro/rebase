@@ -22,6 +22,9 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
+import { checkTemplatePins } from "./check-template-pins.mjs";
+import { loadCliCommands } from "./docs-verify/cli-commands.mjs";
+
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 const templateRoot = path.join(repoRoot, "packages/cli/templates/template");
 const templateConfig = path.join(templateRoot, "config");
@@ -361,6 +364,312 @@ function checkResolutionMatchesShipped() {
     return problems;
 }
 
+/**
+ * `.env.example` is the file the docs call "a reference for the available
+ * variables". It must actually be one.
+ *
+ * Two producers write into a scaffold's `.env` and neither consults this file:
+ * `rebase init` (which generates secrets, a database password and the pinned
+ * runtime version) and `docker-compose.yml` (which interpolates `${VAR}` at
+ * `docker compose up`). Both had drifted from it — `DATABASE_PASSWORD` and
+ * `REBASE_VERSION` were in the generated `.env` and in compose and nowhere
+ * here, so a reader rebuilding a value from the reference landed on `changeme`
+ * and `latest`, silently.
+ *
+ * The `.env` `init` writes is not on disk when this runs, so the keys are read
+ * from `init.ts` itself — every `KEY=` it interpolates into the file, plus the
+ * ones it names in a `setEnvValue` call.
+ */
+function checkEnvExampleCoversWhatWritesIt() {
+    const problems = [];
+    const examplePath = path.join(templateRoot, ".env.example");
+    const composePath = path.join(templateRoot, "docker-compose.yml");
+    const initPath = path.join(repoRoot, "packages/cli/src/commands/init.ts");
+
+    if (!fs.existsSync(examplePath)) return [".env.example is missing from the template"];
+
+    const example = fs.readFileSync(examplePath, "utf8");
+    const documented = new Set(
+        [...example.matchAll(/^#?\s*([A-Z][A-Z0-9_]*)=/gm)].map(m => m[1])
+    );
+
+    /** `${VAR:-default}` and `${VAR:?message}` alike — both are read there. */
+    const composeVars = fs.existsSync(composePath)
+        ? [...fs.readFileSync(composePath, "utf8").matchAll(/\$\{([A-Z][A-Z0-9_]*)[:}]/g)].map(m => m[1])
+        : [];
+
+    // Comments stripped first: `setEnvValue`'s own docblock says "Set
+    // `KEY=value` in a .env body", and a scan that reads prose as code reports
+    // a variable named KEY.
+    const init = (fs.existsSync(initPath) ? fs.readFileSync(initPath, "utf8") : "")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
+    const initVars = [
+        // `envContent = setEnvValue(envContent, "KEY", …)` and the multi-line form.
+        ...[...init.matchAll(/setEnvValue\(\s*envContent,\s*\n?\s*"([A-Z][A-Z0-9_]*)"/g)].map(m => m[1]),
+        // Template literals and regexes that write the line directly.
+        ...[...init.matchAll(/[`"']#?\\?\^?#?\\?s?\*?([A-Z][A-Z0-9_]{2,})=/g)].map(m => m[1])
+    ];
+
+    for (const [source, names] of [["docker-compose.yml", composeVars], ["init.ts", initVars]]) {
+        for (const name of [...new Set(names)].sort()) {
+            if (documented.has(name)) continue;
+            problems.push(
+                `${name} is written or read by ${source} but appears nowhere in .env.example — `
+                + "a reader rebuilding that value from the reference gets the fallback, silently"
+            );
+        }
+    }
+    return problems;
+}
+
+/**
+ * Packages pnpm builds that npm deliberately does not, and why.
+ *
+ * The two lists are NOT meant to match. Under npm these two arrive as platform
+ * `optionalDependencies` carrying a prebuilt binary, so the blocked
+ * `postinstall` is a fallback nothing reaches — verified on npm 12, where
+ * `esbuild --version` answers anyway. Allowing a script that is not needed is a
+ * grant with no benefit, so npm's list is the shorter one on purpose;
+ * `init.test.ts` pins it exactly for the same reason.
+ *
+ * What was missing is the other direction, which is where a real break hides: a
+ * package added to pnpm's list and forgotten in npm's installs *without* its
+ * binary, exits 0, and fails later at the command that needed it —
+ * `@ariga/atlas` did exactly that, and `db:push` failed on a binary nobody had
+ * been told was skipped.
+ */
+const NPM_NEEDS_NO_SCRIPT = new Map([
+    ["esbuild", "npm resolves the platform package, whose binary needs no postinstall"],
+    ["sharp", "same: prebuilt binaries arrive as platform optionalDependencies"]
+]);
+
+/**
+ * Every package pnpm may build is either allowed under npm too, or listed above
+ * with the reason it does not need to be.
+ *
+ * Both managers refuse a dependency's lifecycle scripts unless the project
+ * allowlists them, in each one's own dialect, and a scaffold is free to be
+ * installed with either. The failure is silent on whichever manager gets
+ * forgotten, and is only ever noticed by somebody who already has a broken
+ * project.
+ */
+function checkInstallAllowlistsAgree() {
+    const problems = [];
+
+    for (const [label, root] of [["template", templateRoot], ["baas overlay", baasOverlay]]) {
+        const manifestPath = path.join(root, "package.json");
+        if (!fs.existsSync(manifestPath)) continue;
+        const pkg = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+
+        const pnpmList = [...(pkg.pnpm?.onlyBuiltDependencies ?? [])].sort();
+        const npmList = Object.keys(pkg.allowScripts ?? {}).sort();
+
+        for (const name of pnpmList) {
+            if (npmList.includes(name) || NPM_NEEDS_NO_SCRIPT.has(name)) continue;
+            problems.push(
+                `${label}: pnpm.onlyBuiltDependencies allows ${name} to run its install script and `
+                + "allowScripts does not, so `npm install` blocks it and exits 0. Add it to "
+                + "allowScripts, or to NPM_NEEDS_NO_SCRIPT in this file with the reason npm does "
+                + "not need it."
+            );
+        }
+        for (const name of npmList) {
+            if (pnpmList.includes(name)) continue;
+            problems.push(
+                `${label}: allowScripts allows ${name} to run its install script, `
+                + "but pnpm.onlyBuiltDependencies does not — `pnpm install` blocks it"
+            );
+        }
+    }
+    return problems;
+}
+
+/**
+ * The PGlite stack a scaffold installs must be pinned exactly.
+ *
+ * These three packages peer-depend on each other at exact versions —
+ * `pglite-pgvector@0.0.7` wants `pglite@0.5.6`, not `^0.5.6` — so a caret range
+ * here is not flexibility, it is a guarantee of an unmet peer the first time any
+ * of them publishes. `@rebasepro/cli@0.17.3` shipped `^0.5.6` / `^0.0.7` /
+ * `^0.2.9`, and every `pnpm install` in a fresh project then printed two unmet
+ * peers before the reader had run anything. Nothing breaks; it is simply the
+ * first thing a new user sees.
+ *
+ * A range is the whole failure, so a range is what this refuses. Nothing here
+ * can check that the pinned set actually satisfies itself — that needs a
+ * resolve, and this gate runs offline — but a set that did when it was pinned
+ * cannot drift while the pins are exact.
+ */
+function checkPgliteStackIsPinned() {
+    const manifestPath = path.join(repoRoot, "packages/cli/package.json");
+    if (!fs.existsSync(manifestPath)) return [];
+    const optional = JSON.parse(fs.readFileSync(manifestPath, "utf8")).optionalDependencies ?? {};
+
+    return Object.entries(optional)
+        .filter(([name]) => name.startsWith("@electric-sql/pglite"))
+        .filter(([, range]) => !/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(range))
+        .map(([name, range]) => (
+            `packages/cli/package.json pins ${name} as "${range}" — these packages peer-depend on `
+            + "each other at exact versions, so a range guarantees an unmet peer on the first "
+            + "`pnpm install` of a scaffold after any of them publishes"
+        ));
+}
+
+/**
+ * The three manifests a bundle reads must not declare one name twice.
+ *
+ * `collectDeclaredDependencies` reads root → config → backend and lets the last
+ * one win, so exactly one of two disagreeing ranges reaches `deps.declared` and
+ * the managed runtime installs it. The stock scaffold shipped that
+ * disagreement — `dotenv ^16.0.0` at the root, `^17.4.2` in `backend/` — so
+ * every bundle built from a default project asked the runtime for dotenv 16
+ * while the backend had been compiled against 17.
+ *
+ * `rebase build` refuses on a *disjoint* pair, because refusing on a merely
+ * different one would break projects that have a reason. A template has no such
+ * reason: it is the file every new project starts from, and two ranges for one
+ * name in it are a mistake whether or not they overlap. So this is the stricter
+ * rule, and it is stricter on purpose.
+ */
+function checkScaffoldDeclaresEachDepOnce() {
+    const problems = [];
+    // The manifests `collectDeclaredDependencies` reads, in its order.
+    const MANIFESTS = ["package.json", "config/package.json", "backend/package.json"];
+
+    for (const [label, root] of [["template", templateRoot], ["baas overlay", baasOverlay]]) {
+        const seen = new Map();
+        for (const relative of MANIFESTS) {
+            const manifestPath = path.join(root, relative);
+            if (!fs.existsSync(manifestPath)) continue;
+            let deps;
+            try {
+                deps = JSON.parse(fs.readFileSync(manifestPath, "utf8")).dependencies ?? {};
+            } catch {
+                continue; // another check reports an unparseable manifest
+            }
+            for (const [name, range] of Object.entries(deps)) {
+                // `workspace:*` is how every template names an in-repo package;
+                // it never reaches the bundle and is identical everywhere.
+                if (typeof range !== "string" || range.startsWith("workspace:")) continue;
+                const first = seen.get(name);
+                if (!first) {
+                    seen.set(name, { range, file: relative });
+                    continue;
+                }
+                if (first.range === range) continue;
+                problems.push(
+                    `${label}: ${name} is declared as "${first.range}" in ${first.file} and `
+                    + `"${range}" in ${relative}. A bundle carries one of the two — declare it `
+                    + "once, in the workspace that uses it."
+                );
+            }
+        }
+    }
+
+    return problems;
+}
+
+/**
+ * Every script a scaffold ships can succeed on the tree it is scaffolded into.
+ *
+ * The headless overlay shipped `"generate:sdk": "rebase generate-sdk"`, and a
+ * headless project has no `config/collections` by design — its API is
+ * introspected from the live database at boot. So the script could never
+ * succeed, in 0.17.3 and on main, on the documented headless path. `rebase
+ * doctor` was the same shape. Nothing noticed, because a `package.json` script
+ * is not code and no gate read them.
+ *
+ * Two questions, neither of which needs the scripts to be run:
+ *
+ *   1. Every `rebase <command>` a script names is a command this CLI has. This
+ *      is the same class as the failure above, one layer up: a script naming
+ *      something that is not there.
+ *   2. Every script is declared here with what it needs before it can succeed,
+ *      and every declaration is used by some scaffold. A script nobody wrote a
+ *      precondition for is a script nobody asked "can this work here?" about,
+ *      which is exactly how the two above shipped.
+ *
+ * The preconditions are deliberately coarse. What matters is that adding a
+ * script forces somebody to answer the question, and that a `"succeeds on a
+ * fresh scaffold"` claim is written down where the next reader can check it.
+ */
+const SCAFFOLD_SCRIPTS = new Map([
+    ["dev", "succeeds on a fresh scaffold — the documented first command"],
+    ["build", "succeeds on a fresh scaffold"],
+    ["start", "needs a build"],
+    ["db:generate", "needs collections declared in code"],
+    ["db:push", "needs collections declared in code, and a database"],
+    ["db:migrate", "needs a database"],
+    ["schema:generate", "needs collections declared in code"],
+    ["schema:introspect", "needs a database"],
+    ["generate:sdk", "succeeds on a fresh scaffold — says what to run first when there are no collections"],
+    ["skills:install", "succeeds on a fresh scaffold"],
+    ["example", "needs a running server"],
+    ["deploy", "needs a linked cloud project"]
+]);
+
+/** Scripts a headless scaffold must not ship: it has no `config/collections`. */
+const NEEDS_COLLECTIONS = new Set(["db:generate", "db:push", "schema:generate"]);
+
+function checkScaffoldedScriptsCanSucceed() {
+    const problems = [];
+    const { top, sub } = loadCliCommands(repoRoot);
+    const seen = new Set();
+
+    const variants = [
+        ["templates/template", path.join(templateRoot, "package.json"), false],
+        ["templates/overlays/baas", path.join(baasOverlay, "package.json"), true]
+    ];
+
+    for (const [label, manifest, headless] of variants) {
+        let scripts;
+        try {
+            scripts = JSON.parse(fs.readFileSync(manifest, "utf8")).scripts ?? {};
+        } catch (err) {
+            problems.push(`${label}/package.json is not readable JSON: ${err.message}`);
+            continue;
+        }
+        for (const [name, command] of Object.entries(scripts)) {
+            seen.add(name);
+            if (!SCAFFOLD_SCRIPTS.has(name)) {
+                problems.push(
+                    `${label} ships "${name}": ${command} — add it to SCAFFOLD_SCRIPTS with what it `
+                    + "needs before it can succeed, or delete it. A script nobody wrote a precondition "
+                    + "for is one nobody asked whether it can work here."
+                );
+                continue;
+            }
+            if (headless && NEEDS_COLLECTIONS.has(name)) {
+                problems.push(
+                    `${label} ships "${name}", which ${SCAFFOLD_SCRIPTS.get(name)} — and a headless `
+                    + "scaffold has no config/collections."
+                );
+            }
+            // `rebase db push --collections …` → command `db`, subcommand `push`.
+            const invocation = /(?:^|&&\s*|\|\|\s*)rebase\s+([a-z][a-z0-9-]*)(?:\s+([a-z][a-z0-9-]*))?/.exec(command);
+            if (!invocation) continue;
+            const [, cmd, subcommand] = invocation;
+            if (!top.has(cmd)) {
+                problems.push(`${label}'s "${name}" runs \`rebase ${cmd}\`, which this CLI has no command for.`);
+                continue;
+            }
+            const known = sub.get(cmd);
+            if (subcommand && known && !known.has(subcommand)) {
+                problems.push(`${label}'s "${name}" runs \`rebase ${cmd} ${subcommand}\`, which is not a subcommand of \`rebase ${cmd}\`.`);
+            }
+        }
+    }
+
+    for (const name of SCAFFOLD_SCRIPTS.keys()) {
+        if (!seen.has(name)) {
+            problems.push(`SCAFFOLD_SCRIPTS declares "${name}" and no scaffold ships it any more — delete the entry.`);
+        }
+    }
+    if (seen.size === 0) problems.push("Read no scripts out of the templates — the guard is checking nothing.");
+    return problems;
+}
+
 function checkBaasHasNoAdminTypes() {
     const problems = [];
     const walk = (dir) => {
@@ -381,7 +690,155 @@ function checkBaasHasNoAdminTypes() {
     return problems;
 }
 
+/**
+ * Every file path a getting-started page names exists in the scaffold.
+ *
+ * Quickstart's prerequisites read "Node.js 22.22+, the version in `.nvmrc`" for
+ * two releases. There is no `.nvmrc`: `ls -a packages/cli/templates/template |
+ * grep nvmrc` is empty, and the version floor lives in `package.json`'s
+ * `engines`. It is the first line of the first page, and nothing could have
+ * caught it — the snippet verifier compiles TypeScript, and a path in prose is
+ * neither a snippet nor an identifier.
+ *
+ * All six locales, because a translation names the same paths.
+ *
+ * A path is a backticked token with a file extension and at least one `/`. A
+ * bare `App.tsx` is a filename in a sentence rather than a location, and
+ * flagging every one of those would make this noisy enough to switch off.
+ */
+function checkGettingStartedPathsExist() {
+    const docsRoot = path.join(repoRoot, "website/src/content/docs");
+    const pages = [];
+    for (const locale of ["docs", "de", "es", "fr", "it", "pt"]) {
+        const dir = locale === "docs"
+            ? path.join(docsRoot, "docs/getting-started")
+            : path.join(docsRoot, locale, "docs/getting-started");
+        if (!fs.existsSync(dir)) continue;
+        for (const name of fs.readdirSync(dir)) {
+            if (/\.mdx?$/.test(name)) pages.push(path.join(dir, name));
+        }
+    }
+
+    /**
+     * Paths that are correct and are not in the template.
+     *
+     * Two kinds: files `rebase init` or `rebase dev` *writes* at runtime, and
+     * files that exist only after `rebase eject` — which the pages name in
+     * order to say the scaffold has none.
+     */
+    const NOT_SHIPPED = new Map([
+        ["backend/src/index.ts", "only after `rebase eject`; the pages name it to say a scaffold has none"],
+        ["backend/src/env.ts", "only after `rebase eject`, where the project owns its own env schema"]
+    ]);
+
+    const EXT = /\.(ts|tsx|json|md|mdx|mjs|cjs|js|yml|yaml|example|toml)$/;
+    /** The template ships these without their leading dot; `rebase init` renames them. */
+    const ALIAS = { ".gitignore": "gitignore", ".npmrc": "npmrc" };
+
+    const problems = [];
+    let checked = 0;
+    for (const page of pages) {
+        const rel = path.relative(repoRoot, page);
+        const lines = fs.readFileSync(page, "utf8").split("\n");
+        for (let i = 0; i < lines.length; i++) {
+            for (const m of lines[i].matchAll(/`([^`\n]+)`/g)) {
+                const token = m[1].trim();
+                if (!/^\.?[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.*-]+)+\/?$/.test(token)) continue;
+                if (!EXT.test(token)) continue;
+                checked++;
+                if (NOT_SHIPPED.has(token)) continue;
+                const candidate = ALIAS[token] || token.replace(/\/$/, "");
+                const found = [templateRoot, baasOverlay, repoRoot]
+                    .some(base => fs.existsSync(path.join(base, candidate)));
+                if (found) continue;
+                problems.push(
+                    `${rel}:${i + 1} names \`${token}\`, which is in neither ` +
+                    "packages/cli/templates/template, packages/cli/templates/overlays/baas, " +
+                    "nor the repository. Fix the page, ship the file, or add it to NOT_SHIPPED " +
+                    "with the reason it is correct."
+                );
+            }
+        }
+    }
+
+    // A NOT_SHIPPED entry nothing names any more is dead weight.
+    const named = new Set();
+    for (const page of pages) {
+        const text = fs.readFileSync(page, "utf8");
+        for (const key of NOT_SHIPPED.keys()) if (text.includes(`\`${key}\``)) named.add(key);
+    }
+    for (const [key, why] of NOT_SHIPPED) {
+        if (!named.has(key)) {
+            problems.push(`NOT_SHIPPED exempts \`${key}\` (${why}) and no getting-started page names it — delete the entry.`);
+        }
+    }
+
+    if (checked === 0) problems.push("Read no paths out of the getting-started pages — the guard is checking nothing.");
+    return problems;
+}
+
 let failed = 0;
+const gettingStartedPathProblems = checkGettingStartedPathsExist();
+if (gettingStartedPathProblems.length > 0) {
+    failed++;
+    console.log("  FAIL getting-started pages name files the scaffold ships");
+    for (const p of gettingStartedPathProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   getting-started pages name files the scaffold ships");
+}
+
+// ── The pin, not the working tree ────────────────────────────────────────────
+//
+// Everything below this line compiles the templates against `packages/*/src`
+// through tsconfig `paths` — the working tree, which is not what a scaffold
+// installs. `rebase init` pins the CLI's own version from the registry, and for
+// most of a release cycle that version is one already published, so the tree and
+// the pin disagree. That is how a template importing `queue` from
+// `@rebasepro/types@0.17.3` — which has no such export — compiled green here and
+// failed at `rebase dev` in every fresh project.
+//
+// So ask the other question first, and stop here if the answer is no: a
+// typecheck against the working tree has nothing useful to say about a template
+// that cannot resolve its own imports. The compose half belongs to the release
+// gate — see check-template-pins.mjs — and is not run here.
+if (checkTemplatePins({ axes: ["imports"] }) !== 0) process.exit(1);
+
+const envProblems = checkEnvExampleCoversWhatWritesIt();
+if (envProblems.length > 0) {
+    failed++;
+    console.log("  FAIL .env.example documents every key written into .env");
+    for (const p of envProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   .env.example documents every key written into .env");
+}
+
+const allowlistProblems = checkInstallAllowlistsAgree();
+if (allowlistProblems.length > 0) {
+    failed++;
+    console.log("  FAIL every package pnpm may build is allowed under npm, or excused");
+    for (const p of allowlistProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   every package pnpm may build is allowed under npm, or excused");
+}
+
+const duplicateDepProblems = checkScaffoldDeclaresEachDepOnce();
+if (duplicateDepProblems.length > 0) {
+    failed++;
+    console.log("  FAIL no dependency is declared twice at different ranges in a scaffold");
+    for (const p of duplicateDepProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   no dependency is declared twice at different ranges in a scaffold");
+}
+
+const pgliteProblems = checkPgliteStackIsPinned();
+if (pgliteProblems.length > 0) {
+    failed++;
+    console.log("  FAIL the PGlite stack a scaffold installs is pinned exactly");
+    for (const p of pgliteProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   the PGlite stack a scaffold installs is pinned exactly");
+}
+
 const baasProblems = checkBaasHasNoAdminTypes();
 if (baasProblems.length > 0) {
     failed++;
@@ -389,6 +846,15 @@ if (baasProblems.length > 0) {
     for (const p of baasProblems) console.error(`    ${p}`);
 } else {
     console.log("  ok   baas has no admin layer");
+}
+
+const scriptProblems = checkScaffoldedScriptsCanSucceed();
+if (scriptProblems.length > 0) {
+    failed++;
+    console.log("  FAIL every scaffolded script can succeed on the tree it is scaffolded into");
+    for (const p of scriptProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   every scaffolded script can succeed on the tree it is scaffolded into");
 }
 
 const resolutionProblems = checkResolutionMatchesShipped();
@@ -545,10 +1011,13 @@ try {
 }
 
 if (failed > 0) {
+    // Counted separately: this file checks manifests and a reference file as
+    // well as compiling, and reporting a `.env.example` gap as "does not
+    // compile" sends the reader to look for a type error that is not there.
     console.error(
-        `\n${failed} variant(s) do not compile. These are the files every new project ` +
-            `starts from, so this fails the build.\n` +
-            `Presentation fields belong under \`admin\` — see ` +
+        `\n${failed} FAIL(s) above. These are the files every new project starts from, ` +
+            `so this fails the build.\n` +
+            `If a preset did not compile: presentation fields belong under \`admin\` — see ` +
             `tooling/scripts/codemod/collections-admin-block.mjs.`
     );
     process.exit(1);

@@ -3,6 +3,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 import matter from "gray-matter";
 import { createRequire } from "module";
+// The one derivation of "how many checks does rls-check ship". Typing the
+// number here is what left the previous count in the file an AI reads, for a
+// week after a new check landed in the package.
+import { countPackageChecks } from "../../tooling/scripts/docs-verify/check-rls-check-count.mjs";
+import { extractSidebarSlugs } from "./sidebar-slugs.js";
 
 // gray-matter's bundled engine calls yaml.safeLoad, which js-yaml 4 removed —
 // without this override every matter() call throws and llms.txt ends up empty.
@@ -169,28 +174,16 @@ async function extractSidebarIds(configFilePath) {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const absolutePath = path.resolve(__dirname, configFilePath);
+    const contentRoot = path.resolve("./src/content/docs");
 
-    // Read the config file as text instead of importing it
-    const configContent = fs.readFileSync(absolutePath, "utf-8");
-
-    // Extract the sidebar array from the config content
-    // Find the sidebar configuration using regex
-    const sidebarMatch = configContent.match(/sidebar:\s*\[([\s\S]*?)\],?\s*components:/);
-
-    if (!sidebarMatch) {
+    // Shared with generate_sitemap_md.js, and it expands
+    // `{ autogenerate: { directory } }` groups — a `slug:`-only scan cannot see
+    // them, which is how the whole UI component reference stayed out of both
+    // mirrors.
+    const slugs = extractSidebarSlugs(absolutePath, contentRoot);
+    if (slugs === null) {
         throw new Error("Could not find sidebar configuration in astro.config.mjs");
     }
-
-    const sidebarContent = sidebarMatch[1];
-    const slugs = [];
-
-    // Extract all slug values using regex
-    const slugPattern = /slug:\s*["']([^"']+)["']/g;
-    let match;
-    while ((match = slugPattern.exec(sidebarContent)) !== null) {
-        slugs.push(match[1]);
-    }
-
     return slugs;
 }
 
@@ -226,7 +219,10 @@ async function buildSlugMap(directoryPath, slugMap) {
                         } else {
                             slug = path.relative(contentRoot, fullPath)
                                 .replace(/\.(mdx?|md)$/, "")
-                                .replace(/\/index$/, "");
+                                .replace(/\/index$/, "")
+                                // Same rule as sidebar-slugs.js: Astro serves a
+                                // filename-derived slug in lowercase.
+                                .toLowerCase();
                         }
 
                         slugMap[slug] = {
@@ -350,13 +346,21 @@ const intro = `# Rebase Documentation
  * their place here for the same reason they exist at all: "X vs Y" is the shape
  * of page a model quotes when someone asks it which to use.
  */
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const RLS_CHECK_COUNT = countPackageChecks(REPO_ROOT);
+if (!RLS_CHECK_COUNT) {
+    throw new Error(
+        "Could not read the rls-check CHECKS array — refusing to write a count into llms.txt."
+    );
+}
+
 const PRODUCT_PAGES = [
     ["Rebase", "https://rebase.pro/", "What Rebase is: a Postgres backend with an admin panel generated from the same schema."],
     ["Backend", "https://rebase.pro/backend", "The backend on its own — REST API, auth, RLS, realtime, storage, functions, cron."],
     ["Admin panel (Studio)", "https://rebase.pro/studio", "The admin UI your non-technical teammates use, generated from the collections."],
     ["Pricing", "https://rebase.pro/pricing", "Open source and self-hosted, plus Rebase Cloud (private beta), priced per resource rather than per seat."],
     ["Security", "https://rebase.pro/security", "Row-level security compiled from code to real Postgres policies, and how it is enforced."],
-    ["rls-check (free tool)", "https://rebase.pro/rls-check", "A free, read-only Row-Level Security audit for ANY Postgres database — Supabase, Neon, RDS, anything. Fourteen checks, one command, no account, no Rebase required."],
+    ["rls-check (free tool)", "https://rebase.pro/rls-check", `A free, read-only Row-Level Security audit for ANY Postgres database — Supabase, Neon, RDS, anything. ${RLS_CHECK_COUNT} checks, one command, no account, no Rebase required.`],
     ["For agencies", "https://rebase.pro/agencies", "Shipping a client-ready admin panel from the backend you were going to build anyway."],
     ["CLI", "https://rebase.pro/cli", "`npm i -g @rebasepro/cli` — scaffold, run, migrate and deploy a project."],
     ["Compare", "https://rebase.pro/compare", "Side-by-side against the alternatives, including where a competitor is the better call."]

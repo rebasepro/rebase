@@ -1,7 +1,7 @@
 ---
 title: AI Instruction Files
 sidebar_label: AI Instruction Files
-description: Every scaffolded Rebase project ships ai-instructions.md plus one-line pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md — one source of truth, many filenames.
+description: Every scaffolded Rebase project ships ai-instructions.md plus three-line pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md — one source of truth, many filenames.
 ---
 
 Every assistant wants its rules in a different file. Claude Code reads
@@ -24,15 +24,18 @@ your-project/
     └── copilot-instructions.md   ← pointer
 ```
 
-Each pointer file is two lines:
+Each pointer file is three lines:
 
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
+Install the Rebase skills for this assistant: `rebase skills install --agent claude`.
 ```
 
-`.github/copilot-instructions.md` is identical but for the relative path
-(`../ai-instructions.md`).
+The others differ only in the last word of the third line — `--agent cursor`,
+`--agent windsurf`, `--agent codex`, `--agent copilot` — and in the relative
+path, which is `../ai-instructions.md` in `.github/copilot-instructions.md` and
+`ai-instructions.md` in `AGENTS.md`.
 
 This happens on every `rebase init`, for every preset including `--headless`.
 There is no flag and no prompt.
@@ -42,27 +45,36 @@ any other MCP client at the [Rebase MCP server](/docs/ai/mcp):
 
 ```json title=".mcp.json"
 {
-  "mcpServers": {
-    "rebase": { "command": "npx", "args": ["-y", "@rebasepro/mcp"] }
-  }
+    "mcpServers": {
+        "rebase": {
+            "command": "npx",
+            "args": ["-y", "@rebasepro/mcp"],
+            "env": {
+                "REBASE_PROJECT_DIR": "."
+            }
+        }
+    }
 }
 ```
 
-There is no `REBASE_PROJECT_DIR` in it on purpose: the client spawns the server
+`REBASE_PROJECT_DIR` is `"."`, not an absolute path: the client spawns the server
 at the project root, and an absolute path is the one line of that file that
-cannot be committed.
+cannot be committed. It is there because `~/.rebase/projects.json` is
+machine-wide — a project that names no directory of its own falls through to
+whatever the last project on that machine persisted. See
+[the precedence](/docs/ai/mcp#which-directory-it-acts-on).
 
 ## Why a pointer rather than a copy
 
 The pointer files are deliberately content-free. Assistants follow relative
-Markdown links, so a two-line file that names the real one gets the same result
+Markdown links, so a three-line file that names the real one gets the same result
 as a copy — and it has properties a copy does not:
 
 - **One file to edit.** Rules cannot drift between assistants, because there is
   only one set of rules.
 - **One diff to review.** A change to project conventions is a change to one
   file, not five identical ones a reviewer must compare.
-- **Adding an assistant is two lines.** A new tool with a new filename gets a
+- **Adding an assistant is three lines.** A new tool with a new filename gets a
   pointer, not a sixth copy of your conventions.
 
 The pattern is worth keeping if you fork the scaffold, and worth adopting in
@@ -78,8 +90,13 @@ session:
 1. **Schema as code.** Collections are defined in `config/collections/`. Never
    hand-edit the generated Drizzle schema or the Postgres tables — see
    [Schema as Code](/docs/architecture/schema-as-code).
-2. **Migrations are two steps.** `rebase schema generate`, then `rebase db push`
-   in development, or `rebase db generate && rebase db migrate` for production.
+2. **Applying a collection change** depends on the database. While `pnpm dev`
+   is running, saving the collection file is the whole step: boot regenerates the
+   Drizzle schema and creates the missing tables and columns. `pnpm db:push` is
+   only for what boot deliberately leaves alone — a renamed column, a narrowed
+   type, a removed field, junction-table RLS — and it needs your own PostgreSQL,
+   not the managed development database. Production is `pnpm db:generate` then
+   `pnpm db:migrate`.
 3. **Use the SDK.** Go through `rebase.dataAsAdmin.<slug>` for work done as the
    service identity, or `getDriver(c)` inside a function when the read should run
    as the caller. The server client has no plain `data` accessor. Raw SQL and direct

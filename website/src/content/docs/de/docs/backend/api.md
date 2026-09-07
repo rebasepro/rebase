@@ -1,4 +1,5 @@
 ---
+sourceHash: 8e121c4a54f84556
 title: REST-API
 sidebar_label: REST-API
 description: Automatisch generierte REST-API-Endpunkte für jede Collection, mit Filterung, Sortierung, Paginierung und Einbindung von Relationen.

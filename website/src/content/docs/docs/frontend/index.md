@@ -258,7 +258,7 @@ Toggles between Studio and Content modes:
 
 ```typescript
 const adminModeController = useBuildAdminModeController();
-// Provides: adminModeController.mode ("cms" | "studio" | "settings")
+// Provides: adminModeController.mode ("cms" | "studio")
 ```
 
 ### Scaffold Components

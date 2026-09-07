@@ -1,11 +1,12 @@
 /**
  * `rebase cloud` auth subcommands: login, logout, whoami.
  */
-import arg from "arg";
 import chalk from "chalk";
 import inquirer from "inquirer";
 import {
     resolveCloudUrl,
+    refuseDirectLink,
+    parseCloudArgs,
     createCloudClient,
     requireClient,
     setCurrentContext,
@@ -64,8 +65,20 @@ export function passwordOnTheCommandLine(args: { "--password"?: string }): boole
 }
 
 export async function loginCommand(rawArgs: string[]): Promise<void> {
-    const args = arg(LOGIN_FLAGS, { argv: rawArgs.slice(3),
-permissive: true });
+    // Strictly, through the family's own parser. `arg(…, { permissive: true })`
+    // dropped an undeclared flag on the floor, so `rebase cloud login --emial
+    // me@example.com` prompted for an email as though nothing had been typed.
+    const { flags: args } = parseCloudArgs({
+        spec: LOGIN_FLAGS,
+        rawArgs,
+        commandWords: 2, // cloud login
+        command: "cloud login",
+        maxPositionals: 0
+    });
+    // `login` builds its own client, so it does not pass through
+    // `requireClient`'s guard — and it is the one command where getting this
+    // wrong sends a password somewhere it should never go.
+    refuseDirectLink(rawArgs);
     const url = resolveCloudUrl(rawArgs);
 
     noteBlank();
@@ -159,6 +172,14 @@ mask: "•" });
 }
 
 export async function logoutCommand(rawArgs: string[]): Promise<void> {
+    // Only the globals, but parsed. `rebase cloud logout --frobnicate` exited 0
+    // and signed the session out anyway — the one shape of this bug that also
+    // destroys something.
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 2,
+command: "cloud logout",
+maxPositionals: 0 });
     const url = resolveCloudUrl(rawArgs);
     const client = createCloudClient(url);
     if (!client.auth.getSession()) {
@@ -189,6 +210,11 @@ wasLoggedIn: true });
 }
 
 export async function whoamiCommand(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 2,
+command: "cloud whoami",
+maxPositionals: 0 });
     const { client, url } = await requireClient(rawArgs);
     try {
         const user = await client.auth.getUser();

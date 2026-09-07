@@ -1,4 +1,5 @@
 ---
+sourceHash: 04421ade309db1ce
 title: Búsqueda
 sidebar_label: Búsqueda
 description: Cómo se comporta .search() por defecto y cómo habilitar en una colección de Postgres la búsqueda de texto completo clasificada sobre los campos que especifiques, incluyendo contenido JSONB y arrays.

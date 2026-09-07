@@ -8,14 +8,15 @@
 class ApiError { badRequest, code, conflict, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
 class BlockedUrlError
 class BundleError { hint }
+class CollectionConfigError { hint }
 class CronScheduler { getJob, getJobLogs, getJobLogsFromDb, listJobs, listRejectedJobs, registerJobs, setClient, setJobEnabled, setStore, start, stop, triggerJob }
 class DefaultDriverRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
-class GCSStorageController { deleteObject, getObject, getSignedUrl, getType, listObjects, putObject }
-class LocalStorageController { deleteObject, getAbsolutePath, getBasePath, getObject, getSignedUrl, getType, listObjects, putObject }
+class GCSStorageController { deleteObject, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
+class LocalStorageController { deleteObject, getAbsolutePath, getBasePath, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
 class MetricsRegistry { incrementCounter, recordRequest, render, setGauge, startedAt }
 class RawHtml { toString, value }
-class S3StorageController { deleteObject, getObject, getSignedUrl, getType, listObjects, putObject }
+class S3StorageController { deleteObject, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
 class SMTPEmailService { isConfigured, send, verifyConnection }
 class StoragePolicyError
 class TransformCache { buildKey, get, set }
@@ -168,6 +169,7 @@ function pendingBackgroundWork
 function pkceTokenParams
 function providerVerifiedEmail
 function raw
+function rawQueryLoggingEnabled
 function readBackupBytes
 function readBundleManifest
 function registerDevEmailSink
@@ -191,6 +193,7 @@ function resourceResolvers
 function runFromBundle
 function runtimeKey
 function safeCompare
+function schemaDriftRemedy { lines, short }
 function serveSPA
 function summarizeRlsScan { level, message }
 function transformImage
@@ -263,7 +266,7 @@ interface JwtSigningKeyConfig { algorithm, kid, privateKey }
 interface ListUsersOptions { limit, offset, orderBy, orderDir, roleId, search }
 interface ListenCollectionRequest { collection, filter, limit, logical, offset, onError, onUpdate, order, orderBy, path, searchExplain, searchString, startAfter, subscriptionId, vectorSearch }
 interface ListenEntityRequest { collection, databaseId, id, onError, onUpdate, path, subscriptionId }
-interface LoadedBundle { collectionsDir, cronsDir, dir, functionsDir, manifest, staticApps }
+interface LoadedBundle { collectionsDir, cronsDir, dir, functionsDir, isSource, manifest, staticApps }
 interface LoadedCronJob { definition, id }
 interface LoadedFunction { app, name }
 interface LoadedFunctions { functions, problems }
@@ -311,7 +314,7 @@ interface SingleSubscriptionConfig { clientId, id, path }
 interface StorageAuthorizeContext { bucket, data, key, operation, storageId, user }
 interface StorageAuthorizeData { collection }
 interface StorageAuthorizeUser { email, roles, uid }
-interface StorageController { deleteObject, getObject, getSignedUrl, getType, listObjects, putObject }
+interface StorageController { deleteObject, getObject, getSignedUrl, getType, knownBuckets, listObjects, putObject }
 interface StoragePolicy { allow, operations, path }
 interface StoragePolicyContext { bucket, data, key, operation, params, storageId, user }
 interface StorageRegistry { get, getDefault, getOrDefault, has, list, register, size }
@@ -532,7 +535,7 @@ interface BranchAdmin { createBranch, deleteBranch, getBranchInfo, listBranches 
 interface BranchInfo { createdAt, name, parentDatabase, sizeBytes }
 interface BrinIndex { on, reason, using, where }
 interface BtreeIndex { include, on, reason, unique, using, where }
-interface BucketOptions { account, engine, label, prefix, publicRead, transport }
+interface BucketOptions { account, default, engine, label, prefix, publicRead, transport }
 interface ChannelBus { kind, maxFrameBytes, publish, start, stop }
 interface ChannelHistoryEntry { at, event, payload, senderId, seq }
 interface ChannelHistoryMessage { channel, error, latestSeq, messages, payload, requestId, retained, row, rows, subscriptionId, type }
@@ -705,7 +708,7 @@ interface StorageAuthorizeUser { email, roles, uid }
 interface StorageListResult { items, nextPageToken, prefixes }
 interface StorageReference { bucket, fullPath, name, parent, root, toString }
 interface StorageSource { deleteObject, getObject, getSignedUrl, listObjects, putObject }
-interface StorageSourceDefinition { account, engine, key, label, transport }
+interface StorageSourceDefinition { account, default, engine, key, label, transport }
 interface StorageSourceRegistry { get, getDefault, getOrDefault, has, list }
 interface StringProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, email, enum, excludeFromApi, isId, metadata, name, propertyConfig, storage, type, url, userSelect, validation }
 interface StringPropertyValidationSchema { length, lowercase, matches, matchesMessage, max, min, required, requiredMessage, trim, unique, uniqueInArray, uppercase }

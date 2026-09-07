@@ -8,6 +8,10 @@ HTTP SDK client for the Rebase backend — typed CRUD, auth, storage, realtime W
 pnpm add @rebasepro/client
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 ## What This Package Does
 
 `@rebasepro/client` is the primary SDK for interacting with a Rebase backend from any JavaScript/TypeScript environment (browser, Node.js, edge). It creates a single client instance that provides:

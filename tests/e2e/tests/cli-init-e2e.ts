@@ -1013,45 +1013,28 @@ height: 800 }
             await page.screenshot({ path: path.join(screenshotDir, "0-immediate-load.png") });
 
             /*
-             * Sign in, rather than bootstrap.
+             * Bootstrap, rather than sign in.
              *
-             * This waited 90 seconds for "Welcome!" — the panel's setup screen,
-             * which it shows only when the user table is empty. `rebase init`
-             * now writes `REBASE_ADMIN_EMAIL` and a generated
-             * `REBASE_ADMIN_PASSWORD` into the project's `.env` and boot creates
-             * that account, so by the time a browser reaches a stock scaffold
-             * there IS a user and the panel offers a sign-in instead. The screen
-             * this waited for is one no new project shows any more.
-             *
-             * The credentials are read from the scaffold's own `.env` rather
-             * than typed here: the password is generated per project, and the
-             * address is a template default that is free to change. Absent, this
-             * fails naming them instead of timing out on a screen — the failure
-             * mode that cost a CI run to read.
+             * In development the first account to register is the admin: the
+             * `REBASE_ADMIN_*` pair `rebase init` writes into `.env` is the
+             * production seed, and a `rebase dev` boot leaves the window open on
+             * purpose — so the panel's first screen on a stock scaffold is the
+             * "Welcome!" setup form, and that is what this walks. (For a while the
+             * seed ran in development too, and this signed in as it; that made
+             * the documented first sign-up a role-less account.)
              */
-            const adminEmail = readEnvVar(projectPath, "REBASE_ADMIN_EMAIL");
-            const adminPassword = readEnvVar(projectPath, "REBASE_ADMIN_PASSWORD");
-            if (!adminEmail || !adminPassword) {
-                throw new Error(
-                    "The scaffold's .env names no seeded admin: "
-                    + `REBASE_ADMIN_EMAIL=${adminEmail ?? "(unset)"}, `
-                    + `REBASE_ADMIN_PASSWORD=${adminPassword ? "(set)" : "(unset)"}. `
-                    + "`rebase init` writes both, and the panel's first screen depends on which."
-                );
-            }
+            console.log("Waiting for the first-admin setup screen...");
+            const welcomeText = page.locator("text=Welcome!");
+            await welcomeText.waitFor({ state: "visible", timeout: 90000 });
+            await page.screenshot({ path: path.join(screenshotDir, "1-bootstrap-welcome.png") });
 
-            console.log(`Signing in as the seeded admin (${adminEmail})...`);
-            const signInWithEmail = page.locator("button", { hasText: "Sign in with email" });
-            await signInWithEmail.waitFor({ state: "visible",
-timeout: 90000 });
-            await page.screenshot({ path: path.join(screenshotDir, "1-login-providers.png") });
-            await signInWithEmail.click();
+            console.log("Filling admin account details...");
+            await page.fill('input[placeholder="Jane Doe (optional)"]', "Francesco Admin");
+            await page.fill('input[placeholder="you@example.com"]', "admin@rebase.pro");
+            await page.fill('input[placeholder="••••••••"]', "SecureAdmin123!");
+            await page.screenshot({ path: path.join(screenshotDir, "2-bootstrap-details-filled.png") });
 
-            await page.fill('input[placeholder="you@example.com"]', adminEmail);
-            await page.fill('input[placeholder="••••••••"]', adminPassword);
-            await page.screenshot({ path: path.join(screenshotDir, "2-login-details-filled.png") });
-
-            console.log("Submitting the sign-in form...");
+            console.log("Submitting the admin bootstrap form...");
             await page.click('button[type="submit"]');
 
             // Wait for dashboard redirect

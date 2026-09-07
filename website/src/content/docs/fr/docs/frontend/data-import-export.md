@@ -1,4 +1,5 @@
 ---
+sourceHash: 31f58d9db3601b8c
 title: Import et export de données
 sidebar_label: Import et export de données
 description: Importez des données à partir de fichiers CSV, JSON et Excel dans vos collections, et exportez les données de collection vers CSV ou JSON avec des champs calculés optionnels.

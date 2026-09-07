@@ -4,6 +4,7 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     collectDeclaredDependencies,
+    detectDeclaredDepConflicts,
     detectFrameworkDepDrift,
     detectNativeDependencies,
     detectStorageAuthorize,
@@ -122,6 +123,77 @@ describe("normalizeEsmSpecifiers", () => {
 
         expect(fs.readFileSync(vendored, "utf8")).toContain('"./other"');
     });
+
+    /**
+     * The stock template's own `config/resources.ts` documents
+     * `import { media } from "../resources";` inside a docblock, so every
+     * `rebase build` of an untouched scaffold warned about an import that is
+     * prose. A warning that is wrong on the default project is a warning nobody
+     * reads when it is right.
+     */
+    it("does not report a specifier written inside a comment", () => {
+        const file = write("resources.js", [
+            "/**",
+            " * Point a property at it by handle:",
+            " *",
+            ' * import { media } from "../resources";',
+            " */",
+            'export const media = {};',
+            '// import legacy from "./gone";'
+        ].join("\n"));
+
+        const result = normalizeEsmSpecifiers(scratch);
+
+        expect(result.unresolved).toEqual([]);
+        // And the comment is left exactly as written — a build must not edit
+        // the prose it declines to act on.
+        expect(fs.readFileSync(file, "utf8")).toContain('import { media } from "../resources";');
+    });
+
+    it("still rewrites a real import on a line that also carries a comment", () => {
+        write("dep.js", "export default {};");
+        const file = write("a.js", 'import dep from "./dep"; // was: import dep from "./old"\n');
+
+        const result = normalizeEsmSpecifiers(scratch);
+
+        expect(result.rewritten).toBe(1);
+        expect(result.unresolved).toEqual([]);
+        expect(fs.readFileSync(file, "utf8")).toContain('"./dep.js"');
+        expect(fs.readFileSync(file, "utf8")).toContain('"./old"');
+    });
+
+    /**
+     * A `//` inside a string is the common shape of this going wrong: every URL
+     * in the tree has one, and treating it as a comment would hide the rest of
+     * the line — including a real import.
+     */
+    it("does not mistake a URL in a string for a comment", () => {
+        write("dep.js", "export default {};");
+        const file = write("a.js", [
+            'export const docs = "https://rebase.pro/docs";',
+            'import dep from "./dep";'
+        ].join("\n"));
+
+        const result = normalizeEsmSpecifiers(scratch);
+
+        expect(result.rewritten).toBe(1);
+        expect(fs.readFileSync(file, "utf8")).toContain('"./dep.js"');
+    });
+
+    it("does not let an unterminated quote run past its line", () => {
+        // A regex literal holding a quote (`/["']/`) reads as an opening string
+        // to a scanner that does not parse regexes. Ending the span at the
+        // newline bounds the mistake to the line it started on.
+        write("dep.js", "export default {};");
+        const file = write("a.js", [
+            'export const quoted = /["]/;',
+            'import dep from "./dep";'
+        ].join("\n"));
+
+        normalizeEsmSpecifiers(scratch);
+
+        expect(fs.readFileSync(file, "utf8")).toContain('"./dep.js"');
+    });
 });
 
 describe("collectDeclaredDependencies", () => {
@@ -190,6 +262,45 @@ pg: "^8.0.0" }
         write("config/package.json", JSON.stringify({ dependencies: { dayjs: "^1.11.0" } }));
 
         expect(collectDeclaredDependencies(scratch)).toEqual({ dayjs: "^1.11.0" });
+    });
+
+    it("lets the backend's own range win over the project root's", () => {
+        // The root is a workspace root: it holds the scripts every workspace
+        // shares, and its ranges were never exercised by the code in the bundle.
+        // The backend's were — it is the app being packaged. The stock scaffold
+        // shipped `dotenv ^16` at the root and `^17.4.2` in `backend/`, and the
+        // root used to win, so every default project's bundle told the managed
+        // runtime to install a major the backend had never compiled against.
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "^17.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+
+        expect(collectDeclaredDependencies(scratch)).toEqual({ dotenv: "^17.4.2" });
+    });
+
+    it("refuses two ranges no single version satisfies, naming both files", () => {
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "^16.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+
+        expect(() => collectDeclaredDependencies(scratch))
+            .toThrow(/dotenv: \^16\.0\.0 \(package\.json\) vs \^17\.4\.2 \(backend\/package\.json\)/);
+    });
+
+    it.each([
+        ["file:", "file:../vendorlib"],
+        ["link:", "link:../vendorlib"],
+        ["portal:", "portal:../vendorlib"],
+        ["git+", "git+https://example.com/a/b.git"],
+        ["a bare relative path", "../vendorlib"]
+    ])("refuses a %s specifier the runtime cannot install", (_label, specifier) => {
+        // These resolve on the machine that built the bundle and nowhere else.
+        // Left in `deps.declared` they fail at the deploy's install step —
+        // minutes later, in a pod, with nobody watching.
+        write("backend/package.json", JSON.stringify({
+            dependencies: { "my-shared": specifier }
+        }));
+
+        expect(() => collectDeclaredDependencies(scratch))
+            .toThrow(/backend\/package\.json declares "my-shared"/);
     });
 
     it("strips zod, which the image supplies", () => {
@@ -565,6 +676,68 @@ hono: "1.0.0" }
     it("survives an unparseable package.json rather than failing the build", () => {
         write("package.json", "{ not json");
         expect(() => detectFrameworkDepDrift(scratch, "0.12.0")).not.toThrow();
+    });
+
+    it("carries the third-party conflicts the build refuses on", () => {
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "^16.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+
+        const drift = detectFrameworkDepDrift(scratch, "0.12.0");
+        expect(drift.conflicting).toHaveLength(1);
+        expect(drift.conflicting[0].declarations.map(d => d.file))
+            .toEqual(["package.json", "backend/package.json"]);
+    });
+});
+
+/**
+ * A name declared twice at ranges nothing satisfies.
+ *
+ * Only one of the two reaches `deps.declared`, so the other half of the project
+ * was typechecked against a version the managed runtime will never install.
+ */
+describe("detectDeclaredDepConflicts", () => {
+    it("finds a disjoint pair across two manifests", () => {
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "^16.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+
+        const [conflict] = detectDeclaredDepConflicts(scratch);
+        expect(conflict.name).toBe("dotenv");
+        expect(conflict.declarations[0]).toEqual({ name: "dotenv",
+range: "^16.0.0",
+file: "package.json" });
+        expect(conflict.declarations[1].file).toBe("backend/package.json");
+    });
+
+    it("says nothing about ranges that overlap", () => {
+        // `^17.0.0` and `^17.4.2` are both satisfied by 17.4.2. A project with a
+        // reason to widen one of them is not making a mistake.
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "^17.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+
+        expect(detectDeclaredDepConflicts(scratch)).toEqual([]);
+    });
+
+    it("ignores names the runtime image supplies", () => {
+        // These are stripped from `deps.declared`, so a disagreement about them
+        // never reaches a bundle; `disagreeing` reports the framework ones.
+        write("package.json", JSON.stringify({ dependencies: { hono: "^3.0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { hono: "^4.12.27" } }));
+
+        expect(detectDeclaredDepConflicts(scratch)).toEqual([]);
+    });
+
+    it("ignores a range it cannot parse rather than refusing the build", () => {
+        write("package.json", JSON.stringify({ dependencies: { dotenv: "next" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
+
+        expect(detectDeclaredDepConflicts(scratch)).toEqual([]);
+    });
+
+    it("ignores workspace specifiers, which every template uses", () => {
+        write("package.json", JSON.stringify({ dependencies: { "my-lib": "workspace:*" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { "my-lib": "^2.0.0" } }));
+
+        expect(detectDeclaredDepConflicts(scratch)).toEqual([]);
     });
 });
 

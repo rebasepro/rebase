@@ -68,6 +68,16 @@ export type HonoEnv = {
          * there nothing else would report the failure at all.
          */
         requestLogged?: boolean;
+        /**
+         * The caller's `x-rebase-schema` stamp and this server's, when they
+         * disagree.
+         *
+         * Set by `createSchemaDriftDetector` and read only by the error handler,
+         * which attaches it as the cause of a 400 or 404 the request would have
+         * produced anyway. Never a reason to refuse: an SDK generated against an
+         * older schema is usually still compatible.
+         */
+        schemaDrift?: { client: string; server: string };
     }
 };
 

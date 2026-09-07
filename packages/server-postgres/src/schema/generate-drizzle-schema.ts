@@ -6,51 +6,15 @@ import { generateSchema } from "./generate-drizzle-schema-logic";
 import { CollectionConfig } from "@rebasepro/types";
 import { loadCollectionsFromDirectory } from "@rebasepro/server";
 import { out, outError } from "../cli-output";
+import { nextStepAfterGenerate } from "./generate-next-step";
 
-
-// --- Helper Functions ---
-
-const formatTerminalText = (text: string, options: {
-    bold?: boolean;
-    backgroundColor?: "blue" | "green" | "red" | "yellow" | "cyan" | "magenta";
-    textColor?: "white" | "black" | "red" | "green" | "yellow" | "blue" | "magenta" | "cyan";
-} = {}): string => {
-    let codes = "";
-    if (options.bold) codes += "\x1b[1m";
-    if (options.backgroundColor) {
-        const bgColors = {
-            blue: "\x1b[44m",
-            green: "\x1b[42m",
-            red: "\x1b[41m",
-            yellow: "\x1b[43m",
-            cyan: "\x1b[46m",
-            magenta: "\x1b[45m"
-        } as const;
-        codes += bgColors[options.backgroundColor];
-    }
-    if (options.textColor) {
-        const textColors = {
-            white: "\x1b[37m",
-            black: "\x1b[30m",
-            red: "\x1b[31m",
-            green: "\x1b[32m",
-            yellow: "\x1b[33m",
-            blue: "\x1b[34m",
-            magenta: "\x1b[35m",
-            cyan: "\x1b[36m"
-        } as const;
-        codes += textColors[options.textColor];
-    }
-    return `${codes}${text}\x1b[0m`;
-};
 
 // --- Execution and Watch Logic ---
 
 const runGeneration = async (collectionsFilePath?: string, outputPath?: string) => {
     try {
         if (!collectionsFilePath) {
-            outError("Error: No collections file path provided. Skipping schema generation.");
-            return;
+            throw new Error("No collections file path provided.");
         }
 
         const resolvedPath = path.resolve(collectionsFilePath);
@@ -81,14 +45,16 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
             out(String(schemaContent));
         }
 
-        out(`You can now run ${formatTerminalText("rebase db generate", {
-            bold: true,
-            backgroundColor: "blue",
-            textColor: "black"
-        })} to generate the SQL migration files.`);
+        out(nextStepAfterGenerate());
 
     } catch (error) {
         outError(`Error generating schema: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
+        // The same contract its sibling `generate-postgres-ddl.ts` keeps, and
+        // for the same reason: `rebase db push` runs both as step 1 and reads
+        // nothing but their exit codes. Exiting 0 after printing an error made
+        // the push apply whatever `src/schema.generated.ts` was already there.
+        process.exitCode = 1;
+        throw error;
     }
 };
 
@@ -130,14 +96,19 @@ const main = async () => {
 
         watcher.on("all", (event, filePath) => {
             out(`[${event}] ${filePath}. Regenerating schema...`);
-            runGeneration(resolvedPath, resolvedOutputPath);
+            // A watch session outlives a bad edit; the next save is the retry.
+            void runGeneration(resolvedPath, resolvedOutputPath).catch(() => undefined);
         });
     } else {
-        runGeneration(resolvedPath, resolvedOutputPath);
+        await runGeneration(resolvedPath, resolvedOutputPath);
     }
 };
 
 // This check ensures the script only runs when executed directly
 if (import.meta.url.endsWith(process.argv[1])) {
-    main();
+    // The cause is already on stderr with the exit code set; this keeps Node
+    // from printing the same stack again as an unhandled rejection.
+    main().catch(() => {
+        process.exitCode = 1;
+    });
 }

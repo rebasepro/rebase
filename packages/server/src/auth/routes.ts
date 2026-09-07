@@ -131,7 +131,14 @@ export interface CookieAuthConfig {
     path?: string;
     /** SameSite attribute (default: "Lax"). */
     sameSite?: "Strict" | "Lax" | "None";
-    /** Force the Secure flag. Defaults to `true` when SameSite is "None", otherwise auto-detected from the request protocol. */
+    /**
+     * The Secure flag. Defaults to `true`, and `false` is the only way off —
+     * see `AUTH_COOKIE_SECURE`. It used to be inferred from the request
+     * protocol, which reads `http` behind any TLS-terminating proxy, so a
+     * months-lived credential travelled in cleartext in the commonest
+     * production topology. Set it `false` only for a deployment genuinely
+     * served over plain http.
+     */
     secure?: boolean;
 }
 

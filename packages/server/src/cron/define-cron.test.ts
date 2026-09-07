@@ -33,9 +33,12 @@ describe("defineCron", () => {
     });
 
     it("rejects misspelled fields at compile time", () => {
-        // @ts-expect-error — 'shedule' is not a valid field on CronJobDefinition
         defineCron({
             name: "Bad",
+            // @ts-expect-error — 'shedule' is not a valid field on CronJobDefinition.
+            // The directive sits on the property, not on the `defineCron(` line:
+            // tsc reports an excess property where it is written, so a directive
+            // one line above the call suppresses nothing and asserts nothing.
             shedule: "* * * * *",
             handler: async () => undefined,
         });

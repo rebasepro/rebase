@@ -1,4 +1,5 @@
 ---
+sourceHash: b4130f0ffba10745
 title: Despliegue de Rebase en Fly.io
 description: Aprende a desplegar Rebase globalmente o a restringirlo a centros de datos europeos usando Fly.io.
 sidebar_label: Fly.io
@@ -34,13 +35,28 @@ fly secrets set JWT_SECRET=your_super_long_randomly_generated_secure_string -a m
 ## 3. Validar la Configuración Interna
 Fly habrá generado un archivo `fly.toml` en la raíz de tu proyecto. Verifica que el puerto interno se alinee explícitamente con la configuración predeterminada de Rebase (`3001`):
 
+**No hay ninguna imagen de aplicación que construir a partir de tu código**. `rebase build` produce un directorio `dist-bundle` con tus colecciones, funciones y crons compilados y —si tu proyecto declara una app estática— tu frontend construido. La imagen de runtime publicada lo ejecuta:
+
+```bash
+rebase build
+```
+
+Fly.io extrae desde un registro, así que hornea el bundle en una imagen derivada. Tres líneas, y fija exactamente lo que se ejecuta:
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+Actualizar Rebase más adelante es un cambio en esa línea `FROM`. Tu bundle queda intacto.
+
 ```toml
 # fly.toml
 app = "my-rebase-app"
 primary_region = "fra"
 
 [build]
-  dockerfile = "backend/Dockerfile" # El Dockerfile del backend necesita todo el workspace como contexto de compilación
+  dockerfile = "Dockerfile"
 
 [http_service]
   internal_port = 3001 # Make sure this matches your Hono app port

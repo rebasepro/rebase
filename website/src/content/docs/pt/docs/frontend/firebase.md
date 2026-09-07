@@ -1,4 +1,5 @@
 ---
+sourceHash: 619a84a6bea05de9
 title: Firebase
 sidebar_label: Firebase
 description: "@rebasepro/firebase runs the Rebase admin panel against Firestore, Firebase Auth and Firebase Storage — a client-side adapter, with no Rebase server involved."

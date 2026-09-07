@@ -6,6 +6,7 @@ import { PersistService } from "./PersistService";
 import { RelationService } from "./RelationService";
 import { DataRepository, FetchCollectionOptions, SearchOptions, CountOptions, DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { logger, rawQueryLoggingEnabled } from "@rebasepro/server";
 
 // Re-export data transformer functions for external use
 export { sanitizeAndConvertDates, serializeDataToServer, parseDataFromServer } from "../data-transformer";
@@ -192,8 +193,14 @@ export class DataService implements DataRepository {
      * Execute raw SQL
      */
     async executeSql(sqlText: string, params?: unknown[]): Promise<Record<string, unknown>[]> {
-        if (process.env.NODE_ENV !== "production") {
-            console.debug("Executing raw SQL:", sqlText, params?.length ? `with ${params.length} params` : "");
+        // Through the logger, at `debug`, behind the same switch that lifts the
+        // `Failed query:` redaction. A `console.debug` gated on `NODE_ENV`
+        // alone put every statement on stdout whatever `LOG_LEVEL` said — a
+        // 60-second idle backend emitted 478 lines, 18 of them the job
+        // poller's `UPDATE rebase.jobs … FOR UPDATE SKIP LOCKED` — and it
+        // bypassed the one function where redaction lives.
+        if (rawQueryLoggingEnabled()) {
+            logger.debug(`Executing raw SQL: ${sqlText}${params?.length ? ` with ${params.length} params` : ""}`);
         }
         const { sql } = await import("drizzle-orm");
 
@@ -223,8 +230,8 @@ export class DataService implements DataRepository {
         }
 
         const rows = result.rows;
-        if (process.env.NODE_ENV !== "production") {
-            console.debug(`SQL executed successfully. Returned ${Array.isArray(rows) ? rows.length : "non-array"} rows.`);
+        if (rawQueryLoggingEnabled()) {
+            logger.debug(`SQL executed successfully. Returned ${Array.isArray(rows) ? rows.length : "non-array"} rows.`);
         }
         return rows as Record<string, unknown>[];
     }

@@ -11,7 +11,7 @@ Status legend:
 - **partial** — covered incidentally inside a broader audit or sweep, never on its own.
 - **never** — no dedicated pass.
 
-Forty-six units now have a dedicated write-up in [audits/](audits/), one file per entry,
+Forty-six units now have a dedicated write-up in [audits/](../audits/), one file per entry,
 numbered to match. Those marks were reconciled on 2026-08-09: the register had been
 left saying `partial` or `never` for units whose write-up was already sitting next to
 it — entry 3 read **never** against a fourteen-finding audit of write validation — so
@@ -25,7 +25,8 @@ Existing write-ups this register was reconciled against: [AUDIT-2026-07-28.md](A
 [dx-audit-2026-08-09.md](dx-audit-2026-08-09.md),
 [sdk-generation-audit-2026-08-08.md](sdk-generation-audit-2026-08-08.md),
 [type-placement-audit-2026-07-28.md](type-placement-audit-2026-07-28.md),
-[saas/SWEEP-2026-08-07.md](../../saas/SWEEP-2026-08-07.md), and the sweep log in
+`saas/SWEEP-2026-08-07.md` (the private control-plane repository, not in this
+clone), and the sweep log in
 [bug-classes.md](../bug-classes.md).
 
 ---

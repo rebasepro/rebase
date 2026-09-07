@@ -16,6 +16,8 @@ import { recordEvent } from "../telemetry";
 import { wantsHelp } from "../utils/args";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
+import { unknownCommand } from "../utils/unknown-command";
+import { DEV_DATABASE_KIND_ENV, devDatabaseKind } from "../dev-db/prepare";
 
 export async function schemaCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
     // `--help` is answered here, before `requireProjectRoot` and before the
@@ -34,6 +36,16 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     if (!subcommand || subcommand === "--help" || wantsHelp(rawArgs)) {
         printSchemaHelp(subcommand === "--help" ? undefined : subcommand);
         return;
+    }
+
+    // A typo is answered here, in the same words every other family uses.
+    //
+    // It used to travel to the driver, which said the bare line `Unknown schema
+    // command.` — no list, no pointer, no did-you-mean, for a family with three
+    // subcommands. The set comes from the help table, so what a typo is measured
+    // against and what `--help` prints cannot drift apart.
+    if (!SCHEMA_ACTION_HELP[subcommand]) {
+        unknownCommand(subcommand, Object.keys(SCHEMA_ACTION_HELP), "schema");
     }
 
     const projectRoot = requireProjectRoot();
@@ -62,6 +74,12 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     if (envFile) {
         env.DOTENV_CONFIG_PATH = envFile;
     }
+    // Which database this project is on, so the driver's closing line does not
+    // recommend a command that database refuses. A pure decision — nothing is
+    // started, which matters here above all: `schema generate` reads collection
+    // files and writes one file, and booting a database to run it would be a
+    // side effect nobody asked for.
+    env[DEV_DATABASE_KIND_ENV] = devDatabaseKind(projectRoot) ?? "";
 
     try {
         const isTs = pluginCli.endsWith(".ts");
@@ -100,12 +118,12 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
         notes: ["--watch regenerates on every change to a collection file."]
     },
     introspect: {
-        usage: "rebase schema introspect [--output <dir>] [--schema <name>] [--force]",
+        usage: "rebase schema introspect [--collections <dir>] [--output <dir>] [--schema <name>] [--force]",
         summary: "Read an existing database and write Rebase collection definitions from it.",
         notes: ["--force overwrites collection files that are already there."]
     },
     stale: {
-        usage: "rebase schema stale [--fix]",
+        usage: "rebase schema stale [--collections <dir>] [--output <file>] [--fix]",
         summary: "Report generated schema files that no longer match the collections.",
         notes: ["--fix regenerates them instead of only reporting."]
     }

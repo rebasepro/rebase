@@ -1,4 +1,5 @@
 ---
+sourceHash: ee6fa328c0acbd31
 title: Aplicaciones y Repositorios
 sidebar_label: Aplicaciones y Repositorios
 description: Un proyecto es un backend más las aplicaciones que se comunican con él, las cuales pueden vivir cada una en su propio repositorio.

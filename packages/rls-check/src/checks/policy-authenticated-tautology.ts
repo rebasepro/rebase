@@ -1,6 +1,15 @@
 import type { Check, DbSnapshot, Finding } from "../types";
 
-import { callerIdCall, finding, listAnd, policyTargetsExposedRole, qi, qrel } from "./util";
+import {
+    callerIdCall,
+    finding,
+    isRebaseManagedPolicy,
+    listAnd,
+    managedPolicyFix,
+    policyTargetsExposedRole,
+    qi,
+    qrel
+} from "./util";
 import { callerIdOnlyClause } from "./policy-anonymous-tautology";
 
 const ID = "policy-authenticated-tautology";
@@ -78,8 +87,13 @@ export const policyAuthenticatedTautology: Check = {
                         "user with an account\" is anybody who fills in a form. This is the shape that " +
                         "makes a `users` table — every address on the platform — readable by its own " +
                         "members.",
-                    fix:
-                        "-- Scope the policy to the row, rather than to the existence of a session:\n" +
+                    fix: isRebaseManagedPolicy(snapshot, policy)
+                        ? managedPolicyFix(
+                            policy,
+                            "scope the rule to the row rather than to the existence of a session — " +
+                            "an `ownerField`, or a `condition` naming the group whose members may share rows"
+                        )
+                        : "-- Scope the policy to the row, rather than to the existence of a session:\n" +
                         `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
                         `    USING (user_id = ${uidCall});\n` +
                         "-- Or, where members of a shared group really may see each other's rows, say\n" +

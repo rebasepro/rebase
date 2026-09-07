@@ -108,7 +108,6 @@
   "packages/cms/src/components/DefaultAppBar.tsx::user_menu": 1,
   "packages/cms/src/components/DetailViewBinding.tsx::entity_not_found": 1,
   "packages/cms/src/components/EditFormActions.tsx::this_form_has_errors": 1,
-  "packages/cms/src/components/EditViewBinding.tsx::entity_not_found": 1,
   "packages/cms/src/components/EntityViewBinding.tsx::settings_heading": 1,
   "packages/cms/src/components/RebaseNavigation.tsx::edit_collections": 1,
   "packages/cms/src/components/SelectableTable/filters/RelationFilterField.tsx::filter_for_null_values": 1,

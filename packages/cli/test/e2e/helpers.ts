@@ -359,32 +359,41 @@ export function readEnvVar(projectDir: string, name: string): string | undefined
 }
 
 /**
- * Sign in as the admin `rebase init` named in the scaffold's `.env`.
+ * The account the quickstart tells a reader to create, so a later boot in the
+ * same suite can sign in as it again.
  *
- * A scaffold no longer boots with an empty user table. `init` writes
- * `REBASE_ADMIN_EMAIL` and a generated `REBASE_ADMIN_PASSWORD`, and the runtime
- * creates that account on the first boot — so "register the first user and be
- * promoted to admin" is a path a new project no longer has, and every suite
- * that took it got `409 EMAIL_EXISTS` against an address the seed had already
- * claimed.
- *
- * Reading the credentials instead of hardcoding them is the point: the password
- * is generated per scaffold, and the email is a default the template is free to
- * change. Missing either is a failure and not a fallback — silently registering
- * instead would put this back on the path that broke.
+ * Deliberately not `admin@example.com`: that is what `rebase init` writes into
+ * `.env` as `REBASE_ADMIN_EMAIL`, and a suite that used it would pass whether
+ * the account came from the documented sign-up or from a seed that should not
+ * have run in development.
  */
-export async function loginSeededAdmin(projectDir: string, baseUrl: string): Promise<AuthedUser> {
-    const email = readEnvVar(projectDir, "REBASE_ADMIN_EMAIL");
-    const password = readEnvVar(projectDir, "REBASE_ADMIN_PASSWORD");
-    if (!email || !password) {
-        throw new Error(
-            "The scaffold's .env names no seeded admin: "
-            + `REBASE_ADMIN_EMAIL=${email ?? "(unset)"}, `
-            + `REBASE_ADMIN_PASSWORD=${password ? "(set)" : "(unset)"}. `
-            + "`rebase init` writes both; if it stopped, this suite is testing a first run nobody gets."
-        );
-    }
-    return await login(baseUrl, email, password);
+export const FIRST_ADMIN = { email: "first@example.test", password: "StrongPass3!first" } as const;
+
+/**
+ * Do what the quickstart's "First Login" says, and report what the server said
+ * before it: register into an empty user table and be promoted to admin.
+ *
+ * `needsSetupBefore` is returned rather than asserted here because it is the
+ * precondition the whole rule rests on — an empty table — and a caller that
+ * checks it is testing the documented path rather than "some account exists".
+ *
+ * This replaced a helper that signed in as an account the runtime seeded from
+ * `REBASE_ADMIN_EMAIL` at every boot. That seed is the production contract: it
+ * exists because a public host answers before its operator has typed anything.
+ * Running it in development too spent the bootstrap window before the developer
+ * opened the app, so the documented sign-up produced a role-less account — and
+ * the suite could not see it, because the suite had been changed to sign in as
+ * the seed instead of taking the path the docs describe.
+ */
+export async function claimFirstAdmin(baseUrl: string): Promise<AuthedUser & { needsSetupBefore: boolean }> {
+    let needsSetupBefore = false;
+    try {
+        const cfg = await fetch(`${baseUrl}/api/auth/config`);
+        needsSetupBefore = Boolean(((await cfg.json()) as { needsSetup?: boolean })?.needsSetup);
+    } catch { /* reported by the assertion on needsSetupBefore */ }
+
+    const user = await registerAndLogin(baseUrl, FIRST_ADMIN.email, FIRST_ADMIN.password);
+    return { ...user, needsSetupBefore };
 }
 
 /** Log in an account that already exists, and return it with its token. */

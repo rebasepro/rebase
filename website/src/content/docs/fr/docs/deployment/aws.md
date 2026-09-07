@@ -1,4 +1,5 @@
 ---
+sourceHash: 936afac32ad9dc9d
 title: Déploiement de Rebase sur AWS
 description: Déployez votre instance Rebase en toute sécurité sur Amazon Web Services en utilisant RDS et AWS App Runner, avec une forte orientation européenne.
 sidebar_label: AWS
@@ -21,13 +22,28 @@ Pour maintenir une conformité stricte aux réglementations européennes sur les
 
 ## 2. Pousser l'image vers ECR (Elastic Container Registry)
 
-AWS App Runner tire directement les images d'ECR. Créez votre image Docker localement et poussez-la.
+AWS App Runner tire directement les images d'ECR.
+
+Il n'y a **aucune image applicative à construire depuis vos sources**. `rebase build` produit un répertoire `dist-bundle` avec vos collections, fonctions et crons compilés — et, si votre projet déclare une app statique, votre frontend construit. L'image de runtime publiée l'exécute :
+
+```bash
+rebase build
+```
+
+App Runner tire depuis un registre : intégrez donc le bundle dans une image dérivée. Trois lignes, et cela fige exactement ce qui tourne :
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+Mettre Rebase à niveau plus tard revient à changer cette ligne `FROM`. Votre bundle reste intact.
 
 1. Naviguez vers **Elastic Container Registry** et créez un nouveau dépôt privé nommé `rebase-backend`.
 2. Récupérez les commandes de push fournies par AWS dans la console (qui gèrent l'authentification Docker).
-3. Créez votre image localement **depuis la racine du projet** — le Dockerfile du backend a besoin de l'ensemble du workspace comme contexte de build (il copie `pnpm-workspace.yaml`, `backend/` et `config/`), donc utiliser `./backend` comme contexte échouera :
+3. Construisez et poussez depuis la racine du projet :
    ```bash
-   docker build -t rebase-backend -f backend/Dockerfile .
+   docker build -t rebase-backend .
    ```
 4. Balisez et poussez-la vers votre dépôt ECR nouvellement créé.
 

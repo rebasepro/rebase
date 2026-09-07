@@ -22,6 +22,7 @@
  */
 import { CollectionConfig } from "@rebasepro/types";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
+import { staleVerdict } from "../src/schema/generated-schema-staleness";
 
 import { findLegacyForeignKeyNames, findMissingGeneratedNames } from "../src/schema/generated-schema-staleness";
 
@@ -241,5 +242,83 @@ describe("findMissingGeneratedNames", () => {
         const found = findMissingGeneratedNames(AUTHORS_TABLE, collections);
 
         expect(found.filter(f => f.table === "articles")).toHaveLength(1);
+    });
+});
+
+/**
+ * What `rebase schema stale` says — which, for three of its four paths, was
+ * nothing at all: exit 0, zero bytes on stdout, zero on stderr, for a command
+ * the top-level help describes as "Report generated schema files the
+ * collections have moved past". Indistinguishable from a no-op, from a crash,
+ * and from a subcommand the driver does not implement.
+ */
+describe("the verdict schema stale prints", () => {
+    const OUTPUT = "src/schema.generated.ts";
+    const clean = { outputPath: OUTPUT, generatedExists: true, stale: [], fix: false };
+    const behind = [{ table: "articles", column: "categorie_id", expected: "category_id" }] as never;
+    const said = (input: Parameters<typeof staleVerdict>[0]) => staleVerdict(input).lines.join("\n");
+
+    it("says so when nothing is stale", () => {
+        const verdict = staleVerdict(clean);
+
+        expect(verdict.lines.join("\n")).toContain("Nothing stale");
+        expect(verdict.lines.join("\n")).toContain(OUTPUT);
+        expect(verdict.exitCode).toBe(0);
+        expect(verdict.regenerate).toBe(false);
+    });
+
+    it("never exits 0 with nothing to show for it", () => {
+        // The vacuity assertion, over every path a person can reach.
+        const paths = [
+            clean,
+            { ...clean, generatedExists: false },
+            { ...clean, unreadable: "Cannot find module './authors'" },
+            { ...clean, stale: behind }
+        ];
+
+        for (const input of paths) {
+            expect(staleVerdict(input).lines.filter(Boolean).length).toBeGreaterThan(0);
+        }
+    });
+
+    it("does not call a missing generated schema stale", () => {
+        // A fresh project has not run the generator. Saying "stale" about a file
+        // that does not exist sends the reader looking for something to fix.
+        const printed = said({ ...clean, generatedExists: false });
+
+        expect(printed).not.toContain("stale");
+        expect(printed).toContain("rebase schema generate");
+        expect(staleVerdict({ ...clean, generatedExists: false }).exitCode).toBe(0);
+    });
+
+    it("says a comparison it could not make was not made", () => {
+        const printed = said({ ...clean, unreadable: "Cannot find module './authors'" });
+
+        expect(printed).toContain("Not checked");
+        expect(printed).toContain("Cannot find module");
+    });
+
+    it("fails, and says why, when the generated schema is behind", () => {
+        const verdict = staleVerdict({ ...clean, stale: behind });
+
+        expect(verdict.exitCode).toBe(1);
+        expect(verdict.lines.join("\n")).toContain("refuse to start");
+        expect(verdict.lines.join("\n")).toContain("rebase schema generate");
+    });
+
+    it("stays silent under --fix when there is nothing to fix", () => {
+        // `rebase dev` runs `schema stale --fix` before every boot with
+        // inherited stdio. "Nothing was wrong" is not news a hundred lines into
+        // a start-up transcript; the flag is the automated caller's.
+        expect(staleVerdict({ ...clean, fix: true }).lines).toEqual([]);
+        expect(staleVerdict({ ...clean, generatedExists: false, fix: true }).lines).toEqual([]);
+    });
+
+    it("still speaks under --fix when there is something to fix", () => {
+        const verdict = staleVerdict({ ...clean, fix: true, stale: behind });
+
+        expect(verdict.regenerate).toBe(true);
+        expect(verdict.exitCode).toBe(0);
+        expect(verdict.lines.join("\n")).toContain("Regenerating");
     });
 });

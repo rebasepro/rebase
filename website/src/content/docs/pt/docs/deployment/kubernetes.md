@@ -1,4 +1,5 @@
 ---
+sourceHash: 1c7b378353d6058e
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Faça o deploy do Rebase em um cluster Kubernetes com o Helm chart oficial — um Deployment ou vários, um Job de migração responsável pelo schema, e aplicações estáticas no mesmo host.

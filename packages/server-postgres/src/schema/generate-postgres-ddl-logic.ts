@@ -87,7 +87,13 @@ type ResolveCollection = (slug: string) => CollectionConfig | undefined;
 const statementsToDdl = (statements: string[]): string => statements.map(s => `${s}\n`).join("");
 
 /**
- * The `ON DELETE` a `belongsTo` foreign key gets when the author did not say.
+ * The `ON DELETE` a foreign key gets when the author did not say.
+ *
+ * One rule for every property that emits one — `belongsTo` relations and
+ * `reference` properties alike. `reference` kept its own `CASCADE` default for
+ * a release after this rule was written, which is exactly the split this
+ * function exists to prevent: two spellings of the same link, two data-retention
+ * behaviours, and only one of them documented.
  *
  * An optional link is `SET NULL`: the column can hold NULL, so dropping the
  * parent leaves the child row with an empty pointer, which is what "optional"
@@ -772,7 +778,10 @@ export const generatePostgresDdl = async (
                         const targetTable = getTableName(targetCollection);
                         const targetSchema = isPostgresCollectionConfig(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";
                         const targetId = getPrimaryKeyName(targetCollection);
-                        const onDelete = required ? "CASCADE" : "SET NULL";
+                        // The same rule as `belongsTo`, from the same function.
+                        // A `reference` is a foreign key like any other, and it
+                        // carries no `onDelete` of its own to override it with.
+                        const onDelete = defaultBelongsToOnDelete(required);
 
                         let colDef = `  "${colName}" ${colType}`;
                         if (required) colDef += " NOT NULL";
@@ -1131,7 +1140,11 @@ export const planRelationalColumns = (allCollections: CollectionConfig[]): Relat
                             targetSchema: schemaOfCollection(targetCollection),
                             targetTable: bareTableName(getTableName(targetCollection)),
                             targetColumn: getPrimaryKeyName(targetCollection),
-                            onDelete: required ? "CASCADE" : "SET NULL"
+                            // Same rule, same function as the `CREATE TABLE`
+                            // path above — a default that appears in one and not
+                            // the other makes `db push` plan a constraint
+                            // rewrite on every run.
+                            onDelete: defaultBelongsToOnDelete(required)
                         })
                         : undefined
                 });

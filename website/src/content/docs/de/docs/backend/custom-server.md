@@ -1,4 +1,5 @@
 ---
+sourceHash: aeb69aa6164eafbc
 title: Eigene Serverintegration
 sidebar_label: Eigener Server (Express)
 description: So betten Sie Rebase-Datenbank- und Echtzeitdienste in Ihr eigenes benutzerdefiniertes Node.js-Backend ein, ohne Hono oder den Rebase-Koordinator zu verwenden.
@@ -35,6 +36,11 @@ export const env = loadEnv({
 // env.SMTP_HOST  → string | undefined  (vollständig typisiert)
 // env.STRIPE_SECRET_KEY → string        (validiert, erforderlich)
 ```
+
+Der Import von `z` aus `@rebasepro/server` ist neu <span class="since-badge" data-since="0.18">Since 0.18</span>. In 0.17
+und früher exportierte das Paket kein `z`: Importieren Sie es aus `zod`, passend
+zur Major-Version der Laufzeit, und lassen Sie Ihren Bundler die beiden Kopien
+zusammenführen.
 
 **Wichtige Verhaltensweisen:**
 - Generiert automatisch flüchtige `JWT_SECRET`- und `REBASE_SERVICE_KEY`-Werte in der Entwicklung, sodass Sie ohne manuelle Einrichtung starten können.

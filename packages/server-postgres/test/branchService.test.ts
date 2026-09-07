@@ -1,4 +1,4 @@
-import { BranchService } from "../src/services/BranchService";
+import { BranchService, BranchingUnsupportedError } from "../src/services/BranchService";
 import { DatabasePoolManager } from "../src/databasePoolManager";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PgDialect } from "drizzle-orm/pg-core";
@@ -46,14 +46,22 @@ function createDrizzleQueryError(query: string, pgCode: string, pgMessage: strin
     return Object.assign(new Error(`Failed query: ${query}\nparams: `), { cause: pgError });
 }
 
-/** Create a minimal mock DatabasePoolManager. */
-function createMockPoolManager(defaultDbName = "my_app_db") {
+/**
+ * Create a minimal mock DatabasePoolManager.
+ *
+ * `servesOneDatabase` defaults to `false` — a real Postgres — because that is
+ * the connection every other test in this file describes. The managed database
+ * answers `true`, and the branch mutations refuse there; see the block at the
+ * bottom.
+ */
+function createMockPoolManager(defaultDbName = "my_app_db", servesOneDatabase = false) {
     return {
         defaultDatabaseName: defaultDbName,
         disconnectDatabase: jest.fn().mockResolvedValue(undefined),
         getDrizzle: jest.fn(),
         getPool: jest.fn(),
         hasPool: jest.fn(),
+        servesOneDatabase: jest.fn().mockResolvedValue(servesOneDatabase),
         shutdown: jest.fn().mockResolvedValue(undefined)
     } as unknown as jest.Mocked<DatabasePoolManager>;
 }
@@ -636,6 +644,57 @@ created_at: now }]
                 .map((_call, index) => statementAt(db, index).sql);
 
             expect(statements.some(text => text.includes("pg_terminate_backend"))).toBe(false);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // A server that serves exactly one database
+    // -----------------------------------------------------------------------
+    describe("on a server that serves one database", () => {
+        let managed: jest.Mocked<DatabasePoolManager>;
+        let managedService: BranchService;
+
+        beforeEach(() => {
+            managed = createMockPoolManager("postgres", true);
+            managedService = new BranchService(db, managed);
+        });
+
+        it("refuses createBranch instead of writing a catalogue row that lies", async () => {
+            // On PGlite `CREATE DATABASE "rb_x" TEMPLATE "postgres"` succeeds,
+            // is listable, and reports a size — and connecting to it lands you
+            // in the parent. The CLI has always refused this; Studio reached
+            // the service over the websocket and got a success toast.
+            await expect(managedService.createBranch("sweep-branch"))
+                .rejects.toBeInstanceOf(BranchingUnsupportedError);
+
+            // Refused before anything ran, so no catalogue row exists to clean
+            // up and no metadata row claims a branch that is the parent.
+            expect(db.execute).not.toHaveBeenCalled();
+            expect(managed.disconnectDatabase).not.toHaveBeenCalled();
+        });
+
+        it("refuses deleteBranch too — a DROP there would target the parent's name", async () => {
+            await expect(managedService.deleteBranch("sweep-branch"))
+                .rejects.toBeInstanceOf(BranchingUnsupportedError);
+
+            expect(db.execute).not.toHaveBeenCalled();
+        });
+
+        it("says what to do instead, and carries a code the transports forward", async () => {
+            const error = await managedService.createBranch("x").catch((e: unknown) => e);
+
+            expect(error).toBeInstanceOf(BranchingUnsupportedError);
+            expect((error as BranchingUnsupportedError).code).toBe("BRANCHING_UNSUPPORTED");
+            // The message is the only part that tells the reader where
+            // branching *does* work; `websocket.ts` forwards it verbatim.
+            expect((error as Error).message).toContain("rebase dev --docker");
+            expect((error as Error).message).toContain("DATABASE_URL");
+        });
+
+        it("still lists branches — an empty list is honest, a failure is not", async () => {
+            (db.execute as jest.Mock).mockResolvedValue({ rows: [] });
+
+            await expect(managedService.listBranches()).resolves.toEqual([]);
         });
     });
 });

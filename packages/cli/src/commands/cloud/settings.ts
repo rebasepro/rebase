@@ -8,9 +8,8 @@
  * `check-subdomain` up front so the CLI fails with the real reason rather than a
  * generic collection error.
  */
-import arg from "arg";
 import chalk from "chalk";
-import { requireClient, requireProject, displayProjectRef, emit, printGroupHelp, keyValues, success, fail, reportError } from "./context";
+import { requireClient, requireProject, displayProjectRef, parseCloudArgs, emit, printGroupHelp, keyValues, success, fail, reportError } from "./context";
 
 interface ProjectSettings {
     id: string | number;
@@ -42,6 +41,11 @@ export async function settingsCommand(action: string | undefined, rawArgs: strin
 }
 
 async function showSettings(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud settings",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -95,19 +99,25 @@ export function buildSettingsPatch(args: {
     return patch;
 }
 
+/** What `rebase cloud settings set` parses. Its page is the group's own. */
+export const SET_SETTINGS_FLAGS = {
+    "--name": String,
+    "--subdomain": String,
+    "--repo": String,
+    "--branch": String
+} as const;
+
 async function setSettings(rawArgs: string[]): Promise<void> {
-    const args = arg(
-        {
-            "--name": String,
-            "--subdomain": String,
-            "--repo": String,
-            "--branch": String,
-            "--project": String,
-            "-p": "--project"
-        },
-        { argv: rawArgs.slice(2),
-permissive: true }
-    );
+    // `--project`/`-p` are globals and are not redeclared here; the rest is this
+    // command's own. Strict rather than permissive: `--brnach main` used to be
+    // dropped, and the command then reported "nothing to change".
+    const { flags: args } = parseCloudArgs({
+        spec: SET_SETTINGS_FLAGS,
+        rawArgs,
+        commandWords: 3, // cloud settings set
+        command: "cloud settings",
+        maxPositionals: 0
+    });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);

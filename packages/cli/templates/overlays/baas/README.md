@@ -41,9 +41,13 @@ and the database it is using. **Read that box**: the port is derived from this
 project's path rather than fixed, so several Rebase projects can run at once,
 and `PORT` in `.env` applies to `rebase start`, not here.
 
-- API: `<the printed URL>/api/data/<table>`
-- Docs: `<the printed URL>/api/swagger`
+- API: `<the printed URL>/api/data/<table>` — once a table is served
+- Docs: `<the printed URL>/api/swagger` — likewise
 - Health: `<the printed URL>/health`
+
+A headless project starts with no tables, so the first two answer
+`404 NO_COLLECTIONS` until you create one and restart — the box `rebase dev`
+prints says the same thing. See [Serving a table](#serving-a-table).
 
 There is no database to install: with no `DATABASE_URL` set, `rebase dev` runs a
 managed PostgreSQL for this project, with its data under `.rebase/`. Set

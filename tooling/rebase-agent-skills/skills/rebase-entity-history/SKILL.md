@@ -214,6 +214,8 @@ No request body is needed. The server fetches the stored `values` from the histo
 
 ### Example: Fetch and Revert via cURL
 
+`$TOKEN` is an access token — the `accessToken` a sign-in returns, or an API key.
+
 ```bash
 # List history for entity 42 in the "products" collection
 curl -H "Authorization: Bearer $TOKEN" \

@@ -2,6 +2,7 @@ import chalk from "chalk";
 
 import { describeState } from "../telemetry/consent";
 import { configPath, endpoint, previewEvent, readConfig, readProjectPolicy, setConsent } from "../telemetry";
+import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 
 /**
@@ -16,16 +17,30 @@ import { unknownCommand } from "../utils/unknown-command";
 const TELEMETRY_SUBCOMMANDS = ["status", "show", "enable", "disable"] as const;
 
 export async function telemetryCommand(rawArgs: string[]): Promise<void> {
-    const subcommand = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[0];
-
-    // Checked before the switch because the line above strips flags, so
-    // `rebase telemetry --help` reached `case undefined` and printed the status
-    // page — an answer to a question nobody asked, with the flag ignored in
-    // silence. `printHelp` already existed; nothing routed to it.
-    if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
+    // Checked before parsing, because `--help` is answered by the dispatcher
+    // and never by a handler. It used to be checked after a `filter(a =>
+    // !a.startsWith("-"))` that stripped every flag off the line, so `rebase
+    // telemetry --help` reached `case undefined` and printed the status page.
+    if (wantsHelp(rawArgs)) {
         printHelp();
         return;
     }
+
+    // Strictly, like every other family. That `filter` was not "be lenient": it
+    // deleted every `-`-prefixed token before dispatch, so `rebase telemetry
+    // --frobnicate` printed the status page and exited 0, and a mistyped
+    // `--disable` looked exactly like asking for the status. `parseCommandArgs`
+    // is the CLI's one rule for an undeclared flag, and the comment at the top
+    // of `utils/args.ts` is why: guessing that an unknown flag was meant as
+    // something else is the unsafe branch.
+    const { positionals } = parseCommandArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 1,
+        command: "telemetry",
+        maxPositionals: 1
+    });
+    const subcommand = positionals[0];
 
     switch (subcommand) {
         case "status":

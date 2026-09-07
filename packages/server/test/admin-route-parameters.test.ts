@@ -92,7 +92,7 @@ describe("GET /functions", () => {
         // `basePath` — including the default `/api`.
         const router = createFunctionRoutes(
             [{ name: "hello", app: new Hono() }] as never,
-            0,
+            [],
             "/api/functions"
         );
         // The listing needs a resolved identity; the server's auth middleware

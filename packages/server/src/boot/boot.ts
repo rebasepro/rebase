@@ -24,7 +24,7 @@ import { initializeRebaseBackend, type RebaseBackendInstance } from "../init";
 import { loadCollectionsFromDirectory } from "../collections/loader";
 import type { HonoEnv } from "../api/types";
 import { installRootErrorHandler } from "../api/root-error-handler";
-import { describeCauseChain, logger } from "../utils/logger";
+import { describeCauseChain, logger, type Logger } from "../utils/logger";
 import { serveSPA } from "../serve-spa";
 import { installShutdownHandlers } from "../init/shutdown";
 import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
@@ -32,6 +32,7 @@ import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
 import { loadBootEnv, resolveCorsOrigin, resolveEnableSwagger, type RebaseBootEnv } from "./env";
 import { resolveRole, RoleConfigurationError } from "./role";
 import { FunctionSelectionError } from "../functions/selection";
+import { CollectionConfigError } from "../collections/validate-config";
 import {
     BundleError,
     loadBundle,
@@ -389,7 +390,15 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // The schema editor rewrites collection *source* files. A bundle holds
         // compiled output, so there is nothing it could meaningfully edit —
         // and a running deployment is the last place that should be possible.
-        schemaEditor: false
+        //
+        // But this same call also serves the *source* boot that `rebase dev`
+        // runs, where the collection files are right there, and `false` there
+        // greyed out "Edit collections" on every scaffold — with no reason
+        // anywhere on screen, while the docs said the editor rewrites your
+        // TypeScript. `undefined` is not "on": it hands the decision back to
+        // `initializeRebaseBackend`, which already weighs `collectionsDir`,
+        // `baas` mode and `NODE_ENV`, and reports whichever of those said no.
+        schemaEditor: bundle.isSource ? undefined : false
     });
 
     // Restrict metric labels to collections that exist, now that they do.
@@ -803,27 +812,83 @@ export async function runFromBundle(options: BootOptions = {}): Promise<BootedRu
         }
         return booted;
     } catch (err) {
-        // Both of these are "your configuration says something that cannot
-        // work", so both get the message and the fix rather than a stack trace.
-        // The reader is looking at a container that will not start.
-        if (err instanceof BundleError || err instanceof RoleConfigurationError ||
-            err instanceof FunctionSelectionError) {
-            logger.error(err.message);
-            if (err.hint) logger.error(err.hint);
-        } else {
-            logger.error("Failed to start the Rebase runtime", {
-                error: err instanceof Error ? err : new Error(String(err))
-            });
-            // The reason is almost never in the headline. Everything a driver
-            // rethrows is a wrapper, so the sentence that says what is wrong —
-            // `connect ECONNREFUSED 10.0.0.4:5432` — is a `.cause` two links
-            // down, and putting it only in the structured payload leaves it
-            // inside an escaped JSON blob for whoever is reading `kubectl logs`
-            // on a container that will not start.
-            for (const line of describeCauseChain(err)) logger.error(line);
-        }
+        reportBootFailure(err);
         process.exit(1);
     }
+}
+
+/** The two logger methods {@link reportBootFailure} writes through. */
+export type BootFailureLog = Pick<Logger, "error" | "debug">;
+
+/**
+ * A configuration problem the project can fix, as opposed to a bug.
+ *
+ * These four have a message that IS the answer — it names the file, the key and
+ * the fix — so the fatal path prints it and nothing else. The reader is looking
+ * at a process that will not start; a stack through the framework's own frames
+ * is noise when the answer is "two of your collections claim the same slug".
+ */
+function isConfigurationFailure(err: unknown): err is Error & { hint?: string } {
+    return err instanceof BundleError
+        || err instanceof RoleConfigurationError
+        || err instanceof FunctionSelectionError
+        || err instanceof CollectionConfigError;
+}
+
+/**
+ * Say why the boot failed, in the form the reader can act on.
+ *
+ * Extracted from `runFromBundle` so it can be tested: the catch it came from
+ * ends in `process.exit(1)`, and what a dying process printed on its way out is
+ * exactly the thing nobody had a test for. `CollectionConfigError` spent a
+ * release on the wrong side of this branch, so a multi-line validator message —
+ * composed over several lines, naming both offending files — reached the author
+ * as `{"error":{"name":"Error","message":"1 problem(s) …\n\n…","stack":"… at
+ * assertCollectionConfigs (…/dist/index.es.js:727:8) …"}}`: the answer,
+ * `\n`-escaped, inside 3 KB of framework frames.
+ */
+export function reportBootFailure(
+    err: unknown,
+    log: BootFailureLog = logger,
+    env: { NODE_ENV?: string } = process.env
+): void {
+    if (isConfigurationFailure(err)) {
+        log.error(err.message);
+        if (err.hint) log.error(err.hint);
+        // Kept, and only for the reader who asks for it: the frames are the
+        // framework's, and the message already names the file.
+        if (err.stack) log.debug(err.stack);
+        return;
+    }
+
+    const failure = err instanceof Error ? err : new Error(String(err));
+    // The structured payload goes to whichever reader can use it, and only
+    // there. In production these logs are JSON and a machine parses them, so
+    // the whole error — including `error.cause`, which `troubleshooting.md`
+    // tells operators to look under — belongs on the line. In development the
+    // same object is rendered as one `JSON.stringify` at the end of the
+    // headline: a diagnosis box that carefully names the host, the port and
+    // `docker compose up -d db`, immediately followed by 3 KB of the same
+    // error with `\n`-escaped stack frames. Nobody reads that; it buries the
+    // box above it. Development gets it at `debug`.
+    if (env.NODE_ENV === "production") {
+        log.error("Failed to start the Rebase runtime", { error: failure });
+    } else {
+        // The message, not the object. `describeCauseChain` below renders only
+        // `.cause` links, so without this line an error that has no cause —
+        // `ERR_MODULE_NOT_FOUND` from a missing dependency, anything a config
+        // file throws at module scope — reaches the author as the headline and
+        // nothing else, under a dev-server that then says "fix the error above".
+        log.error(`Failed to start the Rebase runtime: ${failure.message}`);
+        log.debug("Failed to start the Rebase runtime", { error: failure });
+    }
+    // The reason is almost never in the headline. Everything a driver
+    // rethrows is a wrapper, so the sentence that says what is wrong —
+    // `connect ECONNREFUSED 10.0.0.4:5432` — is a `.cause` two links
+    // down, and putting it only in the structured payload leaves it
+    // inside an escaped JSON blob for whoever is reading `kubectl logs`
+    // on a container that will not start.
+    for (const line of describeCauseChain(err)) log.error(line);
 }
 
 

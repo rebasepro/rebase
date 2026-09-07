@@ -1,4 +1,5 @@
 ---
+sourceHash: a83732a379b7739b
 title: Déployer Rebase sur Scaleway
 description: Apprenez à déployer Rebase sur Scaleway pour une infrastructure cloud sécurisée et basée en France à l'aide de conteneurs serverless.
 sidebar_label: Scaleway
@@ -11,6 +12,21 @@ Nous recommandons d'utiliser la **Base de Données Managée** de Scaleway pour u
 ## 1. Créer une Base de Données Postgres Managée
 
 Les Bases de Données Managées de Scaleway offrent des sauvegardes automatiques et une haute disponibilité.
+
+Il n'y a **aucune image applicative à construire depuis vos sources**. `rebase build` produit un répertoire `dist-bundle` avec vos collections, fonctions et crons compilés — et, si votre projet déclare une app statique, votre frontend construit. L'image de runtime publiée l'exécute :
+
+```bash
+rebase build
+```
+
+Serverless Containers tire depuis un registre : intégrez donc le bundle dans une image dérivée. Trois lignes, et cela fige exactement ce qui tourne :
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+Mettre Rebase à niveau plus tard revient à changer cette ligne `FROM`. Votre bundle reste intact.
 
 1. Dans la Console Scaleway, allez dans **PostgreSQL**.
 2. Cliquez sur **Créer une instance de base de données**.
@@ -26,10 +42,10 @@ Les Conteneurs Serverless de Scaleway exécutent des images Docker standard. Com
 
 1. Allez dans **Container Registry** dans la Console Scaleway et créez un Namespace (par exemple, `rebase-apps`).
 2. Connectez-vous au registre depuis votre terminal local en utilisant les instructions fournies.
-3. Construisez votre application Rebase en utilisant le `Dockerfile` généré, **depuis la racine du projet** — le Dockerfile du backend a besoin de l'ensemble du workspace comme contexte de build (il copie `pnpm-workspace.yaml`, `backend/` et `config/`), donc utiliser `./backend` comme contexte échouera :
+3. Construisez et poussez depuis la racine du projet :
 
 ```bash
-docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f backend/Dockerfile .
+docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest .
 ```
 
 4. Poussez l'image :

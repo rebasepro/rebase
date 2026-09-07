@@ -1,4 +1,5 @@
 ---
+sourceHash: f52b1c720e31b72e
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud es el mismo Rebase, operado por nosotros. Qué es, cómo se vincula y despliega un proyecto, y qué no incluye todavía la beta privada.
@@ -90,6 +91,13 @@ rebase build
 rebase cloud deploy --bundle-dir dist-bundle
 ```
 
+Leaving the managed runtime is its own flag, `--eject`, and nothing else asks
+for it: a build that would move a managed project onto a container image it then
+owns is refused until you say so. `--force` used to mean this, which put the
+least reversible thing the CLI can do under the same word as "overwrite this
+file"; it is an unknown option now rather than an alias, so a script carrying it
+stops instead.
+
 Watch it:
 
 ```bash
@@ -136,14 +144,16 @@ A rollback appends a new deployment rather than rewinding history, and waits for
 the restored version to serve before reporting success. Follow it with
 `rebase cloud logs -f`.
 
-## Resources, and what they cost
+## Compute, and what it costs
 
-A project is priced from what it reserves, not from a tier. `resources` prints
-every dial and the control plane's own itemised quote for them:
+A project is priced from what it reserves, not from a tier. `compute` prints
+every dial and the control plane's own itemised quote for them. (`rebase cloud
+resources` is a different thing: the databases and buckets the code declares,
+and whether each is provisioned — see the [CLI reference](/docs/cli/#rebase-cloud).)
 
 ```bash
-rebase cloud resources
-rebase cloud resources set --cpu 500m --memory 2Gi
+rebase cloud compute
+rebase cloud compute set --cpu 500m --memory 2Gi
 ```
 
 | Dial | Unit, and what it means |
@@ -163,7 +173,7 @@ follows the platform default and moves when it moves.
 
 Nothing is validated by the CLI, on purpose — the limits belong to the cluster a
 project runs on, and they differ between providers. The control plane refuses a
-value it cannot honour and names the field. Run `rebase cloud resources` to see
+value it cannot honour and names the field. Run `rebase cloud compute` to see
 the €/month before and after; a change applies immediately, prorated from today,
 except one that restarts the database, which waits for a maintenance window.
 
@@ -182,13 +192,17 @@ except one that restarts the database, which waits for a maintenance window.
 | `db` | Attach or create a database, backups, restore, and point-in-time recovery |
 | `extensions` | The Postgres extension allowlist |
 | `storage` | The project's bucket |
-| `resources` | What the project reserves, what it costs, and how to change it |
+| `resources` | Which databases and buckets the platform holds, against what the code declares |
+| `compute` | What this project reserves, what it costs, and how to change it |
+| `clusters` | The clusters tenants run on. Platform-admin only |
 | `settings`, `orgs`, `webhooks`, `billing` | Project settings, organizations, deploy hooks, payment |
 
 Every group in that table answers `--help` with a page of its own — a usage line,
 its flags, and examples — and `--help` never runs the command. A test holds the
 index to the pages, so a group added without one fails the build rather than
-answering with the table of contents.
+answering with the table of contents. `verify:docs` holds the table itself to
+that index: every group the CLI dispatches appears here exactly once, so a group
+added without a row fails the build too.
 
 Piped, `--help` answers in JSON instead: the same usage line, flags and examples
 as a structure to read rather than sixty lines of terminal escapes.

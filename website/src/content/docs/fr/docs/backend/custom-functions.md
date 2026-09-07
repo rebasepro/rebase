@@ -1,4 +1,5 @@
 ---
+sourceHash: 65910bc3708c9f5d
 title: Fonctions Personnalisées
 sidebar_label: Fonctions Personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés à côté de vos routes CRUD Rebase. Découverts automatiquement depuis un répertoire, avec un accès complet à l'instance backend.

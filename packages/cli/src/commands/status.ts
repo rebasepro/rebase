@@ -21,10 +21,13 @@ import chalk from "chalk";
 import fs from "fs";
 import path from "path";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
-import { readEnvFile, requireProjectRoot } from "../utils/project";
+import { failAsJson, readEnvFile, requireProjectRoot } from "../utils/project";
 import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths } from "../manifest";
 import { deriveOptionsFor, deriveResourceGraph, RESOURCE_GRAPH_FILENAME, readResourceGraphFile, serializeResourceGraph } from "../resources/derive";
 import { computeStatus, type ResourceStatus } from "../resources/status";
+import { findRunningDaemon, managedUrl } from "../dev-db/daemon";
+import { resolveActiveBranch, resolveComposeUrl } from "../dev-db/prepare";
+import { resolveDevDatabase } from "../dev-db/resolve";
 import type { RebaseBackendAppConfig } from "@rebasepro/types";
 
 function usage(): void {
@@ -109,11 +112,25 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
 
     const projectRoot = requireProjectRoot();
 
+    // Every exit below has a `--json` arm, because `--json` means stdout holds
+    // one JSON object on *every* exit of the command. It used to mean that for
+    // the one failure `requireProjectRoot` owns and nothing else, so a caller
+    // parsing stdout got an envelope outside a project and an empty stream
+    // inside a broken one — the case it actually has to handle.
+    const asJson = Boolean(flags["--json"]);
+
     let backend: { name: string; app: RebaseBackendAppConfig };
     try {
         const loaded = loadManifest(projectRoot);
         const found = findBackendApp(loaded.manifest);
         if (!found) {
+            if (asJson) {
+                failAsJson(
+                    "This project declares no backend app, so it declares no resources.",
+                    "no_backend_app",
+                    "Add a backend app to rebase.json, or run `rebase apps init`."
+                );
+            }
             console.error(chalk.red("This project declares no backend app, so it declares no resources."));
             process.exitCode = 1;
             return;
@@ -121,6 +138,10 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
         backend = found;
     } catch (err) {
         if (err instanceof ManifestError) {
+            if (asJson) {
+                failAsJson(err.message, "manifest_invalid", "Fix rebase.json, then run this again.",
+                    err.issues.map(issue => ({ path: issue.path, message: issue.message })));
+            }
             console.error(chalk.red(err.message));
             for (const issue of err.issues) console.error(`  ${chalk.gray(issue.path)} ${issue.message}`);
             process.exitCode = 1;
@@ -134,6 +155,14 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
 
     const { graph, issues } = await deriveResourceGraph(deriveOptionsFor(projectRoot, backendApp));
     if (issues.length > 0) {
+        if (asJson) {
+            failAsJson(
+                `${issues.length} problem(s) in the declared resources.`,
+                "resource_declaration_invalid",
+                "Fix the declarations the issues name, then run this again.",
+                issues.map(issue => ({ path: issue.path, message: issue.message }))
+            );
+        }
         console.error(chalk.red(`\n✗ ${issues.length} problem(s) in the declared resources:\n`));
         for (const issue of issues) console.error(`  ${chalk.bold(issue.path)}  ${issue.message}`);
         console.error("");
@@ -146,16 +175,38 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
     // developer happens to be standing in is not that.
     const env = readEnvFile(projectRoot);
 
+    // Which database this project is on, decided by the same ordered rule
+    // `rebase dev` and `rebase db url` use — and read from the same `.env`, not
+    // from this shell, for the reason above.
+    //
+    // Nothing is started. `status` is a question, and a question that boots a
+    // 180 MB Postgres to answer itself is a different command. So a managed
+    // database that is not running is reported as exactly that, rather than as
+    // a project with no database — which is what this view used to say while
+    // `rebase db url` printed a working connection string for it.
+    const production = env.NODE_ENV === "production";
+    const database = resolveDevDatabase({
+        env: {},
+        envFile: env,
+        branch: resolveActiveBranch(projectRoot, env),
+        composeUrl: resolveComposeUrl(projectRoot, env)
+    });
+    const daemon = database.kind === "managed" ? await findRunningDaemon(projectRoot) : null;
+    const managedDatabase = !production && database.kind === "managed"
+        ? { url: daemon ? managedUrl(daemon.port) : null }
+        : undefined;
+
     const server = await import("@rebasepro/server");
     const { resources, blocked } = computeStatus(graph, env, {
         resolverFor: server.resourceResolver as never,
         resolveDataSources: server.resolveDataSources as never,
         // Judged as production when the .env says so; a stand-in local
         // directory for an unbound bucket is only ever offered to development.
-        production: env.NODE_ENV === "production"
+        production,
+        ...(managedDatabase ? { managedDatabase } : {})
     });
 
-    if (flags["--json"]) {
+    if (asJson) {
         console.log(JSON.stringify({ backend: backendName, runtime: backendApp.runtime, resources, blocked }, null, 2));
         return;
     }

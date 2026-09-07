@@ -76,6 +76,13 @@ const GLOBS = [
     "tooling/scripts/**/*.sh",
     "tooling/scripts/**/*.mts",
     "tooling/rebase-agent-skills/**/*.md",
+    // MCP-registry manifests. `packages/mcp/server.json` sat on `0.16.0` two
+    // releases after that stopped being the version, and nothing referenced it
+    // — not `files` in its own package.json, not a workflow, not a script — so
+    // it was deleted rather than fixed. This glob is why re-adding one costs
+    // nothing to keep honest: a `version` that lags is a finding on the commit
+    // that adds it, not on the day somebody tries to publish it.
+    "packages/*/server.json",
     "examples/*/*.md",
     "README.md",
     ".agent/workflows/*.md"

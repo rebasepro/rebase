@@ -116,11 +116,71 @@ const bootEnvExtension = z.object({
     /** Comma-separated: register, login, forgotPassword, magicLink, emailOtp. */
     CAPTCHA_ROUTES: z.string().optional(),
     AUTH_COOKIE_SAME_SITE: z.enum(["Strict", "Lax", "None", ""]).optional(),
+    /**
+     * `Secure` on the refresh cookie. On by default, and the only way off.
+     *
+     * The flag used to be inferred from the request's protocol, which
+     * `@hono/node-server` reads from the socket — so behind a TLS-terminating
+     * proxy, the normal production topology, the server saw `http` and shipped a
+     * months-lived credential in cleartext. Inverting it closed that, and left
+     * one real deployment with nowhere to go: a bundle served over plain http on
+     * a LAN address, where the browser drops a `Secure` cookie and the session
+     * dies silently at the access token's expiry.
+     *
+     * So the escape hatch is an environment variable rather than a header,
+     * because `X-Forwarded-Proto` is written by whoever is talking to us and a
+     * request must never be able to downgrade this. Setting it to `false` warns
+     * at boot: it is a deliberate, and rare, decision.
+     */
+    AUTH_COOKIE_SECURE: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
     AUTH_DEFAULT_ROLE: z.string().optional(),
+
+    /**
+     * OAuth providers, one `<PROVIDER>_CLIENT_ID` / `_CLIENT_SECRET` pair each.
+     *
+     * Every provider `packages/server/src/auth/*-oauth.ts` ships has a pair
+     * here, and `oauth-env-coverage.test.ts` fails when one gains a factory and
+     * not a pair. Three of the twelve had one; setting `DISCORD_CLIENT_ID` on a
+     * managed deployment did nothing at all — the key was not in this schema, so
+     * `GET /api/auth/config` kept answering `"enabledProviders":[]` and nothing
+     * was logged. A bundle deployment has no other way in: its config object is
+     * built by `resolveAuthOptions`, and `BundleConfigExports` carries no `auth`
+     * field for a project to override it with.
+     *
+     * `GOOGLE_CLIENT_ID` / `_SECRET` are in the base schema (`src/env.ts`) for
+     * historical reasons and are read the same way.
+     */
     GITHUB_CLIENT_ID: z.string().optional(),
     GITHUB_CLIENT_SECRET: z.string().optional(),
     MICROSOFT_CLIENT_ID: z.string().optional(),
     MICROSOFT_CLIENT_SECRET: z.string().optional(),
+    LINKEDIN_CLIENT_ID: z.string().optional(),
+    LINKEDIN_CLIENT_SECRET: z.string().optional(),
+    FACEBOOK_CLIENT_ID: z.string().optional(),
+    FACEBOOK_CLIENT_SECRET: z.string().optional(),
+    TWITTER_CLIENT_ID: z.string().optional(),
+    TWITTER_CLIENT_SECRET: z.string().optional(),
+    DISCORD_CLIENT_ID: z.string().optional(),
+    DISCORD_CLIENT_SECRET: z.string().optional(),
+    GITLAB_CLIENT_ID: z.string().optional(),
+    GITLAB_CLIENT_SECRET: z.string().optional(),
+    BITBUCKET_CLIENT_ID: z.string().optional(),
+    BITBUCKET_CLIENT_SECRET: z.string().optional(),
+    SLACK_CLIENT_ID: z.string().optional(),
+    SLACK_CLIENT_SECRET: z.string().optional(),
+    SPOTIFY_CLIENT_ID: z.string().optional(),
+    SPOTIFY_CLIENT_SECRET: z.string().optional(),
+    /**
+     * Apple is the one provider with no static client secret: Apple wants a
+     * short-lived ES256 JWT, which `createAppleProvider` signs from these three.
+     * So `APPLE_CLIENT_SECRET` does not exist, and all four keys are required
+     * together — three of them is a provider that cannot mint a secret, which is
+     * why `resolveAuthOptions` configures Apple only when it has all of them.
+     */
+    APPLE_CLIENT_ID: z.string().optional(),
+    APPLE_TEAM_ID: z.string().optional(),
+    APPLE_KEY_ID: z.string().optional(),
+    APPLE_PRIVATE_KEY: z.string().optional(),
 
     // ── API surface ──────────────────────────────────────────────────────────
     REBASE_BASE_PATH: z.string().default("/api"),
@@ -227,13 +287,6 @@ const bootEnvExtension = z.object({
 
 export type RebaseBootEnv = RebaseEnv & z.infer<typeof bootEnvExtension>;
 
-/**
- * Load and validate the environment for a bundle boot.
- *
- * Does not read `.env` files — that is the deployment's job (a container gets
- * real environment variables; `rebase dev` and `rebase start` load dotenv before
- * calling in).
- */
 /** One entry of a ZodError, narrowed to the parts this file reads. */
 interface BootEnvIssue {
     path?: (string | number)[];
@@ -261,6 +314,13 @@ function isMissingVariable(issue: BootEnvIssue): boolean {
     return issue.code === "invalid_type" && /received undefined$/.test(issue.message ?? "");
 }
 
+/**
+ * Load and validate the environment for a bundle boot.
+ *
+ * Does not read `.env` files — that is the deployment's job (a container gets
+ * real environment variables; `rebase dev` and `rebase start` load dotenv before
+ * calling in).
+ */
 export function loadBootEnv(): RebaseBootEnv {
     try {
         return loadEnv({ extend: bootEnvExtension }) as RebaseBootEnv;
@@ -304,7 +364,6 @@ export function isLocalhostOrigin(origin: string): boolean {
     }
 }
 
-/** A CORS origin resolver of the shape Hono's `cors()` middleware expects. */
 /**
  * Whether this process serves the OpenAPI docs.
  *
@@ -323,6 +382,7 @@ export function resolveEnableSwagger(env: RebaseBootEnv): boolean | undefined {
     return env.NODE_ENV === "production" ? false : undefined;
 }
 
+/** A CORS origin resolver of the shape Hono's `cors()` middleware expects. */
 export type CorsOriginResolver = (origin: string) => string | null;
 
 /**

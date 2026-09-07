@@ -17,7 +17,7 @@ rewrites TypeScript with ts-morph and supports `saveProperty`,
 `schema-editor-routes.ts` expose it.
 
 It is disabled under `NODE_ENV=production`, for an honest reason stated at
-[`init.ts:1495`](../packages/server/src/init.ts):
+[`init.ts:1495`](../../packages/server/src/init.ts):
 
 > The schema editor is off under `NODE_ENV=production`: it edits collection
 > source files, and a deployed server's files are rebuilt from your repository
@@ -182,7 +182,7 @@ cannot have it until that plumbing does.
 ### The bundle path stays immutable, deliberately
 
 The documented default for self-hosting is `rebase build` → `dist-bundle` →
-`docker run`, and [`boot.ts`](../packages/server/src/boot/boot.ts) hard-codes
+`docker run`, and [`boot.ts`](../../packages/server/src/boot/boot.ts) hard-codes
 `schemaEditor: false` there. Its comment is right: a bundle is compiled output,
 so there is nothing for an editor to write.
 

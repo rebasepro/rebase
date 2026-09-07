@@ -1,4 +1,5 @@
 ---
+sourceHash: 480ba165906124fe
 title: Ansichtsmodi
 sidebar_label: Ansichtsmodi
 description: Konfigurieren Sie Tabellen-, Karten- und Kanban-Board-Ansichten für Ihre Sammlungen.
@@ -19,10 +20,20 @@ Jede Sammlung kann in vier Ansichtsmodi angezeigt werden:
 import { defineCollection } from "@rebasepro/cms-types";
 const productsCollection = defineCollection({
     slug: "products",
-    properties: { /* … */ },
+    // `orderProperty` und `kanban.columnProperty` werden gegen diese
+    // Schlüssel geprüft — bei leerem `properties`-Block verengen sie sich zu `never`.
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        status: { name: "Status", type: "string" },
+        // Der Sortierschlüssel. Ein *String*, nie eine Zahl — siehe „Sortierung“ unten.
+        __order: {
+            name: "Order",
+            type: "string",
+            admin: { disabled: true, hideFromCollection: true }
+        }
+    },
     name: "Products",
     table: "products",
-    // ...
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
@@ -37,13 +48,9 @@ const productsCollection = defineCollection({
 
 ## Listenansicht
 
-![Screenshot-Platzhalter für Listenansicht](/img/features/list-view.png)
-
 Die Listenansicht ist der klassische, saubere CMS-Standardansichtsmodus, der Entitäten in einem unkomplizierten Listenformat ohne die Dichte einer Tabelle darstellt.
 
 ## Tabellenansicht
-
-![Screenshot-Platzhalter für Tabellenansicht](/img/features/table-view.png)
 
 Die Standardansicht ist eine hochleistungsfähige virtualisierte Tabelle mit:
 
@@ -68,8 +75,6 @@ Steuern Sie die Zeilenhöhe mit `defaultSize`:
 | `"xl"` | 260 | Vorschauen von Rich Media Inhalten |
 
 ## Kanban-Ansicht
-
-![Screenshot-Platzhalter für Kanban-Ansicht](/img/features/kanban-view.png)
 
 Konfigurieren Sie ein Kanban-Board, indem Sie festlegen, welche Enum-Eigenschaft als Spalten verwendet werden soll:
 
@@ -150,8 +155,10 @@ demselben Alphabet wie der Admin:
 import { generateKeyBetween } from "fractional-indexing";
 
 // Base36, Kleinbuchstaben. Sortiert wird von Postgres, dessen Standard-Collation
-// keine Byte-Ordnung ist: Lässt man dieses dritte Argument weg, entstehen
-// base62-Schlüssel wie "a0", die das Board ablehnt.
+// keine Byte-Ordnung ist; deshalb sortiert das base62-Standardalphabet der
+// Bibliothek — das Groß- und Kleinschreibung mischt — in der Datenbank anders als
+// im Schlüssel. Lässt man dieses dritte Argument weg, entstehen Schlüssel wie
+// "a0", die das Board ablehnt.
 const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 const tasks = client.data.collection("tasks");
@@ -168,13 +175,20 @@ const { data: last } = await tasks.find({
 await tasks.create({
     title,
     status,
-    __order: generateKeyBetween(last[0]?.__order ?? null, null, ORDER_KEY_DIGITS)
+    __order: generateKeyBetween(
+        (last[0]?.__order as string | undefined) ?? null,
+        null,
+        ORDER_KEY_DIGITS
+    )
 });
 ```
 
-## Kartenansicht
+Auch über das Admin-Formular angelegte Zeilen kommen ohne Schlüssel an — der
+Unterschied ist nur, dass Sie den Balken in dem Moment sehen, in dem Sie eine
+hinzufügen. Dort ist **Initialize** die Lösung; auf einem Board, das ein Backend
+befüllt, ist es eine Lösung, die sich bei jedem Lauf selbst rückgängig macht.
 
-![Screenshot-Platzhalter für Kartenansicht](/img/features/cards-view.png)
+## Kartenansicht
 
 Karten zeigen Entitäten als visuelle Karten an – nützlich für inhaltsreiche Inhalte mit vielen Bildern:
 

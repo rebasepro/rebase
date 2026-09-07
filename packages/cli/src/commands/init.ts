@@ -764,6 +764,19 @@ async function createProject(options: InitOptions) {
     }
 
     console.log("");
+    // Both halves of the first-admin rule, once, here.
+    //
+    // `init` has just written REBASE_ADMIN_EMAIL and a generated password into
+    // `.env`, and they belong to the *production* boot — the compose stack, where
+    // the first-registration window is shut. `rebase dev` reads the same file, so
+    // without this line the honest reading of that `.env` is "these are my
+    // credentials", and the first documented step (register, become the admin)
+    // reads as broken.
+    console.log(chalk.gray("  # Sign in: the first account you register becomes the admin."));
+    console.log(chalk.gray("  # In production (docker compose) that window is shut and the account named by"));
+    console.log(chalk.gray("  # REBASE_ADMIN_EMAIL in .env is created at boot instead."));
+
+    console.log("");
     // `--headless --introspect` had these two claims fighting: the step above
     // announced "collections generated!" and this line then said there are none.
     // Both were reachable at once, and the reader has to believe one of them.
@@ -1289,11 +1302,14 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             envContent,
             "REBASE_ADMIN_EMAIL",
             "admin@example.com",
-            "# ── The first admin account ─────────────────────────────────────────\n" +
-            "# In production the first account to register is NOT promoted to admin,\n" +
-            "# so the operator names it here instead. Created once, while the user\n" +
-            "# table is empty. Change the email to yours, sign in, and change the\n" +
-            "# password below."
+            "# ── The first admin account, in production only ──────────────────────\n" +
+            "# `rebase dev` ignores both of these: on a laptop the first account to\n" +
+            "# register becomes the admin, and it says so at boot. In production —\n" +
+            "# `docker compose up`, or anything with NODE_ENV=production — that\n" +
+            "# window is shut, because the server answers on a hostname before you\n" +
+            "# have typed anything. So the operator names the account here instead.\n" +
+            "# Created once, while the user table is empty. Change the email to\n" +
+            "# yours, sign in, and change the password below."
         );
         envContent = setEnvValue(envContent, "REBASE_ADMIN_PASSWORD", adminPassword);
 

@@ -1,4 +1,5 @@
 ---
+sourceHash: 6bc50ef7860bac7d
 title: Offline & Local-First-Sync
 sidebar_label: Offline
 description: Aktivieren Sie die Local-First-Sync-Engine des Rebase Client SDK — eine lokale Zeilendatenbank, sofortige Offline-Schreibvorgänge mit Rollback und reaktive Live-Abfragen.
@@ -67,7 +68,9 @@ const post = await client.data.posts.create({ title: "Draft", status: "draft" })
 const drafts = await client.data.posts.where("status", "==", "draft").find();
 ```
 
-Offline erstellte Zeilen erhalten eine vom Client generierte ID. Vergibt der Server beim Wiederholen seine eigene, werden die lokale Zeile und alle eingereihten Schreibvorgänge, die noch auf die temporäre ID zeigen, auf die echte umgezogen.
+Offline erstellte Zeilen erhalten eine vom Client generierte ID, und zwar in dem Typ, den die IDs der Sammlung bereits haben: eine **negative ganze Zahl**, wo sie Zahlen sind, eine UUID-Zeichenkette, wo sie Zeichenketten sind. Das Vorzeichen ist das Erkennungsmerkmal — ein echter Schlüssel ist nie negativ —, sodass eine Zeile, die den Server noch nicht erreicht hat, ohne Nachschlagen erkennbar ist und `id` weiterhin dem entspricht, was der generierte `Row`-Typ sagt. Bei einer Sammlung, die dieses Gerät noch nie gelesen hat, gibt es lokal nichts, woran sich der Typ ablesen ließe; dann ist die ID eine UUID.
+
+Vergibt der Server beim Wiederholen seine eigene, werden die lokale Zeile und alle eingereihten Schreibvorgänge, die noch auf die temporäre ID zeigen, auf die echte umgezogen. Bis dahin sollten Sie eine temporäre ID nirgends außerhalb der Offline-Datenbank speichern — ein Fremdschlüssel oder eine gespeicherte URL mit einer solchen ID zeigt auf eine Zeile, die gleich umnummeriert wird.
 
 Schreibvorgänge werden in der Reihenfolge wiederholt, in der Sie sie getätigt haben, collection-übergreifend — ein Create in einer Collection landet also weiterhin vor der Zeile in einer anderen, die darauf verweist.
 

@@ -88,6 +88,17 @@ const NOT_OURS = new Map([
     ["REBASE_RESET_EMAIL", "a test hook for `rebase auth reset-password`"],
     ["REBASE_RESET_PASSWORD", "a test hook for `rebase auth reset-password`"],
     ["REBASE_DEV_PROJECT_ROOT", "set by `rebase dev` for the child process it spawns"],
+    // `--port` is known in the CLI and needed in the server, and the child's
+    // environment is the only channel between them. Nobody sets it by hand; a
+    // reader who did would be telling the server a port was named when it was
+    // derived, and turning a harmless walk into a boot failure.
+    ["REBASE_DEV_PORT_EXPLICIT", "set by `rebase dev` for the backend it spawns"],
+    // The CLI resolves which database this project is on — a pure decision, no
+    // daemon started — and tells the driver, so the driver's own text can stop
+    // recommending `rebase db generate` on a database that refuses it. Nobody
+    // sets it; a reader who did would only be lying to the driver about which
+    // database they are on.
+    ["REBASE_DEV_DATABASE_KIND", "set by the CLI for the driver child it spawns"],
     ["REBASE_JSON", "set by the CLI for its own subprocesses"],
     // Only in the frozen 0.17.3 `bucket` literal in resource_kinds.ts; the
     // runtime binds from the amendment, which the page documents.
@@ -190,6 +201,16 @@ export function checkEnvReads(root = DEFAULT_ROOT) {
         }
 
         for (const m of source.matchAll(/\benv\.([A-Z][A-Z0-9_]*)\b/g)) {
+            if (NAME.test(m[1])) record(m[1], file);
+        }
+
+        // `hostEnv().NAME` — a function that hands back the environment, read
+        // in place. A fourth shape, and the one that got away: the logger's
+        // `REBASE_LOG_RAW_QUERIES` is the only thing that un-redacts a failed
+        // statement, and every DDL, RLS and CDC failure ends at that marker.
+        // It matched none of the three patterns above, so the gate reported
+        // "all documented" while the page had never named it.
+        for (const m of source.matchAll(/\b[A-Za-z_$][\w$]*[Ee]nv\(\s*\)\s*\.\s*([A-Z][A-Z0-9_]*)\b/g)) {
             if (NAME.test(m[1])) record(m[1], file);
         }
 

@@ -6,8 +6,7 @@
  * brief pause in between (a real stop→start with genuine downtime). Stop and
  * restart cause downtime, so they require `--yes` in non-interactive use.
  */
-import arg from "arg";
-import { requireClient, requireProject, displayProjectRef, emit, confirmDestructive, success, reportError, type CloudClient } from "./context";
+import { requireClient, requireProject, displayProjectRef, parseCloudArgs, emit, confirmDestructive, success, reportError, type CloudClient } from "./context";
 
 type PowerAction = "start" | "stop" | "restart";
 
@@ -16,11 +15,17 @@ async function setStatus(client: CloudClient, projectId: string, status: "active
 }
 
 export async function powerCommand(action: PowerAction, rawArgs: string[]): Promise<void> {
-    const args = arg({ "--yes": Boolean,
-"-y": "--yes",
-"--project": String,
-"-p": "--project" }, { argv: rawArgs.slice(2),
-permissive: true });
+    // Every key here is a global, so the spec is empty — declaring one would
+    // replace the global in the merge while the global's other readers went on
+    // reading the raw line. Strict rather than permissive: `stop --yse` used to
+    // drop the flag and then refuse off a terminal for want of it.
+    const { flags: args } = parseCloudArgs({
+        spec: {},
+        rawArgs,
+        commandWords: 2, // cloud start|stop|restart
+        command: `cloud ${action}`,
+        maxPositionals: 0
+    });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);

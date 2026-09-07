@@ -60,7 +60,7 @@ describe("logger redaction", () => {
         logger.error("Insert failed", { error: failingQuery() });
 
         for (const secret of SECRETS) expect(output()).not.toContain(secret);
-        expect(output()).toContain("Failed query: [redacted]");
+        expect(output()).toContain("Failed query: [redacted — set REBASE_LOG_RAW_QUERIES=true in development to see it]");
     });
 
     it("strips them from the message as well as the data", () => {
@@ -157,7 +157,7 @@ describe("logger redaction", () => {
             // Fail closed: a statement of unknown extent is treated as
             // sensitive rather than guessed at.
             expect(redactSensitiveText("Failed query: select * from users where email = 'a@b.c'"))
-                .toBe("Failed query: [redacted]");
+                .toBe("Failed query: [redacted — set REBASE_LOG_RAW_QUERIES=true in development to see it]");
         });
 
         it("redacts every occurrence, not just the first", () => {

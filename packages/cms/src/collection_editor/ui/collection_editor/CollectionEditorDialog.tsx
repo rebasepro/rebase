@@ -31,7 +31,8 @@ import {
     LoadingButton,
     Tab,
     Tabs,
-    Tooltip
+    Tooltip,
+    Typography
 } from "@rebasepro/ui";
 import { EngineProperties, Entity, getDataSourceCapabilities, MapProperty, Properties, Property, TableMetadata, User } from "@rebasepro/types";
 import { PropertyConfig, AdminCollection } from "@rebasepro/cms-types";
@@ -763,8 +764,21 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                         {fullScreen && !isNewCollection && (
                             <div className="flex items-center gap-2">
                                 {/* "(Read-only)" says the button will not work but not why.
-                                    The controller now carries the backend's own reason —
-                                    production, `baas` mode, no `collectionsDir` — so show it. */}
+                                    The controller carries the backend's own reason —
+                                    production, `baas` mode, no `collectionsDir`, no
+                                    `ts-morph` — so show it, on screen and not only under
+                                    a hover: a reason nobody finds is a reason nobody has.
+                                    Full text in the tooltip, because these run long. */}
+                                {configController?.readOnly && (
+                                    <Typography
+                                        variant="caption"
+                                        color="secondary"
+                                        className="max-w-[28rem] truncate"
+                                        title={readOnlyTitle}
+                                    >
+                                        {readOnlyTitle}
+                                    </Typography>
+                                )}
                                 <Tooltip title={configController?.readOnly ? readOnlyTitle : undefined}>
                                     <div>
                                         <LoadingButton

@@ -147,8 +147,21 @@ export class RebaseApiError extends Error {
  * @group Errors
  */
 export class RebaseClientError extends RebaseApiError {
-    constructor(message: string) {
-        super(message);
+    /**
+     * `init` is the same one {@link RebaseApiError} takes, and it is what makes
+     * `code` reachable at all.
+     *
+     * The constructor used to accept a message and nothing else, so every
+     * client-side failure — an undefined filter value, an unknown accessor,
+     * `listen()` on a client built with `realtime: false`, a function name with
+     * a `/` in it, `refreshSession()` while signed out — arrived with `code ===
+     * undefined`. The documented `switch (e.code)` in this file's own example
+     * fell to `default: throw e` for all of them, and the only client-side error
+     * that *did* carry a code was `OFFLINE`, because that one path minted a
+     * `RebaseApiError` instead.
+     */
+    constructor(message: string, init: RebaseErrorInit = {}) {
+        super(message, init);
         this.name = "RebaseClientError";
     }
 }
@@ -179,7 +192,10 @@ const UNSUPPORTED_METHOD = Symbol.for("rebase.unsupportedMethod");
  */
 export function unsupportedMethod<F>(message: string): F {
     const stub = (): never => {
-        throw new RebaseClientError(message);
+        // The two reasons a method is a stub — `realtime: false`, and a driver
+        // with no `listenCollection` — are one thing to a caller: this client
+        // cannot do realtime. One code covers both, and the message says which.
+        throw new RebaseClientError(message, { code: "REALTIME_DISABLED" });
     };
     (stub as unknown as Record<symbol, boolean>)[UNSUPPORTED_METHOD] = true;
     return stub as unknown as F;

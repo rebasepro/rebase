@@ -2,7 +2,10 @@
     "mcpServers": {
         "rebase": {
             "command": "npx",
-            "args": ["-y", "@rebasepro/mcp"]
+            "args": ["-y", "@rebasepro/mcp"],
+            "env": {
+                "REBASE_PROJECT_DIR": "."
+            }
         }
     }
 }

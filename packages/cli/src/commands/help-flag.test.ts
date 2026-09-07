@@ -84,7 +84,14 @@ vi.mock("../dev-db/prepare", () => ({
         database: { kind: "external" as const, url: "postgresql://u@127.0.0.1:5432/db", source: "env-file" as const },
         description: "the configured database"
     })),
-    managedNotices: () => []
+    managedNotices: () => [],
+    // The same "external", said the pure way: `devDatabaseKind` decides without
+    // starting anything, and every command that spawns the driver passes the
+    // answer down so the driver's own text can branch on it.
+    DEV_DATABASE_KIND_ENV: "REBASE_DEV_DATABASE_KIND",
+    devDatabaseKind: () => "external" as const,
+    resolveActiveBranch: () => null,
+    resolveComposeUrl: () => null
 }));
 
 import { apiKeysCommand } from "./api-keys";
@@ -119,6 +126,10 @@ let fetchSpy: ReturnType<typeof vi.fn>;
 let exitSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
+    // Module mocks keep their call history across tests in a file, and every
+    // assertion here is "this door was not used" — which a call from three
+    // tests ago satisfies just as well as a call from this one.
+    vi.clearAllMocks();
     projectRootLookups = 0;
     scratch = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-help-"));
     // `.claude/` is what `skills install` detects — without it the install has
@@ -237,5 +248,113 @@ describe("--help never runs the command", () => {
         // matched too eagerly would disable `db push` instead of fixing help.
         await dbCommand("push", argv("db", "push"));
         expect(execaSpy).toHaveBeenCalled();
+    });
+
+    it("rebase db url --help prints a page and starts no database", async () => {
+        await dbCommand("url", argv("db", "url", "--help"));
+
+        expect(prepareSpy).not.toHaveBeenCalled();
+        expect(exitSpy).not.toHaveBeenCalled();
+    });
+});
+
+describe("a flag nobody declared is refused", () => {
+    /**
+     * `db url` is answered CLI-side, before the driver — where the `db`
+     * family's strictness lives — is ever spawned. So it accepted anything:
+     * `rebase db url --bogus` printed the URL and exited 0, and so did
+     * `rebase db url --json`, which is the one that costs something. A flag
+     * that looks like it asks for a different output format, silently ignored,
+     * hands a script a bare string it will try to parse as JSON.
+     */
+    it.each([["--bogus"], ["--json"], ["--verbose"]])("rebase db url %s", async (flag) => {
+        await expect(dbCommand("url", argv("db", "url", flag))).rejects.toThrow(/unknown or unexpected option/i);
+
+        // Refused before anything is started, not after.
+        expect(prepareSpy).not.toHaveBeenCalled();
+    });
+
+    it("still accepts the two flags db url does take", async () => {
+        // Getting as far as resolving a database is the assertion: the parse
+        // accepted the flag. (This fixture's resolver names none, so the
+        // command then exits over that, which is a different test's subject.)
+        await dbCommand("url", argv("db", "url", "--database-url", "postgres://u@h/db")).catch(() => {});
+        expect(prepareSpy).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ flagUrl: "postgres://u@h/db" })
+        );
+    });
+});
+
+describe("a subcommand nobody implemented is refused before a database starts", () => {
+    /**
+     * `rebase db psh` used to reach `runDriverDbCommand`, which resolves the
+     * database first — so it **booted the managed PGlite**, a 180 MB daemon, to
+     * hand the driver an argv it then rejected with `Unknown db command. Valid:
+     * push, generate, migrate, branch, backup, restore, backups`: a list
+     * missing `url`, `pull`, `stop` and `reset`, all four of which
+     * `rebase db --help` lists and the CLI implements itself.
+     *
+     * `rebase schema genrate` was worse — the driver answered with the bare
+     * line `Unknown schema command.`, no list and no pointer, for a family with
+     * three subcommands.
+     */
+    const said = () =>
+        (console.error as unknown as ReturnType<typeof vi.fn>).mock.calls.map(c => c.join(" ")).join("\n");
+
+    it("names the CLI's own db subcommands, which the driver cannot know about", async () => {
+        await expect(dbCommand("psh", argv("db", "psh"))).rejects.toThrow("process.exit(1)");
+
+        expect(prepareSpy).not.toHaveBeenCalled();
+        expect(execaSpy).not.toHaveBeenCalled();
+        expect(said()).toContain("did you mean `push`");
+        expect(said()).toContain("rebase db --help");
+    });
+
+    it.each([["url"], ["pull"], ["stop"], ["reset"]])("still accepts `db %s`", async (action) => {
+        // The four the driver's list omitted. Getting past the guard is the
+        // assertion; what each then does with this fixture is its own business.
+        await dbCommand(action, argv("db", action)).catch(() => {});
+
+        expect(said()).not.toContain("Unknown db command");
+    });
+
+    it("answers a schema typo with the list and a pointer", async () => {
+        await expect(schemaCommand("genrate", argv("schema", "genrate"))).rejects.toThrow("process.exit(1)");
+
+        expect(execaSpy).not.toHaveBeenCalled();
+        expect(said()).toContain("did you mean `generate`");
+        expect(said()).toContain("rebase schema --help");
+    });
+});
+
+/**
+ * An unknown flag is a typo, and a typo must cost nothing.
+ *
+ * `skills install` read only `--agent`/`-a` off the line and ignored every
+ * other token, so `rebase skills install --frobnicate --agent claude` exited 0
+ * after writing 21 skill files — while `rebase apps list --frobnicate` exits 1.
+ * One CLI, one policy: `parseCommandArgs` rejects it before the first write.
+ */
+describe("rebase skills rejects an unknown flag before writing anything", () => {
+    it("refuses --frobnicate and writes no file", async () => {
+        await expect(
+            skillsCommand("install", argv("skills", "install", "--frobnicate", "--agent", "claude"))
+        ).rejects.toThrow(/unknown or unexpected option/i);
+
+        expect(filesUnder(path.join(scratch, ".claude"))).toEqual([]);
+    });
+
+    it("refuses a stray positional and writes no file", async () => {
+        await expect(
+            skillsCommand("install", argv("skills", "install", "claude"))
+        ).rejects.toThrow(/takes 0 arguments/);
+
+        expect(filesUnder(path.join(scratch, ".claude"))).toEqual([]);
+    });
+
+    it("still installs when the line is right", async () => {
+        await skillsCommand("install", argv("skills", "install", "--agent", "claude"));
+        expect(filesUnder(path.join(scratch, ".claude")).length).toBeGreaterThan(0);
     });
 });

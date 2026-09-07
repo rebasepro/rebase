@@ -95,6 +95,10 @@ export function MultiSelectFieldBinding({
                 // the box, or it will not line up with its neighbour.
                 className={"w-full"}
                 size={size}
+                // Same reason as `SelectFieldBinding`: the label is an element,
+                // so without this the name is whatever chips happen to be
+                // selected — and nothing at all on an empty field.
+                aria-label={property.name ?? propertyKey}
                 value={validValue ? value.map((v) => v?.toString()) : []}
                 disabled={disabled}
                 modalPopover={true}

@@ -41,6 +41,7 @@ import { checkMarketingSnippets } from "./docs-verify/check-marketing-snippets.m
 import { checkDocCommands } from "./docs-verify/check-doc-commands.mjs";
 import { checkAgentBundle } from "./docs-verify/check-agent-bundle.mjs";
 import { checkProseTypes } from "./docs-verify/check-prose-types.mjs";
+import { checkPortableImports } from "./docs-verify/check-portable-imports.mjs";
 import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
 import { checkEnvReads } from "./docs-verify/check-env-reads.mjs";
@@ -49,12 +50,15 @@ import { checkUpgradeCoverage } from "./docs-verify/check-upgrade-coverage.mjs";
 import { checkRlsCheckCount } from "./docs-verify/check-rls-check-count.mjs";
 import { checkErrorCodes } from "./docs-verify/check-error-codes.mjs";
 import { checkMcpToolTables } from "./docs-verify/check-mcp-tool-tables.mjs";
+import { checkCloudSurface } from "./docs-verify/check-cloud-surface.mjs";
 import { checkAiInstructions } from "./docs-verify/check-ai-instructions.mjs";
 import { checkSkillClaims } from "./docs-verify/check-skill-claims.mjs";
 import { checkRlsCheckFlags } from "./docs-verify/check-rls-check-flags.mjs";
 import { checkUnreleasedBadges } from "./docs-verify/check-unreleased-badges.mjs";
 import { checkDocsLinks } from "./docs-verify/check-docs-links.mjs";
 import { checkTranslationFreshness } from "./docs-verify/check-translation-freshness.mjs";
+import { checkConfigExports } from "./docs-verify/check-config-exports.mjs";
+import { checkChangelogSections } from "./docs-verify/check-changelog-sections.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -83,6 +87,7 @@ if (asJson) {
         out.docCommands = checkDocCommands(ROOT).findings;
         out.agentBundle = checkAgentBundle(ROOT).findings;
         out.proseTypes = checkProseTypes(ROOT).findings;
+        out.portableImports = checkPortableImports(ROOT).findings;
         out.versionPins = checkVersionPins(ROOT).findings;
         out.envReference = checkEnvReference(ROOT).findings;
         out.envReads = checkEnvReads(ROOT).findings;
@@ -90,11 +95,14 @@ if (asJson) {
         out.upgradeCoverage = checkUpgradeCoverage(ROOT).findings;
         out.errorCodes = checkErrorCodes(ROOT).findings;
         out.mcpToolTables = checkMcpToolTables(ROOT).findings;
+        out.cloudSurface = checkCloudSurface(ROOT).findings;
         out.aiInstructions = checkAiInstructions(ROOT).findings;
         out.skillClaims = checkSkillClaims(ROOT).findings;
         out.unreleasedBadges = checkUnreleasedBadges(ROOT).findings;
         out.docsLinks = checkDocsLinks(ROOT).findings;
-        out.translationFreshness = checkTranslationFreshness(ROOT).findings;
+        out.translationFreshness = checkTranslationFreshness(ROOT, { strict }).findings;
+        out.configExports = checkConfigExports(ROOT).findings;
+        out.changelogSections = checkChangelogSections(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -181,7 +189,9 @@ if (only === "both" || only === "names") {
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} breaking release(s) missing from the upgrade guide:${NC}`);
-        for (const b of bad) console.log(`  ${RED}${b.version}${NC} ${DIM}(${b.entries} breaking section)${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.version}${NC} ${DIM}${b.reason ?? `(${b.entries} breaking section)`}${NC}`);
+        }
     }
 }
 
@@ -200,10 +210,16 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ rls-check flags ━━━${NC}`);
-    const { findings: bad, flags, scanned } = checkRlsCheckFlags(ROOT);
-    console.log(`${DIM}rls-check accepts ${flags.length} flag(s); checked --help and ${scanned} option table(s).${NC}`);
+    const { findings: bad, flags, scanned, connectionPages } = checkRlsCheckFlags(ROOT);
+    console.log(
+        `${DIM}rls-check accepts ${flags.length} flag(s); checked --help, ${scanned} option table(s) ` +
+            `and the connection-string paragraph on ${connectionPages} page(s).${NC}`
+    );
     if (!bad.length) {
-        console.log(`${GREEN}✓ Every flag the CLI accepts is in --help and both option tables.${NC}`);
+        console.log(
+            `${GREEN}✓ Every flag the CLI accepts is in --help and both option tables, and no page ` +
+                `demands encoding the tool does not.${NC}`
+        );
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} flag documentation mismatch(es):${NC}`);
@@ -213,8 +229,8 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Translation freshness ━━━${NC}`);
-    const { findings: bad, missing, unstamped, fresh, sources, locales } =
-        checkTranslationFreshness(ROOT);
+    const { findings: bad, missing, unstamped, fresh, sources, locales, budget } =
+        checkTranslationFreshness(ROOT, { strict });
     console.log(
         `${DIM}${sources} translatable page(s) × ${locales} locales: ${fresh} fresh, ` +
             `${unstamped.length} unstamped, ${missing.length} missing.${NC}`
@@ -231,8 +247,9 @@ if (only === "both" || only === "names") {
     }
     if (missing.length || unstamped.length) {
         console.log(
-            `      ${DIM}${unstamped.length} predate the stamp and ${missing.length} do not exist ` +
-                `(Starlight falls back to English). Neither fails this check; ` +
+            `      ${DIM}${unstamped.length} carry no stamp (budget ${budget}, a finding under ` +
+                `--strict) and ${missing.length} do not exist at all (Starlight falls back to ` +
+                `English, so that one is a coverage gap rather than a break). ` +
                 `\`node scripts/translate_docs.mjs --dry-run\` in website/ lists them.${NC}`
         );
     }
@@ -241,7 +258,7 @@ if (only === "both" || only === "names") {
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Documentation link graph ━━━${NC}`);
     const { findings: bad, scanned, links } = checkDocsLinks(ROOT);
-    console.log(`${DIM}Resolved ${links} internal link(s) across ${scanned} English docs page(s).${NC}`);
+    console.log(`${DIM}Resolved ${links} internal link(s) and every image across ${scanned} docs page(s), all six locales.${NC}`);
     if (!bad.length) {
         console.log(`${GREEN}✓ Every link resolves, and every page leads somewhere.${NC}`);
     } else {
@@ -256,8 +273,8 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Error-code reference ━━━${NC}`);
-    const { findings: bad, scanned, total } = checkErrorCodes(ROOT);
-    console.log(`${DIM}Found ${total} error code(s) across ${scanned} source file(s).${NC}`);
+    const { findings: bad, scanned, total, families } = checkErrorCodes(ROOT);
+    console.log(`${DIM}Found ${total} error code(s) and ${families} code ${families === 1 ? "family" : "families"} across ${scanned} source file(s).${NC}`);
     if (!bad.length) {
         console.log(`${GREEN}✓ Every code the server can raise is documented, and every documented code exists.${NC}`);
     } else {
@@ -301,11 +318,43 @@ if (only === "both" || only === "names") {
 }
 
 if (only === "both" || only === "names") {
-    console.log(`\n${YELLOW}━━━ Endpoint index ━━━${NC}`);
-    const { findings: bad, routes, modules } = checkEndpointIndex(ROOT);
-    console.log(`${DIM}Extracted ${routes} route(s) from ${modules} router module(s).${NC}`);
+    console.log(`\n${YELLOW}━━━ Changelog sections ━━━${NC}`);
+    const { findings: bad, sections } = checkChangelogSections(ROOT);
+    console.log(`${DIM}## [Unreleased]: ${sections.join(", ") || "(no sections)"}.${NC}`);
     if (!bad.length) {
-        console.log(`${GREEN}✓ Every mounted route is in the endpoint index.${NC}`);
+        console.log(`${GREEN}\u2713 One section per heading, in order.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}\u2717 ${bad.length} changelog section problem(s):${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Config-package exports (all locales) ━━━${NC}`);
+    const { findings: bad, read, cells, scanned } = checkConfigExports(ROOT);
+    console.log(`${DIM}Checked ${cells} documented \`config/index.ts\` export(s) across ${scanned} file(s); the runtime reads ${read.join(", ")}.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}\u2713 Every export a page puts in \`config/index.ts\` is one the runtime reads.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}\u2717 ${bad.length} documented export(s) the runtime does not read:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Endpoint index ━━━${NC}`);
+    const { findings: bad, routes, modules, paramRows, reserved, endpointRows } = checkEndpointIndex(ROOT);
+    console.log(`${DIM}Extracted ${routes} route(s) from ${modules} router module(s); ${endpointRows} documented endpoint row(s); ${paramRows} declared query parameter(s) against ${reserved} reserved key(s).${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}\u2713 Every mounted route is in the endpoint index, every documented endpoint row resolves to one, and every documented query parameter is reserved.${NC}`);
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} route(s) the index does not account for:${NC}`);
@@ -398,6 +447,25 @@ if (only === "both" || only === "names") {
 }
 
 if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Cloud surface table ━━━${NC}`);
+    const { findings: bad, scanned } = checkCloudSurface(ROOT);
+    console.log(
+        `${DIM}Compared deployment/cloud.md's surface table, and every \`rebase cloud …\` line on that ` +
+            `page and the CLI reference, against ${scanned} CLOUD_GROUPS entries and their --help pages.${NC}`
+    );
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every group \`rebase cloud\` dispatches has exactly one row, and every documented line is one the CLI answers.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} thing(s) the cloud docs and the CLI disagree about:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ MCP tool tables ━━━${NC}`);
     const { findings: bad } = checkMcpToolTables(ROOT);
     console.log(`${DIM}Compared packages/mcp/README.md against ALL_TOOLS.${NC}`);
@@ -438,6 +506,22 @@ if (only === "both" || only === "names") {
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} type name(s) that do not exist:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ defineFunction's entry point (all locales) ━━━${NC}`);
+    const { findings: bad, scanned } = checkPortableImports(ROOT);
+    console.log(`${DIM}Scanned ${scanned} page(s) that mention defineFunction.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every page imports defineFunction from @rebasepro/server/functions.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} page(s) teach defineFunction from the package root:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}:${b.line}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);

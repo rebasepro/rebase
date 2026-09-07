@@ -77,6 +77,9 @@ REBASE_ADMIN_EMAIL=you@yourdomain.com
 REBASE_ADMIN_PASSWORD=at_least_twelve_characters
 ```
 
+`REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` are new <span class="since-badge" data-since="0.18">Since 0.18</span>: on 0.17.3
+the first account to register becomes the administrator, in production too.
+
 All six are required — the Compose file declares them with `${VAR:?…}` and
 refuses to interpolate without them.
 

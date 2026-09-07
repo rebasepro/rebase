@@ -1,4 +1,5 @@
 ---
+sourceHash: db02ecc36f64f46c
 title: Campi Personalizzati
 sidebar_label: Campi Personalizzati
 description: Crea campi modulo personalizzati per la modifica delle entità con pieno accesso al contesto del modulo, ai valori dell'entità e agli hook di Rebase.

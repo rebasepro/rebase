@@ -56,6 +56,39 @@ function describeBranchDdlError(err: unknown, fallbackContext: string): Error {
 const BRANCHES_TABLE = "rebase.branches";
 
 /**
+ * The connected server cannot branch, so nothing was done.
+ *
+ * A refusal, not a fault: typed so the transports can forward it intact.
+ * `websocket.ts` answers it with its own code and message rather than letting
+ * it fall into the generic handler, which suppresses the text in production —
+ * and the text is the only part that says what to do instead.
+ */
+export class BranchingUnsupportedError extends Error {
+    /** Wire code, forwarded verbatim to the client. */
+    readonly code = "BRANCHING_UNSUPPORTED";
+
+    constructor(message: string) {
+        super(message);
+        this.name = "BranchingUnsupportedError";
+    }
+}
+
+/**
+ * What to say when the server serves one database.
+ *
+ * Deliberately the same argument the CLI's `refuseBranchOnManagedDatabase`
+ * makes, because it is the same refusal — it just used to be available only to
+ * whoever came in through argv. One paragraph, because this one has to fit in a
+ * toast as well as a terminal.
+ */
+const BRANCHING_UNSUPPORTED_MESSAGE =
+    "Branching does not work on the managed development database. It copies a database with "
+    + "CREATE DATABASE ... TEMPLATE, and the managed database is PGlite, which serves exactly one — "
+    + "the copy would be the original, and every write you meant to sandbox would land in it. "
+    + "Branching needs a real Postgres: run `rebase dev --docker`, or uncomment DATABASE_URL in .env "
+    + "to point at your own.";
+
+/**
  * Validate that a user-provided identifier only contains safe characters.
  * Throws if the value contains characters outside [a-zA-Z0-9_-].
  */
@@ -110,6 +143,24 @@ export class BranchService {
     ) {}
 
     /**
+     * Refuse a branch mutation the connected server cannot honour.
+     *
+     * The check lives here rather than in the CLI's argv parsing because the
+     * CLI is not the only caller: Studio reaches `createBranch` over the
+     * websocket, and before this it got "Branch created successfully" and a
+     * detail pane promising isolation for a database that is the parent.
+     *
+     * Reads only, and only mutations are guarded: `listBranches` on a managed
+     * database is an honest empty list, and refusing it would turn the Branches
+     * pane into a failure with a "Try again" that can never succeed.
+     */
+    private async assertBranchingSupported(): Promise<void> {
+        if (await this.poolManager.servesOneDatabase()) {
+            throw new BranchingUnsupportedError(BRANCHING_UNSUPPORTED_MESSAGE);
+        }
+    }
+
+    /**
      * Ensure the `rebase.branches` metadata table exists in the default database.
      * Idempotent — safe to call on every startup.
      */
@@ -145,6 +196,8 @@ export class BranchService {
         name: string,
         options?: { source?: string; force?: boolean }
     ): Promise<BranchInfo> {
+        await this.assertBranchingSupported();
+
         if (options?.source) {
             validateIdentifier(options.source, "source database name");
         }
@@ -218,6 +271,8 @@ export class BranchService {
      * Cannot delete the main/default database.
      */
     async deleteBranch(name: string, options?: { force?: boolean }): Promise<void> {
+        await this.assertBranchingSupported();
+
         assertValidBranchName(name);
 
         // Safety, first pass: a request that would target the default database

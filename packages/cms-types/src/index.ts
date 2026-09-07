@@ -13,6 +13,11 @@ import "./augment";
 
 export * from "./types/property_options";
 export * from "./react_component_ref";
+// Before `./collections`, and deliberately its own module: this is the builder
+// every collection file imports, and a collection file is loaded by the backend
+// as well as by the panel. `./collections` holds the panel's view models and
+// imports React as a value; nothing in the builder's graph may reach it.
+export * from "./define_collection";
 export * from "./collections";
 export * from "./admin_collection";
 export * from "./rebase_context";

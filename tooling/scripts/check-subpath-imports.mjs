@@ -22,22 +22,29 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { workspacePackages } from "./publishable-packages.mjs";
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const PACKAGES = path.join(ROOT, "packages");
 
 const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const green = (s) => `\x1b[32m${s}\x1b[0m`;
 const bold = (s) => `\x1b[1m${s}\x1b[0m`;
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 
-/** `name -> Set of exported subpaths`, `*` kept as a wildcard segment. */
+/**
+ * `name -> Set of exported subpaths`, `*` kept as a wildcard segment.
+ *
+ * Read from every workspace member rather than from `packages/` alone, so the
+ * one publishable package outside that directory — `tooling/rebase-agent-skills`,
+ * whose `exports` map is `./skills/*` — is checkable like the rest.
+ */
 function exportMaps() {
     const maps = new Map();
-    for (const dir of fs.readdirSync(PACKAGES)) {
-        const manifest = path.join(PACKAGES, dir, "package.json");
+    for (const member of workspacePackages(ROOT)) {
+        if (!member.name.startsWith("@rebasepro/")) continue;
+        const manifest = path.join(ROOT, member.dir, "package.json");
         if (!fs.existsSync(manifest)) continue;
         const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
-        if (!pkg.name?.startsWith("@rebasepro/")) continue;
         // No `exports` field at all means every path resolves — nothing to check.
         maps.set(pkg.name, pkg.exports ? new Set(Object.keys(pkg.exports)) : null);
     }
@@ -85,9 +92,45 @@ const findings = [];
 const REFERENCE =
     /(?:from|import|require)\s*\(?\s*["'](@rebasepro\/([a-z0-9-]+)((?:\/[A-Za-z0-9_.-]+)+))["']/g;
 
-for (const root of [PACKAGES, path.join(ROOT, "website", "src", "content", "docs"), path.join(ROOT, "docs")]) {
-    if (!fs.existsSync(root)) continue;
-    for (const file of files(root)) {
+/**
+ * Every directory in this repository that writes `@rebasepro/<pkg>/<subpath>`.
+ *
+ * It scanned three, and four more contained such specifiers. The riskiest is
+ * `tooling/rebase-agent-skills`, whose files are COPIED INTO USER PROJECTS —
+ * `@rebasepro/cms/editor`, `@rebasepro/server/functions`,
+ * `@rebasepro/ui/index.css` — so an unexported subpath there is shipped advice,
+ * followed on a machine this repository never sees. `app/` is the dogfood
+ * project and `examples/` are what a reader copies from.
+ */
+const SCAN_DIRS = [
+    "packages",
+    "tooling/rebase-agent-skills",
+    "app",
+    "examples",
+    "website/src/content/docs",
+    "docs"
+].map((rel) => path.join(ROOT, rel));
+
+/**
+ * The public LLM mirrors, scanned as individual files.
+ *
+ * `llms.txt` and `llms-full.txt` are generated from the docs and served to
+ * agents, which follow what they say. A `.txt` extension keeps them out of the
+ * directory walk above, so they are named here instead.
+ */
+const SCAN_FILES = fs.existsSync(path.join(ROOT, "website", "public"))
+    ? fs.readdirSync(path.join(ROOT, "website", "public"))
+        .filter((name) => /^llms.*\.txt$/.test(name))
+        .map((name) => path.join(ROOT, "website", "public", name))
+    : [];
+
+const targets = [
+    ...SCAN_DIRS.filter((dir) => fs.existsSync(dir)).flatMap((dir) => files(dir)),
+    ...SCAN_FILES
+];
+
+{
+    for (const file of targets) {
         const text = fs.readFileSync(file, "utf8");
         for (const m of text.matchAll(REFERENCE)) {
             const name = `@rebasepro/${m[2]}`;

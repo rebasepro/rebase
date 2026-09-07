@@ -1,4 +1,5 @@
 ---
+sourceHash: 64da41d7e9319170
 slug: de/docs/compatibility
 title: Kompatibilität
 description: Was Rebase über Versionen hinweg verspricht und was nicht – die sechs versionierten Verträge, wie jeder fehlschlägt und was sich in einem Minor-Release noch ändern kann.
@@ -148,6 +149,31 @@ ausgegeben und von einem generierten SDK im Header `x-rebase-schema`
 (`SCHEMA_VERSION_HEADER`) widergespiegelt wird. Er existiert, damit die Plattform
 melden kann: „Diese App wurde gegen ein älteres Schema gebaut“, anstatt bei der
 ersten Anfrage rätselhaft fehlzuschlagen.
+
+Das Backend liest diesen Header bei jeder Datenanfrage. Drift weist niemals
+einen Aufruf ab – ein SDK, das ein Schema zurückliegt, ist meist weiterhin
+kompatibel, und das Backend vor dem Frontend auszuliefern ist die übliche
+Deploy-Reihenfolge –, aber wenn eine Anfrage mit 400 oder 404 fehlschlägt, führt
+der Fehler die Drift als Ursache mit:
+
+```json
+{
+  "error": {
+    "code": "BAD_REQUEST",
+    "message": "Unknown field \"authorName\" on collection \"posts\"",
+    "cause": {
+      "code": "SCHEMA_DRIFT",
+      "clientSchema": "v1:0e1c…",
+      "serverSchema": "v1:9ab4…",
+      "message": "This client was generated against schema v1:0e1c…; this backend serves v1:9ab4…"
+    }
+  }
+}
+```
+
+So liest sich eine umbenannte Spalte als „Ihr SDK ist veraltet, generieren Sie
+es neu“ statt als ein Feld, dessen Existenz Ihre eigenen Typen behaupten. Einer
+erfolgreichen Anfrage wird davon nichts mitgeteilt.
 
 Er deckt **nur Collections** ab. Das Bearbeiten eines Hooks oder einer Funktion
 ändert den Vertrag des Clients nicht und darf nicht jedes generierte SDK

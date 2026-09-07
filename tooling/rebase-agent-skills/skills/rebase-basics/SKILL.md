@@ -11,8 +11,13 @@ Please complete these setup steps before proceeding, and remember your progress 
    - Run `node --version`. A scaffolded project declares `node >= 22.22.0`, which is
      what `.nvmrc` pins; an older runtime fails at install, not at run time.
    - Run `pnpm --version` to check pnpm is installed. If not, install it: `npm install -g pnpm`.
-   - Verify PostgreSQL is available: `psql --version` or confirm Docker is running with a Postgres container.
-   - If any of these checks fail, use the `rebase-local-env-setup` skill to get the environment ready.
+   - **Do not check for PostgreSQL.** With `DATABASE_URL` unset — which is how
+     `rebase init` leaves `.env` — `rebase dev` starts a **managed PostgreSQL
+     (PGlite)** for the project, with its data under `.rebase/`. Nothing to
+     install, no container, no connection string. `rebase db url` prints
+     whichever database is in use.
+   - If Node or pnpm is missing, use the `rebase-local-env-setup` skill to get
+     the environment ready.
 
 2. **MCP server access:** The MCP server needs a running `rebase dev`, or a
    `REBASE_SERVICE_KEY` in the project's `.env`. Nothing else — there is no
@@ -28,9 +33,10 @@ Please complete these setup steps before proceeding, and remember your progress 
 3. **Project context:** Most Rebase tasks need a project directory.
    - `REBASE_PROJECT_DIR` in the MCP client's config should be the directory
      containing `rebase.json`; without it the server uses its working directory.
-   - Ensure `.env` in that directory contains a valid `DATABASE_URL` — it is what
-     the CLI tools (`rebase_db_push`, `rebase_doctor`, the branch tools) connect
-     with, and they never see the API token.
+   - The CLI tools (`rebase_db_push`, `rebase_doctor`, the branch tools) connect
+     with `DATABASE_URL` and never see the API token. On the managed database
+     there is no `DATABASE_URL` to set and none is needed — do not invent one to
+     make a tool run.
 
 # Rebase Usage Principles
 
@@ -42,9 +48,18 @@ Please adhere to these principles when working with Rebase, as they ensure relia
 
 3. **Follow the Schema-as-Code approach:** Schemas are defined as standalone TypeScript files. The visual Studio generates TypeScript via AST manipulation — it does NOT run raw SQL. Always define collections in code first.
 
-4. **Use the two-step migration workflow:**
-   - `rebase schema generate` — converts collection definitions to Drizzle ORM schema
-   - `rebase db push` (development) or `rebase db generate && rebase db migrate` (production)
+4. **Know which schema loop this project is on:**
+   - `rebase schema generate` — converts collection definitions to Drizzle ORM schema.
+   - **On the managed database (the default), boot applies it.** `rebase dev`
+     generates the schema and creates the missing tables additively at every
+     start; there is no push step, and `rebase db push` refuses — it plans with
+     Atlas, which needs a second empty database to compare against.
+   - **With your own `DATABASE_URL`:** `rebase db push` (development) or
+     `rebase db generate && rebase db migrate` (production).
+   - What boot's additive apply deliberately leaves alone, on either database:
+     junction-table RLS on many-to-many relations, and any change that is not
+     purely additive — a renamed column, a narrowed type, a removed field. Those
+     need `db push` or a migration, which means they need a `DATABASE_URL`.
 
 5. **Use Rebase MCP Server tools when available:** For data operations, user management, and collection browsing, prefer the MCP tools (`list_documents`, `get_document`, `create_document`, etc.) over writing manual API calls.
 
@@ -68,9 +83,12 @@ section is background; this is the actual sequence.
    `rebase build` and the runtime all read the barrel, never the directory
    listing, so a collection left out of it fails silently rather than loudly.
 3. `rebase schema generate` — collections become
-   `backend/src/schema.generated.ts`.
-4. `rebase db push` in development, or `rebase db generate && rebase db migrate`
-   for production.
+   `backend/src/schema.generated.ts`. `rebase dev` does this for you on every
+   restart, so on a running dev server the step is a way to see the file now.
+4. **On the managed database: nothing.** Boot creates the new table. Restart
+   `rebase dev` (or let it restart itself) and the collection is there.
+   With your own `DATABASE_URL`: `rebase db push` in development, or
+   `rebase db generate && rebase db migrate` for production.
 
 **Add a backend function**
 
@@ -88,7 +106,10 @@ section is background; this is the actual sequence.
 **Add an RLS rule**
 
 Rules live on the collection in `securityRules` and become Postgres policies
-when `rebase db push` (or a migration) runs. Declaring one is not applying it.
+at boot on the managed database, or when `rebase db push` (or a migration) runs
+against your own. Declaring one is not applying it — the rule takes effect on
+the next start, not on the next save. The one exception boot leaves alone is a
+junction table's RLS on a many-to-many relation; that needs `db push`.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -141,9 +162,10 @@ When you initialize a Rebase project via the CLI (`rebase init`), the generated 
 │   └── storage.ts        # `storageAuthorize` — who may read/write which keys
 ├── scripts/              # Standalone SDK scripts
 ├── rebase.json           # Which apps this project deploys, and how
+├── .rebase/              # Dev-server state, and the managed database's data
 ├── .env                  # Environment variables (generated from .env.example)
 ├── .env.example          # Template with placeholder secrets
-├── docker-compose.yml    # PostgreSQL container (when no custom DB provided)
+├── docker-compose.yml    # Optional PostgreSQL container — `rebase dev --docker`
 ├── pnpm-workspace.yaml   # pnpm workspace definition
 └── package.json          # Root workspace package.json
 ```
@@ -184,9 +206,10 @@ Read these when you need them, not before.
 
 ### Database & Connection
 
-- **`DATABASE_URL is not set`:** Ensure `.env` exists in the project root with `DATABASE_URL=postgresql://user:password@localhost:5432/rebase`
+- **`DATABASE_URL is not set`:** Usually the wrong diagnosis. A scaffolded project has no `DATABASE_URL` on purpose — `rebase dev` starts the managed PostgreSQL (PGlite) under `.rebase/`. Run `rebase db url` to see which database is in use, and start `rebase dev` if nothing is running. Only set `DATABASE_URL` when the user asked for their own Postgres.
+- **`rebase db push does not work on the managed development database`:** Correct, and not a fault. `db push` plans with Atlas, which needs a second empty database; the managed one serves exactly one. Boot applies the schema additively instead. Set `DATABASE_URL` to your own Postgres if you need push or migrations.
 - **`DATABASE_URL must be a valid URL`:** The value must be a proper PostgreSQL URL including protocol (`postgresql://`). Check for missing or malformed values.
-- **Connection refused on port 5432:** PostgreSQL is not running. Start it with `docker compose up -d db` or verify your local Postgres service.
+- **Connection refused on port 5432:** Only relevant with your own database. PostgreSQL is not running — start it with `docker compose up -d db` or verify your local Postgres service. The managed database has no port to conflict with.
 - **`CORS_ORIGINS or FRONTEND_URL must be set in production`:** In `NODE_ENV=production`, set `CORS_ORIGINS=https://yourapp.com` or `FRONTEND_URL=https://yourapp.com` in `.env`.
 - **Localhost URL blocked in production:** `loadEnv()` rejects localhost/loopback URLs in production. Set `ALLOW_LOCALHOST_IN_PRODUCTION=true` to override (not recommended).
 
@@ -207,7 +230,7 @@ Read these when you need them, not before.
 - **Schema out of sync:** Run `rebase doctor` to detect three-way drift between collections, generated Drizzle schema, and the live database.
 - **`schema.generated.ts` is stale:** Run `rebase schema generate` to regenerate it from your collection definitions.
 - **Migrations pending:** Run `rebase db migrate` to apply outstanding migration files.
-- **Column type mismatch after manual DB edit:** Never edit the database manually. Always modify collection files → `rebase schema generate` → `rebase db push` (dev) or `rebase db generate && rebase db migrate` (prod).
+- **Column type mismatch after manual DB edit:** Never edit the database manually. Always modify collection files → restart `rebase dev` (managed database) or `rebase schema generate` → `rebase db push` (your own, dev) or `rebase db generate && rebase db migrate` (prod).
 
 ### CLI & Tooling
 

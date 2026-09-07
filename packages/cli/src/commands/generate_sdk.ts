@@ -366,6 +366,23 @@ export async function generateSdkCommand(args: GenerateSDKArgs): Promise<void> {
         collections = remote.collections;
         remoteSchemaVersion = remote.schemaVersion;
     } else {
+        // A headless project has no collections directory by design: its API is
+        // introspected from the live database at boot, and there is nothing here
+        // to generate a client from. The scaffold ships `pnpm generate:sdk`
+        // anyway, so the documented headless path had a script that could only
+        // ever fail — and it failed with a path, which reads as a broken install
+        // rather than a question with an answer.
+        if (!fs.existsSync(resolvedCollectionsDir)) {
+            console.log(chalk.gray(
+                "  ○ This project derives its API from the database — "
+                + "run `rebase schema introspect` first."
+            ));
+            console.log(chalk.gray(
+                `    Nothing to generate from: ${resolvedCollectionsDir} does not exist.`
+            ));
+            console.log("");
+            return;
+        }
         console.log(`  ${chalk.gray("Collections:")} ${resolvedCollectionsDir}`);
         console.log(`  ${chalk.gray("Output:")}      ${resolvedOutput}`);
         console.log("");

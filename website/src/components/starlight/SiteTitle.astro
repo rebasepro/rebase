@@ -1,9 +1,22 @@
 ---
 // Custom SiteTitle so the logo and "Rebase" link match the main site and sit flush-left
 import config from "virtual:starlight/user-config";
+import { languages } from "../../i18n/ui";
+
+// The docs are six locales; the marketing site is four. A bare
+// `"/" + locale` therefore sent every Italian and Portuguese reader — 378
+// pages of them — to a home page that has never been built. `languages` is the
+// list of locales that have one; the rest land on their own docs home, which
+// is the page they were already reading.
+const locale = Astro.locals.starlightRoute.locale ?? "";
+const href = !config.locales || !locale
+    ? "/"
+    : locale in languages
+      ? "/" + locale
+      : `/${locale}/docs/`;
 ---
 
-<a href={config.locales ? "/" + (Astro.locals.starlightRoute.locale ?? "") : "/"}
+<a href={href}
    class="flex items-center relative gap-4" transition:name="site-logo">
     <img src="/img/rebase_logo.svg" width="306" height="306" class="h-8 w-8"
          alt="Rebase Logo" transition:name="logo-image">

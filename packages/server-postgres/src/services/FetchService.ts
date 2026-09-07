@@ -1727,8 +1727,20 @@ relatedTo: hop }, include
             }
         }
 
-        // Fallback: fetch base rows without relations
-        const rows = await this.fetchRowsWithConditionsRaw<M>(collectionPath, options);
+        // Fallback: fetch base rows without relations.
+        //
+        // Rendered through the same `toRestRow` the primary path uses, and for
+        // the same two reasons: a column the collection marked
+        // `excludeFromApi` must not be on the wire, and a `number` property
+        // must not arrive as the string Postgres sends for NUMERIC. Neither
+        // used to happen here, and this is not a rare path — every read
+        // carrying a `searchString` or a `vectorSearch` skips `db.query`, as
+        // does any collection whose drizzle export name is not its table name
+        // (`weird_things` → `weirdThings`). So `?searchString=` was the way to
+        // read a password hash out of a collection whose plain reads correctly
+        // withheld it.
+        const rows = (await this.fetchRowsWithConditionsRaw<M>(collectionPath, options))
+            .map(row => toRestRow(row, collection, this.registry));
 
         if (!include || include.length === 0) {
             return rows;
@@ -1863,7 +1875,10 @@ relatedTo: hop }, include
 
         if (result.length === 0) return null;
 
-        const flatEntity: Record<string, unknown> = { ...(result[0] as Record<string, unknown>) };
+        // Same rendering as the primary path — see the sibling comment in
+        // `fetchCollectionForRest`'s fallback.
+        const flatEntity: Record<string, unknown> =
+            toRestRow(result[0] as Record<string, unknown>, collection, this.registry);
 
         if (!include || include.length === 0) {
             return flatEntity;

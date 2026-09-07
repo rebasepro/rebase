@@ -1,4 +1,5 @@
 ---
+sourceHash: 8721ee795ebd8dce
 title: Estilizar UI personalizada
 sidebar_label: Estilizar UI personalizada
 description: Construye vistas personalizadas, páginas de inicio y acciones con los mismos componentes y tokens de tema que el resto del panel de administración, para que se vean nativos y sigan el tema.
@@ -39,7 +40,7 @@ export function DashboardView() {
 }
 ```
 
-Cada componente del kit está catalogado en [UI components](/docs/ui/components/Card) con sus props reales, generadas a partir del código fuente. Consulta allí antes de crearlos manualmente: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` y unos cuarenta más ya existen.
+Cada componente del kit está catalogado en [UI components](/docs/ui/components/card/) con sus props reales, generadas a partir del código fuente. Consulta allí antes de crearlos manualmente: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` y unos cuarenta más ya existen.
 
 ## Color: usa tokens, nunca literales
 

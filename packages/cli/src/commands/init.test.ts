@@ -796,6 +796,24 @@ describe(".env.example", () => {
         expect(envContent).not.toMatch(/^FRONTEND_PORT=/m);
     });
 
+    it("assigns every key exactly once", async () => {
+        // The generated file is read by dotenv AND by docker compose, and both
+        // take the last assignment of a repeated key. A default left
+        // uncommented in .env.example under a key `init` writes elsewhere
+        // therefore overrides the generated value — which is how a scaffold
+        // shipped a compose stack whose database password was `changeme`.
+        //
+        // The existing DATABASE_PASSWORD assertion could not see it: `match`
+        // with /m returns the FIRST line, which was the generated one.
+        const targetDir = await simulateInit("env-once-app");
+        await configureEnvFile(targetDir);
+
+        const keys = [...fs.readFileSync(path.join(targetDir, ".env"), "utf-8")
+            .matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map(m => m[1]);
+        const duplicated = keys.filter((k, i) => keys.indexOf(k) !== i);
+        expect(duplicated).toEqual([]);
+    });
+
     it("configureEnvFile successfully generates a valid .env", async () => {
         const targetDir = await simulateInit("env-test-app");
         // simulateInit does not call configureEnvFile, so we call it manually

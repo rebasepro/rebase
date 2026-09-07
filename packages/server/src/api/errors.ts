@@ -4,8 +4,85 @@ import type { HonoEnv } from "./types";
 import { logger } from "../utils/logger";
 import { hostEnv } from "../utils/host";
 
+/**
+ * A stale caller's schema stamp, as the cause of the error it explains.
+ *
+ * `createSchemaDriftDetector` puts the two stamps on the context when a request
+ * carries an `x-rebase-schema` older than this backend's. It lives next door;
+ * this half is here because `errors.ts` is in the graph of
+ * `@rebasepro/server/functions` and may not reach `@rebasepro/types` at runtime.
+ */
+function schemaDriftCause(drift: { client: string; server: string } | undefined): {
+    code: string;
+    message: string;
+    clientSchema: string;
+    serverSchema: string;
+} | undefined {
+    if (!drift) return undefined;
+    return {
+        code: "SCHEMA_DRIFT",
+        message:
+            `This client was generated against schema ${drift.client}; this backend serves `
+            + `${drift.server}. If the field named above was renamed or removed, regenerate the `
+            + "SDK (`rebase generate-sdk`) and rebuild.",
+        clientSchema: drift.client,
+        serverSchema: drift.server
+    };
+}
+
 /** Tracks whether we've already shown the doctor hint (once per process). */
 let _schemaDriftHinted = false;
+
+/**
+ * The schema-drift remedy, in the words that work on *this* database.
+ *
+ * The three copies of this message hard-coded `Run \`pnpm db:push\``, and on a
+ * stock scaffold — where the managed PGlite database is the default — that
+ * command answers `✗ rebase db push does not work on the managed development
+ * database.` and exits 1. So the one instruction the server gave when a
+ * developer's schema had drifted was a command their project refuses.
+ *
+ * Atlas plans a push by diffing against a second, empty database, and PGlite
+ * serves exactly one — which is why it cannot run there, and why the remedy
+ * has to know which database is under this run. There, boot applies additive
+ * changes, so restarting `rebase dev` *is* the fix.
+ *
+ * `REBASE_DEV_DATABASE_KIND` is set by the CLI from the database it resolved,
+ * the same variable `rebase schema generate`'s closing line already branches
+ * on. Absent — a deployed backend, a container, anything not started by
+ * `rebase dev` — the answer is the general one.
+ */
+export function schemaDriftRemedy(): { short: string; lines: string[] } {
+    if (hostEnv().REBASE_DEV_DATABASE_KIND === "managed") {
+        return {
+            short: "Restart `rebase dev` — boot applies additive schema changes to the managed database.",
+            lines: [
+                "  Quick fixes (managed development database):",
+                "    restart `rebase dev`   boot applies additive changes",
+                "    rebase doctor          full 3-way drift report",
+                "",
+                "  `rebase db push` does not run here: Atlas plans against a",
+                "  second, empty database and PGlite serves one. For a change",
+                "  boot leaves alone, use your own Postgres (DATABASE_URL)",
+                "  or `rebase dev --docker`."
+            ]
+        };
+    }
+
+    return {
+        short: "Run `rebase db push` to sync your schema, or `rebase db migrate` to apply pending migrations.",
+        lines: [
+            "  Quick fixes (local dev, against DATABASE_URL):",
+            "    rebase db push        sync schema to database (dev)",
+            "    rebase db migrate     apply pending migrations (prod)",
+            "    rebase doctor         full 3-way drift report",
+            "",
+            "  Managed cloud: the runtime applies schema + RLS at boot",
+            "  (REBASE_MIGRATE_ON_BOOT); redeploy rather than db push,",
+            "  which cannot reach the tenant database."
+        ]
+    };
+}
 
 /** Shape of Postgres / network errors with diagnostic codes */
 interface PgLikeError {
@@ -67,6 +144,37 @@ function extractMissingIdentifier(pgMessage?: string): string | null {
     const unquoted = pgMessage.match(/(?:relation|column|table)\s+([\w.]+)\s+does not exist/i);
     if (unquoted) return unquoted[1];
     return null;
+}
+
+/**
+ * The sentence a `INVALID_FILTER_VALUE` answer carries.
+ *
+ * Built from Postgres's own wording rather than passed through, because the
+ * driver hands the whole failed statement over as `error.message` and this one
+ * goes to the caller in production too. What is quoted back is the type name
+ * and the literal the caller themselves sent — never a table, a column list or
+ * a statement.
+ *
+ * The three shapes are the ones a filter actually produces: an unparseable
+ * literal (22P02, `?id=eq.abc`), a value outside an enum's labels (22P02 with
+ * different wording), and a number past the column type's range (22003). A
+ * fourth SQLSTATE in class 22 lands on the general sentence, which still says
+ * the useful thing: it is the value that is wrong, not the server.
+ */
+function describeDataException(dbError?: PgLikeError): string {
+    const message = dbError?.message ?? "";
+    const column = dbError?.column ? ` for column "${dbError.column}"` : "";
+
+    const syntax = message.match(/invalid input syntax for type ([\w ]+): "(.*)"/);
+    if (syntax) return `"${syntax[2]}" is not a valid ${syntax[1]}${column}.`;
+
+    const enumValue = message.match(/invalid input value for enum ([\w."]+): "(.*)"/);
+    if (enumValue) return `"${enumValue[2]}" is not one of the values of ${enumValue[1]}${column}.`;
+
+    const range = message.match(/value "(.*)" is out of range for type ([\w ]+)/);
+    if (range) return `"${range[1]}" is out of range for ${range[2]}${column}.`;
+
+    return `A value in this request could not be read as the type of the column it was compared against${column}.`;
 }
 
 /**
@@ -160,6 +268,20 @@ export interface ErrorResponse {
         details?: unknown;
         /** Request correlation ID for tracing (echoes X-Request-ID). */
         requestId?: string;
+        /**
+         * Why this request was going to fail whatever it asked for.
+         *
+         * Only `SCHEMA_DRIFT` today: the caller's `x-rebase-schema` stamp is
+         * older than this backend's, so a 400 naming an unknown field is very
+         * likely a rename the client has not regenerated for. The error itself
+         * is unchanged — this explains it, it does not cause it.
+         */
+        cause?: {
+            code: string;
+            message: string;
+            clientSchema: string;
+            serverSchema: string;
+        };
     };
 }
 
@@ -228,6 +350,19 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // Matched by name rather than `instanceof`: a monorepo can resolve two
     // copies of @rebasepro/types, and `instanceof` is false across them.
     const isBrowserSafeError = /^Rebase(Api|Client)Error$/.test(error.name);
+
+    /* A stale SDK, named on the errors it explains.
+
+       400 and 404 only: those are what a renamed or removed field produces —
+       an unknown filter field is a 400, a collection gone from under its slug
+       is a 404 — and they are the two a caller can act on by regenerating.
+       Attaching it to a 500 would be noise, since a server fault has nothing to
+       do with how old the caller's schema is. */
+    const driftFor = (status: number) =>
+        (status === 400 || status === 404) && typeof c.get === "function"
+            ? schemaDriftCause(c.get("schemaDrift"))
+            : undefined;
+
     if (isBrowserSafeError && error.statusCode === undefined) {
         const status = (error as unknown as { status?: unknown }).status;
         if (typeof status === "number") error.statusCode = status;
@@ -249,14 +384,17 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
                 logger.warn(`⚠️ ${line}`);
             }
         }
+        const apiErrorStatus = error.statusCode || 500;
+        const apiErrorDrift = driftFor(apiErrorStatus);
         return c.json({
             error: {
                 message: error.message,
                 code: error.code || "INTERNAL_ERROR",
                 ...(error.details !== undefined && { details: error.details }),
-                ...(reqId && { requestId: reqId })
+                ...(reqId && { requestId: reqId }),
+                ...(apiErrorDrift && { cause: apiErrorDrift })
             }
-        } satisfies ErrorResponse, (error.statusCode || 500) as ContentfulStatusCode);
+        } satisfies ErrorResponse, apiErrorStatus as ContentfulStatusCode);
     }
 
     let statusCode = error.statusCode || codeToStatus(error.code) || 500;
@@ -297,7 +435,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         code = "SCHEMA_DRIFT";
         const issue = dbError.code === "42703" ? "column" : "table";
         const identifier = dbError.table || dbError.column || extractMissingIdentifier(dbError.message) || "unknown";
-        logMessage = `Schema drift: ${issue} "${identifier}" does not exist in the database. Run \`pnpm db:push\` to sync your schema, or \`pnpm db:migrate\` to apply pending migrations.`;
+        logMessage = `Schema drift: ${issue} "${identifier}" does not exist in the database. ${schemaDriftRemedy().short}`;
     } else if (dbError) {
         const parts = [`[PG ${dbError.code}] ${dbError.message}`];
         if (dbError.detail) parts.push(`Detail: ${dbError.detail}`);
@@ -324,6 +462,19 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
             statusCode = 409;
             parts.push(READ_ONLY_TRANSACTION_MESSAGE);
         }
+        // SQLSTATE class 22 — data exception. The caller sent a value the
+        // column's type cannot hold: `?id=eq.abc` on an integer key,
+        // `?status=eq.nope` on an enum, a timestamp that is not one, a number
+        // past the type's range. Every *other* bad query parameter already has
+        // a precise 400 (`INVALID_LIMIT`, `UNKNOWN_FILTER_FIELD`,
+        // `INVALID_LOGICAL_GROUP`); a bad *value* fell off the end of this
+        // chain and answered 500 INTERNAL_ERROR — and in production `dbMessage`
+        // is stripped, so the caller got a bare 500 naming nothing and had no
+        // way to learn their own typo was the cause.
+        if (dbError.code?.startsWith("22")) {
+            code = "INVALID_FILTER_VALUE";
+            statusCode = 400;
+        }
         logMessage = parts.join(". ");
     }
 
@@ -342,27 +493,28 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         // In dev mode, show a one-time hint to run `rebase doctor`
         if (!_schemaDriftHinted && hostEnv().NODE_ENV !== "production") {
             _schemaDriftHinted = true;
+            // Drawn rather than hand-aligned: the remedy inside it now varies
+            // with the database, and a box whose rows were padded by hand
+            // stayed straight only for the text it was written around.
+            const WIDTH = 62;
+            const row = (text: string) => `│${text.padEnd(WIDTH).slice(0, WIDTH)}│`;
             logger.warn([
                 "",
-                "┌──────────────────────────────────────────────────────────────┐",
-                "│  💡 TIP: Run `rebase doctor` for full schema diagnostics    │",
-                "│                                                             │",
-                "│  Quick fixes (local dev, against DATABASE_URL):             │",
-                "│    pnpm db:push      sync schema to database (dev)          │",
-                "│    pnpm db:migrate   generate + apply migration (prod)      │",
-                "│    rebase doctor     full 3-way drift report                │",
-                "│                                                             │",
-                "│  Managed cloud: the runtime applies schema + RLS at boot    │",
-                "│  (REBASE_MIGRATE_ON_BOOT); redeploy rather than db:push,    │",
-                "│  which cannot reach the tenant database.                    │",
-                "└──────────────────────────────────────────────────────────────┘",
+                `┌${"─".repeat(WIDTH)}┐`,
+                // One space short, deliberately: the emoji occupies two columns
+                // in a terminal and one in `String.length`.
+                `│${"  💡 TIP: Run `rebase doctor` for full schema diagnostics".padEnd(WIDTH - 1)}│`,
+                row(""),
+                ...schemaDriftRemedy().lines.map(row),
+                `└${"─".repeat(WIDTH)}┘`,
                 ""
             ].join("\n"));
         }
-    } else if (code === "READ_ONLY_TRANSACTION") {
-        // A 4xx: the application's own callback, refused. Not a server fault, so
-        // not an ❌ in the log either — and, like the drift arm above, not a
-        // second line when the request log is already going to carry it.
+    } else if (code === "READ_ONLY_TRANSACTION" || code === "INVALID_FILTER_VALUE") {
+        // A 4xx: the application's own callback, refused — or a filter value
+        // the caller's own request could not have worked with. Not a server
+        // fault, so not an ❌ in the log either — and, like the drift arm above,
+        // not a second line when the request log is already going to carry it.
         if (!requestWillBeLogged(c)) logger.warn(
             `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
             (reqId ? ` [${reqId}]` : "")
@@ -384,7 +536,14 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // logged) are covered too.
     const suppressStack = isDbSchemaMismatch || dbError !== null || (statusCode < 500 && code === "BAD_REQUEST");
     if (!suppressStack) {
-        logger.error(String(error.stack || error));
+        // The error goes in as a value, not as `String(error.stack)`. A string
+        // is a leaf to the logger: `serialiseError` — the `.cause`/
+        // `AggregateError` walker the boot path relies on — never runs on one,
+        // so the request path used to print the outer wrapper's stack and drop
+        // the sentence that says what actually failed (`connect ECONNRESET`,
+        // sitting two `.cause` links down). Structured, it walks the chain and
+        // redacts each link on the way.
+        logger.error("unhandled request error", { error });
     }
 
     // Sanitize the message for the client to prevent leaking sensitive details
@@ -394,6 +553,11 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         // Ahead of the generic 4xx arm below, which would echo the raw driver
         // message ("Failed query: insert into …") back to the caller.
         clientMessage = READ_ONLY_TRANSACTION_MESSAGE;
+    } else if (code === "INVALID_FILTER_VALUE") {
+        // Also ahead of the 4xx arm: `error.message` here is the driver's
+        // "Failed query: select … / params: …", which is both unhelpful and the
+        // one thing this envelope must never carry.
+        clientMessage = describeDataException(dbError || (error as PgLikeError));
     } else if (statusCode < 500 && error.message) {
         // If it's a 4xx error (e.g. from validation), it's generally safe to send the message
         clientMessage = error.message;
@@ -404,7 +568,7 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         const pgErr = dbError || (error as PgLikeError);
         const issue = pgErr.code === "42703" ? "column" : "table";
         const identifier = pgErr.table || pgErr.column || extractMissingIdentifier(pgErr.message || error.message) || "unknown";
-        clientMessage = `Schema drift: ${issue} "${identifier}" does not exist. Run \`pnpm db:push\` to sync your schema.`;
+        clientMessage = `Schema drift: ${issue} "${identifier}" does not exist. ${schemaDriftRemedy().short}`;
     } else if (code === "DB_PERMISSION_DENIED") {
         clientMessage = `Permission denied by the database${dbError?.table ? ` on "${dbError.table}"` : ""} (row-level security). Check the RLS policies for this table.`;
     } else if (code === "INTERNAL_ERROR") {
@@ -423,6 +587,8 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         })
     } : undefined;
 
+    const drift = driftFor(statusCode);
+
     return c.json({
         error: {
             message: clientMessage,
@@ -430,7 +596,8 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
             ...(error.details !== undefined
                 ? { details: error.details }
                 : dbDetails !== undefined ? { details: dbDetails } : {}),
-            ...(reqId && { requestId: reqId })
+            ...(reqId && { requestId: reqId }),
+            ...(drift && { cause: drift })
         }
     } satisfies ErrorResponse, statusCode as ContentfulStatusCode);
 };
@@ -453,6 +620,7 @@ function codeToStatus(code?: string): number | undefined {
         EMAIL_EXISTS: 409,
         ROLE_EXISTS: 409,
         READ_ONLY_TRANSACTION: 409,
+        INVALID_FILTER_VALUE: 400,
         SCHEMA_DRIFT: 500,
         DB_PERMISSION_DENIED: 500,
         INTERNAL_ERROR: 500,

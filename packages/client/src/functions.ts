@@ -76,7 +76,8 @@ export function createFunctionsClient(transport: Transport): FunctionsClient {
                 throw new RebaseClientError(
                     `Invalid function name "${name}": a function name is a single path segment. ` +
                     "Pass anything after it as `options.path` — " +
-                    `invoke("${name.split("/")[0]}", payload, { path: "${name.split("/").slice(1).join("/")}" }).`
+                    `invoke("${name.split("/")[0]}", payload, { path: "${name.split("/").slice(1).join("/")}" }).`,
+                    { code: "INVALID_FUNCTION_NAME", details: { name } }
                 );
             }
 

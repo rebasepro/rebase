@@ -24,7 +24,7 @@ export type BuildNavigationStateProps<EC extends AdminCollection, USER extends U
     viewsOrder?: string[];
     collectionRegistryController: CollectionRegistryController<EC> & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
     urlController: UrlController;
-    adminMode?: "cms" | "studio" | "settings";
+    adminMode?: "cms" | "studio";
     effectiveRoleController?: EffectiveRoleController;
 
 };

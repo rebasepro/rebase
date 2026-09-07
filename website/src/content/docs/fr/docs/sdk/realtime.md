@@ -1,4 +1,5 @@
 ---
+sourceHash: a82dd911da9d58ef
 title: Abonnements en temps réel
 sidebar_label: Temps réel
 description: Abonnez-vous aux changements de données en direct avec le SDK Client de Rebase à l'aide d'écouteurs temps réel basés sur WebSocket.
@@ -202,7 +203,7 @@ Les canaux sont légers et éphémères — ils existent tant qu'au moins un cli
 
 Un canal peut être configuré pour conserver ses diffusions, afin qu'un client qui se reconnecte rattrape ce qu'il a manqué au lieu de se resynchroniser depuis zéro. C'est ce qui rend les canaux utilisables comme transport pour l'édition collaborative.
 
-La conservation se configure **côté serveur**, par motif de canal — voir [Backend temps réel](/docs/backend/realtime#conservation-des-canaux). Un client ne peut pas l'activer lui-même : un canal est créé par celui qui le nomme, et une profondeur d'historique choisie par le client permettrait à n'importe quel visiteur d'engager votre backend sur un stockage illimité.
+La conservation se configure **côté serveur**, par motif de canal — voir [Backend temps réel](/fr/docs/backend/realtime#conservation-des-canaux). Un client ne peut pas l'activer lui-même : un canal est créé par celui qui le nomme, et une profondeur d'historique choisie par le client permettrait à n'importe quel visiteur d'engager votre backend sur un stockage illimité.
 
 Sur un canal avec conservation, passez `{ history: true }` et le SDK fait le reste :
 

@@ -46,8 +46,7 @@ async function loadDeclaredResources(configDir: string): Promise<void> {
 const runGeneration = async (collectionsFilePath?: string, outputPath?: string) => {
     try {
         if (!collectionsFilePath) {
-            outError("Error: No collections file path provided. Skipping schema generation.");
-            return;
+            throw new Error("No collections file path provided.");
         }
 
         const resolvedPath = path.resolve(collectionsFilePath);
@@ -126,6 +125,16 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
 
     } catch (error) {
         outError(`Error generating DDL schema: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`);
+        // Step 1 of `rebase db push` is this process, and its exit code is the
+        // only thing the push reads. Printing and exiting 0 made a resources
+        // module that does not evaluate — the single most common cause here —
+        // report `✓ rebase db push completed successfully` while Atlas applied
+        // whatever `drizzle/schema.sql` happened to be on disk, sometimes
+        // minutes old. With no prior file the same run died inside Atlas on
+        // `stat drizzle/schema.sql: no such file or directory`, which hides the
+        // real cause two screens up.
+        process.exitCode = 1;
+        throw error;
     }
 };
 
@@ -167,14 +176,22 @@ const main = async () => {
 
         watcher.on("all", (event, filePath) => {
             out(`[${event}] ${filePath}. Regenerating DDL schema...`);
-            runGeneration(resolvedPath, resolvedOutputPath);
+            // A watch session outlives a bad edit: the cause is already on
+            // stderr, and the next save is the retry. Only the one-shot run
+            // below turns a failure into an exit code.
+            void runGeneration(resolvedPath, resolvedOutputPath).catch(() => undefined);
         });
     } else {
-        runGeneration(resolvedPath, resolvedOutputPath);
+        await runGeneration(resolvedPath, resolvedOutputPath);
     }
 };
 
 // This check ensures the script only runs when executed directly
 if (import.meta.url.endsWith(process.argv[1])) {
-    main();
+    // `runGeneration` has already printed the cause and set the exit code; the
+    // handler is here so the last thing on the terminal is that message rather
+    // than Node's unhandled-rejection dump of the same stack.
+    main().catch(() => {
+        process.exitCode = 1;
+    });
 }

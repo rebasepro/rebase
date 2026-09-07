@@ -103,8 +103,10 @@ describe("storage sources on a shared account", () => {
     it("costs one shared set for many buckets", () => {
         // The whole point, measured. Three buckets on one account: three bucket
         // names plus one credential set, rather than three of everything.
+        // `media` carries the default flag: a project of named buckets has to
+        // say which one an unqualified upload reaches, or boot refuses.
         const definitions: StorageSourceDefinition[] = [
-            { key: "media", engine: "s3", account: "minio" },
+            { key: "media", engine: "s3", account: "minio", default: true },
             { key: "avatars", engine: "s3", account: "minio" },
             { key: "exports", engine: "s3", account: "minio" }
         ];
@@ -119,7 +121,10 @@ describe("storage sources on a shared account", () => {
         expect(Object.keys(env)).toHaveLength(6);
 
         const resolved = resolveStorageSources(env, definitions, "/tmp")!;
-        expect(Object.keys(resolved).sort()).toEqual(["avatars", "exports", "media"]);
+        // `media` again under the default key: the flag registers a second name
+        // for the same backend rather than renaming the source.
+        expect(Object.keys(resolved).sort()).toEqual(["(default)", "avatars", "exports", "media"]);
+        expect(resolved["(default)"]).toBe(resolved.media);
         for (const key of ["media", "avatars", "exports"]) {
             expect(resolved[key]).toMatchObject({
                 accessKeyId: "AKIA_SHARED",
@@ -146,11 +151,14 @@ describe("account survives the whole path, declaration to reader", () => {
         // export exists, so the optional call was a silent no-op and the test
         // passed on whatever any earlier test had declared.
         resetDeclaredResources();
-        bucket("media", { engine: "s3", account: "minio" });
+        bucket("media", { engine: "s3", account: "minio", default: true });
         bucket("avatars", { engine: "s3", account: "minio" });
 
         const definitions = graphToStorageSources(buildResourceGraph());
         expect(definitions.map(d => d.account)).toEqual(["minio", "minio"]);
+        // The same seam, for the flag this time: accepted at the call site,
+        // filtered against the kind's optionKeys, and mapped field by field.
+        expect(definitions.filter(d => d.default === true).map(d => d.key)).toEqual(["media"]);
 
         const resolved = resolveStorageSources({
             S3_BUCKET__MEDIA: "b-media",

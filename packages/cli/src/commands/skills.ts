@@ -4,7 +4,7 @@ import path from "path";
 import inquirer from "inquirer";
 import { createRequire } from "module";
 import { findProjectRoot } from "../utils/project";
-import { wantsHelp } from "../utils/args";
+import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 
 const require = createRequire(import.meta.url);
@@ -102,7 +102,15 @@ const AGENTS = {
     },
     copilot: {
         label: "GitHub Copilot",
-        detectDir: ".github",
+        // Deliberately undetectable. `.github/` is the one directory in this
+        // table that is not evidence of an assistant: `rebase init` writes
+        // `.github/copilot-instructions.md` into every scaffold, and half the
+        // repositories on the internet have a `.github/` for workflows and
+        // issue templates. Listing it made bare `rebase skills install` resolve
+        // to `[copilot]` in every project — so a Claude Code user who ran the
+        // command `rebase init` printed got a success message and nothing in
+        // `.claude/skills`. Copilot is `--agent copilot`.
+        detectDir: null,
         targetDir: ".github/instructions",
         flatLayout: true,
         indexFile: "rebase.instructions.md",
@@ -238,14 +246,39 @@ export function renderSkillIndex(skills: LoadedSkill[], agentKey: AgentKey): str
 }
 
 /**
+ * The body of a YAML block scalar, given the offset of its `description:` line.
+ *
+ * Everything indented more than the key belongs to the value; the first line
+ * that is not blank and not indented ends it.
+ */
+function blockScalarBody(frontMatter: string, keyOffset: number): string {
+    const lines = frontMatter.slice(keyOffset).split("\n").slice(1);
+    const body: string[] = [];
+    for (const line of lines) {
+        if (line.trim() === "") { body.push(""); continue; }
+        if (!/^[ \t]/.test(line)) break;
+        body.push(line.trim());
+    }
+    return body.join(" ");
+}
+
+/**
  * A skill's one-line summary, from its own front matter.
  *
  * Read rather than written here so a new skill needs no edit in this file, and
  * truncated because the index is only worth having while it stays short.
  */
 function describe(skill: LoadedSkill): string {
-    const described = /^description:\s*(.+)$/m.exec(skill.content.split("---")[1] ?? "");
-    const text = (described?.[1] ?? "").trim().replace(/\|/g, "\\|");
+    const frontMatter = skill.content.split("---")[1] ?? "";
+    const described = /^description:[ \t]*(.*)$/m.exec(frontMatter);
+    // `description: |` (or `>`) is a YAML block scalar: the value is the
+    // indented lines that follow, and capturing the line itself captured the
+    // `|`. That rendered an empty "Covers" cell for `rebase-design-language`,
+    // the one skill whose description says agents MUST read it.
+    const raw = /^[|>][-+]?$/.test((described?.[1] ?? "").trim())
+        ? blockScalarBody(frontMatter, described?.index ?? 0)
+        : (described?.[1] ?? "");
+    const text = raw.trim().replace(/\s+/g, " ").replace(/\|/g, "\\|");
     const firstSentence = /^.*?\.(?:\s|$)/.exec(text)?.[0]?.trim() ?? text;
     const fallback = skill.name.replace(/^rebase-/, "").replace(/-/g, " ");
     if (!firstSentence) return fallback;
@@ -256,10 +289,18 @@ function describe(skill: LoadedSkill): string {
     return `${cut.slice(0, cut.lastIndexOf(" ")).replace(/[,;:]$/, "")}…`;
 }
 
-/** Detect which agent environments already exist in the project. */
-function detectAgents(projectDir: string): AgentKey[] {
+/**
+ * Detect which agent environments already exist in the project.
+ *
+ * A `detectDir` has to be evidence *the user* created, not something a scaffold
+ * ships. An agent whose only marker fails that test declares `detectDir: null`
+ * and is reachable by `--agent` alone; guessing wrong here is worse than not
+ * guessing, because the wrong guess installs 21 files and reports success.
+ */
+export function detectAgents(projectDir: string): AgentKey[] {
     const detected: AgentKey[] = [];
     for (const [key, agent] of Object.entries(AGENTS)) {
+        if (!agent.detectDir) continue;
         if (fs.existsSync(path.join(projectDir, agent.detectDir))) {
             detected.push(key as AgentKey);
         }
@@ -345,23 +386,32 @@ export async function skillsCommand(subcommand: string | undefined, rawArgs: str
  * (also accepts a comma-separated list, and `all`). Returns null when none were
  * given.
  */
-function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
-    const requested: string[] = [];
-    for (let i = 0; i < rawArgs.length; i++) {
-        if (rawArgs[i] !== "--agent" && rawArgs[i] !== "-a") continue;
-        const value = rawArgs[i + 1];
-        if (value && !value.startsWith("-")) {
-            requested.push(...value.split(",").map(v => v.trim()).filter(Boolean));
-        }
-    }
+export function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
+    // Strict, and before anything is written. This used to scan `rawArgs` for
+    // `--agent` and ignore every other token, so `rebase skills install
+    // --frobnicate --agent claude` exited 0 after writing 21 files — the CLI's
+    // other families reject an unknown flag, and an installer is the last place
+    // to guess what the person meant.
+    const { flags } = parseCommandArgs({
+        spec: { "--agent": [String], "-a": "--agent" },
+        rawArgs,
+        commandWords: 2,
+        command: "skills install",
+        maxPositionals: 0
+    });
+
+    const requested = (flags["--agent"] ?? [])
+        .flatMap(value => value.split(",").map(v => v.trim()))
+        .filter(Boolean);
     if (requested.length === 0) return null;
 
     // `all` exists for the non-interactive case. Detection cannot help there: a
-    // scaffolded project ships `.cursorrules`, `CLAUDE.md`, `.windsurfrules` and
-    // `AGENTS.md` all at once, so every marker file is present and none of them
-    // says which assistant the developer actually uses. Guessing from them would
-    // install four agents' skills unasked; refusing leaves a scripted setup with
-    // no way through. Naming `all` is the developer saying it out loud.
+    // scaffolded project ships `.cursorrules`, `CLAUDE.md`, `.windsurfrules`,
+    // `AGENTS.md` and `.github/copilot-instructions.md` all at once, so every
+    // pointer file is present and none of them says which assistant the
+    // developer actually uses. Guessing from them would install several agents'
+    // skills unasked; refusing leaves a scripted setup with no way through.
+    // Naming `all` is the developer saying it out loud.
     if (requested.includes("all")) return Object.keys(AGENTS) as AgentKey[];
 
     const valid = Object.keys(AGENTS);
@@ -374,6 +424,10 @@ function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
 }
 
 async function skillsInstall(rawArgs: string[] = []) {
+    // Parse the line before anything else touches the disk: a bad flag must
+    // cost nothing, and everything below this writes or resolves paths.
+    const namedAgents = parseAgentFlags(rawArgs);
+
     // The project root, not the cwd. Agent skills belong beside the repository's
     // other agent configuration — `.claude/`, `.cursor/` — which is both what
     // `detectAgents` looks for and where an assistant reads them from. Resolving
@@ -400,13 +454,16 @@ async function skillsInstall(rawArgs: string[] = []) {
     }
 
     // 2. Explicit --agent wins; otherwise detect existing agent environments
-    let agents = parseAgentFlags(rawArgs) ?? detectAgents(projectDir);
+    let agents = namedAgents ?? detectAgents(projectDir);
 
     // 3. If none detected, ask the user
     if (agents.length === 0) {
-        // A scaffolded project ships `.cursorrules` / `CLAUDE.md` files but none
-        // of the *directories* detectAgents looks for, so a fresh project always
-        // lands here. On a non-TTY that used to abort with a raw ExitPromptError.
+        // A scaffolded project ships `.cursorrules`, `CLAUDE.md`, `AGENTS.md`
+        // and `.github/copilot-instructions.md`, but none of the *directories*
+        // detectAgents looks for, so a fresh project always lands here — which
+        // is correct: those files say what `rebase init` writes, not what the
+        // developer uses. On a non-TTY that used to abort with a raw
+        // ExitPromptError.
         if (!process.stdin.isTTY) {
             console.error(chalk.red("Cannot prompt: this is a non-interactive terminal (no TTY)."));
             console.error(chalk.yellow(`  Name the agents explicitly, e.g. rebase skills install --agent ${Object.keys(AGENTS)[0]}`));
@@ -466,13 +523,15 @@ ${chalk.green.bold("Usage")}
 
 ${chalk.green.bold("Subcommands")}
   ${chalk.blue.bold("install")}    Install Rebase agent skills for your AI coding assistant
-               Supports: Cursor, Claude Code, Windsurf, Gemini CLI, Antigravity
+               Supports: ${Object.values(AGENTS).map(a => a.label).join(", ")}
 
 ${chalk.green.bold("Options")}
   ${chalk.blue("--agent, -a")}   Agent(s) to install for, skipping detection and the prompt.
                 Repeat the flag or pass a comma-separated list, or ${chalk.bold("all")}.
-                Required without a TTY: a scaffolded project carries a marker
-                file for every agent, so detection cannot pick one for you.
+                Required without a TTY: detection looks for an agent's own
+                directory (${Object.values(AGENTS).filter(a => a.detectDir).map(a => a.detectDir).join(", ")}),
+                and a fresh scaffold has none. GitHub Copilot is never detected
+                — ${chalk.gray(".github/")} is not evidence anyone uses it — so name it.
                 Available: ${Object.keys(AGENTS).join(", ")}, all
 
 ${chalk.green.bold("Examples")}

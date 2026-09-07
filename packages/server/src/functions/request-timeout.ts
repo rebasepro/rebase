@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import type { HonoEnv } from "../api/types";
 import { logger } from "../utils/logger";
+import { ApiError, errorHandler } from "../api/errors";
 
 /** Default ceiling for a custom function request, in milliseconds. */
 export const DEFAULT_FUNCTIONS_TIMEOUT_MS = 30_000;
@@ -80,12 +81,15 @@ export function createFunctionsRequestTimeout(ms: number): MiddlewareHandler<Hon
                     "answering 504. The handler is still running; it cannot be cancelled from here. " +
                     "Give outbound calls an AbortSignal, or raise `functionsTimeoutMs` / REBASE_FUNCTIONS_TIMEOUT_MS."
                 );
-                return c.json({
-                    error: {
-                        message: "Function timed out",
-                        code: "FUNCTION_TIMEOUT"
-                    }
-                }, 504);
+                // Through `errorHandler`, not `c.json`: that is what puts the
+                // `requestId` in the body and hands the outcome to the request
+                // log, so the Studio Logs entry for a timeout carries
+                // `errorCode` like every other failure. Hand-built, it was the
+                // one 504 nobody could join to a log line.
+                return errorHandler(
+                    new ApiError(504, "FUNCTION_TIMEOUT", "Function timed out"),
+                    c
+                ) as Response;
             }
         } finally {
             if (timer) clearTimeout(timer);

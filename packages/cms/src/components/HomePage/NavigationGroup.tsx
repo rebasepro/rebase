@@ -1,6 +1,7 @@
 import React, { PropsWithChildren, useState } from "react";
 import { cls, ExpandablePanel, IconButton, iconSize, PencilIcon, Typography } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/app";
+import { useNavigationGroupLabel } from "@rebasepro/app";
+import { NAVIGATION_DEFAULT_GROUP_NAME } from "../../hooks/navigation/utils";
 
 export function NavigationGroup({
     children,
@@ -23,9 +24,27 @@ export function NavigationGroup({
     onToggleCollapsed?: () => void;
 }>) {
 
-    const { t } = useTranslation();
+    const groupLabel = useNavigationGroupLabel();
     const [isHovered, setIsHovered] = useState(false);
-    const currentGroupName = group ?? t("views_group");
+
+    /**
+     * The group's *name*, which is an identifier — it is what `onEditGroup`
+     * renames, what the card ordering compares, and what the drawer keys its
+     * icons off. Never the translated heading.
+     */
+    const currentGroupName = group ?? NAVIGATION_DEFAULT_GROUP_NAME;
+
+    /**
+     * What the heading reads.
+     *
+     * This used to translate only the default group (`t("views_group")`) and
+     * render every other name raw, while the drawer used
+     * `useNavigationGroupLabel` — so the same three groups had two sets of
+     * labels on one screen: `VISTAS / DATABASE / SETTINGS` on the home page
+     * against `VIEWS / BASE DE DATOS / SETTINGS` in the drawer beside it. One
+     * lookup, in both places.
+     */
+    const currentGroupLabel = groupLabel(currentGroupName);
 
     // Show caret only when not in preview and there is a toggle handler
     const showCaret = !isPreview && !!onToggleCollapsed;
@@ -43,7 +62,7 @@ export function NavigationGroup({
                     "font-medium text-[10px] uppercase tracking-[0.08em] text-primary/50 dark:text-primary/70"
                 )}
             >
-                {currentGroupName}
+                {currentGroupLabel}
             </Typography>
             {!isPreview && onEditGroup && !dndDisabled && (
                 <IconButton

@@ -1,4 +1,5 @@
 ---
+sourceHash: 44b8d8c5aa0525b6
 title: Implementando o Rebase no Microsoft Azure
 description: Implante sua instância Rebase de forma segura no Azure usando o Azure Database for PostgreSQL e o Azure Container Apps.
 sidebar_label: Azure
@@ -9,6 +10,21 @@ O Microsoft Azure oferece integrações rigorosas e conformidade empresarial. A 
 Para aderir à conformidade de dados europeia e tempos de resposta locais rápidos, provisione seus recursos em regiões como **Europa Ocidental (Amesterdã)**, **Europa do Norte (Irlanda)** ou **França Central (Paris)**.
 
 ## 1. Provisionar Servidor Flexível PostgreSQL
+
+**Não há nenhuma imagem de aplicação para construir a partir do seu código**. O `rebase build` produz um diretório `dist-bundle` com as suas coleções, funções e crons compilados — e, se o projeto declarar uma app estática, o seu frontend construído. A imagem de runtime publicada executa-o:
+
+```bash
+rebase build
+```
+
+O Container Apps puxa de um registo, por isso incorpore o bundle numa imagem derivada. Três linhas, e fixa exatamente o que corre:
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+Atualizar o Rebase mais tarde é uma alteração nessa linha `FROM`. O seu bundle fica intacto.
 
 1. No Portal do Azure, procure e selecione **servidores do Azure Database for PostgreSQL**.
 2. Clique em **Criar** e selecione **Servidor Flexível**.
@@ -27,9 +43,9 @@ Os Aplicativos de Contêiner do Azure puxarão sua imagem Docker do ACR.
    ```bash
    az acr login --name YourRegistryName
    ```
-3. Compile e envie a imagem Rebase a partir da raiz do projeto — o Dockerfile do backend precisa de todo o workspace como contexto de build (ele copia `pnpm-workspace.yaml`, `backend/` e `config/`), por isso o contexto é `.` e não `./backend`:
+3. Construa e envie a partir da raiz do projeto:
    ```bash
-   docker build -t yourregistryname.azurecr.io/rebase-backend:latest -f backend/Dockerfile .
+   docker build -t yourregistryname.azurecr.io/rebase-backend:latest .
    docker push yourregistryname.azurecr.io/rebase-backend:latest
    ```
 

@@ -1,4 +1,58 @@
 trustLockfile: true
+
+# ── Install settings ─────────────────────────────────────────────────────────
+#
+# All of these lived in `.npmrc`, in kebab-case, and pnpm 11 does not read that
+# file any more: `pnpm config get minimum-release-age` answered `undefined` with
+# the setting sitting right there under twenty lines of comment explaining why
+# it mattered. The tree was resolving with pnpm's defaults — the isolated
+# node_modules layout despite `node-linker=hoisted`, no release-age floor at all
+# — while npm 12 printed one "Unknown project config" warning per line on every
+# npm command. The same move was made in the generated scaffold months ago and
+# never here.
+#
+# `pnpm config get <camelCaseKey>` is the only way to know a setting is live.
+# `check:pnpm-settings` runs exactly that.
+linkWorkspacePackages: true
+preferWorkspacePackages: true
+autoInstallPeers: true
+saveExact: true
+# `.npmrc` said `hoisted` for years and pnpm 11 never read it, so every install
+# since the pnpm 11 upgrade — and every green CI run — has been the isolated
+# layout. Making `hoisted` live here would change module resolution for the whole
+# tree in the same change that moved the keys; keep what is actually running.
+# Switching linkers is its own decision, made on purpose, with a full reinstall.
+nodeLinker: isolated
+hoist: true
+# `.npmrc` also asked for `@types/*` and `express` to be public-hoisted, and
+# pnpm 11 never read that either: the root has two `@types` packages and no
+# `express`, and every workspace compiles against that. Turning the pattern on
+# changes type resolution for all thirty members in the same change that moved
+# the keys, so it stays off; enable it on purpose, with a full reinstall and a
+# typecheck of every member.
+# publicHoistPattern:
+#   - '@types/*'
+#   - express
+# How new a version may be before this repo will install it, in minutes.
+#
+# Three days. The attack this bounds is the one that actually happens to npm: a
+# maintainer account is compromised, a malicious version is published, and it is
+# found and unpublished within hours — so the whole exposure is the window
+# between the publish and the discovery. Waiting the window out is a cheap way
+# not to be in it, and it costs nothing here because versions are pinned exactly
+# (`saveExact`) and CI installs from a frozen lockfile.
+#
+# This said `0` once, above a comment reading "Temporarily disable release age
+# policy for @firecms/neat canary — remove once the package is >24h old". The
+# package had been released for two months. A temporary measure with no expiry
+# is a permanent one, and that one turned the protection off for every
+# dependency in the tree to unblock a single canary; `minimumReleaseAgeExclude`
+# below is how a single package is exempted instead.
+#
+# To take a genuinely fresh version, pass it deliberately for that one install
+# rather than lowering it here again:
+#     pnpm add <pkg> --config.minimum-release-age=0
+minimumReleaseAge: 4320
 packages:
   - packages/*
   - tooling/rebase-agent-skills

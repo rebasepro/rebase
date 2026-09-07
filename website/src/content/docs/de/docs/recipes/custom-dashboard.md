@@ -1,4 +1,5 @@
 ---
+sourceHash: 62363af9dfc94b45
 title: "Rezept: Benutzerdefiniertes Dashboard"
 sidebar_label: Benutzerdefiniertes Dashboard
 description: Erstellen Sie eine benutzerdefinierte Dashboard-Ansicht mit Diagrammen, Statistiken und Datenvisualisierungen mithilfe von Rebase-Hooks.

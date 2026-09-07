@@ -8,6 +8,10 @@ Developer CLI for scaffolding, running, and managing Rebase projects.
 pnpm add -g @rebasepro/cli
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 The CLI is also bundled with every Rebase project as a local dependency.
 
 ## Commands

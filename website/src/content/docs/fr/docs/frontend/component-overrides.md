@@ -1,4 +1,5 @@
 ---
+sourceHash: 3e8accd144f401d4
 title: Surcharges de composants (Swizzling)
 sidebar_label: Surcharges de composants
 description: Remplacez les composants d'UI par défaut par des implémentations personnalisées au niveau de l'application ou de la collection.

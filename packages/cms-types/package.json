@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/cms-types",
   "version": "0.17.3",
-  "description": "Rebase admin-panel type definitions \u2014 the React-flavoured half of the type surface",
+  "description": "Type definitions for the Rebase admin panel \u2014 CMS and Studio \u2014 the React-flavoured half of the type surface",
   "keywords": [
     "rebase",
     "admin",

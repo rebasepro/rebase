@@ -2,23 +2,25 @@ import type { APIRoute } from "astro";
 import { languages, defaultLang } from "../../i18n/ui";
 import { generateMarkdownForPage } from "../../utils/markdownGenerator";
 
-const PAGES = [
-  "compare",
-  "cli",
-  "sdk",
-  "security",
-  "ai",
-  "about",
-  "developers",
-  "product",
-  "contact",
-  "agencies",
-  "startups",
-  "studio",
-  "ui",
-  "backend",
-  "cms"
-];
+/**
+ * Every marketing route, from the routes themselves.
+ *
+ * This was a hand-kept list of sixteen slugs against thirty-one routes, so
+ * `/pricing`, `/rls-check`, `/europe`, `/manifesto` and all eight `rebase-vs-*`
+ * pages had no `.md` twin — the mirrors an agent reads did not include the
+ * pricing page. A literal list of routes next to the routes is a list that goes
+ * stale the first time somebody adds a page, and nothing about adding a page
+ * makes you think of this file.
+ *
+ * `index` is excluded because `index.md.ts` next door serves it, and
+ * `generateMarkdownForPage` gives every slug it has no bespoke section for a
+ * generic mirror rather than a 404. `check_site.mjs` asserts the two sets stay
+ * equal.
+ */
+const PAGES = Object.keys(import.meta.glob("./*.astro"))
+  .map((file) => file.replace(/^\.\//, "").replace(/\.astro$/, ""))
+  .filter((slug) => slug !== "index")
+  .sort();
 
 export function getStaticPaths() {
   const paths = [];

@@ -209,7 +209,7 @@ rebase generate-sdk --collections-dir ./config/collections --output ./generated/
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
 | `--email` | `-e` | (required — or pass as positional arg) | User's email address |
-| `--password` | `-p` | `NewPassword123!` | New password |
+| `--password` | `-p` | one is generated and printed | New password |
 
 ```bash
 # With flags

@@ -71,8 +71,12 @@ Reads source directly, so it needs no build and fails fast.`
         why: `The type-level counterpart. check:headless proves the backend never
 *executes* React and passed for months while 13 shipped .d.ts files began
 with \`import React from "react"\` and @types/react was a devDependency
-only — so a BaaS install had nothing to resolve them against. This scans
-the text of core sources AND built .d.ts, plus the manifests.`
+only — so a BaaS install had nothing to resolve them against.
+
+The SOURCE half: core sources and manifests, which need no build. The
+declarations that rationale is actually about are \`check:types-headless:dts\`,
+in build-gates — it ran here for months, in a job that never builds, so it
+scanned an absent dist and printed the same green line either way.`
     },
     {
         run: "check:browser-deps",
@@ -94,6 +98,22 @@ and check:gates-doc now exist too.`
 a collection file, SDK calls) typechecked with \`react\` mapped to a stub
 that stands in for its absence. Catches a React type reached through an
 alias, which a text scan cannot see.`
+    },
+    {
+        run: "check:ts-expect-error-coverage",
+        why: `A \`@ts-expect-error\` is a test written in the type system, and \`tsc\` is
+the only thing that runs it. Jest and vitest strip types without checking
+them, so in a file no program reads the directive is a comment — and the
+file usually says the opposite in its own docblock:
+\`packages/server/test/auth-config-types.test.ts\` opened with "the real value
+is that tsc validates the @ts-expect-error annotations" and was in neither
+program. Ten directives across eight files were in that state; adding them
+found four that had gone stale, one written a line above the error it meant
+to suppress, and three assertions that were tuple-index errors.
+
+It also holds the include list in \`tsconfig.tests.json\`, which is otherwise
+a hand-maintained ratchet nothing stops you from shortening to make
+\`pnpm typecheck\` green.`
     },
     {
         run: "check:runtime-image",
@@ -224,9 +244,21 @@ search anyone ran, and an empty result reads exactly like "no matches".`
         why: `Six manifests said Node 20, four said 20.10, one said 20, seven said
 nothing, the dogfood app said 18 and five translated quickstarts told
 readers 18+ — while .nvmrc, which is what everyone installs, said
-22.22.0. pnpm enforces \`engines\` on install, so an understated floor is
-not cosmetic: it lets someone through on Node 20 and moves the failure
-into a transitive dependency. The React peer floor decayed the same way.`
+22.22.0. Neither manager enforces \`engines\` on its own (pnpm installs a
+\`>=99.0.0\` project and exits 0), so what makes the number load-bearing is
+\`bin/rebase.js\`'s own floor check and the scaffold's \`engineStrict\` —
+both of which read the declaration this gate keeps honest. The React peer
+floor decayed the same way.`
+    },
+    {
+        run: "check:pnpm-settings",
+        why: `pnpm 11 stopped reading its settings from \`.npmrc\` and said nothing. Eight
+were dead at once, including the three-day \`minimum-release-age\` floor whose
+own comment explains what it bounds — so the tree resolved with pnpm's
+defaults, in the isolated node_modules layout despite \`node-linker=hoisted\`,
+with no supply-chain window at all. This asks pnpm rather than reading the
+file: every setting declared in pnpm-workspace.yaml must come back from
+\`pnpm config\`, with the value declared.`
     },
     {
         run: "check:jsdoc-coverage",
@@ -240,6 +272,13 @@ interchangeably — they are not the same thing, and nothing said so.`
         why: `The \`<Rebase>\` props table documented ten of twenty-four props, and two
 of the ten were declared on RebaseProps and never read by Rebase.tsx. A
 hand-written table drifts the moment a prop is added.`
+    },
+    {
+        run: "check:property-options",
+        why: `The properties page listed 30 of the 36 keys the \`Admin*Options\`
+interfaces declare, and four of the six it missed — \`locale\`,
+\`minimumFractionDigits\`, \`maximumFractionDigits\`, \`notation\` — were in
+no English page at all. The sibling of check:rebase-props, same reason.`
     },
     {
         run: "check:subpath-imports",
@@ -261,12 +300,43 @@ not in the reader's project, so following it finds nothing and there is
 no way to discover where the page actually is.`
     },
     {
+        run: "check:doc-links",
+        why: `A relative link is resolved against the directory of the file it is
+written in, and nothing checked that the result was a file. 62 links under
+\`docs/plans/\` and \`docs/audits/\` wrote \`../packages/…\` from one level too
+deep, so every one of them resolved to \`docs/packages/…\` and pointed at
+nothing — a reader following a citation to a 404 with nothing to search
+for. \`docs/README.md\` names this exact hazard ("70 of them moved the last
+time this was reorganised") and naming it was all anyone had done.
+
+Scope is the markdown a contributor reads — docs, .agent, .github, the two
+root files. The website's pages are \`verify:docs\`, which knows its routing
+and its locales.`
+    },
+    {
+        run: "check:bug-classes",
+        why: `docs/bug-classes.md is cited by number — "class 4 in its purest form" —
+and it had two \`## 50.\` sections, added months apart, one of which referred
+to the other as class 49. A duplicate heading breaks no link and fails no
+test, so nothing said so. This holds uniqueness and contiguity: a gap means
+an entry was deleted, and a deleted class is a sweep nobody runs again.`
+    },
+    {
         run: "check:untranslated",
         why: `The admin ships seven non-English locales and 200-odd strings that have
 a translation key are also written out as English literals, where no
 translation reaches them. Found by looking at the running panel: a
 product card with a missing image said "File not found", and
 \`file_not_found\` is translated seven ways.`
+    },
+    {
+        run: "check:locale-parity",
+        why: `The other half of check:untranslated, and the half that was actually
+broken. 244 Studio strings were turned into keys, the keys were added to
+every locale file holding the English value, and check:untranslated stayed
+green because nothing in the components was wrong. Español showed "No API
+keys yet" and a reset-password dialog in English apart from "Cancelar".
+41 keys were missing outright, which i18next renders as the key.`
     },
     {
         run: "check:glued-code",

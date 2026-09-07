@@ -24,8 +24,14 @@ import path from "node:path";
 import { workspaceGlobs, workspacePackages, publishablePackages, setVersion } from "../publishable-packages.mjs";
 import { checkPublishableSet, RELEASE_FILES, WORKFLOW } from "../check-publishable-set.mjs";
 
+/** The one expression every release file must compute its baseline with. */
+const DERIVATION = "git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true";
+
 /** A workflow that does everything right, so a test can vary one thing. */
 const GOOD_WORKFLOW = `
+      - name: Determine version
+        run: |
+          LATEST_TAG=$(${DERIVATION})
       - name: Bump versions
         run: node tooling/scripts/publishable-packages.mjs --set-version "$VERSION"
       - name: Pack
@@ -219,6 +225,51 @@ test("release.sh is held to the same rule as the workflow", () => {
     assert.equal(found.length, 2, "one for the path filter, one for never deriving");
     assert.ok(found.every(f => f.message.startsWith("tooling/scripts/release.sh")),
         `both findings name release.sh, got: ${found.map(f => f.message).join(" | ")}`);
+});
+
+/**
+ * The version derivation.
+ *
+ * `release.sh` was fixed to walk back from HEAD; the two `publish.yml` steps
+ * kept scanning the tag namespace, where 436 pre-restart `v3.*` tags outrank
+ * every current release. One `git push --tags` and the next stable release
+ * would have computed 3.4.0 and published it.
+ */
+test("a version read out of the tag namespace is a finding", () => {
+    const root = workspace({ "packages/cli": ok("@rebasepro/cli") });
+    const found = messages(root, GOOD_WORKFLOW.replace(
+        DERIVATION,
+        "git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1"
+    ));
+    assert.deepEqual(found, ["1 release step(s) read a version out of the tag namespace."]);
+});
+
+test("two release files deriving the version differently is a finding", () => {
+    // The state the repository was actually in: one file walking the history,
+    // the other scanning the namespace, both green.
+    const root = workspace({ "packages/cli": ok("@rebasepro/cli") });
+    const found = checkPublishableSet({
+        root,
+        sources: {
+            "tooling/scripts/release.sh":
+                "node tooling/scripts/publishable-packages.mjs --dirs\n"
+                + "LATEST_TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*')\n"
+        }
+    });
+    assert.deepEqual(found.map(f => f.message),
+        ["2 different version derivations across the release files."]);
+});
+
+test("the same expression in several files passes", () => {
+    const root = workspace({ "packages/cli": ok("@rebasepro/cli") });
+    assert.deepEqual(checkPublishableSet({
+        root,
+        sources: {
+            "tooling/scripts/release.sh":
+                "node tooling/scripts/publishable-packages.mjs --dirs\n"
+                + `LATEST_TAG=$(${DERIVATION})\n`
+        }
+    }), []);
 });
 
 test("a publishable @rebasepro package outside the workspace is a finding", () => {

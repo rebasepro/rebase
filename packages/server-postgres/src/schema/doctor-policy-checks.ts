@@ -68,6 +68,22 @@ export async function runPolicyChecks(collectionsPath: string, databaseUrl?: str
 
         const runSql = async (text: string) => (await pool.query(text)).rows as Record<string, unknown>[];
 
+        // Prove the connection before anything is ticked.
+        //
+        // `validatePolicyPgRoles` returns without a query when no collection
+        // names a `pgRoles` — which is most projects — so it "passed" against a
+        // database that was never reached, and the tick printed above an
+        // ECONNREFUSED that only surfaced two checks later. Ten lines up, this
+        // file says that reporting success for work it never did is the reason
+        // it exists. This is the same shape, one function along.
+        try {
+            await runSql("SELECT 1");
+        } catch (err) {
+            console.error(chalk.gray("  ⏭ Policy roles: not checked"));
+            console.error(chalk.red("  ✗ Could not check RLS policies:"), err instanceof Error ? err.message : String(err));
+            return "unchecked";
+        }
+
         // A policy naming a role the server never runs as filters every row, so
         // the collection reads as empty. Report it without booting a server.
         try {

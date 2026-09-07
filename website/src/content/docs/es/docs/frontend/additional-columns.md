@@ -1,4 +1,5 @@
 ---
+sourceHash: b39ae0ea2de335df
 title: Columnas Adicionales
 sidebar_label: Columnas Adicionales
 description: Añade columnas calculadas/virtuales a las tablas de colecciones que derivan valores de los datos de la entidad.

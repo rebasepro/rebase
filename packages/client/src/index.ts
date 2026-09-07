@@ -530,7 +530,10 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                     let msg = `Unknown collection accessor "${prop}". Known collections: ${knownList}.`;
                     if (suggestion) msg += ` Did you mean "${suggestion}"?`;
                     msg += ` Use data.collection("<slug>") for dynamic slugs.`;
-                    throw new RebaseClientError(msg);
+                    throw new RebaseClientError(msg, {
+                        code: "UNKNOWN_COLLECTION",
+                        details: { accessor: prop, known: knownKeys }
+                    });
                 }
                 // Untyped fallback: convert camelCase property names to snake_case slugs.
                 // e.g. `companyMembers` → `company_members`
@@ -579,7 +582,8 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                     throw new RebaseClientError(
                         realtimeUnreachable
                             ? `Realtime is enabled but ${unreachableReason}`
-                            : "Realtime is disabled on this client (realtime: false), so channels are unavailable."
+                            : "Realtime is disabled on this client (realtime: false), so channels are unavailable.",
+                        { code: "REALTIME_DISABLED" }
                     );
                 }
                 let existing = realtimeChannels.get(name);

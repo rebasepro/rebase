@@ -75,7 +75,11 @@ export function buildAtlasArgs(invocation: AtlasInvocation): string[] {
             argv.push("--dev-url", devUrl);
         } else if (args.includes("apply") || args.includes("status")) {
             argv.push("--url", url, "--revisions-schema", "rebase");
-            if (args.includes("apply")) {
+            // Measured against the pinned binary: `sql/migrate: baseline and
+            // allow-dirty are mutually exclusive`. `--baseline` is the caller's
+            // explicit answer to the same question `--allow-dirty` answers by
+            // default, so it wins, and adding both would refuse the command.
+            if (args.includes("apply") && !args.includes("--baseline")) {
                 argv.push("--allow-dirty");
             }
         }

@@ -242,6 +242,11 @@ export function describeRuntime(project: {
 }
 
 export async function statusCommand(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 2,
+command: "cloud status",
+maxPositionals: 0 });
     const { client, url } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     try {
@@ -396,6 +401,11 @@ function cpuLine(m: TenantMetrics): string | undefined {
 }
 
 export async function metricsCommand(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 2,
+command: "cloud metrics",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     try {
@@ -558,6 +568,15 @@ export async function webhooksCommand(subcommand: string | undefined, rawArgs: s
     if (subcommand === "delete" && !deleteId) {
         fail("Usage: rebase cloud webhooks delete <id>", undefined, "usage");
     }
+    // The listing takes only the globals, and took them permissively: `webhooks
+    // list --tabel orders` listed every webhook and exited 0.
+    if (!create && !deleteId) {
+        parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud webhooks",
+maxPositionals: 0 });
+    }
 
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
@@ -663,6 +682,11 @@ export async function storageCommand(action: string | undefined, rawArgs: string
     // Everything that is not one of those, and is not `list` or nothing, is a
     // typo — and used to LIST, exit 0, and read as a bucket that was created.
     requireKnownAction("storage", action, STORAGE_ACTIONS);
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud storage",
+maxPositionals: 0 });
 
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
@@ -1184,6 +1208,11 @@ async function clustersAddCommand(rawArgs: string[]): Promise<void> {
 }
 
 async function clustersListCommand(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud clusters",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     try {
         const clusters = (await client.data.collection("clusters").find({ limit: 100 })).data as unknown as Array<{
@@ -1513,6 +1542,17 @@ export async function computeCommand(action: string | undefined, rawArgs: string
     // `compute et --cpu 500m` used to SHOW the dials and exit 0, so a caller
     // that meant to change one was told what it currently is and nothing else.
     requireKnownAction("compute", action, COMPUTE_ACTIONS);
+    // `set` is described by `COMPUTE_SET_FLAGS`, which is derived from
+    // `DIAL_FLAGS`; `buildDialPatch` still reads the values itself, because
+    // `--no-autoscale` is value-less. This parse is only the refusal: without
+    // it `compute set --cpu-request 500m` set nothing and reported success.
+    parseCloudArgs({
+        spec: (action === "set" ? COMPUTE_SET_FLAGS : {}) as Record<string, never>,
+        rawArgs,
+        commandWords: 3,
+        command: action === "set" ? "cloud compute set" : "cloud compute",
+        maxPositionals: 0
+    });
 
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);

@@ -1,4 +1,5 @@
 ---
+sourceHash: ac69f91f756be451
 title: Déployer Rebase sur Google Cloud Platform
 description: Déployez votre instance Rebase en toute sécurité sur GCP en utilisant Cloud SQL et Cloud Run, en vous concentrant sur les régions de centres de données de l'UE.
 sidebar_label: Google Cloud
@@ -24,6 +25,21 @@ Cloud Run met à l'échelle le backend Node.js de Rebase automatiquement jusqu'�
 
 Assurez-vous d'avoir l'interface de ligne de commande `gcloud` installée et authentifiée :
 
+Il n'y a **aucune image applicative à construire depuis vos sources**. `rebase build` produit un répertoire `dist-bundle` avec vos collections, fonctions et crons compilés — et, si votre projet déclare une app statique, votre frontend construit. L'image de runtime publiée l'exécute :
+
+```bash
+rebase build
+```
+
+Cloud Run tire depuis un registre : intégrez donc le bundle dans une image dérivée. Trois lignes, et cela fige exactement ce qui tourne :
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+Mettre Rebase à niveau plus tard revient à changer cette ligne `FROM`. Votre bundle reste intact.
+
 ```bash
 # Set your active GCP project
 gcloud config set project YOUR_PROJECT_ID
@@ -31,10 +47,7 @@ gcloud config set project YOUR_PROJECT_ID
 # Authenticate Docker to the registry (one-time)
 gcloud auth configure-docker gcr.io
 
-# Build from the PROJECT ROOT — the backend Dockerfile needs the whole
-# workspace as its build context (pnpm-workspace.yaml, backend/, config/),
-# so a ./backend context will fail. Then push.
-docker build -f backend/Dockerfile -t gcr.io/YOUR_PROJECT_ID/rebase-backend .
+docker build -t gcr.io/YOUR_PROJECT_ID/rebase-backend .
 docker push gcr.io/YOUR_PROJECT_ID/rebase-backend
 
 # Deploy the newly built image to Cloud Run

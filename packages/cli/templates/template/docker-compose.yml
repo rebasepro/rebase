@@ -150,10 +150,12 @@ services:
       STORAGE_PATH: /uploads
       FORCE_LOCAL_STORAGE: "true"
     volumes:
-      # Your built project. Writable, because the runtime installs the bundle's
-      # declared dependencies into it on first start — `rebase build` emits a
-      # package.json but not a node_modules.
-      - ./dist-bundle:/bundle
+      # Your built project. `rebase build` installs its declared dependencies
+      # into the bundle by default, so `node_modules` is already there and the
+      # mount can be read-only — a compromised hook then cannot rewrite the code
+      # that runs after it. Drop the `:ro` if you build with `--no-vendor`: the
+      # runtime installs at every start instead, and needs to write here.
+      - ./dist-bundle:/bundle:ro
       - uploads:/uploads
 
 volumes:

@@ -12,6 +12,7 @@ import inquirer from "inquirer";
 import {
     requireClient,
     requireProject,
+    requireKnownAction,
     displayProjectRef,
     parseCloudArgs,
     emit,
@@ -74,6 +75,11 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
 }
 
 async function listDatabases(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud db",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -167,8 +173,16 @@ export const CREATE_DATABASE_FLAGS = {
 } as const;
 
 async function createDatabase(rawArgs: string[]): Promise<void> {
-    const args = arg(CREATE_DATABASE_FLAGS, { argv: rawArgs.slice(4),
-permissive: true });
+    // Strict, and through the family's parser: an undeclared flag used to be
+    // dropped, so `db create --typ managed` opened the interactive picker —
+    // or, off a terminal, refused for a type that had been given.
+    const { flags: args } = parseCloudArgs({
+        spec: CREATE_DATABASE_FLAGS,
+        rawArgs,
+        commandWords: 3, // cloud db create
+        command: "cloud db create",
+        maxPositionals: 0
+    });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -333,6 +347,11 @@ connectionStatus: "connected" };
 }
 
 async function testDatabase(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud db",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -387,10 +406,16 @@ interface DbInfoResponse {
  * unavailable, never a placeholder.
  */
 async function dbInfo(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--reveal": Boolean,
-"--project": String,
-"-p": "--project" }, { argv: rawArgs.slice(2),
-permissive: true });
+    // `--project`/`-p` are globals and are not redeclared. Strict, so
+    // `db info --revel` refuses instead of quietly masking the password it
+    // was asked to show.
+    const { flags: args } = parseCloudArgs({
+        spec: { "--reveal": Boolean },
+        rawArgs,
+        commandWords: 3, // cloud db info
+        command: "cloud db",
+        maxPositionals: 0
+    });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -460,6 +485,25 @@ connectionString } : {})
 /* ─── backups ──────────────────────────────────────────────────── */
 
 /**
+ * What `db backup` dispatches. `list` is the default for a bare invocation.
+ *
+ * Fed to `requireKnownAction` before the client is built, like every other
+ * group in this family. Both dispatchers here used to end in an unguarded
+ * default instead, so `db backup lst` and `db backup restre` listed the backups
+ * and read as "ran, nothing to do" — on a command whose other actions overwrite
+ * the live database. `db pitr` did have a refusal, but at the tail, behind a
+ * login and a project lookup: a typo answered `not_logged_in` and never named
+ * the typo.
+ *
+ * The lists are the ones each `--help` page's usage line carries;
+ * `action-help.test.ts` holds the two together.
+ */
+const BACKUP_ACTIONS = ["list", "create", "restore", "status", "download"] as const;
+
+/** What `db pitr` dispatches. `status` is the default for a bare invocation. */
+const PITR_ACTIONS = ["status", "restore", "cutover", "discard"] as const;
+
+/**
  * `db backup [action] [filename]`, resolved in one strict parse.
  *
  * Both halves were reachable by the old operand filter, and both are
@@ -492,6 +536,7 @@ filename: positionals[1] };
 
 async function backupCommand(rawArgs: string[]): Promise<void> {
     const { flags: args, action, filename: backupFile } = resolveBackupArgs(rawArgs);
+    requireKnownAction("db backup", action, BACKUP_ACTIONS);
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -587,7 +632,9 @@ url: res.url }
             return;
         }
 
-        // default: list
+        // default: list — the only word that reaches here, because
+        // `requireKnownAction` refused every other one before the client was
+        // built.
         const res = await client.functions.invoke<{ backups: BackupRow[] }>(
             "backup",
             undefined,
@@ -644,6 +691,7 @@ async function pitrCommand(rawArgs: string[]): Promise<void> {
         maxPositionals: 1
     });
     const action = positionals[0] || "status";
+    requireKnownAction("db pitr", action, PITR_ACTIONS);
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -730,11 +778,10 @@ acknowledgeNoCutover: true },
             return;
         }
 
-        fail(
-            `Unknown pitr command: ${action}`,
-            "Run `rebase cloud db pitr --help`. Actions: status, restore, cutover, discard.",
-            "unknown_command"
-        );
+        // No tail: `requireKnownAction` refused every word that is not one of
+        // the four, before the client was built. The refusal that used to sit
+        // here was behind a login and a project lookup, so a typo answered
+        // `not_logged_in` rather than naming the typo.
     } catch (e) {
         reportError(e, "PITR operation failed");
     }

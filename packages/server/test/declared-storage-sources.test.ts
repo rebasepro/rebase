@@ -32,7 +32,9 @@ describe("one declaration, two readers", () => {
     beforeEach(() => resetDeclaredResources());
 
     it("carries `account` all the way to the ejected entrypoint's resolver", () => {
-        bucket("media", { engine: "s3", account: "minio" });
+        // `media` is the default: a project of named buckets has to say which
+        // one an unqualified upload reaches, or the resolver refuses.
+        bucket("media", { engine: "s3", account: "minio", default: true });
         bucket("avatars", { engine: "s3", account: "minio" });
 
         // The list the eject template builds. It used to lose `account` here.
@@ -46,7 +48,8 @@ describe("one declaration, two readers", () => {
             S3_SECRET_ACCESS_KEY__MINIO: "SECRET_SHARED"
         }, sources, "/tmp/uploads")!;
 
-        expect(Object.keys(resolved).sort()).toEqual(["avatars", "media"]);
+        expect(Object.keys(resolved).sort()).toEqual(["(default)", "avatars", "media"]);
+        expect(resolved["(default)"]).toBe(resolved.media);
         expect(resolved.media).toMatchObject({ bucket: "b-media", accessKeyId: "AKIA_SHARED" });
         expect(resolved.avatars).toMatchObject({ bucket: "b-avatars", accessKeyId: "AKIA_SHARED" });
     });

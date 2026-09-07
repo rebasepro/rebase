@@ -251,7 +251,7 @@ schedule: "30 2 * * 1" })]);
             const log = await scheduler.triggerJob("leaky");
 
             expect(log!.success).toBe(false);
-            expect(log!.error).toBe("Failed query: [redacted]");
+            expect(log!.error).toBe("Failed query: [redacted — set REBASE_LOG_RAW_QUERIES=true in development to see it]");
             expect(scheduler.getJob("leaky")!.lastError).not.toContain("alice@acme.com");
             expect(scheduler.getJob("leaky")!.lastError).not.toContain("$2b$12$");
         });

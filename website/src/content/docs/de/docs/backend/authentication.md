@@ -1,4 +1,5 @@
 ---
+sourceHash: 67e5fa6384e4d04a
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Konfigurieren Sie JWT-Authentifizierung, OAuth-Anbieter, SMTP-E-Mail, Auth-Hooks und benutzerdefinierte Auth-Adapter im Backend.
@@ -94,6 +95,32 @@ auth: {
     spotify:   { clientId: "...", clientSecret: "..." },
 }
 ```
+
+#### Die Umgebungsvariablen
+
+Eine gemanagte oder Bundle-Bereitstellung hat keinen `auth`-Block, in den sie
+schreiben könnte — sie konfiguriert den Server vollständig über die Umgebung.
+Deshalb hat jeder Anbieter oben ein Paar `<ANBIETER>_CLIENT_ID` /
+`<ANBIETER>_CLIENT_SECRET`, und beide Hälften müssen gesetzt sein, bevor der
+Anbieter überhaupt konfiguriert wird:
+
+```bash
+DISCORD_CLIENT_ID=…
+DISCORD_CLIENT_SECRET=…
+```
+
+`GET /api/auth/config` führt `discord` dann unter `enabledProviders` auf — so
+lässt sich prüfen, ob ein Paar angekommen ist.
+
+Apple ist die Ausnahme: Es gibt kein statisches Client-Secret, weil Rebase für
+jeden Token-Austausch ein kurzlebiges ES256-JWT signiert. Nötig sind alle vier
+Werte `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` und
+`APPLE_PRIVATE_KEY` — der Inhalt der `.p8`-Datei, samt Zeilenumbrüchen.
+
+Zwei Optionen haben keine Entsprechung in der Umgebung und brauchen den
+`auth`-Block (also ein ejectetes oder im Code konfiguriertes Backend):
+`microsoft.tenantId`, das sonst auf `common` fällt und jede Adresse als
+unverifiziert meldet, und `gitlab.baseUrl` für eine selbst gehostete Instanz.
 
 ### Kontoverknüpfung über Anmeldemethoden hinweg
 

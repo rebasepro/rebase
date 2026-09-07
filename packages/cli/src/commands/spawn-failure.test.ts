@@ -62,6 +62,11 @@ let errors: string[];
 beforeEach(() => {
     scratch = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-spawn-"));
     fs.mkdirSync(path.join(scratch, "backend"), { recursive: true });
+    // `doctor` hands its three drift phases to the driver only when collections
+    // are declared in code — a headless project has none, and it says so and
+    // stops rather than spawning. Both suites here are about the spawn, so the
+    // fixture has to be a project that reaches one.
+    fs.mkdirSync(path.join(scratch, "config", "collections"), { recursive: true });
     errors = [];
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "warn").mockImplementation(() => undefined);

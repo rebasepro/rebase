@@ -7,7 +7,9 @@ import { callerIdCall,
     effectivePrivileges,
     finding,
     isPublicRole,
+    isRebaseManagedPolicy,
     listAnd,
+    managedPolicyFix,
     qi,
     qrel,
     type Privilege
@@ -103,8 +105,14 @@ export const anonymousWriteAllowed: Check = {
                         `${listAnd(verbs)} rows in ${policy.schema}.${policy.table} at will — inserting ` +
                         `records attributed to other users, or ` +
                         `${commands.includes("DELETE") ? "deleting the table's contents" : "modifying rows they do not own"}.`,
-                    fix:
-                        `-- Scope the write to the caller, or take the privilege away entirely:\n` +
+                    fix: isRebaseManagedPolicy(snapshot, policy)
+                        ? managedPolicyFix(
+                            policy,
+                            `scope the write rule to the caller (an \`ownerField\`) or restrict it to \`roles\` — ` +
+                            `and if anonymous writes are never intended, say so there rather than by ` +
+                            `revoking the grant, which boot re-makes`
+                        )
+                        : `-- Scope the write to the caller, or take the privilege away entirely:\n` +
                         `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
                         `    WITH CHECK (user_id = ${uidCall});\n` +
                         `-- and if anonymous writes are never intended:\n` +

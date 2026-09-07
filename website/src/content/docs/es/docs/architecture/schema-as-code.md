@@ -1,4 +1,5 @@
 ---
+sourceHash: 0824e3198007abfc
 title: Esquema como Código
 sidebar_label: Esquema como Código
 description: Cómo Rebase utiliza colecciones de TypeScript como la única fuente de verdad para el esquema de su base de datos, UI y API.

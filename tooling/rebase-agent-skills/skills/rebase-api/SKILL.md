@@ -462,6 +462,9 @@ See the **rebase-security** skill for using them as the authorization layer, and
 
 ## REST API Examples
 
+`$TOKEN` in these examples is an access token — the `accessToken` a sign-in
+returns, or an API key. Nothing sets it for you.
+
 ### List with filtering, sorting, and pagination
 
 ```bash

@@ -8,6 +8,10 @@ Firebase client adapter for Rebase — connects the Rebase admin panel to Fireba
 pnpm add @rebasepro/firebase
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 **Peer dependencies:** `firebase ^10.12.2 || ^11.0.0 || ^12.0.0`, `react >= 19.0.0`, `react-dom >= 19.0.0`, `typesense ^1.8.0` (optional)
 
 ## What This Package Does

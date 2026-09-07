@@ -475,7 +475,7 @@ status });
  * For a project on the managed runtime it is worse than stale: a successful
  * source build sets `runtimeMode: "custom"` server-side, so the bare form
  * silently swaps a managed project back onto a container image. That one is a
- * refusal rather than a note — `--bundle` is what was meant, and `--force`
+ * refusal rather than a note — `--bundle` is what was meant, and `--eject`
  * ejects on purpose.
  */
 
@@ -629,8 +629,8 @@ export interface EjectContext {
     managed: boolean;
     /** `--source` was passed: build this directory. */
     source: boolean;
-    /** `--force` was passed: eject on purpose. */
-    force: boolean;
+    /** `--eject` was passed: leave the managed runtime on purpose. */
+    eject: boolean;
 }
 
 /**
@@ -640,7 +640,15 @@ export interface EjectContext {
  * Every path below this point builds a container image, and a successful one
  * sets `runtimeMode: "custom"` server-side. So the question is never "which flag
  * was used" but "did the caller ask to leave the managed runtime", and only
- * `--force` answers it.
+ * `--eject` answers it.
+ *
+ * The flag was `--force` until the 2026-09-06 sweep. `--force` means four
+ * different things across this CLI — overwrite a file, disconnect other
+ * Postgres sessions, set a build-time key anyway — and three of them are
+ * recoverable in a minute. This one moves a live project off the managed
+ * runtime, which is the least recoverable thing the CLI can be asked to do,
+ * and it had the same name as "overwrite this file". Renamed rather than
+ * aliased: an alias would leave the dangerous spelling working.
  *
  * `--source` used to be read as answering it too, on the theory that uploading a
  * build context is self-evidently a deliberate eject. It is not: `--source`
@@ -654,8 +662,8 @@ export function ejectRefusal(
     opts: EjectContext,
     projectRef: string
 ): { message: string; hint: string; code: string } | undefined {
-    if (!opts.managed || opts.force) return undefined;
-    const eject = "To eject on purpose, add `--force`.";
+    if (!opts.managed || opts.eject) return undefined;
+    const eject = "To eject on purpose, add `--eject`.";
     if (opts.source) {
         return {
             message:
@@ -673,7 +681,7 @@ export function ejectRefusal(
             "already holds rather than this directory.",
         hint:
             `Redeploy it with \`rebase cloud deploy --bundle\`. ${eject} ` +
-            "`--source . --force` builds this directory; `--force` alone builds what the control plane holds.",
+            "`--source . --eject` builds this directory; `--eject` alone builds what the control plane holds.",
         code: "managed_project"
     };
 }
@@ -689,7 +697,7 @@ export function ejectRefusal(
  *
  * The condition is just `managed`: anything reaching this point is a container
  * image build that `ejectRefusal` has already let through, and on a managed
- * project that is an eject however it was spelled. A caller who passed `--force`
+ * project that is an eject however it was spelled. A caller who passed `--eject`
  * knows — the warning is for the transcript and the payload, which is what
  * anyone reviewing the deploy afterwards actually reads.
  */
@@ -912,8 +920,13 @@ export const DEPLOY_FLAGS = {
     /* Leave the managed runtime on purpose. The ONLY way to build a container
        image for a project the platform runs as managed — for the bare form and
        for `--source` alike, because neither of those says so by itself. See
-       `ejectRefusal`. */
-    "--force": Boolean,
+       `ejectRefusal`.
+
+       Spelled `--force` until 2026-09-06, which put the CLI's least reversible
+       action under the same word as "overwrite this file". No alias: the old
+       spelling is an unknown option now, so a script carrying it stops rather
+       than ejecting a project on a name it no longer means. */
+    "--eject": Boolean,
     "-m": "--message"
 } as const;
 
@@ -986,7 +999,7 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
     //
     // `--source` and `--bundle-dir` are explicit acts and still route away from
     // here — though on a project the platform *runs* as managed, routing away
-    // is now where `ejectRefusal` stops them without `--force`.
+    // is now where `ejectRefusal` stops them without `--eject`.
     // `rebase cloud deploy <app>` — which app of the project this repository is
     // shipping. Positional because it is the subject of the sentence, not an
     // option: a repository holding only an admin panel deploys it by name, and a
@@ -1025,7 +1038,7 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
     const eject: EjectContext = {
         managed: plan.managed,
         source: Boolean(args["--source"]),
-        force: args["--force"] === true
+        eject: args["--eject"] === true
     };
     const refusal = ejectRefusal(eject, projectRef);
     if (refusal) fail(refusal.message, refusal.hint, refusal.code);
@@ -1324,14 +1337,23 @@ async function streamBuildLogs(
     }
 }
 
+/** What `rebase cloud logs` parses. Its page pairs against this. */
+export const LOGS_FLAGS = {
+    "--runtime": Boolean,
+    "--follow": Boolean,
+    "-f": "--follow"
+} as const;
+
 export async function logsCommand(rawArgs: string[], projectRef: string): Promise<void> {
-    const args = arg(
-        { "--runtime": Boolean,
-"--follow": Boolean,
-"-f": "--follow" },
-        { argv: rawArgs.slice(2),
-permissive: true }
-    );
+    // Strict: `--folow` used to be dropped, so a caller that asked to follow
+    // the log got one snapshot and an exit code.
+    const { flags: args } = parseCloudArgs({
+        spec: LOGS_FLAGS,
+        rawArgs,
+        commandWords: 2, // cloud logs
+        command: "cloud logs",
+        maxPositionals: 0
+    });
     const { client, url } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
 

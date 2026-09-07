@@ -1,11 +1,13 @@
 import {
     ADMIN_COLLECTION_KEYS,
-    defineCollection,
     resolveAdminCollection,
     toAdminCollectionConfig,
     type AdditionalFieldKey,
     type AdminCollection
 } from "../src/admin_collection";
+// The builder is its own module: a collection file is loaded by the backend
+// too, so it must be reachable without React. See `define_collection.ts`.
+import { defineCollection } from "../src/define_collection";
 import { ADMIN_PROPERTY_KEYS } from "../src/types/property_options";
 // There is no separate admin authoring type: `augment.ts` declares `admin` onto
 // `CollectionConfig` itself, so core's type *is* the nested authoring shape.

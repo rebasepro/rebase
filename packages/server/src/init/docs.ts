@@ -25,6 +25,26 @@ export async function mountOpenApiDocs(
     requireAuth: boolean
 ): Promise<void> {
     if (serverCollections.length === 0) {
+        // Still routed, and still a 404 — but one that says which 404 it is.
+        //
+        // A bare `404 Not Found` here is indistinguishable from a wrong URL, a
+        // broken install, or a server that is not running, and the generated
+        // headless README sends every new project straight at this path. The
+        // dev banner already explains it ("no tables served yet, so no data API
+        // and no docs"); this is the same sentence for anyone who arrives by
+        // URL instead, and the same code and remedy `/api/data` answers with,
+        // so the two surfaces cannot start disagreeing about why.
+        const explain = (c: { json: (v: unknown, s: number) => Response }) => c.json({
+            error: {
+                message: "This project serves no collections yet, so there is no API to document. " +
+                    "It declares none in code, and the database has no tables to derive them from. " +
+                    "Create tables — a migration, SQL, or a collection file plus `rebase db push` — " +
+                    "and restart.",
+                code: "NO_COLLECTIONS"
+            }
+        }, 404);
+        app.get(`${basePath}/docs`, explain);
+        app.get(`${basePath}/swagger`, explain);
         return;
     }
 

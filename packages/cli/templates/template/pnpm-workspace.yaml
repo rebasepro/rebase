@@ -12,6 +12,15 @@ minimumReleaseAge: 0
 # quietly stopped applying. npm 12 meanwhile warns about both on every install
 # and every `npm run`, saying they will stop working.
 verifyDepsBeforeRun: false
+# Refuse to install on a Node older than `engines.node` in package.json.
+#
+# Off by default, in every package manager, which is why the floor this
+# scaffold declares was enforced by nothing: pnpm 11 installs a project whose
+# `engines.node` is `>=99.0.0` and exits 0, and npm prints EBADENGINE and also
+# exits 0. So a first run on Node 20 said nothing at all, and the first sign was
+# a syntax error from inside a dependency. `engine-strict=true` in npmrc is the
+# same setting for npm.
+engineStrict: true
 confirmModulesPurge: false
 allowBuilds:
   esbuild: true

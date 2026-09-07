@@ -1,4 +1,5 @@
 ---
+sourceHash: c933db5cdbb2cfc2
 title: KI & Agenten
 sidebar_label: Übersicht
 description: Was Rebase für KI-Coding-Assistenten und autonome Agenten bereitstellt – ein MCP-Server, projektlokale Agent Skills, vorbereitete Anweisungsdateien und das Berechtigungsmodell, das bestimmt, worauf ein Agent tatsächlich zugreifen kann.
@@ -12,7 +13,7 @@ Probleme lösen. Es lohnt sich zu wissen, nach welcher davon Sie greifen:
 | [**MCP server**](/docs/ai/mcp) | Ein stdio-basierter Model Context Protocol-Server mit 41 Tools für Ihr Schema, Daten, Benutzer, Speicher, Cron und Dev-Server | Ein Assistent zur Laufzeit |
 | [**Agent skills**](/docs/ai/skills) | 21 Markdown-Skill-Dateien, die durch `rebase skills install` in Ihr Repository geschrieben werden | Ein Assistent als Referenzmaterial |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus assistentenspezifische Pointer-Dateien, erstellt durch `rebase init` | Ein Assistent als dauerhaft aktive Regeln |
-| [**API keys**](/docs/backend/api#api-keys) | Bereichsbezogene Maschinen-Zugangsdaten, pro Collection und pro Operation | Alles, was die HTTP-API aufruft |
+| [**API keys**](/docs/backend/api-keys) | Bereichsbezogene Maschinen-Zugangsdaten, pro Collection und pro Operation | Alles, was die HTTP-API aufruft |
 
 Die ersten drei dienen dazu, einem Assistenten *Wissen* und *Werkzeuge* bereitzustellen. Die
 vierte ist die einzige, die bestimmt, was er tatsächlich tun darf.
@@ -44,7 +45,7 @@ Sichtbarkeit von Zeilen, nicht über die Authentifizierung. Das Gewähren fügt 
 nicht zur Berechtigungsliste hinzu, und das Verweigern stoppt ihn nicht.
 
 Die Mechanismen – Erstellen von Schlüsseln, das Berechtigungs-JSON, Rotation, Ablauf,
-Ratenbegrenzungen – werden in [REST API → API Keys](/docs/backend/api#api-keys) behandelt.
+Ratenbegrenzungen – werden in [REST API → API Keys](/docs/backend/api-keys) behandelt.
 Überspringen Sie dabei nicht [Security Rules (RLS)](/docs/collections/security-rules);
 die zweite Kontrollstufe ist nur so gut wie die Richtlinien, die Sie geschrieben haben.
 
@@ -63,7 +64,7 @@ Rebase bietet einen erstklassigen `vector`-Eigenschaftstyp auf Postgres und eine
 `.vectorSearch()`-Abfragemethode mit `cosine`-, `l2`- und `inner_product`-Distanz.
 Dies ist bereits an zwei Stellen dokumentiert:
 
-- [Querying Data → Vector Search](/docs/sdk/querying#vector-search) — die SDK-Methode,
+- [Querying Data → Vector Search](/docs/sdk/aggregates-and-search#vector-search) — die SDK-Methode,
   das `_distance`-Feld, das jeder Zeile hinzugefügt wird, und die Besonderheiten
 - [REST API → Vector Search](/docs/backend/api#vector-search) — die Abfrageparameter
   `vector_search`, `vector`, `vector_distance` und `vector_threshold`
@@ -81,7 +82,7 @@ Und **jede Vektorspalte erhält einen HNSW-Index für die
 Kosinus-Distanz**, denn mit Kosinus misst `vectorSearch`, sofern Sie nicht
 `distance` übergeben – ein Index bedient genau einen Operator. Anpassen oder
 abschalten lässt er sich an der Property: siehe
-[Der Index](/docs/sdk/querying#the-index).
+[Der Index](/docs/sdk/aggregates-and-search#the-index).
 
 Vektor-Abfragen können zudem nicht abonniert werden; `.vectorSearch(...).listen()` wird
 mit `VECTOR_SEARCH_NOT_LIVE` abgelehnt.

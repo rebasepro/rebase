@@ -23,6 +23,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const SOURCE = path.join(ROOT, "packages/studio/src/components/RebaseStudio.tsx");
 const DOC = path.join(ROOT, "website/src/content/docs/docs/studio/index.md");
 const EN = path.join(ROOT, "packages/app/src/locales/en.ts");
+const NAVIGATION = path.join(ROOT, "packages/cms/src/hooks/navigation/utils.ts");
 
 const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const green = (s) => `\x1b[32m${s}\x1b[0m`;
@@ -66,10 +67,49 @@ function documentedTools() {
     return tools;
 }
 
+/**
+ * Group names the framework itself ships, from the navigation module.
+ *
+ * Read rather than listed, so a fourth one cannot be added without this
+ * noticing. These are *identifiers* — the drawer keys its icons off them, the
+ * home page orders by them, and `isBottomPinnedGroupName` compares them — so
+ * they stay English in the source and only their heading is translated.
+ */
+function shippedGroupNames() {
+    const source = fs.readFileSync(NAVIGATION, "utf8");
+    const names = new Set();
+    for (const m of source.matchAll(/^export const NAVIGATION_[A-Z_]+ = "([^"]+)";$/gm)) names.add(m[1]);
+    for (const m of source.matchAll(/^export const NAVIGATION_BOTTOM_GROUP_NAMES = \[([^\]]+)\]/gm)) {
+        for (const q of m[1].matchAll(/"([^"]+)"/g)) names.add(q[1]);
+    }
+    if (names.size === 0) throw new Error(`no group names parsed from ${path.relative(ROOT, NAVIGATION)}`);
+    return names;
+}
+
+/** `useNavigationGroupLabel`'s key for a group name. Kept in step with it. */
+function groupKey(name) {
+    return `studio_group_${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
+}
+
 const registered = registeredTools();
 const documented = documentedTools();
 
 const problems = [];
+
+// The home page and the drawer both label a group through
+// `useNavigationGroupLabel`, which answers a miss with the raw name — so a
+// group with no key renders in English beside its translated neighbours. That
+// is what `VISTAS / DATABASE / SETTINGS` was on the Spanish home page.
+{
+    const labels = groupLabels();
+    const allGroups = new Set([...shippedGroupNames(), ...registered.values()]);
+    for (const name of allGroups) {
+        const key = groupKey(name);
+        if (!labels.has(key)) {
+            problems.push(`the "${name}" group has no \`${key}\` in en.ts, so its heading renders in English everywhere`);
+        }
+    }
+}
 for (const [slug, group] of registered) {
     if (!documented.has(slug)) problems.push(`the "${slug}" tool is registered but not in the table`);
     else if (documented.get(slug) !== group) {

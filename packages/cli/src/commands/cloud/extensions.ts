@@ -103,6 +103,11 @@ export async function extensionsCommand(action: string | undefined, rawArgs: str
 }
 
 async function listExtensions(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 3,
+command: "cloud extensions",
+maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);

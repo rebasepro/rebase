@@ -23,7 +23,7 @@ That shape is inherited from FireCMS, where it fit: Firestore documents with a
 handful of fields, opened in a side panel. Rebase is a Postgres BaaS where
 collections routinely carry 15–25 columns, and where the *default* open mode is
 now full screen — `resolveOpenEntityMode` returns `full_screen` for both `table`
-and `cards` ([view_mode.ts:99](../packages/cms/src/util/view_mode.ts#L99)).
+and `cards` ([view_mode.ts:99](../../packages/cms/src/util/view_mode.ts#L99)).
 A flat column at ~175px per field is a 2000–3000px scroll before you have done
 anything.
 
@@ -45,12 +45,12 @@ Measured, no config changes:
    Average cost is ~175px of vertical space per field, whatever the field is.
 2. **No grouping primitive exists.** 25 fields render as one undifferentiated
    list. `getFormFieldKeys`
-   ([useColumnsIds.tsx:211](../packages/app/src/components/common/useColumnsIds.tsx#L211))
+   ([useColumnsIds.tsx:211](../../packages/app/src/components/common/useColumnsIds.tsx#L211))
    returns a flat array; `FormLayout` is a single `flex flex-wrap`
-   ([FormLayout.tsx](../packages/cms/src/form/components/FormLayout.tsx)).
+   (`FormLayout.tsx`, since replaced by `FormSections.tsx`).
 3. **The only width knob is `admin.widthPercentage`** — a raw percentage fed to
    `calc(X% - 8px)` in a wrapping flex row
-   ([FormEntry.tsx:14](../packages/cms/src/form/components/FormEntry.tsx#L14)).
+   (`FormEntry.tsx:14`, since replaced by `FieldBlock.tsx`).
    The maths works, but fields only pair into a row by luck of declaration
    order; reordering one property silently reflows every row after it. Nothing
    in the demo config sets it, which is a fair signal about how usable it is.
@@ -72,17 +72,17 @@ the first field: **219px**, of which none carries information.
 
 6. **The path chip renders `posts/`** — a bare trailing slash. It is
    `{entity?.path ?? path}/{entityId}` with no id yet
-   ([EntityForm.tsx:491](../packages/cms/src/form/EntityForm.tsx#L491)).
+   ([EntityForm.tsx:491](../../packages/cms/src/form/EntityForm.tsx#L491)).
 7. **The heading of a new blog post reads `draft`.** The title resolver walks
    candidate properties and returns the first non-empty one; on a new entity the
    only populated value is the `status` default
-   ([EntityForm.tsx:319-329](../packages/cms/src/form/EntityForm.tsx#L319),
-   [title-property.ts:255](../packages/app/src/collections/title-property.ts#L255)).
+   ([EntityForm.tsx:319-329](../../packages/cms/src/form/EntityForm.tsx#L319),
+   [title-property.ts:255](../../packages/app/src/collections/title-property.ts#L255)).
    There is no `status === "new"` guard.
 8. **The id can appear three times.** On `customers` (which uses
    `defaultEntityAction: "view"`): once in the path chip, once as the synthetic
    `Id` row that `EntityViewBinding` always prepends
-   ([EntityViewBinding.tsx:38-61](../packages/cms/src/components/EntityViewBinding.tsx#L38)),
+   ([EntityViewBinding.tsx:38-61](../../packages/cms/src/components/EntityViewBinding.tsx#L38)),
    and once more as the collection's own `id` property. In the ~340px split
    pane the 4/8 grid collapses and each UUID wraps to four lines, so the id
    costs ~350px before the first real field.
@@ -92,12 +92,12 @@ the first field: **219px**, of which none carries information.
 ### 2.4 The right rail
 
 10. `buildSideActions` is a fixed `w-80 2xl:w-96` sticky column
-    ([EntityFormActions.tsx:183](../packages/cms/src/form/EntityFormActions.tsx#L183))
+    ([EntityFormActions.tsx:183](../../packages/cms/src/form/EntityFormActions.tsx#L183))
     holding two or three buttons and then ~700px of nothing. That is 22–27% of
     a 1440px viewport permanently reserved for a Save button.
 11. The sync-status indicator is an **unlabelled sticky circle** (✓ / pencil /
     spinner) at `top-4` inside an `h-0 overflow-visible` container
-    ([EntityForm.tsx:593](../packages/cms/src/form/EntityForm.tsx#L593)). It
+    ([EntityForm.tsx:593](../../packages/cms/src/form/EntityForm.tsx#L593)). It
     floats over field content as you scroll — it lands on top of the `Reviews`
     value in the products form. It also duplicates information the Save button
     already carries.
@@ -105,7 +105,7 @@ the first field: **219px**, of which none carries information.
 ### 2.5 Tabs
 
 12. **Tab order is `[JSON] [History] [Entity] [custom…] [subcollections]`**
-    ([EditViewBinding.tsx:645-673](../packages/cms/src/components/EditViewBinding.tsx#L645)).
+    ([EditViewBinding.tsx:645-673](../../packages/cms/src/components/EditViewBinding.tsx#L645)).
     Two developer tools sit *before* the thing you opened the page to edit. The
     primary tab is third.
 13. Those two are **icon-only, unlabelled, and have no tooltip**, sitting beside
@@ -120,10 +120,10 @@ the first field: **219px**, of which none carries information.
     fields; alternate renderings of this record (`Preview`); records that belong
     to this record (subcollections); and debug tooling (JSON, history).
 17. In the split layout the strip clips — `Customer ›` is cut at the pane edge.
-    Scroll arrows exist ([Tabs.tsx:86](../packages/ui/src/components/Tabs.tsx#L86))
+    Scroll arrows exist ([Tabs.tsx:86](../../packages/ui/src/components/Tabs.tsx#L86))
     but the affordance is weak at that width.
 18. **`selectedTab` doubles as "am I editing"** — `selectedTab === "edit"`
-    ([SidePanelBinding.tsx:102](../packages/cms/src/components/SidePanelBinding.tsx#L102)).
+    ([SidePanelBinding.tsx:102](../../packages/cms/src/components/SidePanelBinding.tsx#L102)).
     Edit mode is encoded as a tab value that is not a tab.
 
 ### 2.6 The tab state machine has five sources of truth
@@ -131,10 +131,10 @@ the first field: **219px**, of which none carries information.
 `EditViewBindingInner` carries `selectedTabProp`, a resolved
 `defaultSelectedView`, a `userHasChangedTab` ref, a `validTabValues` set with an
 `activeTab` fallback, and a `mountedTabsRef` keep-alive set
-([EditViewBinding.tsx:232-301](../packages/cms/src/components/EditViewBinding.tsx#L232)).
+([EditViewBinding.tsx:232-301](../../packages/cms/src/components/EditViewBinding.tsx#L232)).
 On top of that, `SidePanelBinding` runs a **one-time correction effect** that
 re-navigates after mount because the collection registry resolves late
-([SidePanelBinding.tsx:144-168](../packages/cms/src/components/SidePanelBinding.tsx#L144)).
+([SidePanelBinding.tsx:144-168](../../packages/cms/src/components/SidePanelBinding.tsx#L144)).
 Six moving parts to answer "which tab is showing".
 
 ### 2.7 DX
@@ -146,18 +146,18 @@ Six moving parts to answer "which tab is showing".
 20. **`entityViews` and `formView` are two concepts with near-identical
     `Builder` signatures** and different resolution paths (`resolvedSelectedEntityView`
     vs the inline `FormViewBuilder` at
-    [EditViewBinding.tsx:462](../packages/cms/src/components/EditViewBinding.tsx#L462)).
+    [EditViewBinding.tsx:462](../../packages/cms/src/components/EditViewBinding.tsx#L462)).
     Their shared option even disagrees on type: `includeActions?: boolean | "bottom"`
     on `EntityCustomView`, `includeActions?: boolean` on `FormViewConfig`
-    ([entity_views.tsx:80,104](../packages/cms-types/src/types/entity_views.tsx#L80)).
+    ([entity_views.tsx:80,104](../../packages/cms-types/src/types/entity_views.tsx#L80)).
 21. **`EntityCustomViewParams` hands you three overlapping views of the same
     data** — `entity`, `modifiedValues`, and `formContext` (which itself exposes
     both `.values` and `.formex.values`). The codebase picks differently in
     adjacent lines: `formContext.formex.values ?? entity.values` at
-    [EditViewBinding.tsx:374](../packages/cms/src/components/EditViewBinding.tsx#L374),
+    [EditViewBinding.tsx:374](../../packages/cms/src/components/EditViewBinding.tsx#L374),
     `formContext.values ?? entity.values` at
-    [:393](../packages/cms/src/components/EditViewBinding.tsx#L393) and
-    [:408](../packages/cms/src/components/EditViewBinding.tsx#L408).
+    [:393](../../packages/cms/src/components/EditViewBinding.tsx#L393) and
+    [:408](../../packages/cms/src/components/EditViewBinding.tsx#L408).
 22. **You cannot render one generated field from a custom view.**
     `PropertyFieldBinding` exists but is not part of the public entity-view
     contract, so the escape hatch is binary.
@@ -218,7 +218,7 @@ The 52px bar's left half is empty. Put the record there:
 
 - When a sidebar layout resolves: actions on top, sidebar fields under.
 - When it does not: no rail. Save/Discard go in the persistent bar (⌘S is
-  already wired at [EntityForm.tsx:222](../packages/cms/src/form/EntityForm.tsx#L222)).
+  already wired at [EntityForm.tsx:222](../../packages/cms/src/form/EntityForm.tsx#L222)).
 
 Never 340px of empty rail for one button. And replace the unlabelled sticky
 circle with the state of the Save button itself — *Save* / *Saving…* / *Saved* —
@@ -306,7 +306,7 @@ left for a separate change.
 
 ### 5.1 `selectedTab` still doubles as the edit flag
 
-`selectedTab === "edit"` ([SidePanelBinding.tsx:102](../packages/cms/src/components/SidePanelBinding.tsx#L102))
+`selectedTab === "edit"` ([SidePanelBinding.tsx:102](../../packages/cms/src/components/SidePanelBinding.tsx#L102))
 survives, and with it `userHasChangedTab`, the `validTabValues` fallback and the
 one-time correction effect. Splitting `mode` out changes the URL shape, so it
 needs a redirect for the existing `/edit` segment and a pass over

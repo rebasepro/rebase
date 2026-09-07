@@ -15,7 +15,8 @@ node tooling/scripts/verify-docs.mjs --strict # exit 1 on findings
 node tooling/scripts/verify-docs.mjs --json  # machine-readable findings
 ```
 
-It also runs as stage 7 of `tooling/scripts/verify-quality.sh`.
+It also runs as one gate of `pnpm ci:static`, which is what CI and the local
+quality sweep both invoke.
 
 ## The two stages
 
@@ -36,7 +37,11 @@ barrels are handled):
 
 Stage 1 also carries the checks that are textual rather than type-driven —
 deploy build contexts, **version pins** (below), marketing snippets, documented
-shell commands, MCP manifests, and type names claimed in prose.
+shell commands, MCP manifests, type names claimed in prose, and the entry point
+each page teaches `defineFunction` from (`check-portable-imports.mjs`). That
+last one is the class the export surface cannot catch: `@rebasepro/server` and
+`@rebasepro/server/functions` both resolve, so a page teaching the root is a
+page whose readers silently lose portability.
 
 **2. `snippets` — English + skills, deep.** Compiles each fenced ts/js block
 against workspace *source*. English only, because the other five locales are
@@ -189,10 +194,14 @@ block that is wrong — that is the bug this exists to find.
 
 ## Where it blocks
 
-CI runs `pnpm run verify:docs:strict` (`.github/workflows/verify.yml`), so a
-finding fails the build. The baseline is clean — keep it there.
+<!-- gates:start -->
+`pnpm ci:static` runs `verify:docs:strict` (`tooling/scripts/ci-static.mjs`), so a
+finding fails the build.
 
-`tooling/scripts/verify-quality.sh` still calls it without `--strict`, deliberately: it
-is the local sweep, and a warning there is a nudge rather than a stop. To make
-the local run blocking too, add `--strict` to that call and move it from `warn`
-to `err`.
+The local quality sweep runs that same command for its static section, so a
+local run is strict too — there is no warn-only path left in either.
+
+<!-- gates:end -->
+
+`pnpm verify:docs` without `--strict` is the warn-only form, for working through
+findings before the gate above sees them.

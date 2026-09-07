@@ -23,7 +23,7 @@ import fs from "fs";
 import path from "path";
 
 import { composeDatabaseUrl } from "../utils/dev-preflight";
-import { readEnvFile } from "../utils/project";
+import { findProjectRoot, readEnvFile } from "../utils/project";
 import { resourceEnvSuffix } from "@rebasepro/types";
 import { branchUrl, readActiveBranch } from "./branch-pointer";
 import { MANAGED_LIMITATIONS, MANAGED_POOL_MAX } from "./constraints";
@@ -121,6 +121,44 @@ export function resolveComposeUrl(projectRoot: string, envFile: Record<string, s
 }
 
 /**
+ * Which database a project is on, decided without starting anything.
+ *
+ * `resolveDevDatabase` is pure, so the answer is available to help text and to
+ * a driver child alike — and neither should pay for a daemon to learn it. The
+ * driver cannot work it out for itself: on the managed path `DATABASE_URL` is a
+ * perfectly ordinary connection string to a Postgres on loopback, so a child
+ * handed only that has no way to know that `rebase db generate` will be refused.
+ *
+ * Null when there is no project here, which is legal — `rebase db --help` is
+ * answered outside one — and when anything at all goes wrong reading the
+ * project, because help text must not fail to print over an unreadable `.env`.
+ */
+export function devDatabaseKind(projectRoot?: string | null): DevDatabase["kind"] | null {
+    try {
+        const root = projectRoot ?? findProjectRoot();
+        if (!root) return null;
+        const envFile = readEnvFile(root);
+
+        return resolveDevDatabase({
+            env: process.env,
+            envFile,
+            branch: resolveActiveBranch(root, envFile),
+            composeUrl: resolveComposeUrl(root, envFile)
+        }).kind;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The variable a driver child reads {@link devDatabaseKind} from.
+ *
+ * One name, exported, because three commands build that child's environment and
+ * a fourth reads it in another package.
+ */
+export const DEV_DATABASE_KIND_ENV = "REBASE_DEV_DATABASE_KIND";
+
+/**
  * Resolve, start if needed, and describe the database for this command.
  *
  * `projectRoot` is where the managed database's data lives, so two projects on
@@ -142,13 +180,15 @@ export async function prepareDatabaseEnv(
 
     const description = describeDevDatabase(database);
 
-    if (database.kind === "external" && database.source === "branch") {
-        // The one external case that MUST be exported. Every other connection
-        // string is already somewhere the child will look — `.env` via
-        // DOTENV_CONFIG_PATH, or the shell it inherits — but a branch URL is
-        // derived here and exists nowhere else. Without this the pointer
-        // resolves correctly and then changes nothing: `rebase db backup` on a
-        // switched checkout still reported `Database: leadgen`.
+    if (database.kind === "external" && (database.source === "branch" || database.source === "flag")) {
+        // The two external cases that MUST be exported. `environment` and
+        // `env-file` are already somewhere the child will look — the shell it
+        // inherits, or `.env` via DOTENV_CONFIG_PATH — but a branch URL is
+        // derived here and exists nowhere else, and `--database-url` lives only
+        // in this process's argv. Without this the pointer resolves correctly
+        // and then changes nothing: `rebase db backup` on a switched checkout
+        // still reported `Database: leadgen`, and `rebase dev --database-url …`
+        // announced the database and then died on `DATABASE_URL: is required`.
         //
         // Safe to set: `dotenv` does not overwrite a variable that is already
         // in the environment, so the child's own `.env` load cannot undo it.
@@ -172,8 +212,8 @@ export async function prepareDatabaseEnv(
     }
 
     if (database.kind !== "managed") {
-        // An explicit connection string. The child's environment is already
-        // correct and this adds nothing to it.
+        // `environment` or `env-file`: the connection string is already in a
+        // place the child reads for itself, so this adds nothing to it.
         return { database, env: {}, description };
     }
 

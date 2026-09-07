@@ -4,7 +4,8 @@ import { DatabasePoolManager } from "../src/databasePoolManager";
 // Each `new Pool(...)` call returns a fresh mock with `.end()` and `.on()`.
 const createMockPool = () => ({
     end: jest.fn().mockResolvedValue(undefined),
-    on: jest.fn()
+    on: jest.fn(),
+    query: jest.fn().mockResolvedValue({ rows: [] })
 });
 
 let mockPoolInstances: ReturnType<typeof createMockPool>[] = [];
@@ -284,6 +285,69 @@ describe("DatabasePoolManager", () => {
             const poolAfter = manager.getPool("revive");
 
             expect(poolBefore).not.toBe(poolAfter);
+        });
+    });
+
+    // ── servesOneDatabase ──────────────────────────────────────────────────
+    describe("servesOneDatabase", () => {
+        /** What `select version()` returns over the PGlite socket, verbatim. */
+        const PGLITE_VERSION =
+            "PostgreSQL 18.3 (PGlite 0.5.6) on wasm32-unknown-linux-gnu, compiled by emcc "
+            + "(Emscripten gcc/clang-like replacement + linker emulating GNU ld) 3.1.74, 32-bit";
+
+        /** What a stock server returns. Same major version — only the build differs. */
+        const POSTGRES_VERSION =
+            "PostgreSQL 18.3 (Debian 18.3-1.pgdg120+1) on x86_64-pc-linux-gnu, compiled by gcc "
+            + "(Debian 12.2.0-14) 12.2.0, 64-bit";
+
+        it("recognises the managed development database", async () => {
+            const manager = new DatabasePoolManager(VALID_CONNECTION_STRING);
+            manager.getPool("mydb").query = jest.fn().mockResolvedValue({
+                rows: [{ version: PGLITE_VERSION }]
+            }) as never;
+
+            await expect(manager.servesOneDatabase()).resolves.toBe(true);
+        });
+
+        it("does not mistake a real Postgres of the same major version for it", async () => {
+            // The version *number* is identical — PGlite is a wasm build of 18.3
+            // — so anything keying off the major would refuse branching on every
+            // stock server.
+            const manager = new DatabasePoolManager(VALID_CONNECTION_STRING);
+            manager.getPool("mydb").query = jest.fn().mockResolvedValue({
+                rows: [{ version: POSTGRES_VERSION }]
+            }) as never;
+
+            await expect(manager.servesOneDatabase()).resolves.toBe(false);
+        });
+
+        it("asks once and remembers — a live connection cannot change engine", async () => {
+            const manager = new DatabasePoolManager(VALID_CONNECTION_STRING);
+            const query = jest.fn().mockResolvedValue({ rows: [{ version: PGLITE_VERSION }] });
+            manager.getPool("mydb").query = query as never;
+
+            await manager.servesOneDatabase();
+            await manager.servesOneDatabase();
+
+            // A `PostgresBackendDriver` — which builds a `BranchService` — is
+            // constructed per transaction, so an uncached probe would be a round
+            // trip on every request that touches branching.
+            expect(query).toHaveBeenCalledTimes(1);
+        });
+
+        it("fails open, and does not cache the failure", async () => {
+            const manager = new DatabasePoolManager(VALID_CONNECTION_STRING);
+            const query = jest.fn()
+                .mockRejectedValueOnce(new Error("connection terminated"))
+                .mockResolvedValue({ rows: [{ version: PGLITE_VERSION }] });
+            manager.getPool("mydb").query = query as never;
+
+            // A server that cannot answer is not one we can conclude anything
+            // about: refusing would break branching on a healthy Postgres that
+            // blinked.
+            await expect(manager.servesOneDatabase()).resolves.toBe(false);
+            // …and the wrong answer must not be the permanent one.
+            await expect(manager.servesOneDatabase()).resolves.toBe(true);
         });
     });
 });

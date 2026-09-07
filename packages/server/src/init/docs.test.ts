@@ -44,12 +44,22 @@ describe("mountOpenApiDocs", () => {
         expect([401, 403]).toContain(res.status);
     });
 
-    it("mounts nothing at all when there are no server collections", async () => {
+    it("answers both paths with NO_COLLECTIONS when there are none to document", async () => {
         // A spec of zero paths is not useful and a Try-It button next to
-        // nothing is worse than an absent tab.
+        // nothing is worse than an absent tab — so still a 404. But a *bare*
+        // 404 is indistinguishable from a wrong URL or a dead server, and the
+        // generated headless README points every new project at `/api/swagger`.
+        // Same code and remedy `/api/data` gives, so the two cannot drift.
         const a = new Hono<HonoEnv>();
         await mountOpenApiDocs(a, "/api", true, [], false);
-        expect((await a.request("/api/docs")).status).toBe(404);
+
+        for (const path of ["/api/docs", "/api/swagger"]) {
+            const res = await a.request(path);
+            expect(res.status).toBe(404);
+            const body = await res.json() as { error?: { code?: string; message?: string } };
+            expect(body.error?.code).toBe("NO_COLLECTIONS");
+            expect(body.error?.message).toContain("db push");
+        }
     });
 
     it("never serves the Swagger UI in production", async () => {

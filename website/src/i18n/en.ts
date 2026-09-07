@@ -691,7 +691,7 @@ export const en = {
   "europe.10": "There is no application image to build. <code class=\"font-mono text-surface-300\">rebase build</code> produces a bundle; the runtime is already on Docker Hub. Upgrading Rebase is a tag change, not a rebuild — your bundle is untouched.",
   "europe.11": "Creating tables is a separate, deliberate command. A container restart must never be able to change your schema as a side effect of a deploy.",
   "europe.12": "Small enough to read in one sitting",
-  "europe.13": "That is the entire production deployment, minus the secrets. Two services, one volume, three environment variables. The runtime refuses to start in production without <code class=\"font-mono text-surface-300\">DATABASE_URL</code>, <code class=\"font-mono text-surface-300\">JWT_SECRET</code> and <code class=\"font-mono text-surface-300\">CORS_ORIGINS</code> rather than guessing them.",
+  "europe.13": "That is the entire production deployment, minus the secrets. Two services, one volume, three environment variables. The runtime refuses to start in production without <code class=\"font-mono text-surface-300\">DATABASE_URL</code>, <code class=\"font-mono text-surface-300\">JWT_SECRET</code> and one of <code class=\"font-mono text-surface-300\">CORS_ORIGINS</code> or <code class=\"font-mono text-surface-300\">FRONTEND_URL</code>, rather than guessing them.",
   "europe.14": "Mount the bundle read-only and a compromised hook cannot rewrite the code that runs after the next restart. Point your orchestrator's liveness probe at <code class=\"font-mono text-surface-300\">/livez</code> and readiness at <code class=\"font-mono text-surface-300\">/health</code>; the first never touches the database, so a brief hiccup does not restart a perfectly healthy process.",
   "europe.eyebrow.bill": "The bill",
   "europe.15": "Their price is a function of your success. Yours is a number you chose.",
@@ -1028,6 +1028,7 @@ export const en = {
   "comparepage.axis.leaving.rebase": "The database keeps working — policies, constraints and data exactly where they were. The panel was a dependency you can delete.",
   "comparepage.axis.leaving.others": "Depends how deep the tool went into your schema. If it created the tables, leaving means a migration.",
   "comparepage.meta.title": "Rebase compared — Supabase, Directus, Strapi, Retool and the rest",
+  "comparepage.meta.description": "An honest side-by-side: where Rebase wins, where a competitor is the better call, and what the trade-offs actually are.",
 
   // ── devpage ─────────────────────────────────────────────────────
   "devpage.00": "TypeScript · Postgres · your editor",

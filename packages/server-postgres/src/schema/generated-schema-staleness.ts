@@ -282,3 +282,98 @@ export function describeMissingGeneratedNames(missing: MissingGeneratedName[]): 
             : `  • table ${m.table} is not declared  (${m.source})`))
         .join("\n");
 }
+
+/** What `rebase schema stale` found, and what that costs. */
+export interface StaleVerdict {
+    /** The lines to print, in order. Empty only under `--fix` with nothing to fix. */
+    lines: string[];
+    /** Non-zero only when the reader must act before the server will boot. */
+    exitCode: 0 | 1;
+    /** True when `--fix` should regenerate. */
+    regenerate: boolean;
+}
+
+/**
+ * The whole of `schema stale`'s decision, separated from doing it.
+ *
+ * Separated because of what the command used to do on the clean path: **exit 0
+ * having written zero bytes to stdout and zero to stderr.** For a command the
+ * top-level help describes as "Report generated schema files the collections
+ * have moved past", that is indistinguishable from a no-op, a crash, and a
+ * subcommand the driver does not implement. Three of its four paths were
+ * silent, and none of them could be tested where they stood: `cli.ts` uses
+ * `import.meta`, which the driver's jest suite cannot load at all.
+ *
+ * `--fix` is the exception, and stays silent when there is nothing to fix.
+ * `rebase dev` runs `schema stale --fix` before every boot with inherited
+ * stdio, and "nothing was wrong" is not news a hundred lines into a start-up
+ * transcript. The flag is the automated caller's; its silence is the point.
+ */
+export function staleVerdict(input: {
+    /** `--output`, as the reader typed it. */
+    outputPath: string;
+    /** Whether the generated schema exists at all. */
+    generatedExists: boolean;
+    /** The legacy foreign-key names found in it, if it was read. */
+    stale: LegacyForeignKeyName[];
+    /** Why the comparison could not be made, when it could not. */
+    unreadable?: string;
+    /** Whether `--fix` was given. */
+    fix: boolean;
+}): StaleVerdict {
+    const quiet = (lines: string[]): string[] => (input.fix ? [] : lines);
+
+    if (!input.generatedExists) {
+        // Not staleness: a fresh project has not run the generator, and saying
+        // "stale" about a file that does not exist sends the reader looking for
+        // something to fix.
+        return {
+            lines: quiet([`  No generated schema yet at ${input.outputPath} — nothing to compare.`,
+                "  `rebase schema generate` creates it."]),
+            exitCode: 0,
+            regenerate: false
+        };
+    }
+
+    if (input.unreadable !== undefined) {
+        // Best-effort by design: a collections directory that will not load is a
+        // real error, but boot reports it far better than this does. Saying so
+        // is still better than exiting 0 in silence about a check that did not
+        // run — this file's whole subject.
+        return {
+            lines: quiet([`  ⏭ Not checked: ${input.unreadable}`]),
+            exitCode: 0,
+            regenerate: false
+        };
+    }
+
+    if (input.stale.length === 0) {
+        return {
+            lines: quiet([`  ✓ Nothing stale — 1 generated file matches (${input.outputPath}).`]),
+            exitCode: 0,
+            regenerate: false
+        };
+    }
+
+    const found = [
+        "",
+        `  ⚠️  ${input.outputPath} names ${input.stale.length} foreign key(s) the way an earlier release did:`,
+        describeLegacyForeignKeyNames(input.stale),
+        ""
+    ];
+
+    if (input.fix) {
+        return { lines: [...found, "  Regenerating the Drizzle schema so it matches..."], exitCode: 0, regenerate: true };
+    }
+
+    return {
+        lines: [
+            ...found,
+            "  The database column has already been renamed at boot, so the generated schema no "
+            + "longer matches it and the server will refuse to start.",
+            "  Run `rebase schema generate` to regenerate it."
+        ],
+        exitCode: 1,
+        regenerate: false
+    };
+}

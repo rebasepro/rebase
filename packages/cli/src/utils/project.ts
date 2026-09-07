@@ -326,18 +326,33 @@ export function exitDependenciesNotInstalled(projectRoot: string): never {
     process.exit(1);
 }
 
+/** One problem inside a refusal, when the command found several. */
+export interface JsonFailureIssue {
+    /** Where it is — a config path, a manifest key, a file. */
+    path?: string;
+    message: string;
+}
+
 /**
  * The refusal envelope, for a caller that asked for JSON.
  *
  * Same shape as the cloud family's `fail()` — `{ error: { message, code, hint } }`
  * — because there is one CLI and a caller should not have to know which half of
  * it answered. `code` is what a caller branches on and is never absent; the
- * cloud family's reasoning about that applies here unchanged.
+ * cloud family's reasoning about that applies here unchanged. `issues` carries
+ * the per-problem detail a human reader gets as a bullet list, because a
+ * refusal that says "2 problem(s)" and does not say which two is not
+ * machine-readable in any useful sense.
  *
  * On **stdout**, like every other `--json` result: the contract those commands
  * make is that stdout holds one JSON value, and a caller that pipes stdout to a
  * parser must get a parseable refusal rather than an empty stream and a
- * human sentence it never sees.
+ * human sentence it never sees. That contract used to hold for exactly one
+ * failure of each command — the one that goes through `requireProjectRoot` —
+ * while every other exit of the *same* command wrote human text to stderr and
+ * left stdout empty. So `rebase status --json` was parseable outside a project
+ * and unparseable inside a broken one, which is the case a caller actually has
+ * to handle.
  *
  * The flag is read off `process.argv` because the failure happens inside a
  * helper the command calls before it has parsed anything. Coarse — a literal
@@ -345,8 +360,16 @@ export function exitDependenciesNotInstalled(projectRoot: string): never {
  * mode of being coarse is a JSON error where a human one was wanted, and the
  * failure mode of not doing it is an unparseable stream.
  */
-function failAsJson(message: string, code: string, hint: string): never {
-    console.log(JSON.stringify({ error: { message, code, hint } }, null, 2));
+export function failAsJson(
+    message: string,
+    code: string,
+    hint?: string,
+    issues?: JsonFailureIssue[]
+): never {
+    const error: Record<string, unknown> = { message, code };
+    if (hint !== undefined) error.hint = hint;
+    if (issues !== undefined) error.issues = issues;
+    console.log(JSON.stringify({ error }, null, 2));
     process.exit(1);
 }
 

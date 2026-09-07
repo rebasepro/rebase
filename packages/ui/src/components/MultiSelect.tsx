@@ -64,6 +64,16 @@ interface MultiSelectProps<T extends MultiSelectValue = string> {
     children: React.ReactNode;
     renderValues?: (values: T[]) => React.ReactNode;
     portalContainer?: HTMLElement | null;
+    /**
+     * Accessible name for the trigger.
+     *
+     * Without it the name is whatever the button happens to contain — the
+     * selected chips, or nothing at all when the field is empty — so an empty
+     * multi-select announced itself as an unnamed button. `label` cannot serve:
+     * an entity form passes an element there, because the label carries the
+     * property's type icon.
+     */
+    "aria-label"?: string;
 }
 
 // Use generic type for the forwarded ref
@@ -92,7 +102,8 @@ export const MultiSelect = React.forwardRef<
             renderValues,
             open,
             onOpenChange,
-            portalContainer
+            portalContainer,
+            "aria-label": ariaLabel
         },
         ref
     ) => {
@@ -221,6 +232,7 @@ export const MultiSelect = React.forwardRef<
                     <PopoverPrimitive.Trigger asChild>
                         <button
                             ref={inputRef ?? ref}
+                            aria-label={ariaLabel ?? (typeof label === "string" ? label : undefined)}
                             onClick={handleTogglePopover}
                             className={cls(
                                 {

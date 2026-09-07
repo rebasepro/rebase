@@ -193,7 +193,7 @@ export function RealtimeMiniDemo() {
     return (
         <div className="h-full w-full flex flex-col gap-2 px-3 py-3 pointer-events-none select-none overflow-hidden relative font-mono">
             <div className="flex flex-1 min-h-0 items-stretch">
-                {renderPane("a", "localhost:5173 — web")}
+                {renderPane("a", "your app — web")}
 
                 {/* The socket between the two windows */}
                 <div className="w-12 shrink-0 flex flex-col items-center justify-center gap-1 relative">

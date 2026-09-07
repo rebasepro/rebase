@@ -88,7 +88,7 @@ describe("StorageRegistry", () => {
                 const registry = new DefaultStorageRegistry();
 
                 expect(() => registry.getDefault()).toThrow(
-                    "[StorageRegistry] No default storage registered."
+                    "[StorageRegistry] No default storage registered"
                 );
             });
         });
@@ -237,25 +237,32 @@ describe("StorageRegistry", () => {
                 expect(registry.get("media")).toBe(mediaController);
             });
 
-            it("should use first entry as default if no explicit default provided", () => {
+            // Which bucket a file lands in is the project's decision. This used
+            // to promote the first entry with a warning, and the answer differed
+            // either side of a deploy: the synthesized local default is dropped
+            // in production and the promotion was not, so a project declaring
+            // only `bucket("media")` wrote to local disk in development and to
+            // the media bucket in production, with nothing failing in either.
+            it("promotes nothing, and says what to declare when asked for a default", () => {
                 const local = createMockStorageController("local");
                 const s3 = createMockStorageController("s3");
-
-                const consoleSpy = vi.spyOn(console, "warn").mockImplementation();
 
                 const registry = DefaultStorageRegistry.create({
                     "primary": local,
                     "secondary": s3
                 });
 
-                // Should have registered both + created default pointing to first
-                expect(registry.size()).toBe(3); // primary, secondary, (default)
-                expect(registry.has(DEFAULT_STORAGE_ID)).toBe(true);
-                expect(consoleSpy).toHaveBeenCalledWith(
-                    expect.stringContaining('No "(default)" storage provided')
-                );
+                expect(registry.size()).toBe(2);
+                expect(registry.has(DEFAULT_STORAGE_ID)).toBe(false);
 
-                consoleSpy.mockRestore();
+                try {
+                    registry.getDefault();
+                    throw new Error("expected a refusal");
+                } catch (err) {
+                    const message = (err as Error).message;
+                    expect(message).toContain('bucket("primary", { default: true })');
+                    expect(message).toContain("export const uploads = bucket();");
+                }
             });
 
             it("should handle empty map gracefully", () => {

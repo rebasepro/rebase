@@ -161,6 +161,67 @@ export function checkPublishableSet({ root = ROOT, sources } = {}) {
         }
     }
 
+    /* ── 2b. One version derivation, shared by every release file ─── */
+
+    /*  `release.sh` was fixed to walk back from HEAD and the two `publish.yml`
+        steps were not, so the same repository answered "what is the last
+        release" two different ways depending on which entry point you used.
+
+        The difference is not academic. This history descends from a lineage
+        that reached v3.x before versioning restarted at 0.x, and 436 of those
+        tags survive in clones. Sorting the tag namespace by version answers
+        v3.3.0; `git describe` can only return a tag HEAD descends from, and
+        answers v0.17.3. One `git push --tags` from a developer's machine was
+        all that stood between the workflow and publishing 3.4.0 to npm — a
+        number that cannot be taken back.
+
+        So: every variable a release file computes from git tags must be
+        computed by the SAME expression, and that expression must walk the
+        history rather than scan the namespace. */
+
+    const derivations = new Map();
+    const namespaceScans = [];
+
+    for (const file of RELEASE_FILES) {
+        const text = sources?.[file] ?? readRelease(root, file);
+        for (const [, variable, command] of text.matchAll(
+            /^\s*([A-Za-z_]\w*)=\$\(\s*(git\s+(?:tag|describe)[^)]*)\)/gm
+        )) {
+            const expression = command.trim().replace(/\s+/g, " ");
+            if (!/^git describe --tags --abbrev=0 --match /.test(expression)) {
+                namespaceScans.push(`${file}: ${variable}=$(${expression})`);
+                continue;
+            }
+            if (!derivations.has(expression)) derivations.set(expression, []);
+            derivations.get(expression).push(`${file} (${variable})`);
+        }
+    }
+
+    if (namespaceScans.length > 0) {
+        fail(
+            `${namespaceScans.length} release step(s) read a version out of the tag namespace.`,
+            namespaceScans.join("\n      ")
+            + "\n\n      Sorting tags by version returns the highest number that exists anywhere,"
+            + "\n      including the 436 pre-restart `v3.*` tags still in developer clones."
+            + "\n      Use `git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*'`,"
+            + "\n      which can only return a tag this commit descends from."
+        );
+    } else if (derivations.size === 0) {
+        fail(
+            "No release file derives a base version from git at all.",
+            "One of them must, and `check:publishable-set` cannot tell whether the others agree."
+        );
+    } else if (derivations.size > 1) {
+        fail(
+            `${derivations.size} different version derivations across the release files.`,
+            [...derivations].map(([expression, where]) =>
+                `${expression}\n        ${where.join("\n        ")}`).join("\n      ")
+            + "\n\n      `release.sh` and both `publish.yml` steps must compute the base version"
+            + "\n      identically, or the release you run by hand and the release CI runs"
+            + "\n      disagree about which version came last."
+        );
+    }
+
     /* ── 3. Nothing publishable outside the workspace ──────────────── */
 
     const members = new Set(workspacePackages(root).map(p => p.dir));

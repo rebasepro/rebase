@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,6 +28,63 @@ const paint = (code, text) => (useColor ? `\x1b[${code}m${text}\x1b[0m` : text);
 const red = (text) => paint(31, text);
 const yellow = (text) => paint(33, text);
 const dim = (text) => paint(90, text);
+
+/**
+ * Refuse to run on a Node older than this CLI's own floor, before anything else.
+ *
+ * `engines.node` is declared on all 22 packages and `check:floors` keeps the
+ * numbers in step — on the reasoning that "npm and pnpm check `engines` on
+ * install, so the number is load-bearing". pnpm 11 does not: a project whose
+ * `engines.node` is `>=99.0.0` installs silently and exits 0, and so does a
+ * *dependency* declaring it. npm prints `EBADENGINE` and also exits 0. So the
+ * declared floor was enforced by nothing at all, and `rebase init` on Node 20
+ * said nothing until a syntax error surfaced from inside a dependency —
+ * `checkNodeVersion` existed but only `rebase doctor` ever called it.
+ *
+ * First, and before `await import("../dist/…")`, because the bundle is the
+ * thing most likely to fail incomprehensibly on an old runtime: the point is to
+ * name the version rather than let the reader debug a stack trace in minified
+ * output.
+ *
+ * The floor is read from this package's own `package.json` rather than written
+ * here, so it cannot drift from what `check:floors` gates and from what
+ * `rebase doctor` reports. The comparison duplicates
+ * `doctor-environment.ts`'s — importing it would mean importing the bundle,
+ * which is the thing being guarded — and `bin-floor.test.ts` asserts the two
+ * still agree.
+ */
+function assertNodeFloor() {
+    let required;
+    try {
+        const manifest = JSON.parse(readFileSync(join(here, "..", "package.json"), "utf8"));
+        required = manifest?.engines?.node;
+    } catch {
+        return; // No manifest, no floor to enforce. Never a reason to refuse.
+    }
+    if (typeof required !== "string") return;
+
+    // `>=x[.y[.z]]`, the only form any engines.node in this repo takes. Anything
+    // else parses to nothing and the guard stands down rather than guessing.
+    const declared = required.match(/>=\s*v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+    if (!declared) return;
+    const running = process.versions.node.match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+    if (!running) return;
+
+    for (let i = 1; i <= 3; i++) {
+        const min = Number(declared[i] ?? 0);
+        const now = Number(running[i] ?? 0);
+        if (now > min) return;
+        if (now < min) {
+            process.stderr.write(
+                `${red(`✗ rebase CLI: Node ${process.versions.node} is running, and Rebase needs ${required}.`)}\n` +
+                `  Install Node ${declared[1]} or newer (nvm install ${declared[1]}), then reinstall dependencies.\n`
+            );
+            process.exit(1);
+        }
+    }
+}
+
+assertNodeFloor();
 
 /**
  * Warn when the built CLI is older than the source it was built from.

@@ -17,13 +17,15 @@ import {
     findBackendDir,
     findDevDir,
     envDeclaredProject,
+    autoDiscoverLocal,
+    describeForeignDevServer,
     explainToolError,
     answerCliFlags,
     lastLines
 } from "../src/index";
 import type { PackageManager } from "../src/index";
 import { spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -1162,12 +1164,123 @@ describe("the environment block outranks the persisted registry", () => {
                     prod: { name: "prod", projectDir: dir, baseUrl: "https://prod.example.com", token: "", addedAt: "2020-01-01T00:00:00.000Z" }
                 }
             },
-            { REBASE_BASE_URL: "http://localhost:4321" }
+            // Same `projectDir` as the remembered entry: the stickiness is
+            // legitimate here, which is what makes the warning the right answer
+            // rather than the reset the next test covers.
+            { REBASE_PROJECT_DIR: dir, REBASE_BASE_URL: "http://localhost:4321" }
         );
         const written = warn.mock.calls.map((c) => String(c[0])).join("");
         expect(written).toContain("\"prod\" is the active one");
         warn.mockRestore();
         rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("resolves the working directory, not another project's persisted default", async () => {
+        // The registry is machine-wide. Project A calling rebase_project_add
+        // used to persist a `default` carrying A's directory, URL and dev
+        // service key; every other project on the machine then resolved to it.
+        const a = mkdtempSync(join(tmpdir(), "rebase-mcp-projA-"));
+        const b = mkdtempSync(join(tmpdir(), "rebase-mcp-projB-"));
+        writeFileSync(join(b, "rebase.json"), JSON.stringify({ rebase: "^1", apps: {} }));
+        const cwd = process.cwd();
+        process.chdir(b);
+        try {
+            const mod = await bootWith(
+                {
+                    activeProject: "default",
+                    projects: {
+                        default: {
+                            name: "default",
+                            projectDir: a,
+                            baseUrl: "http://localhost:3070",
+                            token: "rk_a_service_key_0000000000000000",
+                            addedAt: "2020-01-01T00:00:00.000Z"
+                        }
+                    }
+                },
+                {}
+            );
+            const current = await currentProject(mod);
+            expect(current.projectDir).toBe(realpathSync(b));
+            expect(current.hasToken).toBe(false);
+        } finally {
+            process.chdir(cwd);
+            rmSync(a, { recursive: true, force: true });
+            rmSync(b, { recursive: true, force: true });
+        }
+    });
+
+    it("keeps the persisted default when the working directory is not a project", async () => {
+        const a = mkdtempSync(join(tmpdir(), "rebase-mcp-projA-"));
+        const plain = mkdtempSync(join(tmpdir(), "rebase-mcp-plain-"));
+        const cwd = process.cwd();
+        process.chdir(plain);
+        try {
+            const mod = await bootWith(persistedDefault(a), {});
+            const current = await currentProject(mod);
+            expect(current.projectDir).toBe(a);
+            expect(current.baseUrl).toBe("https://persisted.example.com");
+        } finally {
+            process.chdir(cwd);
+            rmSync(a, { recursive: true, force: true });
+            rmSync(plain, { recursive: true, force: true });
+        }
+    });
+
+    it("does not persist a derived default back into the machine-wide registry", async () => {
+        const b = mkdtempSync(join(tmpdir(), "rebase-mcp-projB-"));
+        writeFileSync(join(b, "rebase.json"), JSON.stringify({ rebase: "^1", apps: {} }));
+        const cwd = process.cwd();
+        process.chdir(b);
+        try {
+            const mod = await bootWith({ activeProject: null, projects: {} }, {});
+            const handler = (mod.server as any)._requestHandlers.get("tools/call");
+            await handler({
+                method: "tools/call",
+                params: {
+                    name: "rebase_project_add",
+                    arguments: { name: "staging", baseUrl: "https://staging.example.com", token: "rk_live_staging" }
+                }
+            });
+            const persisted = JSON.parse(readFileSync(registryPath, "utf8"));
+            expect(Object.keys(persisted.projects)).toEqual(["staging"]);
+            expect(persisted.projects.default).toBeUndefined();
+        } finally {
+            process.chdir(cwd);
+            rmSync(b, { recursive: true, force: true });
+        }
+    });
+
+    it("stops targeting a remembered project that belongs to another directory", async () => {
+        const a = mkdtempSync(join(tmpdir(), "rebase-mcp-projA-"));
+        const b = mkdtempSync(join(tmpdir(), "rebase-mcp-projB-"));
+        writeFileSync(join(b, "rebase.json"), JSON.stringify({ rebase: "^1", apps: {} }));
+        const cwd = process.cwd();
+        process.chdir(b);
+        try {
+            const mod = await bootWith(
+                {
+                    activeProject: "a-staging",
+                    projects: {
+                        "a-staging": {
+                            name: "a-staging",
+                            projectDir: a,
+                            baseUrl: "https://staging.example.com",
+                            token: "rk_live_projecta",
+                            addedAt: "2020-01-01T00:00:00.000Z"
+                        }
+                    }
+                },
+                {}
+            );
+            const current = await currentProject(mod);
+            expect(current.name).toBe("default");
+            expect(current.projectDir).toBe(realpathSync(b));
+        } finally {
+            process.chdir(cwd);
+            rmSync(a, { recursive: true, force: true });
+            rmSync(b, { recursive: true, force: true });
+        }
     });
 
     it("reports nothing when the environment is silent", () => {
@@ -1180,8 +1293,60 @@ describe("the environment block outranks the persisted registry", () => {
     });
 });
 
+describe("local discovery fills gaps only", () => {
+    const registered = {
+        name: "staging",
+        projectDir: "/tmp/does-not-matter",
+        baseUrl: "https://staging.example.com",
+        token: "rk_live_default",
+        addedAt: "2020-01-01T00:00:00.000Z"
+    };
+    const devState = { baseUrl: "http://localhost:3070", serviceKey: "dev-service-key-000000000000000000", pid: process.pid };
+
+    it("keeps a registered baseUrl when a dev server is running", () => {
+        const resolved = autoDiscoverLocal({ ...registered }, devState);
+        expect(resolved.baseUrl).toBe("https://staging.example.com");
+        expect(resolved.token).toBe(registered.token);
+    });
+
+    it("fills an empty baseUrl and an empty token from the dev server", () => {
+        const resolved = autoDiscoverLocal({ ...registered, baseUrl: "", token: "" }, devState);
+        expect(resolved.baseUrl).toBe("http://localhost:3070");
+        expect(resolved.token).toBe(devState.serviceKey);
+    });
+
+    it("warns on stderr when the registered URL and the dev server disagree", () => {
+        const warn = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        autoDiscoverLocal({ ...registered, name: `staging-${Math.random()}` }, devState);
+        const written = warn.mock.calls.map((c) => String(c[0])).join("");
+        expect(written).toContain("https://staging.example.com");
+        expect(written).toContain("http://localhost:3070");
+        expect(written).toContain("registered URL wins");
+        warn.mockRestore();
+    });
+
+    it("leaves the project alone when no dev server is running", () => {
+        const resolved = autoDiscoverLocal({ ...registered }, null);
+        expect(resolved).toEqual(registered);
+    });
+});
+
 describe("showing a schema change before making it", () => {
     const handler = () => (server as any)._requestHandlers.get("tools/call");
+
+    /** Every file under a directory, with its contents. */
+    function snapshot(dir: string): Record<string, string> {
+        const out: Record<string, string> = {};
+        const walk = (d: string, prefix: string) => {
+            for (const entry of readdirSync(d, { withFileTypes: true })) {
+                const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+                if (entry.isDirectory()) walk(join(d, entry.name), rel);
+                else out[rel] = readFileSync(join(d, entry.name), "utf8");
+            }
+        };
+        walk(dir, "");
+        return out;
+    }
 
     /** Drive the mocked `spawn` to a chosen exit code and output. */
     function cliReturns(output: string, code: number) {
@@ -1206,8 +1371,10 @@ describe("showing a schema change before making it", () => {
         vi.clearAllMocks();
     });
 
-    it("registers a plan tool that runs a dry push", () => {
+    it("registers a plan tool that asks the backend", () => {
         expect(ALL_TOOLS.map((t) => t.name)).toContain("rebase_schema_plan");
+        const tool = ALL_TOOLS.find((t) => t.name === "rebase_schema_plan")!;
+        expect(tool.inputSchema.required).toEqual(["collectionId", "collection"]);
     });
 
     it("plans without touching the environment, so the gate lets it through", () => {
@@ -1217,16 +1384,70 @@ describe("showing a schema change before making it", () => {
         expect(gatedTargetFor("rebase_db_push")).toBe("db");
     });
 
-    it("passes --dry-run, not a bare push", async () => {
-        cliReturns("Planned changes:\n  ALTER TABLE posts ADD COLUMN subtitle text", 0);
-        const result = await handler()({
-            method: "tools/call",
-            params: { name: "rebase_schema_plan", arguments: {} }
-        });
-        const argv = (spawn as any).mock.calls.at(-1)[1] as string[];
-        expect(argv).toEqual(expect.arrayContaining(["rebase", "db", "push", "--dry-run"]));
-        expect(result.content[0].text).toContain("ALTER TABLE posts ADD COLUMN subtitle");
-        expect(result.isError).toBeUndefined();
+    /**
+     * The whole point of moving off `db push --dry-run`: that command runs
+     * `schema generate` first, so a tool documented as "applies nothing" wrote
+     * `backend/drizzle/{schema,policies}.sql` and `backend/src/schema.generated.ts`
+     * into the repository on every call — and then, on the managed database,
+     * exited 1.
+     */
+    it("spawns no CLI and leaves the project directory byte-identical", async () => {
+        const project = mkdtempSync(join(tmpdir(), "rebase-mcp-plan-"));
+        mkdirSync(join(project, "backend", "src"), { recursive: true });
+        writeFileSync(join(project, "backend", "src", "schema.generated.ts"), "// hand-written\n");
+        const before = snapshot(project);
+
+        const fetchSpy = vi.fn(async (_url: unknown, _init?: unknown) => new Response(
+            JSON.stringify({
+                applicable: true,
+                verdict: "applicable",
+                changes: [],
+                statements: ["ALTER TABLE posts ADD COLUMN subtitle text"],
+                files: ["config/collections/posts.ts"],
+                message: "1 statement",
+                withheldConstraints: [],
+                followUp: []
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+        ));
+        vi.stubGlobal("fetch", fetchSpy);
+        try {
+            const result = await handler()({
+                method: "tools/call",
+                params: {
+                    name: "rebase_schema_plan",
+                    arguments: { collectionId: "posts", collection: { slug: "posts", table: "posts" } }
+                }
+            });
+            expect(spawn).not.toHaveBeenCalled();
+            expect(String(fetchSpy.mock.calls[0][0])).toContain("/api/admin/schema/plan");
+            expect(result.content[0].text).toContain("ALTER TABLE posts ADD COLUMN subtitle");
+            expect(result.isError).toBeUndefined();
+            expect(snapshot(project)).toEqual(before);
+        } finally {
+            vi.unstubAllGlobals();
+            rmSync(project, { recursive: true, force: true });
+        }
+    });
+
+    it("translates a 501 into the reason the backend cannot plan", async () => {
+        vi.stubGlobal("fetch", vi.fn(async () => new Response(
+            JSON.stringify({ error: { code: "SCHEMA_EDITING_NO_COLLECTIONS_DIR" } }),
+            { status: 501, headers: { "content-type": "application/json" } }
+        )));
+        try {
+            const result = await handler()({
+                method: "tools/call",
+                params: {
+                    name: "rebase_schema_plan",
+                    arguments: { collectionId: "posts", collection: {} }
+                }
+            });
+            expect(result.isError).toBe(true);
+            expect(result.content[0].text).toContain("collectionsDir");
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 
     it("marks a non-zero CLI exit as an error rather than describing one", async () => {
@@ -1277,6 +1498,127 @@ describe("error ergonomics", () => {
         expect(explained).toContain("rebase dev");
         expect(explained).toContain("rebase_dev_start");
         expect(explained).toContain("rebase_project_current");
+    });
+
+    it("turns a cron 404 into the file that would create the surface", async () => {
+        // `surfaces.cron` gates the mount, so a project with no cron jobs — every
+        // fresh scaffold — answers 404 and the client raised a bare `Not Found`.
+        const notFound = Object.assign(new Error("Not Found"), { status: 404 });
+        mockClient.cron.listJobs.mockRejectedValueOnce(notFound);
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "cron_list_jobs", arguments: {} }
+        });
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("backend/crons/");
+        expect(result.content[0].text).not.toBe("Error: Not Found");
+    });
+
+    it("says the same thing when the surface answers an empty list", async () => {
+        mockClient.cron.listJobs.mockResolvedValueOnce({ jobs: [] });
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "cron_list_jobs", arguments: {} }
+        });
+        expect(result.isError).toBeUndefined();
+        expect(result.content[0].text).toContain("backend/crons/");
+    });
+
+    it("leaves a 404 alone for a tool whose surface is always mounted", () => {
+        const notFound = Object.assign(new Error("Not Found"), { status: 404 });
+        expect(explainToolError(notFound, "http://x", "get_document")).toBe("Not Found");
+    });
+
+    it("can switch to a branch it just made", async () => {
+        // create/delete/info/list without switch left an agent able to make a
+        // branch and unable to use it: the only route onto one was hand-editing
+        // DATABASE_URL.
+        expect(ALL_TOOLS.map((t) => t.name)).toContain("rebase_db_branch_switch");
+        // A local pointer under `.rebase/`, never `.env` and never the database.
+        expect(LOCAL_ONLY_TOOLS.has("rebase_db_branch_switch")).toBe(true);
+        expect(gatedTargetFor("rebase_db_branch_switch")).toBeNull();
+
+        (mockSpawn.stdout.on as any).mockImplementation((event: string, cb: (b: Buffer) => void) => {
+            if (event === "data") cb(Buffer.from("On branch feature_auth"));
+            return mockSpawn.stdout;
+        });
+        (mockSpawn.stderr.on as any).mockImplementation(() => mockSpawn.stderr);
+        (mockSpawn.on as any).mockImplementation((event: string, cb: (c: number) => void) => {
+            if (event === "close") cb(0);
+            return mockSpawn;
+        });
+
+        await handler()({
+            method: "tools/call",
+            params: { name: "rebase_db_branch_switch", arguments: { name: "feature_auth" } }
+        });
+        expect((spawn as any).mock.calls.at(-1)[1]).toEqual(
+            expect.arrayContaining(["db", "branch", "switch", "feature_auth"])
+        );
+
+        await handler()({
+            method: "tools/call",
+            params: { name: "rebase_db_branch_switch", arguments: { off: true } }
+        });
+        expect((spawn as any).mock.calls.at(-1)[1]).toEqual(
+            expect.arrayContaining(["db", "branch", "switch", "--off"])
+        );
+
+        // No name and no `--off` reports the active branch rather than moving.
+        await handler()({
+            method: "tools/call",
+            params: { name: "rebase_db_branch_switch", arguments: {} }
+        });
+        const bare = (spawn as any).mock.calls.at(-1)[1] as string[];
+        expect(bare).toEqual(expect.arrayContaining(["db", "branch", "switch"]));
+        expect(bare).not.toContain("--off");
+        vi.clearAllMocks();
+    });
+
+    it("names a dev server it did not spawn, in both dev tools", async () => {
+        const state = { baseUrl: "http://localhost:3070", serviceKey: "k", pid: process.pid };
+        expect(describeForeignDevServer("logs", state)).toContain("http://localhost:3070");
+        expect(describeForeignDevServer("logs", state)).toContain("did not start it");
+        expect(describeForeignDevServer("stop", state)).toContain("Ctrl-C");
+        expect(describeForeignDevServer("logs", null)).toBeNull();
+    });
+
+    it("reads a live .rebase/state.json rather than only its own child", async () => {
+        const project = mkdtempSync(join(tmpdir(), "rebase-mcp-devstate-"));
+        mkdirSync(join(project, ".rebase"), { recursive: true });
+        writeFileSync(
+            join(project, ".rebase", "state.json"),
+            JSON.stringify({ baseUrl: "http://localhost:3070", serviceKey: "k".repeat(40), pid: process.pid })
+        );
+        const home = join(tmpdir(), "rebase-mcp-test-home");
+        const registryPath = join(home, ".rebase", "projects.json");
+        mkdirSync(join(home, ".rebase"), { recursive: true });
+        const saved = existsSync(registryPath) ? readFileSync(registryPath, "utf8") : null;
+        writeFileSync(registryPath, JSON.stringify({
+            activeProject: "default",
+            projects: {
+                default: {
+                    name: "default", projectDir: project, baseUrl: "", token: "",
+                    addedAt: "2020-01-01T00:00:00.000Z"
+                }
+            }
+        }));
+        vi.resetModules();
+        try {
+            const mod = await import("../src/index");
+            const call = (mod.server as any)._requestHandlers.get("tools/call");
+            const result = await call({
+                method: "tools/call",
+                params: { name: "rebase_dev_logs", arguments: { lines: 5 } }
+            });
+            expect(result.content[0].text).toContain("http://localhost:3070");
+            expect(result.content[0].text).not.toBe("Dev server is not running.");
+        } finally {
+            if (saved === null) rmSync(registryPath, { force: true });
+            else writeFileSync(registryPath, saved);
+            rmSync(project, { recursive: true, force: true });
+            vi.resetModules();
+        }
     });
 
     it("leaves an error that is not a connection failure alone", () => {

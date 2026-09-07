@@ -1,4 +1,5 @@
 ---
+sourceHash: b48cc9bf8ad4dcf3
 title: Despliegue
 sidebar_label: Despliegue
 description: Despliega tu proyecto Rebase a producción usando Docker, plataformas en la nube o configuraciones manuales.
@@ -16,82 +17,178 @@ No hay una URL de administración separada: el panel de administración forma pa
 | Tipo de proyecto | La URL raíz muestra | El panel de administración está en |
 |--------------|----------------|-------------------|
 | Scaffold predeterminado (`rebase init`) | El panel de administración | `/` — el frontend **es** el administrador |
-| Frontend de producto personalizado | Tu app | Donde lo montes, comúnmente `/admin` — consulta [Cambiar la URL Base](#changing-the-base-url) |
+| Frontend de producto personalizado | Tu app | Donde lo montes, comúnmente `/admin` — consulta [Cambiar la URL Base](#cambiar-la-url-base) |
 | Proyecto solo backend | Nada (solo API) | No desplegado |
 
 :::note[Primera visita]
-En la primera visita al administrador de un despliegue nuevo, Rebase muestra una pantalla de bootstrap para **crear tu cuenta de administrador**. La primera cuenta registrada recibe privilegios de administrador — reclámala justo después de desplegar.
+Un despliegue de **producción** recién creado no ofrece ninguna pantalla de bootstrap, y su primer registro es una cuenta corriente. Nombra al administrador antes del primer arranque — consulta [Tu primer administrador](#tu-primer-administrador).
 :::
 
 ## Docker Compose (Recomendado)
 
-El proyecto generado incluye un `Dockerfile` y un `docker-compose.yml`. Esta es la forma más sencilla de desplegar:
+El proyecto generado ya incluye un `docker-compose.yml` que funciona — **ese
+fichero es el que hay que usar en un proyecto con scaffold**, tal cual, en lugar
+de escribirlo a mano o copiarlo de otro sitio. `rebase init` rellenó sus
+secretos, su primera cuenta de administrador y su versión de runtime fijada, y
+la propia puerta de aceptación del framework lo arranca en cada push. Levanta
+**dos** contenedores: Postgres y el runtime de Rebase publicado, con tu bundle
+compilado montado dentro. No hay ninguna imagen de aplicación que construir.
 
-```yaml title="docker-compose.yml"
-services:
-  postgres:
-    image: pgvector/pgvector:pg18
-    environment:
-      POSTGRES_USER: rebase_app
-      POSTGRES_PASSWORD: rebase
-      POSTGRES_DB: rebase
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
-  app:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    ports:
-      - "3001:3001"
-    environment:
-      DATABASE_URL: postgresql://rebase_app:rebase@postgres:5432/rebase
-      JWT_SECRET: ${JWT_SECRET}
-      NODE_ENV: production
-    depends_on:
-      - postgres
-    volumes:
-      - uploads:/app/uploads
-
-volumes:
-  pgdata:
-  uploads:
-```
+[Autoalojamiento](/docs/deployment/self-hosting) cubre el mismo despliegue sin
+un scaffold detrás, usando
+[`infra/docker/docker-compose.selfhost.yml`](https://github.com/rebasepro/rebase/blob/main/infra/docker/docker-compose.selfhost.yml)
+del repositorio de Rebase — y las dos cosas que ese fichero deja fuera a
+propósito: un pooler de conexiones y ejecutar las funciones y el worker de
+trabajos como procesos propios.
 
 ```bash
+rebase build          # produce ./dist-bundle
 docker compose up -d
 ```
 
-:::note
-El `docker-compose.yml` generado por Rebase es la fuente de verdad y ya usa este contexto de compilación (la raíz del proyecto con `dockerfile: backend/Dockerfile`); el ejemplo anterior solo lo reproduce. El Dockerfile del backend necesita todo el workspace como contexto (`pnpm-workspace.yaml`, `backend/`, `config/`), por lo que `build: ./backend` fallaría.
-:::
+Primero `rebase build`, siempre: el servicio `api` monta `./dist-bundle`, y sin
+él el contenedor arranca contra un directorio vacío.
 
-## Crear el Esquema de la Base de Datos
+La forma del fichero generado:
 
-Al arrancar, Rebase crea automáticamente **solo las tablas de autenticación**. Las tablas de tus propias colecciones **no se crean automáticamente**. Aplica el esquema una vez contra la base de datos de producción:
+```yaml title="docker-compose.yml (generated — abridged)"
+services:
+  db:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_USER: rebase_app
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
+      POSTGRES_DB: rebase
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rebase_app -d rebase"]
+
+  api:
+    # The published runtime. Upgrading Rebase is a tag change, not a rebuild.
+    image: rebasepro/server:${REBASE_VERSION:-latest}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3001}:3001"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://rebase_app:${DATABASE_PASSWORD:-changeme}@db:5432/rebase
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY:?set REBASE_SERVICE_KEY in .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS in .env}
+      # This service runs in production, where the first account to register is
+      # not promoted to admin. So the admin is named instead.
+      REBASE_ADMIN_EMAIL: ${REBASE_ADMIN_EMAIL:?set REBASE_ADMIN_EMAIL in .env}
+      REBASE_ADMIN_PASSWORD: ${REBASE_ADMIN_PASSWORD:?set REBASE_ADMIN_PASSWORD in .env}
+      DISABLE_SELF_REGISTRATION: ${DISABLE_SELF_REGISTRATION:-true}
+    volumes:
+      # Your built project, from `rebase build`. Read-only: the build vendors
+      # the bundle's dependencies by default, so nothing has to write here.
+      - ./dist-bundle:/bundle:ro
+
+volumes:
+  postgres_data:
+```
+
+Las tres líneas `REBASE_ADMIN_*` / `DISABLE_SELF_REGISTRATION` son nuevas <span class="since-badge" data-since="0.18">Since 0.18</span>
+— en 0.17.3 la primera cuenta registrada se convierte en la administradora,
+también en producción. Consulta [Tu primer
+administrador](#tu-primer-administrador) más abajo.
+
+El bundle se monta en solo lectura. `rebase build` instala las dependencias
+declaradas del proyecto en `dist-bundle` salvo que pases `--no-vendor`, en cuyo
+caso el runtime las instala en cada arranque y el montaje tiene que ser
+escribible: quita entonces el `:ro`. Consulta
+[Autoalojamiento](/docs/deployment/self-hosting/#dependencies).
+
+`rebase init` escribe todo esto en `.env` por ti, incluida una contraseña de
+administrador generada. Cada variable se declara con `${VAR:?…}`, así que una
+que falte detiene el stack con un mensaje que la nombra en lugar de arrancar
+algo a medio configurar — y Compose interpola el fichero entero antes de
+seleccionar servicios, así que una que falte detiene también
+`docker compose up -d db`.
+
+Cambia el correo del administrador por el tuyo, inicia sesión y cambia la
+contraseña. Consulta [Tu primer administrador](#tu-primer-administrador).
+
+### El esquema
+
+El runtime crea las tablas que faltan al arrancar, **incluidas las de tus
+colecciones**: `REBASE_MIGRATE_ON_BOOT` vale `ensure` por defecto, que es
+aditivo sobre todo el esquema y aplica con él la seguridad a nivel de fila. Un
+primer `docker compose up` contra una base de datos vacía levanta sirviendo tus
+colecciones.
+
+Lo que el arranque nunca hace es cambiar algo que ya existe: no altera el tipo
+de una columna, no elimina nada y no edita las etiquetas de un enum existente,
+porque el reinicio de un contenedor no debe reformar un esquema como efecto
+colateral de un despliegue. Eso pasa por la CLI, desde un checkout o desde un
+job de CI apuntando a la base de datos de producción:
 
 ```bash
 pnpm run db:push
 ```
 
-Si omites este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta. Ejecútalo desde un checkout del proyecto o desde CI con `DATABASE_URL` apuntando a producción, **no dentro del contenedor**: la imagen de producción se distribuye sin la CLI. Para migraciones versionadas, usa `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
+Ejecútalo para la RLS de las tablas de unión en relaciones muchos a muchos, y
+para cualquier cambio que no sea puramente aditivo: una columna renombrada, un
+tipo estrechado, un campo eliminado.
+
+Para un **flujo de trabajo versionado y en equipo**, versiona ficheros de
+migración con `pnpm run db:generate` y ejecuta `pnpm run db:migrate` como paso
+de release. En cualquier caso se ejecuta desde un checkout del proyecto, no
+dentro del contenedor en marcha: la imagen de runtime se distribuye sin la CLI.
+
+## Tu primer administrador
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
+
+**Define `REBASE_ADMIN_EMAIL` y `REBASE_ADMIN_PASSWORD` antes del primer arranque.** Todas las guías por plataforma de este sitio apuntan aquí, porque es el único paso que no tiene arreglo desde fuera.
+
+Una base de datos recién creada no tiene usuarios, y fuera de producción la política de registro admite el primer alta y la promueve a administrador. Tiene que hacerlo: nombrar a un administrador exige un llamante ya autenticado, así que una base de datos vacía sin esa regla es un callejón sin salida. En un portátil, quien está al teclado es el operador, y eso es exactamente lo correcto.
+
+Es exactamente lo incorrecto en un host con nombre público. Los artefactos publicados levantan DNS y TLS antes de que el operador haya escrito nada, así que la ventana está abierta a internet desde el primer segundo, y quien llegue primero al formulario de alta se queda con el despliegue.
+
+Por eso, bajo `NODE_ENV=production` esa ventana está cerrada. Una tabla de usuarios vacía rechaza el registro de arranque con `SETUP_REQUIRED`, una cuenta creada por registro abierto es una cuenta corriente, `GET /api/auth/config` nunca anuncia `needsSetup` y `POST /api/admin/bootstrap` se niega. En 0.17.3 y anteriores la ventana también estaba abierta en producción: actualiza antes de exponer un despliegue nuevo.
+
+`rebase dev` lee el mismo `.env`, pero ignora ambas variables a propósito y lo dice al arrancar: en local, el primer registro sigue siendo la forma de entrar. Los valores que escribió `rebase init` son del arranque de producción. Sembrar en los dos lados gastaría la ventana antes de que la desarrolladora hubiera abierto la app, que es justo lo que hacía que el primer paso del propio quickstart produjera una cuenta sin rol.
+
+Quedan dos formas de entrar, y ninguna es una carrera:
+
+```bash
+REBASE_ADMIN_EMAIL=you@example.com
+REBASE_ADMIN_PASSWORD=<at least 12 characters>
+DISABLE_SELF_REGISTRATION=true
+```
+
+El runtime crea esa cuenta una vez, mientras la tabla de usuarios está vacía, y no hace nada en los arranques siguientes. O asigna el rol a un usuario existente con la clave de servicio, si aprovisionas cuentas por otra vía.
+
+El runtime impone dos reglas al arrancar, y ambas producen si no una cuenta que nadie puede usar:
+
+- La contraseña debe tener **al menos 12 caracteres**, o se rechaza y no se crea ninguna cuenta.
+- La dirección debe ser una que acepte `POST /api/auth/login`: analiza su cuerpo con `z.string().email()`, así que un dominio sin punto (`admin@localhost`) se crea sin quejas y luego responde 400 en cada inicio de sesión. El arranque también rechaza esa dirección.
+
+Define ambas o ninguna: media credencial es una errata, y el despliegue que deja — autorregistro cerrado, sin administrador — sólo se recupera desde una consola `psql`. El arranque avisa cuando la tabla está vacía en producción y no se ha nombrado administrador.
+
+Inicia sesión y cambia la contraseña. Está en texto plano allí donde hayas puesto tu entorno.
 
 ## Lista de Verificación para Producción
+
+<span class="since-badge" data-since="0.18">Since 0.18</span>
 
 Antes de desplegar en producción, asegúrate de:
 
 | Elemento | Detalles |
 |------|---------|
+| **Primer administrador** | Define `REBASE_ADMIN_EMAIL` y `REBASE_ADMIN_PASSWORD` **antes del primer arranque**, junto con `DISABLE_SELF_REGISTRATION=true`. En producción la primera cuenta registrada no se promueve — consulta [Tu primer administrador](#tu-primer-administrador). |
+| **NODE_ENV** | `NODE_ENV=production`. Es lo que cierra la ventana de bootstrap, rechaza el almacenamiento local de ficheros, exige `CORS_ORIGINS` y apaga la documentación OpenAPI. Un despliegue que se queda con el valor por defecto está corriendo en modo desarrollo. |
+| **Esquema de la base de datos** | El arranque crea las tablas de tus colecciones de forma aditiva. Ejecuta `pnpm run db:push` (o `pnpm run db:migrate`) para la RLS de las tablas de unión y para todo lo que no sea puramente aditivo. |
 | **JWT_SECRET** | Usa una cadena aleatoria criptográficamente fuerte (≥ 32 caracteres). Nunca la reutilices entre entornos. |
 | **DATABASE_URL** | Usa una instancia de Postgres gestionada (Neon, Supabase, RDS) con TLS habilitado |
-| **Esquema de la base de datos** | Ejecuta `pnpm run db:push` una vez contra la base de datos de producción para crear las tablas de tus colecciones (al arrancar, Rebase solo crea las tablas de autenticación) |
-| **CORS** | Configura los orígenes permitidos en tu backend si el frontend y el backend están en dominios diferentes |
-| **Volúmenes de almacenamiento** | Monta volúmenes persistentes para las subidas de archivos. O cambia a S3 para producción. |
+| **CORS_ORIGINS** | Siempre, no solo cuando el frontend está en otro dominio. El runtime se niega a arrancar en producción sin `CORS_ORIGINS` ni `FRONTEND_URL`, porque una API que adivina sus orígenes permitidos acaba permitiendo el equivocado. |
+| **Control de acceso al almacenamiento** | Un bucket configurado **se niega a arrancar en producción** sin un modelo de control de acceso. El almacenamiento no está bajo seguridad a nivel de fila y sus claves comparten un único espacio de nombres plano, así que un valor por defecto permisivo deja que cualquier usuario autenticado liste (`GET /storage/list?prefix=`) y luego lea, sobrescriba o borre los ficheros de todos los demás. Satisfazlo con un hook `storageAuthorize` o con `storagePolicies` (el scaffold incluye un hook en `config/storage.ts`), o declara la intención con `STORAGE_PUBLIC_READ` para una CDN pública de verdad, o `STORAGE_ALLOW_ANY_AUTHENTICATED` para una app de un solo inquilino donde se confía cada fichero a cada cuenta. |
+| **Backend de almacenamiento** | `STORAGE_TYPE=local` se **descarta** en producción, y las subidas responden `501 STORAGE_NOT_CONFIGURED` — el sistema de archivos del contenedor se destruye en el siguiente reinicio, así que un backend local es pérdida de datos silenciosa. Usa `s3` o `gcs`, o define `FORCE_LOCAL_STORAGE=true` si la ruta es de verdad un volumen duradero. |
+| **MFA_ENCRYPTION_KEY** | Defínela (32+ caracteres aleatorios) si usas TOTP. Sin ella, los secretos almacenados se cifran con `JWT_SECRET` — así que rotarlo cierra la sesión de todo el mundo *y* deja indescifrable cada autenticador registrado. |
 | **HTTPS** | Termina TLS en tu proxy inverso (nginx, Cloudflare, balanceador de carga) |
-| **Registro** | Establece `ALLOW_REGISTRATION=false` después de crear tu cuenta de administrador |
-
 | **Las lecturas públicas siguen necesitando un llamante** | `access: "public"` amplía qué *filas* ve un llamante, no quién puede llamar: una petición anónima a `/api/data/*` responde 401 mientras `AUTH_REQUIRE` esté activo. Pon `AUTH_REQUIRE=false` para un sitio público que lee su propio backend y deja que RLS decida por sí solo. Es una variable de entorno, así que un `.env` local que la defina **no** viaja con tu despliegue. |
 
 ## Módulos Nativos en el Runtime Gestionado

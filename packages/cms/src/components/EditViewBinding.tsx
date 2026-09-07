@@ -10,6 +10,7 @@ import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBin
 import { EntityViewBinding } from "./EntityViewBinding";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
 import {
+    Button,
     CenteredView,
     CircularProgress,
     cls,
@@ -54,10 +55,10 @@ import { useAdminContext } from "../hooks/useAdminContext";
 import { EntityInspector, InspectorTab } from "./EntityInspector";
 import { useEntityDisplayTitle } from "../hooks/useEntityDisplayTitle";
 import { createFormexStub, getEntityFromCache } from "@rebasepro/app";
-import { usePermissions } from "@rebasepro/app";
+import { usePermissions, useTranslation } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { withListState } from "../util/view_mode";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import {
     MAIN_TAB_VALUE,
@@ -201,6 +202,8 @@ export function EditViewBinding<M extends Record<string, unknown>>({
         : handoff.current.values;
 
     const { canEdit: canEditHook } = usePermissions();
+    const { t } = useTranslation();
+    const urlController = useUrlController();
 
     const initialStatus = props.copy ? "copy" : (entityId ? "existing" : "new");
     const [status, setStatus] = useState<EntityStatus>(initialStatus);
@@ -219,10 +222,42 @@ export function EditViewBinding<M extends Record<string, unknown>>({
         </CenteredView>
     }
 
-    if (!dataLoading && !initialDirtyValues && !entity && (status === "existing" || status === "copy")) {
-        console.error(`Entity with id ${entityId} not found in collection ${props.path}`);
+    /**
+     * There is no id, so there is no record that could have been missing.
+     *
+     * The branch below answers "the record this URL names is not there", and
+     * with no id nothing is named. Without this it fired on every successful
+     * *create*: `EntityFormBinding` sets `status` to `"existing"` the moment a
+     * save lands, and the `entityId` prop arrives one render later from the
+     * URL, so for one frame the component reported a record with no id as
+     * missing — `Entity with id undefined not found in collection posts`,
+     * twice under StrictMode, beside a "Saved successfully" toast, with
+     * "Entity not found" flashed over the record that had just been created.
+     *
+     * Written against the id rather than against `status === "existing"`
+     * because the same thing is true of a copy in flight, and because "we have
+     * nothing to look up" is the actual reason.
+     */
+    const nothingToLookUp = !entityId;
+
+    if (!dataLoading && !initialDirtyValues && !entity && !nothingToLookUp
+        && (status === "existing" || status === "copy")) {
+        // A `warn`, and only for a real id: an unknown record in the URL is
+        // something a person did, not a fault in the panel — the screen below
+        // says so, and this is for whoever is reading the console at the time.
+        console.warn(`Entity with id ${entityId} not found in collection ${props.path}`);
         return <CenteredView>
-            <Typography variant="label">Entity not found</Typography>
+            <div className="flex flex-col items-center gap-2 text-center">
+                <Typography variant="label">{t("entity_not_found")}</Typography>
+                <Typography variant="body2" color="secondary">{t("entity_not_found_body")}</Typography>
+                <Button
+                    variant="text"
+                    component={Link}
+                    to={urlController.buildUrlCollectionPath(props.path)}
+                >
+                    {t("back_to_collection", { name: props.collection.name ?? props.path })}
+                </Button>
+            </div>
         </CenteredView>;
     }
 

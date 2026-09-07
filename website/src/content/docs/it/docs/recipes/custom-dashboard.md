@@ -1,4 +1,5 @@
 ---
+sourceHash: 62363af9dfc94b45
 title: "Ricetta: Dashboard Personalizzata"
 sidebar_label: Dashboard Personalizzata
 description: Costruisci una vista dashboard personalizzata con grafici, statistiche e visualizzazioni di dati utilizzando i hook di Rebase.

@@ -1,4 +1,5 @@
 ---
+sourceHash: a83732a379b7739b
 title: Implementando Rebase no Scaleway
 description: Aprenda como implementar o Rebase no Scaleway para uma infraestrutura de nuvem segura e baseada na França usando Containers Serverless.
 sidebar_label: Scaleway
@@ -11,6 +12,21 @@ Recomendamos utilizar o **Managed Database** da Scaleway para um suporte Postgre
 ## 1. Criar um Banco de Dados Postgres Gerenciado
 
 Os Managed Databases da Scaleway oferecem backups automáticos e alta disponibilidade.
+
+**Não há nenhuma imagem de aplicação para construir a partir do seu código**. O `rebase build` produz um diretório `dist-bundle` com as suas coleções, funções e crons compilados — e, se o projeto declarar uma app estática, o seu frontend construído. A imagem de runtime publicada executa-o:
+
+```bash
+rebase build
+```
+
+O Serverless Containers puxa de um registo, por isso incorpore o bundle numa imagem derivada. Três linhas, e fixa exatamente o que corre:
+
+```dockerfile title="Dockerfile"
+FROM rebasepro/server:0.17.3
+COPY dist-bundle /bundle
+```
+
+Atualizar o Rebase mais tarde é uma alteração nessa linha `FROM`. O seu bundle fica intacto.
 
 1. No Console Scaleway, vá para **PostgreSQL**.
 2. Clique em **Criar uma Instância de Banco de Dados**.
@@ -26,10 +42,10 @@ Os Scaleway Serverless Containers executam imagens Docker padrão. Primeiro, con
 
 1. Vá para **Container Registry** no Console Scaleway e crie um Namespace (ex: `rebase-apps`).
 2. Faça login no registro a partir do seu terminal local usando as instruções fornecidas.
-3. Construa sua aplicação Rebase a partir da raiz do projeto — o Dockerfile do backend precisa de todo o workspace como contexto de build (ele copia `pnpm-workspace.yaml`, `backend/` e `config/`), por isso o contexto é `.` e não `./backend`:
+3. Construa e envie a partir da raiz do projeto:
 
 ```bash
-docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f backend/Dockerfile .
+docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest .
 ```
 
 4. Envie a imagem:

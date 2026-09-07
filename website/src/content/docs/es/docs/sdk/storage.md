@@ -1,4 +1,5 @@
 ---
+sourceHash: 7a0c74973860c714
 title: Almacenamiento y Archivos
 sidebar_label: Almacenamiento
 description: Suba, descargue, liste y elimine archivos con el módulo de almacenamiento del SDK del Cliente de Rebase.
@@ -26,7 +27,7 @@ const result = await client.storage.putObject({
     }
 });
 
-// result: { key: string, url: string, ... }
+// result: { key: string; bucket: string; storageUrl: string }
 ```
 
 ### Desde un Campo de Archivo
@@ -60,6 +61,10 @@ if (url) {
     console.log("File not found");
 }
 ```
+
+:::caution[El argumento `bucket` es hoy un prefijo de ruta]
+En `getSignedUrl`, `getObject` y `deleteObject`, el segundo argumento se pliega dentro de la clave del objeto (`<bucket>/<key>`) y nunca llega al servidor como bucket, así que un nombre que el despliegue no sirve se reporta como *archivo* ausente, no como bucket desconocido — y un archivo escrito con `putObject({ bucket: "media" })` no se lee de vuelta con `getSignedUrl(key, "media")`. Lea un archivo con la misma forma de llamada que lo escribió. El lado del servidor ya responde `404 UNKNOWN_STORAGE_SOURCE` en `/api/storage/list`; el argumento del SDK se está reelaborando para coincidir.
+:::
 
 Con un bucket específico:
 

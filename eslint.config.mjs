@@ -36,8 +36,30 @@ export default [
             "**/.artifacts/**",
             "**/playwright-report/**",
             "**/test-results/**",
+            // The three workspace projects outside the library, each ignored for
+            // a different reason and each measured rather than assumed. They are
+            // not unchecked: `pnpm typecheck` reads none of them either, but
+            // `check:examples` compiles `examples/*` against BUILT output — the
+            // way a real user consumes them — and the website has its own
+            // `astro check`. What is missing here is style rules, not types.
+            //
+            // `tooling/videos/` is Remotion, a React codebase whose components
+            // are frames rather than UI. 2 errors today, both
+            // `react/no-unescaped-entities` in a title card, where an apostrophe
+            // rendered as `&apos;` would be a defect rather than a fix.
             "**/videos/**",
+            // The Astro site. 88 errors, almost all `no-unescaped-entities` in
+            // marketing prose — the same rule, and the same reason it is wrong
+            // here: these are `.tsx` islands whose text is copy. Astro files
+            // need a parser this config does not load, so linting the site means
+            // linting a third of it and calling that coverage.
             "**/website/**",
+            // The standalone example apps. They each carry their own tsconfig,
+            // so typescript-eslint refuses them outright — "multiple candidate
+            // TSConfigRootDirs are present", a parse error per file rather than
+            // a finding. Fixing that means pinning `tsconfigRootDir` for a
+            // nested project, which changes how every rule resolves types in
+            // the rest of the repository.
             "**/examples/**",
             "**/saas/**",
             // Ad-hoc checkouts of the saas repo alongside it — `saas-sweep`,

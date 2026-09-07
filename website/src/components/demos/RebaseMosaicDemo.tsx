@@ -651,7 +651,7 @@ export default function RebaseMosaicDemo() {
                             {"\n"}
                             <span className="text-purple-400">const</span> client = <span
                             className="text-blue-400">createRebaseClient</span>(&#123;{"\n"}
-                            {"  "}baseUrl: <span className="text-green-400">"http://localhost:3001"</span>{"\n"}
+                            {"  "}baseUrl: <span className="text-blue-300">import.meta.env.VITE_API_URL</span>{"\n"}
                             &#125;);{"\n"}
                             {"\n"}
                             <span className="text-neutral-500">// Query active posts in real-time</span>{"\n"}

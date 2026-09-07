@@ -19,6 +19,10 @@ a transitive dependency rather than installing it yourself.
 npm install @rebasepro/cms-types
 ```
 
+ESM-only: `"type": "module"` with no CommonJS build, so it is loaded with
+`import`. `require()` of it resolves only on Node 22.12+, which supports
+`require(esm)`.
+
 ## Usage
 
 ```ts

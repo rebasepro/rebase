@@ -1,4 +1,5 @@
 ---
+sourceHash: 3830846c0457a79f
 title: Layout del Form
 sidebar_label: Layout del Form
 description: Controlla come è organizzato il form dell'entità — ampiezza delle colonne, sezioni e il rail dei metadati.

@@ -4,7 +4,8 @@ import { ChevronDownIcon, cls, iconSize, Typography } from "@rebasepro/ui";
 
 import { IconForView, getIcon } from "@rebasepro/app";
 import { DrawerNavigationItem } from "./DrawerNavigationItem";
-import { useTranslation, useComponentOverride, useNavigationGroupLabel } from "@rebasepro/app";
+import { useComponentOverride, useNavigationGroupLabel } from "@rebasepro/app";
+import { NAVIGATION_DEFAULT_GROUP_NAME } from "../hooks/navigation/utils";
 
 export interface DrawerNavigationGroupProps {
     /**
@@ -65,7 +66,6 @@ export function DrawerNavigationGroup({
     hideHeader,
     icon
 }: DrawerNavigationGroupProps) {
-    const { t } = useTranslation();
     // The group name is the identifier everything else keys off — the icon
     // mapping, the collapse memory, `AppView.group`. Only the header is
     // translated, and only for the groups Rebase itself ships.
@@ -109,7 +109,7 @@ export function DrawerNavigationGroup({
                         color={"secondary"}
                         className="font-semibold text-[11px] uppercase tracking-wider flex-grow line-clamp-1 text-surface-400 dark:text-surface-400"
                     >
-                        {(groupLabel(group) || t("views_group"))}
+                        {groupLabel(group || NAVIGATION_DEFAULT_GROUP_NAME)}
                     </Typography>
                     {headerActions && (
                         <div onClick={(e) => e.stopPropagation()}>

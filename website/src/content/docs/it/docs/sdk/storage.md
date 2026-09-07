@@ -1,4 +1,5 @@
 ---
+sourceHash: 7a0c74973860c714
 title: Archiviazione e file
 sidebar_label: Archiviazione
 description: Carica, scarica, elenca ed elimina file usando il modulo di archiviazione dell'SDK Client di Rebase.
@@ -26,7 +27,7 @@ const result = await client.storage.putObject({
     }
 });
 
-// result: { key: string, url: string, ... }
+// result: { key: string; bucket: string; storageUrl: string }
 ```
 
 ### Da un campo file
@@ -60,6 +61,10 @@ if (url) {
     console.log("File not found");
 }
 ```
+
+:::caution[L'argomento `bucket` oggi è un prefisso di percorso]
+In `getSignedUrl`, `getObject` e `deleteObject` il secondo argomento viene ripiegato nella chiave dell'oggetto (`<bucket>/<key>`) e non raggiunge mai il server come bucket: un nome che il deployment non serve viene segnalato come *file* mancante, non come bucket sconosciuto — e un file scritto con `putObject({ bucket: "media" })` non si rilegge con `getSignedUrl(key, "media")`. Rileggi un file con la stessa forma di chiamata che lo ha scritto. Lato server `/api/storage/list` risponde già `404 UNKNOWN_STORAGE_SOURCE`; l'argomento dell'SDK è in corso di revisione per allinearsi.
+:::
 
 Con un bucket specifico:
 

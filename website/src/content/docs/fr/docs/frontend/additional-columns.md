@@ -1,4 +1,5 @@
 ---
+sourceHash: b39ae0ea2de335df
 title: Colonnes supplémentaires
 sidebar_label: Colonnes supplémentaires
 description: Ajoutez des colonnes calculées/virtuelles aux tableaux de collection qui dérivent des valeurs des données d'entité.

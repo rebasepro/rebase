@@ -4,11 +4,20 @@
  * `publish.yml` takes the bump as a free-text `workflow_dispatch` input
  * defaulting to `"patch"`, and nothing correlates that input with the diff. So a
  * release that removed an export from `@rebasepro/server` ships as 0.13.1, and
- * every consumer pinned `"@rebasepro/server": "^0.13.0"` — the range `rebase init`
- * scaffolds — resolves it on their next install. `^0.13.0` is
- * `>=0.13.0 <0.14.0`: a breaking change auto-installs. Under 0.x the *minor* is
- * the breaking position, and until this file nothing enforced that a breaking
- * change reached it.
+ * the number tells every reader it is safe to take.
+ *
+ * That number is the only signal there is. `rebase init` writes EXACT pins —
+ * `"@rebasepro/server": "0.17.3"`, one version for all ten packages, since the
+ * lockstep set has to move together — so nothing auto-installs and nothing
+ * warns: a project upgrades when a person edits the version, and what that
+ * person has to go on is the digit that changed and the changelog entry behind
+ * it. A patch that removed an export is a lie told at exactly the moment
+ * somebody is deciding whether to trust it. (This file used to argue from
+ * `^0.13.0` auto-resolving on the next install, which stopped being true when
+ * `init` moved to exact pins; the conclusion did not change, only the reason.)
+ *
+ * Under 0.x the *minor* is the breaking position, and until this file nothing
+ * enforced that a breaking change reached it.
  *
  * The three axes with a committed artifact can answer for themselves, so they do:
  *
@@ -23,6 +32,24 @@
  *                                      emitted — see below.
  *   * BUNDLE_FORMAT_VERSION,         — either constant moving is a coordinated
  *     RUNTIME_CONTRACT_VERSION         release by definition.
+ *
+ * A fourth axis has no committed artifact behind it and is diffed from the
+ * manifests directly:
+ *
+ *   * `engines.node` in every         — a floor that MOVED. Nothing generates
+ *     publishable package               this field and nothing diffed it, so it
+ *                                       went `>=20` → `>=22.22.0` across 21
+ *                                       packages with no release note at all,
+ *                                       and `pnpm install` answers a mismatch
+ *                                       with a warning rather than a failure.
+ *
+ * A fifth axis asks a different question — not "what did this release break"
+ * but "is this release self-consistent". `rebase init` pins every `@rebasepro`
+ * dependency, and the scaffold's compose image tag, to the CLI's own version, so
+ * a release that ships a template naming something it does not publish produces
+ * projects that cannot boot. `check-template-pins.mjs` holds it; unlike the
+ * four above there is no deliberate version of it, so it refuses outright
+ * rather than asking for a minor and a note.
  *
  * Then two things must be true or the release stops: the bump is at least a
  * minor, and the section about to be promoted out of `[Unreleased]` says so under
@@ -52,6 +79,8 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { classify } from "./check-api-surface.mjs";
+import { checkTemplatePins } from "./check-template-pins.mjs";
+import { publishablePackages } from "./publishable-packages.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -164,6 +193,37 @@ export function contractConstants(text) {
     };
 }
 
+/** `engines.node` as a manifest declares it, or null when it declares none. */
+export function enginesNode(text) {
+    if (text === null || text === undefined) return null;
+    try {
+        return JSON.parse(text)?.engines?.node ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Does the `[Unreleased]` section say the Node floor moved?
+ *
+ * The floor went from `>=20` to `>=22.22.0` on 21 published packages between
+ * 0.17.3 and this commit, and `grep -ciE "engines|Node 22|22\.22"` over the
+ * whole section returned 0. `pnpm install` only *warns* on an engines mismatch
+ * (`[WARN] Unsupported engine`), so the failure lands later, somewhere else,
+ * and the release note is the only place it could have been named.
+ *
+ * "Mentions `engines`" or "quotes the new floor" — either is enough. Asking for
+ * a particular wording would be asking for a sentence that gets pasted rather
+ * than written.
+ */
+export function mentionsEngines(section, floor) {
+    if (!section) return false;
+    if (/\bengines\b/i.test(section)) return true;
+    if (/\bnode\s*(?:>=|≥)?\s*\d+/i.test(section)) return true;
+    if (floor && section.includes(floor)) return true;
+    return false;
+}
+
 /** The `[Unreleased]` section, which is what a release promotes. */
 export function unreleasedSection(text) {
     const start = text.indexOf("## [Unreleased]");
@@ -185,7 +245,9 @@ export function checkReleaseBump({
     readNow = file => {
         const abs = path.join(ROOT, file);
         return fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : null;
-    }
+    },
+    templatePins = v => checkTemplatePins({ releasedAs: v }),
+    manifests = () => publishablePackages(ROOT).map(p => `${p.dir}/package.json`)
 } = {}) {
     if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
         console.error("usage: node tooling/scripts/check-release-bump.mjs <version> [--from <tag>] [--allow-unguarded]");
@@ -248,7 +310,68 @@ export function checkReleaseBump({
         }
     }
 
+    // ── Axis 4: the Node floor the published tarballs declare ───
+    //
+    // `engines.node` is the one breaking change with no committed contract
+    // behind it: nothing generates it, nothing diffs it, and `pnpm install`
+    // answers a mismatch with `[WARN] Unsupported engine` and carries on. So the
+    // floor moved from `>=20` to `>=22.22.0` across 21 published packages in one
+    // commit, the release notes said nothing, and the first person to find out
+    // would have been a user on Node 20 whose build failed somewhere with no
+    // mention of Node in it.
+    //
+    // A package that did not exist at the tag is skipped: a first release cannot
+    // raise a floor nobody was on.
+    const engineChanges = [];
+    for (const file of manifests()) {
+        const before = readAtTag(file);
+        if (before === null) continue;
+        const now = readNow(file);
+        if (now === null) continue;              // deleted; axis 1 owns that
+        const was = enginesNode(before);
+        const is = enginesNode(now);
+        if (was !== is) engineChanges.push({ file, was, is });
+    }
+    if (engineChanges.length) {
+        const { was, is } = engineChanges[0];
+        const also = engineChanges.length > 1 ? ` (and ${engineChanges.length - 1} more)` : "";
+        breaks.push(
+            `engines.node: ${was ?? "(unset)"} → ${is ?? "(unset)"} in ${engineChanges.length} `
+            + `publishable package(s) — ${engineChanges[0].file}${also}. An install on the old floor `
+            + "stops working, and pnpm only warns."
+        );
+    }
+
+    // ── Axis 5: what the scaffold this release ships can import ─
+    //
+    // Not a diff between two baselines like the three above — a consistency
+    // question about the release itself. `rebase init` pins every `@rebasepro/*`
+    // dependency, and the compose file's image tag, to the CLI's own version. So
+    // a release must publish everything its own templates name, or every project
+    // scaffolded from it fails at `rebase dev` and at `docker compose up`, with
+    // a green build behind it. 0.17.3 is the release that proved it: the
+    // template's `docker-compose.yml` `:?`-requires `REBASE_ADMIN_EMAIL` and
+    // `REBASE_ADMIN_PASSWORD`, and the image at that tag has never heard of
+    // either — with `DISABLE_SELF_REGISTRATION` defaulting to `true` beside
+    // them, a self-host boots with no admin and no way to make one.
+    //
+    // `version` rather than the manifests: this step runs before "Bump
+    // versions", so the manifests still name the release being replaced.
+    //
+    // This one is not a `break` — a break is a thing you may ship deliberately
+    // as a minor with a `### Breaking` note. There is no deliberate version of
+    // publishing a scaffold that cannot boot, so it refuses outright.
     console.log(`\n${bold(`Release ${previous} → ${version}`)} (${level}), against ${from}\n`);
+    if (templatePins(version) !== 0) {
+        console.error(red(
+            "\n✗ The templates this release ships name something it does not publish.\n" +
+            "\n    `rebase init` pins every @rebasepro dependency, and the compose file's image tag, to\n" +
+            `    the CLI's own version — ${version} after this release. Every project scaffolded from it\n` +
+            "    would fail at `rebase dev` or at `docker compose up`, with a green build behind it.\n" +
+            "\n    Fix the template, or add what it names to this release.\n"
+        ));
+        return 1;
+    }
     for (const file of unguarded) {
         console.log(`  · ${file} did not exist at ${from} — that axis is unguarded for this release.`);
     }
@@ -267,13 +390,12 @@ export function checkReleaseBump({
         const declared = readNow(CHANGELOG);
         const declaredSection = declared === null ? null : unreleasedSection(declared);
         if (level === "patch" && declaredSection !== null && /^###\s+Breaking\b/m.test(declaredSection)) {
-            const range = `^${previous.split(".").slice(0, 2).join(".")}.0`;
             console.error(red("✗ The changelog declares a breaking change and the bump is a PATCH.\n"));
             console.error(red(
                 `  ✗ ${CHANGELOG}'s [Unreleased] section has a "### Breaking" heading, so this release\n` +
-                `    breaks something. Every consumer on "${range}" — the range \`rebase init\` scaffolds —\n` +
-                `    installs ${version} on their next install. Under 0.x the minor is the breaking\n` +
-                "    position: release this as a minor.\n"
+                `    breaks something. \`rebase init\` writes exact pins ("${previous}"), so nobody takes\n` +
+                `    ${version} by accident — they take it by reading the number, and a patch says it is\n` +
+                "    safe. Under 0.x the minor is the breaking position: release this as a minor.\n"
             ));
             return 1;
         }
@@ -313,11 +435,11 @@ export function checkReleaseBump({
 
     const problems = [];
     if (level === "patch") {
-        const range = `^${previous.split(".").slice(0, 2).join(".")}.0`;
         problems.push(
-            `The bump is a PATCH. Every consumer on "${range}" — the range \`rebase init\` scaffolds —\n` +
-            `    installs ${version} on their next install. Under 0.x the minor is the breaking\n` +
-            "    position: release this as a minor."
+            `The bump is a PATCH. \`rebase init\` writes exact pins ("${previous}"), so the version\n` +
+            `    number is the whole signal: somebody deciding whether to move to ${version} reads the\n` +
+            "    digit that changed. Under 0.x the minor is the breaking position: release this as a\n" +
+            "    minor."
         );
     }
     const changelog = readNow(CHANGELOG);
@@ -329,6 +451,15 @@ export function checkReleaseBump({
             `${CHANGELOG}'s [Unreleased] section has no "### Breaking" heading. The release notes and\n` +
             "    the upgrade guide are built from it, and a breaking release whose notes do not say so\n" +
             "    is the version of this that reaches users."
+        );
+    }
+    if (engineChanges.length && !mentionsEngines(section, engineChanges[0].is)) {
+        problems.push(
+            `${CHANGELOG}'s [Unreleased] section never mentions \`engines\` or a Node version, and this\n` +
+            `    release moves the floor to ${engineChanges[0].is ?? "(unset)"} in ${engineChanges.length} publishable package(s).\n` +
+            "    `pnpm install` answers an engines mismatch with a warning and keeps going, so the\n" +
+            "    failure lands later and elsewhere. Name the floor and where it comes from (`.nvmrc`)\n" +
+            "    in a `### Breaking` bullet."
         );
     }
 

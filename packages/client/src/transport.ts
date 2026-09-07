@@ -179,7 +179,8 @@ function assertNoUndefinedFilterValues(where: Record<string, unknown>): void {
     const reject = (field: string, op: unknown): never => {
         throw new RebaseClientError(
             `Filter on "${field}" has an undefined value (["${String(op)}", undefined]). `
-            + `Omit "${field}" from \`where\` to skip the filter, or use ["is-null", null] to match SQL NULL.`
+            + `Omit "${field}" from \`where\` to skip the filter, or use ["is-null", null] to match SQL NULL.`,
+            { code: "INVALID_FILTER", details: { field, operator: String(op) } }
         );
     };
 

@@ -501,7 +501,7 @@ export const StorageView = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     // Accepts the historical unqualified `path` so links already shared keep
     // working; only the namespaced one is ever written.
-    const currentPath = searchParams.get(STORAGE_PATH_PARAM) || searchParams.get("path") || "";
+    const currentPath = searchParams.get(STORAGE_PATH_PARAM) ?? searchParams.get("path") ?? "";
     const [loading, setLoading] = useState(true);
     /** Why the listing failed, classified — see `load-failure.ts`. */
     const [failure, setFailure] = useState<LoadFailure | null>(null);

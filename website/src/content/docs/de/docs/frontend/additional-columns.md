@@ -1,4 +1,5 @@
 ---
+sourceHash: b39ae0ea2de335df
 title: Zusätzliche Spalten
 sidebar_label: Zusätzliche Spalten
 description: Fügen Sie berechnete/virtuelle Spalten zu Sammlungstabellen hinzu, die Werte aus Entitätsdaten ableiten.

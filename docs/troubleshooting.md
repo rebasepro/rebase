@@ -27,6 +27,20 @@ The runtime unwraps it for you. A boot failure logs:
 If you are reading JSON logs (`NODE_ENV=production`), the same chain is under
 `error.cause`, with `code`, `address` and `port` on each link.
 
+### `Failed query: [redacted]`
+
+That is not a truncated log line. Drizzle builds every query failure as
+`Failed query: <sql>` followed by the bound values, so the statement and its
+parameters — an email address, a password hash — ride along in the message and
+the stack of anything the driver rethrows. The logger strips that span out of
+every line it writes, and prints `[redacted]` where it was.
+
+The statement is rarely the answer anyway: the reason is in the `caused by:`
+lines underneath. When you do need it, set `REBASE_LOG_RAW_QUERIES=true` in
+development and the SQL is printed instead. It is ignored outside development,
+so a variable that leaks into a production environment cannot un-redact
+anything there.
+
 ## The database is not running
 
 ```
@@ -167,8 +181,9 @@ boot log:
 The usual causes: a dependency imported but not in `package.json`, a relative
 import missing its extension (`./util` rather than `./util.js` — the project is
 ESM, so the extension is required), and a file that exports something other than
-a Hono app. Author with `defineFunction(...)` from `@rebasepro/server` to get
-that last one as a compile error instead.
+a Hono app. Author with `defineFunction(...)` from `@rebasepro/server/functions`
+to get that last one as a compile error instead — that subpath, not the package
+root, so the function stays portable.
 
 A subdirectory is not scanned. `functions/admin/users.ts` is reported as a
 skipped entry rather than served.

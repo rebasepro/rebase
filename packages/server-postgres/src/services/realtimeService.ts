@@ -12,7 +12,7 @@ import { PostgresCollectionRegistry } from "../collections/PostgresCollectionReg
 import { buildPropertyCallbacks, getTableName, OrderBySpecError, parseOrderBySpecStrict } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
 import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
-import { logger } from "@rebasepro/server";
+import { logger, rawQueryLoggingEnabled } from "@rebasepro/server";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
@@ -298,10 +298,18 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      */
     public rlsUserRole?: string;
 
-    /** Whether to emit verbose debug logs (disabled in production). */
-    private static readonly DEBUG = process.env.NODE_ENV !== "production";
+    /**
+     * Verbose subscription tracing.
+     *
+     * Through the logger at `debug`, behind the same switch that lifts the
+     * `Failed query:` redaction: these lines quote paths, filters and refetch
+     * SQL, and a `console.debug` gated on `NODE_ENV` alone wrote them to stdout
+     * whatever `LOG_LEVEL` said, without passing through the one function where
+     * redaction lives.
+     */
     private debugLog(...args: unknown[]) {
-        if (RealtimeService.DEBUG) console.debug(...args);
+        if (!rawQueryLoggingEnabled()) return;
+        logger.debug(args.map(a => (typeof a === "string" ? a : JSON.stringify(a))).join(" "));
     }
 
     setDataDriver(driver: DataDriver) {

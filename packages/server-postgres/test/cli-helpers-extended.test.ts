@@ -144,17 +144,21 @@ describe("CLI Helpers — Extended", () => {
             );
         });
 
-        it("should silently catch connection errors", async () => {
+        it("catches connection errors — but no longer silently", async () => {
+            // It used to swallow them entirely, and Atlas then died four frames
+            // later on `database "mydb_dev_diff" does not exist (3D000)` with
+            // the cause gone. It still must not throw (a push must not die
+            // here); it now reports, and says it created nothing.
+            // `dev-database-scratch.test.ts` covers what it says.
             mockConnect.mockRejectedValue(new Error("connection refused"));
 
             const { ensureDevDatabaseExists } = require("../src/cli-helpers");
-            // Should not throw
             await expect(
                 ensureDevDatabaseExists(
                     "postgresql://user:pass@localhost:5432/mydb",
                     "postgresql://user:pass@localhost:5432/mydb_dev_diff"
                 )
-            ).resolves.toBeUndefined();
+            ).resolves.toBe(false);
         });
     });
 

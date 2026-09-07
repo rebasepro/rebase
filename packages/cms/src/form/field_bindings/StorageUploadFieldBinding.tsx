@@ -282,6 +282,12 @@ function FileDropComponent({
                 [ext]: []
             }), {}) : undefined,
             disabled: disabled || isDndItemDragging,
+            // react-dropzone defaults to `multiple: true`, so a
+            // `type: "string"` property with a storage config offered a picker
+            // that took several files, uploaded the first, and never mentioned
+            // the rest — one thumbnail, one 201, and the others gone without a
+            // word. The field holds one path; the picker should ask for one.
+            multiple: multipleFilesSupported,
             noDragEventsBubbling: true,
             maxSize: storage.maxSize,
             onDrop: onFilesAdded,

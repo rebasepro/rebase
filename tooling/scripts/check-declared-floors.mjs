@@ -22,11 +22,20 @@
  * since installing them at the version they advertise produces a tree that
  * cannot run.
  *
- * A `>=20` that is really 22.22 is worse than no declaration. npm and pnpm
- * check `engines` on install, so the number is load-bearing: it is what tells
- * someone on Node 20 to stop *before* an obscure syntax error somewhere in a
- * transitive dependency. Understated, it lets them through and moves the
- * failure somewhere unrecognisable.
+ * A `>=20` that is really 22.22 is worse than no declaration. The number is
+ * what tells someone on Node 20 to stop *before* an obscure syntax error
+ * somewhere in a transitive dependency; understated, it lets them through and
+ * moves the failure somewhere unrecognisable.
+ *
+ * This used to say "npm and pnpm check `engines` on install, so the number is
+ * load-bearing". They do not, by default. pnpm 11 installs a project declaring
+ * `>=99.0.0` silently and exits 0; so does a *dependency* declaring it. npm
+ * prints `EBADENGINE` and also exits 0. So for as long as that sentence stood,
+ * this gate was keeping a number in step that nothing enforced. Two things
+ * enforce it now, and both read the same declaration: `bin/rebase.js` refuses
+ * to run below the CLI's own floor before it imports anything, and the
+ * scaffold sets `engineStrict` (`engine-strict` for npm), which turns both
+ * managers' shrug into a refusal.
  *
  * So: `.nvmrc` is the source, and this gate holds everything else to it.
  *
@@ -59,6 +68,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+
+import { publishablePackages } from "./publishable-packages.mjs";
 
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 
@@ -99,6 +110,9 @@ const roots = ["packages", "tooling", "app", "examples", "infra", "website"]
 
 const found = [path.join(root, "package.json"), ...roots.flatMap((d) => manifests(d))];
 
+/** The directories a release actually publishes, as repo-relative paths. */
+const publishableDirs = new Set(publishablePackages(root).map((p) => p.dir));
+
 const problems = [];
 
 for (const file of found) {
@@ -118,8 +132,13 @@ for (const file of found) {
 
     // Published packages must say something. Private workspace members may stay
     // silent — nobody installs them, so they inherit the repo's floor.
-    const isPublishablePackage = rel.startsWith("packages/") && rel.split("/").length === 3;
-    if (isPublishablePackage && manifest.private !== true && declared === undefined) {
+    //
+    // Derived from `publishablePackages()` rather than from the path, which
+    // used to be `rel.startsWith("packages/")`. That exempted the one
+    // publishable package outside that directory — `tooling/rebase-agent-skills`,
+    // the package `check:publishable-set` exists BECAUSE it kept falling out of
+    // things — so it shipped promising nothing at all.
+    if (publishableDirs.has(path.dirname(rel)) && manifest.private !== true && declared === undefined) {
         problems.push(`${rel}: no engines.node — a published package that promises nothing is installable on anything`);
     }
 }
@@ -155,6 +174,13 @@ for (const file of found) {
  * The English one carried a carve-out ("a headless project needs only 20") that
  * stopped being true the moment the CLI itself moved to 22.22; the five
  * translations were three majors behind it.
+ *
+ * Containing the right number is not enough, and that is the half this gate
+ * used to miss: the sentence with the carve-out in it contained `22.22`, so it
+ * passed for months while telling `--headless` readers a second, wrong number.
+ * A prerequisite line naming two Node versions cannot be right — the reader has
+ * to decide which applies to them, and the scaffold they get declares one — so
+ * any version number on that line other than the floor is a finding.
  */
 const quickstarts = fs
     .globSync("website/src/content/docs/**/getting-started/quickstart.md", { cwd: root })
@@ -177,6 +203,28 @@ for (const file of quickstarts) {
     }
     if (!line.includes(prosefloor)) {
         problems.push(`${rel}: prerequisite says ${JSON.stringify(line.trim())}, expected it to name ${prosefloor}`);
+        continue;
+    }
+
+    // Every version-shaped number on the line, with the floor's own spellings
+    // removed first — `22.22+`, `>=22.22.0` and `22.22.0` are all the floor.
+    // What is left is a second version somebody added, which is exactly how the
+    // headless carve-out survived a gate that only looked for the right number.
+    // A bare major counts: the carve-out that survived for months read "needs
+    // only 20", and refusing to call that a version claim is precisely the
+    // leniency that let it through.
+    const others = [...line
+        .replaceAll(`${floor}`, "")
+        .replaceAll(prosefloor, "")
+        .matchAll(/\b(\d+(?:\.\d+){0,2})\b/g)]
+        .map((m) => m[1]);
+
+    if (others.length > 0) {
+        problems.push(
+            `${rel}: prerequisite names ${others.length} other Node version(s) (${others.join(", ")}) `
+            + `besides ${prosefloor} — ${JSON.stringify(line.trim())}. One floor, or the reader has `
+            + "to guess which one is theirs."
+        );
     }
 }
 

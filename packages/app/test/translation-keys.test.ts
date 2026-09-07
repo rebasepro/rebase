@@ -100,6 +100,12 @@ describe("translation keys", () => {
         // findings make the 160th invisible, and the 160th arrives every time
         // somebody adds a key to `en.ts` and stops. Translate a line and drop
         // it from the baseline; the file only ever shrinks.
+        //
+        // It reached `[]` on 2026-09-06: the 41 keys the sweep found missing
+        // from every bundle were translated along with the 189 that held the
+        // English string. `pnpm check:locale-parity` is the standing gate for
+        // both halves — this one stays because it also checks the *call sites*,
+        // which that script does not read.
         const localesDir = path.join(ROOT, "packages/app/src/locales");
         const others = fs.readdirSync(localesDir)
             .filter(f => f.endsWith(".ts") && f !== "en.ts" && !f.endsWith(".test.ts"));

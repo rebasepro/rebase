@@ -24,7 +24,19 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rebasepassword}
       POSTGRES_DB: rebase
     ports:
-      - "5432:5432"
+      # `${REBASE_DB_PORT:-5432}`, not a literal, because 5432 is the port a
+      # developer is most likely to already be serving. Docker publishes on
+      # `0.0.0.0`; a native Postgres binds the MORE SPECIFIC `127.0.0.1`, which
+      # wins for `localhost` — so compose starts, reports `Up (healthy)
+      # 0.0.0.0:5432->5432/tcp`, and every connection on the documented URL
+      # lands in the developer's own database instead. `db push` then writes a
+      # schema into it. Nothing errors anywhere along that path.
+      #
+      # `REBASE_DB_PORT=5499 docker compose up -d db` is the way out, and the
+      # same variable belongs in the URL in `app/.env`.
+      # `pnpm check:contributor-setup --live` proves the connection reached this
+      # container rather than something else answering on the port.
+      - "${REBASE_DB_PORT:-5432}:5432"
     volumes:
       # `/var/lib/postgresql`, not `/var/lib/postgresql/data` — the 18 image
       # keeps its data in a major-versioned subdirectory of this path and
@@ -39,6 +51,15 @@ services:
       start_period: 10s
     command:
       - "postgres"
+      # The marker `pnpm check:contributor-setup --live` reads back. `cluster_name`
+      # is settable only at server start and empty by default, so a connection
+      # that reports it reached THIS container and not whatever else happened to
+      # answer on the published port. Set on the command line rather than in an
+      # init script on purpose: an init script runs once, against an empty data
+      # directory, so an existing volume would have no marker and the check
+      # would fail for the wrong reason.
+      - "-c"
+      - "cluster_name=rebase-compose"
       - "-c"
       - "shared_buffers=256MB"
       - "-c"

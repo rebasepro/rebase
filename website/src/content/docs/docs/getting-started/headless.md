@@ -28,7 +28,9 @@ Two workspaces, no `frontend/`:
 | `config/` | `storageAuthorize`, and any collections `--introspect` generates |
 
 `--template` has no effect here: a preset seeds collection files, and this
-flavour has none. Node 20 is enough, where the full project wants 22.22+.
+flavour has none. Node 22.22+, the same floor as the full project — the headless
+overlay's `package.json` declares `"node": ">=22.22.0"` and replaces the one
+under it.
 
 ## Point it at your database
 
@@ -112,7 +114,7 @@ in code and the boot-time introspection stops being what defines the API.
 Over HTTP:
 
 ```bash
-curl "$API_URL/api/data/posts?limit=10"
+curl "$REBASE_URL/api/data/posts?limit=10"
 ```
 
 Or with the type-safe client, which is a dependency of the headless scaffold
@@ -121,8 +123,9 @@ already:
 ```typescript title="scripts/example.ts"
 import { createRebaseClient } from "@rebasepro/client";
 
-// The URL `rebase dev` printed, or your deployment's.
-const rebase = createRebaseClient({ baseUrl: process.env.API_URL! });
+// The URL `rebase dev` printed, or your deployment's. `pnpm example` reads it
+// from `.rebase-dev-url` when the variable is unset.
+const rebase = createRebaseClient({ baseUrl: process.env.REBASE_URL! });
 
 const { data: posts } = await rebase.data.collection("posts").find({
     where: { published: ["==", true] },
@@ -133,7 +136,9 @@ const { data: posts } = await rebase.data.collection("posts").find({
 - [REST API](/docs/backend/api/) — the endpoint shapes, filters and errors
 - [Client SDK](/docs/sdk/) — querying, auth, realtime, storage
 - `/api/docs` and `/api/swagger` — the OpenAPI document and its viewer, served
-  by the running backend
+  by the running backend once it has a collection. A project with none serves
+  neither: the document is generated from the collections, so there is nothing
+  to describe until the section above has run
 
 ## `404 NO_COLLECTIONS`
 

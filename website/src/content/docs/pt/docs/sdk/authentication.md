@@ -1,4 +1,5 @@
 ---
+sourceHash: 9268d903ba4bf874
 title: Autenticação
 sidebar_label: Autenticação
 description: Autenticação do lado do cliente com o SDK da Rebase — login com e-mail/senha, provedores OAuth, gerenciamento de sessões e listeners do estado de autenticação.
@@ -241,7 +242,7 @@ import { createRebaseClient, createCookieStorage } from "@rebasepro/client";
 
 // Use cookies instead of localStorage
 const client = createRebaseClient({
-    baseUrl: "http://localhost:3001",
+    baseUrl: import.meta.env.VITE_API_URL,
     auth: {
         storage: createCookieStorage({
             path: "/",

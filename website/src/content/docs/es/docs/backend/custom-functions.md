@@ -1,4 +1,5 @@
 ---
+sourceHash: 65910bc3708c9f5d
 title: Funciones Personalizadas
 sidebar_label: Funciones Personalizadas
 description: Añada puntos finales de API Hono personalizados junto con sus rutas CRUD de Rebase. Auto-descubiertos desde un directorio, con acceso completo a la instancia de backend.

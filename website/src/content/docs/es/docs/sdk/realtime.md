@@ -1,4 +1,5 @@
 ---
+sourceHash: a82dd911da9d58ef
 title: Suscripciones en Tiempo Real
 sidebar_label: Tiempo Real
 description: Suscríbase a los cambios de datos en vivo con el SDK del Cliente de Rebase mediante listeners en tiempo real basados en WebSocket.
@@ -209,7 +210,7 @@ Así que el nombre de un canal no es un secreto ni un permiso. No ponga en un ca
 
 Un canal puede configurarse para conservar sus difusiones, de modo que un cliente que se reconecta recupere lo que se perdió en lugar de resincronizarse desde cero. Esto es lo que hace que los canales sirvan como transporte para la edición colaborativa.
 
-La retención se configura **en el servidor**, por patrón de canal — consulte [Backend de Tiempo Real](/docs/backend/realtime#retención-de-canales). Un cliente no puede activarla por su cuenta, porque un canal lo crea quien lo nombra, y una profundidad de historial elegida por el cliente permitiría a cualquier visitante comprometer su backend con almacenamiento ilimitado.
+La retención se configura **en el servidor**, por patrón de canal — consulte [Backend de Tiempo Real](/es/docs/backend/realtime#retención-de-canales). Un cliente no puede activarla por su cuenta, porque un canal lo crea quien lo nombra, y una profundidad de historial elegida por el cliente permitiría a cualquier visitante comprometer su backend con almacenamiento ilimitado.
 
 En un canal con retención, pase `{ history: true }` y el SDK hace el resto:
 

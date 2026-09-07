@@ -591,7 +591,7 @@ export const fr = {
   "europe.10": "Il n'y a pas d'image applicative à construire. <code class=\"font-mono text-surface-300\">rebase build</code> produit un bundle ; le runtime est déjà sur Docker Hub. Mettre Rebase à jour, c'est changer un tag, pas reconstruire — votre bundle n'est pas touché.",
   "europe.11": "Créer des tables est une commande distincte et délibérée. Le redémarrage d'un conteneur ne doit jamais pouvoir modifier votre schéma comme effet de bord d'un déploiement.",
   "europe.12": "Assez court pour être lu d'une traite",
-  "europe.13": "C'est tout le déploiement de production, hors secrets. Deux services, un volume, trois variables d'environnement. Le runtime refuse de démarrer en production sans <code class=\"font-mono text-surface-300\">DATABASE_URL</code>, <code class=\"font-mono text-surface-300\">JWT_SECRET</code> et <code class=\"font-mono text-surface-300\">CORS_ORIGINS</code>, plutôt que de les deviner.",
+  "europe.13": "C'est tout le déploiement de production, hors secrets. Deux services, un volume, trois variables d'environnement. Le runtime refuse de démarrer en production sans <code class=\"font-mono text-surface-300\">DATABASE_URL</code>, <code class=\"font-mono text-surface-300\">JWT_SECRET</code> et l'une de <code class=\"font-mono text-surface-300\">CORS_ORIGINS</code> ou <code class=\"font-mono text-surface-300\">FRONTEND_URL</code>, plutôt que de les deviner.",
   "europe.14": "Montez le bundle en lecture seule et un hook compromis ne peut pas réécrire le code qui s'exécutera au prochain redémarrage. Pointez la sonde de liveness de votre orchestrateur sur <code class=\"font-mono text-surface-300\">/livez</code> et celle de readiness sur <code class=\"font-mono text-surface-300\">/health</code> ; la première ne touche jamais la base, donc un hoquet passager ne redémarre pas un processus parfaitement sain.",
   "europe.eyebrow.bill": "La facture",
   "europe.15": "Leur prix est une fonction de votre succès. Le vôtre est un nombre que vous avez choisi.",
@@ -928,6 +928,7 @@ export const fr = {
   "comparepage.axis.leaving.rebase": "La base continue de fonctionner — politiques, contraintes et données exactement là où elles étaient. Le panneau était une dépendance que vous pouvez supprimer.",
   "comparepage.axis.leaving.others": "Cela dépend de la profondeur à laquelle l'outil est entré dans votre schéma. S'il a créé les tables, partir veut dire migrer.",
   "comparepage.meta.title": "Rebase comparé — Supabase, Directus, Strapi, Retool et les autres",
+  "comparepage.meta.description": "Un comparatif honnête : là où Rebase gagne, là où un concurrent est le meilleur choix, et quels sont vraiment les compromis.",
 
   // ── devpage ─────────────────────────────────────────────────────
   "devpage.00": "TypeScript · Postgres · votre éditeur",

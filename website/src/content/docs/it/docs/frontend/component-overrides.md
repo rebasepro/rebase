@@ -1,4 +1,5 @@
 ---
+sourceHash: 3e8accd144f401d4
 title: Sovrascrittura dei Componenti (Swizzling)
 sidebar_label: Sovrascrittura dei Componenti
 description: Sovrascrivi i componenti UI predefiniti con implementazioni personalizzate a livello di applicazione o di collezione.
