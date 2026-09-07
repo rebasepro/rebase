@@ -70,7 +70,7 @@ const cell = (col: number, row: number): View => ({ x: col * CELL.w, y: row * CE
  * a report streaming, a spring — those are how fast the product is, and
  * the product did not get slower.
  */
-export const TEMPO = 1.05;
+export const TEMPO = 1;
 /** A frame from the original sheet, on the stretched timeline. */
 export const tempo = (raw: number): number => Math.round(raw * TEMPO);
 
@@ -111,24 +111,27 @@ export const BEATS: Beat[] = [
     /* No cold open. The film opens on the presenter, already talking; the
        ribbon fades up behind them over the first frames. A logo pre-roll
        here left a person on camera for over a second with nothing to say. */
+    /* Each start is four frames after its line begins: the words lead the
+       picture. The sheet is laid out from the script at 8.5 frames a word
+       with half-second gaps, and lands on 3000 frames — a hundred seconds. */
     { id: "hook", start: tempo(12), view: cell(0, 0), roll: 0.58, ground: "base", reveal: 0.3 },
-    { id: "init", start: tempo(376), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "rule", start: tempo(596), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
-    { id: "push", start: tempo(836), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.3 },
-    { id: "users", start: tempo(1076), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
-    { id: "agent", start: tempo(1316), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
-    { id: "panel", start: tempo(1516), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
-    { id: "views", start: tempo(1776), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
-    { id: "schema", start: tempo(1886), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
-    { id: "studio", start: tempo(2006), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
-    { id: "all", start: tempo(2116), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "init", start: tempo(500), view: TERMINAL, roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "rule", start: tempo(750), view: cell(1, 0), roll: 0.22, ground: "claim", reveal: 0.3 },
+    { id: "push", start: tempo(1110), view: TERMINAL, roll: 0.7, ground: "base", reveal: 0.3 },
+    { id: "users", start: tempo(1318), view: cell(1, 1), roll: 0.22, ground: "base", reveal: 0.3 },
+    { id: "agent", start: tempo(1653), view: cell(2, 0), roll: 0.34, ground: "deep", reveal: 0.3 },
+    { id: "panel", start: tempo(1920), view: cell(2, 1), roll: 0.64, ground: "base", reveal: 0.3 },
+    { id: "views", start: tempo(2187), view: cell(2, 2), roll: 0.16, ground: "base", reveal: 0.3 },
+    { id: "schema", start: tempo(2297), view: cell(1, 2), roll: 0.74, ground: "base", reveal: 0.3 },
+    { id: "studio", start: tempo(2432), view: cell(0, 2), roll: 0.46, ground: "base", reveal: 0.3 },
+    { id: "all", start: tempo(2537), view: ALL, roll: 0.16, ground: "base", reveal: 0.3 },
 ];
 
 /** Where the camera starts: on the hook, which is where it stays until the
  *  first move. */
 export const OPENING: View = cell(0, 0);
 
-export const DESK_DURATION = tempo(2516);
+export const DESK_DURATION = tempo(3000);
 
 export const beat = (id: string): Beat => {
     const b = BEATS.find((x) => x.id === id);

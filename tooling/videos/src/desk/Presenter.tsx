@@ -1,6 +1,7 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, OffthreadVideo, staticFile, useCurrentFrame } from "remotion";
-import { beat, tempo, TEMPO } from "./beats";
+import { beat } from "./beats";
+import { DESK_FRAMES_PER_WORD, DESK_NARRATION } from "./script";
 import { FONT, FRAME, INK } from "../theme";
 
 /**
@@ -56,7 +57,8 @@ const ALL = beat("all");
  *  now. But can you trust it?", fourteen words to camera — then the window
  *  flies to the corner while the evidence arrives on the desk behind it. */
 export const PRESENTER_IN = 0;
-export const FLY_TO_CORNER = tempo(14) + Math.round(14 * 10 * TEMPO) + 5;
+const QUESTION = DESK_NARRATION[0];
+export const FLY_TO_CORNER = Math.round(QUESTION.at + QUESTION.words.length * DESK_FRAMES_PER_WORD) + 5;
 const FLY = 36;
 /** Lifts off the corner as the camera lifts off the desk. */
 export const FLY_TO_CLOSE = ALL.start + 4;

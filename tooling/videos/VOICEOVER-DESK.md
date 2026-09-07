@@ -1,49 +1,41 @@
-# Rebase intro — the desk cut — voice-over script
+# Rebase in 100 seconds — voice-over script
 
-Read at **171 words per minute** (10.5 frames a word at 30fps). Say it the way
-you would say it to one person across a desk.
+**Read fast — 8.5 frames a word, about 200 words a minute — and dry.** It's
+2026, you're talking to one person, and you are not impressed by any of it.
+Present tense. Blunt. The jokes are flat, not performed: "not an if-statement
+you wrote at 2 AM" is said exactly like the sentence before it.
 
-**Every line is a sentence** — a subject, a verb, and the thing the verb is
-about. Nothing here needs to be read twice to parse.
+**No dead air.** The gaps between lines are half a second at most. The
+pictures run under the words; you do not wait for them. The one exception is
+"and it finds nothing" — the green line prints five frames before you say
+"nothing", and it should feel like you saw it.
 
-**It opens on you, already talking.** No logo, no pause: you are on screen
-from the first frame and the question starts half a second in. "You can
-build a backend in an afternoon now. But can you trust it?" — to camera,
-before any evidence. Then the evidence: an agent built this one, and a scan
-found three security holes.
+**It opens on you, already talking.** No logo, no pause. You are on screen
+from the first frame and the first word is half a second in.
 
-**No slogans.** You are explaining what just happened, not selling it. The
-last thing said is a practical next step — scan your own database — not a
-tagline. Not "the scan is free", either: all of it is, and singling the scan
-out made the rest sound like it was not.
+**Every line is still a sentence.** "Zero findings." would have been on brand
+and is not one.
 
-**One story, one desk, in the order it happens.** There are no cuts. Every
-line is caused by the one before: the scan finds three holes, so you point
-Rebase at the same database; it writes a file per table, so the rule goes in
-that file; you push it, so the same scan finds nothing; you run it, so the
-API answers Robert, Dana and an agent, and your team gets the panel. "Three
-commands" at the end is a count of what you watched.
-
-Total: **2642 frames = 88.1 seconds** at 30fps · 226 words · speech is
-90% of the running time.
+Total: **3000 frames = 100.0 seconds** at 30fps · 324 words · 194 words a
+minute over the whole run, silences included.
 
 ## The script
 
-| # | Beat | Starts | Words | Line | Join |
-|---|------|--------|-------|------|------|
-| 01 | You, to camera | 0.5s | 14 | You can build a backend in an afternoon now. But can you trust it? | 0.5s beat |
-| 02 | The evidence | 5.9s | 14 | An agent built this one. It works. A ten-second scan found three security holes. | 2.6s **pause** |
-| 03 | Point Rebase at it | 13.0s | 20 | So you point Rebase at the same database. It reads the tables and writes one file for each of them. | 0.6s beat |
-| 04 | The rule | 20.6s | 25 | The access rules go in that file. This one says customers can only see their own orders. Postgres enforces it. Your code doesn't have to. | 0.1s flow |
-| 05 | Push, and the same scan | 29.4s | 13 | You push it, and you run the same scan again. It finds nothing. | 0.2s flow |
-| 06 | Run it | 34.2s | 4 | Then you run it. | 2.1s **pause** — the terminal prints the ports |
-| 07 | Two people | 37.5s | 25 | Two people send the same request. Robert is a customer, so he sees his own orders. Dana works in support, so she sees every order. | 0.0s flow |
-| 08 | The agent | 46.3s | 18 | An agent works the same way. It gets a key with permissions, and it can't get around them. | 0.4s flow |
-| 09 | The panel | 52.9s | 19 | Your team also gets an admin panel. It is generated from the same files, so the same rules apply. | 2.6s **pause** — the montage plays |
-| 10 | Every view | 62.1s | 11 | Every collection gets its own views: boards, tables, cards and forms. | 0.0s flow |
-| 11 | The schema | 65.9s | 13 | The schema is read from the database, so it matches what is there. | 0.0s flow |
-| 12 | Studio | 70.5s | 11 | And you can edit the database itself from the same app. | 0.1s flow |
-| 13 | The whole desk | 74.3s | 39 | That was three commands. It is open source, and you can run it on your laptop, on your own servers, or on any cloud. The scan runs on any Postgres, so you can start by scanning your own database. | — |
+| # | Beat | Starts | Words | Line | Gap after |
+|---|------|--------|-------|------|-----------|
+| 01 | You, to camera | 0.5s | 24 | It's 2026. Anyone can build a backend in an afternoon. You don't even need to know what one is. But can you trust it? | 0.6s |
+| 02 | The evidence | 7.9s | 27 | This one was vibe-coded by an agent in an afternoon. It works. And a ten-second scan found three holes, including a customers table that anyone can read. | 1.0s |
+| 03 | Point Rebase at it | 16.5s | 28 | So you point Rebase at that same database. It reads the tables that are already there and writes a TypeScript file for each one. That's the whole setup. | 0.4s |
+| 04 | The rule | 24.9s | 40 | Access rules go in that same file. This one says customers can only see their own orders. And it doesn't compile into middleware you might forget to call. It compiles into a Postgres row-level security policy. The database enforces it. | 0.7s |
+| 05 | Push, and the same scan | 36.9s | 14 | You push it, you run the exact same scan again, and it finds nothing. | 0.5s |
+| 06 | Run it | 41.3s | 4 | Then you run it. | 1.3s — the terminal prints the ports |
+| 07 | Two people | 43.8s | 38 | Robert is a customer, so he gets his own orders. Dana works in support, so she gets all of them. It's the same query. The database decides who gets what, not an if-statement you wrote at 2 AM. | 0.4s |
+| 08 | The agent | 55.0s | 30 | And an agent works the exact same way. It gets a key with permissions on it, and it cannot get around them. The database doesn't care how nicely you ask. | 0.4s |
+| 09 | The panel | 63.9s | 30 | Your team also gets an admin panel, generated from the same files, with the same rules applied. Nobody had to build a CRUD app on top of the CRUD app. | 0.4s |
+| 10 | Every view | 72.8s | 12 | Every collection gets boards, tables, cards and forms, straight from its schema. | 0.3s |
+| 11 | The schema | 76.4s | 15 | The schema view is read from the live database, so it can't lie to you. | 0.3s |
+| 12 | Studio | 80.9s | 12 | And you can work on the database itself from the same app. | 0.1s |
+| 13 | The whole desk | 84.4s | 50 | So that was three commands. It's open source, MIT licensed, and you can run it on your laptop, on your own servers, or on any cloud that can run a container. The scan works on any Postgres, so go run it on your own database, ideally before somebody else does. | — |
 
 ## The presenter
 
@@ -57,9 +49,8 @@ You are on screen. Three places, one video element (`src/desk/Presenter.tsx`):
 - **Close** — you grow out of the corner into the left column as the desk
   recedes; the address lands beside you. The last line is to camera.
 
-**At the climax, look at the scan.** "You push it, and you run the same scan
-again. It finds nothing." — glance left toward the terminal as the green
-line prints, then back to the lens for "Then you run it."
+**At "it finds nothing", look at the scan.** Glance left toward the terminal
+as the green line prints, then back to the lens for "Then you run it."
 
 ### Shooting
 
@@ -85,13 +76,13 @@ line prints, then back to the lens for "Then you run it."
   **36 frames early**, so you can read ahead rather than sight-read.
 - A line that starts before the camera has arrived is deliberate. Do not wait
   for the picture.
-- "The same scan" means it: the window from the opening re-runs, same
-  command, same database. Say it like something you watched happen.
+- "The exact same scan" means it: the window from the opening re-runs, same
+  command, same database.
 - The three tour lines (every view, the schema, Studio) are one breath split
   three ways. Do not stop between them.
-- Every terminal line is what the tools print. Numbers are checked against
-  the repo, not rounded for the read.
+- Every terminal line is what the tools print. MIT, three commands, nine
+  tables, three findings and the container image are all checked against
+  the repo.
 - No line refers to Rebase Cloud. "Any cloud" means the viewer's own.
-- The timeline is the original sheet stretched by `TEMPO` (1.05) in
-  `src/desk/beats.ts`. To slow it again, change one number; the beats, the
-  moves and these frames all follow.
+- `TEMPO` in `src/desk/beats.ts` stretches the whole sheet — beats, moves and
+  the narration's frames alike. It is 1 now. To slow it, change one number.

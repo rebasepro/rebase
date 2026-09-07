@@ -1,65 +1,61 @@
-import { tempo, TEMPO } from "./beats";
+import { TEMPO } from "./beats";
 
 /**
- * The voiceover for the desk film, on an ABSOLUTE timeline. Same rules as
- * the slide film's — every "this" and "it" points at something on screen,
- * no line contradicts its picture, no Rebase Cloud — and these:
+ * The voiceover for the desk film, on an ABSOLUTE timeline — and in the
+ * register of a fast explainer, not a product page read aloud:
  *
- * EVERY LINE IS A SENTENCE. A subject, a verb, and the thing the verb is
- * about. "Who can see what goes in that file" parsed two ways and neither
- * of them out loud; "The schema, read from the database, so it matches
- * what's actually there" had no main verb at all. "Nothing found." was two
- * words standing in for a sentence. Each is now a sentence a person could
- * say to another person: "The access rules go in that file." "The schema
- * is read from the database, so it matches what is there." "It finds
- * nothing." No fronted clauses, no dash doing a verb's job, no list where
- * a sentence should be.
+ * IT'S 2026, AND YOU. Present tense, second person, blunt. "Anyone can
+ * build a backend in an afternoon. You don't even need to know what one
+ * is." One dry line per beat, always with a point under it: "not an
+ * if-statement you wrote at 2 AM"; "the database doesn't care how nicely
+ * you ask"; "nobody had to build a CRUD app on top of the CRUD app";
+ * "ideally before somebody else does". No slogans, no taglines; the jokes
+ * are where a slogan would have been.
  *
- * IT OPENS ON YOU, WITH A QUESTION. "You can build a backend in an
- * afternoon now. But can you trust it?" — said to camera, before any
- * evidence. Then the evidence: an agent built this one, and a scan found
- * three security holes.
+ * ~200 WORDS A MINUTE, NO DEAD AIR. 8.5 frames a word, gaps of half a
+ * second at most, and the whole thing lands on 3000 frames: a hundred
+ * seconds. The pictures run under the words; the words never wait for
+ * them, except the one place the terminal has to print before "it finds
+ * nothing" can be said.
  *
- * NO SLOGANS. The facts stay — open source, runs where you want, three
- * commands — and the last thing said is a practical next step, not a
- * tagline. Not "the scan is free", either: the whole product is, and
- * singling the scan out made the rest sound like it was not.
+ * STILL SENTENCES. A subject, a verb, and the thing the verb is about.
+ * "Zero findings." would have been on brand and is not a sentence.
  *
- * EVERY LINE IS CAUSED BY THE ONE BEFORE, and the line follows the camera:
- * it starts a few frames before the move so the words are already going
- * when the picture arrives.
+ * And the rules that never change: every "this" and "it" points at
+ * something on screen; every line is caused by the one before; no line
+ * contradicts its picture; no line refers to Rebase Cloud; every claim is
+ * checked against the repo (MIT, three commands, nine tables, three
+ * findings, the container image).
  */
 
-/** 10 frames a word at the original tempo, scaled with it. Fractional is
- *  fine: the prompter compares frames, it does not count them. */
-export const DESK_FRAMES_PER_WORD = 10 * TEMPO;
+/** 8.5 frames a word — about 200 a minute — scaled with the tempo. */
+export const DESK_FRAMES_PER_WORD = 8.5 * TEMPO;
 
 export const DESK_NARRATION: { at: number; words: string[] }[] = [
     // the question, to camera
-    { at: tempo(14), words: ["You", "can", "build", "a", "backend", "in", "an", "afternoon", "now.", "But", "can", "you", "trust", "it?"] },
+    { at: 15, words: ["It's", "2026.", "Anyone", "can", "build", "a", "backend", "in", "an", "afternoon.", "You", "don't", "even", "need", "to", "know", "what", "one", "is.", "But", "can", "you", "trust", "it?"] },
     // the evidence
-    { at: tempo(170), words: ["An", "agent", "built", "this", "one.", "It", "works.", "A", "ten-second", "scan", "found", "three", "security", "holes."] },
+    { at: 236, words: ["This", "one", "was", "vibe-coded", "by", "an", "agent", "in", "an", "afternoon.", "It", "works.", "And", "a", "ten-second", "scan", "found", "three", "holes,", "including", "a", "customers", "table", "that", "anyone", "can", "read."] },
     // init
-    { at: tempo(372), words: ["So", "you", "point", "Rebase", "at", "the", "same", "database.", "It", "reads", "the", "tables", "and", "writes", "one", "file", "for", "each", "of", "them."] },
+    { at: 496, words: ["So", "you", "point", "Rebase", "at", "that", "same", "database.", "It", "reads", "the", "tables", "that", "are", "already", "there", "and", "writes", "a", "TypeScript", "file", "for", "each", "one.", "That's", "the", "whole", "setup."] },
     // rule
-    { at: tempo(588), words: ["The", "access", "rules", "go", "in", "that", "file.", "This", "one", "says", "customers", "can", "only", "see", "their", "own", "orders.", "Postgres", "enforces", "it.", "Your", "code", "doesn't", "have", "to."] },
+    { at: 746, words: ["Access", "rules", "go", "in", "that", "same", "file.", "This", "one", "says", "customers", "can", "only", "see", "their", "own", "orders.", "And", "it", "doesn't", "compile", "into", "middleware", "you", "might", "forget", "to", "call.", "It", "compiles", "into", "a", "Postgres", "row-level", "security", "policy.", "The", "database", "enforces", "it."] },
     // push + rescan
-    { at: tempo(840), words: ["You", "push", "it,", "and", "you", "run", "the", "same", "scan", "again.", "It", "finds", "nothing."] },
+    { at: 1106, words: ["You", "push", "it,", "you", "run", "the", "exact", "same", "scan", "again,", "and", "it", "finds", "nothing."] },
     // run
-    { at: tempo(976), words: ["Then", "you", "run", "it."] },
+    { at: 1240, words: ["Then", "you", "run", "it."] },
     // users
-    { at: tempo(1072), words: ["Two", "people", "send", "the", "same", "request.", "Robert", "is", "a", "customer,", "so", "he", "sees", "his", "own", "orders.", "Dana", "works", "in", "support,", "so", "she", "sees", "every", "order."] },
+    { at: 1314, words: ["Robert", "is", "a", "customer,", "so", "he", "gets", "his", "own", "orders.", "Dana", "works", "in", "support,", "so", "she", "gets", "all", "of", "them.", "It's", "the", "same", "query.", "The", "database", "decides", "who", "gets", "what,", "not", "an", "if-statement", "you", "wrote", "at", "2", "AM."] },
     // agent
-    { at: tempo(1322), words: ["An", "agent", "works", "the", "same", "way.", "It", "gets", "a", "key", "with", "permissions,", "and", "it", "can't", "get", "around", "them."] },
+    { at: 1649, words: ["And", "an", "agent", "works", "the", "exact", "same", "way.", "It", "gets", "a", "key", "with", "permissions", "on", "it,", "and", "it", "cannot", "get", "around", "them.", "The", "database", "doesn't", "care", "how", "nicely", "you", "ask."] },
     // panel
-    { at: tempo(1512), words: ["Your", "team", "also", "gets", "an", "admin", "panel.", "It", "is", "generated", "from", "the", "same", "files,", "so", "the", "same", "rules", "apply."] },
+    { at: 1916, words: ["Your", "team", "also", "gets", "an", "admin", "panel,", "generated", "from", "the", "same", "files,", "with", "the", "same", "rules", "applied.", "Nobody", "had", "to", "build", "a", "CRUD", "app", "on", "top", "of", "the", "CRUD", "app."] },
     // views
-    { at: tempo(1774), words: ["Every", "collection", "gets", "its", "own", "views:", "boards,", "tables,", "cards", "and", "forms."] },
+    { at: 2183, words: ["Every", "collection", "gets", "boards,", "tables,", "cards", "and", "forms,", "straight", "from", "its", "schema."] },
     // schema
-    { at: tempo(1884), words: ["The", "schema", "is", "read", "from", "the", "database,", "so", "it", "matches", "what", "is", "there."] },
+    { at: 2293, words: ["The", "schema", "view", "is", "read", "from", "the", "live", "database,", "so", "it", "can't", "lie", "to", "you."] },
     // studio
-    { at: tempo(2014), words: ["And", "you", "can", "edit", "the", "database", "itself", "from", "the", "same", "app."] },
+    { at: 2428, words: ["And", "you", "can", "work", "on", "the", "database", "itself", "from", "the", "same", "app."] },
     // all
-    // "the scan is free" implied the rest was not. It is all MIT.
-    { at: tempo(2124), words: ["That", "was", "three", "commands.", "It", "is", "open", "source,", "and", "you", "can", "run", "it", "on", "your", "laptop,", "on", "your", "own", "servers,", "or", "on", "any", "cloud.", "The", "scan", "runs", "on", "any", "Postgres,", "so", "you", "can", "start", "by", "scanning", "your", "own", "database."] },
+    { at: 2533, words: ["So", "that", "was", "three", "commands.", "It's", "open", "source,", "MIT", "licensed,", "and", "you", "can", "run", "it", "on", "your", "laptop,", "on", "your", "own", "servers,", "or", "on", "any", "cloud", "that", "can", "run", "a", "container.", "The", "scan", "works", "on", "any", "Postgres,", "so", "go", "run", "it", "on", "your", "own", "database,", "ideally", "before", "somebody", "else", "does."] },
 ];
