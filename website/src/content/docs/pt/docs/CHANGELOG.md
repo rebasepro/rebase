@@ -15,6 +15,15 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 Five defects an end-to-end pass over a freshly installed project turned up.
 
+- **A dev database that fails to start now says why.** The daemon is detached, so
+  its output goes to `pglite.log` rather than to the terminal, and both failure
+  messages named that path instead of carrying its contents. That is a fair
+  trade on a laptop and none at all in CI, where the runner discards the
+  workspace: a canary run failed with "The development database failed to start
+  (exit 1) — see pglite.log", and by the time anyone read it the file was gone.
+  Both messages carry the tail of the log now, bounded, and say so distinctly
+  when the daemon wrote nothing or the log cannot be read.
+
 - **`GET /api/data/:slug/aggregate` answered 501 on every deployment.**
   `FetchService.aggregate` has existed for as long as the route has, and the
   route reads it off `restFetchService` — an adapter object that listed

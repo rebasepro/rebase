@@ -82,6 +82,31 @@ const MANAGED_DATABASE = "postgres";
  * Putting it in the URL fixes every consumer at once — Atlas, `pg`, and anything
  * a driver shells out to later — rather than teaching each one about PGlite.
  */
+
+/**
+ * The end of `pglite.log`, for an error message that has to carry its own reason.
+ *
+ * The daemon writes its output to a file because it is detached — it has to
+ * outlive the command that started it. That is right, and it means every
+ * startup failure used to be reported as a path: "see pglite.log for the
+ * reason". On a laptop that is a fair trade. In CI it is not a trade at all,
+ * because the runner discards the workspace: the log named in the message no
+ * longer exists by the time anybody reads the message, so a failed run says
+ * only that something failed.
+ *
+ * So the tail comes with the error. Bounded, because a log that has been
+ * appended to across many runs is not something to paste in full.
+ */
+export function pgliteLogTail(projectRoot: string, lines = 12): string {
+    try {
+        const contents = fs.readFileSync(path.join(devDbDir(projectRoot), "pglite.log"), "utf8").trimEnd();
+        if (!contents) return "  (pglite.log is empty — the daemon wrote nothing before exiting)";
+        return contents.split("\n").slice(-lines).map(line => `      ${line}`).join("\n");
+    } catch {
+        return "  (pglite.log could not be read)";
+    }
+}
+
 export function managedUrl(port: number): string {
     return `postgresql://${MANAGED_USER}@127.0.0.1:${port}/${MANAGED_DATABASE}?sslmode=disable`;
 }
@@ -333,7 +358,8 @@ export async function ensureManagedDatabase(
             if (child.exitCode !== null && child.exitCode !== 0) {
                 throw new Error(
                     `The development database failed to start (exit ${child.exitCode}).\n` +
-                    `  See ${path.join(devDbDir(projectRoot), "pglite.log")} for the reason.`
+                    `  ${path.join(devDbDir(projectRoot), "pglite.log")} ends:\n` +
+                    pgliteLogTail(projectRoot)
                 );
             }
 
@@ -342,7 +368,8 @@ export async function ensureManagedDatabase(
 
         throw new Error(
             `The development database did not start within ${Math.round(START_TIMEOUT_MS / 1000)}s.\n` +
-            `  See ${path.join(devDbDir(projectRoot), "pglite.log")} for the reason.\n` +
+            `  ${path.join(devDbDir(projectRoot), "pglite.log")} ends:\n` +
+            pgliteLogTail(projectRoot) + "\n" +
             "  To use your own Postgres instead, set DATABASE_URL or pass --database-url."
         );
     } finally {
