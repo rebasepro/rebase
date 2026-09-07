@@ -2,6 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import FormattedDate from '../../components/FormattedDate.astro';
 import { publishedPosts } from '../../utils/blog';
+import { NeatBackground } from '../../components/NeatBackground';
 
 const posts = await publishedPosts();
 
@@ -53,20 +54,15 @@ const breadcrumbs = [
 									/>
 								)
 							) : (
-								/* The per-post gradient from
-								   `scripts/generate_blog_images.mjs`. What stood
-								   here was a grey box with a picture icon in it,
-								   on every card, which reads as an image that
-								   failed to load rather than as a design. */
-								<img
-									src={`/img/blog/${post.id}.jpg`}
-									alt=""
-									loading="lazy"
-									width={1600}
-									height={800}
-									class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-									aria-hidden="true"
-								/>
+								/* The site's own gradient, live. `poseKey` is the
+								   post slug, so each card gets its own seat on the
+								   orbit — and the same seat the post's own page
+								   derives from its pathname. What stood here was a
+								   grey box with a picture icon, on every card,
+								   which reads as an image that failed to load. */
+								<div class="w-full h-full group-hover:scale-105 transition-transform duration-300">
+									<NeatBackground client:visible variant="card" poseKey={post.id} />
+								</div>
 							)}
 						</div>
 						<div class="p-6">

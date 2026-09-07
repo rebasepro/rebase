@@ -4,17 +4,17 @@ import type { CollectionEntry } from 'astro:content';
 import Layout from './Layout.astro';
 import FormattedDate from '../components/FormattedDate.astro';
 import { getAuthor } from '../utils/authors';
+import { NeatBackground } from '../components/NeatBackground';
 
 type Props = CollectionEntry<'blog'>['data'] & { slug?: string };
 
 const { title, description, pubDate, updatedDate, heroImage, authors, image, slug } = Astro.props;
 const author = authors ? getAuthor(authors) : null;
 
-// Artwork rendered per post by `scripts/generate_blog_images.mjs`: the site's
-// own Neat gradient, seated by a hash of this slug, so a post looks like itself
-// and unlike its neighbours. `heroImage` still wins when a post ships a real
-// picture — the gradient is the floor, not the ceiling.
-const generatedArt = slug ? `/img/blog/${slug}.jpg` : null;
+// The social card is a *file*, because a crawler renders no WebGL and reads no
+// HTML — `scripts/generate_blog_images.mjs` writes it. The hero on this page is
+// the live gradient instead, seated off this post's own pathname.
+// `heroImage` still wins when a post ships a real picture.
 const generatedCard = slug ? `/img/blog/og/${slug}.png` : null;
 
 // Generate breadcrumbs for blog posts
@@ -96,19 +96,14 @@ const articleSchema = {
 						class="w-full h-auto"
 					/>
 				</div>
-			) : generatedArt && (
-				<div class="mb-12 rounded-2xl overflow-hidden">
-					{/* A plain <img>: the file is generated into `public/` and is
-					    already sized and encoded, so there is nothing for
-					    astro:assets to optimise and no import to resolve. */}
-					<img
-						src={generatedArt}
-						alt=""
-						width={1600}
-						height={800}
-						class="w-full h-auto"
-						aria-hidden="true"
-					/>
+			) : (
+				<div class="mb-12 rounded-2xl overflow-hidden aspect-[2/1] relative isolate">
+					{/* `poseKey` is the slug, not the pathname, so this lands on
+					    exactly the seat this post's card uses on /blog — the
+					    artwork is the same picture in both places. Leaving it off
+					    would hash "/blog/<slug>" here and "<slug>" there, which
+					    are different keys and so different frames. */}
+					<NeatBackground client:idle variant="card" poseKey={slug} />
 				</div>
 			)}
 

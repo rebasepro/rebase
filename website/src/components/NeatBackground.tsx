@@ -142,6 +142,22 @@ function frustumHalfWidth(aspect: number, zoom: number) {
 
 const VARIANT_OVERRIDES: Record<string, Partial<any>> = {
     hero: {},
+    // Blog artwork. Rides the same orbit as a hero — see `usesPose` below — but
+    // it is the picture rather than something behind text, so the two
+    // concessions the hero makes to legibility come back off: the canvas is not
+    // held at `opacity: 0.55` over the page, and the colour is not dimmed to
+    // stay out of the headline's way. `resolution` stays at the base 0.05, which
+    // is what keeps the facets hard-edged and angular rather than smoothing the
+    // ribbon into curves.
+    card: {
+        colorBrightness: 0.85,
+        colorSaturation: 1.2,
+        // NOT the base config's 0. On a `shapeType: "ribbon"` a `ribbonFade` of
+        // exactly 0 draws nothing at all: the canvas comes back as a flat fill
+        // of `backgroundColor`, with no error and no warning. 0.001 already
+        // renders; 0.08 is the value `cylinderFade` next to it uses.
+        ribbonFade: 0.08,
+    },
     a: {
         yOffset: 0,
         planeBend: 0.2,
@@ -258,6 +274,19 @@ function poseForPath(pathname: string): HeroPose {
     return heroPose(poseParamFor(key), key === "/");
 }
 
+/**
+ * A seat from an arbitrary key rather than from the URL.
+ *
+ * The blog index carries one canvas per post and they all sit at `/blog`, so
+ * the pathname cannot separate them — every card would be framed identically,
+ * which is the opposite of the point. Keying on the post's slug gives each card
+ * its own seat, and gives it the *same* seat as that post's own page, where the
+ * pathname derivation lands on the slug anyway.
+ */
+function poseForKey(key: string): HeroPose {
+    return heroPose(poseParamFor(key), false);
+}
+
 // The language is not part of a page's identity: /es/product and /product are
 // the same page, and switching language must not move the camera.
 const LOCALE_PREFIXES = new Set(["es", "de", "fr"]);
@@ -340,7 +369,14 @@ function releaseCompileSlot() {
     setTimeout(() => { compiling = false; }, 0);
 }
 
-export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | "b" }) {
+export function NeatBackground({
+    variant = "hero",
+    poseKey
+}: {
+    variant?: "hero" | "a" | "b" | "card";
+    /** Overrides the pathname as the seat's identity. See {@link poseForKey}. */
+    poseKey?: string;
+}) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -357,6 +393,9 @@ export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | 
             window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
         const isHero = variant === "hero";
+        // A card is posed like a hero — it rides the orbit — but it does not
+        // survive a navigation, so it neither persists nor re-seats on swap.
+        const usesPose = isHero || variant === "card";
         const config = { ...NEAT_BASE_CONFIG, ...(VARIANT_OVERRIDES[variant] ?? {}) };
         if (prefersReducedMotion) config.speed = 0;
 
@@ -370,7 +409,7 @@ export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | 
         // The hero is the only variant that persists across a client-side
         // navigation (`transition:persist` at the call sites), so it is the only
         // one whose pose can change while the instance is alive.
-        let pose = poseForPath(window.location.pathname);
+        let pose = poseKey ? poseForKey(poseKey) : poseForPath(window.location.pathname);
 
         // The camera offsets above are composed for a wide canvas. On a phone the
         // frustum is less than half as wide, so the same offset lands the camera
@@ -455,7 +494,7 @@ export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | 
         const startGradient = () => {
             if (cancelled || !NeatGradient) return;
 
-            if (isHero) {
+            if (usesPose) {
                 // Read the pose at compile time, not at mount: a reader can navigate
                 // away before the gradient is eligible, and the seat that matters is
                 // the one for the page they are on now.
@@ -561,7 +600,7 @@ export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | 
             clearTimeout(resizeTimer);
             resizeTimer = setTimeout(() => {
                 if (!neat) return;
-                if (isHero) {
+                if (usesPose) {
                     measureFraming();
                     writePose(pose);
                 } else {
@@ -615,6 +654,7 @@ export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | 
         const applyOffset = () => {
             ticking = false;
             if (!neat) return;
+            if (variant === "card") return;
             if (isHero) {
                 writePose(pose);
             } else {
@@ -675,6 +715,23 @@ export function NeatBackground({ variant = "hero" }: { variant?: "hero" | "a" | 
                     aria-hidden="true"
                 />
             </div>
+        );
+    }
+
+    if (variant === "card") {
+        return (
+            <canvas
+                ref={canvasRef}
+                style={{
+                    display: "block",
+                    width: "100%",
+                    height: "100%",
+                    // Not the dividers' 0.55: this canvas is the artwork, not a
+                    // wash behind something.
+                    opacity: 1
+                }}
+                aria-hidden="true"
+            />
         );
     }
 

@@ -16,15 +16,13 @@
  *     node website/scripts/generate_blog_images.mjs --only <slug>
  *     node website/scripts/generate_blog_images.mjs --check   # CI: nothing missing
  *
- * Two files per post, because they are read at different sizes for different
- * reasons:
+ * One file per post: `img/blog/og/<slug>.png`, 1200×630, the gradient with the
+ * title burned in behind a scrim.
  *
- *  - `img/blog/<slug>.jpg` — 1600×800, no text. The hero above the title on
- *    the post page, and the card thumbnail on /blog. Text here would be the
- *    headline twice, six lines apart.
- *  - `img/blog/og/<slug>.png` — 1200×630, the same gradient with the title
- *    burned in behind a scrim. A social crawler renders no WebGL and reads no
- *    HTML, so this half has to be pixels.
+ * On the site itself the hero and the /blog cards mount `NeatBackground`
+ * directly — the live component, seated off the post slug — so nothing there
+ * needs a picture. The social card is the one place that cannot: a crawler runs
+ * no WebGL and reads no HTML, so that half has to be pixels.
  *
  * They are **committed**, following `generate_og_images.mjs`: `astro build`
  * must not depend on a browser, and artwork that fails to render must not be
@@ -415,9 +413,8 @@ if (!posts.length) {
 if (args.includes("--check")) {
     const missing = [];
     for (const post of posts) {
-        for (const file of [path.join(OUT_ART, `${post.slug}.jpg`), path.join(OUT_OG, `${post.slug}.png`)]) {
-            if (!existsSync(file)) missing.push(path.relative(SITE, file));
-        }
+        const file = path.join(OUT_OG, `${post.slug}.png`);
+        if (!existsSync(file)) missing.push(path.relative(SITE, file));
     }
     if (missing.length) {
         console.error(`✗ ${missing.length} blog image(s) missing:`);
@@ -501,9 +498,8 @@ async function renderOnce({ config, width, height, card, type, quality }) {
 }
 
 for (const post of posts) {
-    const artFile = path.join(OUT_ART, `${post.slug}.jpg`);
     const ogFile = path.join(OUT_OG, `${post.slug}.png`);
-    if (!force && existsSync(artFile) && existsSync(ogFile)) {
+    if (!force && existsSync(ogFile)) {
         skipped++;
         continue;
     }
@@ -567,8 +563,6 @@ for (const post of posts) {
             `using the best (ink ${(best.stats.ink * 100).toFixed(0)}%, chroma ${best.stats.chroma.toFixed(0)})`
         );
     }
-    await writeFile(artFile, best.buffer);
-    written++;
 
     const card = await renderOnce({
         config: { ...BASE, ...pose },
