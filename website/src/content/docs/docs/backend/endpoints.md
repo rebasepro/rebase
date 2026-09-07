@@ -7,8 +7,11 @@ description: Every HTTP route a Rebase backend mounts — data, auth, storage, a
 Every route the server mounts, in one table, with what it takes to reach it.
 
 The paths assume the default `basePath` of `/api`; `REBASE_BASE_PATH` moves all
-of them together. `/health` and `/metrics` sit outside it on purpose, because an
-orchestrator probes `/health`, not `/api/health`.
+of them together. `/health`, `/livez` and `/metrics` sit outside it on purpose,
+because an orchestrator probes `/health` and should not have to know the base
+path. `/health` is *also* mounted under it, so `/api/health` answers the same
+way rather than 404ing at the one moment someone is checking whether the server
+is alive.
 
 A gate — `tooling/scripts/docs-verify/check-endpoint-index.mjs` — compares this
 table to the routes the source registers, so a new surface cannot be added
@@ -34,16 +37,25 @@ list. `:slug` is a collection's `slug`.
 | `GET` | `/api/data/collections` | session | [REST API](/docs/backend/api/) |
 | `GET` | `/api/data/:slug` | RLS | [Querying](/docs/backend/api/#filtering) |
 | `POST` | `/api/data/:slug` | RLS | [REST API](/docs/backend/api/) |
+| `GET` | `/api/data/:slug/count` | RLS | [Querying](/docs/backend/api/#filtering) |
+| `GET` | `/api/data/:slug/aggregate` | RLS | [REST API](/docs/backend/api/#rest-endpoints) |
 | `GET` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
+| `PUT` | `/api/data/:slug/:id` | RLS | Deprecated alias of `PATCH` — same partial write, answers `Deprecation: true` |
 | `DELETE` | `/api/data/:slug/:id` | RLS | [REST API](/docs/backend/api/) |
+| `POST` | `/api/data/:slug/bulk` | RLS | Insert many rows, optionally upserting — [REST API](/docs/backend/api/) |
+| `PATCH` | `/api/data/:slug/bulk` | RLS | Update many rows by id — [REST API](/docs/backend/api/) |
+| `POST` | `/api/data/:slug/bulk/delete` | RLS | Delete many rows by id — [REST API](/docs/backend/api/) |
 | `GET` | `/api/data/:slug/:id/history` | RLS | [Entity History](/docs/backend/history/) |
 | `POST` | `/api/data/:slug/:id/history/:historyId/revert` | RLS | [Entity History](/docs/backend/history/) |
 
-Aggregation, text search, vector search, relation inclusion and field selection
-are query parameters on `GET /api/data/:slug` rather than routes of their own —
-`aggregate`, `search`, `vector_search`, `include`, `fields`. See
-[REST API](/docs/backend/api/).
+Counting and aggregation are routes of their own, registered before `/:id` so
+that `aggregate` is not read as an entity id. `?select=` and `?groupBy=` are
+their parameters, and `select` is required on `/aggregate`.
+
+Text search, vector search, relation inclusion and field selection *are* query
+parameters on `GET /api/data/:slug` rather than routes — `search`,
+`vector_search`, `include`, `fields`. See [REST API](/docs/backend/api/).
 
 A project that declares no collections and introspects none serves this prefix
 as a single `404 NO_COLLECTIONS`. See [Backend only](/docs/getting-started/headless/).

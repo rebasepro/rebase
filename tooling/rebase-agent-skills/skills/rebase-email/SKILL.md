@@ -212,7 +212,7 @@ users someone else's mark. On the managed runtime, set `EMAIL_LOGO_URL` instead.
 | Password Reset | `POST /api/auth/forgot-password` | `"Reset your {appName} password"` | 1 hour |
 | Email Verification | `POST /api/auth/send-verification` | `"Verify your {appName} email address"` | No expiry (stored as user field) |
 | User Invitation | `POST /api/admin/users` (admin-created user, no explicit password) | `"You've been invited to {appName}"` | 1 hour (uses password reset token) |
-| Welcome Email | `POST /api/auth/register` and OAuth first-login | `"¡Bienvenido/a a {appName}!"` | N/A (informational) |
+| Welcome Email | `POST /api/auth/register` and OAuth first-login | `"Welcome to {appName}"` | N/A (informational) |
 | Magic Link | `POST /api/auth/magic-link` (needs `auth.magicLink: true`) | `"Sign in to {appName}"` | 15 minutes |
 
 ### Template Functions
@@ -274,7 +274,7 @@ function getWelcomeEmailTemplate(
 ): { subject: string; html: string; text: string }
 ```
 
-> **IMPORTANT FOR AGENTS:** The default welcome email template is in Spanish. The subject is `"¡Bienvenido/a a {appName}!"` and the body is Spanish text. Override this template if you need a different language.
+> **IMPORTANT FOR AGENTS:** Every built-in template is in English. The welcome subject is `"Welcome to {appName}"`. An earlier release shipped this one in Spanish; it does not any more, so do not add a translation layer to "fix" it. Override the template if you need another language.
 
 ### Template User Greeting
 

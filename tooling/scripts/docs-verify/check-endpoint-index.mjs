@@ -205,6 +205,32 @@ const EXTRA_ROUTES = [
 ];
 
 /**
+ * The data API's routes whose *tail* is static even though their prefix is not.
+ *
+ * `api-generator.ts` registers everything on `` `${basePath}/…` ``, where
+ * `basePath` is a collection's slug. {@link MOUNTS} therefore maps it to `null`
+ * — no prefix this source can know — and {@link METHOD} cannot see the paths
+ * anyway, because it requires a literal `/` right after the quote and these
+ * start with `${`.
+ *
+ * Between them those two facts meant the data API contributed **no routes at
+ * all** to the completeness check, and six of them were missing from the index
+ * for it to catch: `/count`, `/aggregate`, the deprecated `PUT /:id`, and the
+ * whole bulk-write surface (`POST` and `PATCH /bulk`, `POST /bulk/delete`) —
+ * three routes that write, in a table whose first line calls itself every route
+ * the server mounts.
+ *
+ * The prefix is unknowable; the tail is not. Each one is checked as
+ * `/api/data/:slug<tail>`, which is how the index writes the family.
+ */
+const DATA_FAMILY = {
+    file: "packages/server/src/api/rest/api-generator.ts",
+    prefix: "/api/data/:slug",
+    /** `` this.router.get(`${basePath}/count`, … ``, capturing method and tail. */
+    pattern: /this\.router\.(get|post|put|patch|delete)\(\s*`\$\{basePath\}([^`]*)`/g
+};
+
+/**
  * Prefixes whose paths come from a project's data, not from this source.
  *
  * A collection's CRUD and a project's custom functions are registered from
@@ -355,6 +381,26 @@ export function checkEndpointIndex(root = DEFAULT_ROOT) {
             routeSpecs.push({ method: m[2].toUpperCase(), path: full });
         }
     }
+    // The data API's static tails, which no MOUNTS prefix can reach.
+    const dataSource = readFileSync(path.join(root, DATA_FAMILY.file), "utf8");
+    let dataTails = 0;
+    for (const m of dataSource.matchAll(DATA_FAMILY.pattern)) {
+        const full = DATA_FAMILY.prefix + m[2];
+        dataTails += 1;
+        routes.add(full);
+        routeSpecs.push({ method: m[1].toUpperCase(), path: full });
+    }
+    // The generator is the data API. If it ever stops matching, this check goes
+    // back to being blind to the surface it was blind to before, silently.
+    if (!dataTails) {
+        findings.push({
+            kind: "gone",
+            message:
+                `${DATA_FAMILY.file} registered no \`\${basePath}\` routes — the data API is ` +
+                "no longer being read, so nothing is checking it."
+        });
+    }
+
     for (const extra of EXTRA_ROUTES) routeSpecs.push(extra);
 
     if (routes.size === 0) {

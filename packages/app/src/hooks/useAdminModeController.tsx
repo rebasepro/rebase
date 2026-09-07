@@ -2,7 +2,8 @@ import { AdminModeControllerContext } from "../contexts/AdminModeController";
 import { useContext } from "react";
 
 /**
- * Use this controller to change the admin mode (developer vs editor)
+ * Use this controller to change the admin mode: `"cms"` for editing data,
+ * `"studio"` for the developer tools.
  * @group Hooks and utilities
  */
 export interface AdminModeController {
@@ -11,7 +12,7 @@ export interface AdminModeController {
 }
 
 /**
- * Hook to retrieve the current admin mode ("developer" | "editor"), and `setMode`
+ * Hook to retrieve the current admin mode (`"cms"` | `"studio"`), and `setMode`
  * to change it.
  *
  * Consider that in order to use this hook you need to have a parent

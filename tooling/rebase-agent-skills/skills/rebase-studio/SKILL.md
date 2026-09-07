@@ -13,9 +13,9 @@ Rebase Studio (`@rebasepro/studio`) is the developer tools layer for Rebase. It 
 - **StudioHomePage** — customizable landing page with tool cards grouped by section
 - **Studio Bridge** — hooks that connect Studio tools to CMS data (collections, navigation, side panels)
 
-## Admin Modes (Tri-State)
+## Admin Modes (Bi-State)
 
-> **IMPORTANT FOR AGENTS:** The Studio uses a **tri-state** mode system: `"cms"` | `"studio"` | `"settings"`. It is NOT `"developer"` / `"editor"`. These are the only valid values.
+> **IMPORTANT FOR AGENTS:** The Studio uses a **bi-state** mode system: `"cms"` | `"studio"`. It is NOT `"developer"` / `"editor"`, and there is no `"settings"` mode — the union carried one briefly, nothing set it and nothing read it, and it is gone. These two are the only valid values.
 
 The admin mode is controlled by `AdminModeController` and persisted in `localStorage` under the key `rebase-admin-mode`. Default mode is `"cms"`. A browser that used the panel before 0.17.0 still holds `"content"`; it is migrated on read.
 
@@ -25,7 +25,6 @@ The admin mode is controlled by `AdminModeController` and persisted in `localSto
 |------|-------------|------------------|
 | `"cms"` | Clean CMS experience for editing data. Default mode. | Collections + admin entries (Users/Roles) |
 | `"studio"` | Developer tools and schema management. | Dev tool views + admin entries (Users/Roles) |
-| `"settings"` | Application settings and configuration. | Settings-related views |
 
 ### Mode Controller API
 
@@ -33,8 +32,8 @@ The admin mode is controlled by `AdminModeController` and persisted in `localSto
 import { useAdminModeController } from "@rebasepro/app";
 
 interface AdminModeController {
-    mode: "cms" | "studio" | "settings";
-    setMode: (mode: "cms" | "studio" | "settings") => void;
+    mode: "cms" | "studio";
+    setMode: (mode: "cms" | "studio") => void;
 }
 
 // Usage in a component

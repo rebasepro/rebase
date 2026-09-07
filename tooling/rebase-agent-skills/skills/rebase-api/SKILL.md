@@ -35,7 +35,7 @@ All data routes are mounted under `/api/data/`. Other route categories:
 
 ### CRUD Operations
 
-> **IMPORTANT FOR AGENTS:** Updates use `PATCH` — a partial write, only the properties you send. There is no `PUT`; it was an alias for the same handler and has been removed. `POST` returns `201`, `DELETE` returns `204` (empty body).
+> **IMPORTANT FOR AGENTS:** Updates use `PATCH` — a partial write, only the properties you send. `PUT` still reaches the same handler, so it is a partial write too rather than the replace its verb implies, and it answers with a `Deprecation: true` header — write `PATCH`. `POST` returns `201`, `DELETE` returns `204` (empty body).
 
 | Method | Endpoint | Description | Status |
 |--------|----------|-------------|--------|

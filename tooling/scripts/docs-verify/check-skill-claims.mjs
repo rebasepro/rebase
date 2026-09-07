@@ -184,7 +184,167 @@ function rules(root) {
         });
     }
 
+    // ── PUT on the data API was kept, not removed ─────────────────────────
+    //
+    // `rebase-api` said "There is no `PUT`; it was an alias for the same
+    // handler and has been removed." The alias is still registered — it
+    // forwards to the same `updateEntity` and answers `Deprecation: true`, a
+    // decision the code comments at length about. So the skill inverted the one
+    // fact an agent acts on: a client written against `PUT` keeps working, and
+    // the thing worth saying is that it is a *partial* write despite the verb.
+    const dataApi = read(root, "packages/server/src/api/rest/api-generator.ts");
+    if (/this\.router\.put\(\s*`\$\{basePath\}\/:id`/.test(dataApi)) {
+        out.push({
+            what: "`PUT` on the data API",
+            expected: "registered, forwarding to the PATCH handler",
+            forbid: /(?:no|not|NO)\s+`PUT`|`PUT`[^.\n]{0,40}(?:has been |was )?removed/i,
+            hint: "api-generator.ts still registers `PUT /:id`; it forwards to `updateEntity` " +
+                "and sets `Deprecation: true`, so it is a deprecated alias rather than a gone one"
+        });
+    }
+
+    // ── The built-in email templates are English ──────────────────────────
+    //
+    // `rebase-email` told agents, twice, that the welcome template is Spanish
+    // and quoted a subject line to prove it. Every template is English now, so
+    // the skill's advice — "override this template if you need a different
+    // language" — sent an agent to solve a problem that no longer exists.
+    const welcome = /getWelcomeEmailTemplate[\s\S]{0,900}?const subject = `([^`]+)`/.exec(
+        read(root, "packages/server/src/email/templates.ts")
+    )?.[1];
+    if (welcome) {
+        out.push({
+            what: "the welcome email's language",
+            expected: welcome.replace(/\$\{appName\}/g, "{appName}"),
+            forbid: /welcome email template is in \w+|¡Bienvenido/i,
+            hint: "every built-in template in packages/server/src/email/templates.ts is English"
+        });
+    }
+
     return out;
+}
+
+/**
+ * A skill that claims to list every `rebase db` subcommand has to list them all.
+ *
+ * Two skills carried the enumeration — `rebase-backend-postgres` as a sentence,
+ * `rebase-basics/references/cli-commands.md` as a table plus "the driver accepts
+ * exactly the subcommands above" — and both stopped at seven while the CLI grew
+ * to eleven. `url`, `pull`, `stop` and `reset` were missing from both, so an
+ * agent told these are "the whole list" reads `rebase db url` as a typo and
+ * invents a way to find the connection string.
+ *
+ * Both claims sat inside `<!-- docs-verify: ignore -->` blocks, because the
+ * same paragraph has to name `rebase db studio` in order to say it does not
+ * exist — and `check-doc-commands` would flag that. The opt-out is a line
+ * range, so silencing the uncheckable half silenced the checkable half with it.
+ * This check therefore reads the file whole and ignores those markers: it is
+ * asking whether a subcommand is *named anywhere on the page*, which is a
+ * question the opt-out was never meant to answer.
+ */
+function checkDbSubcommandCoverage(root, findings) {
+    const db = read(root, "packages/cli/src/commands/db.ts");
+    const start = db.indexOf("const DB_ACTION_HELP");
+    if (start === -1) return;
+    const subcommands = [...db.slice(start).matchAll(/^ {4}([a-z][\w-]*):\s*\{/gm)].map((m) => m[1]);
+    // A claim checked against an empty list is a claim nothing checks.
+    if (subcommands.length < 2) return;
+
+    /**
+     * A sentence that says the list that surrounds it is complete.
+     *
+     * Matched against the whole file rather than line by line, and with `\s+`
+     * for the spaces: markdown wraps, and "accepts exactly / the subcommands
+     * above" straddled two lines in the one file where the enumeration lived
+     * only in a table. A per-line test saw neither half and passed the page.
+     */
+    const EXHAUSTIVE = /\bthe\s+whole\s+list\b|\baccepts\s+exactly\s*(?:>\s*)?\s*the\s+subcommands\b/i;
+
+    for (const rel of globSync(`${SKILLS}/**/*.md`, { cwd: root })) {
+        const body = read(root, rel);
+        const claim = EXHAUSTIVE.exec(body);
+        if (!claim) continue;
+        const line = body.slice(0, claim.index).split("\n").length - 1;
+        // `rebase db <sub>` only — the form a reader types. A bare `` `url` ``
+        // matches prose about URLs on half these pages, and counting it let a
+        // dropped table row pass the mutation test that was meant to prove this
+        // rule works.
+        const missing = subcommands.filter((sub) => !new RegExp(`rebase db ${sub}\\b`).test(body));
+        if (!missing.length) continue;
+        findings.push({
+            file: `${rel}:${line + 1}`,
+            message:
+                `claims to list every \`rebase db\` subcommand and does not name ` +
+                `${missing.map((m) => `\`${m}\``).join(", ")}. ` +
+                `db.ts declares ${subcommands.length}: ${subcommands.join(", ")}.`
+        });
+    }
+}
+
+/**
+ * Admin-mode values a skill names, against the union the panel actually has.
+ *
+ * `rebase-studio` opened with "The Studio uses a **tri-state** mode system:
+ * `"cms"` | `"studio"` | `"settings"` … These are the only valid values" — an
+ * emphatic, agent-directed claim about a union that has two members. The third
+ * was removed precisely because nothing set it and nothing read it, and the
+ * source comment says so.
+ *
+ * The type is written out in the skill as a fenced `interface AdminModeController`
+ * rather than imported, so the snippet typechecker saw a doc declaring its own
+ * local type and had nothing to compare it to. That is the blind spot this
+ * function covers: a *declared* type is unverifiable by construction unless
+ * something knows where the real one lives.
+ */
+function checkAdminModes(root, findings) {
+    const hook = read(root, "packages/app/src/hooks/useAdminModeController.tsx");
+    const union = /mode:\s*((?:"[a-z]+"\s*\|\s*)*"[a-z]+")\s*;/.exec(hook)?.[1];
+    if (!union) return;
+    const valid = new Set([...union.matchAll(/"([a-z]+)"/g)].map((m) => m[1]));
+    if (valid.size < 1) return;
+
+    // Scope by the union's own members rather than by a word like "mode": a
+    // line that lists the admin modes necessarily names one of them. Keying on
+    // "setMode" instead matched the *theme* controller ten paragraphs down —
+    // `mode: "light" | "dark"` — and reported "light" as an invalid admin mode,
+    // which is the kind of finding that gets a gate switched off.
+    const namesAValidMode = new RegExp([...valid].map((v) => `"${v}"`).join("|"));
+
+    /**
+     * A value the sentence is *denying*, not teaching.
+     *
+     * The correction has to spell the wrong name out — "there is no
+     * `"settings"` mode" is the fix, not the drift — so a check that cannot
+     * tell those apart punishes the sentence that repairs it.
+     */
+    const denied = (line, value) => {
+        const at = line.indexOf(`"${value}"`);
+        return /\b(?:no|not|never|removed|gone|dropped|neither|nor)\b[^.]{0,60}$/i.test(
+            line.slice(0, at)
+        );
+    };
+
+    for (const rel of globSync(`${SKILLS}/**/*.md`, { cwd: root })) {
+        const lines = read(root, rel).split("\n");
+        const skip = ignoredLines(lines);
+        lines.forEach((line, i) => {
+            if (skip.has(i + 1) || !namesAValidMode.test(line)) return;
+            for (const m of line.matchAll(/"([a-z]+)"/g)) {
+                const value = m[1];
+                if (valid.has(value)) continue;
+                // The names the skill correctly warns *against*, and the
+                // pre-0.17 stored value it correctly describes migrating.
+                if (["developer", "editor", "content"].includes(value)) continue;
+                if (denied(line, value)) continue;
+                findings.push({
+                    file: `${rel}:${i + 1}`,
+                    message:
+                        `\`"${value}"\` is not an admin mode. The union in ` +
+                        `useAdminModeController.tsx is ${[...valid].map((v) => `"${v}"`).join(" | ")}.`
+                });
+            }
+        });
+    }
 }
 
 /**
@@ -334,6 +494,8 @@ export function checkSkillClaims(root) {
     checkComponentNames(root, findings);
     checkCounts(root, findings);
     checkScaffoldPaths(root, findings);
+    checkDbSubcommandCoverage(root, findings);
+    checkAdminModes(root, findings);
 
     return { findings, scanned };
 }

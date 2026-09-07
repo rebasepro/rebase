@@ -159,6 +159,10 @@ rebase build && rebase start
 | `rebase db backup` | Write a backup of the current database |
 | `rebase db backups` | List the backups taken so far |
 | `rebase db restore` | Restore the database from a backup |
+| `rebase db pull` | Introspect the live database back into collection files |
+| `rebase db url` | Print the connection string this project uses — nothing else goes to stdout, so it pipes |
+| `rebase db stop` | Stop the managed local database |
+| `rebase db reset` | Delete and recreate the managed local database |
 | `rebase db --help` | Show database command help |
 
 <!-- docs-verify: ignore -->
