@@ -367,13 +367,32 @@ async function execDriverCli(
 ): Promise<void> {
     const { projectRoot, backendDir, pluginCli, env } = resolved;
     const stdio = options.quiet ? "pipe" : "inherit";
-    const isTs = pluginCli.endsWith(".ts");
-    if (isTs) {
-        const tsxBin = resolveTsx(projectRoot);
-        if (!tsxBin) throw new Error(dependenciesNotInstalled(projectRoot));
+
+    /**
+     * tsx, whether the driver CLI is source or built.
+     *
+     * It used to be tsx only for a `.ts` entry, which happened to be right for
+     * as long as the driver shipped `src/`. Once it shipped `dist/cli.js`
+     * instead, this ran the built CLI under plain `node` — and some of its
+     * subcommands load the PROJECT's collections in process. `schema stale`
+     * does, so on every scaffold whose collections import each other (the stock
+     * one does) it failed to resolve them and reported "⏭ Not checked": a
+     * command that answers "is the generated schema stale?" with nothing at all,
+     * exiting 0, on the default project.
+     *
+     * Node cannot load a `.ts` file, and cannot resolve `./authors` or
+     * `./authors.js` onto `authors.ts`. tsx does both. It is a devDependency of
+     * every scaffold for exactly this reason.
+     */
+    const tsxBin = resolveTsx(projectRoot);
+    if (tsxBin) {
         await execa(tsxBin, [pluginCli, ...childArgs], { cwd: backendDir, stdio, env });
         return;
     }
+
+    // No tsx. A `.ts` entry cannot run at all; a built one still runs, and the
+    // subcommands that do not touch the project's TypeScript still work.
+    if (pluginCli.endsWith(".ts")) throw new Error(dependenciesNotInstalled(projectRoot));
     await execa("node", [pluginCli, ...childArgs], { cwd: backendDir, stdio, env });
 }
 

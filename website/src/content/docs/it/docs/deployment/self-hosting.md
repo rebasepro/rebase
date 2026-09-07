@@ -1,5 +1,5 @@
 ---
-sourceHash: 59a28fdc4be60490
+sourceHash: 175b96ac9239d947
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Esegui Rebase ovunque con l'immagine di runtime ufficiale e il bundle del tuo progetto — Docker Compose, Fly, Railway o un VPS classico.

@@ -1,5 +1,5 @@
 ---
-sourceHash: d7ed6205b17e92f1
+sourceHash: a38f51968ee29ac6
 title: Distribuzione di Rebase su Scaleway
 description: Scopri come distribuire Rebase su Scaleway per un'infrastruttura cloud sicura, basata in Francia, utilizzando i Serverless Containers.
 sidebar_label: Scaleway

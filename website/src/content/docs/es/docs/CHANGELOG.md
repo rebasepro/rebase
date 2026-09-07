@@ -11,6 +11,65 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+### Fixed
+
+Five defects an end-to-end pass over a freshly installed project turned up.
+
+- **`GET /api/data/:slug/aggregate` answered 501 on every deployment.**
+  `FetchService.aggregate` has existed for as long as the route has, and the
+  route reads it off `restFetchService` — an adapter object that listed
+  `fetchCollectionForRest` and `fetchOneForRest` and nothing else. Both getters,
+  so both the service-key path and the authenticated one. The 501's own comment
+  says it describes "every non-Postgres driver", which is what its author
+  believed; the endpoint index documents `count()`, `sum()`, `avg()`, `min()`,
+  `max()` and `groupBy`, none of which had ever run over HTTP.
+
+  Forwarded from both. The authenticated one goes through the same read-only
+  `withTransaction` as the other two, which is what sets the RLS GUCs and drops
+  to the restricted role — not an implementation detail here, because an
+  aggregate is an efficient way to learn about rows you cannot select. Verified:
+  an admin counts 2 users and a second account counts 1, matching what each can
+  list, and an unauthenticated aggregate is 401.
+
+- **`rebase eject` produced a project that compiled and could not boot.** The
+  template's `env.ts` took `z` from `"zod"` rather than from the runtime, under a
+  comment explaining that the version an ejected project pinned did not export
+  it and ending *"Switch both lines back when the version bumps."* 0.18.0 bumped
+  and published `z`; the workaround stayed, and became the thing it was written
+  to avoid. `loadEnv({ extend })` recognises a `.default()` by class identity, so
+  a schema built with a second copy of zod is rejected field by field: every
+  ejected project on 0.18.0, 0.18.1 and 0.19.0 died at boot on a raw `ZodError`
+  naming `SMTP_PORT`, `SMTP_SECURE` and `APP_NAME` — three variables with
+  defaults, none of which the operator had set.
+
+  `check:templates` now refuses a template that imports `zod` directly *while
+  the runtime exports `z`*, which is the narrow condition that turns this
+  workaround into a defect rather than a necessity.
+
+- **A path naming a relation the collection does not declare was a 500.**
+  `GET /api/data/authors/1/posts` answered `INTERNAL_ERROR` — telling the caller
+  to retry or report an outage over a request that will never succeed, and
+  burying a message that already said exactly what was wrong. It is a
+  `404 UNKNOWN_RELATION` now, like an unknown collection: the URL names nothing.
+  Three throw sites, one in `nested-path.ts` and two in `RelationService`.
+
+- **`rebase schema stale` checked nothing on the stock scaffold.** It loads the
+  project's collections in process, and the two places that spawn the driver CLI
+  each chose the interpreter from the driver's own file extension — tsx for a
+  `.ts` entry, `node` otherwise. Correct while the driver shipped `src/`; wrong
+  the moment it shipped `dist/cli.js`, because the files being loaded are the
+  *project's* TypeScript. Node cannot resolve `./authors` onto `authors.ts`, so
+  the command reported "⏭ Not checked" and exited 0 — on a scaffold whose own
+  collections import each other. Both spawns take tsx whenever it is installed,
+  and a gate refuses an interpreter chosen from the artifact's extension.
+
+- **`defineCron` required a `name` the runtime does not.** The loader has always
+  read `definition.name ?? loaded.id`, where the id is the file's own name — so a
+  cron without one registered happily under `rebase dev` and then failed
+  `rebase build` with "Property 'name' is missing". `name` is optional, and
+  documented as defaulting to the filename.
+
+
 ## [0.19.0] - 2026-09-07
 
 ### Changed

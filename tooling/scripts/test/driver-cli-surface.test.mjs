@@ -129,3 +129,51 @@ test("the build banner introduces no colliding identifiers", () => {
         "Node globals such as `process` need no import."
     );
 });
+
+/**
+ * No spawn of the driver CLI picks its interpreter from the file extension.
+ *
+ * `execDriverCli` (commands/db.ts) and `schemaCommand` (commands/schema.ts) each
+ * spawn the driver, and each carried its own copy of the same rule: tsx for a
+ * `.ts` entry, `node` for anything else. That was right for exactly as long as
+ * the driver shipped `src/`. When it started shipping `dist/cli.js`, both copies
+ * silently switched to plain `node` — and the driver loads the PROJECT's
+ * TypeScript collections in process. `rebase schema stale` could no longer
+ * resolve `./authors` onto `authors.ts` and answered "⏭ Not checked" on the
+ * stock scaffold, exiting 0.
+ *
+ * Fixing one copy would have left the other. The rule is: tsx if it is there,
+ * because the project's code is TypeScript whatever the driver's entry is.
+ */
+test("no driver spawn chooses its interpreter by file extension", () => {
+    const offenders = [];
+    const sources = [
+        "packages/cli/src/commands/db.ts",
+        "packages/cli/src/commands/schema.ts"
+    ];
+    for (const rel of sources) {
+        const file = path.join(ROOT, rel);
+        if (!existsSync(file)) continue;
+        const source = readFileSync(file, "utf8");
+        // `const isTs = pluginCli.endsWith(".ts")` and friends: the shape that
+        // makes the interpreter a function of the artifact rather than of what
+        // the child has to load.
+        for (const [i, line] of source.split("\n").entries()) {
+            if (/pluginCli\s*\.endsWith\(\s*["']\.ts["']\s*\)/.test(line) && !/^\s*(\/\/|\*)/.test(line)) {
+                // Allowed only as a fallback guard AFTER tsx was looked for.
+                const before = source.split("\n").slice(0, i).join("\n");
+                if (!/resolveTsx\(/.test(before)) {
+                    offenders.push(`${rel}:${i + 1} → ${line.trim()}`);
+                }
+            }
+        }
+    }
+    assert.deepEqual(
+        offenders,
+        [],
+        "These choose tsx-or-node from the driver entry's extension, before looking for tsx:\n  " +
+        offenders.join("\n  ") +
+        "\n\nThe driver loads the project's TypeScript in process, so the interpreter has to be " +
+        "tsx whenever it is installed — regardless of whether the driver's own entry is .ts or .js."
+    );
+});

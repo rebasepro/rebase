@@ -72,8 +72,19 @@ export function resolveNestedPath(
 
         if (!relation) {
             const available = Object.keys(resolvedRelations).join(", ") || "(none)";
-            throw new Error(
-                `Relation '${relationKey}' not found in collection '${parentCollection.slug}'. Available relations: [${available}]`
+            // A path segment naming a relation the collection does not declare
+            // is a bad URL, not a server fault. It answered 500 INTERNAL_ERROR,
+            // which tells the caller to retry or report an outage over a
+            // request that will never succeed — and buries a message that
+            // already says exactly what is wrong.
+            //
+            // 404, like an unknown collection: the URL names nothing. The
+            // available relations stay in the message because reaching this
+            // point means the caller could already read the parent collection,
+            // and `?include=` would list the same names.
+            throw ApiError.notFound(
+                `Relation '${relationKey}' not found in collection '${parentCollection.slug}'. Available relations: [${available}]`,
+                "UNKNOWN_RELATION"
             );
         }
 

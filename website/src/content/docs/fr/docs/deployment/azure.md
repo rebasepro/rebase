@@ -1,5 +1,5 @@
 ---
-sourceHash: cec387cb76e79c2a
+sourceHash: 03fb4207de242bd1
 title: Déploiement de Rebase sur Microsoft Azure
 description: Déployez votre instance Rebase en toute sécurité sur Azure en utilisant Azure Database pour PostgreSQL et Azure Container Apps.
 sidebar_label: Azure

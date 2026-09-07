@@ -1,5 +1,5 @@
 ---
-sourceHash: e432bfccb32736cc
+sourceHash: 2c7f9f01319b6b40
 title: Despliegue de Rebase en AWS
 description: Despliegue su instancia de Rebase de forma segura en Amazon Web Services utilizando RDS y AWS App Runner, con un fuerte enfoque europeo.
 sidebar_label: AWS

@@ -55,6 +55,51 @@ const BLOG_FILES = ["posts.ts", "authors.ts", "tags.ts", "index.ts"];
  * string when it meets a slash. Strings are the only context that matters in
  * JSON; there are no template literals or regex literals to worry about.
  */
+/**
+ * A template never imports `zod` directly.
+ *
+ * `loadEnv({ extend })` merges the project's schema with the framework's, and
+ * zod recognises a `.default()` by class identity — so a schema built against a
+ * second copy of zod is not merged, it is rejected field by field. The symptom
+ * is a raw ZodError at boot naming variables the operator never set, and it has
+ * cost this project twice: a managed deploy that reported success and ran zero
+ * crons, and every project ejected on 0.18.0–0.19.0, which could not boot at
+ * all. Both times the schema was built with the wrong `z`.
+ *
+ * The exception is deliberate and narrow — a template that pins a version which
+ * does not export `z` has no other option, and that is why this import existed
+ * between 0.17.3 and 0.18.0. So the rule is not "never import zod", it is "never
+ * import zod while the runtime exports it", which is the state that turns a
+ * workaround into a defect.
+ */
+function checkNoDirectZodImports() {
+    const problems = [];
+    const runtimeExportsZ = fs
+        .readFileSync(path.join(repoRoot, "packages/server/src/index.ts"), "utf8")
+        .includes('export { z } from "zod"');
+    if (!runtimeExportsZ) return problems;
+
+    const walk = (dir) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) { walk(full); continue; }
+            if (!/\.tsx?$/.test(entry.name)) continue;
+            for (const line of fs.readFileSync(full, "utf8").split("\n")) {
+                // An import statement, not a mention of one in a comment.
+                if (/^\s*import\s[^\n]*from\s*["']zod["']\s*;?\s*$/.test(line)) {
+                    problems.push(
+                        `${path.relative(repoRoot, full)} → ${line.trim()} — @rebasepro/server exports \`z\`; ` +
+                        "a schema built with another copy is rejected field by field by `loadEnv({ extend })`, " +
+                        "and the server dies at boot on a raw ZodError."
+                    );
+                }
+            }
+        }
+    };
+    walk(path.join(repoRoot, "packages/cli/templates"));
+    return problems;
+}
+
 function stripJsonComments(source) {
     let out = "";
     let inString = false;
@@ -830,6 +875,15 @@ if (gettingStartedPathProblems.length > 0) {
     for (const p of gettingStartedPathProblems) console.error(`    ${p}`);
 } else {
     console.log("  ok   getting-started pages name files the scaffold ships");
+}
+
+const zodImportProblems = checkNoDirectZodImports();
+if (zodImportProblems.length > 0) {
+    failed++;
+    console.log("  FAIL no template builds a schema with its own copy of zod");
+    for (const p of zodImportProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   no template builds a schema with its own copy of zod");
 }
 
 // ── The pin, not the working tree ────────────────────────────────────────────

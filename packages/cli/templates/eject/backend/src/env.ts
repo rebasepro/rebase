@@ -2,17 +2,19 @@ import * as dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { loadEnv } from "@rebasepro/server";
-// This should be `import { loadEnv, z } from "@rebasepro/server"`, and will be
-// in the first release that publishes that `z`. `loadEnv({ extend })` composes
-// the schema below with the framework's, and a schema built against a second
-// copy of zod fails the framework's instanceof checks and is silently dropped —
-// so taking `z` from the runtime is the only form that is reliably correct.
-// The `@rebasepro/server` version an ejected project pins does not export it
-// yet, and a template may only import what the version it pins publishes
-// (`pnpm check:templates`); an import of a symbol that is not there fails at
-// boot rather than at build. Switch both lines back when the version bumps.
-import { z } from "zod";
+// `z` comes from the runtime, not from "zod". `loadEnv({ extend })` composes the
+// schema below with the framework's, and zod recognises a `.default()` by class
+// identity — so a schema built against a second copy is not merged, it is
+// rejected field by field. The ejected server then dies at boot on a raw
+// ZodError naming SMTP_PORT, SMTP_SECURE and APP_NAME, every one of which has a
+// default and none of which the operator set.
+//
+// This file imported from "zod" between 0.17.3 and 0.19.0, because the version
+// an ejected project pinned did not publish `z` and a template may only import
+// what its pinned version exports (`pnpm check:templates`). 0.18.0 published it;
+// the workaround outlived its reason and became the defect it was written to
+// avoid, in every project ejected on 0.18.0, 0.18.1 or 0.19.0.
+import { loadEnv, z } from "@rebasepro/server";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

@@ -1,5 +1,5 @@
 ---
-sourceHash: d7ed6205b17e92f1
+sourceHash: a38f51968ee29ac6
 title: Rebase auf Scaleway bereitstellen
 description: Erfahren Sie, wie Sie Rebase auf Scaleway für eine sichere, französisch basierte Cloud-Infrastruktur mit Serverless-Containern bereitstellen.
 sidebar_label: Scaleway

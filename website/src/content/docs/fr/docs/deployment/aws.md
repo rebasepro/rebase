@@ -1,5 +1,5 @@
 ---
-sourceHash: e432bfccb32736cc
+sourceHash: 2c7f9f01319b6b40
 title: Déploiement de Rebase sur AWS
 description: Déployez votre instance Rebase en toute sécurité sur Amazon Web Services en utilisant RDS et AWS App Runner, avec une forte orientation européenne.
 sidebar_label: AWS

@@ -31,8 +31,18 @@ export interface CronJobDefinition {
      */
     timezone?: string;
 
-    /** Human-readable name shown in the Studio UI. */
-    name: string;
+    /**
+     * Human-readable name shown in the Studio UI. Defaults to the file's own
+     * name — `crons/nightly-cleanup.ts` is `nightly-cleanup`.
+     *
+     * Optional because the loader has always treated it that way
+     * (`definition.name ?? loaded.id`), while this declared it required. So a
+     * cron without one ran happily under `rebase dev` and then failed
+     * `rebase build` with "Property 'name' is missing" — the dev loop and the
+     * build disagreeing about whether the project compiles, which is the worst
+     * place for a type to be stricter than the code.
+     */
+    name?: string;
 
     /** Optional description shown in the Studio UI. */
     description?: string;

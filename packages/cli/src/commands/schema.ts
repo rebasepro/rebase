@@ -82,24 +82,33 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     env[DEV_DATABASE_KIND_ENV] = devDatabaseKind(projectRoot) ?? "";
 
     try {
-        const isTs = pluginCli.endsWith(".ts");
-        if (isTs) {
-            const tsxBin = resolveTsx(projectRoot);
-            if (!tsxBin) {
-                exitDependenciesNotInstalled(projectRoot);
-            }
-            await execa(tsxBin, [pluginCli, ...argsFromCommand(rawArgs, "schema")], {
-                cwd: backendDir,
-                stdio: "inherit",
-                env
-            });
-        } else {
-            await execa("node", [pluginCli, ...argsFromCommand(rawArgs, "schema")], {
-                cwd: backendDir,
-                stdio: "inherit",
-                env
-            });
+        /**
+         * tsx, whether the driver CLI is source or built.
+         *
+         * This chose the interpreter from the file extension — tsx for a `.ts`
+         * entry, `node` for a built one — which was right only for as long as
+         * the driver shipped `src/`. Once it shipped `dist/cli.js`, the built
+         * CLI ran under plain `node`, and some of its subcommands load the
+         * PROJECT's collections in process. `schema stale` does: on the stock
+         * scaffold, whose collections import each other, Node could not resolve
+         * `./authors` onto `authors.ts` and the command reported "⏭ Not
+         * checked" — answering "is the generated schema stale?" with nothing,
+         * and exiting 0.
+         *
+         * The same rule lives in `execDriverCli` (commands/db.ts). Two copies of
+         * one decision is how they came to disagree; this one is kept because
+         * `schema` deliberately does NOT resolve a database, and `execDriverCli`
+         * is reached through a path that does.
+         */
+        const tsxBin = resolveTsx(projectRoot);
+        if (!tsxBin && pluginCli.endsWith(".ts")) {
+            exitDependenciesNotInstalled(projectRoot);
         }
+        await execa(tsxBin ?? "node", [pluginCli, ...argsFromCommand(rawArgs, "schema")], {
+            cwd: backendDir,
+            stdio: "inherit",
+            env
+        });
     } catch (error) {
         // A child that ran and exited non-zero already printed its diagnostics
         // through inherited stdio; a child that never started (ENOENT on tsx,

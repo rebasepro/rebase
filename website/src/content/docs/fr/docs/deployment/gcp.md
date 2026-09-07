@@ -1,5 +1,5 @@
 ---
-sourceHash: 22f97bb2e84b90ec
+sourceHash: 4ce81cfc99dff90a
 title: Déployer Rebase sur Google Cloud Platform
 description: Déployez votre instance Rebase en toute sécurité sur GCP en utilisant Cloud SQL et Cloud Run, en vous concentrant sur les régions de centres de données de l'UE.
 sidebar_label: Google Cloud

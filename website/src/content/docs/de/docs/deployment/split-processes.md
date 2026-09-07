@@ -1,5 +1,5 @@
 ---
-sourceHash: 7ee0affc96cd6171
+sourceHash: b5b92ee0a21c210a
 title: Auf mehrere Prozesse aufteilen
 sidebar_label: Getrennte Prozesse
 description: "Führe ein Bundle als mehrere zusammenarbeitende Prozesse aus — eine API, eine Functions-Schicht, einen Worker — aus demselben veröffentlichten Runtime-Image, damit eine rechenintensive Custom Function nicht mehr mit der Daten-API konkurriert."

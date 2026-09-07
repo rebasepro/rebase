@@ -980,7 +980,9 @@ export class CronScheduler {
     private toStatus(job: RegisteredJob): CronJobStatus {
         return {
             id: job.id,
-            name: job.definition.name,
+            // Same fallback the two `listJobs` paths already applied: `name` is
+            // optional and the id is the file's own name.
+            name: job.definition.name ?? job.id,
             description: job.definition.description,
             schedule: job.definition.schedule,
             enabled: job.enabled,

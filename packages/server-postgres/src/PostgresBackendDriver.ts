@@ -254,6 +254,20 @@ export class PostgresBackendDriver implements DataDriver {
                 if (!row) return row;
                 const [masked] = await this.applyAfterReadForRest([row], collectionPath);
                 return masked;
+            },
+            // Forwarded, not omitted. `FetchService.aggregate` has existed for
+            // as long as the route has, and this object is the only thing the
+            // route can see — so leaving it out made
+            // `GET /api/data/:slug/aggregate` answer 501 on every deployment,
+            // including the Postgres one whose absence the 501's own comment
+            // says it is describing.
+            //
+            // No afterRead pass: the callbacks shape rows, and an aggregate
+            // returns sums and counts rather than rows. Row-level authorization
+            // is not skipped — it is applied one layer down, by the
+            // request-scoped handle this service reads through.
+            aggregate: async (collectionPath, options) => {
+                return raw.aggregate(collectionPath, options);
             }
         };
     }
@@ -1761,6 +1775,17 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             fetchOneForRest: async (collectionPath, id, include, databaseId) => {
                 return this.withTransaction(async (delegate) => {
                     return delegate.restFetchService.fetchOneForRest(collectionPath, id, include, databaseId);
+                }, { accessMode: "read only" });
+            },
+            // In the same read-only transaction as the two above, which is what
+            // sets the RLS GUCs and drops to the restricted role. That is not a
+            // detail to leave to the base implementation: an aggregate is an
+            // efficient way to learn about rows the caller cannot select, and
+            // `count(*)` over a table whose policies return nothing has to be
+            // zero rather than the true row count.
+            aggregate: async (collectionPath, options) => {
+                return this.withTransaction(async (delegate) => {
+                    return delegate.restFetchService.aggregate!(collectionPath, options);
                 }, { accessMode: "read only" });
             }
         };

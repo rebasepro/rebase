@@ -1,5 +1,5 @@
 ---
-sourceHash: 22f97bb2e84b90ec
+sourceHash: 4ce81cfc99dff90a
 title: Desplegando Rebase en Google Cloud Platform
 description: Despliega tu instancia de Rebase de forma segura en GCP usando Cloud SQL y Cloud Run, centrándote en regiones de centros de datos de la UE.
 sidebar_label: Google Cloud

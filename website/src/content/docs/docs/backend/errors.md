@@ -155,6 +155,7 @@ the ID you got. Read the response header.
 | `MISSING_AGGREGATE_SELECT` | 400 | The aggregate route was called with no `?select=`. | Add one, e.g. `?select=count()`. |
 | `NO_COLLECTIONS` | 404 | The project serves no collections: none declared in code, and no tables to derive them from. | Create tables — a migration, SQL, or a collection file plus `rebase db push` — and restart. |
 | `NOT_FOUND` | 404 | No row with that id in that collection — or one that row-level security hides from this caller. | Check the id, then the collection's `securityRules`. |
+| `UNKNOWN_RELATION` | 404 | A nested path names a relation the parent collection does not declare, e.g. `/api/data/authors/1/posts` where `authors` declares none. | Check the relation's name — the message lists the ones the collection has. A back-reference has to be declared on the parent to be traversable. |
 | `ORDER_BY_FIELD_NOT_SORTABLE` | 400 | The sort names a property that is not sortable. | Sort on a column-backed property. |
 | `PAYLOAD_TOO_LARGE` | 413 | The body exceeds the configured limit. | Send less, or raise the limit. |
 | `READ_ONLY_TRANSACTION` | 409 | An `afterRead` callback tried to write. A request-scoped read runs in a `READ ONLY` transaction, so neither the callback nor anything it calls may write. | Move the write out of the read: a background job, or `rebase.dataAsAdmin` from a cron job or a custom function. |
