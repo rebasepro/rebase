@@ -115,7 +115,15 @@ const NEAT_BASE_CONFIG = {
     planeTwist: 1,
     silhouetteFade: 0,
     cylinderFade: 0.08,
-    ribbonFade: 0,
+    // NOT 0. On a `shapeType: "ribbon"` — which this is — a `ribbonFade` of
+    // exactly 0 draws nothing at all: the canvas comes back as a flat fill of
+    // `backgroundColor`, with no error, no warning and no watermark. It sat at
+    // 0 for as long as this file has existed, so every hero on the site was
+    // rendering an empty canvas, and nothing looked broken because the canvas is
+    // held at `opacity: 0.55` over a near-black page — "no gradient" and "a very
+    // dim gradient" are the same picture. Found 2026-09-07 when the blog cards,
+    // which are the same component at full opacity, came up black.
+    ribbonFade: 0.08,
     flatShading: true,
     cameraLock: false,
     cameraX: 0,
@@ -152,11 +160,6 @@ const VARIANT_OVERRIDES: Record<string, Partial<any>> = {
     card: {
         colorBrightness: 0.85,
         colorSaturation: 1.2,
-        // NOT the base config's 0. On a `shapeType: "ribbon"` a `ribbonFade` of
-        // exactly 0 draws nothing at all: the canvas comes back as a flat fill
-        // of `backgroundColor`, with no error and no warning. 0.001 already
-        // renders; 0.08 is the value `cylinderFade` next to it uses.
-        ribbonFade: 0.08,
     },
     a: {
         yOffset: 0,
