@@ -33,7 +33,7 @@ rebase build
 App Runner preleva da un registry, quindi incorpora il bundle in un'immagine derivata. Tre righe, e fissa esattamente ciò che gira:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.18.0
+FROM rebasepro/server:0.18.1
 COPY dist-bundle /bundle
 ```
 

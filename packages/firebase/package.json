@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/firebase",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Firebase data source for Rebase — run the Rebase admin panel and SDK against Firestore.",
   "keywords": [
     "rebase",

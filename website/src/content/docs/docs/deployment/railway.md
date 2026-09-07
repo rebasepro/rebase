@@ -33,7 +33,7 @@ rebase build
 Commit a three-line `Dockerfile` at the repository root, so Railway's build step is a copy rather than a compilation:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.18.0
+FROM rebasepro/server:0.18.1
 COPY dist-bundle /bundle
 ```
 

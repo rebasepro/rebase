@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/forms",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Schema-driven form components for Rebase collections.",
   "keywords": [
     "rebase",

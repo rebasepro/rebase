@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/server",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "Database-Agnostic Backend Core for Rebase",
   "keywords": [
     "rebase",

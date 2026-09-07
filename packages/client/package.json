@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/client",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "HTTP SDK client for the Rebase custom backend",
   "keywords": [
     "rebase",

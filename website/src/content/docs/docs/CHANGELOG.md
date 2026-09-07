@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-09-07
+
 ### Fixed
 
 - **The published driver shipped no CLI, so a new project's first data read
