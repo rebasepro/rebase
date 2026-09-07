@@ -104,29 +104,28 @@ const SessionBody: React.FC = () => {
     );
 };
 
-/* Findings on the agent's database. All three name checks rls-check ACTUALLY
-   has — see packages/rls-check/src/checks — in the one scene whose subject is
-   that you should verify claims rather than take them. */
-const FOUND: { text: string; tone: "crit" | "body" }[] = [
-    { text: "[critical] rls-disabled     public.customers", tone: "crit" },
-    { text: "readable by anyone holding the anon key", tone: "body" },
-    { text: "[critical] anonymous-write-allowed  public.orders", tone: "crit" },
-    { text: "anon may INSERT with no policy restricting it", tone: "body" },
-    { text: "[high]     grant-to-public  public.tickets", tone: "crit" },
-];
-
-/* What the tool prints when there is nothing to print — verbatim from
-   packages/rls-check/src/report.ts, the green line and the summary line. */
-const CLEAN = "No findings. Every table, view and policy in scope passed all checks.";
-const CLEAN_SUMMARY = "0 confirmed · 0 worth checking · 15 checks run against 9 tables in 1 schema";
-
-const CMD = "npx @rebasepro/rls-check $DATABASE_URL";
+import { SCAN_AFTER, SCAN_BEFORE } from "./scan-output";
 
 /**
- * The scan, twice. Phase one types the command and streams three findings.
- * Phase two, a minute later on the same desk, types the same command under
- * them, the findings fall away, and the tool's own clean report prints. Same
- * window, same database, same command — that is the argument.
+ * The scan, twice. Phase one types the command and rls-check's report
+ * prints — the real report, verbatim (scan-output.ts): header, the caveat
+ * about the connecting role, nine critical findings, the tally, the exit
+ * code. Phase two, a minute later on the same desk, types the same command
+ * under it and the clean report prints. Same window, same database, same
+ * command — that is the argument.
+ *
+ * The window is a fixed height and scrolls like the shell: a report this
+ * long streams past and the tail settles — "critical 9", "9 of 9 tables
+ * have row-level security disabled", "Exit code 1"; then "No findings",
+ * zeros, "Exit code 0".
+ *
+ * ON THE CLEAN REPORT: rls-check 0.18.1 reports `rls-enabled-not-forced`
+ * (high, when the owner can log in) on every table `db push` produces,
+ * because push does not set FORCE and the server context is meant to
+ * bypass. The clean capture was taken with FORCE on every table. Whether
+ * the tool should skip that check on a Rebase database is an open product
+ * decision; until it is made, this window shows what the tool prints
+ * with the check satisfied, not what it prints after push alone.
  */
 export const ScanWindow: React.FC<{
     x: number;
@@ -142,114 +141,85 @@ export const ScanWindow: React.FC<{
     </div>
 );
 
+const CMD = "npx @rebasepro/rls-check";
+/** Lines of report per frame once it starts printing: a burst, as a tool
+ *  prints, not a stream. */
+const BURST = 6;
+const HEIGHT = 300;
+
+function paint(line: string): string {
+    const t = line.trim();
+    if (t.startsWith("[critical]") || t.startsWith("CRITICAL")) return CHROMA.coral;
+    if (t.startsWith("[high]") || t.startsWith("HIGH")) return CHROMA.coral;
+    if (t.startsWith("No findings.")) return "#34D399";
+    if (t.startsWith("Exit code 1")) return CHROMA.coral;
+    if (t.startsWith("Exit code 0")) return "#34D399";
+    if (t.startsWith("critical ")) return t.startsWith("critical 0") ? INK.muted : CHROMA.coral;
+    if (t.startsWith("rls-check ") || t === "Summary" || t.startsWith("Note")) return INK.high;
+    if (/^public\./.test(t) || t.startsWith("9 of 9")) return INK.copy;
+    return INK.muted;
+}
+
+const Report: React.FC<{ lines: string[]; from: number }> = ({ lines, from }) => {
+    const frame = useCurrentFrame();
+    return (
+        <>
+            {lines.map((line, i) => {
+                const at = from + Math.floor(i / BURST);
+                if (frame < at) return null;
+                return (
+                    <div key={i} style={{ color: paint(line), whiteSpace: "pre", opacity: ramp(frame, at, 4) }}>
+                        {line === "" ? "\u00a0" : line}
+                    </div>
+                );
+            })}
+        </>
+    );
+};
+
 const ScanBody: React.FC<{ rerunAt: number }> = ({ rerunAt }) => {
     const frame = useCurrentFrame();
     const rate = 0.5;
     const typed1 = Math.round(ramp(frame, 8, CMD.length * rate) * CMD.length);
     const report1 = 8 + CMD.length * rate + 8;
-
     const rerun = frame >= rerunAt;
     const typed2 = Math.round(ramp(frame, rerunAt + 4, CMD.length * rate) * CMD.length);
     const report2 = rerunAt + 4 + CMD.length * rate + 8;
-    /* The first report collapses as the second command is typed, so the
-       window does not grow: the findings fade and give up their height. */
-    const collapse = ramp(frame, rerunAt + 2, 16);
 
     return (
-        <Frame title="rls-check · the same database" delay={0} bodyStyle={{ padding: "24px 30px 28px" }}>
-            <div style={{ fontFamily: FONT.mono, fontSize: 18, lineHeight: 1.7 }}>
-                <div style={{ color: INK.high }}>
-                    <span style={{ color: INK.muted, marginRight: 12 }}>$</span>
-                    {CMD.slice(0, typed1)}
-                </div>
-
+        <Frame title="rls-check · the same database" delay={0} bodyStyle={{ padding: "22px 30px 26px" }}>
+            {/* Bottom-anchored once it overflows, top-anchored before — the
+                same box as the shell's (Terminal.tsx). */}
+            <div style={{ position: "relative", height: HEIGHT, overflow: "hidden" }}>
                 <div
                     style={{
-                        overflow: "hidden",
-                        maxHeight: rerun ? `${(1 - collapse) * 320}px` : undefined,
-                        opacity: 1 - collapse,
-                        marginTop: 10,
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        minHeight: "100%",
+                        fontFamily: FONT.mono,
+                        fontSize: 14,
+                        lineHeight: 1.65,
                     }}
                 >
-                    {FOUND.map((l, i) => (
-                        <div
-                            key={l.text}
-                            style={{
-                                paddingLeft: l.tone === "body" ? 26 : 0,
-                                fontSize: l.tone === "body" ? 16 : 18,
-                                color: l.tone === "crit" ? CHROMA.coral : INK.muted,
-                                opacity: ramp(frame, report1 + i * 7, 12),
-                                whiteSpace: "pre",
-                            }}
-                        >
-                            {l.text}
-                        </div>
-                    ))}
-                    <div
-                        style={{
-                            marginTop: 12,
-                            color: CHROMA.coral,
-                            letterSpacing: "0.04em",
-                            opacity: ramp(frame, report1 + 44, 14),
-                        }}
-                    >
-                        2 critical · 1 high
+                    <div style={{ color: INK.high }}>
+                        <span style={{ color: INK.muted, marginRight: 12 }}>$</span>
+                        {CMD.slice(0, typed1)}
                     </div>
+                    <Report lines={SCAN_BEFORE} from={report1} />
+                    {rerun && (
+                        <>
+                            <div style={{ color: INK.high, marginTop: 6 }}>
+                                <span style={{ color: INK.muted, marginRight: 12 }}>$</span>
+                                {CMD.slice(0, typed2)}
+                            </div>
+                            <Report lines={SCAN_AFTER} from={report2} />
+                        </>
+                    )}
                 </div>
-
-                {rerun && (
-                    <>
-                        <div style={{ color: INK.high, marginTop: 10 }}>
-                            <span style={{ color: INK.muted, marginRight: 12 }}>$</span>
-                            {CMD.slice(0, typed2)}
-                        </div>
-                        <div style={{ marginTop: 10, color: "#34D399", opacity: ramp(frame, report2, 12) }}>
-                            {CLEAN}
-                        </div>
-                        <div
-                            style={{
-                                marginTop: 6,
-                                fontSize: 16,
-                                color: INK.muted,
-                                opacity: ramp(frame, report2 + 14, 12),
-                            }}
-                        >
-                            {CLEAN_SUMMARY}
-                        </div>
-                        <div
-                            style={{
-                                marginTop: 6,
-                                fontSize: 16,
-                                color: INK.copy,
-                                opacity: ramp(frame, report2 + 26, 12),
-                            }}
-                        >
-                            Exit code 0
-                        </div>
-                    </>
-                )}
             </div>
         </Frame>
     );
 };
 
-/** The small print under the scan, once it has run clean. */
-export const ScanNote: React.FC<{ x: number; y: number; at: number }> = ({ x, y, at }) => {
-    const frame = useCurrentFrame();
-    return (
-        <div
-            style={{
-                position: "absolute",
-                left: x,
-                top: y,
-                fontFamily: FONT.mono,
-                fontSize: 16,
-                color: INK.muted,
-                letterSpacing: "0.02em",
-                opacity: ramp(frame, at, 20),
-            }}
-        >
-            Read-only · no signup · nothing leaves your machine
-        </div>
-    );
-};

@@ -15,14 +15,16 @@ import { ramp } from "./motion";
 
 export interface OutputLine {
     text: string;
-    /** ok = a green tick; muted = a note; plain = as typed. */
-    tone?: "ok" | "muted" | "plain" | "accent";
+    /** ok = a green tick; green = green without the tick; muted = a note;
+     *  plain = as typed; accent = the blue a tool uses for a heading. */
+    tone?: "ok" | "green" | "muted" | "plain" | "accent";
     /** Frames after the command finishes typing. */
     at: number;
 }
 
 const TONE: Record<NonNullable<OutputLine["tone"]>, string> = {
     ok: "#34D399",
+    green: "#34D399",
     muted: INK.muted,
     plain: INK.copy,
     accent: PRIMARY_LIGHT,
@@ -107,8 +109,8 @@ export const Terminal: React.FC<{
                             minHeight: line.text ? undefined : size * 0.9,
                         }}
                     >
-                        {tone === "ok" && <span style={{ marginRight: 12 }}>✔</span>}
-                        {line.text}
+                        {tone === "ok" && <span style={{ marginRight: 12 }}>✓</span>}
+                        {line.text === "" ? "\u00a0" : line.text}
                     </div>
                 );
             })}

@@ -16,7 +16,7 @@ from the first frame and the first word is half a second in.
 **Every line is a sentence.** A subject, a verb, and the thing the verb is
 about. Nothing here needs a second reading to parse.
 
-Total: **3000 frames = 100.0 seconds** at 30fps · 302 words · 181 words a
+Total: **3000 frames = 100.0 seconds** at 30fps · 303 words · 182 words a
 minute over the whole run, silences included.
 
 ## The script
@@ -24,8 +24,8 @@ minute over the whole run, silences included.
 | # | Beat | Starts | Words | Line | Gap after |
 |---|------|--------|-------|------|-----------|
 | 01 | You, to camera | 0.5s | 15 | It's 2026. Anyone can build a backend in an afternoon. But can you trust it? | 0.6s |
-| 02 | The evidence | 5.6s | 34 | A coding agent built this one. It says it's done: auth, CRUD for nine tables, a REST API, deployed. And a ten-second scan of the same database finds two critical issues and one high. | 0.7s |
-| 03 | Point Rebase at it | 16.5s | 28 | So you point Rebase at that same database. It reads the tables that are already there and writes a TypeScript file for each one. That's the whole setup. | 0.5s |
+| 02 | The evidence | 5.6s | 35 | A coding agent built this one. It says it's done: auth, CRUD for nine tables, a REST API, deployed. And a ten-second scan of the same database finds nine critical issues. Every table is open. | 0.4s |
+| 03 | Point Rebase at it | 16.5s | 28 | So you point Rebase at that same database. It reads the tables that are already there and writes a TypeScript file for each one. That's the first command. | 0.5s |
 | 04 | The rule | 25.4s | 35 | Access rules go in that same file. This one says customers can only see their own orders. It doesn't compile into middleware. It compiles into a Postgres row-level security policy, and the database enforces it. | 0.7s |
 | 05 | Push, and the same scan | 36.6s | 14 | You push it, you run the exact same scan again, and it finds nothing. | 0.6s |
 | 06 | Run it | 41.4s | 4 | Then you run it. | 1.5s — the terminal prints the ports |

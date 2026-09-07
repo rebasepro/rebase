@@ -10,36 +10,54 @@ import { useTone } from "../../Plane";
  * THE RULE — the file `init` just wrote, with four lines added to it, and
  * the policy those four lines compile to. Sits on the blue field.
  *
- * The file is on screen FIRST, as introspection left it: a name, a table,
- * properties. Then the rule is typed into it. That order is the point of the
- * beat — you did not write a schema, you added a rule to a file that already
- * described your table — and a version that showed the rule alone read as
- * "here is some config", unattached to anything.
+ * The file is on screen FIRST, as introspection left it. Then the rule is
+ * typed into it. That order is the point of the beat — you did not write a
+ * schema, you added a rule to a file that already described your table.
+ *
+ * THE FILE IS THE REAL ONE: the head of `config/collections/orders.ts` as
+ * `rebase schema introspect` generated it for this table, with
+ * `securityRules` inserted after `table`. It continues below the fold. THE
+ * POLICY IS THE REAL ONE: the statements `db push` writes to
+ * `drizzle/policies.sql` for that rule (generatePolicyStatements, the
+ * name is the rule's hash), with the one long CREATE POLICY broken across
+ * three lines so it fits the frame — whitespace only.
  */
 
-const FILE = `export const orders = defineCollection({
+const FILE = `import { PostgresCollectionConfig } from "@rebasepro/types";
+import customersCollection from "./customers";
+import orderItemsCollection from "./order_items";
+
+const ordersCollection: PostgresCollectionConfig = {
     name: "Orders",
+    singularName: "Order",
+    slug: "orders",
     table: "orders",
-    properties: { reference, total, status, customer },
     securityRules: [
         { operation: "select",
           using: "customer_id = rebase.uid()" }
-    ]
-});`;
+    ],
+    properties: {
+        id: {
+            name: "Id",
+            columnName: "id",
+            type: "string",
+            isId: "uuid",
+        },`;
 
-/* Lines 0-3 and 8 are the generated file; 4-7 are what gets added. */
-const GENERATED = [0, 1, 2, 3, 8];
-const ADDED = [4, 5, 6, 7];
+/* Lines 9-12 are what gets added; everything else is the generated file. */
+const ADDED = [9, 10, 11, 12];
+const GENERATED = FILE.split("\n").map((_, i) => i).filter((i) => !ADDED.includes(i));
 const FILE_AT = 0;
 const ADD_AT = 40;
 const DRAW_AT = 86;
 const POLICY_AT = 100;
 
-const POLICY = `ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+const POLICY = `ALTER TABLE "public"."orders" ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY orders_select_9f2c1a4b ON orders
-    FOR SELECT TO rebase_user
-    USING (customer_id = rebase.uid());`;
+DROP POLICY IF EXISTS "orders_select_4903a5a" ON "public"."orders";
+CREATE POLICY "orders_select_4903a5a" ON "public"."orders"
+    AS PERMISSIVE FOR SELECT TO "public"
+    USING ((customer_id)::text = rebase.uid());`;
 
 export const RuleWindows: React.FC<{ x: number; y: number; at: number }> = ({ x, y, at }) => (
     <div style={{ position: "absolute", left: x, top: y, width: 1520 }}>
@@ -54,18 +72,32 @@ const RuleBody: React.FC = () => {
     const tone = useTone();
     const draw = ramp(frame, DRAW_AT, 18, ENTER);
     const delays = FILE.split("\n").map((_, i) =>
-        GENERATED.includes(i) ? FILE_AT + 14 + GENERATED.indexOf(i) * 2 : ADD_AT + ADDED.indexOf(i) * 6,
+        GENERATED.includes(i) ? FILE_AT + 14 + GENERATED.indexOf(i) * 1.5 : ADD_AT + ADDED.indexOf(i) * 6,
     );
     return (
         <>
             <div style={{ display: "flex", alignItems: "flex-start" }}>
                 <div style={{ width: 700, flexShrink: 0 }}>
-                    <CodeCaption delay={FILE_AT}>collections/orders.ts</CodeCaption>
-                    <Frame delay={FILE_AT + 4} style={{ marginTop: 12 }} bodyStyle={{ padding: "24px 28px" }}>
-                        {/* The generated lines recede only once the rule starts
-                            arriving — before that they are the whole file, and a
-                            file shown dimmed reads as disabled. */}
-                        <Code code={FILE} delays={delays} emphasise={frame >= ADD_AT ? ADDED : undefined} size={19} lazy />
+                    <CodeCaption delay={FILE_AT}>config/collections/orders.ts</CodeCaption>
+                    <Frame delay={FILE_AT + 4} style={{ marginTop: 12 }} bodyStyle={{ padding: "24px 28px 0" }}>
+                        {/* A window onto the file: it continues below the fold,
+                            and the fold fades. The generated lines recede only
+                            once the rule starts arriving — before that they are
+                            the whole file, and a file shown dimmed reads as
+                            disabled. */}
+                        <div style={{ position: "relative", maxHeight: 392, overflow: "hidden" }}>
+                            <Code code={FILE} delays={delays} emphasise={frame >= ADD_AT ? ADDED : undefined} size={17} lazy />
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    height: 90,
+                                    background: "linear-gradient(rgba(11,12,15,0), #0B0C0F)",
+                                }}
+                            />
+                        </div>
                     </Frame>
                 </div>
 
@@ -76,9 +108,9 @@ const RuleBody: React.FC = () => {
                 </svg>
 
                 <div style={{ flex: 1 }}>
-                    <CodeCaption delay={POLICY_AT - 4}>migrations/0004_orders.sql</CodeCaption>
+                    <CodeCaption delay={POLICY_AT - 4}>drizzle/policies.sql</CodeCaption>
                     <Frame delay={POLICY_AT} style={{ marginTop: 12 }} bodyStyle={{ padding: "24px 28px" }}>
-                        <Code code={POLICY} sql delay={POLICY_AT + 14} step={3.5} size={19} />
+                        <Code code={POLICY} sql delay={POLICY_AT + 14} step={3.5} size={16} />
                     </Frame>
                 </div>
             </div>

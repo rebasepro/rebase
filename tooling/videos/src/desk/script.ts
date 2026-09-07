@@ -22,7 +22,11 @@ import { TEMPO } from "./beats";
  * line is caused by the one before; no line contradicts its picture; no
  * line refers to Rebase Cloud; no slogans; nothing is singled out as free
  * because all of it is; and every claim is checked against the repo —
- * MIT, three commands, nine tables, three findings, the container image.
+ * MIT, three commands, nine tables, the container image — or captured from
+ * the tools themselves: the scan's nine findings and its clean report are
+ * rls-check's own output (windows/scan-output.ts), the terminal's lines are
+ * init's, push's and dev's, the file is the one introspection generates and
+ * the policy is the one push writes.
  */
 
 /** Nine frames a word — about 200 a minute — scaled with the tempo. */
@@ -33,9 +37,9 @@ export const DESK_NARRATION: { at: number; words: string[] }[] = [
     { at: 15, words: ["It's", "2026.", "Anyone", "can", "build", "a", "backend", "in", "an", "afternoon.", "But", "can", "you", "trust", "it?"] },
     // the evidence
     // reads the two windows: the agent's summary, then the scan's verdict
-    { at: 167, words: ["A", "coding", "agent", "built", "this", "one.", "It", "says", "it's", "done:", "auth,", "CRUD", "for", "nine", "tables,", "a", "REST", "API,", "deployed.", "And", "a", "ten-second", "scan", "of", "the", "same", "database", "finds", "two", "critical", "issues", "and", "one", "high."] },
+    { at: 167, words: ["A", "coding", "agent", "built", "this", "one.", "It", "says", "it's", "done:", "auth,", "CRUD", "for", "nine", "tables,", "a", "REST", "API,", "deployed.", "And", "a", "ten-second", "scan", "of", "the", "same", "database", "finds", "nine", "critical", "issues.", "Every", "table", "is", "open."] },
     // init
-    { at: 495, words: ["So", "you", "point", "Rebase", "at", "that", "same", "database.", "It", "reads", "the", "tables", "that", "are", "already", "there", "and", "writes", "a", "TypeScript", "file", "for", "each", "one.", "That's", "the", "whole", "setup."] },
+    { at: 495, words: ["So", "you", "point", "Rebase", "at", "that", "same", "database.", "It", "reads", "the", "tables", "that", "are", "already", "there", "and", "writes", "a", "TypeScript", "file", "for", "each", "one.", "That's", "the", "first", "command."] },
     // rule
     { at: 763, words: ["Access", "rules", "go", "in", "that", "same", "file.", "This", "one", "says", "customers", "can", "only", "see", "their", "own", "orders.", "It", "doesn't", "compile", "into", "middleware.", "It", "compiles", "into", "a", "Postgres", "row-level", "security", "policy,", "and", "the", "database", "enforces", "it."] },
     // push + rescan

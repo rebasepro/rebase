@@ -3,7 +3,7 @@ import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { beat, cameraAt, cameraStill, DESK, DESK_DURATION, windowOpacity } from "./beats";
 import { FLY_TO_CORNER } from "./Presenter";
 import { Title } from "./Title";
-import { AgentSession, ScanNote, ScanWindow } from "./windows/Hook";
+import { AgentSession, ScanWindow } from "./windows/Hook";
 import { RuleWindows } from "./windows/Rule";
 import { Shell } from "./windows/Shell";
 import { UsersWindows } from "./windows/Users";
@@ -53,7 +53,10 @@ const STUDIO = beat("studio");
    itself — these are its arithmetic (typing at 0.55 frames a character). */
 const SHELL_AT = INIT.start + 8;
 const PUSH_AT = PUSH.start + 14;
-const RERUN_AT = PUSH_AT + 8 + 40 + 4;
+/** The push output is nine lines, the last of them at +42; the scan re-runs
+ *  under it, then dev is typed once the clean report has settled. */
+const CD_AT = PUSH_AT - 36;
+const RERUN_AT = PUSH_AT + 56;
 const DEV_AT = RERUN_AT + 70;
 
 const Chroma: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -111,21 +114,23 @@ export const Desk: React.FC = () => {
                         x={200}
                         y={230}
                         at={FLY_TO_CORNER + 12}
-                        lines={["Anyone can have a backend by lunch.", "Nobody can tell you if it's safe."]}
+                        lines={["Anyone can build a backend", "in an afternoon.", "Nobody can tell you if it's safe."]}
                     />
                 </On>
                 <On beats={["hook", "init", "push", "all"]}>
-                    <AgentSession x={200} y={530} w={740} at={FLY_TO_CORNER + 18} />
-                    {/* Wide enough that the tool's own clean line — 70 characters
-                        of it — sits on one row at 18px. Wrapped, it read as two
-                        findings; wider, it ran under the presenter. */}
-                    <ScanWindow x={1010} y={530} w={820} at={FLY_TO_CORNER + 203} rerunAt={RERUN_AT} />
-                    <ScanNote x={1010} y={846} at={RERUN_AT + 70} />
+                    {/* The scan sits on the LEFT: its report is 72 columns wide
+                        and its summary line 77, and on the right that ran under
+                        the presenter's corner. The agent's session, whose lines
+                        are short, takes the right. 740 wide at 14px holds the
+                        widest line the tool prints, the 77-character summary. Timed so the tally prints
+                        under "nine critical". */}
+                    <ScanWindow x={200} y={540} w={740} at={FLY_TO_CORNER + 216} rerunAt={RERUN_AT} />
+                    <AgentSession x={960} y={540} w={620} at={FLY_TO_CORNER + 18} />
                 </On>
 
                 {/* ── (0,½) THE TERMINAL — init, then push, then dev ─── */}
                 <On beats={["init", "push", "all"]}>
-                    <Shell x={200} y={1000} w={1380} at={SHELL_AT} pushAt={PUSH_AT} devAt={DEV_AT} />
+                    <Shell x={200} y={1000} w={1380} at={SHELL_AT} cdAt={CD_AT} pushAt={PUSH_AT} devAt={DEV_AT} />
                 </On>
 
                 {/* ── (1,0) THE RULE — on the blue field ─────────────── */}
