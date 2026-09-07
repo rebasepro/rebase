@@ -3,7 +3,6 @@
 ## [Unreleased]
 
 ### Breaking
-
 - **`defineCollection` is one signature, and its errors land on the field.** It
   was three overloads — Postgres, Firestore, MongoDB — and when a call failed
   TypeScript emitted exactly one diagnostic, on `defineCollection(`, listing each
@@ -112,8 +111,62 @@
   `check:release-bump` now refuses a release that moves an `engines` field
   without saying so here.
 
-### Added
+- **`rebase.data` is gone at runtime, not only from the type.** `RebaseServerClient`
+  dropped `data` so the admin-scoped plane would have exactly one name and the
+  privilege would be visible at the call site — and the property was then left on
+  the object as a runtime alias, which defeats the point: untyped code could still
+  reach the privileged plane by the name that means *user-scoped* everywhere else.
+  It is deleted at boot; `rebase.data` is `undefined`. Server-side code says
+  `rebase.dataAsAdmin` when it means the admin plane and `context.data` when it
+  means the caller's. Eleven places in the prose across six locales taught the old
+  name, and the scaffold's always-on agent rule was `always use the SDK
+  (rebase.data.<slug>)` — the one accessor the server omits, in the file an
+  assistant reads before doing anything else.
 
+- **`@rebasepro/cli` publishes three exports, not ninety-five.** `src/index.ts`
+  re-exported sixteen modules — `initCommand`, `dbCommand`, the whole of
+  `commands/cloud`, `detectPackageManager`, `findProjectRoot` — and became an API
+  because it was published, not because anyone decided it should be one. Nothing
+  imported it: not this repository, not the control plane, which does not depend
+  on `@rebasepro/cli` at all. Three now, each with a reason: `entry`, because
+  `bin/rebase.js` cannot run without it, and the `manifest` and `bundle`
+  contracts, which are deliberately shared so a control plane can validate a
+  bundle with the code that produced it.
+
+- **Peer ranges are carets, and an open range is not a promise.** `app` and `cms`
+  moved to React 19.2.7 when react-router 8 made it mandatory; the five packages
+  they pull in — `ui`, `forms`, `firebase`, `plugin-insights`, `cms-types` —
+  stayed at `>=19.0.0`, a range whose lower half cannot satisfy the app depending
+  on them, so an installer picking 19.0.0 produced a tree that resolved cleanly
+  and broke at render. They are `^19.2.7` now. `>=19.0.0` also claims React 20
+  compatibility on behalf of a component library, which is precisely the claim
+  that turns out to be false. `@rebasepro/app`'s own `typescript` peer moves from
+  `>=5.0.0` to `^6.0.0`: `src/vitePlugin.ts` imports the compiler API to find the
+  callbacks block, which is a runtime import in a published package and not a
+  build-time convenience, and the plugin is written against TypeScript 6's
+  compiler API — `>=5` understates it in one direction and promises TypeScript 7
+  in the other, where that API no longer exists.
+
+- **`rebase cloud webhooks create` takes `--endpoint`.** `--url` names the control
+  plane for every command in this family — `resolveCloudUrl` reads it straight off
+  the raw line, ahead of the environment variable and the link file — and
+  `webhooks create` declared a second `--url` for the customer's endpoint. The two
+  parses are independent, so the documented example sent
+  `https://example.com/hook` to `requireClient` as the host to authenticate
+  against: the one command whose whole argument is somebody else's URL could not
+  run. A test now reads every `spec:` handed to `parseCloudArgs` and refuses any
+  key the global spec already covers, because that spec is spread over the globals
+  and silently replaces one.
+
+- **`serializeFilter` emits strictly.** The shared leaf encoder parses liberally,
+  because a short code arrives off the wire, and emits strictly, because a caller
+  handing one to the serializer built the condition by hand and should use the
+  spelling the types name. `serializeFilter({ a: ["gt", 5] })` throws rather than
+  round-tripping `gte`. This is the rule `serializeTuple` has always followed;
+  what changed is that `serializeLogicalCondition` no longer carries a second,
+  drifted copy of it.
+
+### Added
 - **`rebase db migrate --baseline <version>`** records a version as applied on a
   database that already carries the schema — every database Rebase has booted
   against does, because boot provisions the tables — so the first `db migrate`
@@ -178,7 +231,6 @@
   bucket a current CLI declared reached the platform as nothing; this is the test
   across that seam.
 
-
 - **`rebase db branch prune` — branching shipped with no cleanup story at all.**
   No TTL, no prune, no `delete --all`, and every branch is a full-size copy:
   `CREATE DATABASE ... TEMPLATE` duplicates the files on disk, so five branches
@@ -234,7 +286,6 @@
   a command that can copy in both directions eventually copies the wrong way, and
   the wrong way here is a laptop over production. The refusal points at `--from`.
 
-
 - **`rebase db branch switch` — branching stopped one step short of being a
   feature.** `create` copied a 12 MB database in 1.2s and then printed
   `Database: rb_feature_auth` and nothing else: there was no `switch`, no
@@ -258,7 +309,6 @@
   are on returns the checkout to the main database instead of leaving it aimed
   at a database that no longer exists.
 
-
 - **`policy.registered()`.** `POST /auth/anonymous` mints a real user row with a
   real uid, so a guest satisfies `policy.authenticated()` — which is the point
   of the feature, and also means "signed in" was true for anyone who pressed
@@ -273,38 +323,143 @@
   customer's `users` table readable by anyone who could sign up. It is a
   separate id from the anonymous finding on purpose: different severity,
   different fix, and `--skip` should be able to silence one without the other.
-- **In production, whoever registered first owned the deployment.** An empty
-  user table admitted the first registration and promoted it to admin — the
-  right rule for a laptop, and an open window on every host with a public
-  hostname, since the shipped artifacts bring DNS and TLS up before the
-  operator has typed anything. `GET /auth/config` advertised `needsSetup:
-  true`, so the unclaimed hosts were also easy to find. `POST /admin/bootstrap`
-  offered the same prize one request later, to the earliest-registered user.
+- **`get(id)` reads a row that is expected to exist.** `findById` returns
+  `M | undefined`, and it was the only way to read one row, so every caller had to
+  prove the row was there before touching a field — or reach for the `!` that
+  everyone reaches for instead. A row fetched by an id that came from a link, a
+  route parameter or another row is expected to exist: its absence is the error
+  case, not a value to thread through the rest of the function. `get(id)` returns
+  the row and throws `RebaseApiError` `NOT_FOUND` (404) when it is not there;
+  `findById` stays as the explicit maybe-form. Added in all three implementations
+  of the collection surface — the browser SDK, the offline wrapper, and the
+  server-side accessor behind `rebase.dataAsAdmin` and `context.data` — so the
+  shape of "it is not there" does not depend on who is asking.
 
-  The window now exists only outside `NODE_ENV=production`. In production an
-  empty table refuses the bootstrap registration with `SETUP_REQUIRED` and says
-  what to do instead, a first account created through open registration is an
-  ordinary account, `needsSetup` is never advertised, `/admin/bootstrap`
-  refuses, and boot warns when the table is empty and `REBASE_ADMIN_EMAIL` is
-  unset. The two ways in — the named admin seed (`REBASE_ADMIN_EMAIL` /
-  `REBASE_ADMIN_PASSWORD`, which every shipped blueprint already sets) and the
-  service key — are the ones nobody can race for. Development, `rebase dev`
-  and the test suites keep first-registration-is-admin.
+- **Anonymous sessions and MFA in the SDK.** `signInAnonymously()` mints a real
+  account — an id, roles, a session, and row-level security scoping its rows —
+  and `linkAnonymous(email, password)` promotes it in place, keeping everything
+  written as a guest. The MFA routes have been on the server since 0.16 with no
+  client method to reach them; enrolment, verification and the challenge step are
+  on `auth` now. Both pair with `policy.registered()` below: a guest satisfies
+  `policy.authenticated()`, which is the point of the feature and also the reason
+  a rule about somebody who can be held responsible needs its own predicate.
 
-- **`GET /api/functions` handed anyone the inventory of custom endpoints.**
-  Functions themselves stay anonymous-callable by default (a webhook receiver
-  has to be), but the listing now requires a resolved identity — a signed-in
-  user, an API key or the service key. `rebase cloud debug` already read a
-  401 there as "mounted".
+- **`channel.onError`, so a refused broadcast is not a delivered one.** A channel
+  frame is fire-and-forget, so a refusal about one matched no pending request, no
+  subscription and no channel: `CHANNEL_FORBIDDEN`, `RATE_LIMITED`,
+  `CHANNEL_HISTORY_WRITE_FAILED` and `CHANNEL_BUS_PAYLOAD_TOO_LARGE` all fell
+  through into a console warning while `await channel.broadcast(…)` resolved as
+  though the message had been sent. The missing piece was an address: the server
+  names the channel on a refusal about one, and the client routes it to the
+  channel's own handler.
 
-- **Two audit reports named internal infrastructure.** A private database
-  address and a cluster-internal service hostname in `docs/audits/` are
-  replaced with placeholders, and the webhook audit carries a dated status
-  line, since the SSRF guard it says does not exist has existed since
-  2026-08-08.
+- **`rebase doctor` checks the things that break a first run.** It compared three
+  descriptions of a schema, which is the right check for a project that works and
+  the wrong one for a project that has never worked — everything that stops a
+  first run happens before a table can be compared. Seven checks. Five need no
+  database and run first: the running Node against the range the CLI declares, two
+  lockfiles in one project, two collections claiming one slug, a `JWT_SECRET`
+  production will refuse to boot on, and the same `@rebasepro/*` package pinned to
+  different versions across a project's manifests. Two join the database phase:
+  pgvector missing where a `{ type: "vector" }` property needs it, and a schema
+  stamp that says this database was provisioned from different collections. An
+  environment error fails the command — a doctor that exits 0 over one is a doctor
+  nobody can gate on — and `.env` values are never echoed, because doctor's output
+  goes wherever a terminal goes.
+
+- **Studio's Logs Explorer can show you an error.** Its ring buffer was filled by
+  one request middleware and nothing else, so the panel rendered a wall of
+  `GET /api/data/posts 200 4ms` — every entry at `info`, whatever the request
+  answered — while every error, warning and boot diagnosis the server wrote went
+  to a terminal the person looking at the panel does not have. The request entry
+  now carries the status as its level, the collection, and the code and message
+  the error handler answered with; and `logger` gained a sink, teed into the ring
+  at warn and above with `source` read off the message's own prefix. Sinks receive
+  the message after redaction, never before.
+
+- **Studio speaks the seven locales the panel ships.** Every tool name, group
+  heading and description was an English literal in a panel that translates 900
+  other keys, so a German reader got a German drawer with an English half. 43
+  `studio_*` keys cover the eleven tools, the five groups and the refused and
+  empty states. **`devViews` adds a tool** rather than being discarded:
+  `RebaseStudioConfig` declared it and `RebaseStudio` destructured only `tools`,
+  then built its own list and registered that — so `<RebaseStudio devViews={[…]}>`
+  typechecked, registered nothing, and left no trace explaining why.
+
+- **A cron that will never fire is visible, and a timeout stops the work.** A
+  schedule the scheduler refused — six fields, copied out of a tool that supports
+  seconds, is the common one — was logged once at boot and then gone, and the job
+  is absent from `listJobs()`, so "my cron is missing" and "my cron will never
+  fire" were the same picture. `GET /api/admin/cron` now carries a `rejected`
+  array with the id, the schedule and the reason, counted into `skipped`. A job
+  may also declare a timeout, after which the run is abandoned and recorded as
+  such rather than holding its slot forever.
+
+- **Boot says where each backend option goes, and warns when it goes nowhere.**
+  Every backend page shows `initializeRebaseBackend({ … })`, and a managed
+  deployment has no such call — the runtime makes it, reading exactly four names
+  out of `config/index.ts`. Anything else was dropped in silence:
+  `export const storagePolicies` compiled, deployed, and did nothing. Boot now
+  warns when the config index exports an option the managed runtime cannot take,
+  and names where that option does belong.
+
+- **A successful `rebase cloud deploy` prints the URL it deployed to.** The one
+  thing the command was for was left to a second command. Resolved exactly as
+  `status` resolves it, so the two cannot disagree about the host, and
+  best-effort throughout: a control plane that does not report a base domain
+  prints no URL rather than a fabricated one.
+
+- **Fourteen `rebase cloud` groups gained the `--help` page the docs promised
+  them.** `login`, `logout`, `whoami`, `link`, `unlink`, `use`, `open`,
+  `rollback`, `cancel`, `start`, `stop`, `restart`, `metrics` and `resources` all
+  fell through to the index — a list of groups and not one flag — so
+  `login --password`, `link`'s positional URL, the `-y` that `stop` requires and
+  every resource dial had no discoverable spelling anywhere in the CLI. The pages
+  carry the units and ranges the dials take (`--db-mode shared|dedicated`,
+  autoscale 1–16, CPU target 10–95) and one sentence that keeps them honest: the
+  prices are the control plane's quote, not a number written here. Two tests hold
+  it, and `resources` joins the index it was missing from.
+
+- **A headless first run ends in a box.** `printSummary` waited for a frontend URL
+  before drawing anything, so a headless project — the shape whose whole first run
+  is `rebase dev` — got no summary at all, and the managed database's port is
+  derived from the project path, so nothing on disk said how to reach it. The box
+  is sized to its contents, names Swagger only when the backend says it mounted
+  it, and says why when it did not. **`rebase db url`** is the same answer outside
+  the banner: the resolved connection string on stdout and nothing else, so
+  `psql "$(rebase db url)"` works.
+
+- **The version handshake the compatibility matrix already described.** Three
+  documented signals had a receiver and no sender. `x-rebase-schema` has been
+  listed as "sent by the SDK" since the matrix was written and no client ever put
+  it on a request; the transport takes `schemaVersion` and sends it now.
+  `runtime.version` was published only on the admin-gated `/contract`, so the two
+  callers that need it — a CLI deciding whether it is too old, an SDK reporting
+  what it built against — could not ask; `/api/meta/schema-version`, which is
+  unauthenticated by design, carries it. And `rebase cloud` requests now send
+  `User-Agent: rebase-cli/<version>`, from a single `cliVersion()` replacing two
+  divergent copies that read the manifest by counting directories.
+
+- **`rebase skills install` has a target for every pointer file the scaffold
+  writes.** `rebase init` writes five instruction pointers and `skills.ts` knew
+  four agents, neither of which was Codex or Copilot — so a Codex user opened a
+  file their own scaffold had written, followed it to `rebase skills install`, and
+  got a prompt that did not list them. `codex`, `kiro` and `copilot` join the
+  list. **The MCP server can show the SQL before running it**: an agent asked to
+  change a schema had no way to say what the change would do, since `rebase db
+  push` printed the planned SQL only while refusing. `rebase_schema_plan` answers
+  that question on its own, and hands a destructive plan to a human rather than
+  approving it.
+
+- **`rebase cloud login` warns where the password just went.** A password written
+  as an argument is in the shell's history file and in the process table for as
+  long as the command runs, and neither is something this CLI can redact
+  afterwards. The flag stays — there is no machine token, so a non-interactive
+  login genuinely needs the password from somewhere — but it warns before the
+  request, not after, and names `REBASE_CLOUD_EMAIL` / `REBASE_CLOUD_PASSWORD` as
+  the route that does not touch the command line.
 
 ### Changed
-
 - **A bucket can be marked as the default, and the promotion that stands in for
   that says so.** `bucket("media", { default: true })` names the bucket that
   serves uploads which name no `storageSource`. A project of named buckets with
@@ -362,8 +517,102 @@
   narrow, so the left-to-right default pushed the graph off both sides on open.
   The machinery went with the buttons rather than being left behind.
 
-### Removed
+- **Saving a collection file is the first edit, and now that is what works.**
+  Adding a property while `rebase dev` was running produced the worst shape a
+  failure can have: everything looked right. tsx restarted the backend, boot's
+  additive ensure added the column, the panel showed the field — and the first
+  save of a row carrying it answered `400 VALIDATION_UNKNOWN_FIELDS: 'posts' has
+  no column 'subtitle'`, because the driver looks its columns up in
+  `backend/src/schema.generated.ts` and nothing had regenerated it. Four voices
+  told the reader four different things to do about it, and the one on screen
+  named `rebase db push` — which cannot run at all on the database a scaffolded
+  project uses, since Atlas diffs against a second empty database and PGlite
+  serves exactly one. The watcher does it now: the same idempotent
+  `ensureGeneratedSchema` call `dev` already makes at startup runs on a change
+  under `config/collections/`, and the box says what happened rather than what to
+  type.
 
+- **`--no-db` starts no database, including the managed one.** The flag gated the
+  branch that starts a docker-compose container and nothing else; the managed
+  PGlite starts on the other branch, in `prepareDatabaseEnv`, which was called
+  unconditionally. So on a scaffolded project — the one project shape where the
+  managed database is what you get — `rebase dev --no-db` wrote `.rebase/pglite/`,
+  started a daemon and served against it. Two reads of one flag are two things
+  that have to agree; there is one now. With no database prepared the backend is
+  left to fail on `DATABASE_URL: is required`, which is the failure the flag
+  exists to produce. The README and the Quickstart said `--no-db` meant "bring
+  your own", which described neither the old behaviour nor the new one: bringing
+  your own is setting `DATABASE_URL`.
+
+- **`rebase dev --docker` starts the container and reaches it.** The flag changed
+  a banner line and nothing else: the backend was spawned with no `DATABASE_URL`
+  at all, and the preflight that starts the container decided "local, and not
+  running" from a DSN it could not find in `.env`, so it returned before it ever
+  looked at `docker-compose.yml`. The URL is derived now — `composeDatabaseUrl`
+  reads the compose `db` service and interpolates `${DATABASE_PASSWORD:-changeme}`
+  the same way compose does, producing byte for byte the string `rebase init`
+  already writes into `.env` as the commented-out `DATABASE_URL`. A compose file
+  that cannot yield one is a `--docker` that cannot be honoured, and it says so
+  rather than falling back to `localhost:5432` and pointing the project at
+  whatever Postgres happens to be on the default port.
+
+- **Sixteen packages stop shipping their sources twice.** `files: ["dist", "src"]`
+  was justified by making stack traces and go-to-definition work for anyone who
+  installs the package. They already did: every `.map` under `dist` carries full
+  `sourcesContent`. So `src` was a second copy of the same bytes —
+  `server-postgres` 7.30 → 5.39 MB unpacked, `types` 1.35 → 0.84, `client` 1.28 →
+  0.87, `common` 1.09 → 0.76. The `"source": "src/index.ts"` field goes with it,
+  because it named a file the tarball no longer contains — from all twenty that
+  carried it, including the four (`cli`, `server`, `codegen`, `rls-check`) whose
+  `files` never listed `src` in the first place, so the pointer had been dangling
+  for as long as it had existed. `check:package-contents` refuses `src/` in a
+  tarball, so this cannot come back one manifest at a time.
+
+- **Every package is ESM-only, and now says so.** All 21 are `"type": "module"`
+  with no CommonJS build, which the README never stated —
+  `require("@rebasepro/client")` fails with `ERR_REQUIRE_ESM`, a message naming
+  the loader rather than the decision, and no configuration recovers it. Stated in
+  the README, and `@rebasepro/mcp` and `@rebasepro/rls-check` gain the `exports`
+  map their eighteen siblings have, so every file in them stopped being API by
+  default.
+
+- **One always-on rule for flat-layout agents, not 84,000 characters.** Cursor,
+  Windsurf, Kiro and Copilot load their whole rules directory into every request,
+  so installing 21 skills there put about 84,000 characters of Rebase reference in
+  front of every question a person asked those tools — whether or not the question
+  was about Rebase. An instruction an assistant skims is an instruction it does
+  not follow, so the effect of installing more was to make each skill count for
+  less. Those targets get one rule that points at the rest. `rebase-basics`, the
+  skill loaded for every Rebase task, was 929 lines, two thirds of them reference
+  material read once a month; it leads with the recipes now — the sequence for
+  adding a collection, a function, a rule — and keeps the tables behind them.
+
+- **`rebase init` asks npm once for a version it already knew.** Every
+  `@rebasepro/*` package in this repository ships at one version, and
+  `check:publishable-set` fails the build on the first PR after a bump if any of
+  them drifts — so the version to pin was decided before `init` touched the
+  network: it is the CLI's own. Asking the registry once per package bought
+  nothing but eleven chances to hang, and offline it was eleven timeouts ending in
+  a fallback to `"latest"`, the one answer that scaffolds a project mixing
+  framework eras. One call remains, to `@rebasepro/server`, because lockstep is
+  enforced in the repository and not on the registry — a release can still leave a
+  package behind, which is what happened to `@rebasepro/agent-skills` across three
+  of them. A registry it cannot reach is not a release gap: it prints what it
+  pinned and why and carries on.
+
+- **The scaffold's toolchain catches up with the runtime it targets.**
+  `@types/node` was `^20` in all four scaffold manifests while `engines.node` says
+  22.22, so a new project typechecked against the standard library of a runtime it
+  refuses to run on. `backend/tsconfig.json` shipped `moduleResolution: "node"` —
+  TypeScript's node10 algorithm, which does not read `exports` maps — while its
+  `config/` sibling, whose sources the same program includes, has always used
+  `bundler`. And dotenv was pinned a major behind every package in this
+  repository, so a scaffolded project loaded `.env` through a different major than
+  the CLI and the runtime do. `check:templates` now asserts the tsconfig it
+  compiles with is the one the template ships, instead of proving the templates
+  work under a setting they do not carry.
+
+### Removed
 - **`loadDeclaredStorageSources`** (`@rebasepro/server`), **`normalizeStorageSources`**
   and **`DeclaredStorageSources`** (`@rebasepro/types`). All three served the
   `storage` block of `rebase.json`, which the manifest validator now refuses:
@@ -373,8 +622,38 @@
   a breaking change is just a change — the runtime contract stays at 1, as it did
   for the declaration change itself.
 
-### Fixed
+- **`basePath` and `baseCollectionPath` on `<Rebase>`.** Declared on
+  `RebaseProps`, documented as "URL prefixes when the admin is not at the site
+  root", and never destructured in `Rebase.tsx`. Setting either did nothing at
+  all, and the symptom of getting the prefix wrong is a collection view that hangs
+  on a spinner — so the reader who reached for the documented prop got exactly the
+  failure the prop claimed to prevent, with no way to tell it had been ignored.
+  The sub-path recipe is `apps.admin.path` in `rebase.json`, which `rebase build`
+  already supplies.
 
+- **`UIReferenceView`, `UIStyleGuide` and `CrmDashboardDemo` leave
+  `@rebasepro/app`'s barrel.** A file that renders every component in the kit, a
+  token sheet, and a fake CRM with its sample data, in the bundle of every
+  consumer who never opens them — and `RebaseRouteDefs` hardcoded `/debug/ui`, so
+  the whole reference was a static dependency of the admin's route table.
+
+- **Four agent-launcher manifests that nothing could install.**
+  `tooling/rebase-agent-skills/` carried a Claude plugin, a Cursor plugin, a
+  Gemini extension and a Kiro power; every one of those installers reads its
+  manifest from a *repository root*, and these sat five directories down in a
+  monorepo. `files: ["skills/"]` kept them out of the npm tarball as well, and
+  they were pinned at `version: 1.0.0` against a package at 0.17.3.
+
+- **`pnpm.onlyBuiltDependencies` from `packages/cli`.** It is honoured at the
+  workspace root only, so it did nothing there — and it was published to npm as
+  part of the manifest. Worse than inert: it listed `esbuild`, which the workspace
+  root deliberately sets to `false` under a docblock explaining that esbuild's
+  postinstall swaps its JS shim for a native binary and leaves every
+  `pnpm exec esbuild` dying on `SyntaxError: … ELF`. The one setting that would
+  have mattered if pnpm ever started reading it was the one that would have
+  reintroduced a build failure the repository had already diagnosed.
+
+### Fixed
 - **The `database` resource kind could not load beside a driver published before
   0.17.2.** `optionKeys` gained `"extensions"` in the literal itself, and a kind
   literal that has shipped is a wire contract: every published driver inlines
@@ -426,7 +705,6 @@
   field the containers it matches actually emit, and that every
   `${log.extracted_label.…}` in a notification is a label some condition
   extracts.
-
 
 - **A collection routed to a second database got its table in the first.**
   Provisioning filtered collections by *engine*, so `dataSource: "analytics"` on
@@ -488,7 +766,6 @@
   functions that run at boot — rather than from a second implementation of what
   "configured" means, which would eventually reassure someone about a deployment
   that is about to refuse to start.
-
 
 - **A second collection claiming the same `slug` or table was dropped without a
   word.** `CollectionRegistry` registers by slug and by table name, and returns
@@ -658,7 +935,6 @@
   connected. The failure now lists the sessions by `application_name`, and
   `--force` disconnects them for you, on create and delete alike.
 
-
 - **Creating a user in the panel never showed the temporary password.** The
   server mints one, returns it beside the columns on the create response, and
   will not repeat it; the dialog that shows it to the administrator was
@@ -675,7 +951,6 @@
   Unfeigned and Edith cards because the carousel builds its keys dynamically
   and the sweep only saw literal `t("…")` calls. The four locales get their
   copy back, and the built page no longer carries `alt="undefined …"`.
-
 
 - **`rls-check` reported clean on a table the whole internet could read.** The
   `policy-anonymous-tautology` check bailed out whenever it saw the literal
@@ -777,8 +1052,456 @@
   `^0.2.9` floated to 0.2.11, which demands `pglite-pgvector` 0.0.9 while the
   CLI asked for 0.0.7. The family is pinned exactly.
 
-### Security
+- **`rebase --debug db branch switch feature` reported success and left the
+  checkout on the main database.** `switch` writes a per-checkout pointer the CLI
+  owns, and the dispatch found the word at `rawArgs.slice(2)[2]` — which assumes
+  nothing precedes the command words. `--debug` is what `bin/rebase.js` prints
+  after every failure as the thing to re-run with, so it is the likeliest token to
+  precede them. The command missed the CLI's branch, went to the driver, and came
+  back reporting success; every later `dev`, `push` and backup then ran against
+  the wrong database believing it was the branch — the exact failure branching
+  exists to prevent, announced as a success. Same class, swept:
+  `refuseAtlasOnManagedDatabase` and `refuseBranchOnManagedDatabase` read the
+  domain at a fixed index and stopped refusing, and the driver reads its domain
+  out of `args[0]`, so `rebase --debug db push` answered "Unknown domain command:
+  --debug". A leading flag is moved after the command words rather than dropped —
+  dropping is the same bug facing the other way, and it would lose
+  `--database-url` in silence.
 
+- **`rebase db backup list` created a backup.** `list` was a positional the local
+  command parsed permissively and never read, so the wrong guess wrote a dump
+  instead of reading one and left a file retention then has to reason about — while
+  `rebase cloud db backup list` did what it says. Both spellings list now. In the
+  same shape: `--output` is canonical and `--out` is the alias `build` and
+  `cloud env pull` already carry, but `db backup` took only `--out` and
+  `generate-sdk` only `--output`, so the wrong one was silently discarded and the
+  default path used.
+
+- **A misspelled flag is an error, not a silently discarded value.**
+  `arg(…, { permissive: true })` does not relax parsing — it moves an undeclared
+  flag into the positionals, and nothing on these command lines reads a positional:
+
+  ```
+  rebase db push --alow-destructive     pushed with the destructive gate shut
+  rebase schema generate --ouput x      wrote the default path, in silence
+  rebase generate-sdk --ouput ./sdk     same, and the next build imported it
+  ```
+
+  One spec per command in `cli-flags.ts`. The driver keeps its check at its own
+  entry point rather than in those parsers, which is load-bearing: `db push` and
+  `db generate` re-enter the schema and DDL generators with the *db* line, so a
+  strict parser inside either would reject `--allow-destructive` on a line where
+  it is correct.
+
+- **`rebase schema generate --help` regenerated the schema.** `cli.ts` rewrote the
+  subcommand to `--help` only when the user named none, so the flag travelled into
+  the driver, whose `schemaCommand` has no `--help` case, and it ran the generator
+  — overwriting `src/schema.generated.ts`. `introspect --help` rewrote the
+  collection files. It also hit `requireProjectRoot` first, so
+  `rebase schema introspect --help` in an empty directory exited 1 with "Could not
+  find a Rebase project root": help you cannot read until you already have a
+  project. Answered before the root lookup and before the spawn now, with a page
+  per subcommand, and the driver keeps its own second line of defence because it
+  is spawnable on its own.
+
+- **A mistyped command answers in one line, with the correction.** Six families
+  each answered a mistyped subcommand differently, and five of them dumped the
+  whole help afterwards — which pushes the line that says what happened off the
+  top of a CI log. `telemetry` printed only the help, so a typo was
+  indistinguishable from `rebase telemetry --help`. None offered the correction,
+  which for a typo is the entire answer. One helper now: the near miss when there
+  is one, where to read the rest, on stderr, exit 1 — Damerau-Levenshtein because
+  a transposition is the commonest typing error and plain edit distance scores it
+  2, a tight budget because `push` and `pull` are two edits apart and one is the
+  destructive neighbour of the other, and an abbreviation completes only when it
+  names exactly one command, so `res` never picks between `reset` and `restore`.
+
+- **The top-level help lists the commands that were only in the source.**
+  `db pull`, `db stop`, `db reset`, `db branch` and `schema stale` all worked and
+  appeared in no help page anywhere — and those are the recovery commands, the
+  ones you go looking for at the moment you are least able to go source-diving for
+  them. The guard reads the commands out of the dispatch — the `case` labels, the
+  subcommand comparisons, and the driver's own `VALID_ACTIONS` — so a command
+  added without a help line is a test failure.
+
+- **`bin/rebase.js` stopped colouring pipes, and a typo stopped offering a stack
+  trace.** Its three stderr writes happen before the bundle is imported, so they
+  never went through chalk and hard-coded `\x1b[31m`: the escapes landed in every
+  redirect, every CI log and every agent reading a failed command. Now `NO_COLOR`
+  / `FORCE_COLOR` / `isTTY`, the same three chalk honours. And a usage error no
+  longer ends with "Re-run with `--debug` for the stack trace" — the stack points
+  at the argument parser, and the suggestion is to add another flag to the command
+  line we have just established is the problem.
+
+- **A child process that never started said nothing at all.** `schema.ts` and
+  `doctor.ts` ended their spawn in `catch { process.exit(1); }` — the error not
+  even bound — so `rebase schema generate` against a broken tsx exited 1 with no
+  output, and so did `rebase doctor`, whose entire job is to say what is wrong.
+  `db.ts` was supposed to be the model and had the same hole for a subtler reason:
+  it filtered execa's message with `/Command failed|exited with code/i`, and execa
+  prefixes every failure that way — including the spawn failures the filter was
+  written to let through. A child that ran has a numeric `exitCode` or a signal; a
+  child that never started has neither. One helper, that rule.
+
+- **Six commands had three wordings for "dependencies are not installed", and none
+  of them said what to run.** "Could not find CLI entry point for
+  @rebasepro/server-postgres", "Could not find tsx binary", "Could not find tsx
+  binary for backend" — all three mean `node_modules` is missing, and all three
+  read as Rebase being broken. Now: "Dependencies are not installed — run `pnpm
+  install` in <root>", with the package manager taken from the project's lock file
+  and the directory named, because the working directory is usually `backend/` or
+  `frontend/` where the install would create a second, wrong `node_modules`.
+
+- **Six things a first run showed you, and none of them were true.** `--yes` says
+  no to git init and to installing, which is the right behaviour for CI and the
+  opposite of the interactive defaults, and `--help` now says so rather than
+  leaving the reader to discover it from an empty `node_modules`. Offline, every
+  version lookup failed and the release-gap refusal fired — "Rebase X is not fully
+  published to npm … not a problem with your machine, your network, or your
+  package manager" — when every package being unreachable is exactly a
+  connectivity failure. `index.html` linked a `/favicon.ico` that the template
+  does not ship and declared it `image/svg+xml`, so every first page load logged a
+  404. `generated/` is written by `rebase generate-sdk` and is now ignored, since a
+  committed copy is stale the moment a collection changes. The summary box named
+  the admin URL and not the API, which is what every SDK client, curl and Swagger
+  link needs, and the two ports are derived separately so one is not derivable
+  from the other. And `rebase.json` spelled `npm run build --workspace frontend`
+  in a pnpm project; `init` rewrites it from the detected manager.
+
+- **A warning that was always there.** Every first `rebase dev` on a fresh project
+  warned that `.env`'s `PORT` and `VITE_API_URL` were being ignored — about a file
+  the developer had not opened yet, and both halves were wrong. `PORT=3001` is
+  copied verbatim out of the scaffold's own `.env.example`, so a value equal to
+  the scaffold's default was written by the scaffold, not chosen by anyone.
+  `VITE_API_URL=` ships empty and should never have been named at all: the reader
+  was `^\s*KEY\s*=\s*(.+?)\s*$` with `/m`, and `\s` matches a newline while `$`
+  matches at every line end, so the leading `\s*` ate the line break and the
+  capture returned the *next* line. An empty variable read as whatever was written
+  under it. `readEnvValue` matches horizontal whitespace only.
+
+- **`--no-install` was in both the README and the Quickstart, and was not a flag.**
+  `arg` has no negation, so the second half of `--install` / `--no-install` was not
+  "the default, redundantly stated" — it was an unknown option, and
+  `rebase init app --yes --no-install` exited 1 on a line copied straight out of
+  the docs. It is an explicit "no" now: it suppresses the interactive install
+  question too, and wins over `--install` when both are passed. And **the example
+  script the scaffold ships is a script that runs** — `scripts/example.ts` is in
+  the base template while its runner and every one of its imports were in the baas
+  overlay only, so in the default scaffold `pnpm example` was a script that did
+  not exist.
+
+- **A boot failure names the database, the port and the reason.** `loadBootEnv`
+  restates a `ZodError` as a list of variables to fix, and its "this one is simply
+  missing" branch tested `issue.message === "Invalid input"` — zod 3's wording.
+  Under zod 4 the message carries the types and the `received` field is gone, so
+  nothing had matched since the upgrade and the friendliest line in the boot
+  output was the validator's own, verbatim. Alongside it: a failed connection now
+  says which database, on which port, and why, and `rebase dev` says which port
+  was already in use and which one the server moved to — and says when the backend
+  died, instead of leaving "Press Ctrl+C" on screen against a process that is
+  gone.
+
+- **A 404 on a row says which row, and names row-level security.** "Entity not
+  found" was the entire message on five routes. It does not say which collection,
+  which id, or — the part that costs the most time — that a row can be present and
+  invisible: authenticated requests run as a restricted role, so a `SELECT` policy
+  that excludes this caller produces exactly this 404. Somebody checks whether the
+  row exists, finds it in psql, concludes the API is broken, and spends the
+  afternoon in the wrong file. The collection and the id are both in the URL the
+  caller just sent, so naming them back reveals nothing.
+
+- **Five more messages that named nothing.** "Parent table not found" appeared
+  four times in `RelationService` naming neither the collection nor the table,
+  and the absence has two causes worth telling apart — the collection is not
+  exported from `config/collections/index.ts`, or the generated schema predates
+  it. "Junction table not found: <name>" had the name and not the diagnosis.
+  "Default driver not initialized by bootstrappers" left the reader's next
+  question — which one — unanswered, and in a multi-source configuration that is
+  not obvious. `serve-spa.ts` keeps its bare `Not found` bodies: two of the three
+  are a forbidden path answered as a missing one on purpose.
+
+- **One log line per failed request, carrying the user and the collection.** A
+  failure produced two lines, each holding half of it: the error handler had the
+  code and the diagnosis and nothing about who asked, and `requestLogger` had the
+  user, the status and the latency and nothing about what went wrong.
+  Correlating them meant matching on the request id, for twice the volume and less
+  than one line's worth of meaning. The handler leaves its half on the context
+  and stays quiet wherever a request line is coming; where nothing claimed one —
+  a project mounting routes onto its own Hono app — it still speaks.
+
+- **`LOG_LEVEL=warn` silenced every `console.log` in the process.**
+  `utils/logging.ts` reassigned `console.debug`, `console.log` and `console.warn`
+  to no-ops, irreversibly, because the originals were discarded rather than saved
+  — so a line that ships in the scaffold's own `.env.example` muted a dependency's
+  output, the project's own debugging, and any CLI report running in the same
+  process. Deleted. The structured logger is the only level authority now: it
+  filters its own lines and touches nothing else, and the level is read per line
+  rather than captured at construction, since the singleton exists from the first
+  import, long before any project configuration has been read.
+
+- **The root app answers the JSON envelope when anything throws**, so a failure
+  before the API router — a body too large, a malformed URL, a middleware fault —
+  stops arriving as Hono's own HTML. And **a failed write keeps the SQLSTATE that
+  says why it failed**: drizzle's `err.message` is `Failed query: <sql>` and not
+  one word of Postgres's answer, which sat in `.cause` and was discarded, so four
+  unrelated write failures read identically.
+
+- **`rebase doctor` no longer ends when it cannot reach the database.**
+  `checkCollectionsVsDatabase` threw, the error escaped `runDoctor`, and the CLI's
+  last-resort catch printed "Doctor failed" over a drizzle stack — so the two
+  phases that need no database at all, the generated schema and the SDK types,
+  never ran. The database phase is a skipped phase with the boxed diagnosis above
+  it now, and the run continues to the verdict. `blocked` separates the two ways a
+  phase can be skipped, because "you did not set `DATABASE_URL`" is a situation
+  somebody may be content with and "the `DATABASE_URL` you set refuses
+  connections" is not — the report renders them identically and the exit code does
+  not, or `rebase doctor` goes green in CI against a database it never reached.
+
+- **The dev secrets were called ephemeral when they were not.** A generated
+  `JWT_SECRET` is written to `.env` and survives every restart; boot announced it
+  as regenerated each time, which is the one property that decides whether
+  yesterday's tokens still work.
+
+- **`CORS_ORIGINS` is read in development too.** `resolveCorsOrigin` returned
+  early outside production and never looked at the allow-list, so the variable did
+  nothing in the environment where it is most often needed: a phone on the LAN, a
+  colleague's machine, an ngrok tunnel, a forwarded Codespaces port — every one is
+  a non-localhost origin, every one was refused, and the variable that names the
+  fix had no effect on it. Development allows localhost plus the list now.
+
+- **Nine places the SDK envelope and its unwrapping disagreed with themselves.**
+  `RebaseApiError` now carries `requestId` and `retryAfterSeconds` — both were on
+  the wire and dropped, so a bug report could not quote the one string that finds
+  the server-side line and the offline queue's backoff ignored a server that had
+  said exactly how long to wait. The auth middlewares answer through
+  `errorHandler` instead of seven near-copies of the envelope written by hand, and
+  the handler is *called* rather than thrown to, because `defineFunction` hands
+  users a Hono app and a throw with no `onError` at the mount point is a 500 where
+  a 401 was meant. `client.call()` returns the body verbatim like
+  `functions.invoke()`, instead of unwrapping a top-level `data` key and making
+  the documented shorthand return a different value. A second `.where(or(…))` now
+  ANDs with the first instead of replacing it — it was the one call on the builder
+  that made a query match *more* rows. `update()` takes `WriteOptions`, on the
+  verb where a lost response is most likely to be retried into a second applied
+  edit. And the dead `collection_patch` handler is gone, with its own drifting
+  copy of the cache-merge rules.
+
+- **`page` and `offset` are validated, like `limit`.** A negative or non-numeric
+  value reached the query builder, where it became either a Postgres error about
+  a bound parameter or a silently wrong window.
+
+- **`count()` de-duplication is per client, not per process.** The in-flight map
+  was module-level and keyed on a path plus a query string, which says nothing
+  about *who* is asking — so two clients in one process counting the same
+  collection shared a single request and the second was answered with the first
+  one's total. That is not a stale number, it is somebody else's: row-level
+  security makes an admin panel's count and a signed-in user's count of the same
+  collection genuinely different answers.
+
+- **The server being down is a `RebaseApiError` too.** The class's own docblock
+  says a `catch` block only ever needs to check for this one class, and it did not
+  cover the failure every app meets first — a refused connection, a DNS failure,
+  CORS, an abort — which came out as whatever the runtime's `fetch` felt like
+  rejecting with. `e.status` and `e.code` were undefined on the error most likely
+  to have a branch written for it.
+
+- **The fluent builder takes what `find(params)` takes.** Two spellings of one
+  API, and the chainable one was a subset, so a caller who started with `.where()`
+  discovered it could not express the query the object form could. Every gap was
+  documented, worked over HTTP, and was a compile error on a generated SDK — which
+  is to say on every project that took the trouble to be typed. **`listen`,
+  `listenById` and `count` are part of the contract**, not optional members:
+  optionality was answering two questions at once, the SDK landing page's own
+  Quick Example did not compile under `strictNullChecks`, and the realtime page
+  had to write `.listenById!(`.
+
+- **One leaf encoder for filters, so a group means what it says.**
+  `serializeLogicalCondition` carried its own copy and the copy had drifted from
+  `serializeTuple` on every rule the top-level codec had already been fixed for.
+  Each divergence is a filter that runs, returns rows, and answers a different
+  question than the one asked, with no error anywhere: `null` went out as the
+  four-character string, so `deleted_at.eq.null` was a 500 on a timestamp column
+  and silently the wrong rows on a text one.
+
+- **An `afterRead` that returns nothing no longer erases the row.** The collection
+  tier fell back with `?? fetched` and the global and property tiers did not — so
+  the same callback, one that mutates `row` and returns nothing, worked when
+  registered on a collection and replaced every row with `undefined` when
+  registered globally. Three call sites, one per read path.
+
+- **A `beforeDelete` that returns `false` answers 403, not 204.** It is typed
+  `boolean | void` and documented as "return false or throw to block deletion".
+  Returning `false` did stop the delete — and the route then answered `204 No
+  Content`, which means the row is gone: the panel removed it from the list,
+  clients dropped it from their caches, and the next reload brought it back. A
+  veto that reports success is worse than no veto.
+
+- **A write from an `afterRead` is a 409 that names the callback.**
+  Request-scoped reads open their transaction `READ ONLY`, so a write from an
+  `afterRead` — or from anything it calls — is refused by Postgres with SQLSTATE
+  25006, and that arrived as `500 Internal Server Error`, which reads as the
+  database being down rather than as the reader's own code being refused. 25006
+  maps to `409 READ_ONLY_TRANSACTION` now.
+
+- **`afterSaveError` gets the error.** `AfterSaveErrorProps` never declared it and
+  neither driver passed it, so the handler the guide has always shown compiled and
+  logged `undefined`. The caller's real `id` comes with it (it was the string
+  `"unknown"`) and so do the `previousValues` the pre-write read already had (they
+  were hardcoded `undefined`, hiding an update's before-state).
+
+- **`rebase.email` is there even when nothing configured mail.**
+  `RebaseServerClient` declares `email: EmailService`, not optional, and the
+  property was simply absent whenever the backend booted without `auth.email` — so
+  a cron or a custom function written against the type compiled, deployed, and
+  died on "Cannot read properties of undefined (reading 'send')", a stack trace
+  about a language feature rather than about the thing nobody set up. A stand-in
+  is always attached; its `send()` throws a sentence naming `SMTP_HOST`,
+  `auth.email` and the dev sink, and `isConfigured()` is false.
+
+- **`rebase dev` watches the directories the runtime scans, not only what it
+  imports.** tsx restarts on a change to something the entrypoint imported;
+  functions and crons are not imported, because the runtime scans their
+  directories at boot. So a new `backend/functions/new.ts` written while
+  `rebase dev` ran stayed 404 until somebody restarted by hand, and a new cron
+  never registered at all.
+
+- **`loadEnv({ extend })` refuses a schema built by another copy of zod.** A
+  managed bundle that installed its own zod ran with two copies loaded, `.merge()`
+  accepts the schema because the shapes are identical, and `.parse()` then rejects
+  every field carrying a `.default()`, because a default is recognised by class
+  identity. The deploy came up, reported success, and ran zero crons — and nothing
+  in the failure mentioned zod. It is refused by name now, with the remedy.
+
+- **The RLS editor saves through plan/apply, like everything else.** Two doors
+  onto one file, behaving differently: editing a policy in the collection editor
+  planned the change, showed the SQL, asked, and applied it, while editing the
+  same policy in the RLS editor POSTed the rules to
+  `/schema-editor/collection/save` and stopped — the source changed, nothing said
+  what the change implied, and the database was left to a later `db push`. A
+  policy declared and not enforced is the worst thing this editor can produce, and
+  it was what it produced by default.
+
+- **A refused listing is not an empty one.** Backups, Cron Jobs, API Keys and
+  Branches each caught a failed list, opened a snackbar, and left their list
+  empty. Four seconds later the toast was gone and the screen read "No backups
+  found yet", "No Cron Jobs Registered", "No API keys yet", "No branches yet" —
+  statements about the project, made on the strength of a request the caller was
+  refused. Anyone arriving after the toast was told a database with backups has
+  none. In the same pass: **the schema visualizer stops waiting for collections it
+  has** — `undefined` is the Studio bridge before the admin's registry has
+  registered itself and waiting is right, `[]` is that registry saying there is
+  nothing to draw, and a project that declares no collections sat on "Loading
+  schema…" for as long as anyone left it open — and **the empty states name things
+  the reader can actually find**, rather than a `docs/backups.md` path that exists
+  in this repository and in nobody's project.
+
+- **Core hooks say which provider is missing.** Five contexts defaulted to
+  `{} as Whatever`, a lie the type system agreed with: `useData()` called outside
+  `<Rebase>` returned an empty object and the failure surfaced one call later as
+  "data.collection is not a function" inside some component's render — no hook
+  named, no provider named, and a stack pointing at the wrong line. They default
+  to `null` now and each hook throws with both names.
+
+- **The demo's `useAuth` flashed signed-out on every reload.** `getSession()` is
+  synchronous, and in cookie mode a restore is always a round trip — the refresh
+  token is in an `HttpOnly` cookie the page cannot read — so reading it on the
+  first render answers `null` whether there is a session or not. The hook awaits
+  `client.auth.isInitialized()` now, which is the pattern the docs show.
+
+- **`rls-check` stopped hiding what a scan did not cover.** A `--role` that is not
+  in `pg_roles` was dropped, so a typo did not widen the scan and get noticed — it
+  narrowed it, and every check gates on a grant to an exposed role, so the run
+  printed a clean report of a database nobody looked at. It is exit 2 now, naming
+  the role. And **a keyword connection string reaches the host it names**: `pg`
+  cannot read the libpq keyword form, so `host=127.0.0.1 port=1 …` connected to
+  the default host while the error named `127.0.0.1:1` — a failure reported
+  against a host the scan never went near. The keywords are translated into
+  explicit `Client` options, and the ones that cannot be expressed are refused
+  rather than dropped.
+
+- **Six MCP errors an agent could not act on.** `fetch failed` is what Node says
+  when nothing is listening, and on its own it names no host, no port and no next
+  step — nine times out of ten the situation is that `rebase dev` is not running,
+  and the agent holds the tool that starts it. Connection errors now carry the URL
+  that was tried and the command that fixes it. **The environment block outranks
+  the persisted registry**: `REBASE_PROJECT_DIR` / `REBASE_BASE_URL` /
+  `REBASE_API_TOKEN` seeded the `default` project exactly once, on the first start
+  that found no `~/.rebase/projects.json`, so the block a person had just written
+  into `.mcp.json` was dead — pointing it at a second project kept talking to the
+  first, and nothing anywhere said so. And the package's npm landing page told its
+  reader to run `npx rebase-mcp` — the unscoped name on npm belongs to somebody
+  else, so the documented first command fetched and executed a stranger's code.
+  `check-doc-commands.mjs` has caught this class since it was written;
+  `packages/*/README.md` was simply never in its globs.
+
+- **Eleven claims in the agent skills that the code contradicts.** A doc a person
+  reads wrong costs them a minute; a skill an agent reads wrong becomes code.
+  `rebase-api` gave the list default as 20 and the ceiling as 100 — they are 50
+  and 1000, and asking for more is a 400 rather than a clamp, so an agent paging
+  by 100 got 50 rows and reported a short table as complete. The user tools take
+  `uid`, not `userId`, which is what the input schema declares and what the
+  handler reads. `rebase-basics` opened with two prerequisites that do not exist —
+  sign in to Rebase Cloud, then pick a project with `list_projects` — and there is
+  no `list_projects` tool, the MCP server has never read `tokens.json`, and it does
+  not talk to Rebase Cloud at all, so an agent following the first section was
+  stopped at step two by a login that cannot succeed. A gate now checks the class.
+
+- **`rebase cloud rollback` refused every managed project.** `isRollbackable`
+  required an `imageUrl`, and a managed deploy publishes none — the platform image
+  is the platform's half of the runtime and the customer's half is the bundle. So
+  the refusal fired locally, before the server was ever asked, and told the owner
+  of a managed project that no image was recorded when one never could have been.
+  The rule is the backend's `rollbackTargetOf` now: successful AND (image OR
+  bundle).
+
+- **A mistyped `rebase cloud` action ran the group's default.** Four groups are
+  written as a chain of `if (action === "x")` with the listing at the bottom, so a
+  word matching nothing fell through to it: `storage creat` listed the buckets and
+  exited 0, `clusters verifyy` listed the clusters, `resources et --cpu 500m`
+  printed the dials it was asked to change. Reporting a typo as a successful run
+  of a different command is worse than an error. Each group declares the words it
+  dispatches now, and the rest are refused before the client is built. Relatedly,
+  four groups answered a mistyped action with `{"error":{"code":"error"}}` — an
+  envelope whose only machine-readable field is the word "error" — and all of them
+  answer `unknown_command` now; and **`billing --help` names the actions billing
+  dispatches**, having documented `portal` and `usage` against a dispatch that
+  answers `setup` and `checkout`, so both documented words fell through to the
+  default and printed the billing account instead.
+
+- **A piped `rebase cloud <group> --help` said something different from the
+  terminal page.** Eight group pages existed twice — a hand-formatted template
+  literal for a terminal, and a bare list of action words for everything else — so
+  piped, `env --help` answered
+  `{"command":"env","actions":["list","set","unset","reveal","pull"]}`: no
+  descriptions, no flags, and not the paragraph about build-time variables that is
+  the reason the page exists. This family latches JSON mode off a TTY, so that was
+  every scripted and every agent-driven read of it. One description, rendered
+  twice. `REBASE_JSON=0` is honoured, having been tested against the literal "1"
+  so that "0" fell through to the TTY test and set the mode anyway. And **the
+  index lists each group once, from one list** — `clusters` appeared twice under
+  two different descriptions, because the page was a hand-formatted literal
+  sitting beside the array that fed the JSON form with nothing relating the two.
+
+- **`rebase cloud deploy` asks about the card before the build, not after the
+  upload.** The first deploy of a project needs a payment method on the
+  organization, and nothing said so until the control plane answered 402 — which
+  on the managed path arrives last, after a type-check, a build, a pack and an
+  upload whose only product was a discarded tarball. The check refuses in one
+  direction only, on a positive "no card on file", because two of the server's
+  skips are invisible from here; every answer this client cannot get proceeds and
+  lets the server decide.
+
+- **The "you are not linked" hints named a command that does not exist.** Three
+  messages ended with `rebase link <url>`, and `cli.ts` dispatches `cloud` — the
+  link lives inside that family. So `rebase apps config backend` on an unlinked
+  checkout, and both of `generate-sdk`'s unlinked paths, answered "what do I run
+  now?" with something that exits 1, at exactly the moment somebody is stuck. A
+  test now sweeps every `rebase <word>` the CLI quotes at a reader and holds the
+  first word to the dispatch list — `check-doc-commands.mjs` does this for the
+  markdown, and nothing did it for the strings the CLI prints, which are read more
+  often because they arrive when something has gone wrong.
+
+### Security
 An external audit of the framework and Rebase Cloud on 2 September 2026. Every
 item below was reproduced before it was fixed. Read the first one if you read
 nothing else: it is the only one that can have been silently true on a
@@ -927,7 +1650,6 @@ deployment you already run.
   tooling. Both raised, with `browserslist` alongside them.
 
 ### Documentation
-
 - **The branching page promised three things the feature does not do.** It said
   the CLI updates your local development configuration when you create or switch
   to a branch — there is no `switch`, and `create` leaves `.env` byte-identical.
@@ -939,7 +1661,6 @@ deployment you already run.
   `CREATE DATABASE ... TEMPLATE` writes a catalog entry and copies nothing, so
   the "branch" resolves to the database it was cloned from. `rebase db branch
   info` and `--from` were missing from the CLI reference as well.
-
 
 - **`docs/compatibility.md` publishes the readiness table it promised** — one
   row per subsystem, dated, rated stable / beta / experimental, each with what
@@ -966,6 +1687,115 @@ deployment you already run.
 - **`@rebasepro/server-mongo` and `@rebasepro/firebase` have pages**, each
   leading with what it does not do.
 
+- **Six deployment guides built a Dockerfile that does not exist.** AWS, Azure,
+  GCP, Scaleway, Railway and Fly.io all said `docker build -f backend/Dockerfile
+  .`, with a careful note about the build context because *that* had been wrong
+  once. There is no `backend/Dockerfile`: a scaffolded project's compose stack
+  mounts a bundle into the published runtime image, and the only Dockerfile the
+  CLI writes comes from `rebase eject`, at the project root. Every one of the six
+  stopped at step 2, for everyone, on every platform.
+
+- **The production checklist described a window that is shut.** "On the first
+  visit, Rebase shows a bootstrap screen … claim it right after deploying" is
+  development. In production an empty user table refuses the bootstrap
+  registration with `SETUP_REQUIRED`, `needsSetup` is never advertised, and an
+  account created through open registration is an ordinary one — so a reader
+  following the page deployed, waited for a screen that does not appear, and had
+  no admin. The Kubernetes guide's own headline `helm install` was refused by the
+  chart for the same reason (`config.adminEmail` has been required since
+  self-registration was turned off), the self-host recipe is six values rather
+  than four, and the VPS recipe ran the process in development mode — localhost
+  origins reflected, the OpenAPI spec served, the first-admin window left open on
+  a box with a public name. The unit file now carries `NODE_ENV=production` and
+  the two `REBASE_ADMIN_*` lines, and says why each is there.
+
+- **Two pages recommended two different compose files.** Deployment said the
+  generated `docker-compose.yml` "is the source of truth; use it as-is";
+  Self-Hosting said to use `infra/docker/docker-compose.selfhost.yml` "rather than
+  copying a snippet out of this page". The two do not take the same environment,
+  so a reader with a scaffolded project who met both produced a stack that would
+  not interpolate. The two storage refusals that stop a production boot — a
+  configured bucket with no access-control model, and `STORAGE_TYPE=local` on a
+  host with no persistent volume — are named on the checklist now.
+
+- **An error-code reference and a troubleshooting page**, both gated, and the
+  error envelope the server actually sends: both samples in `backend/index.md`
+  showed `{ message, code, status }` with kebab-case codes, where the server sends
+  `{ message, code, details?, requestId? }` with SCREAMING_SNAKE codes and no
+  `status` in the body at all — so a reader who followed either wrote a branch
+  that never fires, in six locales.
+
+- **After-hooks run inside the write's transaction, and the docs now say so.**
+  `afterSave` and `afterDelete` have always run there, awaited, so a throw in one
+  rolls the row back. Three docs and a JSDoc promised the opposite — "run after
+  the transaction commits", "do not block the HTTP response" — which invited
+  exactly the code that breaks under the real behaviour: an HTTP call in
+  `afterSave` that turns a slow remote into a rolled-back save.
+
+- **"Two-Phase Meta" is deleted, because it never happened.** The realtime page
+  taught an emission model the SDK does not have: a first callback with heuristic
+  metadata carrying `estimated: true`, then an optional second one with the real
+  numbers. There is one emission per push, it waits for `count()`, and there is no
+  `estimated` flag anywhere in the codebase — so an app written to the page checked
+  a field that is always undefined and rendered its first paint as authoritative.
+
+- **Four documented routes answered a `text/plain` 404.** `GET /api/collections`
+  had its own section in `api.md` and no router serves it, so the request fell
+  through to Hono's own 404 — not the error envelope, not even JSON. Its
+  neighbours in the route table were the same. The OpenAPI paths are `/api/docs`
+  and `/api/swagger`, named wrongly in every locale, and `/api/meta/contract` is
+  what actually serves schema metadata.
+
+- **The five `RebaseBackendConfig` keys nobody could find, and the seven nobody
+  should set.** `compression`, `maxBodySize`, `csrf`, `cronPersistence` and
+  `schemaEditor` all change behaviour you can otherwise only observe, and none
+  appeared in the configuration reference — so the way to learn that responses are
+  gzipped by default, or that CSRF is deliberately off, was to read `init.ts`.
+  Seven others are internal and now say so. The configuration page also lists the
+  variables the code actually reads, and `DATABASE_URL` stops being called
+  required: unset means the managed database, set means yours, said once.
+
+- **The AI plugin's Autofill posts field values to `app.rebase.pro`.** That is a
+  reasonable default — the service is free, the requests are anonymous, no JWT
+  travels with them — but the person deciding whether the content of those fields
+  may leave the machine had no way to learn it from the docs. The plugins page
+  names the address, says what is and is not sent, and shows the `endpoint` option
+  for running it yourself. The same page never said that plugins are an
+  admin-panel concept.
+
+- **The information architecture, checked rather than asserted.** Every link
+  resolves and every page leads somewhere; the two longest pages are split; a
+  glossary covers the five words the first fifteen minutes assume; Studio has a
+  home; `rebase cloud` has a subsection per group; there is one index of every
+  route the server mounts; a feature that is not released yet says so; a BaaS
+  reader has a path that never mentions React; and a translation that has gone
+  stale is now something the verifier says out loud rather than something a reader
+  discovers. "a entity" was a global search-and-replace, thirty times over.
+
+- **Docs that quote a file now are that file.** Page three of Project Structure
+  showed an `App.tsx` with no `App` function, no export, a `createRebaseClient` at
+  module scope and two hooks no package exports — a newcomer met that on page
+  three and concluded the scaffold was broken. The block is the template's file
+  byte for byte, and `check:templates` fails when the two differ. The plugins,
+  custom-views and frontend-overview samples compile and lead with the composition
+  `rebase init` actually writes; the `defineFunction` hover example imports from
+  the portable `@rebasepro/server/functions` and stops recommending a `use()` that
+  covers only the routes below it; the functions guide's first example is
+  `app.post("/")`, because `functions.invoke` sends POST and following the page
+  start to finish produced a 404; and `rls-check`'s README samples are output the
+  tool actually produced, with every flag it accepts in the table and a gate that
+  reads the flags out of `parseArgs` to keep them there.
+
+- **The `rebase cloud` recipes are the ones the CLI accepts.** The deploy recipe
+  is one command — `deploy` has read `rebase.json` since it learned to, so
+  `rebase build && rebase cloud deploy --bundle` was three things to remember for
+  a path that needs none of them — and the link sequence starts with
+  `billing setup` and creates the project with flags, because
+  `rebase cloud projects create my-app` is parsed with `maxPositionals: 0` and
+  exits before it reaches the control plane. Rollback says what is restored for
+  each way of deploying, and `--provider` / `--region` are explained as the
+  registered deploy target they record rather than the region choice the beta does
+  not offer. All mirrored into the five locale copies.
 
 ## [0.17.3] - 2026-08-31
 

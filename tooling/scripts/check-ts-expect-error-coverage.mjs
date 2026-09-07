@@ -46,7 +46,12 @@ const PROGRAMS = [
 ];
 
 const SOURCE_EXTENSIONS = /\.(?:ts|tsx|mts|cts)$/;
-const SKIP_DIRECTORIES = new Set(["node_modules", "dist", ".git", ".astro", "build", "coverage"]);
+// `.claude` holds agent scratch space, including this repo's own worktree
+// convention (`.claude/worktrees/<branch>`). Those are separate checkouts at
+// other commits: a directive found there belongs to another tree's tsconfig,
+// not this one, and a fresh CI clone never has them — so a developer using a
+// worktree got a red gate that CI could not reproduce.
+const SKIP_DIRECTORIES = new Set(["node_modules", "dist", ".git", ".astro", "build", "coverage", ".claude"]);
 
 const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const green = (s) => `\x1b[32m${s}\x1b[0m`;

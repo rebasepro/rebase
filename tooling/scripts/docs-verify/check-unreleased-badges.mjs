@@ -154,7 +154,25 @@ const NOT_NEW = new Map([
     ["kind", "a relation's `kind`, since relations were authored"],
     ["required", "`validation: { required }`, since 0.12"],
     ["validation", "the property `validation` block, since 0.12"],
-    ["defineCollection", "the collection factory, since 0.12"]
+    ["defineCollection", "the collection factory, since 0.12"],
+    // Surfaces the 0.18 notes name because they were FIXED or REMOVED, not
+    // introduced. A note about an old surface is not a new feature, and badging
+    // the pages that describe it would tell a reader on 0.17 that something they
+    // already have is unavailable to them.
+    ["CORS_ORIGINS", "read since before 0.6; 0.18 fixes it being ignored in development"],
+    ["rebase cloud login", "shipped with `rebase cloud` in 0.10; 0.18 adds a warning to --password"],
+    ["rebase cloud rollback", "shipped with `rebase cloud`; 0.18 stops it refusing managed deploys"],
+    ["rebase dev --docker", "the flag existed and did nothing; 0.18 makes it start and reach the container"],
+    ["rebase init", "the scaffolder, since 0.9"],
+    ["database", "the `database` resource and the word itself, since before 0.12"],
+    ["page", "the `page` list parameter, since the REST surface existed; 0.18 only validates it"],
+    ["count()", "an SDK method since 0.13; 0.18 fixes its de-duplication key"],
+    ["afterSaveError", "the callback has always existed; what is new is the `error` it is passed"],
+    ["rebase.email", "declared on `RebaseServerClient` all along; 0.18 makes it present when mail is unconfigured"],
+    ["rebase.data", "being REMOVED at runtime, not added"],
+    ["basePath", "a `<Rebase>` prop being REMOVED because it never did anything; `useBuildUrlController` still takes one"],
+    ["baseCollectionPath", "same removal, same surviving hook parameter"],
+    ["text/plain", "a content type, not a Rebase surface"]
 ]);
 
 /**

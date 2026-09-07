@@ -125,6 +125,66 @@ answers an engines mismatch with `[WARN] Unsupported engine` and installs
 anyway, so the failure does not arrive at install time; it arrives later,
 somewhere with no mention of Node in it.
 
+## 26. `rebase.data` is gone at runtime
+
+`RebaseServerClient` dropped `data` from its type so that server-side code has
+to say whose identity a read runs under, and the property was then left on the
+object as a runtime alias. It is deleted at boot: `rebase.data` is `undefined`.
+
+**What to change:** in server code — functions, crons, callbacks — write
+`rebase.dataAsAdmin` where you mean the admin plane and `context.data` where you
+mean the caller's. Typed code has been getting the error since the type changed;
+what breaks now is untyped code, and a scaffold's `ai-instructions.md` that
+still tells an assistant to reach for `rebase.data.<slug>` — `rebase init`
+rewrites that file, so regenerate it or edit the rule by hand. Browser code is
+untouched: `rebase.data` on the client SDK is the user-scoped plane and stays.
+
+## 27. `@rebasepro/cli` publishes three exports
+
+`src/index.ts` re-exported sixteen modules and put 95 names on npm. It exports
+`entry`, `manifest` and `bundle` now.
+
+**What to change:** nothing, unless you `import` from `@rebasepro/cli` — which
+is unlikely, since nothing in this repository or the control plane did. If you
+do, the CLI is a binary: shell out to `rebase <command>` rather than calling its
+command functions, whose signatures were never a contract.
+
+## 28. Peer ranges are carets
+
+`ui`, `forms`, `firebase`, `plugin-insights` and `cms-types` declared
+`react >=19.0.0`, a range whose lower half cannot satisfy `app` and `cms` at
+19.2.7 — so an installer that picked 19.0.0 produced a tree that resolved
+cleanly and broke at render. All five say `^19.2.7`. `@rebasepro/app`'s
+`typescript` peer moves from `>=5.0.0` to `^6.0.0`.
+
+**What to change:** be on React 19.2.7 or later, and on TypeScript 6 if you use
+`@rebasepro/app`'s Vite plugin. If your install previously resolved React 19.0.x
+you will now get a peer warning until you raise it; that warning is the tree you
+were already running, said out loud.
+
+## 29. `rebase cloud webhooks create` takes `--endpoint`
+
+`--url` names the control plane for every command in this family, so the second
+`--url` this one declared for the customer's endpoint could never win: the
+documented example sent the webhook URL to the client as the host to
+authenticate against.
+
+**What to change:** `rebase cloud webhooks create --endpoint https://…` in any
+script that creates one. The old spelling could not have worked, so there is no
+behaviour to preserve — only lines to correct.
+
+## 30. `serializeFilter` emits strictly
+
+The shared leaf encoder parses liberally, because a short code arrives off the
+wire, and emits strictly, because a caller handing one to the serializer built
+the condition by hand. `serializeFilter({ a: ["gt", 5] })` throws rather than
+round-tripping `gte`.
+
+**What to change:** only if you call `@rebasepro/common`'s serializers directly.
+Use the operator names the types declare (`gt`, `gte`, `lt`, `lte`, …) rather
+than REST short codes. Query builders and the SDK were already spelling them
+this way; what changes is that the wrong spelling now says so.
+
 ---
 
 **Next:** [the upgrade checklist](/docs/upgrading/#upgrade-checklist) ·

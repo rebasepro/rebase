@@ -1,5 +1,5 @@
 ---
-sourceHash: 36838c587151b5fb
+sourceHash: d1c70f940fd7166b
 slug: fr/docs/upgrading/0-17-to-next
 title: Migrer de 0.17 vers la prochaine version
 sidebar_label: 0.17 → prochaine
@@ -95,6 +95,71 @@ le `.nvmrc` du dépôt.
 répond à une incompatibilité d'engines par `[WARN] Unsupported engine` et
 installe quand même : l'échec n'arrive donc pas à l'installation, mais plus tard,
 à un endroit où Node n'est jamais mentionné.
+
+
+## 26. `rebase.data` a disparu à l'exécution
+
+`RebaseServerClient` a retiré `data` de son type pour que le code serveur doive
+dire sous quelle identité tourne une lecture — la propriété était ensuite restée
+sur l'objet comme alias d'exécution. Elle est supprimée au démarrage :
+`rebase.data` vaut `undefined`.
+
+**À changer :** dans le code serveur — fonctions, crons, callbacks — écrivez
+`rebase.dataAsAdmin` là où vous voulez le plan administrateur et `context.data`
+là où vous voulez celui de l'appelant. Le code typé recevait l'erreur depuis le
+changement de type ; ce qui casse maintenant, c'est le code non typé, et le
+`ai-instructions.md` d'un échafaudage, qui indique encore à un assistant
+d'utiliser `rebase.data.<slug>`. Ce fichier est écrit par `rebase init` :
+régénérez-le ou corrigez la règle à la main. Le code navigateur est intact :
+`rebase.data` dans le SDK client est le plan utilisateur et reste.
+
+## 27. `@rebasepro/cli` publie trois exports
+
+`src/index.ts` réexportait seize modules et plaçait 95 noms sur npm. Il exporte
+maintenant `entry`, `manifest` et `bundle`.
+
+**À changer :** rien, sauf si vous importez depuis `@rebasepro/cli` — ce qui est
+peu probable, puisque ni ce dépôt ni le plan de contrôle ne le faisaient. Si oui :
+la CLI est un binaire. Appelez `rebase <command>` comme processus plutôt que
+d'importer ses fonctions de commande, dont les signatures n'ont jamais été un
+contrat.
+
+## 28. Les plages de peers sont des carets
+
+`ui`, `forms`, `firebase`, `plugin-insights` et `cms-types` déclaraient
+`react >=19.0.0`, une plage dont la moitié basse ne peut pas satisfaire `app` et
+`cms` en 19.2.7 : un installeur choisissant 19.0.0 produisait un arbre qui se
+résolvait proprement et cassait au rendu. Les cinq disent `^19.2.7`. Le peer
+`typescript` de `@rebasepro/app` passe de `>=5.0.0` à `^6.0.0`.
+
+**À changer :** être en React 19.2.7 ou plus, et en TypeScript 6 si vous utilisez
+le plugin Vite de `@rebasepro/app`. Si votre installation résolvait React 19.0.x,
+vous verrez un avertissement de peer jusqu'à ce que vous montiez ; cet
+avertissement, c'est l'arbre que vous exécutiez déjà, dit à voix haute.
+
+## 29. `rebase cloud webhooks create` prend `--endpoint`
+
+`--url` nomme le plan de contrôle pour toute cette famille de commandes, donc le
+second `--url` que celle-ci déclarait pour l'endpoint du client ne pouvait jamais
+l'emporter : l'exemple documenté envoyait l'URL du webhook au client comme hôte
+d'authentification.
+
+**À changer :** `rebase cloud webhooks create --endpoint https://…` dans tout
+script qui en crée un. L'ancienne graphie ne pouvait pas fonctionner : il n'y a
+pas de comportement à préserver, seulement des lignes à corriger.
+
+## 30. `serializeFilter` émet strictement
+
+L'encodeur de feuilles partagé analyse largement, parce qu'un code court arrive
+du réseau, et émet strictement, parce qu'un appelant qui en passe un au
+sérialiseur a construit la condition à la main. `serializeFilter({ a: ["gt", 5] })`
+lève au lieu de renvoyer `gte`.
+
+**À changer :** seulement si vous appelez directement les sérialiseurs de
+`@rebasepro/common`. Utilisez les noms d'opérateurs que déclarent les types
+(`gt`, `gte`, `lt`, `lte`, …) plutôt que les codes courts REST. Les constructeurs
+de requêtes et le SDK les écrivaient déjà ainsi ; ce qui change, c'est que la
+mauvaise graphie le dit maintenant.
 
 ---
 

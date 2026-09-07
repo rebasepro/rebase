@@ -26,7 +26,6 @@
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
   "type": "module",
-  "source": "src/index.ts",
   "publishConfig": {
     "access": "public"
   },
