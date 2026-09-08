@@ -115,7 +115,8 @@ CREATE TABLE "public"."posts" (
   "publish_date" TIMESTAMP WITH TIME ZONE,
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
   "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  "author_id" UUID
+  "author_id" UUID,
+  "order" TEXT
 );
 
 CREATE TABLE "public"."posts_tags" (
@@ -193,10 +194,15 @@ CREATE TABLE "rebase"."users" (
   "tokens_valid_after" TIMESTAMP WITH TIME ZONE
 );
 
+-- Indexes
+CREATE INDEX "posts_status_publish_date_ix_ca3aef2" ON "public"."posts" ("status", "publish_date" DESC);
+CREATE INDEX "posts_publish_date_ix_b949573" ON "public"."posts" ("publish_date") WHERE "status" = 'published';
+CREATE INDEX "posts_author_id_ix_00ad191" ON "public"."posts" ("author_id");
+
 -- Foreign Key Constraints
 ALTER TABLE "public"."order_items" ADD CONSTRAINT "order_items_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "public"."orders" ("id") ON DELETE CASCADE;
 ALTER TABLE "public"."order_items" ADD CONSTRAINT "order_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."products" ("id") ON DELETE RESTRICT;
-ALTER TABLE "public"."orders" ADD CONSTRAINT "orders_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "public"."customers" ("id") ON DELETE CASCADE;
+ALTER TABLE "public"."orders" ADD CONSTRAINT "orders_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "public"."customers" ("id") ON DELETE RESTRICT;
 ALTER TABLE "public"."posts" ADD CONSTRAINT "posts_author_id_fkey" FOREIGN KEY ("author_id") REFERENCES "public"."authors" ("id") ON DELETE SET NULL;
 ALTER TABLE "public"."posts_tags" ADD CONSTRAINT "posts_tags_post_id_fkey" FOREIGN KEY ("post_id") REFERENCES "public"."posts" ("id") ON DELETE CASCADE;
 ALTER TABLE "public"."posts_tags" ADD CONSTRAINT "posts_tags_tag_id_fkey" FOREIGN KEY ("tag_id") REFERENCES "public"."tags" ("id") ON DELETE CASCADE;

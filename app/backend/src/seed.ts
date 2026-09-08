@@ -415,6 +415,41 @@ export async function runSeed() {
             imageUrls: p.images || (p.main_image ? [p.main_image] : [])
         }));
 
+        // Map each fixture image onto the seed-asset file of the same name.
+        //
+        // The name is NOT derived. It used to be: the filenames on disk were
+        // `md5(<a firebase URL> + <the fixture's storage path>)[0:5]_<basename>`,
+        // so the fixture's *folder prefix* was an input to a name already
+        // written on disk. A later commit renamed that prefix for reasons that
+        // had nothing to do with images (it named a client), every hash moved,
+        // and all 434 product images 404'd — with the seed still reporting
+        // success, because nothing checked that a referenced file existed.
+        // The files are now named after themselves, so the only thing that can
+        // break the mapping is deleting one — which the check below catches.
+        const availableImages = new Set(productImagePaths);
+        const missingImages: string[] = [];
+        for (const p of demoProducts) {
+            const localPaths: string[] = [];
+            for (const imgUrl of p.imageUrls) {
+                const filename = imgUrl.split("/").pop() || "image.jpg";
+                const localPath = `product_images/${filename}`;
+                if (!availableImages.has(localPath)) missingImages.push(localPath);
+                localPaths.push(localPath);
+            }
+            p.localImages = localPaths.length > 0 ? localPaths : null;
+        }
+        if (missingImages.length > 0) {
+            // Loud and fatal: a demo whose images all 404 is worse than a demo
+            // that refused to seed, and the previous behaviour ("reference the
+            // file whether it exists or not") is what let that ship unnoticed.
+            const shown = missingImages.slice(0, 5).join(", ");
+            throw new Error(
+                `${missingImages.length} product image(s) referenced by demo-products.json are not in ` +
+                `seed-assets/product_images: ${shown}${missingImages.length > 5 ? ", …" : ""}. ` +
+                "Add the files, or fix the fixture — do not let the seed reference them anyway."
+            );
+        }
+
         const NUM_ORDERS = 180;
         const authorIds = Array.from({ length: NUM_AUTHORS }, (_, i) => generateUUID("author", i));
         const tagIds = Array.from({ length: NUM_TAGS }, (_, i) => generateUUID("tag", i));
@@ -605,27 +640,25 @@ tag_id: tagIds[t] });
 
         // ── Products ──────────────────────────────────────────────────
         console.log("📦 Generating demo products...");
-
-        // Map product image paths to the static seed-asset files (already copied above).
-        // The filenames in seed-assets use an md5(hashSalt + path)[0:5]_filename pattern.
-        // NOTE: IMAGE_HASH_SALT is a legacy string kept ONLY so that the md5 hashes
-        // continue to match the pre-existing seed-asset filenames on disk. It is NOT
-        // a live URL — nothing is ever fetched from this address.
-        const IMAGE_HASH_SALT = "https://firebasestorage.googleapis.com/v0/b/firecms-demo-27150.appspot.com/o/";
-        for (const p of demoProducts) {
-            const localPaths: string[] = [];
-            for (const imgUrl of p.imageUrls) {
-                const hashInput = `${IMAGE_HASH_SALT}${encodeURIComponent(imgUrl)}?alt=media`;
-                const filename = imgUrl.split("/").pop() || "image.jpg";
-                const id = createHash("md5").update(hashInput).digest("hex").substring(0, 5);
-                const localName = `${id}_${filename}`;
-                // Reference the file whether it exists or not — it should be in seed-assets
-                localPaths.push(`product_images/${localName}`);
-            }
-            p.localImages = localPaths.length > 0 ? localPaths : null;
-        }
-
         const allProducts = demoProducts;
+
+        // The four dimensions the `filterPresets` on the Products collection cut
+        // on — status, stock_quantity, is_featured, rating — are assigned by
+        // index, not by Math.random(). A random draw is what made "Low stock
+        // (< 10)" a coin flip: stock was 5..204, so under 3% of the catalogue
+        // could ever match it, and a preset chip that lands on an empty grid
+        // reads as a broken product, not as a filter that found nothing.
+        // Everything else about a product is still noise.
+        const productStatus = (i: number): (typeof productsStatus.enumValues)[number] =>
+            i % 29 === 3 ? "archived" : (i % 13 === 5 ? "draft" : "active");
+        // 0 for one in 17 (the "Out of stock" card subtitle), 1..9 for one in 7,
+        // a healthy 15..200 for the rest.
+        const productStock = (i: number): number =>
+            i % 17 === 0 ? 0 : (i % 7 === 0 ? 1 + (i % 9) : 15 + Math.floor(Math.random() * 186));
+        // 2.8..5.0 across the catalogue so "Top rated (4+)" excludes a real
+        // share of it; the old 3.5..5.0 band made the preset near-vacuous.
+        const productRating = (i: number): string =>
+            (2.8 + ((i * 37) % 23) / 10).toFixed(1);
 
         const productValues = allProducts.map((p, i) => ({
             id: productIds[i],
@@ -638,13 +671,13 @@ tag_id: tagIds[t] });
             price: p.price.toFixed(2),
             compare_at_price: Math.random() > 0.7 ? (p.price * (1.1 + Math.random() * 0.4)).toFixed(2) : null,
             cost: p.cost.toFixed(2),
-            stock_quantity: String(Math.floor(Math.random() * 200) + 5),
+            stock_quantity: String(productStock(i)),
             low_stock_threshold: String(Math.floor(Math.random() * 15) + 5),
             weight_grams: String(p.weight),
-            rating: String((3.5 + Math.random() * 1.5).toFixed(1)),
+            rating: productRating(i),
             review_count: String(Math.floor(Math.random() * 500) + 1),
-            status: "active" as (typeof productsStatus.enumValues)[number],
-            is_featured: Math.random() > 0.8,
+            status: productStatus(i),
+            is_featured: i % 5 === 0,
             images: p.localImages,
             created_at: randomDate(180, 10),
             updated_at: randomDate(30, 0)
