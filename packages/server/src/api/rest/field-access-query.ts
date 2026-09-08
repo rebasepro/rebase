@@ -99,7 +99,7 @@ export function assertReadableFields(
     const { refused } = restrictedFieldNames(collection, viewer, "read");
     if (refused.size === 0) return;
 
-    const named = [...new Set(names.filter((n): n is string => Boolean(n) && refused.has(n!)))];
+    const named = [...new Set(names.filter((n): n is string => n !== undefined && refused.has(n)))];
     if (named.length === 0) return;
 
     throw ApiError.badRequest(
