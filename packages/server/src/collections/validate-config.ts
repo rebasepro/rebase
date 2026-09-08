@@ -240,7 +240,7 @@ const BASE_PROPERTY_KEYS = [
  */
 const PROPERTY_KEYS_BY_TYPE = {
     string: ["columnType", "isId", "enum", "storage", "userSelect", "email", "url", "autoValue"],
-    number: ["columnType", "isId", "enum"],
+    number: ["columnType", "isId", "enum", "precision", "scale"],
     boolean: [],
     date: ["columnType", "mode", "timezone", "autoValue"],
     geopoint: [],
@@ -784,6 +784,10 @@ function checkProperty(
         checkEnumValues(property.enum, `${path}.enum`, collect);
     }
 
+    if (type === "number") {
+        checkNumericPrecision(property, path, collect);
+    }
+
     checkValidationPattern(property.validation, `${path}.validation`, collect);
 
     // Recurse into the two composites. `of` may be one property or an array of
@@ -1077,6 +1081,54 @@ function checkPrimaryKeyStrategy(
                 "key would be referenced by narrower columns. Remove the `columnType`."
             );
         }
+    }
+}
+
+/**
+ * `precision` and `scale` only mean something on a `numeric` column.
+ *
+ * They are the difference between a price the database rounds and a price that
+ * keeps whatever the caller sent — which is exactly the kind of rule that is
+ * silently ignored rather than enforced, so the two ways of writing it wrong are
+ * caught here where the property has a path.
+ *
+ * `scale` alone is refused: `NUMERIC(precision, scale)` has no form that states
+ * the second without the first, so the declaration cannot reach the column at
+ * all. `precision` on a type that has no modifier — an integer, a float, a
+ * serial — is a warning rather than an error: the column is valid, it just does
+ * not do what the line says.
+ */
+const NUMERIC_TYPES_WITHOUT_A_MODIFIER = new Set([
+    "integer", "real", "double precision", "bigint", "serial", "bigserial"
+]);
+
+function checkNumericPrecision(
+    property: Record<string, unknown>,
+    path: string,
+    collect: ProblemCollector
+): void {
+    const { precision, scale, columnType } = property as {
+        precision?: unknown;
+        scale?: unknown;
+        columnType?: unknown;
+    };
+    if (precision === undefined && scale === undefined) return;
+
+    if (scale !== undefined && precision === undefined) {
+        collect.error(
+            `${path}.scale`,
+            "`scale` needs a `precision` beside it: a Postgres column is `NUMERIC(precision, scale)` and " +
+            "there is no form that states the second without the first, so this one reaches the column as " +
+            "an unbounded `NUMERIC`."
+        );
+    }
+    if (typeof columnType === "string" && NUMERIC_TYPES_WITHOUT_A_MODIFIER.has(columnType)) {
+        collect.warn(
+            `${path}.precision`,
+            `\`precision\`/\`scale\` are not read beside \`columnType: "${columnType}"\` — only a \`numeric\` ` +
+            "column takes them. Drop the `columnType` to get `NUMERIC(precision, scale)`, or drop the " +
+            "precision."
+        );
     }
 }
 

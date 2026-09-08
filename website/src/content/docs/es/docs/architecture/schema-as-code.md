@@ -146,8 +146,9 @@ CREATE TABLE "public"."products" (
 );
 ```
 
-Policies, search columns and vector indexes are written to files of their own
-and applied by the CLI in their own right — Atlas manages none of the three.
+Policies, search columns, vector indexes and `updated_at` triggers are written to
+files of their own and applied by the CLI in their own right — Atlas manages
+none of the four.
 
 ## Seguridad y Objetos de Base de Datos no Mapeados
 

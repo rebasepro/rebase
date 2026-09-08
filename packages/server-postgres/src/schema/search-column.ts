@@ -155,10 +155,10 @@ const columnNameOf = (propName: string, prop?: Property | null): string =>
 /**
  * Classify a property for search purposes.
  *
- * Deliberately narrower than `getSqlColumnType`: search only cares whether a
- * value reaches text, and the mapping from property to *physical* type is
- * asserted against `getSqlColumnType` in the contract test rather than
- * duplicated here.
+ * Deliberately narrower than the schema plan's `PgType`: search only cares
+ * whether a value reaches text, and the mapping from property to *physical*
+ * type is asserted against the plan in the contract test rather than duplicated
+ * here.
  *
  * Returns null for anything that is not text-bearing, which the caller turns
  * into a boot error naming the property.
