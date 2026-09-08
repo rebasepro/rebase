@@ -158,17 +158,37 @@ implicit-any error in a consumer's own file, pointing at their code.
  */
 const REEXPORTED_LIBRARIES = { z: "zod" };
 
+/**
+ * The names a module's `export { ... }` statements actually publish.
+ *
+ * Parsed rather than grepped. The first version of this check tested the whole
+ * emitted file for `\bz\s*(,|\}|as\b)`, which in a bundled file matches any
+ * minifier-generated local named `z` — it failed @rebasepro/cms, which exports
+ * no `z` at all, and would have failed on a letter forever.
+ */
+function exportedNames(source) {
+    const names = new Set();
+    for (const statement of source.matchAll(/export\s*\{([^}]*)\}/g)) {
+        for (const clause of statement[1].split(",")) {
+            const name = clause.trim();
+            if (!name) continue;
+            const renamed = /\bas\s+([A-Za-z_$][\w$]*)$/.exec(name);
+            names.add(renamed ? renamed[1] : name);
+        }
+    }
+    return names;
+}
+
 const mainEntry = [pkg.module, pkg.main, pkg.exports?.["."]?.import, pkg.exports?.["."]?.default]
     .find(entry => typeof entry === "string" && entry.endsWith(".js"));
 
 if (mainEntry && existsSync(resolve(pkgDir, mainEntry))) {
     const emitted = readFileSync(resolve(pkgDir, mainEntry), "utf8");
+    const exported = exportedNames(emitted);
     const inlined = [];
 
     for (const [binding, library] of Object.entries(REEXPORTED_LIBRARIES)) {
-        const reExported = new RegExp(`\\b${binding}\\s*(,|\\}|as\\b)`).test(emitted)
-            && /export\s*\{/.test(emitted);
-        if (!reExported) continue;
+        if (!exported.has(binding)) continue;
         if (!emitted.includes(`from "${library}"`)) inlined.push(library);
     }
 
