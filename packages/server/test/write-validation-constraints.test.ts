@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import { CollectionConfig } from "@rebasepro/types";
 import { assertKnownWriteFields, assertWriteValuesValid, type WriteViolation } from "../src/api/rest/write-validation";
 
@@ -289,5 +291,52 @@ describe("the 400 carries structured violations alongside the message list", () 
         };
         const error = thrown(() => assertWriteValuesValid({ address: { zip: "1" } }, collection));
         expect(details(error).violations?.[0]).toMatchObject({ field: "address.zip", code: "length" });
+    });
+});
+
+/**
+ * These rules judge what a *caller sent*. Server code writing through
+ * `rebase.data` is not a caller.
+ *
+ * A hook that stamps a moderation flag, a migration that backfills a column, a
+ * seed script — none of them should be measured against rules written to
+ * describe a public API, and none of them come through this module. The
+ * database's own constraints (NOT NULL, the enum type, a CHECK) are what hold
+ * for those, and they hold for every path.
+ *
+ * A guard rather than a sentence in a docblock, because the exemption is a
+ * property of *where this is called from*, and the way it would be lost is
+ * somebody importing it into the driver to "make validation consistent" — which
+ * would silently change the contract for every in-process write in every
+ * project. See `prefer a guard over a doc`.
+ */
+describe("in-process writes are exempt, by placement", () => {
+    /** Where the write path lives, from this package's test directory. */
+    const driverPath = path.resolve(
+        __dirname,
+        "../../server-postgres/src/PostgresBackendDriver.ts"
+    );
+
+    it("is not imported by the Postgres driver", () => {
+        if (!fs.existsSync(driverPath)) {
+            // A published/partial checkout without the sibling package. Nothing
+            // to assert, and failing here would be about the checkout.
+            return;
+        }
+        const source = fs.readFileSync(driverPath, "utf-8");
+        // The module specifier, in any position that loads it: a static import,
+        // a dynamic one, a `require`. A call cannot exist without one of these,
+        // so this is the whole surface — and matching the *function names*
+        // instead would fail on a docblock that merely explains the split, which
+        // is a comment worth having.
+        expect(source).not.toMatch(/(?:from|import|require)\s*\(?\s*["'][^"']*write-validation["']/);
+    });
+
+    it("is reached from the request boundaries, which is where a caller is", () => {
+        // The REST routes and the two sockets. `assertWriteRequestValid` is
+        // exported for the sockets precisely because they are the *other*
+        // request boundary — not because the rule belongs deeper down.
+        const routes = path.resolve(__dirname, "../src/api/rest/api-generator.ts");
+        expect(fs.readFileSync(routes, "utf-8")).toMatch(/from "\.\/write-validation"/);
     });
 });
