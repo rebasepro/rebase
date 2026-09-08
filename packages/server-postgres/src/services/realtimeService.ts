@@ -1070,30 +1070,39 @@ roles: ["anon"] };
         // The `logical` group is carried here as well: this branch answers the
         // same subscription as the one above, and a fallback that drops a
         // condition returns *more* rows than the path it stands in for.
-        if (collectionRequest.searchString) {
-            return await this.dataService.searchRows(
-                notifyPath,
-                collectionRequest.searchString,
-                {
-                    filter: collectionRequest.filter as FilterValues<string>,
-                    logical: collectionRequest.logical,
-                    orderBy: collectionRequest.orderBy,
-                    order: collectionRequest.order,
-                    limit: collectionRequest.limit,
-                    databaseId: collectionRequest.databaseId,
-                    searchExplain: collectionRequest.searchExplain
-                }
-            );
-        }
-        return await this.dataService.fetchCollection(notifyPath, {
-            filter: collectionRequest.filter as FilterValues<string>,
-            logical: collectionRequest.logical,
-            orderBy: collectionRequest.orderBy,
-            order: collectionRequest.order,
-            limit: collectionRequest.limit,
-            offset: collectionRequest.offset,
-            startAfter: collectionRequest.startAfter,
-            databaseId: collectionRequest.databaseId
+        //
+        // The field viewer IS established, unlike the database's auth context:
+        // the subscriber's roles are in hand either way, and leaving the scope
+        // off would make this the one path where a role-restricted field is
+        // served to everybody — a fallback that hands out *more* than the path
+        // it stands in for, which is the defect the paragraph above describes
+        // one clause at a time.
+        return await withFieldViewer({ roles: authContext?.roles ?? [] }, async () => {
+            if (collectionRequest.searchString) {
+                return await this.dataService.searchRows(
+                    notifyPath,
+                    collectionRequest.searchString,
+                    {
+                        filter: collectionRequest.filter as FilterValues<string>,
+                        logical: collectionRequest.logical,
+                        orderBy: collectionRequest.orderBy,
+                        order: collectionRequest.order,
+                        limit: collectionRequest.limit,
+                        databaseId: collectionRequest.databaseId,
+                        searchExplain: collectionRequest.searchExplain
+                    }
+                );
+            }
+            return await this.dataService.fetchCollection(notifyPath, {
+                filter: collectionRequest.filter as FilterValues<string>,
+                logical: collectionRequest.logical,
+                orderBy: collectionRequest.orderBy,
+                order: collectionRequest.order,
+                limit: collectionRequest.limit,
+                offset: collectionRequest.offset,
+                startAfter: collectionRequest.startAfter,
+                databaseId: collectionRequest.databaseId
+            });
         });
     }
 
@@ -1239,7 +1248,12 @@ roles: ["anon"] };
             );
         }
 
-        return await this.dataService.fetchOne(notifyPath, id);
+        // Same reasoning as the collection fallback above: no database auth
+        // context is available here, but the subscriber's roles are.
+        return await withFieldViewer(
+            { roles: authContext?.roles ?? [] },
+            async () => await this.dataService.fetchOne(notifyPath, id)
+        );
     }
 
     private sendCollectionUpdate(clientId: string, subscriptionId: string, rows: Record<string, unknown>[], path: string) {
