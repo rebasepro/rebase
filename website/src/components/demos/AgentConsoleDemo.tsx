@@ -26,22 +26,22 @@ const line = (indent: number, ...parts: React.ReactNode[]) => (
 
 const CAPABILITIES: Capability[] = [
     {
-        key: "vector",
-        label: "Vector search",
-        Icon: Search,
-        title: "Vector similarity search",
-        desc: "Native pgvector with cosine, L2 and inner-product distance. Query embeddings straight over REST — no separate vector database to run.",
-        pills: ["pgvector", "cosine · L2 · inner product", "no extra service"],
-        screen: "GET /api/data/docs",
+        key: "surface",
+        label: "A small surface",
+        Icon: FileCheck2,
+        title: "A surface an agent can hold",
+        desc: "A whole backend is a handful of typed collection files. No controllers, no serializers, no migrations to hand-write — and no React in the contract, so nothing about your UI can confuse the model about your data.",
+        pills: ["1 file per collection", "React-free types", "compiler-checked"],
+        screen: "config/collections/orders.ts",
         body: (
             <>
-                {line(0, <span className="text-emerald-400">GET </span>, <span className="text-surface-300">/api/data/docs</span>)}
-                {line(1, <span className="text-surface-500">?vector_search=</span>, <span className="text-amber-300">embedding</span>)}
-                {line(1, <span className="text-surface-500">&vector=</span>, <span className="text-primary">[0.12, 0.98, …]</span>)}
-                {line(1, <span className="text-surface-500">&vector_distance=</span>, <span className="text-cyan-300">cosine</span>)}
+                {line(0, <span className="text-blue-400">export const</span>, <span className="text-surface-200"> orders</span>, <span className="text-surface-300">: </span>, <span className="text-cyan-300">PostgresCollectionConfig</span>, <span className="text-surface-300"> = {"{"}</span>)}
+                {line(1, <span className="text-surface-300">table: </span>, <span className="text-emerald-300">"orders"</span>, <span className="text-surface-300">,</span>)}
+                {line(1, <span className="text-surface-300">properties: {"{"} total, status, customer {"}"},</span>)}
+                {line(1, <span className="text-surface-300">securityRules: [{"{"} operation: </span>, <span className="text-emerald-300">"select"</span>, <span className="text-surface-300">, … {"}"}],</span>)}
+                {line(0, <span className="text-surface-300">{"}"};</span>)}
                 <div className="mt-3 border-t border-hairline pt-3">
-                    {line(0, <span className="text-surface-500">200 OK · 14ms</span>)}
-                    {line(0, <span className="text-surface-400">[{"{"} "id": "d_91", "score": 0.94 {"}"}, …]</span>)}
+                    {line(0, <span className="text-surface-500">→ REST · typed SDK · RLS policies · admin views</span>)}
                 </div>
             </>
         )
@@ -78,20 +78,43 @@ const CAPABILITIES: Capability[] = [
         )
     },
     {
-        key: "functions",
-        label: "Custom functions",
-        Icon: Zap,
-        title: "Custom functions & streaming",
-        desc: "Drop a route file in functions/ and it mounts itself. Full typed access to your data layer — stream an LLM response, chain agent actions, take a webhook.",
-        pills: ["auto-mounted", "typed data access", "streaming"],
-        screen: "functions/summarize.ts",
+        key: "context",
+        label: "Scaffolded context",
+        Icon: FileText,
+        title: "Agent context, scaffolded",
+        desc: "Every new project ships with AGENTS.md and CLAUDE.md already written: the layout, the commands, the conventions. Your agent is productive on the first prompt.",
+        pills: ["AGENTS.md", "CLAUDE.md", "rebase init"],
+        screen: "my-app/",
         body: (
             <>
-                {line(0, <span className="text-blue-400">export default</span>, <span className="text-surface-300"> </span>, <span className="text-amber-300">async</span>, <span className="text-surface-300"> (req, res) ={">"} {"{"}</span>)}
-                {line(1, <span className="text-surface-500">// full typed access to the driver</span>)}
-                {line(1, <span className="text-blue-400">const</span>, <span className="text-surface-300"> docs = </span>, <span className="text-blue-400">await</span>, <span className="text-amber-300"> data</span>, <span className="text-surface-300">.docs.find();</span>)}
-                {line(1, <span className="text-blue-400">return</span>, <span className="text-surface-300"> stream(summarize(docs));</span>)}
-                {line(0, <span className="text-surface-300">{"}"}</span>)}
+                {line(0, <span className="text-primary">~ </span>, <span className="text-surface-200">pnpm dlx @rebasepro/cli init my-app</span>)}
+                <div className="mt-2.5 space-y-1">
+                    {line(0, <span className="text-surface-400">my-app/</span>)}
+                    {line(1, <span className="text-emerald-300">AGENTS.md</span>, <span className="text-surface-600"> — layout, commands, conventions</span>)}
+                    {line(1, <span className="text-emerald-300">CLAUDE.md</span>, <span className="text-surface-600"> — same, for Claude Code</span>)}
+                    {line(1, <span className="text-surface-400">config/collections/</span>)}
+                    {line(1, <span className="text-surface-400">backend/  frontend/</span>)}
+                </div>
+            </>
+        )
+    },
+    {
+        key: "skills",
+        label: "Agent skills",
+        Icon: BookOpen,
+        title: "Official agent skills",
+        desc: "Twenty maintained skills — collections, security rules, auth, realtime, storage, the SDK — written into your agent's own rules directory. It reads how Rebase works instead of guessing.",
+        pills: ["Claude Code", "Cursor", "Windsurf", "Gemini CLI"],
+        screen: "~/my-app",
+        body: (
+            <>
+                {line(0, <span className="text-primary">~ </span>, <span className="text-surface-200">rebase skills</span>)}
+                {line(0, <span className="text-surface-500">detected .claude/ — installing to .claude/skills/</span>)}
+                <div className="mt-2 space-y-1">
+                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-surface-400">rebase-collections, rebase-security, rebase-auth</span>)}
+                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-surface-400">rebase-realtime, rebase-sdk, rebase-storage …</span>)}
+                    {line(0, <span className="text-surface-300">20 skills installed</span>)}
+                </div>
             </>
         )
     },
@@ -116,21 +139,20 @@ const CAPABILITIES: Capability[] = [
         )
     },
     {
-        key: "realtime",
-        label: "Realtime engine",
-        Icon: Radio,
-        title: "Realtime engine",
-        desc: "One WebSocket for live data subscriptions, broadcast channels and presence. Agents and humans see the same row change at the same moment.",
-        pills: ["data subscriptions", "broadcast", "presence", "auto-reconnect"],
-        screen: "ws://localhost:3000/realtime",
+        key: "functions",
+        label: "Custom functions",
+        Icon: Zap,
+        title: "Custom functions & streaming",
+        desc: "Drop a route file in functions/ and it mounts itself. Full typed access to your data layer — stream an LLM response, chain agent actions, take a webhook.",
+        pills: ["auto-mounted", "typed data access", "streaming"],
+        screen: "functions/summarize.ts",
         body: (
             <>
-                {line(0, <span className="text-emerald-400">● connected</span>, <span className="text-surface-500"> · subscribed to orders</span>)}
-                <div className="mt-2.5 space-y-1">
-                    {line(0, <span className="text-surface-500">12:04:11 </span>, <span className="text-amber-300">UPDATE</span>, <span className="text-surface-300"> orders/ORD-2026-0042 → shipped</span>)}
-                    {line(0, <span className="text-surface-500">12:04:11 </span>, <span className="text-primary">presence</span>, <span className="text-surface-300"> agent-7 joined</span>)}
-                    {line(0, <span className="text-surface-500">12:04:13 </span>, <span className="text-emerald-400">INSERT</span>, <span className="text-surface-300"> orders/ORD-2026-0043</span>)}
-                </div>
+                {line(0, <span className="text-blue-400">export default</span>, <span className="text-surface-300"> </span>, <span className="text-amber-300">async</span>, <span className="text-surface-300"> (req, res) ={">"} {"{"}</span>)}
+                {line(1, <span className="text-surface-500">// full typed access to the driver</span>)}
+                {line(1, <span className="text-blue-400">const</span>, <span className="text-surface-300"> docs = </span>, <span className="text-blue-400">await</span>, <span className="text-amber-300"> data</span>, <span className="text-surface-300">.docs.find();</span>)}
+                {line(1, <span className="text-blue-400">return</span>, <span className="text-surface-300"> stream(summarize(docs));</span>)}
+                {line(0, <span className="text-surface-300">{"}"}</span>)}
             </>
         )
     },
@@ -161,63 +183,41 @@ const CAPABILITIES: Capability[] = [
         )
     },
     {
-        key: "skills",
-        label: "Agent skills",
-        Icon: BookOpen,
-        title: "Official agent skills",
-        desc: "Twenty maintained skills — collections, security rules, auth, realtime, storage, the SDK — written into your agent's own rules directory. It reads how Rebase works instead of guessing.",
-        pills: ["Claude Code", "Cursor", "Windsurf", "Gemini CLI"],
-        screen: "~/my-app",
+        key: "realtime",
+        label: "Realtime engine",
+        Icon: Radio,
+        title: "Realtime engine",
+        desc: "One WebSocket for live data subscriptions, broadcast channels and presence. Agents and humans see the same row change at the same moment.",
+        pills: ["data subscriptions", "broadcast", "presence", "auto-reconnect"],
+        screen: "ws://localhost:3000/realtime",
         body: (
             <>
-                {line(0, <span className="text-primary">~ </span>, <span className="text-surface-200">rebase skills</span>)}
-                {line(0, <span className="text-surface-500">detected .claude/ — installing to .claude/skills/</span>)}
-                <div className="mt-2 space-y-1">
-                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-surface-400">rebase-collections, rebase-security, rebase-auth</span>)}
-                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-surface-400">rebase-realtime, rebase-sdk, rebase-storage …</span>)}
-                    {line(0, <span className="text-surface-300">20 skills installed</span>)}
-                </div>
-            </>
-        )
-    },
-    {
-        key: "surface",
-        label: "A small surface",
-        Icon: FileCheck2,
-        title: "A surface an agent can hold",
-        desc: "A whole backend is a handful of typed collection files. No controllers, no serializers, no migrations to hand-write — and no React in the contract, so nothing about your UI can confuse the model about your data.",
-        pills: ["1 file per collection", "React-free types", "compiler-checked"],
-        screen: "config/collections/orders.ts",
-        body: (
-            <>
-                {line(0, <span className="text-blue-400">export const</span>, <span className="text-surface-200"> orders</span>, <span className="text-surface-300">: </span>, <span className="text-cyan-300">PostgresCollectionConfig</span>, <span className="text-surface-300"> = {"{"}</span>)}
-                {line(1, <span className="text-surface-300">table: </span>, <span className="text-emerald-300">"orders"</span>, <span className="text-surface-300">,</span>)}
-                {line(1, <span className="text-surface-300">properties: {"{"} total, status, customer {"}"},</span>)}
-                {line(1, <span className="text-surface-300">securityRules: [{"{"} operation: </span>, <span className="text-emerald-300">"select"</span>, <span className="text-surface-300">, … {"}"}],</span>)}
-                {line(0, <span className="text-surface-300">{"}"};</span>)}
-                <div className="mt-3 border-t border-hairline pt-3">
-                    {line(0, <span className="text-surface-500">→ REST · typed SDK · RLS policies · admin views</span>)}
-                </div>
-            </>
-        )
-    },
-    {
-        key: "context",
-        label: "Scaffolded context",
-        Icon: FileText,
-        title: "Agent context, scaffolded",
-        desc: "Every new project ships with AGENTS.md and CLAUDE.md already written: the layout, the commands, the conventions. Your agent is productive on the first prompt.",
-        pills: ["AGENTS.md", "CLAUDE.md", "rebase init"],
-        screen: "my-app/",
-        body: (
-            <>
-                {line(0, <span className="text-primary">~ </span>, <span className="text-surface-200">pnpm dlx @rebasepro/cli init my-app</span>)}
+                {line(0, <span className="text-emerald-400">● connected</span>, <span className="text-surface-500"> · subscribed to orders</span>)}
                 <div className="mt-2.5 space-y-1">
-                    {line(0, <span className="text-surface-400">my-app/</span>)}
-                    {line(1, <span className="text-emerald-300">AGENTS.md</span>, <span className="text-surface-600"> — layout, commands, conventions</span>)}
-                    {line(1, <span className="text-emerald-300">CLAUDE.md</span>, <span className="text-surface-600"> — same, for Claude Code</span>)}
-                    {line(1, <span className="text-surface-400">config/collections/</span>)}
-                    {line(1, <span className="text-surface-400">backend/  frontend/</span>)}
+                    {line(0, <span className="text-surface-500">12:04:11 </span>, <span className="text-amber-300">UPDATE</span>, <span className="text-surface-300"> orders/ORD-2026-0042 → shipped</span>)}
+                    {line(0, <span className="text-surface-500">12:04:11 </span>, <span className="text-primary">presence</span>, <span className="text-surface-300"> agent-7 joined</span>)}
+                    {line(0, <span className="text-surface-500">12:04:13 </span>, <span className="text-emerald-400">INSERT</span>, <span className="text-surface-300"> orders/ORD-2026-0043</span>)}
+                </div>
+            </>
+        )
+    },
+    {
+        key: "vector",
+        label: "Vector search",
+        Icon: Search,
+        title: "Vector similarity search",
+        desc: "Native pgvector with cosine, L2 and inner-product distance. Query embeddings straight over REST — no separate vector database to run.",
+        pills: ["pgvector", "cosine · L2 · inner product", "no extra service"],
+        screen: "GET /api/data/docs",
+        body: (
+            <>
+                {line(0, <span className="text-emerald-400">GET </span>, <span className="text-surface-300">/api/data/docs</span>)}
+                {line(1, <span className="text-surface-500">?vector_search=</span>, <span className="text-amber-300">embedding</span>)}
+                {line(1, <span className="text-surface-500">&vector=</span>, <span className="text-primary">[0.12, 0.98, …]</span>)}
+                {line(1, <span className="text-surface-500">&vector_distance=</span>, <span className="text-cyan-300">cosine</span>)}
+                <div className="mt-3 border-t border-hairline pt-3">
+                    {line(0, <span className="text-surface-500">200 OK · 14ms</span>)}
+                    {line(0, <span className="text-surface-400">[{"{"} "id": "d_91", "score": 0.94 {"}"}, …]</span>)}
                 </div>
             </>
         )

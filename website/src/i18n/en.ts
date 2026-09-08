@@ -1,10 +1,11 @@
 export const en = {
-  "hero.badge": "Open-source · Deploy anywhere · Postgres-native",
-  "hero.title.part1": "The Postgres you already have.",
-  "hero.title.part2": "The backend you always wanted.",
+  "hero.badge": "Open-source · MIT · Any Postgres",
+  "hero.title.part1": "The backend that can't forget",
+  "hero.title.part2": "a permission check.",
   "hero.subtitle":
-    "Point it at the Postgres you already run. REST, a typed SDK, realtime and auth appear — and every access rule is enforced by the database itself.",
+    "One TypeScript file per collection gives you the schema, the REST API, the typed SDK and the panel. The access rules in that same file compile to Postgres row-level security, so every route, job, script and agent hits the same wall.",
   "hero.cta.demo": "Try the demo",
+  "hero.cta.audit": "Audit your database",
 
   // Free-tool section. The copy stays useful to someone who will never adopt
   // Rebase — the moment it reads as a funnel, it stops being worth running.
@@ -16,28 +17,25 @@ export const en = {
   "copy.command.done": "Copied",
   "demo.init": "✔ Initialized Rebase in current directory.",
   "demo.pull": "✔ Schema pushed to database. Tables created.",
+  "demo.rls": "✔ Access rules compiled into Postgres policies.",
   "demo.dev": "✔ API, realtime and panel running.",
   "demo.ports": "API and panel URLs printed on start <span class=\"text-surface-700\">·</span> <span class=\"text-surface-200\">rebase dev</span> picks free ports per project",
-  "social.title": "Teams shipping on our tools — Rebase, and FireCMS, the open-source CMS in 10,000+ Firebase projects.",
+  "social.title": "From the makers of FireCMS, the open-source CMS in 10,000+ Firebase projects.",
   // The five-paths figure inside beat 03 (PolicyPathsFigure): where the rule
   // lives today, and the rule as Postgres holds it. Code stays English.
   "recognition.badge": "Where the rule lives today",
   "recognition.five": "Five ways in",
   "recognition.one": "One rule",
   "recognition.oneNote": "one rule, in Postgres, on every path",
-  // Beat 04 — the panel that ships with the backend (carousel + the three products).
+  // Beat 03 — what you get: the SDK/REST/realtime demos, then the panel as a
+  // sub-block of the same chapter (merged 2026-09-09; panel.badge is no longer
+  // rendered on the home page).
   "panel.badge": "The panel that ships with it",
-  "panel.title": "Your team's back office, rendered from the same definition.",
-  "engine.badge": "What your app talks to",
-  // Was "Everything your app calls, already running." — the third consecutive
-  // beat heading to open on "Everything" (02 generated / 03 calls / 04 sits on),
-  // which flattened three different promises into one. Same claim, own words.
-  // NOTE: es/de/fr are stale on this key AND carry the pre-rework framing
-  // ("A complete backend. Not just a pretty face"), which defends the panel
-  // instead of leading with the backend — see SITE-STORY's backend-first rule.
-  "engine.title": "The whole backend, already running.",
+  "panel.title": "The panel, rendered from the same definition.",
+  "engine.badge": "What you get",
+  "engine.title": "Everything your app calls, and the panel your team works in.",
   "engine.subtitle":
-    "A typed SDK for your collections, REST over every table, and realtime on a WebSocket — plus auth, storage and backups, running against your database from minute one.",
+    "A typed SDK for your collections, REST over every table and realtime on a WebSocket, running against your database from minute one.",
   "engine.link": "Explore the backend",
   "agentera.badge": "Built for the agent era",
   "agentera.title": 'The backend an agent can\'t screw up',
@@ -51,23 +49,23 @@ export const en = {
   // for the third heading running. es/de/fr never drifted; this restores parity
   // with them rather than inventing new copy. The subtitle also stops listing
   // the layer stack, because the figure beside it already draws that.
-  "modes.subtitle": "The panel reads your data through the same API and the same policies your app does. Your app talks to the backend, your team works in the panel, and both see one set of rules.",
+  "modes.subtitle": "It reads your data through the same API and the same policies your app does. Your app talks to the backend, your team works in the panel, and both see one set of rules.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
-    "REST, auth, storage, realtime and backups over your database. No UI, no React anywhere in the dependency tree.",
+    "The server your app calls. No UI, no React anywhere in the dependency tree.",
   "modes.baas.tag": "What your app talks to",
   "modes.cms.title": "Rebase CMS",
   "modes.cms.desc":
     "Spreadsheet editing, media, relations, roles and workflows — with your own React components dropped in wherever the default field isn't enough.",
   "modes.cms.tag": "Where your team works",
   "modes.full.title": "Rebase Studio",
-  "modes.full.desc": "SQL editor, schema visualizer, RLS policy editor, logs and API explorer. Studio is the developer workspace. It registers inside the same panel as CMS.",
-  "modes.full.tag": "Developer tools, in the same panel",
+  "modes.full.desc": "SQL editor, schema visualizer, RLS policy editor, logs and API explorer. Studio is the developer half of the same panel your team already uses.",
+  "modes.full.tag": "The developer half of the panel",
   "showcase.badge": "Built for real products",
-  "showcase.title.part1": "Teams ship faster with",
-  "showcase.title.part2": "Rebase",
+  "showcase.title.part1": "Seven products.",
+  "showcase.title.part2": "One definition.",
   "showcase.subtitle":
-    "From <b>marketplaces</b> to <b>retail loyalty</b>, <b>public data</b> and <b>internal tools</b> — seven very different products, the same definition underneath.",
+    "A <b>certified medical device</b>, a <b>retail loyalty programme</b>, a <b>two-sided marketplace</b>, <b>public data</b>, an outbound sales agent, a design tool and a CRM — very different products, the same collection file underneath.",
   "showcase.nolink": "Internal tool — no public site",
   "showcase.case0.badge": "Vector Design Tool · Built by the Rebase team",
   "showcase.case0.title": "Dadaki",
@@ -116,7 +114,7 @@ export const en = {
   "cta.lane.cloud.link": "Request access",
   "cta.button.demo": "Try the demo",
   "cta.button.docs": "Read the docs",
-  "engine.plus": "Plus auth and roles, S3-compatible storage, scheduled jobs, serverless functions and backups — all against the database you already own, under the same policies.",
+  "engine.plus": "Plus auth and roles, S3-compatible storage, scheduled jobs, serverless functions and backups, all under the same policies.",
   "personas.badge": "Who touches it",
   "personas.title": "Three people touch this. None of them the same way.",
   "personas.dev.title": "The developer who owns the database",
@@ -145,7 +143,7 @@ export const en = {
   "opensource.badge": "Open source",
   "opensource.title": "Your code. Your infra.<br/>Zero lock-in.",
   "opensource.desc":
-    "MIT-licensed, end to end — the schema editor, the generated APIs, the typed SDK, all of it. Your data stays in your Postgres: no vendor dependency, no per-seat pricing, no surprises.",
+    "MIT-licensed, end to end. Your data stays in your Postgres: no vendor dependency, no per-seat pricing, and leaving is a redeploy.",
   "opensource.link1": "For developers",
   "opensource.link2": "How it compares",
   "showcase.exploreCms": "Explore Rebase CMS",
@@ -170,7 +168,7 @@ export const en = {
   "power.appcode": "App Code",
   "power.generates": "→ generates all of the following",
   "power.mobile.generates": "→ generates DB schema · REST API · Typed SDK · entity forms · admin views",
-  "power.label.admin": "Admin views",
+  "power.label.admin": "Panel views",
   "power.label.form": "Edit form",
   "power.label.db": "DB Schema",
   "power.label.sdk": "Typed SDK",
@@ -493,8 +491,8 @@ export const en = {
   "about.join.desc": "The code, the issues and the arguments are all in the open. Come and disagree with us.",
   "about.join.github": "Contribute on GitHub",
   "about.join.discord": "Join our Discord",
-  "index.meta.title": "Rebase — The Open-Source Backend for Postgres: APIs, Auth, Realtime & CMS",
-  "index.meta.description": "Point Rebase at your Postgres and get REST APIs, auth, storage, realtime and backups, with a schema-driven admin panel for your team. Secured by row-level security. Open-source, deploy anywhere.",
+  "index.meta.title": "Rebase — Open-Source Backend for Postgres: Access Rules Enforced by the Database",
+  "index.meta.description": "One TypeScript file per collection gives you the schema, REST API, typed SDK and panel. Access rules compile to Postgres row-level security, so every route, job and agent obeys them. Open-source; self-host or use Rebase Cloud.",
   "cms.meta.title": "Rebase CMS — the admin panel of your Rebase backend",
   "cms.meta.description": "A generated back office on every Rebase backend: spreadsheet editing, media, roles and history — extensible with your own React, on the same API and policies as your app.",
   "backend.meta.title": "Rebase Backend — REST, typed SDK, realtime and RLS over your Postgres",

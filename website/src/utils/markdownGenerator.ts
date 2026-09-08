@@ -36,25 +36,20 @@ export function generateMarkdownForPage(page: string, lang: string): string {
   if (page === "index" || page === "") {
     /*
      * This is what an agent reads about Rebase — `/index.md` is what `llms.txt`
-     * is assembled from — so it must say what the page says. It did not.
+     * is assembled from — so it must say what the page says.
      *
-     * It built "Key Benefits" from `howitworks.*`, copy that renders on NO page
-     * (grep it), and whose bold term in each bullet is the PROBLEM rather than
-     * the benefit. The rendered result read:
+     * It once built "Key Benefits" from `howitworks.*`, copy that renders on NO
+     * page (grep it), and whose bold term in each bullet named the PROBLEM
+     * rather than the benefit — so the file told a model that Rebase's key
+     * benefits were boilerplate admin UIs and brittle auth.
      *
-     *     ## Key Benefits
-     *     - **Boilerplate back offices**: ...
-     *     - **Hand-rolled API layers**: ...
-     *     - **Brittle auth & permissions**: ...
-     *
-     * — which tells a model that Rebase's key benefits are boilerplate admin
-     * UIs and brittle auth. It then opened its feature list with kanban boards,
-     * the first item SITE-STORY §2 puts BELOW the line as never-the-headline.
-     *
-     * It now mirrors the home page's beats in the page's own order, from keys
-     * the page actually renders, so the two cannot drift without someone
-     * noticing. See PRODUCT.md: "when a home-page beat changes, change the
-     * generator in the same commit".
+     * It now follows the home page's spine, beat for beat, from keys the page
+     * actually renders: the claim, then mechanism (01), security (02) with the
+     * audit that lets you check it, what you get (03), agents (04), customers
+     * (05), and the close. The panel is half of "what you get" rather than a
+     * beat of its own, and the ownership line lives in the close — both exactly
+     * as they now render. See PRODUCT.md: "when a home-page beat changes,
+     * change the generator in the same commit".
      */
     return `# ${cleanHtml(tr("index.meta.title"))}
 
@@ -68,11 +63,14 @@ ${cleanHtml(tr("hero.subtitle"))}
 
 ## The claims, in the order the page makes them
 
-1. **One definition, every surface** — ${inline(tr("engine.title"))}: ${cleanHtml(tr("engine.subtitle"))}
+1. **One definition, every surface** — ${inline(tr("power.title"))}: ${cleanHtml(tr("power.subtitle"))}
 2. **Security lives in the database** — ${inline(tr("security.title"))}: ${cleanHtml(tr("security.desc"))}
-3. **The panel that ships with it** — ${inline(tr("panel.title"))}: ${cleanHtml(tr("modes.subtitle"))}
-4. **Agent-native** — ${inline(tr("agentera.badge"))}: ${cleanHtml(tr("agentera.p1"))}
-5. **It is yours** — ${inline(tr("opensource.title"))}: ${cleanHtml(tr("opensource.desc"))}
+3. **And you can check it** — ${inline(tr("rlscheck.title"))}: ${cleanHtml(tr("rlscheck.subtitle"))} Run \`npx @rebasepro/rls-check\` against any Postgres — read-only, no account, nothing installed.
+4. **What you get** — ${inline(tr("engine.title"))}: ${cleanHtml(tr("engine.subtitle"))}
+   - ${inline(tr("panel.title"))}: ${cleanHtml(tr("modes.subtitle"))}
+5. **Agent-native** — ${inline(tr("agentera.badge"))}: ${cleanHtml(tr("agentera.p1"))}
+6. **Shipped, not promised** — ${inline(tr("showcase.title.part1") + " " + tr("showcase.title.part2"))}: ${cleanHtml(tr("showcase.subtitle"))}
+7. **It is yours** — ${inline(tr("cta.title"))}: ${cleanHtml(tr("opensource.desc"))}
 
 ## Three adoption modes
 
@@ -82,26 +80,15 @@ Rebase is adopted in layers, and each one is additive:
 - **Rebase CMS** — the above, plus a schema-driven back office generated from the same collection definitions.
 - **Rebase Studio** — the above, plus the developer workspace: SQL editor, schema visualizer, RLS editor, logs and an API explorer, registered inside the same panel as CMS.
 
-Authorization is Postgres row-level security in every mode. \`npx @rebasepro/rls-check\` audits any Postgres, read-only, with nothing installed.
-
-## The panel that ships with it
-
-- **${inline(tr("modes.cms.title"))}** — ${cleanHtml(tr("modes.cms.desc"))}
-- **${inline(tr("modes.full.title"))}** — ${cleanHtml(tr("modes.full.desc"))}
-
-Neither changes the API. ${cleanHtml(tr("modes.subtitle"))}
-
-## What it can do for an agent
-
-${inline(tr("agentera.badge"))}. ${cleanHtml(tr("agentera.p1"))}
+Authorization is Postgres row-level security in every mode, and no panel changes the API.
 
 ## Real products built on it
 
 Built by the Rebase team, each on a Postgres database its owner controls.
 
-- **${cleanHtml(tr("showcase.case0.title"))}** (${cleanHtml(tr("showcase.case0.badge"))}) — ${cleanHtml(tr("showcase.case0.desc"))}
 - **${cleanHtml(tr("showcase.case2.title"))}** (${cleanHtml(tr("showcase.case2.badge"))}) — ${cleanHtml(tr("showcase.case2.desc"))}
 - **${cleanHtml(tr("showcase.case.title"))}** (${cleanHtml(tr("showcase.case.badge"))}) — ${cleanHtml(tr("showcase.case.desc"))}
+- **${cleanHtml(tr("showcase.case0.title"))}** (${cleanHtml(tr("showcase.case0.badge"))}) — ${cleanHtml(tr("showcase.case0.desc"))}
 
 ## Rebase Cloud
 

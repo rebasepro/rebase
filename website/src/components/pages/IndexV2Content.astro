@@ -31,6 +31,23 @@ const SELFHOST_COMMAND = "docker compose up -d";
 
 ---
 <div class="isolate text-white">
+    {/* ============================================================
+        HOME PAGE SPINE — five numbered chapters, one close.
+
+          hero      the claim, with the artifact
+          01        MECHANISM — the collection file and what it fans out to
+          02        SECURITY — the claim ranked highest, then the free audit
+                    that lets a reader check it rather than read it
+          03        WHAT YOU GET — the engine and the panel, one chapter
+          04        AGENT ERA
+          05        CUSTOMERS
+          close     the three lanes, the terms, and the ask
+
+        Colour is spent twice and only twice: the blue slab on 02 and the coral
+        close. Both carry a claim whose subject is the ABSENCE of an event, which
+        no demo beside them can show. Everything else runs on the page ground or
+        on `ground-raised`.
+        ============================================================ */}
 
         <!-- ============================================================
              HERO — Neat is the composition, not the wallpaper.
@@ -100,6 +117,10 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         <p class="max-w-[34rem] text-base sm:text-lg leading-relaxed text-[#b4b8bd]">
                             {t("hero.subtitle")}
                         </p>
+                        {/* The second CTA is the audit, not the docs. It is the
+                            one thing on the page a stranger can run against
+                            their own database in a minute without an account,
+                            and the close already carries a docs button. */}
                         <div class="mt-8 flex flex-wrap items-center gap-3">
                             <a
                                 href={translatePath("/demo")}
@@ -108,10 +129,10 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 {t("hero.cta.demo")}
                             </a>
                             <a
-                                href={translatePath("/docs")}
+                                href={translatePath("/rls-check")}
                                 class="inline-flex items-center justify-start gap-2 rounded-lg border border-white/15 px-6 min-h-(--control-large) text-sm font-semibold text-white transition-colors hover:border-white/35"
                             >
-                                {t("cta.button.docs")}
+                                {t("hero.cta.audit")}
                             </a>
                         </div>
                     </div>
@@ -158,6 +179,10 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 <p><span class="select-none text-surface-500">$</span> <span class="select-all text-white">{INSTALL_COMMAND}</span></p>
                                 <p class="text-emerald-400">{t("demo.init")}</p>
                                 <p class="text-emerald-400">{t("demo.pull")}</p>
+                                {/* The page's strongest claim, said once in the
+                                    first screen: the policies are compiled, not
+                                    remembered. Chapter 02 argues it at length. */}
+                                <p class="text-emerald-400">{t("demo.rls")}</p>
                                 <p class="text-emerald-400">{t("demo.dev")}</p>
                                 <p class="mt-3 text-surface-500" set:html={t("demo.ports")}></p>
                                 <p class="mt-1"><span class="select-none text-surface-500">$</span> <span class="terminal-caret inline-block h-4 w-[7px] translate-y-[2px] bg-primary"></span></p>
@@ -193,21 +218,159 @@ const SELFHOST_COMMAND = "docker compose up -d";
             <NeatBackground variant="b" client:visible />
         </div>
 
+        <!-- CHAPTER 01 — MECHANISM. The collection file in the middle and the
+             five artifacts it fans out to. -->
         <div>
             <CollectionPowerSection index="01" />
+        </div>
 
-            <!-- The bento, with the content kept and the uniform card dropped:
-                 hairline cells on one raised plate instead of six floating cards. -->
-            <section class="chapter relative ground-raised border-y border-white/8 py-chapter">
-                {/* The numeral is decoration only — the mono label below already
-                    says "02", so this is aria-hidden and the digit is never read
-                    twice. It is absolutely positioned and cropped by the
-                    section's own edge, so it adds no height and reads as
-                    structure rather than ornament. */}
+        <!-- ============================================================
+             CHAPTER 02 — SECURITY. The one chapter whose accent is the brand
+             blue, because it carries the highest-ranked claim.
+             ============================================================ -->
+        <div>
+            {/* CHAPTER 02 — a STRUCTURAL guarantee, and one of only two coloured
+                grounds on the page.
+
+                It qualifies because its claim is the absence of an event: "not by
+                middleware someone has to remember to call". The figure beside
+                it shows five paths and one check; it cannot show that nobody forgot. The colour
+                carries the half of the argument the demo cannot.
+
+                Brand blue deepened, because this promise holds by construction —
+                it is what Rebase is. See `ground-chroma` for the rule and for
+                why the raw #0070F4 cannot be used here. */}
+            <section class="chapter ground-chroma ground-claim py-chapter" style="--hue: var(--color-primary)">
+                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+                        <div class="lg:col-span-5">
+                            {/* No `text-[#b4b8bd]` inside a slab. That grey is
+                                tuned for the near-black page ground; on a
+                                coloured one it reads as dirt. The slab sets its
+                                own `color` and everything here inherits it. */}
+                            <p class="eyebrow">
+                                <span class="font-mono">02</span>
+                                <span class="mx-2 opacity-40">·</span>{t("security.badge")}
+                            </p>
+                            <h2 class="mt-label font-headers text-display-2 text-balance">
+                                {t("security.title")}
+                            </h2>
+                            <p class="mt-lead max-w-[38rem] leading-relaxed">{t("security.desc")}</p>
+                            <div class="mt-10 flex flex-col items-start gap-3">
+                                <a href={translatePath("/security")} class="accent-link">
+                                    {t("security.link")}
+                                    <ArrowRight size={15} />
+                                </a>
+                                <!-- The argument behind the demo above. The section
+                                     shows RLS being edited; this is why it is generated
+                                     rather than hand-written in the first place. -->
+                                <a
+                                    href="/blog/2026-08-23-security-that-does-not-depend-on-remembering"
+                                    class="group inline-flex items-start gap-2.5 text-sm text-surface-400 hover:text-white transition-colors"
+                                >
+                                    <span class="mt-px inline-flex flex-none items-center rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wider bg-white/5 text-surface-300 ring-1 ring-white/10">
+                                        {t("label.blog")}
+                                    </span>
+                                    <span class="max-w-[34rem] leading-relaxed group-hover:underline underline-offset-4 decoration-white/30">
+                                        {t("security.postLink")}
+                                    </span>
+                                </a>
+                            </div>
+                        </div>
+                        {/* The villain and the fix in one frame: five ways into
+                            the same table with the rule in one of them, folding
+                            into the policy as Postgres holds it. The RLS editor
+                            that stood here lives on /security and /studio; a demo
+                            appears on the home page and at most one deep page,
+                            and it was on two. */}
+                        <div class="lg:col-span-7 lg:bleed-right animate-on-scroll fade-in-up delay-100">
+                            <PolicyPathsFigure lang={lang} t={t} />
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+        </div>
+
+        {/* PROOF — the free audit, directly under the security claim, and part
+            of the same chapter.
+
+            Chapter 02 asserts that authorization belongs in the database. This
+            is the one place on the page where that claim can be checked rather
+            than read: a published, read-only tool that audits ANY Postgres,
+            needs no account, and does not care whether you use Rebase.
+
+            It carries no numeral of its own on purpose. It is the evidence for
+            the chapter above it, not a sixth beat, and it is deliberately
+            compact — `RlsCheckReport` renders a full terminal, and this follows
+            a coloured slab that already carries a demo. The whole job here is
+            "this exists, go and run it".
+
+            The band is grey, asked for explicitly (2026-09-04). Between a
+            coloured slab above and the page ground below, no ground at all
+            simply disappears; `ground-raised` is the same grey the page's other
+            bands use, so the proof point separates itself without claiming a
+            chapter number or a second colour. */}
+        <section class="chapter relative ground-raised border-y border-white/8 py-band">
+            <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
+                <div class="flex flex-col gap-10 lg:flex-row lg:items-center lg:justify-between lg:gap-16">
+                    <div class="max-w-xl">
+                        <h2 class="font-headers text-2xl sm:text-3xl text-balance">
+                            {t("rlscheck.title")}
+                        </h2>
+                        <p class="mt-lead text-sm text-[#b4b8bd] leading-relaxed" set:html={t("rlscheck.subtitle")}></p>
+                        <a href={translatePath("/rls-check")} class="accent-link mt-8">
+                            {t("rlscheck.cta")}
+                            <ArrowRight size={15} />
+                        </a>
+                    </div>
+
+                    <div class="flex-none lg:max-w-md w-full">
+                        <div class="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] pl-3 pr-1.5 py-2 font-mono text-xs text-surface-200">
+                            <code class="select-all flex-1 truncate">{RLS_CHECK_COMMAND}</code>
+                            <button
+                                type="button"
+                                data-track-copy="home-rls-check"
+                                data-command={RLS_CHECK_COMMAND}
+                                class="copy-btn flex-none rounded-md p-1.5 text-surface-500 hover:text-white hover:bg-white/5 transition-colors"
+                                aria-label="Copy command"
+                                title="Copy to clipboard"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                     stroke-linejoin="round" aria-hidden="true">
+                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="mt-3 text-2xs leading-5 text-surface-500">{t("rlscheck.note")}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- NEAT DIVIDER → chapter 03, gold. -->
+        <div class="neat-divider relative pointer-events-none overflow-hidden"
+             style="z-index: -1; --divider-h: 600px;">
+            <NeatBackground variant="a" client:visible />
+        </div>
+
+        <!-- CHAPTER 03 — WHAT YOU GET. One chapter, two halves: the engine
+             (SDK, REST, realtime — three live demos) and then the panel that
+             ships on top of it. They used to be two numbered beats either side
+             of the security slab, which made the page state its feature list
+             twice. The engine's `ground-raised` plate went with the merge: the
+             security slab and the proof band above are already two grounds in a
+             row, and a third would leave the page with no ground at all. -->
+        <div>
+            {/* No `overflow-hidden` here and no z-0: the gold divider above
+                bleeds THROUGH this section by design (§6). */}
+            <section class="chapter relative py-chapter">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="max-w-[42rem] animate-on-scroll fade-in-up">
                         <p class="eyebrow">
-                            <span class="font-mono">02</span>
+                            <span class="font-mono">03</span>
                             <span class="mx-2 text-surface-700">·</span>{t("engine.badge")}
                         </p>
                         <h2 class="mt-label font-headers text-display-2 text-balance">
@@ -263,167 +426,14 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             <ArrowRight size={15} />
                         </a>
                     </div>
-                </div>
-            </section>
-        </div>
 
-        <!-- ============================================================
-             CHAPTER 03 — SECURITY. The one chapter whose accent is the brand
-             blue, because it carries the highest-ranked claim.
-             ============================================================ -->
-        <div>
-            {/* CHAPTER 03 — a STRUCTURAL guarantee, and one of only two coloured
-                grounds on the page.
-
-                It qualifies because its claim is the absence of an event: "not by
-                middleware someone has to remember to call". The figure beside
-                it shows five paths and one check; it cannot show that nobody forgot. The colour
-                carries the half of the argument the demo cannot.
-
-                Brand blue deepened, because this promise holds by construction —
-                it is what Rebase is. See `ground-chroma` for the rule and for
-                why the raw #0070F4 cannot be used here. */}
-            <section class="chapter ground-chroma ground-claim py-chapter" style="--hue: var(--color-primary)">
-                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-                        <div class="lg:col-span-5">
-                            {/* No `text-[#b4b8bd]` inside a slab. That grey is
-                                tuned for the near-black page ground; on a
-                                coloured one it reads as dirt. The slab sets its
-                                own `color` and everything here inherits it. */}
-                            <p class="eyebrow">
-                                <span class="font-mono">03</span>
-                                <span class="mx-2 opacity-40">·</span>{t("security.badge")}
-                            </p>
-                            <h2 class="mt-label font-headers text-display-2 text-balance">
-                                {t("security.title")}
-                            </h2>
-                            <p class="mt-lead max-w-[38rem] leading-relaxed">{t("security.desc")}</p>
-                            <div class="mt-10 flex flex-col items-start gap-3">
-                                <a href={translatePath("/studio")} class="accent-link">
-                                    {t("security.link")}
-                                    <ArrowRight size={15} />
-                                </a>
-                                <!-- The argument behind the demo above. The section
-                                     shows RLS being edited; this is why it is generated
-                                     rather than hand-written in the first place. -->
-                                <a
-                                    href="/blog/2026-08-23-security-that-does-not-depend-on-remembering"
-                                    class="group inline-flex items-start gap-2.5 text-sm text-surface-400 hover:text-white transition-colors"
-                                >
-                                    <span class="mt-px inline-flex flex-none items-center rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wider bg-white/5 text-surface-300 ring-1 ring-white/10">
-                                        {t("label.blog")}
-                                    </span>
-                                    <span class="max-w-[34rem] leading-relaxed group-hover:underline underline-offset-4 decoration-white/30">
-                                        {t("security.postLink")}
-                                    </span>
-                                </a>
-                            </div>
-                        </div>
-                        {/* The villain and the fix in one frame: five ways into
-                            the same table with the rule in one of them, folding
-                            into the policy as Postgres holds it. The RLS editor
-                            that stood here lives on /security and /studio; a demo
-                            appears on the home page and at most one deep page,
-                            and it was on two. */}
-                        <div class="lg:col-span-7 lg:bleed-right animate-on-scroll fade-in-up delay-100">
-                            <PolicyPathsFigure lang={lang} t={t} />
-                        </div>
-                    </div>
-
-                </div>
-            </section>
-        </div>
-
-        {/* PROOF — the free audit, directly under the security claim.
-
-            Chapter 03 asserts that authorization belongs in the database. This
-            is the one place on the page where that claim can be checked rather
-            than read: a published, read-only tool that audits ANY Postgres,
-            needs no account, and does not care whether you use Rebase.
-
-            It sits here and not in its own numbered chapter deliberately. The
-            chapter numbers are the page's spine and renumbering 04-08 to insert
-            a proof point would be a worse trade than a quiet band. It is also
-            deliberately compact — `RlsCheckReport` renders a full terminal, and
-            this section follows a coloured slab that already carries a demo.
-            The whole job here is "this exists, go and run it".
-
-            Before this the tool was absent from the shipping home page
-            entirely: `RlsCheckReport` was imported and never rendered.
-
-            The band is grey, asked for explicitly (2026-09-04). It was written
-            as "a quiet band" and then given no ground at all, which is not a
-            band — between a coloured slab above and the page ground below it
-            simply disappeared. `ground-raised` is the same grey the page's
-            other bands use, so the proof point separates itself without
-            claiming a chapter number or a second colour. -->
-        */}
-        <section class="chapter relative ground-raised border-y border-white/8 py-band">
-            <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                <div class="flex flex-col gap-10 lg:flex-row lg:items-center lg:justify-between lg:gap-16">
-                    <div class="max-w-xl">
-                        <h2 class="font-headers text-2xl sm:text-3xl text-balance">
-                            {t("rlscheck.title")}
-                        </h2>
-                        <p class="mt-lead text-sm text-[#b4b8bd] leading-relaxed" set:html={t("rlscheck.subtitle")}></p>
-                        <a href={translatePath("/rls-check")} class="accent-link mt-8">
-                            {t("rlscheck.cta")}
-                            <ArrowRight size={15} />
-                        </a>
-                    </div>
-
-                    <div class="flex-none lg:max-w-md w-full">
-                        <div class="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] pl-3 pr-1.5 py-2 font-mono text-xs text-surface-200">
-                            <code class="select-all flex-1 truncate">{RLS_CHECK_COMMAND}</code>
-                            <button
-                                type="button"
-                                data-track-copy="home-rls-check"
-                                data-command={RLS_CHECK_COMMAND}
-                                class="copy-btn flex-none rounded-md p-1.5 text-surface-500 hover:text-white hover:bg-white/5 transition-colors"
-                                aria-label="Copy command"
-                                title="Copy to clipboard"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" aria-hidden="true">
-                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                </svg>
-                            </button>
-                        </div>
-                        <p class="mt-3 text-2xs leading-5 text-surface-500">{t("rlscheck.note")}</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- NEAT DIVIDER → chapter 04, gold. -->
-        <div class="neat-divider relative pointer-events-none overflow-hidden"
-             style="z-index: -1; --divider-h: 600px;">
-            <NeatBackground variant="a" client:visible />
-        </div>
-
-        <!-- CHAPTER 04 — THE PANEL, WHEN YOU WANT ONE. One beat, not two: the
-             carousel shows the panel; the three columns under it say what the
-             panel is made of and that the API does not move without it. The
-             "modes" chapter that used to precede the carousel said the same
-             thing in prose a screen earlier (cut 2026-09-03). -->
-        <div>
-            {/* No `overflow-hidden` here and no z-0: the gold divider above
-                bleeds THROUGH this section by design (§6). */}
-            <section class="chapter relative py-chapter">
-                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                    <div class="max-w-[42rem] animate-on-scroll fade-in-up">
-                        <p class="eyebrow">
-                            <span class="font-mono">04</span>
-                            <span class="mx-2 text-surface-700">·</span>{t("panel.badge")}
-                        </p>
-                        <h2 class="mt-label font-headers text-display-2 text-balance">
-                            {t("panel.title")}
-                        </h2>
-                        <p class="mt-lead max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("modes.subtitle")}</p>
-                    </div>
+                    <!-- The panel half. A sub-heading, not a second eyebrow: the
+                         panel is part of what you get, not a chapter of its own.
+                         The carousel shows it; the three columns under it say
+                         what it is made of and that the API does not move
+                         without it. -->
+                    <h3 class="mt-block font-headers text-2xl sm:text-3xl text-balance">{t("panel.title")}</h3>
+                    <p class="mt-lead max-w-[38rem] text-[#b4b8bd] leading-relaxed">{t("modes.subtitle")}</p>
                     {/* No `.frame`: the carousel draws its own browser chrome, and
                         §6 allows a demo one frame, not two. The view toggle is page
                         furniture and sits outside the product's edge. */}
@@ -458,29 +468,24 @@ const SELFHOST_COMMAND = "docker compose up -d";
             </section>
         </div>
 
-        {/* CHAPTER 05 — a HAZARD guarantee, and the second and last coloured
-            ground on the page.
+        {/* CHAPTER 04 — a HAZARD guarantee.
 
-            Same test as 03, the other side of it. The claim is again the absence
+            Same test as 02, the other side of it. The claim is again the absence
             of an event — "an agent can't screw up" — and again unshowable: the
             console beside it demonstrates what an agent CAN reach, never that it
-            failed to do damage. Coral because this promise is about a named
-            danger not landing, and coral is the page's alarm hue.
+            failed to do damage. It runs on `ground-raised` rather than a second
+            coloured slab: the page spends chroma twice, on 02 and on the close.
 
-            Dark ink, not white. Coral only exists as a colour at high lightness,
-            so this is the one section on the site that inverts: white on #FB5066
-            is 3.26:1 and fails AA, near-black is 6.11:1.
-
-            The divider that used to introduce this chapter is gone. A coloured
-            ground is a stronger version of the same gesture, and running both
-            would have two devices doing one job. */}
+            The divider that used to introduce this chapter is gone. A ground
+            change is the same gesture, and running both would have two devices
+            doing one job. */}
         <div>
             <section class="chapter ground-raised relative border-y border-white/8 py-chapter">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
                         <div class="lg:col-span-5">
                             <p class="eyebrow">
-                                <span class="font-mono">05</span>
+                                <span class="font-mono">04</span>
                                 <span class="mx-2 opacity-40">·</span>{t("agentera.badge")}
                             </p>
                             <h2 class="mt-label font-headers text-display-2 text-balance">
@@ -504,7 +509,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
             </section>
         </div>
 
-        <!-- CHAPTER 06 — CUSTOMERS. The carousel renders its own eyebrow, title
+        <!-- CHAPTER 05 — CUSTOMERS. The carousel renders its own eyebrow, title
              and subtitle; wrapping it in a second header duplicated all three.
              It also renders its own `py-28 sm:py-36`, and this wrapper used to
              add `py-24 sm:py-32` on top — 272px of ground above the heading and
@@ -516,45 +521,10 @@ const SELFHOST_COMMAND = "docker compose up -d";
         </div>
 
         {/* The roadmap used to run here. It is not in SITE-STORY's beat table,
-            and it sat between the real customers (08) and the ownership close
-            (09) — a list of things that do not exist yet, in the last screen
-            before the ask, on a page whose rule is proof over assertion. It
-            still ships on /about, where "what are you building next" is the
-            page's own question. */}
-
-        <!-- CHAPTER 07 — OWNERSHIP. Claim 5 (SITE-STORY §2), the page's last
-             argument before the ask. Cut on 2026-09-03 into the close's
-             headline, restored the same day from #45 as its own beat: a fact
-             about the terms is worth nothing to a reader who has not yet
-             decided the product is good, and worth more than any other to
-             one who has — which is who is standing here. The close goes back
-             to asking. -->
-        <section class="chapter relative border-t border-white/8 py-chapter">
-            <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
-                    <div class="lg:col-span-5">
-                        <p class="eyebrow">
-                            <span class="font-mono">07</span>
-                            <span class="mx-2 text-surface-700">·</span>{t("opensource.badge")}
-                        </p>
-                        <h2 class="mt-label font-headers text-display-2 text-balance" set:html={t("opensource.title")}></h2>
-                    </div>
-                    <div class="lg:col-span-7">
-                        <p class="text-lg leading-relaxed text-[#b4b8bd] max-w-measure-lead">{t("opensource.desc")}</p>
-                        <div class="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3">
-                            <a href={translatePath("/developers")} class="accent-link">
-                                {t("opensource.link1")}
-                                <ArrowRight size={15} />
-                            </a>
-                            <a href={translatePath("/compare")}
-                               class="text-sm font-semibold text-surface-400 transition-colors hover:text-white">
-                                {t("opensource.link2")}
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
+            and it sat between the real customers and the close — a list of
+            things that do not exist yet, in the last screen before the ask, on
+            a page whose rule is proof over assertion. It still ships on /about,
+            where "what are you building next" is the page's own question. */}
 
         {/* FINAL CTA — the three lanes, as one band, and the page's second and
             last chroma ground.
@@ -568,12 +538,29 @@ const SELFHOST_COMMAND = "docker compose up -d";
             The canvas goes with it. That is deliberate rather than a saving —
             the page opens in art and closes in colour, which is a register
             change the reader can feel: atmosphere while you are being
-            persuaded, flat colour when you are being asked. */}
+            persuaded, flat colour when you are being asked.
+
+            Ownership (claim 5) is folded in here rather than standing as its own
+            beat. A fact about the terms is worth nothing to a reader who has not
+            yet decided the product is good, and worth more than any other to one
+            who has — which is exactly who is standing here. It is a paragraph
+            under the ask, not a chapter before it. */}
         <section class="chapter ground-chroma ground-close relative isolate overflow-hidden" style="--hue: var(--color-chroma-coral)">
             <div class="mx-auto max-w-6xl px-6 lg:px-8 py-chapter">
                 <h2 class="font-headers text-2xl sm:text-3xl max-w-xl text-balance">
                     {t("cta.title")}
                 </h2>
+                <p class="mt-lead max-w-[38rem] text-sm leading-relaxed">{t("opensource.desc")}</p>
+                <div class="mt-6 flex flex-wrap items-center gap-x-8 gap-y-3">
+                    <a href={translatePath("/developers")} class="accent-link">
+                        {t("opensource.link1")}
+                        <ArrowRight size={15} />
+                    </a>
+                    <a href={translatePath("/compare")}
+                       class="text-sm font-semibold text-surface-400 transition-colors hover:text-white">
+                        {t("opensource.link2")}
+                    </a>
+                </div>
 
                 <div class="mt-block grid grid-cols-1 md:grid-cols-3 border-y border-white/10">
                     <div class="md:border-r border-white/10 py-10 md:pr-8">
@@ -640,7 +627,11 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             </span>
                         </h3>
                         <p class="mt-3 text-sm text-[#b4b8bd] leading-relaxed">{t("cta.lane.cloud.desc")}</p>
-                        <a href={translatePath("/pricing")} class="accent-link mt-5">
+                        {/* Cloud is not open yet, so the lane's link asks for an
+                            address rather than sending a reader to a price list
+                            for something they cannot buy. The form is in the
+                            footer of every page (Layout renders it). */}
+                        <a href="#footer-waitlist" class="accent-link mt-5">
                             {t("cta.lane.cloud.link")} <ArrowRight size={14} />
                         </a>
                     </div>
@@ -663,4 +654,3 @@ const SELFHOST_COMMAND = "docker compose up -d";
             </div>
         </section>
     </div>
-
