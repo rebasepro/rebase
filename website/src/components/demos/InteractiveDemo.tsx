@@ -99,7 +99,7 @@ await client.data.orders.update("${activeOrder.id}", {
     }, null, 2);
 
     return (
-        <div className="w-full h-full min-h-[580px] grid grid-cols-1 lg:grid-cols-12 border border-surface-800 bg-surface-950 rounded-xl overflow-hidden shadow-2xl relative not-content">
+        <div className="w-full h-full min-h-[580px] grid grid-cols-1 lg:grid-cols-12 border border-hairline bg-surface-frame rounded-xl overflow-hidden shadow-2xl relative not-content">
             
             {/* Success Toast */}
             <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-emerald-950 border border-emerald-500/30 text-emerald-400 text-xs font-semibold px-4 py-2 rounded-full shadow-lg transition-all duration-300 flex items-center gap-2 ${showToast ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'}`}>
@@ -108,16 +108,16 @@ await client.data.orders.update("${activeOrder.id}", {
             </div>
 
             {/* LEFT SIDE: the interactive panel (8 cols on lg) */}
-            <div className="lg:col-span-7 flex flex-col h-full border-b lg:border-b-0 lg:border-r border-surface-800">
+            <div className="lg:col-span-7 flex flex-col h-full border-b lg:border-b-0 lg:border-r border-hairline">
                 {/* Admin Header */}
-                <div className="px-5 py-3 border-b border-surface-800/80 bg-surface-900/40 flex items-center justify-between">
+                <div className="px-5 py-3 border-b border-hairline bg-surface-sheet flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <ShoppingCart size={16} className="text-primary-light" />
                         <span className="text-xs font-semibold text-white font-sans tracking-wide">Orders Manager</span>
                     </div>
                     
                     {/* Search bar */}
-                    <div className="relative h-8 rounded-lg bg-surface-900 border border-surface-700/60 px-2 flex items-center gap-1.5 w-48">
+                    <div className="relative h-8 rounded-lg bg-surface-card border border-hairline px-2 flex items-center gap-1.5 w-48">
                         <Search size={12} className="text-surface-500" />
                         <input 
                             type="text" 
@@ -132,15 +132,15 @@ await client.data.orders.update("${activeOrder.id}", {
                 {/* List & Detail Splitted layout */}
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-12 min-h-0">
                     {/* Orders List (6 cols on md) */}
-                    <div className="md:col-span-6 border-b md:border-b-0 md:border-r border-surface-800/60 overflow-y-auto max-h-[480px]">
-                        <div className="divide-y divide-surface-900">
+                    <div className="md:col-span-6 border-b md:border-b-0 md:border-r border-hairline overflow-y-auto max-h-[480px]">
+                        <div className="divide-y divide-hairline">
                             {filteredOrders.map(order => {
                                 const isSelected = order.id === selectedOrderId;
                                 return (
                                     <div 
                                         key={order.id}
                                         onClick={() => setSelectedOrderId(order.id)}
-                                        className={`p-3.5 flex flex-col gap-1 cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 border-l-2 border-primary' : 'hover:bg-surface-900/40'}`}
+                                        className={`p-3.5 flex flex-col gap-1 cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 border-l-2 border-primary' : 'hover:bg-surface-hover'}`}
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-mono font-semibold text-white">{order.id}</span>
@@ -162,9 +162,9 @@ await client.data.orders.update("${activeOrder.id}", {
                     </div>
 
                     {/* Order Details Pane (6 cols on md) */}
-                    <div className="md:col-span-6 bg-surface-900/20 p-4 flex flex-col justify-between overflow-y-auto max-h-[480px]">
+                    <div className="md:col-span-6 bg-surface-field p-4 flex flex-col justify-between overflow-y-auto max-h-[480px]">
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between border-b border-surface-800/40 pb-2">
+                            <div className="flex items-center justify-between border-b border-hairline pb-2">
                                 <span className="text-xs font-semibold text-white">Order Details</span>
                                 <span className="text-[9px] font-mono text-surface-500">path: orders/{activeOrder.id}</span>
                             </div>
@@ -196,12 +196,12 @@ await client.data.orders.update("${activeOrder.id}", {
                                     </div>
 
                                     {showStatusDropdown && (
-                                        <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-surface-950 border border-surface-800 rounded-lg shadow-xl overflow-hidden divide-y divide-surface-900">
+                                        <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-surface-frame border border-hairline rounded-lg shadow-xl overflow-hidden divide-y divide-hairline">
                                             {STATUS_OPTIONS.map(opt => (
                                                 <div 
                                                     key={opt}
                                                     onClick={() => handleUpdateStatus(opt)}
-                                                    className="p-2 text-[10px] text-surface-300 hover:bg-surface-900 cursor-pointer flex items-center justify-between"
+                                                    className="p-2 text-[10px] text-surface-300 hover:bg-surface-hover cursor-pointer flex items-center justify-between"
                                                 >
                                                     {opt}
                                                     {activeOrder.status === opt && <Check size={12} className="text-emerald-400" />}
@@ -232,7 +232,7 @@ await client.data.orders.update("${activeOrder.id}", {
                         </div>
 
                         {/* Interactive Hint */}
-                        <div className="mt-4 pt-3 border-t border-surface-850 text-[10px] text-surface-500 leading-normal flex items-start gap-1.5">
+                        <div className="mt-4 pt-3 border-t border-hairline text-[10px] text-surface-500 leading-normal flex items-start gap-1.5">
                             <Play size={10} className="text-primary-light shrink-0 mt-0.5" />
                             <span>Try changing the <strong className="font-semibold text-surface-300">customer name</strong> or <strong className="font-semibold text-surface-300">status</strong> — the SDK call and the REST response on the right update live.</span>
                         </div>
@@ -243,10 +243,10 @@ await client.data.orders.update("${activeOrder.id}", {
             {/* RIGHT SIDE: Live SDK & API Inspector (5 cols on lg) */}
             <div className="lg:col-span-5 flex flex-col h-full bg-[#0c0c0e]">
                 {/* Tabs */}
-                <div className="px-4 py-2.5 border-b border-surface-800 bg-[#0f0f11] flex items-center justify-between">
+                <div className="px-4 py-2.5 border-b border-hairline bg-[#0f0f11] flex items-center justify-between">
                     <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider font-mono">Live API inspector</span>
                     
-                    <div className="flex items-center gap-1 bg-surface-950 border border-surface-800 p-0.5 rounded-md">
+                    <div className="flex items-center gap-1 bg-surface-frame border border-hairline p-0.5 rounded-md">
                         <button 
                             onClick={() => setActiveInspectorTab("sdk")}
                             className={`px-2 py-1 text-[9px] font-mono font-semibold rounded flex items-center gap-1 cursor-pointer ${activeInspectorTab === "sdk" ? 'bg-primary/20 text-primary-light border border-primary/30' : 'text-surface-500 hover:text-surface-300'}`}
@@ -296,7 +296,7 @@ await client.data.orders.update("${activeOrder.id}", {
                 </div>
 
                 {/* Footer details */}
-                <div className="px-4 py-2 border-t border-surface-800/40 bg-surface-950/20 text-[10px] text-surface-500 font-mono flex items-center justify-between">
+                <div className="px-4 py-2 border-t border-hairline bg-surface-well/40 text-[10px] text-surface-500 font-mono flex items-center justify-between">
                     <span>Driver: pgvector + postgres</span>
                     <span>HTTPS 200 OK</span>
                 </div>

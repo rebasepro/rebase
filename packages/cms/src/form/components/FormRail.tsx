@@ -1,7 +1,7 @@
 import type { Entity } from "@rebasepro/types";
 import type { ResolvedFormField } from "@rebasepro/app";
 import React from "react";
-import { CheckIcon, cls, CopyIcon, defaultBorderMixin, IconButton, iconSize, Tooltip, Typography } from "@rebasepro/ui";
+import { CheckIcon, cls, CopyIcon, IconButton, iconSize, Tooltip, Typography } from "@rebasepro/ui";
 
 export interface FormRailProps {
     fields: ResolvedFormField[];
@@ -50,9 +50,10 @@ export function FormRail({
             // window is not a wide form. Both surfaces that render a rail —
             // `EntityForm` and `EntityViewBinding` — name their form element
             // `@container/form`, so a panel that never gets that wide keeps 304.
-            "flex flex-col gap-6 shrink-0 w-76 @7xl/form:w-84 border-l overflow-y-auto",
-            "px-5 py-6 bg-surface-50 dark:bg-surface-900",
-            defaultBorderMixin
+            // No left rule: the rail is sheet beside the form's card, and that
+            // step is the separation. Regions meet with a step, not a line.
+            "flex flex-col gap-6 shrink-0 w-76 @7xl/form:w-84 overflow-y-auto",
+            "px-5 py-6 bg-surface-sheet"
         )}>
             {fields.length > 0 && (
                 <div className={"flex flex-col gap-5"}>

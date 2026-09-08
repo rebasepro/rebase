@@ -199,7 +199,7 @@ const postsCollection: PostgresCollectionConfig = {
         icon: "FileText",
         group: "Content",
         defaultViewMode: "cards",
-        enabledViews: ["table", "cards", "kanban"],
+        enabledViews: ["list", "table", "cards", "kanban"],
         // `publish_date` rather than the derived `updated_at`: a post card is
         // read to see when the post goes out, not when someone last touched the
         // row. The date slot formats relatively and reads the sign, so a

@@ -34,7 +34,7 @@ function SliderThumb(props: {
             <SliderPrimitive.Thumb
                 className={cls({
                         "border-primary bg-primary outline-none": !props.props.disabled,
-                        "border-surface-accent-300 bg-surface-accent-300 dark:border-surface-700 dark:bg-surface-700": props.props.disabled
+                        "border-surface-raised-hover bg-surface-raised-hover": props.props.disabled
                     },
                     props.classes,
                     "focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-opacity-50 focus-visible:ring-primary/50",
@@ -48,7 +48,7 @@ function SliderThumb(props: {
                                   className={cls(
                                       "TooltipContent",
                                       "max-w-lg leading-relaxed",
-                                      "z-50 rounded-md px-3 py-2 text-xs leading-none bg-surface-accent-700 dark:bg-surface-accent-800 bg-opacity-90 bg-surface-accent-700/90 dark:bg-surface-accent-800/90 font-medium text-surface-accent-50 shadow-2xl select-none duration-400 ease-in transform opacity-100"
+                                      "z-50 rounded-md px-3 py-2 text-xs leading-none bg-surface-800/95 dark:bg-surface-raised-hover font-medium text-white shadow-2xl select-none duration-400 ease-in transform opacity-100"
                                   )}>
             {props.props.value?.[props.index]}
         </TooltipPrimitive.Content>
@@ -84,12 +84,12 @@ const Slider = React.forwardRef<
             >
                 <SliderPrimitive.Track
                     style={{ height: size === "small" ? 4 : 8 }}
-                    className={"relative w-full grow overflow-hidden rounded-full bg-surface-accent-300 bg-opacity-40 bg-surface-accent-300/40 dark:bg-surface-700 dark:bg-opacity-40 dark:bg-surface-700/40"}>
+                    className={"relative w-full grow overflow-hidden rounded-full bg-surface-active"}>
 
                     <SliderPrimitive.Range
                         className={cls("absolute h-full", {
                             "bg-primary": !props.disabled,
-                            "bg-surface-accent-300 dark:bg-surface-700": props.disabled
+                            "bg-surface-raised-hover": props.disabled
                         })}
                     />
                 </SliderPrimitive.Track>

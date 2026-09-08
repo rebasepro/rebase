@@ -289,7 +289,7 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
         <div className="frame overflow-hidden">
 
             {/* ── Sliders ───────────────────────────────────────────── */}
-            <div className="border-b border-surface-800/60 bg-surface-950/40 px-5 py-6 sm:px-7">
+            <div className="border-b border-hairline bg-surface-well/60 px-5 py-6 sm:px-7">
                 <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
                     {T("ehc.sliders.title")}
                 </p>
@@ -308,7 +308,7 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
             <div className="grid grid-cols-1 lg:grid-cols-2">
 
                 {/* ── The managed invoice ───────────────────────────── */}
-                <div className="border-b border-surface-800/60 p-6 sm:p-7 lg:border-b-0 lg:border-r">
+                <div className="border-b border-hairline p-6 sm:p-7 lg:border-b-0 lg:border-r">
                     <div className="mb-5 flex items-baseline justify-between gap-3">
                         <span className="text-sm font-semibold text-surface-200">{T("ehc.managed.title")}</span>
                         <span className="rounded-md bg-white/[0.04] px-2 py-0.5 text-[11px] text-surface-500 ring-1 ring-inset ring-white/5">
@@ -345,7 +345,7 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
                         })}
                     </ul>
 
-                    <div className="mt-5 flex items-end justify-between gap-4 border-t border-surface-800/60 pt-5">
+                    <div className="mt-5 flex items-end justify-between gap-4 border-t border-hairline pt-5">
                         <span className="text-sm text-surface-400">{T("ehc.permonth")}</span>
                         <span className="font-mono text-3xl font-semibold tabular-nums text-white">
                             {money(bill.total, "$")}
@@ -449,7 +449,7 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
                             ))}
                         </ul>
 
-                        <div className="mt-5 flex items-end justify-between gap-4 border-t border-surface-800/60 pt-5">
+                        <div className="mt-5 flex items-end justify-between gap-4 border-t border-hairline pt-5">
                             <span className="text-sm text-surface-400">{T("ehc.permonth")}</span>
                             <span className="font-mono text-3xl font-semibold tabular-nums text-white">
                                 €{box.toFixed(2)}
@@ -463,7 +463,7 @@ export function EuHostingCostDemo({ s = {}, lang = "en" }: { s?: Record<string, 
             </div>
 
             {/* ── The read-out ──────────────────────────────────────── */}
-            <div className="border-t border-surface-800/60 bg-surface-950/50 px-5 py-6 sm:px-7">
+            <div className="border-t border-hairline bg-surface-well/70 px-5 py-6 sm:px-7">
                 {insideIncluded ? (
                     <p className="text-[15px] leading-relaxed text-surface-300"
                        dangerouslySetInnerHTML={{ __html: T("ehc.read.included", money(PRICING.base, "$")) }}/>
@@ -537,7 +537,7 @@ function Slider({ label, value, idx, max, included, onChange }: {
                 value={idx}
                 aria-label={label}
                 onChange={(e) => onChange(Number(e.target.value))}
-                className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-surface-800 accent-primary
+                className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-surface-raised accent-primary
                            [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none
                            [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary
                            [&::-webkit-slider-thumb]:shadow-[0_0_0_4px_rgba(0,112,244,0.18)]
@@ -552,7 +552,7 @@ function Bar({ label, width, value, tone }: { label: string; width: number; valu
     return (
         <div className="flex items-center gap-3">
             <span className="w-20 flex-none text-xs text-surface-500">{label}</span>
-            <span className="relative h-7 flex-1 overflow-hidden rounded-lg bg-surface-900/60">
+            <span className="relative h-7 flex-1 overflow-hidden rounded-lg bg-surface-raised">
                 <span
                     className={`absolute inset-y-0 left-0 rounded-lg transition-all duration-500 ease-out ${
                         tone === "amber" ? "bg-amber-500/30" : "bg-primary/40"

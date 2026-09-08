@@ -38,7 +38,11 @@ export function ToggleButtonGroup<T extends string = string>({
     className
 }: ToggleButtonGroupProps<T>) {
     return (
-        <div role="group" aria-label="Toggle options" className={cls("inline-flex flex-row bg-surface-100 dark:bg-surface-900 rounded-lg p-1 gap-1", className)}>
+        // A 32px rounded track (`lg`) with `md` segments. It was 48px with a
+        // blue label on the active segment; the lifted fill already says which
+        // segment is on, so the label stays in the primary ink and the hue is
+        // not spent twice.
+        <div role="group" aria-label="Toggle options" className={cls("inline-flex flex-row bg-surface-field rounded-lg p-1 gap-1", className)}>
             {options.map((option) => (
                 <button
                     key={option.value}
@@ -53,15 +57,15 @@ export function ToggleButtonGroup<T extends string = string>({
                     aria-pressed={value === option.value}
                     aria-disabled={option.disabled || undefined}
                     className={cls(
-                        "flex flex-row items-center justify-center gap-2 py-3 px-4 rounded-md transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                        "flex flex-row items-center justify-center gap-2 h-6 px-3.5 rounded-md transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                         value === option.value
-                            ? "bg-white dark:bg-surface-700 text-primary dark:text-primary-300 shadow-sm"
-                            : "text-text-secondary dark:text-text-secondary-dark hover:bg-surface-200 dark:hover:bg-surface-800",
+                            ? "bg-surface-lifted text-text-primary dark:text-text-primary-dark shadow-sm"
+                            : "text-text-secondary dark:text-text-secondary-dark hover:bg-surface-hover",
                         option.disabled && "opacity-50 cursor-not-allowed"
                     )}
                 >
                     {option.icon}
-                    <span className="text-sm font-medium">{option.label}</span>
+                    <span className="text-xs font-medium">{option.label}</span>
                 </button>
             ))}
         </div>

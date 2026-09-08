@@ -74,8 +74,8 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(f
                         !disabled && "hover:bg-primary/20 dark:hover:bg-primary/30"
                     )
                     : cls(
-                        "bg-surface-accent-100 text-text-secondary dark:bg-surface-accent-800 dark:text-text-secondary-dark",
-                        !disabled && "hover:bg-surface-accent-200 dark:hover:bg-surface-accent-700"
+                        "bg-surface-raised text-text-secondary dark:text-text-secondary-dark",
+                        !disabled && "hover:bg-surface-raised-hover"
                     ),
                 disabled && "opacity-50 cursor-not-allowed",
                 className

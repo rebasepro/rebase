@@ -35,7 +35,7 @@ export function Skeleton({
         className={
         cls(
             "block relative overflow-hidden",
-            "bg-surface-accent-50 dark:bg-surface-accent-800 rounded-md",
+            "bg-surface-raised rounded-md",
             "max-w-full max-h-full",
             // The defaults are classes, not inline styles, so that a caller can
             // override them: an inline style beats every utility, which is why

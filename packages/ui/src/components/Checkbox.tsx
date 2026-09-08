@@ -96,7 +96,7 @@ export const Checkbox = React.memo(({
                 padding ? paddingClasses[size] : "",
                 padding || onCheckedChange ? outerSizeClasses[size] : "",
                 "inline-flex items-center justify-center text-sm font-medium focus:outline-none transition-colors ease-in-out duration-150",
-                onCheckedChange ? "rounded-full hover:bg-surface-accent-200 hover:bg-opacity-75 hover:bg-surface-accent-200/75 dark:hover:bg-surface-accent-700 dark:hover:bg-opacity-75 dark:hover:bg-surface-accent-700/75" : "",
+                onCheckedChange ? "rounded-full hover:bg-surface-hover" : "",
                 onCheckedChange ? "cursor-pointer" : "cursor-default"
             )}>
                 <div
@@ -104,8 +104,8 @@ export const Checkbox = React.memo(({
                         "border-2 shrink-0 relative transition-colors ease-in-out duration-150",
                         sizeClasses[size],
                         disabled
-                            ? (indeterminate || isChecked ? "bg-surface-accent-400 dark:bg-surface-accent-600" : "bg-surface-accent-400 dark:bg-surface-accent-600")
-                            : (indeterminate || isChecked ? colorClasses[color] : "bg-white dark:bg-surface-900"),
+                            ? "bg-surface-300 dark:bg-surface-600"
+                            : (indeterminate || isChecked ? colorClasses[color] : "bg-surface-card"),
                         (indeterminate || isChecked) ? "text-surface-accent-100 dark:text-surface-accent-900" : "",
                         disabled
                             ? "border-transparent"

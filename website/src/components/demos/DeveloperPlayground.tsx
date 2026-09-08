@@ -93,8 +93,8 @@ export function DeveloperPlayground() {
                             }}
                             className={`flex flex-col items-start text-left p-4 rounded-xl border transition-all duration-300 relative cursor-pointer ${
                                 isActive
-                                    ? "bg-surface-900 border-primary/40 ring-1 ring-primary/20 shadow-lg shadow-primary/5"
-                                    : "bg-surface-950/60 border-surface-800/40 hover:bg-surface-900/50 hover:border-surface-800"
+                                    ? "bg-surface-sheet border-primary/40 ring-1 ring-primary/20 shadow-lg shadow-primary/5"
+                                    : "bg-surface-well/80 border-hairline hover:bg-surface-hover hover:border-hairline-strong"
                             }`}
                         >
                             {/* Accent Glow for active tab */}
@@ -105,14 +105,14 @@ export function DeveloperPlayground() {
                                 <span className={`p-1.5 rounded-lg border transition-colors ${
                                     isActive 
                                         ? "bg-primary/10 text-primary-light border-primary/20" 
-                                        : "bg-surface-900 text-surface-500 border-surface-800"
+                                        : "bg-surface-sheet text-surface-500 border-hairline"
                                 }`}>
                                     {tab.icon}
                                 </span>
                                 <span className={`text-[10px] uppercase font-semibold tracking-wider px-2 py-0.5 rounded-md ${
                                     isActive
                                         ? "bg-primary/20 text-primary-light border border-primary/30"
-                                        : "bg-surface-900 text-surface-500 border border-surface-800/60"
+                                        : "bg-surface-sheet text-surface-500 border border-hairline"
                                 }`}>
                                     {tab.badge}
                                 </span>
@@ -129,9 +129,9 @@ export function DeveloperPlayground() {
             </div>
 
             {/* ── Active Tab Dashboard Workspace ── */}
-            <div className="w-full rounded-2xl border border-surface-800/80 bg-surface-950/80 shadow-[0_15px_40px_rgba(0,0,0,0.55)] overflow-hidden">
+            <div className="w-full rounded-2xl border border-hairline bg-surface-well/85 shadow-[0_15px_40px_rgba(0,0,0,0.55)] overflow-hidden">
                 {/* Mock Window Controls Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800/60 bg-surface-900/30">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-hairline bg-surface-field">
                     <div className="flex items-center gap-2">
                         <span className="text-[11px] font-mono text-surface-500 ml-3 tracking-wide">
                             rebase-workspace / {activeTab === "schema" ? "schema_definition.ts" : activeTab === "sdk" ? "client_query.ts" : activeTab === "fields" ? "custom_rating_widget.tsx" : "row_level_security.sql"}
@@ -150,7 +150,7 @@ export function DeveloperPlayground() {
                     {activeTab === "schema" && (
                         <>
                             {/* Code side */}
-                            <div className="lg:col-span-6 border-b lg:border-b-0 lg:border-r border-surface-800/50 bg-[#0f0f11] p-5 font-mono text-[11px] leading-relaxed flex flex-col justify-between">
+                            <div className="lg:col-span-6 border-b lg:border-b-0 lg:border-r border-hairline bg-[#0f0f11] p-5 font-mono text-[11px] leading-relaxed flex flex-col justify-between">
                                 <div className="space-y-4">
                                     <div className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider mb-2">TypeScript Model definition</div>
                                     <pre className="text-surface-300">
@@ -169,7 +169,7 @@ export function DeveloperPlayground() {
                                         &#125;;
                                     </pre>
                                 </div>
-                                <div className="mt-6 pt-4 border-t border-surface-800/40 flex items-center justify-between">
+                                <div className="mt-6 pt-4 border-t border-hairline flex items-center justify-between">
                                     <div className="text-[10px] text-surface-500">AST Mutator will append new fields to this file automatically when edited in UI.</div>
                                     <button
                                         onClick={runSchemaSync}
@@ -187,7 +187,7 @@ export function DeveloperPlayground() {
                             {/* Vis sync side */}
                             <div className="lg:col-span-6 bg-[#09090b] p-5 flex flex-col justify-between">
                                 <div className="space-y-4">
-                                    <div className="flex items-center justify-between border-b border-surface-800/50 pb-2.5">
+                                    <div className="flex items-center justify-between border-b border-hairline pb-2.5">
                                         <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Visual Studio Schema Editor</span>
                                         <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded border ${
                                             schemaStatus === "synced"
@@ -202,7 +202,7 @@ export function DeveloperPlayground() {
                                     </p>
                                     <SchemaBuilderMiniDemo />
                                 </div>
-                                <div className="text-[10px] text-surface-500 font-mono bg-surface-900/40 px-3 py-2 rounded border border-surface-800/40">
+                                <div className="text-[10px] text-surface-500 font-mono bg-surface-raised px-3 py-2 rounded border border-hairline">
                                     <span>Active Engine: </span>
                                     <code className="text-amber-400 font-semibold">drizzle-kit push:postgres</code>
                                 </div>
@@ -214,8 +214,8 @@ export function DeveloperPlayground() {
                     {activeTab === "sdk" && (
                         <>
                             {/* Code side */}
-                            <div className="lg:col-span-7 border-b lg:border-b-0 lg:border-r border-surface-800/50 bg-[#0f0f11] flex flex-col">
-                                <div className="p-4 border-b border-surface-800/40 flex items-center justify-between">
+                            <div className="lg:col-span-7 border-b lg:border-b-0 lg:border-r border-hairline bg-[#0f0f11] flex flex-col">
+                                <div className="p-4 border-b border-hairline flex items-center justify-between">
                                     <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Universal SDK Console</span>
                                     <span className="text-[8px] text-blue-400 font-semibold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">Isomorphic Drizzle client</span>
                                 </div>
@@ -225,7 +225,7 @@ export function DeveloperPlayground() {
                             </div>
                             {/* API inspector side */}
                             <div className="lg:col-span-5 bg-[#09090b] flex flex-col">
-                                <div className="p-4 border-b border-surface-800/40 flex items-center justify-between">
+                                <div className="p-4 border-b border-hairline flex items-center justify-between">
                                     <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Generated REST Endpoint</span>
                                     <span className="text-[8px] text-green-400 font-semibold bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">Instant API</span>
                                 </div>
@@ -240,7 +240,7 @@ export function DeveloperPlayground() {
                     {activeTab === "fields" && (
                         <>
                             {/* Registration code side */}
-                            <div className="lg:col-span-6 border-b lg:border-b-0 lg:border-r border-surface-800/50 bg-[#0f0f11] p-5 font-mono text-[11px] leading-relaxed flex flex-col justify-between">
+                            <div className="lg:col-span-6 border-b lg:border-b-0 lg:border-r border-hairline bg-[#0f0f11] p-5 font-mono text-[11px] leading-relaxed flex flex-col justify-between">
                                 <div className="space-y-4">
                                     <div className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Custom widget registration</div>
                                     <pre className="text-surface-300">
@@ -257,7 +257,7 @@ export function DeveloperPlayground() {
                                         &#125;;
                                     </pre>
                                 </div>
-                                <div className="text-[10px] text-surface-500 leading-normal border-t border-surface-800/40 pt-4">
+                                <div className="text-[10px] text-surface-500 leading-normal border-t border-hairline pt-4">
                                     Register any standard React component as a widget. Rebase automatically handles the form lifecycle state, validation constraints, and serialization.
                                 </div>
                             </div>
@@ -273,7 +273,7 @@ export function DeveloperPlayground() {
                     {/* ── TAB 4: VISUAL SECURITY (RLS) ── */}
                     {activeTab === "security" && (
                         <div className="lg:col-span-12 bg-[#09090b] flex flex-col">
-                            <div className="p-4 border-b border-surface-800/40 flex items-center justify-between">
+                            <div className="p-4 border-b border-hairline flex items-center justify-between">
                                 <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Visual row-level security policy builder</span>
                                 <span className="text-[8px] text-emerald-400 font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">DB Level Security</span>
                             </div>

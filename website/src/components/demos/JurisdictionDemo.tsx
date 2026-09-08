@@ -201,7 +201,7 @@ export function JurisdictionDemo({ s = {} }: { s?: Record<string, string> }) {
         <div className="frame overflow-hidden">
 
             {/* Vendor switch */}
-            <div className="flex flex-wrap items-center gap-2 border-b border-surface-800/60 bg-surface-950/50 px-4 py-3 sm:px-6">
+            <div className="flex flex-wrap items-center gap-2 border-b border-hairline bg-surface-well/70 px-4 py-3 sm:px-6">
                 <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-500">
                     {T("jd.strip")}
                 </span>
@@ -224,7 +224,7 @@ export function JurisdictionDemo({ s = {} }: { s?: Record<string, string> }) {
             <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr]">
 
                 {/* ── The four rows ─────────────────────────────────── */}
-                <div className="divide-y divide-surface-800/60">
+                <div className="divide-y divide-hairline">
                     {ROWS.map((row) => {
                         // The first row is the constant. Everything else swings.
                         const constant = row.key === "region";
@@ -300,7 +300,7 @@ export function JurisdictionDemo({ s = {} }: { s?: Record<string, string> }) {
                 </div>
 
                 {/* ── The read-out ──────────────────────────────────── */}
-                <div className={`relative flex flex-col justify-between gap-6 border-t border-surface-800/60 p-6 transition-colors duration-500 lg:border-l lg:border-t-0 sm:p-7 ${tone.panel}`}>
+                <div className={`relative flex flex-col justify-between gap-6 border-t border-hairline p-6 transition-colors duration-500 lg:border-l lg:border-t-0 sm:p-7 ${tone.panel}`}>
                     <div
                         className="pointer-events-none absolute inset-0 opacity-70 transition-opacity duration-500"
                         aria-hidden="true"
@@ -357,7 +357,7 @@ export function JurisdictionDemo({ s = {} }: { s?: Record<string, string> }) {
                 </div>
             </div>
 
-            <p className="border-t border-surface-800/60 bg-surface-950/40 px-5 py-3 text-[11px] leading-relaxed text-surface-500 sm:px-7">
+            <p className="border-t border-hairline bg-surface-well/60 px-5 py-3 text-[11px] leading-relaxed text-surface-500 sm:px-7">
                 {T("jd.footnote")}
             </p>
         </div>

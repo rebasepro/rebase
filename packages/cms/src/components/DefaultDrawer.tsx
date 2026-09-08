@@ -365,7 +365,7 @@ export function DrawerToggle({
                     type="button"
                     className={cls(
                         "flex flex-row items-center rounded-lg cursor-pointer w-full",
-                        "hover:bg-surface-accent-100 dark:hover:bg-surface-800",
+                        "hover:bg-surface-hover",
                         "transition-colors duration-150",
                         "py-2"
                     )}
@@ -419,7 +419,7 @@ function DrawerModeSwitch({
                 showSwitch ? "opacity-100 h-7 mt-2 mb-0" : "opacity-0 pointer-events-none h-7 mt-2 mb-0"
             )}
         >
-            <div role="group" aria-label="Panel mode" className="flex bg-surface-100 dark:bg-surface-900 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700/60">
+            <div role="group" aria-label="Panel mode" className="flex bg-surface-field rounded-lg p-0.5">
                 <button
                     onClick={() => {
                         adminModeController.setMode("cms");
@@ -427,9 +427,9 @@ function DrawerModeSwitch({
                     }}
                     aria-pressed={adminModeController.mode === "cms"}
                     className={cls(
-                        "flex-1 px-3 py-0.5 text-xs font-semibold rounded-md transition-all text-center",
+                        "flex-1 px-3 py-0.5 text-xs font-medium rounded-md transition-all text-center",
                         adminModeController.mode === "cms"
-                            ? "bg-white dark:bg-surface-800 shadow-sm text-primary dark:text-primary-400"
+                            ? "bg-surface-lifted shadow-sm text-text-primary dark:text-text-primary-dark"
                             : "text-surface-500 hover:text-surface-900 dark:hover:text-white"
                     )}
                 >
@@ -442,9 +442,9 @@ function DrawerModeSwitch({
                     }}
                     aria-pressed={adminModeController.mode === "studio"}
                     className={cls(
-                        "flex-1 px-3 py-0.5 text-xs font-semibold rounded-md transition-all text-center",
+                        "flex-1 px-3 py-0.5 text-xs font-medium rounded-md transition-all text-center",
                         adminModeController.mode === "studio"
-                            ? "bg-white dark:bg-surface-800 shadow-sm text-primary dark:text-primary-400"
+                            ? "bg-surface-lifted shadow-sm text-text-primary dark:text-text-primary-dark"
                             : "text-surface-500 hover:text-surface-900 dark:hover:text-white"
                     )}
                 >
@@ -520,7 +520,7 @@ export function DrawerFooterActions({
                                 className={cls(
                                     "shrink-0 flex items-center justify-center w-[44px] cursor-pointer",
                                     "rounded-md py-1",
-                                    "hover:bg-surface-accent-100 dark:hover:bg-surface-800",
+                                    "hover:bg-surface-hover",
                                     "transition-colors duration-150"
                                 )}
                                 role="button"

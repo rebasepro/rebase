@@ -81,12 +81,12 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
     // Memoize className computations
     const backgroundColor = useMemo((): string => {
         if (isDragging) {
-            return "bg-surface-100 dark:bg-surface-800";
+            return "bg-surface-raised";
         }
         if (isGroupedOver) {
-            return "bg-surface-200 dark:bg-surface-700";
+            return "bg-surface-raised";
         }
-        return "bg-white dark:bg-surface-800 hover:bg-surface-50 dark:hover:bg-surface-700";
+        return "bg-surface-card hover:bg-surface-hover";
     }, [isDragging, isGroupedOver]);
 
     const borderColor = useMemo((): string =>
@@ -128,7 +128,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
                         </div>
                     ) : (
                         <div className={cls(
-                            "w-10 h-10 rounded-md bg-surface-100 dark:bg-surface-900 flex items-center justify-center transition-opacity duration-200",
+                            "w-10 h-10 rounded-md bg-surface-raised flex items-center justify-center transition-opacity duration-200",
                             selectionEnabled && "group-hover/card:opacity-30",
                             selected && "opacity-0"
                         )}>

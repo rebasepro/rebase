@@ -78,7 +78,7 @@ const marks: { [key: string]: MarkSpec } = {
         parseDOM: [{ tag: "code" }],
         toDOM() {
             return ["code", {
-                class: "rounded-md bg-surface-accent-50 dark:bg-surface-700 px-1.5 py-1 font-mono font-medium",
+                class: "rounded-md bg-surface-raised px-1.5 py-1 font-mono font-medium",
                 spellcheck: "false"
             }, 0];
         }
@@ -200,7 +200,7 @@ const nodes: { [key: string]: NodeSpec } = {
             }
         ],
         toDOM(node) {
-            return ["pre", { class: "rounded bg-blue-50 dark:bg-surface-700 border border-solid border-gray-200 dark:border-gray-800 p-5 font-mono font-medium text-gray-800 dark:text-gray-200" }, ["code", 0]];
+            return ["pre", { class: "rounded bg-surface-well border border-hairline p-5 font-mono font-medium text-gray-800 dark:text-gray-200" }, ["code", 0]];
         }
     },
     image: {

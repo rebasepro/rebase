@@ -144,7 +144,7 @@ export const UIStyleGuide = () => {
             </section>
 
             <section className="mb-12">
-                <div className="flex justify-between items-center bg-surface-100 dark:bg-surface-950 p-8 rounded-xl border border-dashed border-surface-400">
+                <div className="flex justify-between items-center bg-surface-frame p-8 rounded-xl border border-dashed border-surface-400">
                     <div>
                         <Typography variant="h5">Dark Mode Check</Typography>
                         <Typography variant="body2" color="secondary">Typography and buttons should adapt automatically.</Typography>

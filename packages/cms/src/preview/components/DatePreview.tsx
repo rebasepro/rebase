@@ -73,7 +73,10 @@ export function DatePreview({
         const tzAbbrev = parts.find(p => p.type === "timeZoneName")?.value ?? "";
 
         return (
-            <span className="flex items-center gap-1">
+            // A date is a measured value: the mono tier, tabular, so a column of
+            // them lines up and a live one does not jitter. Size and colour are
+            // inherited from where it sits — a table cell, a form value.
+            <span className="flex items-center gap-1 font-mono tabular-nums">
                 {formattedDate}
                 {tzAbbrev && (
                     <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -99,8 +102,8 @@ export function DatePreview({
     const formattedDate = format(date, dateFormat, { locale: dateUtilsLocale });
 
     return (
-        <>
+        <span className="font-mono tabular-nums">
             {formattedDate}
-        </>
+        </span>
     );
 }

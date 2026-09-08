@@ -383,6 +383,12 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
             ref={detailPanelRef}
             className={cls(
                 "flex-1 flex flex-col min-w-0 h-full transition-all ease-out w-full",
+                // The record is an object opened beside the list, so it carries
+                // its own left edge — the way a card carries its hairline. The
+                // resize handle between the panes is transparent; this line is
+                // the record's, not a divider hanging in the gap. Side-by-side
+                // only: stacked, the record has no left neighbour.
+                largeLayout && "border-l border-hairline",
                 animationPhase === "entered"
                     ? "opacity-100 translate-x-0"
                     : (largeLayout ? "opacity-0 translate-x-8" : "opacity-0 translate-x-1/3")

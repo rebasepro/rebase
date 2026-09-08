@@ -48,14 +48,15 @@ const MOCK_ORDERS: Order[] = [
 ];
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  // CHIP_COLORS in DARK mode — packages/ui/src/util/chip_colors.ts. These were
-  // Tailwind's `-500` stops with flat white ink, which is the pairing the chip
-  // rework removed: white on amber-500 measures ~2:1 and is not readable.
-  Confirmed: { bg: "#2750ae", text: "#cfdfff" },
-  Delivered: { bg: "#338a17", text: "#030801" },
-  Shipped: { bg: "#4f46e5", text: "#e0e7ff" },
-  Cancelled: { bg: "#ba1e45", text: "#ffdce5" },
-  Processing: { bg: "#b87503", text: "#261801" },
+  // CHIP_COLORS in DARK mode, the TINTED variant the product draws by default
+  // since 2026-09-08 — packages/ui/src/util/chip_colors.ts (`darkTintColor`,
+  // `darkTintText`). The solid stops these replaced painted a status as a
+  // block; a 14% wash behind hue-coloured ink is a label.
+  Confirmed: { bg: "rgba(45, 127, 249, 0.14)", text: "#9cc7ff" },
+  Delivered: { bg: "rgba(32, 201, 51, 0.14)", text: "#93e088" },
+  Shipped: { bg: "rgba(99, 102, 241, 0.14)", text: "#a5b4fc" },
+  Cancelled: { bg: "rgba(248, 43, 96, 0.14)", text: "#ff9eb7" },
+  Processing: { bg: "rgba(252, 180, 0, 0.14)", text: "#ffd66e" },
 };
 
 /* ─── KPI Card ─── */
@@ -68,7 +69,7 @@ function KPICard({ title, subtitle, value, change, icon, isHighlighted = false }
     <div className={`flex-1 min-w-0 rounded-lg border p-2.5 transition-all duration-300 ${
       isHighlighted
         ? "border-primary/40 bg-primary/5 dark:bg-primary/10 shadow-sm"
-        : "border-surface-200/30 dark:border-surface-700/40 bg-white dark:bg-surface-900/50"
+        : "border-hairline bg-surface-sheet"
     }`}>
       <div className="flex items-center justify-between mb-1">
         <div className="text-xs font-medium text-surface-900 dark:text-surface-200">{title}</div>
@@ -95,8 +96,8 @@ function OrderRow({ order, isHovered, isSelected, onHover, onLeave }: {
   const statusColor = STATUS_COLORS[order.status];
   return (
     <div
-      className={`flex items-center min-w-full border-b border-surface-200/20 dark:border-surface-700/30 cursor-pointer transition-colors px-4 ${
-        isSelected ? "bg-primary/5" : isHovered ? "bg-surface-100/50 dark:bg-surface-800/20" : ""
+      className={`flex items-center min-w-full border-b border-hairline cursor-pointer transition-colors px-4 ${
+        isSelected ? "bg-primary/5" : isHovered ? "bg-surface-field" : ""
       }`}
       style={{ height: 58 }}
       onMouseEnter={onHover}
@@ -104,7 +105,7 @@ function OrderRow({ order, isHovered, isSelected, onHover, onLeave }: {
     >
       <div className="flex-shrink-0 w-10 flex items-center justify-center">
         <div className={`border-2 w-4 h-4 rounded flex items-center justify-center transition-colors ${
-          isSelected ? "bg-primary border-primary" : "bg-white dark:bg-surface-900 border-surface-400 dark:border-surface-500"
+          isSelected ? "bg-primary border-primary" : "bg-surface-card border-surface-400 border-hairline-strong"
         }`}>
           {isSelected && (
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -156,7 +157,7 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
   return (
     <div className="flex flex-col h-full">
       {/* Panel top bar */}
-      <div className="h-14 flex items-center px-3 border-b border-surface-200/20 dark:border-surface-700/30 shrink-0 gap-1">
+      <div className="h-14 flex items-center px-3 border-b border-hairline shrink-0 gap-1">
         <button className="p-1.5 rounded text-surface-400"><X size={18} /></button>
         <button className="p-1.5 rounded text-surface-400"><Maximize2 size={14} /></button>
         <div className="flex-1" />
@@ -169,7 +170,7 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
         <div className="flex flex-col w-full pt-6 pb-16 px-4 sm:px-6">
           {/* Saved badge */}
           <div className="flex justify-end mb-2" style={{ minHeight: 22 }}>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-300 text-[10px] font-semibold border border-transparent" style={{ minWidth: 72 }}>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-surface-500 dark:text-surface-300 text-[10px] font-semibold border border-transparent" style={{ minWidth: 72 }}>
               ✓ Saved
             </span>
           </div>
@@ -178,7 +179,7 @@ function OrderDetailPanel({ order, onClose, highlightedField }: {
           <div className="text-xl font-semibold text-surface-900 dark:text-white leading-tight mb-2">{order.id}</div>
 
           {/* Path */}
-          <div className="w-full rounded-md bg-surface-100 dark:bg-surface-950 px-3 py-1.5 mb-6">
+          <div className="w-full rounded-md bg-surface-well px-3 py-1.5 mb-6">
             <code className="text-[11px] text-surface-500">orders/{order.id}</code>
           </div>
 
@@ -347,12 +348,12 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
 
   return (
     <div
-      className="flex overflow-hidden bg-surface-50 dark:bg-surface-900 text-surface-900 dark:text-white pointer-events-none select-none relative"
+      className="flex overflow-hidden bg-surface-sheet text-surface-900 dark:text-white pointer-events-none select-none relative"
       style={{ height, width: "100%" }}
     >
       {/* Drawer */}
       <div className="z-20 relative hidden sm:block" style={{ width: 72 }}>
-        <div className="h-full no-scrollbar overflow-y-auto overflow-x-hidden relative bg-surface-50 dark:bg-surface-900" style={{ width: 72 }}>
+        <div className="h-full no-scrollbar overflow-y-auto overflow-x-hidden relative bg-surface-sheet" style={{ width: 72 }}>
           <div className="flex flex-col h-full">
             <div className="flex flex-row items-center shrink-0 pt-4 pb-0 px-2">
               <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
@@ -361,13 +362,13 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
             </div>
             <div className="mt-1 flex-grow overflow-scroll no-scrollbar">
               <div className="my-2 mx-2 flex flex-col">
-                <div className="overflow-hidden bg-surface-50 dark:bg-surface-800/30 rounded-lg">
+                <div className="overflow-hidden bg-surface-field rounded-lg">
                   {NAV_ITEMS.map((item) => {
                     const Icon = item.icon;
                     return (
                       <div key={item.label}>
                         <div className={`rounded-lg truncate flex flex-row items-center h-10 font-semibold text-xs ${
-                          item.active ? "bg-surface-accent-200/60 dark:bg-surface-800 dark:bg-opacity-50" : "hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75"
+                          item.active ? "bg-surface-accent-200/60 bg-surface-raised dark:bg-opacity-50" : "hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75"
                         } text-text-primary dark:text-surface-200`}>
                           <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
                             <Icon size={18} />
@@ -392,12 +393,12 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
 
       {/* Main */}
       <main className="flex flex-col grow overflow-auto">
-        <div className="border-surface-200/20 dark:border-surface-700/30 bg-surface-50 dark:bg-surface-900 grow overflow-auto m-0 mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border flex flex-col">
+        <div className="border-hairline bg-surface-sheet grow overflow-auto m-0 mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border flex flex-col">
           {/* Toolbar */}
-          <div className="min-h-[48px] overflow-x-auto px-2 md:px-4 bg-surface-50 dark:bg-surface-900 border-b border-surface-200/40 dark:border-surface-700/40 flex flex-row justify-between items-center w-full shrink-0">
+          <div className="min-h-[48px] overflow-x-auto px-2 md:px-4 bg-surface-sheet border-b border-hairline flex flex-row justify-between items-center w-full shrink-0">
             <div className="flex items-center gap-1 mr-4">
-              <div className="flex items-center bg-surface-100 dark:bg-surface-800 rounded-md p-0.5 gap-0.5">
-                <button className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-white dark:bg-surface-900 shadow-sm text-primary">
+              <div className="flex items-center bg-surface-raised rounded-md p-0.5 gap-0.5">
+                <button className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-surface-card shadow-sm text-primary">
                   <LayoutList size={14} /><span className="text-xs">List</span>
                 </button>
               </div>
@@ -406,7 +407,7 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
               </button>
             </div>
             <div className="flex items-center gap-1">
-              <div className="flex items-center h-8 rounded-lg bg-surface-accent-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700/60 px-2.5 gap-1.5 min-w-[160px]">
+              <div className="flex items-center h-8 rounded-lg bg-surface-accent-50 bg-surface-sheet border border-hairline px-2.5 gap-1.5 min-w-[160px]">
                 <Search size={16} className="text-surface-400" />
                 <span className="text-xs text-surface-400 whitespace-nowrap">Search</span>
               </div>
@@ -415,14 +416,14 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
               <button aria-label="Settings" className="p-1.5 rounded-full text-surface-500"><Settings size={16} /></button>
               <button aria-label="Delete" className="p-1.5 rounded-full text-surface-500 opacity-50"><Trash2 size={16} /></button>
               <span className="text-xs text-surface-400 mx-1">(0)</span>
-              <button className="flex items-center gap-1 min-h-[32px] px-2 rounded-lg border border-primary bg-primary text-white text-sm font-semibold tracking-wide">
+              <button className="flex items-center gap-1 min-h-[32px] px-2 rounded-lg border border-primary bg-primary text-white text-sm font-medium">
                 <Plus size={16} /><span className="text-xs font-medium">Add Order</span>
               </button>
             </div>
           </div>
 
           {/* Content area — list + panel split */}
-          <div className="h-full w-full flex bg-white dark:bg-surface-950 overflow-hidden relative">
+          <div className="h-full w-full flex bg-surface-card overflow-hidden relative">
             {/* Left: list content (shrinks when panel opens; hidden on mobile when panel is open) */}
             <div
               className="flex flex-col overflow-auto transition-all duration-150 ease-out"
@@ -450,7 +451,7 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
                         isHighlighted={highlightedKPI === 2} />
                     </div>
                   </div>
-                  <div className="h-px bg-surface-200/30 dark:bg-surface-700/40 mx-4" />
+                  <div className="h-px bg-surface-raised mx-4" />
                 </>
               )}
 
@@ -471,7 +472,7 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
 
             {/* Right: detail panel (split view; full-width overlay on mobile) */}
             <div
-              className="border-l border-surface-200/20 dark:border-surface-700/30 bg-white dark:bg-surface-900 shadow-[-4px_0_20px_rgba(0,0,0,0.08)] flex flex-col transition-all duration-150 ease-out overflow-hidden"
+              className="border-l border-hairline bg-surface-card shadow-[-4px_0_20px_rgba(0,0,0,0.08)] flex flex-col transition-all duration-150 ease-out overflow-hidden"
               style={{
                 width: panelOpen
                   ? isMobile ? "100%" : isMedium ? "65%" : "55%"

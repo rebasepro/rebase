@@ -21,8 +21,8 @@ const Label = React.forwardRef<
         ref={ref}
         onClick={onClick}
         className={cls("text-sm font-medium peer-disabled:cursor-not-allowed",
-            border && "border border-surface-300 dark:border-surface-700 rounded-md px-3 py-1.5",
-            onClick && "hover:cursor-pointer hover:bg-surface-200 dark:hover:bg-surface-800",
+            border && "border border-hairline-strong rounded-md px-3 py-1.5",
+            onClick && "hover:cursor-pointer hover:bg-surface-hover",
             defaultBorderMixin, className)}
         {...props}
     />

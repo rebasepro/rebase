@@ -197,7 +197,7 @@ parentEntityIds,
             {entitiesCount === null
                 ? <Skeleton className={"w-8 h-4 rounded-md mx-1"}/>
                 : <span
-                    className={"mx-1 text-xs text-surface-accent-600 dark:text-surface-accent-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded tabular-nums"}>
+                    className={"mx-1 text-xs text-surface-accent-600 dark:text-surface-accent-400 bg-surface-raised px-1.5 py-0.5 rounded tabular-nums"}>
                     {entitiesCount.toLocaleString()}
                 </span>}
         </Tooltip>

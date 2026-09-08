@@ -145,7 +145,7 @@ export const ImageBubble = forwardRef<HTMLDivElement, ImageBubbleProps>(
                     position: "fixed",
                     zIndex: 50
                 }}
-                className={cls("flex flex-col gap-1.5 p-2 w-56 max-w-[90vw] rounded-lg border bg-white dark:bg-surface-800 shadow-lg", defaultBorderMixin, className)}
+                className={cls("flex flex-col gap-1.5 p-2 w-56 max-w-[90vw] rounded-lg border bg-surface-card shadow-lg", defaultBorderMixin, className)}
                 onMouseDown={(e) => {
                     // Prevent mousedown from stealing focus from inputs
                     // but we don't want to prevent typing

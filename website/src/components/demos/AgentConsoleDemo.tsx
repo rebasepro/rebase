@@ -39,7 +39,7 @@ const CAPABILITIES: Capability[] = [
                 {line(1, <span className="text-surface-500">?vector_search=</span>, <span className="text-amber-300">embedding</span>)}
                 {line(1, <span className="text-surface-500">&vector=</span>, <span className="text-primary">[0.12, 0.98, …]</span>)}
                 {line(1, <span className="text-surface-500">&vector_distance=</span>, <span className="text-cyan-300">cosine</span>)}
-                <div className="mt-3 border-t border-surface-800/60 pt-3">
+                <div className="mt-3 border-t border-hairline pt-3">
                     {line(0, <span className="text-surface-500">200 OK · 14ms</span>)}
                     {line(0, <span className="text-surface-400">[{"{"} "id": "d_91", "score": 0.94 {"}"}, …]</span>)}
                 </div>
@@ -56,7 +56,7 @@ const CAPABILITIES: Capability[] = [
         screen: "api-keys",
         body: (
             <div className="space-y-1.5">
-                <div className="grid grid-cols-[1fr_auto_auto] gap-3 text-surface-500 pb-1.5 border-b border-surface-800/60">
+                <div className="grid grid-cols-[1fr_auto_auto] gap-3 text-surface-500 pb-1.5 border-b border-hairline">
                     <span>key</span><span>scope</span><span>rate</span>
                 </div>
                 <div className="grid grid-cols-[1fr_auto_auto] gap-3">
@@ -144,7 +144,7 @@ const CAPABILITIES: Capability[] = [
         screen: "cron",
         body: (
             <div className="space-y-1.5">
-                <div className="grid grid-cols-[auto_1fr_auto] gap-4 text-surface-500 pb-1.5 border-b border-surface-800/60">
+                <div className="grid grid-cols-[auto_1fr_auto] gap-4 text-surface-500 pb-1.5 border-b border-hairline">
                     <span>schedule</span><span>job</span><span>last run</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr_auto] gap-4">
@@ -195,7 +195,7 @@ const CAPABILITIES: Capability[] = [
                 {line(1, <span className="text-surface-300">properties: {"{"} total, status, customer {"}"},</span>)}
                 {line(1, <span className="text-surface-300">securityRules: [{"{"} operation: </span>, <span className="text-emerald-300">"select"</span>, <span className="text-surface-300">, … {"}"}],</span>)}
                 {line(0, <span className="text-surface-300">{"}"};</span>)}
-                <div className="mt-3 border-t border-surface-800/60 pt-3">
+                <div className="mt-3 border-t border-hairline pt-3">
                     {line(0, <span className="text-surface-500">→ REST · typed SDK · RLS policies · admin views</span>)}
                 </div>
             </>
@@ -232,7 +232,7 @@ export function AgentConsoleDemo() {
         <div className="frame overflow-hidden">
 
             {/* window chrome */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-800/60 bg-surface-950/50">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-hairline bg-surface-well/70">
                 <span className="font-mono text-[11px] text-surface-500">
                     agent · what it can reach
                 </span>
@@ -241,7 +241,7 @@ export function AgentConsoleDemo() {
             <div className="grid grid-cols-1 lg:grid-cols-[248px_1fr]">
 
                 {/* left rail */}
-                <nav className="p-2 lg:border-r border-surface-800/60 flex lg:block gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <nav className="p-2 lg:border-r border-hairline flex lg:block gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {CAPABILITIES.map((cap) => {
                         const on = cap.key === activeKey;
                         return (
@@ -252,7 +252,7 @@ export function AgentConsoleDemo() {
                                 aria-pressed={on}
                                 className={`flex-none lg:w-full flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-200 ${
                                     on
-                                        ? "bg-primary/10 text-white ring-1 ring-inset ring-primary/25"
+                                        ? "bg-surface-active text-white"
                                         : "text-surface-400 hover:text-surface-200 hover:bg-white/[0.03]"
                                 }`}>
                                 <cap.Icon size={15} className={on ? "text-primary" : "text-surface-500"}/>
@@ -272,8 +272,8 @@ export function AgentConsoleDemo() {
                     <p className="mt-2 text-sm leading-relaxed text-surface-400 max-w-2xl">{active.desc}</p>
 
                     {/* the mock surface */}
-                    <div className="mt-5 rounded-xl border border-surface-800/60 bg-surface-950/80 overflow-hidden">
-                        <div className="px-3.5 py-2 border-b border-surface-800/60 bg-surface-900/40">
+                    <div className="mt-5 rounded-xl border border-hairline bg-surface-well/85 overflow-hidden">
+                        <div className="px-3.5 py-2 border-b border-hairline bg-surface-sheet">
                             <span className="font-mono text-[10px] text-surface-500">{active.screen}</span>
                         </div>
                         <div className="p-4 font-mono text-[11px] leading-relaxed overflow-x-auto">
@@ -284,7 +284,7 @@ export function AgentConsoleDemo() {
                     <div className="mt-4 flex flex-wrap gap-1.5">
                         {active.pills.map((p) => (
                             <span key={p}
-                                  className="px-2 py-1 rounded-lg bg-surface-800/60 text-[11px] text-surface-300 ring-1 ring-inset ring-surface-700/50">
+                                  className="px-2 py-1 rounded-lg bg-surface-raised text-[11px] text-surface-300 ring-1 ring-inset ring-surface-700/50">
                                 {p}
                             </span>
                         ))}

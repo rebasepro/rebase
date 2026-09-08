@@ -179,7 +179,7 @@ export function UserSelectPopover({
                         "flex items-center gap-1.5 text-xs font-medium transition-colors rounded border border-transparent",
                         "text-text-secondary dark:text-text-secondary-dark",
                         "hover:text-text-primary dark:hover:text-text-primary-dark",
-                        "bg-surface-100 hover:bg-surface-200 dark:bg-surface-950 dark:hover:bg-surface-700",
+                        "bg-surface-raised hover:bg-surface-raised-hover",
                         size === "small" ? "px-2 py-1" : "px-3 py-1.5",
                         className
                     )}
@@ -323,7 +323,7 @@ function UserRow({ user, isSelected, isSelf, onClick }: UserRowProps) {
             onClick={onClick}
             className={cls(
                 "w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors",
-                "hover:bg-surface-accent-100 dark:hover:bg-surface-accent-900",
+                "hover:bg-surface-hover",
                 isSelected && "bg-primary/5 dark:bg-primary-dark/10"
             )}
             style={{ minHeight: ITEM_HEIGHT }}
@@ -336,7 +336,7 @@ function UserRow({ user, isSelected, isSelf, onClick }: UserRowProps) {
                     className="w-7 h-7 rounded-full object-cover shrink-0"
                 />
             ) : (
-                <div className="w-7 h-7 rounded-full bg-surface-200 dark:bg-surface-700 flex items-center justify-center shrink-0">
+                <div className="w-7 h-7 rounded-full bg-surface-raised flex items-center justify-center shrink-0">
                     <CircleUserIcon
                         size={"smallest"}
                         className="text-text-disabled dark:text-text-disabled-dark"

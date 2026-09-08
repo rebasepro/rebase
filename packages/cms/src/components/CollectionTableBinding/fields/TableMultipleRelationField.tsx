@@ -118,7 +118,7 @@ export const TableMultipleRelationFieldInternal = React.memo(
                         className={cls("px-3 py-2 text-sm font-medium flex items-center gap-4",
                             disabled
                                 ? "text-surface-accent-500"
-                                : "cursor-pointer text-text-secondary dark:text-text-secondary-dark hover:bg-surface-accent-50 dark:hover:bg-surface-800 group-hover:bg-surface-accent-50 dark:group-hover:bg-surface-800")}
+                                : "cursor-pointer text-text-secondary dark:text-text-secondary-dark hover:bg-surface-hover group-hover:bg-surface-hover")}
                         onClick={handleOpen}
                         size={"medium"}>
                         <PencilIcon

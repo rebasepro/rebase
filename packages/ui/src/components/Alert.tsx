@@ -39,7 +39,7 @@ const getColorClasses = (severity: string) => {
             return "bg-emerald-500/8 dark:bg-emerald-500/12 text-emerald-800 dark:text-emerald-200 border border-emerald-500/20 dark:border-emerald-500/25";
         case "base":
         default:
-            return "bg-surface-accent-500/8 dark:bg-surface-accent-400/10 text-surface-accent-800 dark:text-surface-accent-100 border border-surface-accent-500/15 dark:border-surface-accent-400/20";
+            return "bg-surface-field text-text-primary dark:text-text-primary-dark border border-hairline";
     }
 };
 

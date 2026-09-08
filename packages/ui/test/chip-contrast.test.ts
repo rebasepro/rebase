@@ -1,4 +1,4 @@
-import { CHIP_COLORS, CHIP_SEED_KEYS, contrastRatio, getColorSchemeForSeed } from "../src/util/chip_colors";
+import { CHIP_COLORS, CHIP_SEED_KEYS, contrastRatio, getColorSchemeForSeed, tintOnPage } from "../src/util/chip_colors";
 
 /**
  * Chips must be readable.
@@ -16,9 +16,9 @@ import { CHIP_COLORS, CHIP_SEED_KEYS, contrastRatio, getColorSchemeForSeed } fro
 /** WCAG AA for normal-sized text. Chip labels are 11–13px. */
 const AA = 4.5;
 
-/** The surfaces an outlined chip sits on: `bg-white` and `surface-950`. */
+/** The surfaces a chip sits on: a light card and the dark `surface-card` (#181818). */
 const PAGE_LIGHT = "#ffffff";
-const PAGE_DARK = "#0a0a0a";
+const PAGE_DARK = "#181818";
 
 describe("chip contrast", () => {
     it("covers every scheme, so a new hue cannot slip past this file", () => {
@@ -48,6 +48,20 @@ describe("chip contrast", () => {
             expect(scheme.darkOutlineText).toBeDefined();
             expect(contrastRatio(scheme.outlineText as string, PAGE_LIGHT)).toBeGreaterThanOrEqual(AA);
             expect(contrastRatio(scheme.darkOutlineText as string, PAGE_DARK)).toBeGreaterThanOrEqual(AA);
+        });
+
+        it("tinted: ink clears AA on the tint AS COMPOSITED over the page, both modes", () => {
+            // The default variant now. The trap it guards: an ink that clears
+            // AA on the bare page lands near 3.5:1 on a 16% wash of its own
+            // hue, so the ink has to be measured on the composite, not the page.
+            expect(scheme.tintColor).toBeDefined();
+            expect(scheme.tintText).toBeDefined();
+            expect(scheme.darkTintColor).toBeDefined();
+            expect(scheme.darkTintText).toBeDefined();
+            const lightBg = tintOnPage(scheme.tintColor as string, PAGE_LIGHT);
+            const darkBg = tintOnPage(scheme.darkTintColor as string, PAGE_DARK);
+            expect(contrastRatio(scheme.tintText as string, lightBg)).toBeGreaterThanOrEqual(AA);
+            expect(contrastRatio(scheme.darkTintText as string, darkBg)).toBeGreaterThanOrEqual(AA);
         });
     });
 

@@ -85,9 +85,16 @@ export const BooleanSwitch = React.forwardRef(function BooleanSwitch({
                 // inset is symmetric at every size.
                 SWITCH_GEOMETRY[size].track,
                 "outline-none outline-hidden rounded-full relative shadow-sm",
-                value ? (disabled
-                    ? "bg-white bg-opacity-54 bg-white/54 dark:bg-surface-accent-950 border-surface-accent-100 dark:border-surface-accent-700 ring-1 ring-surface-accent-200 dark:ring-surface-accent-700"
-                    : "ring-secondary ring-1 bg-secondary dark:bg-secondary") : "bg-white bg-opacity-54 bg-white/54 dark:bg-surface-accent-900 ring-1 ring-surface-accent-200 dark:ring-surface-accent-700",
+                // On is the primary, not the secondary rose: a boolean is the one
+                // place the product turns a hue into a value, and the hue it uses
+                // should be the one that means "yes" everywhere else (the primary
+                // button, the checked checkbox). The rose stays a marketing token.
+                // Off is the neutral `active` fill with a strong hairline, so the
+                // track is visible on every surface without a fill of its own;
+                // disabled keeps its state legible at reduced strength.
+                disabled
+                    ? (value ? "bg-primary/40 ring-1 ring-transparent" : "bg-surface-field ring-1 ring-hairline")
+                    : (value ? "bg-primary ring-1 ring-primary" : "bg-surface-active ring-1 ring-hairline-strong"),
                 className
             )}
             {...props}
@@ -96,7 +103,9 @@ export const BooleanSwitch = React.forwardRef(function BooleanSwitch({
                 key={"knob"}
                 className={cls(
                     "block rounded-full transition-transform duration-100 ease-out transform will-change-auto shadow-sm",
-                    disabled ? "bg-surface-accent-400 dark:bg-surface-accent-600" : "bg-surface-accent-400 dark:bg-surface-accent-600",
+                    // A glyph on the track, not a surface: the numbered grey is the
+                    // knob's own colour on both themes.
+                    "bg-surface-400",
                     SWITCH_GEOMETRY[size].bar,
                     SWITCH_GEOMETRY[size].barX
                 )}
@@ -106,7 +115,7 @@ export const BooleanSwitch = React.forwardRef(function BooleanSwitch({
                 key={"knob"}
                 className={cls(
                     "block rounded-full transition-transform duration-100 ease-out transform will-change-auto shadow-sm",
-                    disabled ? "bg-surface-accent-300 dark:bg-surface-accent-700" : (value ? "bg-white shadow" : "bg-surface-accent-600 dark:bg-surface-accent-400"),
+                    disabled ? "bg-surface-300 dark:bg-surface-600" : (value ? "bg-white shadow" : "bg-surface-500 dark:bg-surface-400"),
                     SWITCH_GEOMETRY[size].knob,
                     value ? SWITCH_GEOMETRY[size].on : SWITCH_GEOMETRY[size].off
                 )}

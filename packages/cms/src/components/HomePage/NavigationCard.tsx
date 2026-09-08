@@ -26,7 +26,6 @@ export const NavigationCard = React.memo(function NavigationCard({
         <Card
             className={cls(
                 "group h-full p-4 cursor-pointer transition-colors duration-150 ease-in-out",
-                "hover:bg-primary/5 dark:hover:bg-primary/5",
                 shrink && "w-full max-w-full min-h-0 scale-75"
             )}
             onClick={() => {

@@ -30,8 +30,8 @@ export function PropertyAddColumnComponent({
             asChild={true}
             title={canEditCollection ? t("studio_property_add_column") : t("studio_property_add_column_no_permission")}>
             <div
-                className={"p-0.5 w-20 h-full flex items-center justify-center cursor-pointer bg-surface-100/40 bg-surface-100/40 hover:bg-surface-100 dark:bg-surface-900 dark:bg-opacity-40 dark:bg-surface-900/40 dark:hover:bg-surface-800"}
-                // className={onHover ? "bg-white dark:bg-surface-900" : undefined}
+                className={"p-0.5 w-20 h-full flex items-center justify-center cursor-pointer hover:bg-surface-hover"}
+                // className={onHover ? "bg-surface-card" : undefined}
                 onClick={canEditCollection ? () => {
                     collectionEditorController.editProperty({
                         editedCollectionId: collection.slug,

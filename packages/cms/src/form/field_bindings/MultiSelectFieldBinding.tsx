@@ -28,7 +28,7 @@ export function MultiSelectFieldBinding({
     property,
     includeDescription,
     hideLabel,
-    size = "large",
+    size = "small",
     autoFocus
 }: FieldProps<ArrayProperty, unknown, Record<string, unknown>>) {
 

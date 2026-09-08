@@ -121,7 +121,10 @@ html.dark {
 }
 
 .typography-button {
-    @apply text-sm font-semibold tracking-wide;
+    /* 500, sentence case, no tracking. Semibold + tracking-wide was the Rubik-era
+       button voice and it made every control shout equally; the reference sets
+       controls at 500 and lets the primary FILL carry emphasis, not the label. */
+    @apply text-sm font-medium;
 }
 
 /* ---------------------------------------------------------------------------

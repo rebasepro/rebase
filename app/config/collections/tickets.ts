@@ -189,7 +189,7 @@ const ticketsCollection: PostgresCollectionConfig = {
         icon: "Ticket",
         group: "Support",
         defaultViewMode: "kanban",
-        enabledViews: ["table", "kanban"],
+        enabledViews: ["list", "table", "kanban"],
         // Triage — state, urgency, who owns it — to the rail, where it stays
         // visible while you read the thing being triaged.
         form: {

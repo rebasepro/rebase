@@ -157,10 +157,10 @@ const t = useTranslations(lang);
             {/* Admin views — matches real VirtualTable styling */}
             <div data-card class="frame relative z-10 w-[360px] xl:w-[400px] mr-2 xl:mr-4">
                 {/* Toolbar — collection name + search + add */}
-                <div class="flex items-center justify-between px-3 py-2 border-b border-surface-700/40">
+                <div class="flex items-center justify-between px-3 py-2 border-b border-hairline">
                     <span class="text-sm text-white font-medium">Products</span>
                     <div class="flex items-center gap-1.5">
-                        <div class="h-8 bg-surface-900 border border-surface-700/60 rounded-lg px-2.5 flex items-center gap-1.5">
+                        <div class="h-8 bg-surface-card border border-hairline rounded-lg px-2.5 flex items-center gap-1.5">
 
 <svg
   class="lucide lucide-search"
@@ -180,7 +180,7 @@ const t = useTranslations(lang);
 
                             <span class="text-2xs text-surface-500">Search…</span>
                         </div>
-                        <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-surface-900 border border-surface-700/60 hover:bg-white/[0.09]">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-surface-card border border-hairline hover:bg-white/[0.09]">
 
 <svg
   class="lucide lucide-plus"
@@ -201,8 +201,8 @@ const t = useTranslations(lang);
                         </div>
                     </div>
                 </div>
-                {/* Header row — bg-surface-900, no vertical borders, uppercase */}
-                <div class="flex text-3xs font-semibold text-surface-500 tracking-wider uppercase border-b border-surface-700/40 bg-surface-900">
+                {/* Header row — bg-surface-sheet, no vertical borders, uppercase */}
+                <div class="flex text-3xs font-semibold text-surface-500 tracking-wider uppercase border-b border-hairline bg-surface-sheet">
                     <div class="px-3 py-2.5 w-[72px] text-center">ID</div>
                     <div class="px-3 py-2.5 flex-1">Name</div>
                     <div class="px-3 py-2.5 w-[100px]">Category</div>
@@ -211,7 +211,7 @@ const t = useTranslations(lang);
                 </div>
                 {/* Data rows — no vertical borders, horizontal dividers only */}
                 {SAMPLE_ROWS.map((row) => (
-                    <div class="flex text-sm border-b border-surface-800/40 last:border-0 hover:bg-surface-800/30 cursor-pointer">
+                    <div class="flex text-sm border-b border-hairline last:border-0 hover:bg-surface-hover cursor-pointer">
                         <div class="px-3 py-3 w-[72px] text-surface-500 font-mono text-xs text-center truncate">{row.id}</div>
                         <div class="px-3 py-3 text-surface-200 flex-1 truncate">{row.name}</div>
                         <div class="px-3 py-3 w-[100px]">
@@ -256,7 +256,7 @@ const t = useTranslations(lang);
                         </span>
                     </div>
                     {/* Entity path */}
-                    <div class="rounded-md bg-surface-800/40 px-3 py-1.5">
+                    <div class="rounded-md bg-surface-raised px-3 py-1.5">
                         <code class="text-3xs text-surface-500 select-all">products/x7kQ2p</code>
                     </div>
 
@@ -303,7 +303,7 @@ const t = useTranslations(lang);
                         </div>
                     </div>
                     {/* Save button */}
-                    <button type="button" class="w-full min-h-[48px] px-4 rounded-lg border border-primary bg-primary text-white text-sm font-semibold tracking-wide hover:brightness-105 transition-colors">Save</button>
+                    <button type="button" class="w-full min-h-[48px] px-4 rounded-lg border border-primary bg-primary text-white text-sm font-medium hover:brightness-105 transition-colors">Save</button>
                 </div>
             </div>
         </div>
@@ -313,13 +313,13 @@ const t = useTranslations(lang);
             {/* Radial glow behind code block */}
             <div id="cp-code-block" class="relative rounded-xl">
                 <div class="frame relative z-10 ring-1 ring-primary/40">
-                    <div class="flex items-center justify-between px-4 py-3 bg-surface-900 border-b border-surface-800">
+                    <div class="flex items-center justify-between px-4 py-3 bg-surface-sheet border-b border-hairline">
                         <div class="flex items-center gap-3">
                             <span class="text-2xs text-surface-400 font-mono tracking-wider uppercase font-semibold ml-2">{t('power.appcode')}</span>
                         </div>
                         <span class="text-2xs text-surface-500 font-mono">products.ts</span>
                     </div>
-                    <pre class="bg-surface-950 px-5 py-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
+                    <pre class="bg-surface-frame px-5 py-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
                 </div>
             </div>
 
@@ -337,7 +337,7 @@ const t = useTranslations(lang);
                     ].map(item => {
                         const IconComp = item.icon;
                         return (
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-surface-800 bg-surface-900/60 text-surface-400 text-2xs">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-hairline bg-surface-raised text-surface-400 text-2xs">
                                 <IconComp class="text-surface-400 w-3 h-3" />
                                 {item.label}
                             </span>
@@ -351,7 +351,7 @@ const t = useTranslations(lang);
         <div class="flex flex-col items-start justify-center gap-5 flex-1 min-w-0 z-20">
             {/* DB Schema — offset up */}
             <div data-card class="frame xl:-mt-10 w-[270px] xl:w-[310px] ml-2 xl:ml-6">
-                <div class="flex items-center gap-2 px-4 py-2.5 border-b border-surface-800 bg-surface-900/60">
+                <div class="flex items-center gap-2 px-4 py-2.5 border-b border-hairline bg-surface-sheet">
 
 <svg
   class="lucide lucide-database"
@@ -380,7 +380,7 @@ const t = useTranslations(lang);
 
             {/* Typed SDK */}
             <div data-card class="frame w-[350px] xl:w-[420px] ml-4 xl:ml-8 relative z-10">
-                <div class="flex items-center gap-2 px-4 py-2.5 border-b border-surface-800 bg-surface-900/60">
+                <div class="flex items-center gap-2 px-4 py-2.5 border-b border-hairline bg-surface-sheet">
 
 <svg
   class="lucide lucide-code"
@@ -410,7 +410,7 @@ const t = useTranslations(lang);
             <div class="flex flex-row gap-4 items-start w-full ml-0 xl:ml-6">
                 {/* REST API */}
                 <div data-card class="frame w-[185px] xl:w-[200px] shrink-0">
-                    <div class="flex items-center gap-2 px-3 py-2.5 border-b border-surface-800 bg-surface-900/60">
+                    <div class="flex items-center gap-2 px-3 py-2.5 border-b border-hairline bg-surface-sheet">
 
 <svg
   class="lucide lucide-globe"
@@ -431,7 +431,7 @@ const t = useTranslations(lang);
 
                         <span class="text-2xs uppercase tracking-wider font-semibold text-surface-400 font-mono">REST API</span>
                     </div>
-                    <div class="divide-y divide-surface-800/50">
+                    <div class="divide-y divide-hairline">
                         {SAMPLE_ENDPOINTS.map(ep => (
                             <div class="flex items-center justify-between px-3 py-2.5">
                                 <span class={`flex-shrink-0 text-3xs font-semibold border px-1.5 py-0.5 rounded font-mono ${ep.color}`}>{ep.method}</span>
@@ -450,10 +450,10 @@ const t = useTranslations(lang);
     {/* Mobile fallback */}
     <div class="lg:hidden px-6 space-y-4 animate-on-scroll fade-in-up delay-100">
         <div class="rounded-xl overflow-hidden frame">
-            <div class="flex items-center justify-between px-4 py-3 bg-surface-900 border-b border-surface-800">
+            <div class="flex items-center justify-between px-4 py-3 bg-surface-sheet border-b border-hairline">
                 <span class="text-2xs text-surface-400 font-mono uppercase font-semibold">{t('power.appcode')} — products.ts</span>
             </div>
-            <pre class="bg-surface-950 p-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
+            <pre class="bg-surface-frame p-5 font-mono text-2xs leading-relaxed text-surface-300 overflow-x-auto" set:html={COLLECTION_CODE_HTML}></pre>
         </div>
         <p class="text-center text-xs text-surface-500 font-mono">{t('power.mobile.generates')}</p>
     </div>

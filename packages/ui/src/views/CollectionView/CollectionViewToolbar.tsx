@@ -134,7 +134,7 @@ export function CollectionViewToolbar({
         <div
             className={cls(
                 "flex items-center gap-2 px-2 flex-shrink-0",
-                "border-b border-surface-200 dark:border-surface-800",
+                "border-b border-hairline",
                 compact ? "py-0.5 gap-1" : "py-1"
             )}
         >

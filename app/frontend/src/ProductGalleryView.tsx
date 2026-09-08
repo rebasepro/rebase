@@ -32,9 +32,9 @@ export function ProductGalleryView({
                         <button
                             key={String(entity.id)}
                             onClick={() => onEntityClick?.(entity)}
-                            className="text-left rounded-lg border border-surface-200 dark:border-surface-800 overflow-hidden hover:border-primary transition-colors"
+                            className="text-left rounded-lg border border-hairline overflow-hidden hover:border-primary transition-colors"
                         >
-                            <div className="aspect-square bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+                            <div className="aspect-square bg-surface-raised flex items-center justify-center">
                                 {images.length > 0
                                     ? <Typography variant="caption" color="secondary">{images.length} image(s)</Typography>
                                     : <Typography variant="caption" color="secondary">No image</Typography>}

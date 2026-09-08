@@ -161,7 +161,7 @@ export function TaskTable({
                 key={task.id}
                 className={cls(
                     "group flex items-start gap-3 py-2.5 px-3 rounded-md transition-colors duration-150 cursor-pointer",
-                    "hover:bg-surface-accent-100 dark:hover:bg-surface-800",
+                    "hover:bg-surface-hover",
                     isCompleted && "opacity-60",
                     overdue && "border-l-2 border-l-red-500 rounded-l-none",
                     soon && !overdue && "border-l-2 border-l-amber-450 rounded-l-none"
@@ -236,7 +236,7 @@ export function TaskTable({
                                     return clientPic ? (
                                         <img src={clientPic} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
                                     ) : (
-                                        <div className="w-4 h-4 rounded-full bg-surface-200 dark:bg-surface-700 text-surface-500 dark:text-surface-400 flex items-center justify-center shrink-0">
+                                        <div className="w-4 h-4 rounded-full bg-surface-raised text-surface-500 dark:text-surface-400 flex items-center justify-center shrink-0">
                                             <span className="text-[9px] font-semibold">{clientInitial}</span>
                                         </div>
                                     );
@@ -365,7 +365,7 @@ function CompletedSection({
                 variant="text"
                 size="small"
                 color="neutral"
-                className="w-full justify-between hover:bg-surface-accent-100 dark:hover:bg-surface-800 px-3 py-1.5 h-auto text-left"
+                className="w-full justify-between hover:bg-surface-hover px-3 py-1.5 h-auto text-left"
                 onClick={handleToggle}
                 endIcon={
                     <svg

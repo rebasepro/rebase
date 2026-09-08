@@ -145,7 +145,7 @@ export const ColorSelector = ({
                             }
                             view.focus();
                         }}
-                        className="flex cursor-pointer items-center justify-between px-2 py-1 text-sm hover:bg-surface-100 hover:dark:bg-surface-700"
+                        className="flex cursor-pointer items-center justify-between px-2 py-1 text-sm hover:bg-surface-hover"
                     >
                         <div className="flex items-center gap-2">
                             <div
@@ -176,7 +176,7 @@ export const ColorSelector = ({
                             }
                             view.focus();
                         }}
-                        className="flex cursor-pointer items-center justify-between px-2 py-1 text-sm hover:bg-surface-100 hover:dark:bg-surface-700"
+                        className="flex cursor-pointer items-center justify-between px-2 py-1 text-sm hover:bg-surface-hover"
                     >
                         <div className="flex items-center gap-2">
                             <div

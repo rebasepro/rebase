@@ -731,7 +731,7 @@ relation } as RelationItem;
                         <PopoverPrimitive.Content
                             ref={contentRef}
                             data-relation-selector-content
-                            className={cls("z-50 overflow-hidden border bg-white dark:bg-surface-800 rounded-lg min-w-72", defaultBorderMixin)}
+                            className={cls("z-50 overflow-hidden border bg-surface-card rounded-lg min-w-72", defaultBorderMixin)}
                             align="start"
                             sideOffset={8}
                             side="bottom"
@@ -831,8 +831,8 @@ relation } as RelationItem;
                                                     onSelect={() => onItemClick(item)}
                                                     className={cls(
                                                         "flex flex-row items-center gap-1.5 m-1 p-1 rounded-xs cursor-pointer ring-offset-transparent",
-                                                        isSelected && "bg-surface-accent-200 dark:bg-surface-accent-950",
-                                                        "aria-selected:outline-hidden aria-selected:ring-2 aria-selected:ring-primary/75 aria-selected:ring-offset-2 aria-selected:bg-surface-accent-100 dark:aria-selected:bg-surface-accent-900"
+                                                        isSelected && "bg-surface-active",
+                                                        "aria-selected:outline-hidden aria-selected:bg-surface-active"
                                                     )}
                                                 >
                                                     {multiple && (<InnerCheckBox checked={isSelected}/>)}
@@ -887,7 +887,7 @@ relation } as RelationItem;
                                         onClick={handleCreateNew}
                                         className={cls(
                                             "w-full flex flex-row items-center gap-2 px-4 py-3 text-sm text-left",
-                                            "text-primary hover:bg-surface-accent-50 dark:hover:bg-surface-800"
+                                            "text-primary hover:bg-surface-hover"
                                         )}>
                                         <PlusIcon size={iconSize.smallest}/>
                                         <span className="truncate">
@@ -916,7 +916,7 @@ function InnerCheckBox({ checked }: { checked: boolean }) {
             <div
                 className={cls(
                     "border-2 relative transition-colors ease-in-out duration-150 w-4 h-4 rounded-xs flex items-center justify-center",
-                    checked ? "bg-primary text-surface-accent-100 dark:text-surface-accent-900 border-transparent" : "bg-white dark:bg-surface-accent-900 border-surface-accent-800 dark:border-surface-accent-200"
+                    checked ? "bg-primary text-surface-accent-100 dark:text-surface-accent-900 border-transparent" : "bg-surface-card border-surface-accent-800 dark:border-surface-accent-500"
                 )}
             >
                 {checked && <CheckIcon size={iconSize.smallest} className="absolute"/>}

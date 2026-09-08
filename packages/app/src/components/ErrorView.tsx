@@ -60,7 +60,7 @@ export function ErrorView({
                     </Typography>
                     {errorCode && (
                         <span
-                            className="inline-block mt-1 px-1.5 py-0.5 text-[10px] font-mono rounded bg-surface-200 dark:bg-surface-700 text-text-secondary"
+                            className="inline-block mt-1 px-1.5 py-0.5 text-[10px] font-mono rounded bg-surface-raised text-text-secondary"
                         >
                             {errorCode}
                         </span>

@@ -151,7 +151,8 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
             <div className={cls(
                 "select-none rounded-lg text-sm",
                 invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
-                disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
+                // An invisible field has no hover fill of its own: whatever frames it (a table cell) carries the hover.
+                disabled ? fieldBackgroundDisabledMixin : (invisible ? "" : fieldBackgroundHoverMixin),
                 "relative flex items-center",
                 className,
                 {
@@ -254,7 +255,7 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
             {/* Pass the calculated finalContainer */}
             <SelectPrimitive.Portal container={finalContainer}>
                 <SelectPrimitive.Content position={position}
-                    className={cls(focusedDisabled, "z-50 relative overflow-hidden border bg-white dark:bg-surface-800 p-2 rounded-lg shadow-lg animate-in fade-in-0 zoom-in-95 duration-150", defaultBorderMixin)}>
+                    className={cls(focusedDisabled, "z-50 relative overflow-hidden border bg-surface-card p-2 rounded-lg shadow-lg animate-in fade-in-0 zoom-in-95 duration-150", defaultBorderMixin)}>
                     <SelectPrimitive.Viewport className={cls("p-1", viewportClassName)}
                         style={{ maxHeight: "var(--radix-select-content-available-height)" }}>
                         {children}
@@ -292,8 +293,8 @@ export const SelectItem = React.memo(function SelectItem<T extends SelectValue =
             "w-full",
             "relative flex items-center p-2 rounded-md text-sm text-surface-accent-700 dark:text-surface-accent-300",
             "focus:z-10",
-            "data-[state=checked]:bg-surface-accent-100 data-[state=checked]:dark:bg-surface-accent-800 focus:bg-surface-accent-100 dark:focus:bg-surface-900",
-            "data-[state=checked]:focus:bg-surface-accent-200 data-[state=checked]:dark:focus:bg-surface-900",
+            "data-[state=checked]:bg-surface-active focus:bg-surface-hover",
+            "data-[state=checked]:focus:bg-surface-active",
             disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
             "[&>*]:w-full",
             "overflow-visible",

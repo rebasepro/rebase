@@ -128,9 +128,9 @@ export function RealtimeMiniDemo() {
         const cursorTop = HEADER_H + targetIndex * ROW_H + ROW_H / 2 - 2;
 
         return (
-            <div className={`flex-1 min-w-0 flex flex-col relative rounded-lg overflow-hidden bg-surface-950 border transition-colors duration-300 shadow-[0_6px_20px_rgba(0,0,0,0.5)] ${justApplied ? "border-primary/40" : "border-surface-800"}`}>
+            <div className={`flex-1 min-w-0 flex flex-col relative rounded-lg overflow-hidden bg-surface-frame border transition-colors duration-300 shadow-[0_6px_20px_rgba(0,0,0,0.5)] ${justApplied ? "border-primary/40" : "border-hairline"}`}>
                 {/* Each client is its own window: own traffic lights, own URL bar */}
-                <div className="flex items-center gap-1 px-2 py-1 border-b border-surface-800/70 bg-[#161618] shrink-0">
+                <div className="flex items-center gap-1 px-2 py-1 border-b border-hairline bg-[#161618] shrink-0">
                     <div className="w-1.5 h-1.5 rounded-full bg-rose-500/70"></div>
                     <div className="w-1.5 h-1.5 rounded-full bg-amber-400/70"></div>
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-400/70"></div>
@@ -145,7 +145,7 @@ export function RealtimeMiniDemo() {
 
                 {/* Table */}
                 <div className="relative flex-1 overflow-hidden">
-                    <div className="flex px-2 items-center border-b border-surface-800/50 bg-surface-900/20" style={{ height: HEADER_H }}>
+                    <div className="flex px-2 items-center border-b border-hairline bg-surface-field" style={{ height: HEADER_H }}>
                         <div className="flex-1 text-[7px] font-semibold text-surface-500 uppercase tracking-wider">name</div>
                         <div className="w-12 text-[7px] font-semibold text-surface-500 uppercase tracking-wider">status</div>
                         <div className="w-10 text-[7px] font-semibold text-surface-500 uppercase tracking-wider text-right">upd</div>
@@ -157,7 +157,7 @@ export function RealtimeMiniDemo() {
                         return (
                             <div
                                 key={row.id}
-                                className={`flex px-2 items-center border-b border-surface-800/25 transition-colors duration-300 ${lit ? "bg-primary/10 ring-1 ring-inset ring-primary/25" : ""}`}
+                                className={`flex px-2 items-center border-b border-hairline transition-colors duration-300 ${lit ? "bg-primary/10 ring-1 ring-inset ring-primary/25" : ""}`}
                                 style={{ height: ROW_H }}
                             >
                                 <div className="flex-1 text-[9px] text-white truncate">{row.name}</div>
@@ -198,7 +198,7 @@ export function RealtimeMiniDemo() {
                 {/* The socket between the two windows */}
                 <div className="w-12 shrink-0 flex flex-col items-center justify-center gap-1 relative">
                     <span className="text-[7px] text-surface-500 uppercase tracking-wider">ws</span>
-                    <div className="relative w-full h-px bg-surface-800">
+                    <div className="relative w-full h-px bg-hairline">
                         {(phase === "travel" || phase === "click") && (
                             <span
                                 className={`absolute -top-[2px] w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_rgba(0,112,244,0.9)] ${event.origin === "a" ? "rt-travel-right" : "rt-travel-left"}`}

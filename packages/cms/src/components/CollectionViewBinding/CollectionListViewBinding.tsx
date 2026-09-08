@@ -154,12 +154,12 @@ function getIdealColumnWidth(prop: Property): { width: string, widthPx: number }
  */
 function getRowClasses(size: CollectionSize): string {
     switch (size) {
-        case "xs": return "py-2 px-5";
-        case "s": return "py-2.5 px-5";
-        case "m": return "py-3 px-5";
-        case "l": return "py-4 px-5";
-        case "xl": return "py-5 px-5";
-        default: return "py-3 px-5";
+        case "xs": return "py-2 px-3";
+        case "s": return "py-2.5 px-3";
+        case "m": return "py-3 px-3";
+        case "l": return "py-4 px-3";
+        case "xl": return "py-5 px-3";
+        default: return "py-3 px-3";
     }
 }
 
@@ -169,7 +169,7 @@ function getRowClasses(size: CollectionSize): string {
 // they are the same layout described twice, so a change to one is a change to
 // the other.
 
-/** `px-5` on both sides. */
+/** `mx-2` + `px-3` on both sides: the row is an inset, rounded highlight, not an edge-to-edge bar. */
 const ROW_PADDING_WIDTH = 40;
 /** The checkbox cell (`w-8`). */
 const CHECKBOX_WIDTH = 32;
@@ -982,23 +982,22 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     return (
         <div
             className={cls(
-                "@container flex items-center gap-4 cursor-pointer group transition-colors duration-200 relative h-full",
+                "@container flex items-center gap-4 cursor-pointer group transition-colors duration-200 relative h-full mx-2 rounded-lg",
                 rowClasses,
-                isActive
-                    ? "bg-surface-accent-100 dark:bg-surface-accent-950 hover:bg-surface-accent-200 dark:hover:bg-surface-accent-950"
-                    : selected
-                        ? "bg-surface-accent-50 dark:bg-surface-accent-900 hover:bg-surface-accent-100 dark:hover:bg-surface-accent-950"
-                        : highlighted
-                            ? "bg-surface-accent-50 dark:bg-surface-accent-900 hover:bg-surface-50 dark:hover:bg-surface-800/40"
-                            : "bg-white dark:bg-surface-900 hover:bg-surface-50 dark:hover:bg-surface-800/40"
+                // A row has NO fill of its own: it is text on the panel, and only
+                // the row being touched, chosen or opened takes a shape — an alpha
+                // highlight, rounded because it is an object the moment it
+                // appears. Giving every row a solid card fill and rounding it
+                // turned the list into a stack of tiles; the shape belongs to the
+                // interaction, not to the list.
+                isActive || selected
+                    ? "bg-surface-active"
+                    : highlighted
+                        ? "bg-surface-hover"
+                        : "hover:bg-surface-hover"
             )}
             onClick={handleClick}
         >
-            {/* Selection indicator line */}
-            {selected && !isActive && (
-                <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary-500 rounded-r-full"/>
-            )}
-
             {/* Selection Checkbox — its own cell only when it is not riding on
                 the thumbnail. See {@link ListRowProps.combineSelection}. */}
             {selectionEnabled && !combineSelection && (
@@ -1018,11 +1017,11 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
             {showImage && (
                 <div className="flex-shrink-0 relative w-10 h-10">
                     {slots.image ? (
-                        <div className={cls("w-10 h-10 rounded-lg border relative overflow-hidden bg-surface-100 dark:bg-surface-900", defaultBorderMixin)}>
+                        <div className={cls("w-10 h-10 rounded-lg border relative overflow-hidden bg-surface-raised", defaultBorderMixin)}>
                             <SlotValue slot={slots.image} size="small" fill={true}/>
                         </div>
                     ) : (
-                        <div className={cls("w-10 h-10 rounded-lg bg-surface-100 dark:bg-surface-900 flex items-center justify-center border", defaultBorderMixin)}>
+                        <div className={cls("w-10 h-10 rounded-lg bg-surface-raised flex items-center justify-center border", defaultBorderMixin)}>
                             <IconForView
                                 collectionOrView={collection}
                                 className="text-surface-500 dark:text-surface-400"
@@ -1326,7 +1325,7 @@ function ListHeader({
     // header button's `aria-label` instead — see `ListHeaderLabel`.
     return (
         <div className={cls(
-            "flex items-center gap-4 px-5 py-1.5 select-none border-b bg-surface-50 dark:bg-surface-900",
+            "flex items-center gap-4 px-5 py-1.5 select-none border-b bg-surface-sheet",
             defaultBorderMixin
         )}>
             {selectionEnabled && <div className="flex-shrink-0 w-8"/>}

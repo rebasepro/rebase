@@ -54,7 +54,7 @@ function ProjectCard({ project, compact }: { project: SampleProject; compact?: b
 
     return (
         <Card className={cls("cursor-pointer overflow-hidden group relative", "transition-all duration-200", "hover:shadow-lg hover:-translate-y-0.5")}>
-            <div className={cls("relative overflow-hidden bg-surface-100 dark:bg-surface-900", compact ? "h-20" : "aspect-[5/2]")}>
+            <div className={cls("relative overflow-hidden bg-surface-raised", compact ? "h-20" : "aspect-[5/2]")}>
                 <div className="absolute inset-0 opacity-20 transition-all duration-300" style={{ background: `linear-gradient(90deg, var(--color-primary) ${project.progress}%, transparent ${project.progress}%)` }} />
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
                     <FolderKanbanIcon size={compact ? 20 : 28} className="text-surface-400 dark:text-surface-500" />
@@ -75,7 +75,7 @@ function ProjectCard({ project, compact }: { project: SampleProject; compact?: b
                 {!compact && (
                     <div className={cls("flex items-center justify-between mt-2 pt-2 border-t", defaultBorderMixin)}>
                         <div className="flex items-center gap-1.5">
-                            <div className="w-5 h-5 rounded-full bg-surface-200 dark:bg-surface-700 text-surface-500 flex items-center justify-center text-[9px] font-semibold">{project.assignee[0]}</div>
+                            <div className="w-5 h-5 rounded-full bg-surface-raised text-surface-500 flex items-center justify-center text-[9px] font-semibold">{project.assignee[0]}</div>
                             <Typography variant="caption" color="secondary" className="truncate max-w-[100px]">{project.assignee}</Typography>
                         </div>
                         <Typography variant="caption" className={cls("font-mono text-[10px]", isOverdue ? "text-red-500 font-semibold" : "text-surface-400")}>{project.dueDate}</Typography>

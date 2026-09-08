@@ -328,7 +328,7 @@ export function ContentHomePage({
        Render
        ─────────────────────────────────────────────────────────────── */
     return (
-        <div ref={containerRef} className="py-2 overflow-auto h-full w-full bg-surface-50 dark:bg-surface-800">
+        <div ref={containerRef} className="py-2 overflow-auto h-full w-full bg-surface-sheet">
             <Container maxWidth="6xl">
                 <div className="mb-4 flex flex-col gap-2">
                     <SchemaDriftBanner />

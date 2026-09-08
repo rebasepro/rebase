@@ -74,7 +74,7 @@ export function DrawerNavigationItem({
                 transition: drawerOpen ? "width 150ms ease-in" : undefined
             }}
             className={({ isActive }: { isActive: boolean }) => cls("rounded-lg truncate group/nav",
-                "hover:bg-primary/5 dark:hover:bg-primary/5 text-surface-700 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white",
+                "hover:bg-surface-hover text-surface-700 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white",
                 "flex flex-row items-center",
                 drawerOpen ? "pr-4 h-[30px]" : "h-[30px]",
                 "font-medium text-[13px]",

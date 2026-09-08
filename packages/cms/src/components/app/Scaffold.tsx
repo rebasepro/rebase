@@ -238,7 +238,7 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
             <AppContext.Provider value={appContextValue}>
                 <div
                     className={cls("flex h-screen w-screen overflow-hidden",
-                        "bg-surface-50 dark:bg-surface-900",
+                        "bg-surface-frame",
                         "text-surface-900 dark:text-white", className)}
                     style={{
                         paddingTop: "env(safe-area-inset-top)",
@@ -268,14 +268,21 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
                         {hasAppBar && <DrawerHeader/>}
 
                         <div
-                            className={cls(defaultBorderMixin, "bg-surface-50 dark:bg-surface-800", "grow overflow-auto m-0", {
-                                "mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border-t lg:border-x lg:border-solid": padding,
+                            // The sheet is one lightness step above the frame AND carries a
+                            // plain hairline on its edge. The step alone (#0a0a0a to #131313,
+                            // #f0f0f2 to #f9f9fa) is about 3 L* on both themes, under what a
+                            // dimmed screen renders, and the first pass of this system removed
+                            // the line on the theory that the step would do its work; the
+                            // frame and the sheet then read as one black. The reference's own
+                            // content sheet carries this line. Only in the inset `lg` layout:
+                            // edge-to-edge on small screens, a border draws at the viewport.
+                            className={cls("bg-surface-sheet", "grow overflow-auto m-0", "lg:border lg:border-hairline", {
+                                "mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-xl": padding,
                                 // No app bar means no DrawerHeader spacer above, so inset the
                                 // panel by the same amount as its sides and bottom.
                                 // Must come after the padding classes, which reset lg margins.
                                 "lg:mt-2": !hasAppBar && padding,
-                                "lg:mt-4": !hasAppBar && !padding,
-                                "border-t": hasAppBar && !padding
+                                "lg:mt-4": !hasAppBar && !padding
                             })}>
 
                             <ErrorBoundary>
@@ -314,13 +321,14 @@ function DrawerWrapper(props: {
     const visualWidth = !props.displayed ? 0 : ((props.open || props.hovered) ? DRAWER_WIDTH : 72);
 
     const isFloating = props.hovered && !props.open;
-    const darkBg = "dark:bg-surface-900";
-    const darkBgFloating = "dark:bg-surface-900";
     const { t } = useTranslation();
 
+    // The drawer is part of the frame, on both themes. When it floats over the
+    // sheet it needs an edge, because a frame-coloured panel over the sheet is
+    // an object at that moment; docked, it is a region and gets none.
     const innerDrawer = <div
-        className={cls("h-full overflow-hidden", defaultBorderMixin,
-            isFloating ? `absolute top-0 left-0 bottom-0 z-50 bg-surface-50 ${darkBgFloating} shadow-lg border-r` : `relative bg-surface-50 ${darkBg}`)}
+        className={cls("h-full overflow-hidden bg-surface-frame", defaultBorderMixin,
+            isFloating ? "absolute top-0 left-0 bottom-0 z-50 shadow-lg border-r" : "relative")}
         style={{
             width: visualWidth,
             transition: "left 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, opacity 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms, width 75ms cubic-bezier(0.4, 0, 0.6, 1) 0ms"
@@ -351,7 +359,7 @@ function DrawerWrapper(props: {
                 open={props.open}
                 onOpenChange={props.setDrawerOpen}
                 title={t("navigation_drawer")}
-                overlayClassName={"bg-white/80 dark:bg-surface-900/80"}
+                overlayClassName={"bg-surface-scrim"}
             >
                 {innerDrawer}
             </Sheet>

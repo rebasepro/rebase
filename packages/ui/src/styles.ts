@@ -46,7 +46,7 @@ export const controlPaddingMixin = {
 } as const satisfies Record<ButtonSize, string>;
 
 export const focusedDisabled = "focus-visible:ring-0 focus-visible:ring-offset-0";
-export const focusedInvisibleMixin = "focus:bg-opacity-70 focus:bg-surface-accent-100 focus:dark:bg-white/[0.07] focus:bg-surface-accent-100/70";
+export const focusedInvisibleMixin = "focus:bg-surface-field-hover";
 
 /**
  * The focus ring — the single most-seen interaction state in the product, and
@@ -70,54 +70,78 @@ export const focusedClasses = "z-30 outline-none ring-2 ring-primary/60 ring-off
 /**
  * Field surfaces.
  *
- * The inset top hairline is the whole difference between a field that reads as
- * a filled rectangle and one that reads as recessed into the surface. It is a
- * 1px inset highlight, not a gradient — the same device `.frame` already uses
- * on the marketing site, and the flat-surface rule stands.
+ * A field is the one surface that goes the other way: it is INSET into
+ * whatever holds it, so `surface-field` is an alpha fill rather than a solid,
+ * and it composes over a card, the sheet or a dialog alike. It also carries
+ * the hairline: a field is an object (DESIGN.md rule 2), and without the line
+ * a 4% fill on a card reads as a soft slab rather than a control — measured on
+ * the product form, eight of them in a row looked like a wall. The reference
+ * draws every input with its 1px edge, on both themes.
  *
- * Light mode gets none: on a white page the highlight has nothing to catch.
+ * The 1px inset top highlight that used to sit here was the recessed-edge
+ * device from before the field had a border; with a real hairline above it
+ * the two stacked into a doubled top edge. The border does its work now.
+ *
+ * Exactly one element carries this mixin per field — the box, never the
+ * input inside it — so the alpha fill and its hover composite once.
  */
-export const fieldBackgroundMixin = "bg-surface-accent-200/50 dark:bg-white/[0.055] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.045)]";
-export const fieldBackgroundInvisibleMixin = "bg-surface-accent-200/0 dark:bg-white/0";
-export const fieldBackgroundDisabledMixin = "bg-surface-accent-200/50 dark:bg-white/[0.03]";
+export const fieldBackgroundMixin = "bg-surface-field border border-hairline";
+export const fieldBackgroundInvisibleMixin = "bg-transparent";
+export const fieldBackgroundDisabledMixin = "bg-surface-field/60";
 
 /**
  * `transition-colors` here, because every other interactive surface in the kit
  * has it and fields did not — `cardClickableMixin` eases, a TextField snapped.
  * On a form of eight fields that difference is the whole feel of the screen.
  */
-export const fieldBackgroundHoverMixin = "transition-colors duration-150 hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09]";
+export const fieldBackgroundHoverMixin = "transition-colors duration-150 hover:bg-surface-field-hover";
 
-export const defaultBorderMixin = "border-surface-200 dark:border-surface-700/60";
+/**
+ * The hairline. One value per theme (`--hairline` in theme.css), and where it
+ * goes matters more than what it is: a line marks an OBJECT — a card on the
+ * sheet, a field, a floating surface. It does not mark a region: a tile inside
+ * a card, a row, a segmented track, a button, a chip are fills, and the
+ * lightness step between them is the whole separation. One exception, and it
+ * is the sheet's own edge against the frame: that step is about 3 L* on both
+ * themes and did not read on a real screen, so the Scaffold draws this line
+ * there. Measured before this existed, the panel drew the same line on every
+ * card and every tile as well, and with only two surface values available the
+ * line was doing the work a step should have done.
+ */
+export const defaultBorderMixin = "border-hairline";
 
 // ---------------------------------------------------------------------------
-// Surfaces: two kinds, and the difference is what the border is for.
+// Surfaces are named by ROLE (see theme.css) and the theme decides the value.
+// Every nested surface is one step lifted from the surface it sits on, on both
+// themes. The reasoning and the measurements behind the ladder are in
+// docs/plans/surface-system-2026-09.md.
+//
+// Two kinds of card, and the difference is what the border is for.
 //
 // A **floating** surface — a menu, a dialog, a popover — sits OVER the page. It
 // has to be legible against whatever happens to be underneath it, so its edge
-// is definite: solid `surface-700`. That is `paperMixin`.
+// is definite: `hairline-strong`. That is `paperMixin`.
 //
-// A **page** surface — a card in the document flow — sits ON the page, and the
-// page is already `surface-950`/`surface-900`. A solid edge there reads as a
-// box drawn around content rather than as the content having a surface, which
-// is why every serious caller was overriding it: 53 `<Card>` sites in the SaaS
-// console alone re-declared this border at `/60`, the same value
-// `defaultBorderMixin` above has always used. The component was wrong and the
-// callers were right, so the component now says what they meant.
+// A **page** surface — a card in the document flow — sits ON the sheet, and it
+// is already one step lighter than the sheet. It keeps a plain hairline, which
+// is all a card on the sheet needs; once the step is there the line is close
+// to optional, and a stronger one reads as a box drawn around content.
 // ---------------------------------------------------------------------------
-export const paperMixin = "bg-white rounded-lg dark:bg-surface-900 border border-surface-200 dark:border-surface-700";
-export const cardMixin = "bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-700/60";
+export const paperMixin = "bg-surface-card rounded-lg border border-hairline-strong";
+export const cardMixin = "bg-surface-card rounded-xl border border-hairline";
 
 /**
  * An inset well: code, a query, a log tail, a connection string.
  *
  * It must read as *recessed into* the surface holding it, which means darker
- * than that surface in dark mode — `surface-950` under a `surface-900` card.
- * The obvious-looking `surface-800` is a trap: `#111111` is LIGHTER than the
- * `#0a0a0a` card around it, so the well appears to float above the thing it is
- * set into. Pair with `font-mono`; this mixin carries the surface only.
+ * than that surface in dark mode. Cards now sit at `surface-card` (#181818),
+ * so #0a0a0a is already fourteen units below and reads as a well; #000 was
+ * tuned for the old #0a card and is now harsher than it needs to be. That value
+ * is the `surface-well` role (theme.css), the one surface that goes DOWN the
+ * ladder on purpose. Pair with `font-mono`; this mixin carries the surface
+ * only.
  */
-export const codeSurfaceMixin = "bg-surface-100 dark:bg-surface-950 rounded-md";
+export const codeSurfaceMixin = "bg-surface-well rounded-md";
 
 /**
  * The accent, used as TEXT.
@@ -137,5 +161,22 @@ export const codeSurfaceMixin = "bg-surface-100 dark:bg-surface-950 rounded-md";
  * the other way and #0070F4 is already correct.
  */
 export const accentTextMixin = "text-primary dark:text-primary-light";
-export const cardClickableMixin = "hover:bg-primary/5 dark:hover:bg-primary/5 cursor-pointer transition-colors duration-150";
+
+/**
+ * Hover on a SOLID surface goes one step lighter, and it stays neutral. The
+ * previous `hover:bg-primary/5` tinted every clickable card blue, which spent
+ * the brand colour on a state that carries no meaning; on the dark ladder it
+ * also read as a hue shift rather than a lift.
+ */
+export const cardClickableMixin = "hover:bg-surface-card-hover cursor-pointer transition-colors duration-150";
 export const cardSelectedMixin = "bg-primary-bg/30 dark:bg-primary-bg/10 ring-1 ring-primary/75";
+
+/**
+ * Hover on a TRANSPARENT ground — a nav item, a menu item, a list row, a tree
+ * row. `surface-hover` is an alpha fill, so it lifts whatever it lands on by
+ * the same amount, and `surface-active` is the same idea one step further for
+ * the selected row when no hue is wanted. Do not use these on a solid card:
+ * an alpha fill REPLACES a solid background rather than tinting it.
+ */
+export const surfaceHoverMixin = "hover:bg-surface-hover transition-colors duration-150";
+export const surfaceActiveMixin = "bg-surface-active";

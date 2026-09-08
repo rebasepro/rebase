@@ -20,6 +20,18 @@ export type ChipColorScheme = {
     outlineText?: string;
     /** Outlined-variant ink in dark mode. */
     darkOutlineText?: string;
+    /**
+     * The `tinted` variant: the hue's solid stop at low alpha, as an `rgba()`
+     * string so it composes over a card, the sheet or a dialog alike, and an
+     * ink MEASURED on what that tint reads as over the page. A tint is the
+     * reference's rule for hue in the chrome — a 12–16% wash behind hue-coloured
+     * text — and it is what a status or enum chip paints by default now; the
+     * saturated `color` stop is the `filled` variant, kept for swatches.
+     */
+    tintColor?: string;
+    tintText?: string;
+    darkTintColor?: string;
+    darkTintText?: string;
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -47,7 +59,7 @@ const CONTRAST_TARGET = 4.6;
 
 /** Page backgrounds the outlined variant sits on: `bg-white` and `surface-950`. */
 const PAGE_LIGHT = "#ffffff";
-const PAGE_DARK = "#0a0a0a";
+const PAGE_DARK = "#181818";
 
 function toRgb(hex: string): [number, number, number] {
     let h = hex.replace("#", "");
@@ -58,6 +70,45 @@ function toRgb(hex: string): [number, number, number] {
 function toHex(rgb: number[]): string {
     return "#" + rgb.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0")).join("");
 }
+
+function toRgba(hex: string, alpha: number): string {
+    const [r, g, b] = toRgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
+ * What a translucent colour reads as over an opaque one: a per-channel sRGB
+ * mix, which is how the browser composites it. The tint ink is pushed against
+ * this, never against the page alone — a 16% wash of the hue moves the
+ * background a long way toward the ink, and an ink that only cleared AA on
+ * the bare page lands near 3.5:1 on its own tint.
+ */
+export function compositeOver(fgHex: string, alpha: number, bgHex: string): string {
+    const fg = toRgb(fgHex);
+    const bg = toRgb(bgHex);
+    return toHex(fg.map((c, i) => alpha * c + (1 - alpha) * bg[i]));
+}
+
+/** Read an `rgba(r, g, b, a)` string back as what it composites to over `bgHex`. */
+export function tintOnPage(rgba: string, bgHex: string): string {
+    const m = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if (!m) return rgba;
+    const fg = toHex([Number(m[1]), Number(m[2]), Number(m[3])]);
+    return compositeOver(fg, m[4] === undefined ? 1 : Number(m[4]), bgHex);
+}
+
+/**
+ * Tint alpha by tone, light then dark. The tones keep meaning something in the
+ * tinted variant — a `Darker` chip is a heavier wash, not a different hue —
+ * and dark mode runs four points higher because the same alpha of a bright
+ * hue reads fainter over near-black than over white.
+ */
+const TINT_ALPHA: Record<ChipTone, [light: number, dark: number]> = {
+    Lighter: [0.10, 0.14],
+    Light: [0.14, 0.18],
+    Dark: [0.18, 0.22],
+    Darker: [0.22, 0.26]
+};
 
 function relativeLuminance(hex: string): number {
     const [r, g, b] = toRgb(hex).map(v => {
@@ -169,12 +220,26 @@ function tone(stops: HueStops, chipTone: ChipTone): ChipColorScheme {
         darkOutlineText: push(stops.onDeep ?? stops.pale, "#ffffff", PAGE_DARK)
     };
 
+    // The tint is the SOLID stop washed out, on both themes, so a hue keeps
+    // its identity across the two — a pale-stop tint of blue reads as grey.
+    // Light ink starts from `deep` and dark ink from `mid`: the saturated end
+    // that already sits on the right side of the composite, pushed only as
+    // far as the measurement says.
+    const [alphaLight, alphaDark] = TINT_ALPHA[chipTone];
+    const tint = {
+        tintColor: toRgba(stops.solid, alphaLight),
+        tintText: push(stops.deep, "#000000", compositeOver(stops.solid, alphaLight, PAGE_LIGHT)),
+        darkTintColor: toRgba(stops.solid, alphaDark),
+        darkTintText: push(stops.mid, "#ffffff", compositeOver(stops.solid, alphaDark, PAGE_DARK))
+    };
+
     const filled = (light: string, dark: string): ChipColorScheme => ({
         color: light,
         text: inkOn(stops, light),
         darkColor: dark,
         darkText: inkOn(stops, dark),
-        ...outline
+        ...outline,
+        ...tint
     });
 
     switch (chipTone) {

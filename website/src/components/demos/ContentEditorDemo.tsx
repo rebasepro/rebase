@@ -55,9 +55,9 @@ function EditorContent({ step }: { step: number }) {
             </p>
 
             {step >= 1 && (
-                <div className="rounded-lg overflow-hidden border border-surface-200 dark:border-surface-700/50">
+                <div className="rounded-lg overflow-hidden border border-hairline">
                     <img src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=300&fit=crop" alt="" className="w-full h-36 object-cover" loading="lazy" />
-                    <div className="text-center text-[11px] text-surface-500 py-1.5 italic bg-surface-50 dark:bg-surface-900">Code-first schema definition</div>
+                    <div className="text-center text-[11px] text-surface-500 py-1.5 italic bg-surface-sheet">Code-first schema definition</div>
                 </div>
             )}
 
@@ -67,7 +67,7 @@ function EditorContent({ step }: { step: number }) {
                     <div className="space-y-2">
                         {["Rich text with markdown shortcuts", "Slash commands for block insertion", "Drag-and-drop reordering", "Inline image uploads"].map((item, i) => (
                             <div key={i} className="flex items-center gap-2.5">
-                                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${i < 3 || step >= 4 ? "bg-primary border-primary" : "border-surface-400 dark:border-surface-600"}`}>
+                                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${i < 3 || step >= 4 ? "bg-primary border-primary" : "border-surface-400 border-hairline-strong"}`}>
                                     {(i < 3 || step >= 4) && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                                 </div>
                                 <span className={`text-sm ${i < 3 || step >= 4 ? "text-surface-500 dark:text-surface-500 line-through" : "text-surface-700 dark:text-surface-300"}`}>{item}</span>
@@ -84,8 +84,8 @@ function EditorContent({ step }: { step: number }) {
             )}
 
             {step >= 5 && (
-                <div className="bg-surface-100 dark:bg-surface-900 border border-surface-200 dark:border-surface-700/50 rounded-lg overflow-hidden">
-                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-surface-200 dark:border-surface-700/50">
+                <div className="bg-surface-sheet border border-hairline rounded-lg overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-hairline">
                         <span className="text-[10px] font-mono text-surface-500">typescript</span>
                     </div>
                     <pre className="p-3 text-xs font-mono text-surface-600 dark:text-surface-300 overflow-x-auto leading-relaxed whitespace-pre">{`const blog = defineCollection({
@@ -179,10 +179,10 @@ export function ContentEditorDemo() {
     }, []);
 
     return (
-        <div className="flex overflow-hidden bg-surface-50 dark:bg-surface-900 text-surface-900 dark:text-white pointer-events-none select-none relative" style={{ height: 520, width: "100%" }}>
+        <div className="flex overflow-hidden bg-surface-sheet text-surface-900 dark:text-white pointer-events-none select-none relative" style={{ height: 520, width: "100%" }}>
             {/* ═══ Drawer ═══ */}
             <div className="z-20 relative hidden sm:block" style={{ width: 72 }}>
-                <div className="h-full overflow-hidden relative bg-surface-900" style={{ width: 72 }}>
+                <div className="h-full overflow-hidden relative bg-surface-sheet" style={{ width: 72 }}>
                     <div className="flex flex-col h-full">
                         <div className="flex items-center justify-center pt-4 pb-0 px-2">
                             <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
@@ -191,9 +191,9 @@ export function ContentEditorDemo() {
                         </div>
                         <div className="mt-1 flex-grow overflow-hidden">
                             <div className="my-2 mx-2 flex flex-col">
-                                <div className="overflow-hidden bg-surface-800/30 rounded-lg">
+                                <div className="overflow-hidden bg-surface-field rounded-lg">
                                     {NAV_ITEMS.map(item => (
-                                        <div key={item.label} className={`rounded-lg flex items-center h-10 ${item.active ? "bg-surface-800/50" : ""} text-surface-200`}>
+                                        <div key={item.label} className={`rounded-lg flex items-center h-10 ${item.active ? "bg-surface-raised" : ""} text-surface-200`}>
                                             <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-surface-400">
                                                 <MI size={18}>{item.icon}</MI>
                                             </div>
@@ -215,30 +215,30 @@ export function ContentEditorDemo() {
 
             {/* ═══ Main ═══ */}
             <main className="flex flex-col grow overflow-auto">
-                <div className="border-surface-700/30 bg-surface-900 grow overflow-auto lg:mx-2 lg:mb-2 lg:rounded-lg lg:border flex flex-col">
+                <div className="border-hairline bg-surface-sheet grow overflow-auto lg:mx-2 lg:mb-2 lg:rounded-lg lg:border flex flex-col">
                     {/* Toolbar */}
-                    <div className="min-h-[44px] px-2 md:px-4 bg-surface-900 border-b border-surface-700/40 flex flex-row justify-between items-center shrink-0">
+                    <div className="min-h-[44px] px-2 md:px-4 bg-surface-sheet border-b border-hairline flex flex-row justify-between items-center shrink-0">
                         <div className="flex items-center gap-1">
-                            <div className="flex items-center bg-surface-800 rounded-md p-0.5 gap-0.5">
+                            <div className="flex items-center bg-surface-raised rounded-md p-0.5 gap-0.5">
                                 <button className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-surface-500"><MI size={14}>format_list_bulleted</MI></button>
-                                <button className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-surface-900 shadow-sm text-primary"><MI size={14}>list</MI><span>Table</span></button>
+                                <button className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-surface-sheet shadow-sm text-primary"><MI size={14}>list</MI><span>Table</span></button>
                             </div>
                             <button aria-label="Filter" className="p-1.5 rounded-full text-surface-500"><MI size={18}>filter_list</MI></button>
                         </div>
                         <div className="flex items-center gap-1">
-                            <div className="flex items-center h-8 rounded-lg bg-surface-900 border border-surface-700/60 px-2.5 gap-1.5 min-w-[140px]">
+                            <div className="flex items-center h-8 rounded-lg bg-surface-card border border-hairline px-2.5 gap-1.5 min-w-[140px]">
                                 <MI size={16} className="text-surface-400">search</MI>
                                 <span className="text-xs text-surface-400">Search</span>
                             </div>
                             <button aria-label="Settings" className="p-1.5 text-surface-500"><MI size={18}>settings</MI></button>
-                            <button className="flex items-center gap-1 min-h-[32px] px-2 rounded-lg border border-primary bg-primary text-white text-sm font-semibold tracking-wide"><MI size={18}>add</MI></button>
+                            <button className="flex items-center gap-1 min-h-[32px] px-2 rounded-lg border border-primary bg-primary text-white text-sm font-medium"><MI size={18}>add</MI></button>
                         </div>
                     </div>
 
                     {/* Table */}
-                    <div className="h-full w-full flex flex-col bg-surface-950 overflow-auto">
+                    <div className="h-full w-full flex flex-col bg-surface-frame overflow-auto">
                         {/* Header */}
-                        <div className="sticky top-0 z-10 flex min-w-fit border-b border-surface-700/30 bg-surface-900" style={{ height: 40 }}>
+                        <div className="sticky top-0 z-10 flex min-w-fit border-b border-hairline bg-surface-sheet" style={{ height: 40 }}>
                             <div className="flex-shrink-0 flex items-center justify-center px-3 text-xs uppercase font-semibold text-surface-400" style={{ width: 100 }}>ID</div>
                             <div className="flex-shrink-0 flex items-center px-3 text-xs uppercase font-semibold text-surface-400" style={{ width: 300 }}>
                                 <MI size={14} className="opacity-60 mr-1">file_text</MI>Title
@@ -257,7 +257,7 @@ export function ContentEditorDemo() {
                                 const isHovered = hoveredRow === post.id;
                                 const sc = STATUS_COLORS[post.status];
                                 return (
-                                    <div key={post.id} className={`flex min-w-full text-sm border-b border-surface-700/30 cursor-pointer transition-colors ${isHovered ? "bg-surface-800/30" : ""}`} style={{ height: 48 }}>
+                                    <div key={post.id} className={`flex min-w-full text-sm border-b border-hairline cursor-pointer transition-colors ${isHovered ? "bg-surface-field" : ""}`} style={{ height: 48 }}>
                                         <div className="flex-shrink-0 flex items-center justify-center px-3 font-mono text-xs text-surface-500" style={{ width: 100 }}>
                                             <div className="flex items-center gap-1">
                                                 <button className="p-0.5 rounded text-surface-500"><MI size={14}>edit</MI></button>
@@ -283,11 +283,11 @@ export function ContentEditorDemo() {
 
             {/* ═══ Side Panel ═══ */}
             <div
-                className="absolute top-0 right-0 h-full w-[55%] max-w-[680px] min-w-[340px] z-40 bg-white dark:bg-surface-900 border-l border-surface-700/30 flex flex-col shadow-2xl transition-transform duration-300 ease-out"
+                className="absolute top-0 right-0 h-full w-[55%] max-w-[680px] min-w-[340px] z-40 bg-surface-card border-l border-hairline flex flex-col shadow-2xl transition-transform duration-300 ease-out"
                 style={{ transform: panelOpen ? "translateX(0)" : "translateX(100%)" }}
             >
                 {/* Panel top bar */}
-                <div className="h-12 flex items-center px-3 border-b border-surface-700/30 shrink-0 gap-1">
+                <div className="h-12 flex items-center px-3 border-b border-hairline shrink-0 gap-1">
                     <button className="p-1.5 rounded text-surface-400"><MI size={18}>close</MI></button>
                     <button className="p-1.5 rounded text-surface-400"><MI size={16}>open_in_full</MI></button>
                     <div className="flex-1" />
@@ -305,7 +305,7 @@ export function ContentEditorDemo() {
                                     <MI size={12}>edit</MI> Modified
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-800 text-surface-300 text-[10px] font-semibold">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-surface-300 text-[10px] font-semibold">
                                     <MI size={12}>check</MI> Saved
                                 </span>
                             )}
@@ -352,17 +352,17 @@ export function ContentEditorDemo() {
                 </div>
 
                 {/* Panel bottom bar */}
-                <div className="flex items-center justify-between px-3 py-2.5 border-t border-surface-700/30 bg-surface-900 shrink-0">
+                <div className="flex items-center justify-between px-3 py-2.5 border-t border-hairline bg-surface-sheet shrink-0">
                     <div className="flex items-center gap-1">
                         <button className="p-1.5 rounded text-surface-500"><MI size={16}>content_copy</MI></button>
                         <button className="p-1.5 rounded text-surface-500"><MI size={16}>delete</MI></button>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button className="min-h-[40px] px-3 rounded-lg border border-transparent text-primary text-sm font-semibold tracking-wide">Discard</button>
-                        <button className={`min-h-[40px] px-3 rounded-lg border border-transparent text-sm font-semibold tracking-wide ${formDirty ? "text-primary" : "text-primary opacity-30"}`}>
+                        <button className="min-h-[40px] px-3 rounded-lg border border-transparent text-primary text-sm font-medium">Discard</button>
+                        <button className={`min-h-[40px] px-3 rounded-lg border border-transparent text-sm font-medium ${formDirty ? "text-primary" : "text-primary opacity-30"}`}>
                             {isSaving ? "Saving..." : "Save"}
                         </button>
-                        <button className="min-h-[40px] px-3 rounded-lg border border-primary bg-primary text-white text-sm font-semibold tracking-wide">Save and close</button>
+                        <button className="min-h-[40px] px-3 rounded-lg border border-primary bg-primary text-white text-sm font-medium">Save and close</button>
                     </div>
                 </div>
             </div>

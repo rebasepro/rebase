@@ -566,7 +566,7 @@ entityId }
         {propertyDetailView()}
     </div>;
 
-    let result = <div className="relative flex flex-col h-full w-full bg-white dark:bg-surface-800">
+    let result = <div className="relative flex flex-col h-full w-full bg-surface-card">
 
         <EntityIdentityBar
             collection={collection as AdminCollection}

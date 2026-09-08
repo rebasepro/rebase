@@ -90,6 +90,18 @@
     --control-xl: 56px;   /* buttons only */
     --control-2xl: 64px;  /* buttons only */
 
+    /* Radius ladder. Tailwind's defaults (6 / 8 / 12) read as square beside
+       the reference, whose controls sit at ~10px and cards at 12–14; matching
+       it outright (8 / 10 / 14) read as borrowed. This sits between: the two
+       utilities the product uses for controls and containers move up one or
+       two pixels, chips keep the default. Overriding the utilities rather than
+       the call sites moves every control, card, menu and sheet together; no
+       call site names a number. `rounded-full` is a rule, not a size, and it
+       is rare: search fields, the switch and avatars. */
+    --radius-md: 6px;    /* chip, code well, tile, segment (Tailwind's own value) */
+    --radius-lg: 9px;    /* control, row highlight, menu, folder tab, segmented track */
+    --radius-xl: 13px;   /* card, sheet, dialog */
+
     /* Colors */
     --color-primary: #0070F4;
     --color-primary-light: oklch(from var(--color-primary) calc(l + 0.15) c h);
@@ -165,4 +177,104 @@
     --color-surface-accent-800: #1e293b;
     --color-surface-accent-900: #172033;
     --color-surface-accent-950: #0f172a;
+}
+
+/* The semantic surfaces as Tailwind colors. `inline` is load-bearing: it makes
+   `bg-surface-card` emit `var(--surface-card)` at the element, so the value
+   resolves under whichever dark selector the consumer uses. In a plain
+   `@theme` the alias would be computed once on `:root` and stay light. The
+   variables themselves are defined at the bottom of this file. */
+@theme inline {
+    --color-surface-frame: var(--surface-frame);
+    --color-surface-sheet: var(--surface-sheet);
+    --color-surface-card: var(--surface-card);
+    --color-surface-card-hover: var(--surface-card-hover);
+    --color-surface-raised: var(--surface-raised);
+    --color-surface-raised-hover: var(--surface-raised-hover);
+    --color-surface-lifted: var(--surface-lifted);
+    --color-surface-field: var(--surface-field);
+    --color-surface-field-hover: var(--surface-field-hover);
+    --color-surface-hover: var(--surface-hover);
+    --color-surface-active: var(--surface-active);
+    --color-surface-scrim: var(--surface-scrim);
+    --color-surface-well: var(--surface-well);
+    --color-hairline: var(--hairline);
+    --color-hairline-strong: var(--hairline-strong);
+}
+
+/* ---------------------------------------------------------------------------
+ * Semantic surfaces — one role, two themes. Added 2026-09-08.
+ *
+ * Measured on demo.rebase.pro in dark mode, the panel used exactly two opaque
+ * surface values: the ground (#0a0a0a) and the content sheet (#111111). Every
+ * card painted `dark:bg-surface-900` — the GROUND value — on top of the sheet,
+ * so cards were holes cut into the surface they sat on, and the largest areas
+ * on screen carried the darkest value. Retuning the numbers cannot fix that:
+ * the sheet used `800` and cards used `900`, and `900` must stay darker.
+ *
+ * So a surface is now named by ROLE and the theme decides the value. Two rules:
+ *
+ *   1. Every nested surface is one step lifted from the surface it sits on.
+ *      Lifted means lighter on both themes; the light frame is the greyest
+ *      thing on the page. Fields are the one exception — a field is inset, so
+ *      it is an alpha fill that goes the other way.
+ *   2. A hairline marks an object, not a region. Cards on the sheet, floating
+ *      surfaces and fields get a line. The sheet edge, tiles inside a card,
+ *      rows, tracks, buttons and chips do not; the lightness step separates
+ *      them.
+ *
+ * These are plain custom properties, deliberately outside `@theme`, so they
+ * can switch on the theme selector. The `@theme inline` entries above alias
+ * them into Tailwind, and `inline` matters: it makes `bg-surface-card` emit
+ * `var(--surface-card)` at the element, which resolves under whichever dark
+ * selector the consumer uses (`.dark` in the panel, `[data-theme=dark]` on the
+ * marketing site). Without `inline` the value would be fixed on `:root`.
+ *
+ * Interaction fills are alpha so they compose over whatever they land on. The
+ * solid surfaces carry their own hover value because an alpha hover on a solid
+ * background REPLACES it — white at 6% over the sheet is darker than the card
+ * it was meant to lift.
+ *
+ * The full reasoning, with the measurements, is in
+ * docs/plans/surface-system-2026-09.md and docs/design/instatic-distilled.html.
+ * ------------------------------------------------------------------------- */
+:root,
+.light,
+[data-theme="light"] {
+    --surface-frame: #f0f0f2;
+    --surface-sheet: #f9f9fa;
+    --surface-card: #ffffff;
+    --surface-card-hover: #f7f7f8;
+    --surface-raised: #ececee;
+    --surface-raised-hover: #e3e3e6;
+    --surface-lifted: #ffffff;
+    --surface-field: rgb(0 0 0 / 0.035);
+    --surface-field-hover: rgb(0 0 0 / 0.055);
+    --surface-hover: rgb(0 0 0 / 0.04);
+    --surface-active: rgb(0 0 0 / 0.07);
+    --surface-scrim: rgb(0 0 0 / 0.4);
+    /* The one surface that goes DOWN the ladder on purpose: a code well, a
+       query, a log tail, a connection string, recessed into its card. */
+    --surface-well: #f5f5f5;
+    --hairline: rgb(0 0 0 / 0.08);
+    --hairline-strong: rgb(0 0 0 / 0.13);
+}
+
+.dark,
+[data-theme="dark"] {
+    --surface-frame: #0a0a0a;
+    --surface-sheet: #131313;
+    --surface-card: #181818;
+    --surface-card-hover: #1d1d1d;
+    --surface-raised: #242424;
+    --surface-raised-hover: #2c2c2c;
+    --surface-lifted: #2c2c2c;
+    --surface-field: rgb(255 255 255 / 0.04);
+    --surface-field-hover: rgb(255 255 255 / 0.07);
+    --surface-hover: rgb(255 255 255 / 0.06);
+    --surface-active: rgb(255 255 255 / 0.09);
+    --surface-scrim: rgb(0 0 0 / 0.6);
+    --surface-well: #0a0a0a;
+    --hairline: rgb(255 255 255 / 0.08);
+    --hairline-strong: rgb(255 255 255 / 0.14);
 }

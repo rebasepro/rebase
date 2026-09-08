@@ -28,6 +28,7 @@ export type { ChipHue, ChipTone } from "./util/chip_colors";
 export { useOutsideAlerter } from "./hooks/useOutsideAlerter";
 export { useDebouncedCallback } from "./hooks/useDebouncedCallback";
 export { useDebounceCallback } from "./hooks/useDebounceCallback";
+export { useIsDarkMode } from "./hooks/useIsDarkMode";
 export { useDebounceValue } from "./hooks/useDebounceValue";
 export { useInjectStyles } from "./hooks/useInjectStyles";
 export { PortalContainerProvider, usePortalContainer } from "./hooks/PortalContainerContext";

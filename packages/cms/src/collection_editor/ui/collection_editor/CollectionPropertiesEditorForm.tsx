@@ -421,13 +421,13 @@ export function CollectionPropertiesEditorForm({
     };
 
     const body = (
-        <div className={"grid grid-cols-12 h-full min-h-0 bg-surface-50 dark:bg-surface-800"}>
+        <div className={"grid grid-cols-12 h-full min-h-0 bg-surface-sheet"}>
             <div className={cls(
-                "col-span-12 lg:col-span-5 h-full min-h-0 flex flex-col bg-surface-50 dark:bg-surface-800",
+                "col-span-12 lg:col-span-5 h-full min-h-0 flex flex-col bg-surface-sheet",
                 !asDialog && "border-r " + defaultBorderMixin
             )}>
                 {/* Sidebar Header */}
-                <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px] shrink-0", defaultBorderMixin)}>
+                <div className={cls("flex items-center justify-between px-3 py-2 border-b min-h-[48px] shrink-0", defaultBorderMixin)}>
                     <div className="flex-grow min-w-0 pr-2">
                         <Field
                             name={"name"}
@@ -468,7 +468,7 @@ export function CollectionPropertiesEditorForm({
                 </div>
 
                 {/* Sidebar Content */}
-                <div className="flex-grow overflow-y-auto p-3 space-y-3 bg-surface-50 dark:bg-surface-800">
+                <div className="flex-grow overflow-y-auto p-3 space-y-3 bg-surface-sheet">
                     {owner && (
                         <div className="px-1 py-0.5">
                             <Typography variant="body2" color="secondary">
@@ -501,7 +501,7 @@ export function CollectionPropertiesEditorForm({
             </div>
 
             {!asDialog &&
-                <div className={"col-span-12 lg:col-span-7 p-4 md:py-8 md:px-4 h-full overflow-auto bg-surface-50 dark:bg-surface-800"}>
+                <div className={"col-span-12 lg:col-span-7 p-4 md:py-8 md:px-4 h-full overflow-auto bg-surface-sheet"}>
                     <div
                         className="sticky top-8 min-h-full w-full flex flex-col justify-center">
 

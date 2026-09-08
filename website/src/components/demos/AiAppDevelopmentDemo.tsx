@@ -6,7 +6,7 @@ export default function AiAppDevelopmentDemo() {
   const [recipeTab, setRecipeTab] = useState<"schema" | "sql">("schema");
 
   return (
-    <div className="w-full max-w-6xl mx-auto rounded-3xl border border-surface-800 bg-[#070709] p-6 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden">
+    <div className="w-full max-w-6xl mx-auto rounded-3xl border border-hairline bg-[#070709] p-6 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden">
       {/* Background glow effects - strictly using site primary blue (#0070f4) */}
       <div className="absolute -left-48 -top-48 w-[400px] h-[400px] rounded-full bg-primary/5 blur-[120px] pointer-events-none"></div>
       <div className="absolute -right-48 -bottom-48 w-[400px] h-[400px] rounded-full bg-primary/5 blur-[120px] pointer-events-none"></div>
@@ -15,7 +15,7 @@ export default function AiAppDevelopmentDemo() {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:30px_30px] pointer-events-none"></div>
 
       {/* Header and Toggle */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 pb-6 border-b border-surface-800/60 relative z-10">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 pb-6 border-b border-hairline relative z-10">
         <div>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold ring-1 ring-primary/20 mb-2">
             <Zap className="w-3.5 h-3.5" /> Decoupled Architectures
@@ -25,7 +25,7 @@ export default function AiAppDevelopmentDemo() {
         </div>
 
         {/* Mode Selector */}
-        <div className="flex bg-surface-900 p-1.5 rounded-xl border border-surface-800 self-start">
+        <div className="flex bg-surface-card p-1.5 rounded-xl border border-hairline self-start">
           <button
             onClick={() => setActiveMode("recipes")}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer ${
@@ -60,13 +60,13 @@ export default function AiAppDevelopmentDemo() {
             onClick={() => setActiveMode("recipes")}
             className={`group p-5 rounded-2xl border text-left transition-all duration-300 cursor-pointer ${
               activeMode === "recipes"
-                ? "bg-surface-900 border-primary/40 shadow-[0_4px_20px_rgba(0,112,244,0.1)]"
-                : "bg-surface-950/40 border-surface-800/60 hover:border-surface-700"
+                ? "bg-surface-sheet border-primary/40 shadow-[0_4px_20px_rgba(0,112,244,0.1)]"
+                : "bg-surface-well/60 border-hairline hover:border-hairline-strong"
             }`}
           >
             <div className="flex items-center gap-3 mb-2">
               <div className={`p-2 rounded-lg border ${
-                activeMode === "recipes" ? "bg-primary/10 border-primary/20 text-primary" : "bg-surface-900 border-surface-800 text-surface-500"
+                activeMode === "recipes" ? "bg-primary/10 border-primary/20 text-primary" : "bg-surface-sheet border-hairline text-surface-500"
               }`}>
                 <Terminal className="w-4 h-4" />
               </div>
@@ -84,13 +84,13 @@ export default function AiAppDevelopmentDemo() {
             onClick={() => setActiveMode("pipelines")}
             className={`group p-5 rounded-2xl border text-left transition-all duration-300 cursor-pointer ${
               activeMode === "pipelines"
-                ? "bg-surface-900 border-primary/40 shadow-[0_4px_20px_rgba(0,112,244,0.1)]"
-                : "bg-surface-950/40 border-surface-800/60 hover:border-surface-700"
+                ? "bg-surface-sheet border-primary/40 shadow-[0_4px_20px_rgba(0,112,244,0.1)]"
+                : "bg-surface-well/60 border-hairline hover:border-hairline-strong"
             }`}
           >
             <div className="flex items-center gap-3 mb-2">
               <div className={`p-2 rounded-lg border ${
-                activeMode === "pipelines" ? "bg-primary/10 border-primary/20 text-primary" : "bg-surface-900 border-surface-800 text-surface-500"
+                activeMode === "pipelines" ? "bg-primary/10 border-primary/20 text-primary" : "bg-surface-sheet border-hairline text-surface-500"
               }`}>
                 <Settings className="w-4 h-4" />
               </div>
@@ -103,7 +103,7 @@ export default function AiAppDevelopmentDemo() {
             </p>
           </div>
 
-          <div className="mt-auto p-4 rounded-xl bg-surface-900/40 border border-surface-800/60 hidden lg:block">
+          <div className="mt-auto p-4 rounded-xl bg-surface-raised border border-hairline hidden lg:block">
             <span className="text-[11px] font-semibold text-white block mb-1">Architectural Rule</span>
             <p className="text-[10px] text-surface-400 leading-normal">
               Never build third-party API dependencies into the core engine. Always inject features locally or route via event streams.
@@ -115,15 +115,15 @@ export default function AiAppDevelopmentDemo() {
         <div className="lg:col-span-8">
           
           {/* Main Visual Frame */}
-          <div className="rounded-2xl border border-surface-800 bg-[#0d0d0f] shadow-2xl flex flex-col h-[510px] overflow-hidden relative">
+          <div className="rounded-2xl border border-hairline bg-[#0d0d0f] shadow-2xl flex flex-col h-[510px] overflow-hidden relative">
             
             {/* Window Topbar */}
-            <div className="px-4 py-3 bg-[#121215] border-b border-surface-900 flex items-center justify-between">
+            <div className="px-4 py-3 bg-[#121215] border-b border-hairline flex items-center justify-between">
               <div className="flex items-center gap-1.5">
               </div>
               
               {activeMode === "recipes" ? (
-                <div className="flex items-center gap-2 font-mono text-[10px] text-slate-500 bg-[#09090b] px-3 py-1 rounded border border-surface-800">
+                <div className="flex items-center gap-2 font-mono text-[10px] text-slate-500 bg-[#09090b] px-3 py-1 rounded border border-hairline">
                   <span className="text-primary font-semibold">$</span> rebase skills install --agent claude
                 </div>
               ) : (
@@ -137,10 +137,10 @@ export default function AiAppDevelopmentDemo() {
             {activeMode === "recipes" && (
               <div className="flex-1 flex flex-col overflow-hidden bg-[#0d0d0f]">
                 {/* Editor Tabs */}
-                <div className="flex bg-[#121215] border-b border-surface-900 select-none">
+                <div className="flex bg-[#121215] border-b border-hairline select-none">
                   <button
                     onClick={() => setRecipeTab("schema")}
-                    className={`px-4 py-2 text-xs font-mono flex items-center gap-2 border-r border-surface-900 cursor-pointer ${
+                    className={`px-4 py-2 text-xs font-mono flex items-center gap-2 border-r border-hairline cursor-pointer ${
                       recipeTab === "schema" ? "bg-[#0d0d0f] text-white border-t border-t-primary" : "text-surface-500 hover:text-surface-300"
                     }`}
                   >
@@ -149,7 +149,7 @@ export default function AiAppDevelopmentDemo() {
                   </button>
                   <button
                     onClick={() => setRecipeTab("sql")}
-                    className={`px-4 py-2 text-xs font-mono flex items-center gap-2 border-r border-surface-900 cursor-pointer ${
+                    className={`px-4 py-2 text-xs font-mono flex items-center gap-2 border-r border-hairline cursor-pointer ${
                       recipeTab === "sql" ? "bg-[#0d0d0f] text-white border-t border-t-primary" : "text-surface-500 hover:text-surface-300"
                     }`}
                   >
@@ -281,7 +281,7 @@ export default function AiAppDevelopmentDemo() {
                 </div>
 
                 {/* Subtext description panel */}
-                <div className="bg-surface-900/50 border border-surface-800/60 rounded-xl p-3 text-[11px] font-mono text-slate-400 flex items-center gap-3 z-10 leading-relaxed">
+                <div className="bg-surface-raised border border-hairline rounded-xl p-3 text-[11px] font-mono text-slate-400 flex items-center gap-3 z-10 leading-relaxed">
                   <div className="h-2 w-2 rounded-full bg-primary animate-pulse shrink-0"></div>
                   <span>
                     When a row enters <code className="text-white">feedbacks</code>, Rebase forwards the payload to your local function to trigger the AI analysis asynchronously.

@@ -7,7 +7,7 @@
 
 @layer utilities {
     body {
-        @apply w-full min-h-screen bg-surface-50 dark:bg-surface-900 flex flex-col items-center justify-center;
+        @apply w-full min-h-screen bg-surface-frame flex flex-col items-center justify-center;
     }
 
     a {

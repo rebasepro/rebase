@@ -580,16 +580,21 @@
    product surfaces, so only the dark half is written down. If the toolkit's
    field changes, change it HERE too; nothing generates one from the other. */
 
-/* TextField / Select / BooleanSwitchWithLabel container. */
+/* TextField / Select / BooleanSwitchWithLabel container.
+   Updated 2026-09-08 with the surface system: a field is `surface-field` (white
+   4% in dark) inside a 1px `hairline` (white 8%), at the control radius, which
+   theme.css now sets to 9px. The old 5.5% fill with no edge is what the panel
+   drew before it had a border. */
 @utility field {
     position: relative;
-    border-radius: 8px;                      /* rounded-lg */
-    background: rgb(255 255 255 / 0.055);    /* fieldBackgroundMixin, dark */
+    border-radius: 9px;                      /* rounded-lg, as theme.css sets it */
+    background: rgb(255 255 255 / 0.04);     /* --surface-field, dark */
+    border: 1px solid rgb(255 255 255 / 0.08); /* --hairline, dark */
 }
 
 /* Hover state of the same container, for demos where a field is clickable. */
 @utility field-hover {
-    background: rgb(255 255 255 / 0.09);     /* fieldBackgroundHoverMixin, dark */
+    background: rgb(255 255 255 / 0.07);     /* --surface-field-hover, dark */
 }
 
 /* The shrunk floating label. `text-sm` scaled to 0.75 is 10.5px on a 15px line,
@@ -608,9 +613,11 @@
 
 /* BooleanSwitch, `size="medium"` — 44x26 track, 20px knob, 3px inset.
 
-   The ON track is `--color-secondary`, NOT the primary blue. Every demo drew a
-   blue toggle; the product has never shipped one. Geometry and both palettes
-   come from SWITCH_GEOMETRY and the class list in
+   The ON track is the PRIMARY since 2026-09-08 (it was the secondary rose): a
+   boolean is the one place the product turns a hue into a value, and the hue
+   is the one that means "yes" everywhere else. OFF is the neutral `active`
+   fill inside a strong hairline. Geometry and both palettes come from
+   SWITCH_GEOMETRY and the class list in
    packages/ui/src/components/BooleanSwitch.tsx. */
 @utility switch-track {
     position: relative;
@@ -618,13 +625,13 @@
     height: 26px;
     flex: none;
     border-radius: 9999px;
-    background: var(--color-surface-accent-900);
-    box-shadow: 0 0 0 1px var(--color-surface-accent-700), 0 1px 2px rgb(0 0 0 / 0.05);
+    background: rgb(255 255 255 / 0.09);      /* --surface-active, dark */
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.14), 0 1px 2px rgb(0 0 0 / 0.05); /* --hairline-strong */
 }
 
 @utility switch-track-on {
-    background: var(--color-secondary);
-    box-shadow: 0 0 0 1px var(--color-secondary), 0 1px 2px rgb(0 0 0 / 0.05);
+    background: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary), 0 1px 2px rgb(0 0 0 / 0.05);
 }
 
 @utility switch-knob {
@@ -634,7 +641,7 @@
     width: 20px;
     height: 20px;
     border-radius: 9999px;
-    background: var(--color-surface-accent-400);
+    background: var(--color-surface-400);
     translate: 3px 0;
     transition: translate 100ms ease-out, background-color 100ms ease-out;
 }
@@ -653,22 +660,24 @@
    is both a different hue family and several stops darker, so an "Electronics"
    chip on the site and the same chip in the product did not look related.
 
-   Values below are `CHIP_COLORS[hue]` in dark mode — the `Lighter` tone, which
-   is what a bare `color: "blue"` in a collection config resolves to. Pair with
-   `chip` for the geometry.
+   Values below are `CHIP_COLORS[hue]` in dark mode as the product draws them
+   since the tinted variant became the default (2026-09-08): the hue's solid
+   stop at 14% behind hue-coloured ink measured on that composite. A bare
+   `color: "blue"` in a collection config resolves to this. Pair with `chip`
+   for the geometry.
 
    Regenerate with:
      node -e "import('./packages/ui/dist/index.es.js').then(m=>{const c=m.CHIP_COLORS;
-       for (const k of Object.keys(c)) console.log(k, c[k].darkColor, c[k].darkText)})" */
+       for (const k of Object.keys(c)) console.log(k, c[k].darkTintColor, c[k].darkTintText)})" */
 
-/* Chip geometry, `size="small"`: rounded-lg, px-2 py-0.5, text-xs, medium. */
+/* Chip geometry, `size="small"`: rounded-md (6px), px-2 py-0.5, text-xs, medium. */
 @utility chip {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
     width: max-content;
     max-width: 100%;
-    border-radius: 8px;
+    border-radius: 6px;
     padding: 0.125rem 0.5rem;
     font-size: 0.75rem;
     line-height: 1rem;
@@ -683,78 +692,78 @@
 }
 
 @utility chip-blue {
-    background: #2750ae;
-    color: #cfdfff;
+    background: rgba(45, 127, 249, 0.14);
+    color: #9cc7ff;
 }
 
 @utility chip-cyan {
-    background: #0b76b7;
-    color: #eefafe;
+    background: rgba(24, 191, 255, 0.14);
+    color: #77d1f3;
 }
 
 @utility chip-teal {
-    background: #06a09b;
-    color: #012524;
+    background: rgba(32, 217, 210, 0.14);
+    color: #72ddc3;
 }
 
 @utility chip-green {
-    background: #338a17;
-    color: #030801;
+    background: rgba(32, 201, 51, 0.14);
+    color: #93e088;
 }
 
 @utility chip-yellow {
-    background: #b87503;
-    color: #261801;
+    background: rgba(252, 180, 0, 0.14);
+    color: #ffd66e;
 }
 
 @utility chip-orange {
-    background: #d74d26;
-    color: #180804;
+    background: rgba(255, 111, 44, 0.14);
+    color: #ffa981;
 }
 
 @utility chip-red {
-    background: #ba1e45;
-    color: #ffdce5;
+    background: rgba(248, 43, 96, 0.14);
+    color: #ff9eb7;
 }
 
 @utility chip-pink {
-    background: #b2158b;
-    color: #ffdaf6;
+    background: rgba(255, 8, 194, 0.14);
+    color: #f99de2;
 }
 
 @utility chip-purple {
-    background: #6b1cb0;
-    color: #ede2fe;
+    background: rgba(139, 70, 255, 0.14);
+    color: #cdb0ff;
 }
 
 @utility chip-gray {
-    background: #444444;
-    color: #eeeeee;
+    background: rgba(102, 102, 102, 0.14);
+    color: #cccccc;
 }
 
 @utility chip-indigo {
-    background: #4f46e5;
-    color: #e0e7ff;
+    background: rgba(99, 102, 241, 0.14);
+    color: #a5b4fc;
 }
 
 @utility chip-violet {
-    background: #7c3aed;
-    color: #ede9fe;
+    background: rgba(139, 92, 246, 0.14);
+    color: #c4b5fd;
 }
 
 @utility chip-fuchsia {
-    background: #c026d3;
-    color: #fefcff;
+    background: rgba(217, 70, 239, 0.14);
+    color: #f0abfc;
 }
 
 @utility chip-rose {
-    background: #e11d48;
-    color: #fffcfc;
+    background: rgba(244, 63, 94, 0.14);
+    color: #fda4af;
 }
 
 @utility chip-emerald {
-    background: #059669;
-    color: #021e16;
+    background: rgba(16, 185, 129, 0.14);
+    color: #6ee7b7;
 }
 
 /* The terminal caret. A static block reads as a rendering artefact; a blinking

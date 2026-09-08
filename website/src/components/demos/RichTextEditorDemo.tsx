@@ -38,10 +38,10 @@ export function RichTextEditorDemo() {
     return (
         <div className="w-full h-[600px] bg-[#0A0A0A] text-surface-200 flex flex-col font-sans select-none pointer-events-none relative">
             {/* Fake toolbar */}
-            <div className="h-12 border-b border-surface-800/60 bg-surface-900/40 flex items-center px-4 gap-4 shrink-0">
+            <div className="h-12 border-b border-hairline bg-surface-sheet flex items-center px-4 gap-4 shrink-0">
                 <div className="flex gap-2">
                 </div>
-                <div className="h-4 w-px bg-surface-700"></div>
+                <div className="h-4 w-px bg-hairline-strong"></div>
                 <div className="flex gap-3 text-surface-500">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7"/></svg>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -92,11 +92,11 @@ export function RichTextEditorDemo() {
                             </div>
                             
                             {/* Slash Command Dropdown */}
-                            <div className="absolute top-10 left-0 bg-surface-800 border border-surface-700 rounded-xl shadow-2xl p-1.5 w-64 z-10 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="absolute top-10 left-0 bg-surface-raised border border-hairline-strong rounded-xl shadow-2xl p-1.5 w-64 z-10 animate-in fade-in slide-in-from-top-2 duration-200">
                                 <div className="px-3 py-2 text-xs font-semibold text-surface-500 uppercase tracking-wider">Basic Blocks</div>
                                 
-                                <div className="bg-surface-700/50 rounded-lg flex items-center p-2 gap-3 mb-1">
-                                    <div className="bg-surface-900 rounded-md p-1.5 border border-surface-600 shadow-sm">
+                                <div className="bg-surface-raised-hover rounded-lg flex items-center p-2 gap-3 mb-1">
+                                    <div className="bg-surface-card rounded-md p-1.5 border border-hairline-strong shadow-sm">
                                         <svg className="w-4 h-4 text-surface-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                                     </div>
                                     <div className="flex flex-col">
@@ -106,7 +106,7 @@ export function RichTextEditorDemo() {
                                 </div>
                                 
                                 <div className="rounded-lg flex items-center p-2 gap-3 opacity-50">
-                                    <div className="bg-surface-900 rounded-md p-1.5 border border-surface-700">
+                                    <div className="bg-surface-card rounded-md p-1.5 border border-hairline-strong">
                                         <svg className="w-4 h-4 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.5 4h-5L7 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
                                     </div>
                                     <div className="flex flex-col">
@@ -120,16 +120,16 @@ export function RichTextEditorDemo() {
 
                     {(step >= 3) && (
                         <div className="flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-300">
-                            <div className="w-full h-48 bg-surface-900 rounded-xl border border-surface-700 flex flex-col items-center justify-center relative overflow-hidden group">
+                            <div className="w-full h-48 bg-surface-card rounded-xl border border-hairline-strong flex flex-col items-center justify-center relative overflow-hidden group">
                                 <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center opacity-80 mix-blend-luminosity transition-all duration-700"></div>
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                                 
                                 {step === 3 && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-surface-900/80 backdrop-blur-sm transition-opacity duration-500 opacity-100">
+                                    <div className="absolute inset-0 flex items-center justify-center bg-surface-sheet backdrop-blur-sm transition-opacity duration-500 opacity-100">
                                         <div className="flex flex-col items-center">
                                             <svg className="w-8 h-8 text-primary mb-3 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                                             <span className="text-sm text-white font-medium">Uploading image...</span>
-                                            <div className="w-32 h-1.5 bg-surface-800 rounded-full mt-3 overflow-hidden">
+                                            <div className="w-32 h-1.5 bg-surface-raised rounded-full mt-3 overflow-hidden">
                                                 <div className="h-full bg-primary animate-[shimmer_1s_infinite]"></div>
                                             </div>
                                         </div>

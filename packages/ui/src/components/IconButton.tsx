@@ -15,7 +15,7 @@ export type IconButtonProps<C extends React.ElementType> =
     "aria-label"?: string;
 }
 
-const buttonClasses = "hover:bg-surface-accent-200 hover:bg-opacity-75 hover:bg-surface-accent-200/75 dark:hover:bg-surface-accent-800 hover:scale-[1.04] active:scale-95 transition-transform";
+const buttonClasses = "hover:scale-[1.04] active:scale-95 transition-transform";
 // `[&>svg]:shrink-0` is load-bearing: without it flex compresses the icon to
 // whatever width is left after padding, so an 18px icon in a 28px button
 // rendered 12x18 — visibly squashed rather than merely small.
@@ -57,7 +57,7 @@ const IconButtonInner = <C extends React.ElementType = "button">({
                                                                      ...props
                                                                  }: IconButtonProps<C>, ref: React.ForwardedRef<HTMLButtonElement>) => {
 
-    const bgClasses = variant === "ghost" ? "bg-transparent" : "bg-surface-accent-200 bg-opacity-50 bg-surface-accent-200/50 dark:bg-surface-900 dark:bg-opacity-50 dark:bg-surface-900/50";
+    const bgClasses = variant === "ghost" ? "bg-transparent hover:bg-surface-hover" : "bg-surface-raised hover:bg-surface-raised-hover";
     const Component: React.ElementType<any> = component || "button";
     const isNativeButton = Component === "button";
 

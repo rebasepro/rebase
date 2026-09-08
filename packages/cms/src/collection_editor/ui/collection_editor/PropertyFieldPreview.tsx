@@ -38,11 +38,11 @@ export function PropertyFieldPreview({
         <div onClick={onClick} className={onClick ? "cursor-pointer" : ""}>
         <div
             className={cls(
-                "w-full flex flex-row gap-3 items-center px-3 py-2 rounded-lg transition-all duration-200 border bg-white dark:bg-surface-900 shadow-xs",
-                borderColorClass || "border-surface-200 dark:border-surface-700",
+                "w-full flex flex-row gap-3 items-center px-3 py-2 rounded-lg transition-all duration-200 border bg-surface-card shadow-xs",
+                borderColorClass || "border-hairline-strong",
                 selected
                     ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light ring-1 ring-inset ring-primary border-primary/30"
-                    : "hover:bg-surface-50 dark:hover:bg-surface-700"
+                    : "hover:bg-surface-hover"
             )}
         >
             <PropertyConfigBadge propertyConfig={propertyConfig} size="small"/>
@@ -115,10 +115,10 @@ export function NonEditablePropertyPreview({
         <div onClick={onClick} className={onClick ? "cursor-pointer" : ""}>
         <div
             className={cls(
-                "w-full flex flex-row gap-3 items-center px-3 py-2 rounded-lg transition-all duration-200 border bg-white dark:bg-surface-900 border-surface-200 dark:border-surface-700 shadow-xs",
+                "w-full flex flex-row gap-3 items-center px-3 py-2 rounded-lg transition-all duration-200 border bg-surface-card border-hairline-strong shadow-xs",
                 selected
                     ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light ring-1 ring-inset ring-primary border-primary/30"
-                    : "hover:bg-surface-50 dark:hover:bg-surface-700"
+                    : "hover:bg-surface-hover"
             )}
         >
             <div className={"relative shrink-0"}>
@@ -127,7 +127,7 @@ export function NonEditablePropertyPreview({
                     className={"h-8 w-8 flex items-center justify-center rounded-full shadow-2xs text-white bg-surface-500"}>
                     <FunctionSquareIcon className={"text-inherit"} size={iconSize.small}/>
                 </div>}
-                <MinusCircleIcon className={"text-surface-accent-400 absolute -right-2 -top-2 bg-surface-50 dark:bg-surface-900 rounded-full"} size={iconSize.small}/>
+                <MinusCircleIcon className={"text-surface-accent-400 absolute -right-2 -top-2 bg-surface-card rounded-full"} size={iconSize.small}/>
             </div>
 
             <div className="flex-1 flex flex-col min-w-0 mr-16">

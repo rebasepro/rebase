@@ -154,9 +154,13 @@ export function ResizablePanels({
             {/* Divider */}
             {!stacked && showFirstPanel && showSecondPanel && (
                 <div
+                    // The divider is a handle, not a rule: invisible until the
+                    // pointer is on it. The two panels it separates already
+                    // differ by a surface step, and a permanent 1px line between
+                    // them was one of six on the split record view where the
+                    // reference draws one.
                     className={cls(
-                        "relative z-10 flex flex-shrink-0 items-center justify-center",
-                        defaultBorderMixin,
+                        "relative z-10 flex flex-shrink-0 items-center justify-center border-transparent",
                         isHorizontal ? "border-l w-px h-full cursor-col-resize" : "border-t h-px w-full cursor-row-resize"
                     )}
                     onMouseDown={handleResizeStart}

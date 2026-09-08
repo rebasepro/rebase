@@ -135,7 +135,7 @@ const VERDICT_CHIP: Record<Verdict, { label: string; scheme: "greenLighter" | "o
 const monospace = "font-mono text-xs leading-relaxed";
 const codeBlock = cls(
     monospace,
-    "bg-surface-100 dark:bg-surface-800 rounded-md p-3 overflow-x-auto whitespace-pre"
+    "bg-surface-raised rounded-md p-3 overflow-x-auto whitespace-pre"
 );
 
 /** A disclosure that starts closed. The evidence, for the reader who wants it. */
@@ -209,7 +209,7 @@ function WithheldConstraints({ constraints }: { constraints: WithheldConstraint[
             <ul className="space-y-2">
                 {constraints.map(constraint => (
                     <li key={constraint.target} className="text-sm">
-                        <code className="bg-surface-200 dark:bg-surface-700 px-1 rounded">
+                        <code className="bg-surface-raised px-1 rounded">
                             {constraint.target}
                         </code>
                         <div className="mt-1">{constraint.reason}</div>

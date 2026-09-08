@@ -410,7 +410,7 @@ export const UserSelector = React.forwardRef<
                         <PopoverPrimitive.Content
                             ref={contentRef}
                             data-user-selector-content
-                            className={cls("z-50 overflow-hidden border bg-white dark:bg-surface-800 rounded-lg min-w-72", defaultBorderMixin)}
+                            className={cls("z-50 overflow-hidden border bg-surface-card rounded-lg min-w-72", defaultBorderMixin)}
                             align="start"
                             sideOffset={8}
                             side="bottom"
@@ -480,8 +480,8 @@ export const UserSelector = React.forwardRef<
                                                     onSelect={() => handleItemClick(item)}
                                                     className={cls(
                                                         "flex flex-row items-center gap-1.5 m-1 p-1.5 rounded-xs cursor-pointer ring-offset-transparent",
-                                                        isSelected && "bg-surface-accent-200 dark:bg-surface-accent-950",
-                                                        "aria-selected:outline-hidden aria-selected:ring-2 aria-selected:ring-primary/75 aria-selected:ring-offset-2 aria-selected:bg-surface-accent-100 dark:aria-selected:bg-surface-accent-900"
+                                                        isSelected && "bg-surface-active",
+                                                        "aria-selected:outline-hidden aria-selected:bg-surface-active"
                                                     )}
                                                 >
                                                     <UserDisplay user={item.user}/>

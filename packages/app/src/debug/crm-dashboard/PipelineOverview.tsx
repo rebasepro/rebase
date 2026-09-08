@@ -172,10 +172,9 @@ export function PipelineOverview({
                                         <div
                                             className={cls(
                                                 "flex flex-col items-center justify-center rounded-lg px-3 py-3 min-w-[72px] transition-colors duration-150 cursor-pointer",
-                                                "hover:bg-surface-accent-100 dark:hover:bg-surface-800",
                                                 isEmpty
-                                                    ? "bg-surface-50 dark:bg-surface-900/20"
-                                                    : "bg-surface-100/50 dark:bg-surface-900/60"
+                                                    ? "bg-surface-field hover:bg-surface-field-hover"
+                                                    : "bg-surface-raised hover:bg-surface-raised-hover"
                                             )}
                                             style={{ flex: `${widthPercent} 1 0%` }}
                                             onClick={() => onNavigate(`/c/engagements?stage=${stage.stageKey}`)}
@@ -217,7 +216,7 @@ export function PipelineOverview({
                         {/* Separator between active and closed stages */}
                         {activeStages.length > 0 && closedStages.length > 0 && (
                             <div className="flex items-center shrink-0 mx-2">
-                                <div className="w-px h-8 bg-surface-200 dark:bg-surface-700" />
+                                <div className="w-px h-8 bg-surface-raised" />
                             </div>
                         )}
 
@@ -238,11 +237,10 @@ export function PipelineOverview({
                                         <div
                                             className={cls(
                                                 "flex flex-col items-center justify-center rounded-lg px-3 py-3 min-w-[72px] transition-colors duration-150 cursor-pointer",
-                                                "hover:bg-surface-accent-100 dark:hover:bg-surface-800",
                                                 "opacity-60",
                                                 isEmpty
-                                                    ? "bg-surface-50 dark:bg-surface-900/10"
-                                                    : "bg-surface-100/30 dark:bg-surface-900/30"
+                                                    ? "bg-surface-field hover:bg-surface-field-hover"
+                                                    : "bg-surface-raised hover:bg-surface-raised-hover"
                                             )}
                                             style={{ flex: "0 0 auto" }}
                                             onClick={() => onNavigate(`/c/engagements?stage=${stage.stageKey}`)}

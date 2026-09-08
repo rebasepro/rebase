@@ -234,7 +234,10 @@ const ordersCollection: PostgresCollectionConfig = {
         icon: "ShoppingCart",
         group: "E-Commerce",
         defaultEntityAction: "view",
-        enabledViews: ["table", "kanban"],
+        // Explicit because "list" is now enabled and would otherwise take the
+        // default slot — orders have always opened on the table.
+        defaultViewMode: "table",
+        enabledViews: ["list", "table", "kanban"],
         kanban: {
             columnProperty: "status"
         },

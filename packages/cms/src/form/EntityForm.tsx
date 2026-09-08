@@ -515,7 +515,10 @@ export function EntityForm<M extends Record<string, unknown>>({
             minimalistView: false,
             // One height for every control in the form. Left to their own
             // defaults, a text field came out 48px, a select 44 and a switch 64.
-            size: "large",
+            // `small` (32px, 14px text): the record-form density, and the
+            // reference's own. `large` was the hero-form scale and eight of them
+            // in a row read as a wall; see DESIGN.md "Form density".
+            size: "small",
             autoFocus: autoFocusKey === field.key
         };
 

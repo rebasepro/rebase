@@ -47,7 +47,7 @@ export function DemoLoginView({ authController, googleClientId }: DemoLoginViewP
                     {/* Demo info */}
                     <div className={cls(
                         "rounded-lg px-4 py-3 text-sm",
-                        "bg-surface-100 text-surface-600 dark:bg-surface-900 dark:text-surface-300"
+                        "bg-surface-field text-surface-600 dark:text-surface-300"
                     )}>
                         {/* Both steps, in order. This said "Just click Sign in
                             with email" while `disabled={!privacyAccepted}` held

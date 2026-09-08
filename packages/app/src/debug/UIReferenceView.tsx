@@ -2,10 +2,13 @@
 /**
  * UIReferenceView — hidden debug route at /debug/ui
  *
- * This file is a STATIC reference of the real UI patterns used across the app.
- * Markup / styles are copied from source files where a section mirrors a real
- * screen. DO NOT add invented styles — copy from actual source files, or from
- * the components in @rebasepro/ui.
+ * The design source of truth for the kit, in two halves. The SYSTEM chapters
+ * (principles, surfaces, colour, typography, shape and space, depth and icons,
+ * cards and data — `./ui-reference/SystemSections.tsx`) show the decisions in
+ * `theme.css`, `styles.ts` and `DESIGN.md` with the kit's own components. The
+ * ELEMENT chapters below mirror real screens: markup and classes are copied
+ * from the source files they name. DO NOT add invented styles here — copy from
+ * the actual component, or compose kit components.
  *
  * Sections named after a component mirror that component. Sections named after
  * a pattern (e.g. "Management Screen", "Form Dialog") are illustrative
@@ -14,8 +17,9 @@
  * Do not cite source line numbers here — they rot silently. Name the file only.
  *
  * Sources:
+ *   theme.css, styles.ts, DESIGN.md, docs/design/instatic-distilled.html,
  *   DefaultDrawer.tsx, DefaultAppBar.tsx, DrawerNavigationItem.tsx,
- *   DrawerNavigationGroup.tsx
+ *   DrawerNavigationGroup.tsx, FieldBlock.tsx
  */
 import React, { useState } from "react";
 import {
@@ -81,27 +85,44 @@ import {
 import { RebaseLogo } from "../components/RebaseLogo";
 import { CrmDashboardDemo } from "./crm-dashboard/CrmDashboardDemo";
 import { CollectionTableDemo, CardViewDemo, KanbanBoardDemo } from "./collection-views";
+import { SectionBlock } from "./ui-reference/SectionBlock";
+import {
+    CardsDataSection,
+    ColourSection,
+    DepthIconsSection,
+    PrinciplesSection,
+    ShapeSpaceSection
+} from "./ui-reference/SystemSections";
 
-const SECTIONS = [
-    { id: "drawer", label: "Drawer", icon: PanelLeftIcon },
-    { id: "appbar", label: "App Bar", icon: AppWindow },
-    { id: "tabs", label: "Tabs", icon: ListIcon },
-    { id: "editor-sidebar", label: "Editor Sidebar", icon: ColumnsIcon },
-    { id: "empty-states", label: "Empty States", icon: FileIcon },
-    { id: "typography", label: "Typography", icon: TypeIcon },
-    { id: "buttons", label: "Buttons", icon: PlusIcon },
-    { id: "inputs", label: "Form Inputs", icon: FileTextIcon },
-    { id: "chips-alerts", label: "Chips & Alerts", icon: AlertCircleIcon },
-    { id: "users", label: "Management", icon: UserIcon },
-    { id: "user-dialog", label: "Form Dialog", icon: CircleUserIcon },
-    { id: "crm-dashboard", label: "CRM Dashboard", icon: LayoutGridIcon },
-    { id: "collection-table", label: "Collection Table", icon: ListIcon },
-    { id: "card-view", label: "Card View", icon: LayoutGridIcon },
-    { id: "kanban-board", label: "Kanban Board", icon: KanbanIcon }
+/** The page's chapters, in reading order: the system first, then the elements built on it. */
+const SECTIONS: { id: string; label: string; icon: React.ComponentType<{ size?: number }>; group: "System" | "Shell" | "Controls" | "Screens" }[] = [
+    { id: "principles", label: "Principles", icon: SunMoonIcon, group: "System" },
+    { id: "surfaces", label: "Surfaces", icon: LayoutGridIcon, group: "System" },
+    { id: "colour", label: "Colour", icon: AlertCircleIcon, group: "System" },
+    { id: "typography", label: "Typography", icon: TypeIcon, group: "System" },
+    { id: "shape", label: "Shape and space", icon: ColumnsIcon, group: "System" },
+    { id: "depth", label: "Depth and icons", icon: AppWindow, group: "System" },
+    { id: "drawer", label: "Drawer", icon: PanelLeftIcon, group: "Shell" },
+    { id: "appbar", label: "App bar", icon: AppWindow, group: "Shell" },
+    { id: "tabs", label: "Tabs", icon: ListIcon, group: "Shell" },
+    { id: "editor-sidebar", label: "Editor sidebar", icon: ColumnsIcon, group: "Shell" },
+    { id: "buttons", label: "Buttons", icon: PlusIcon, group: "Controls" },
+    { id: "inputs", label: "Form inputs", icon: FileTextIcon, group: "Controls" },
+    { id: "chips-alerts", label: "Chips and alerts", icon: TagIcon, group: "Controls" },
+    { id: "data", label: "Cards and data", icon: LayoutGridIcon, group: "Controls" },
+    { id: "empty-states", label: "Empty states", icon: FileIcon, group: "Screens" },
+    { id: "users", label: "Management", icon: UserIcon, group: "Screens" },
+    { id: "user-dialog", label: "Form dialog", icon: CircleUserIcon, group: "Screens" },
+    { id: "crm-dashboard", label: "CRM dashboard", icon: LayoutGridIcon, group: "Screens" },
+    { id: "collection-table", label: "Collection table", icon: ListIcon, group: "Screens" },
+    { id: "card-view", label: "Card view", icon: LayoutGridIcon, group: "Screens" },
+    { id: "kanban-board", label: "Kanban board", icon: KanbanIcon, group: "Screens" }
 ];
 
+const SECTION_GROUPS = ["System", "Shell", "Controls", "Screens"] as const;
+
 export function UIReferenceView() {
-    const [activeSection, setActiveSection] = useState("drawer");
+    const [activeSection, setActiveSection] = useState("principles");
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
     const scrollTo = (id: string) => {
@@ -132,52 +153,55 @@ export function UIReferenceView() {
                     <Typography variant="subtitle1" noWrap className="truncate">UI Ref</Typography>
                 </div>
 
-                {/* Nav entries */}
+                {/* Nav entries — the same rows the real drawer draws: a group header
+                    from DrawerNavigationGroup, then 30px sentence-case items from
+                    DrawerNavigationItem. This nav used to run its own 40px uppercase
+                    rows, which made the reference's own chrome the one place on the
+                    page that did not follow the reference. */}
                 <div className="mt-3 flex-grow overflow-scroll no-scrollbar">
-                    <div className="my-2 mx-2 flex flex-col">
-                        {/* Group header — from DrawerNavigationGroup */}
-                        <div className={cls("pl-4 pr-2 py-1 flex flex-row items-center transition-colors cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700/50 rounded-t-lg bg-surface-50 dark:bg-surface-950/30")}>
-                            <ChevronDownIcon size={iconSize.smallest} className="text-surface-500 dark:text-surface-400 transition-transform duration-200 mr-1"/>
-                            <Typography variant="caption" color="secondary" className="font-medium flex-grow line-clamp-1">
-                                SECTIONS
-                            </Typography>
-                        </div>
-                        {/* Nav items — from DrawerNavigationItem */}
-                        <div className="overflow-hidden bg-surface-50 dark:bg-surface-950/30 rounded-b-lg">
-                            {SECTIONS.map(s => {
-                                const IconComponent = s.icon;
-                                return (
-                                    <div key={s.id}>
+                    {SECTION_GROUPS.map(group => (
+                        <div key={group} className="my-2 mx-2 flex flex-col">
+                            <div className="pl-3 pr-2 py-0.5 flex flex-row items-center transition-colors cursor-pointer hover:bg-surface-hover rounded-lg">
+                                <ChevronDownIcon size={iconSize.small} className="text-surface-400 dark:text-surface-400 transition-transform duration-200 mr-1"/>
+                                <Typography variant="caption" color="secondary" className="font-semibold text-[11px] uppercase tracking-wider flex-grow line-clamp-1 text-surface-400 dark:text-surface-400">
+                                    {group}
+                                </Typography>
+                            </div>
+                            <div className="flex flex-col">
+                                {SECTIONS.filter(s => s.group === group).map(s => {
+                                    const IconComponent = s.icon;
+                                    const active = activeSection === s.id;
+                                    return (
                                         <div
+                                            key={s.id}
                                             onClick={() => scrollTo(s.id)}
                                             className={cls(
                                                 "rounded-lg truncate group/nav",
-                                                "hover:bg-primary/5 dark:hover:bg-primary/5 text-text-primary dark:text-surface-200 hover:text-surface-900 dark:hover:text-white",
-                                                "flex flex-row items-center",
-                                                "pr-4 h-10",
-                                                "font-medium text-xs cursor-pointer",
-                                                activeSection === s.id ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary" : ""
+                                                "hover:bg-surface-hover text-surface-700 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white",
+                                                "flex flex-row items-center pr-4 h-[30px]",
+                                                "font-medium text-[13px] cursor-pointer",
+                                                active ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary [&_div]:text-primary" : ""
                                             )}
                                         >
-                                            <div className={cls("shrink-0 flex items-center justify-center w-[56px] h-[40px] text-surface-500 dark:text-text-secondary-dark transition-colors duration-150 group-hover/nav:text-primary", activeSection === s.id && "text-primary dark:text-primary")}>
-                                                <IconComponent size={iconSize.small}/>
+                                            <div className="shrink-0 flex items-center justify-center w-[44px] h-[30px] text-surface-500 dark:text-text-secondary-dark [&>svg]:size-4 group-hover/nav:text-primary transition-colors duration-150">
+                                                <IconComponent size={iconSize.smallest}/>
                                             </div>
-                                            <div className="text-text-primary dark:text-surface-200 opacity-100 font-inherit truncate space-x-2">
-                                                {s.label.toUpperCase()}
+                                            <div className="text-text-primary dark:text-surface-200 font-inherit truncate">
+                                                {s.label}
                                             </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
+                    ))}
                 </div>
 
                 {/* DrawerToggle — from DefaultDrawer */}
                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
                     <div className={cls(
                         "flex flex-row items-center rounded-lg cursor-pointer",
-                        "hover:bg-surface-accent-100 dark:hover:bg-surface-800",
+                        "hover:bg-surface-hover",
                         "transition-colors duration-150",
                         "py-2"
                     )}>
@@ -201,9 +225,153 @@ export function UIReferenceView() {
                 engages instead of being overruled from above. */}
             <div ref={scrollContainerRef} className="flex-1 min-w-0">
 
+                <PrinciplesSection/>
+
+                {/* ══════════════════════════════════════════════════════════
+                    SECTION: Surfaces
+                    The semantic surface ladder from theme.css, nested the way
+                    the panel nests it. Toggle the theme to see both ladders.
+                ══════════════════════════════════════════════════════════ */}
+                <SectionBlock id="surfaces" title="Surfaces — theme.css, styles.ts">
+                    <Typography variant="body2" color="secondary" className="mb-4">
+                        A surface is named by role and the theme decides the value. Frame, sheet and card each sit one step
+                        lighter than the one below; above the card, raised and field are grey on both themes. A hairline marks
+                        an object (a card, a field, a floating panel), never a region (a tile, a row, a track), with one
+                        exception: the sheet edge against the frame, where the step alone is too small to read.
+                        See <code className="font-mono text-xs">packages/ui/DESIGN.md</code>.
+                    </Typography>
+                    <div className="bg-surface-frame rounded-xl p-4">
+                        <Typography variant="caption" className="typography-micro block mb-2 text-text-secondary dark:text-text-secondary-dark">frame · bg-surface-frame</Typography>
+                        <div className="bg-surface-sheet border border-hairline rounded-xl p-4">
+                            <Typography variant="caption" className="typography-micro block mb-3 text-text-secondary dark:text-text-secondary-dark">sheet · bg-surface-sheet</Typography>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-surface-card border border-hairline rounded-xl p-4">
+                                    <Typography variant="caption" className="typography-micro block mb-3 text-text-secondary dark:text-text-secondary-dark">card · bg-surface-card + border-hairline</Typography>
+                                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                                        <div className="bg-surface-raised hover:bg-surface-raised-hover transition-colors rounded-lg px-3 py-1.5 text-sm">raised</div>
+                                        <div className="bg-surface-field hover:bg-surface-field-hover transition-colors rounded-lg px-3 py-1.5 text-sm text-text-secondary dark:text-text-secondary-dark">field</div>
+                                        <div className="bg-surface-field rounded-lg p-1 inline-flex gap-1 text-sm">
+                                            <span className="bg-surface-lifted rounded-md px-3 py-0.5 shadow-sm">lifted</span>
+                                            <span className="px-3 py-0.5 text-text-secondary dark:text-text-secondary-dark">track</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col gap-0.5">
+                                        <div className="px-3 py-1.5 text-sm rounded-md hover:bg-surface-hover transition-colors cursor-default">row · hover:bg-surface-hover</div>
+                                        <div className="px-3 py-1.5 text-sm rounded-md bg-surface-active">row · bg-surface-active</div>
+                                    </div>
+                                </div>
+                                <div className="bg-surface-card border border-hairline-strong rounded-lg p-4 shadow-lg self-start">
+                                    <Typography variant="caption" className="typography-micro block mb-3 text-text-secondary dark:text-text-secondary-dark">floating · paperMixin, border-hairline-strong</Typography>
+                                    <Typography variant="body2">
+                                        A menu, a popover, a dialog. The stronger line is what lets it read against anything underneath.
+                                    </Typography>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                        {([
+                            ["frame", "bg-surface-frame"],
+                            ["sheet", "bg-surface-sheet"],
+                            ["card", "bg-surface-card"],
+                            ["raised", "bg-surface-raised"],
+                            ["lifted", "bg-surface-lifted"],
+                            ["well", "bg-surface-well"],
+                            ["hairline", "border-hairline"],
+                            ["hairline strong", "border-hairline-strong"]
+                        ] as const).map(([label, cn]) => (
+                            <div key={cn} className={cls("rounded-lg h-14 flex items-end p-2 border", cn.startsWith("bg-") ? cn + " border-hairline" : "bg-surface-card " + cn)}>
+                                <Typography variant="caption" className="font-mono text-text-secondary dark:text-text-secondary-dark">{label}</Typography>
+                            </div>
+                        ))}
+                    </div>
+                </SectionBlock>
+
+                <ColourSection/>
+
                 {/* ═══════════════════════════════════════════════
-                    SECTION: Drawer
+                    SECTION: Typography
                 ═══════════════════════════════════════════════ */}
+                <SectionBlock id="typography" title="Typography">
+                    <Typography variant="body2" color="secondary" className="mb-4 max-w-[68ch]">
+                        Instrument Sans for headings, Inter for everything read, JetBrains Mono for everything measured. The
+                        ladder is monotonic: 600 for h1–h4, 500 for h5, h6 and labels, 400 for copy, and 700 never. The display
+                        end separates itself by size and tracking, not by weight. Each row names its variant and the rendered
+                        size, weight and tracking tier it resolves to.
+                    </Typography>
+                    <div className="flex flex-col gap-3">
+                        {TYPE_LADDER.map(([v, spec]) => (
+                            <div key={v} className={cls("flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4 border-b pb-3 last:border-0", defaultBorderMixin)}>
+                                <span className="w-56 shrink-0 text-[11px] text-text-secondary dark:text-text-secondary-dark font-mono">
+                                    {v} <span className="text-text-disabled dark:text-text-disabled-dark">· {spec}</span>
+                                </span>
+                                {/* `component="p"` keeps the variant's styling but not its
+                                    element. Rendering the specimen with its native tag put a
+                                    real <h1> — "The quick brown fox jumps over the lazy dog" —
+                                    plus h2-h6 into the document outline of every page that
+                                    embeds this view, including the public rebase.pro/ui gallery,
+                                    where it competed with the page's actual heading. The class
+                                    carries the type, so this renders identically. */}
+                                <Typography variant={v} component="p">The quick brown fox jumps over the lazy dog</Typography>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex gap-4 flex-wrap mt-4">
+                        {(["primary", "secondary", "disabled", "error"] as const).map(c => (
+                            <Typography key={c} color={c}>color=&quot;{c}&quot;</Typography>
+                        ))}
+                    </div>
+
+                    {/* The data tiers are shown with real content rather than the
+                        pangram above: `micro` is always one or two words naming the
+                        value beneath it, and `mono` is always a measurement. A
+                        specimen reading "The quick brown fox" would demonstrate the
+                        size and misrepresent the purpose. */}
+                    <div className={cls("mt-8 pt-6 border-t", defaultBorderMixin)}>
+                        <Typography variant="subtitle2" className="block mb-1">Data tiers</Typography>
+                        <Typography variant="body2" color="secondary" className="block mb-5 max-w-[65ch]">
+                            For values that are looked up rather than read: a field name, a measurement,
+                            a headline figure. <code className="font-mono text-xs">mono</code> and{" "}
+                            <code className="font-mono text-xs">stat</code> both carry{" "}
+                            <code className="font-mono text-xs">tabular-nums</code>, so a column of them
+                            keeps its decimal points aligned and a live counter does not jitter as its
+                            digits change width. The mono tier carries counts, sizes, times, ids and paths;
+                            it never carries a sentence.
+                        </Typography>
+
+                        <div className="flex flex-wrap items-start gap-x-12 gap-y-5">
+                            {([
+                                ["Region", "europe-west1"],
+                                ["Took", "32.2s"],
+                                ["Last run", "16/08/2026, 05:30:32"]
+                            ] as const).map(([label, value]) => (
+                                <div key={label}>
+                                    <Typography variant="micro" component="div" color="secondary" className="block">
+                                        {label}
+                                    </Typography>
+                                    <Typography variant="mono" component="div" className="block mt-1 text-sm">
+                                        {value}
+                                    </Typography>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-6 flex flex-wrap items-end gap-10">
+                            <div>
+                                <span className="text-[11px] text-text-secondary dark:text-text-secondary-dark font-mono">stat · 30 · 600 · tabular</span>
+                                <Typography variant="stat" component="div" className="block mt-1">1,284</Typography>
+                            </div>
+                            <div>
+                                <span className="text-[11px] text-text-secondary dark:text-text-secondary-dark font-mono">display-2 · 36→64 fluid · 600 · the one greeting a page has</span>
+                                <div className="text-display-2 font-headers font-semibold mt-1">Good afternoon, Zulu.</div>
+                            </div>
+                        </div>
+                    </div>
+                </SectionBlock>
+
+                <ShapeSpaceSection/>
+                <DepthIconsSection/>
+
                 <SectionBlock id="drawer" title="Drawer — DefaultDrawer.tsx">
                     <Typography variant="body2" color="secondary" className="mb-4">
                         The drawer wraps <code className="font-mono text-xs">DrawerLogo</code>, scrollable <code className="font-mono text-xs">DrawerNavigationGroup</code>s,
@@ -214,7 +382,7 @@ export function UIReferenceView() {
                         {/* Collapsed — exact markup from DefaultDrawer + DrawerNavigationItem */}
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-1">Collapsed (72px)</Typography>
-                            <div className={cls("flex flex-col h-72 relative w-[72px] border rounded-lg overflow-hidden bg-white dark:bg-surface-900", defaultBorderMixin)}>
+                            <div className={cls("flex flex-col h-72 relative w-[72px] border rounded-lg overflow-hidden bg-surface-card", defaultBorderMixin)}>
                                 <div className="flex flex-row items-center shrink-0 pt-4 pb-2 px-2">
                                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
                                         <RebaseLogo width="28px" height="28px"/>
@@ -222,10 +390,10 @@ export function UIReferenceView() {
                                 </div>
                                 <div className="mt-3 flex-grow overflow-hidden">
                                     <div className="my-2 mx-2 flex flex-col">
-                                        <div className="overflow-hidden rounded-lg bg-surface-50 dark:bg-surface-950/30">
-                                            {[<FolderIcon key="folder" size={iconSize.small}/>, <UserIcon key="user" size={iconSize.small}/>, <TagIcon key="tag" size={iconSize.small}/>].map((icon, i) => (
-                                                <div key={i} className="rounded-lg truncate hover:bg-primary/5 dark:hover:bg-primary/5 flex flex-row items-center h-10">
-                                                    <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px] text-text-secondary dark:text-text-secondary-dark">
+                                        <div className="flex flex-col">
+                                            {[<FolderIcon key="folder" size={iconSize.smallest}/>, <UserIcon key="user" size={iconSize.smallest}/>, <TagIcon key="tag" size={iconSize.smallest}/>].map((icon, i) => (
+                                                <div key={i} className={cls("rounded-lg truncate hover:bg-surface-hover flex flex-row items-center h-[30px]", i === 0 && "bg-primary/8 dark:bg-primary/10")}>
+                                                    <div className={cls("shrink-0 flex items-center justify-center w-[44px] h-[30px] [&>svg]:size-4", i === 0 ? "text-primary dark:text-primary" : "text-surface-500 dark:text-text-secondary-dark")}>
                                                         {icon}
                                                     </div>
                                                 </div>
@@ -234,7 +402,7 @@ export function UIReferenceView() {
                                     </div>
                                 </div>
                                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
-                                    <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-800 transition-colors duration-150 py-2">
+                                    <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-hover transition-colors duration-150 py-2">
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
                                             <ChevronsRightIcon size={iconSize.small}/>
                                         </div>
@@ -246,7 +414,7 @@ export function UIReferenceView() {
                         {/* Expanded — exact markup from DefaultDrawer + DrawerNavigationGroup + DrawerNavigationItem */}
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-1">Expanded (280px)</Typography>
-                            <div className={cls("flex flex-col h-72 relative w-[280px] border rounded-lg overflow-hidden bg-white dark:bg-surface-900", defaultBorderMixin)}>
+                            <div className={cls("flex flex-col h-72 relative w-[280px] border rounded-lg overflow-hidden bg-surface-card", defaultBorderMixin)}>
                                 {/* DrawerLogo */}
                                 <div className="flex flex-row items-center shrink-0 pt-4 pb-2 px-2">
                                     <div className="shrink-0 flex items-center justify-center w-[56px] h-[40px]">
@@ -256,34 +424,31 @@ export function UIReferenceView() {
                                         <Typography variant="subtitle1" noWrap className="truncate">Rebase</Typography>
                                     </div>
                                 </div>
-                                {/* DrawerNavigationGroup */}
+                                {/* DrawerNavigationGroup: an 11px uppercase group label in the
+                                    muted tier, then 30px sentence-case rows at 13px from
+                                    DrawerNavigationItem. The active row is the one place the
+                                    drawer spends the primary, as an 8-10% tint. */}
                                 <div className="mt-3 flex-grow overflow-hidden">
                                     <div className="my-2 mx-2 flex flex-col">
-                                        <div className="pl-4 pr-2 py-1 flex flex-row items-center transition-colors cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-700/50 rounded-t-lg bg-surface-50 dark:bg-surface-950/30">
-                                            <ChevronDownIcon size={iconSize.smallest} className="text-surface-500 dark:text-surface-400 mr-1"/>
-                                            <Typography variant="caption" color="secondary" className="font-medium flex-grow line-clamp-1">CONTENT</Typography>
+                                        <div className="pl-3 pr-2 py-0.5 flex flex-row items-center transition-colors cursor-pointer hover:bg-surface-hover rounded-lg">
+                                            <ChevronDownIcon size={iconSize.small} className="text-surface-400 dark:text-surface-400 mr-1"/>
+                                            <Typography variant="caption" color="secondary" className="font-semibold text-[11px] uppercase tracking-wider flex-grow line-clamp-1 text-surface-400 dark:text-surface-400">Content</Typography>
                                         </div>
-                                        <div className="overflow-hidden bg-surface-50 dark:bg-surface-950/30 rounded-b-lg">
+                                        <div className="flex flex-col">
                                             {[
-                                                { label: "Posts",
-icon: <FolderIcon size={iconSize.small}/>,
-active: true },
-                                                { label: "Authors",
-icon: <UserIcon size={iconSize.small}/>,
-active: false },
-                                                { label: "Tags",
-icon: <TagIcon size={iconSize.small}/>,
-active: false }
+                                                { label: "Posts", icon: <FolderIcon size={iconSize.smallest}/>, active: true },
+                                                { label: "Authors", icon: <UserIcon size={iconSize.smallest}/>, active: false },
+                                                { label: "Tags", icon: <TagIcon size={iconSize.smallest}/>, active: false }
                                             ].map(({ label, icon, active }) => (
                                                 <div key={label} className={cls(
-                                                    "rounded-lg truncate hover:bg-primary/5 dark:hover:bg-primary/5 text-text-primary dark:text-surface-200 hover:text-surface-900 dark:hover:text-white flex flex-row items-center pr-4 h-10 font-medium text-xs cursor-pointer",
-                                                    active ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary" : ""
+                                                    "rounded-lg truncate hover:bg-surface-hover text-surface-700 dark:text-surface-300 hover:text-surface-900 dark:hover:text-white flex flex-row items-center pr-4 h-[30px] font-medium text-[13px] cursor-pointer",
+                                                    active ? "bg-primary/8 dark:bg-primary/10 text-primary dark:text-primary [&_div]:text-primary" : ""
                                                 )}>
-                                                    <div className={cls("shrink-0 flex items-center justify-center w-[56px] h-[40px] transition-colors duration-150", active ? "text-primary dark:text-primary" : "text-surface-500 dark:text-text-secondary-dark")}>
+                                                    <div className={cls("shrink-0 flex items-center justify-center w-[44px] h-[30px] [&>svg]:size-4 transition-colors duration-150", active ? "text-primary dark:text-primary" : "text-surface-500 dark:text-text-secondary-dark")}>
                                                         {icon}
                                                     </div>
                                                     <div className="text-text-primary dark:text-surface-200 font-inherit truncate">
-                                                        {label.toUpperCase()}
+                                                        {label}
                                                     </div>
                                                 </div>
                                             ))}
@@ -292,7 +457,7 @@ active: false }
                                 </div>
                                 {/* DrawerToggle */}
                                 <div className={cls("shrink-0 mt-auto border-t px-2 py-2", defaultBorderMixin)}>
-                                    <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-800 transition-colors duration-150 py-2">
+                                    <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-hover transition-colors duration-150 py-2">
                                         <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
                                             <ChevronsLeftIcon size={iconSize.small}/>
                                         </div>
@@ -324,7 +489,7 @@ active: false }
                                 <Typography variant="caption" color="secondary">/</Typography>
                                 <div className="flex flex-row items-center gap-2 whitespace-nowrap">
                                     <Typography variant="body2">Posts</Typography>
-                                    <span className="text-xs text-surface-accent-500 dark:text-surface-accent-400 bg-surface-100 dark:bg-surface-700 px-1 py-0 rounded">42</span>
+                                    <span className="text-xs text-surface-accent-500 dark:text-surface-accent-400 bg-surface-raised px-1 py-0 rounded">42</span>
                                 </div>
                                 <Typography variant="caption" color="secondary">/</Typography>
                                 <div className="flex flex-row items-center gap-2 whitespace-nowrap">
@@ -334,11 +499,11 @@ active: false }
                         </div>
                         <div className="grow"/>
                         {/* Content/Studio toggle — from DefaultAppBar */}
-                        <div className={cls("mr-2 hidden sm:flex bg-surface-100 dark:bg-surface-950 rounded-lg p-0.5 border", defaultBorderMixin)}>
-                            <button className={cls("px-3 py-1 text-xs font-semibold rounded-md transition-all", "bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400")}>
+                        <div className={cls("mr-2 hidden sm:flex bg-surface-field rounded-lg p-0.5")}>
+                            <button className={cls("px-3 py-1 text-xs font-medium rounded-md transition-all", "bg-surface-lifted shadow-sm text-text-primary dark:text-text-primary-dark")}>
                                 Content
                             </button>
-                            <button className={cls("px-3 py-1 text-xs font-semibold rounded-md transition-all", "text-surface-500 hover:text-surface-900 dark:hover:text-white")}>
+                            <button className={cls("px-3 py-1 text-xs font-medium rounded-md transition-all", "text-surface-500 hover:text-surface-900 dark:hover:text-white")}>
                                 Studio
                             </button>
                         </div>
@@ -388,13 +553,13 @@ active: false }
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">variant=&quot;boxy&quot; (Editor Standard)</Typography>
                             <div className={cls("border rounded-lg overflow-hidden w-[320px]", defaultBorderMixin)}>
-                                <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-surface-200 dark:border-surface-950">
+                                <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-hairline">
                                     <Tab value="schema">Schema</Tab>
                                     <Tab value="snippets">Snippets</Tab>
                                     <Tab value="history">History</Tab>
                                 </Tabs>
                                 {/* Section header pattern — used in all editor sidebars */}
-                                <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+                                <div className={cls("p-3 border-b flex justify-between items-center", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">TABLES</Typography>
                                     <IconButton size="small">
                                         <SettingsIcon size={iconSize.smallest}/>
@@ -409,7 +574,7 @@ active: false }
                         {/* Toolbar tabs — from SQLEditor/JSEditor main toolbar */}
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">Toolbar Tabs (boxy, inline with controls)</Typography>
-                            <div className={cls("border rounded-lg overflow-hidden flex items-center justify-between pr-2 bg-white dark:bg-surface-950", defaultBorderMixin)}>
+                            <div className={cls("border rounded-lg overflow-hidden flex items-center justify-between pr-2 bg-surface-card", defaultBorderMixin)}>
                                 <div className="flex items-center">
                                     <Tabs value="query1" onValueChange={() => {}} variant="boxy" className="w-[unset] flex-shrink-0">
                                         <Tab value="query1" className="flex items-center gap-1.5">
@@ -427,7 +592,7 @@ active: false }
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <Button variant="text" size="small">Explain</Button>
-                                    <div className="h-4 w-px bg-surface-200 dark:bg-surface-950"/>
+                                    <div className="h-4 w-px bg-hairline"/>
                                     <Button size="small" color="primary">Run</Button>
                                 </div>
                             </div>
@@ -450,12 +615,12 @@ active: false }
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-1">SQL Editor Sidebar</Typography>
                             <div className={cls("flex flex-col h-72 w-[240px] border rounded-lg overflow-hidden", defaultBorderMixin)}>
-                                <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-surface-200 dark:border-surface-950">
+                                <Tabs value="schema" onValueChange={() => {}} variant="boxy" className="border-b border-hairline">
                                     <Tab value="schema">Schema</Tab>
                                     <Tab value="snippets">Snippets</Tab>
                                     <Tab value="history">History</Tab>
                                 </Tabs>
-                                <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+                                <div className={cls("p-3 border-b flex justify-between items-center", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark">TABLES</Typography>
                                     <IconButton size="small">
                                         <SettingsIcon size={iconSize.smallest}/>
@@ -464,13 +629,13 @@ active: false }
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-1">
                                     {/* Schema tree items — from SchemaBrowser */}
                                     <div className="mb-2">
-                                        <div className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors">
+                                        <div className="flex items-center p-1 cursor-pointer hover:bg-surface-hover rounded transition-colors">
                                             <svg className="w-3 h-3 mr-1 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>
                                             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-xs">public</Typography>
                                         </div>
                                         <div className="ml-3 mt-1 space-y-1">
                                             {["users", "posts", "comments"].map(t => (
-                                                <div key={t} className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors group">
+                                                <div key={t} className="flex items-center p-1 cursor-pointer hover:bg-surface-hover rounded transition-colors group">
                                                     <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                                     <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark text-xs truncate">{t}</Typography>
                                                 </div>
@@ -485,11 +650,11 @@ active: false }
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-1">RLS Editor Sidebar</Typography>
                             <div className={cls("flex flex-col h-72 w-[240px] border rounded-lg overflow-hidden", defaultBorderMixin)}>
-                                <Tabs value="tables" onValueChange={() => {}} variant="boxy" className="border-b border-surface-200 dark:border-surface-950">
+                                <Tabs value="tables" onValueChange={() => {}} variant="boxy" className="border-b border-hairline">
                                     <Tab value="tables">Tables</Tab>
                                     <Tab value="info">Info</Tab>
                                 </Tabs>
-                                <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+                                <div className={cls("p-3 border-b flex justify-between items-center", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">RLS</Typography>
                                     <IconButton size="small">
                                         <SettingsIcon size={iconSize.smallest}/>
@@ -497,7 +662,7 @@ active: false }
                                 </div>
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-1">
                                     <div className="mb-2">
-                                        <div className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors">
+                                        <div className="flex items-center p-1 cursor-pointer hover:bg-surface-hover rounded transition-colors">
                                             <svg className="w-3 h-3 mr-1 rotate-90" fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>
                                             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-xs">public</Typography>
                                         </div>
@@ -506,7 +671,7 @@ active: false }
 enabled: true }, { name: "posts",
 enabled: true }, { name: "sessions",
 enabled: false }].map(t => (
-                                                <div key={t.name} className={cls("flex items-center p-1 cursor-pointer rounded transition-colors", t.name === "users" ? "bg-primary/10 text-primary dark:bg-primary/20" : "hover:bg-surface-100 dark:hover:bg-surface-900 text-text-secondary")}>
+                                                <div key={t.name} className={cls("flex items-center p-1 cursor-pointer rounded transition-colors", t.name === "users" ? "bg-primary/10 text-primary dark:bg-primary/20" : "hover:bg-surface-hover text-text-secondary")}>
                                                     <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                                     <Typography variant="body2" className="text-xs truncate flex-1">{t.name}</Typography>
                                                     <div className={cls("w-1.5 h-1.5 rounded-full shrink-0", t.enabled ? "bg-green-500" : "bg-orange-400 opacity-50")}/>
@@ -521,8 +686,8 @@ enabled: false }].map(t => (
                         {/* Collection Editor Sidebar replica */}
                         <div>
                             <Typography variant="caption" color="secondary" className="block mb-1">Collection Editor Sidebar</Typography>
-                            <div className={cls("flex flex-col h-72 w-[240px] border rounded-lg overflow-hidden bg-white dark:bg-surface-950", defaultBorderMixin)}>
-                                <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+                            <div className={cls("flex flex-col h-72 w-[240px] border rounded-lg overflow-hidden bg-surface-card", defaultBorderMixin)}>
+                                <div className={cls("p-3 border-b flex justify-between items-center", defaultBorderMixin)}>
                                     <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">COLLECTIONS</Typography>
                                     <IconButton size="small">
                                         <PlusIcon size={iconSize.smallest}/>
@@ -531,7 +696,7 @@ enabled: false }].map(t => (
                                 <div className="flex-grow overflow-y-auto no-scrollbar p-2 space-y-0.5">
                                     {[{ name: "Authors" }, { name: "Posts",
 selected: true }, { name: "Tags" }].map(c => (
-                                        <div key={c.name} className={cls("flex items-center gap-3 px-3 py-2 cursor-pointer rounded-md text-sm transition-colors", c.selected ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light" : "hover:bg-surface-100 dark:hover:bg-surface-900 text-text-secondary dark:text-text-secondary-dark")}>
+                                        <div key={c.name} className={cls("flex items-center gap-3 px-3 py-2 cursor-pointer rounded-md text-sm transition-colors", c.selected ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light" : "hover:bg-surface-hover text-text-secondary dark:text-text-secondary-dark")}>
                                             <FolderIcon size={iconSize.small} className={cls(c.selected ? "text-primary dark:text-primary-light" : "text-text-secondary dark:text-text-secondary-dark")}/>
                                             <span className="truncate flex-1">{c.name}</span>
                                         </div>
@@ -604,83 +769,22 @@ selected: true }, { name: "Tags" }].map(c => (
                 </SectionBlock>
 
                 {/* ═══════════════════════════════════════════════
-                    SECTION: Typography
-                ═══════════════════════════════════════════════ */}
-                <SectionBlock id="typography" title="Typography">
-                    <Typography variant="body2" color="secondary" className="mb-4">
-                        All variants from <code className="font-mono text-xs">Typography</code>. Colors: primary (default), secondary, disabled, error.
-                    </Typography>
-                    <div className="flex flex-col gap-3">
-                        {(["h1", "h2", "h3", "h4", "h5", "h6", "lead", "subtitle1", "subtitle2", "body1", "body2", "caption", "label", "button"] as const).map(v => (
-                            <div key={v} className={cls("flex items-baseline gap-4 border-b pb-3 last:border-0", defaultBorderMixin)}>
-                                <span className="w-24 shrink-0 text-xs text-surface-400 font-mono">{v}</span>
-                                {/* `component="p"` keeps the variant's styling but not its
-                                    element. Rendering the specimen with its native tag put a
-                                    real <h1> — "The quick brown fox jumps over the lazy dog" —
-                                    plus h2-h6 into the document outline of every page that
-                                    embeds this view, including the public rebase.pro/ui gallery,
-                                    where it competed with the page's actual heading. The class
-                                    carries the type, so this renders identically. */}
-                                <Typography variant={v} component="p">The quick brown fox jumps over the lazy dog</Typography>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="flex gap-4 flex-wrap mt-4">
-                        {(["primary", "secondary", "disabled", "error"] as const).map(c => (
-                            <Typography key={c} color={c}>color=&quot;{c}&quot;</Typography>
-                        ))}
-                    </div>
-
-                    {/* The data tiers are shown with real content rather than the
-                        pangram above: `micro` is always one or two words naming the
-                        value beneath it, and `mono` is always a measurement. A
-                        specimen reading "The quick brown fox" would demonstrate the
-                        size and misrepresent the purpose. */}
-                    <div className={cls("mt-8 pt-6 border-t", defaultBorderMixin)}>
-                        <Typography variant="subtitle2" className="block mb-1">Data tiers</Typography>
-                        <Typography variant="body2" color="secondary" className="block mb-5 max-w-[65ch]">
-                            For values that are looked up rather than read: a field name, a measurement,
-                            a headline figure. <code className="font-mono text-xs">mono</code> and{" "}
-                            <code className="font-mono text-xs">stat</code> both carry{" "}
-                            <code className="font-mono text-xs">tabular-nums</code>, so a column of them
-                            keeps its decimal points aligned and a live counter does not jitter as its
-                            digits change width.
-                        </Typography>
-
-                        <div className="flex flex-wrap items-start gap-x-12 gap-y-5">
-                            {([
-                                ["Region", "europe-west1"],
-                                ["Took", "32.2s"],
-                                ["Last run", "16/08/2026, 05:30:32"]
-                            ] as const).map(([label, value]) => (
-                                <div key={label}>
-                                    <Typography variant="micro" component="div" color="secondary" className="block">
-                                        {label}
-                                    </Typography>
-                                    <Typography variant="mono" component="div" className="block mt-1 text-sm">
-                                        {value}
-                                    </Typography>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="mt-6">
-                            <span className="text-xs text-surface-400 font-mono">stat</span>
-                            <Typography variant="stat" component="div" className="block mt-1">1,284</Typography>
-                        </div>
-                    </div>
-                </SectionBlock>
-
-                {/* ═══════════════════════════════════════════════
                     SECTION: Buttons
                 ═══════════════════════════════════════════════ */}
                 <SectionBlock id="buttons" title="Buttons">
+                    <Typography variant="body2" color="secondary" className="mb-4 max-w-[68ch]">
+                        <code className="font-mono text-xs">neutral</code> is the default and paints <code className="font-mono text-xs">surface-raised</code>;
+                        it is what almost every button is. <code className="font-mono text-xs">primary</code> filled is the one main
+                        action a screen has. The label is 14px at weight 500, sentence case, no tracking: emphasis is the fill,
+                        never the letterforms. <code className="font-mono text-xs">secondary</code> and <code className="font-mono text-xs">error</code> exist
+                        for destructive confirmations and the marketing site, not for the panel&apos;s chrome.
+                    </Typography>
                     <div className="flex flex-col gap-6">
                         {(["filled", "text"] as const).map(variant => (
                             <div key={variant}>
                                 <Typography variant="caption" color="secondary" className="block mb-2 font-mono">variant=&quot;{variant}&quot;</Typography>
                                 <div className="flex flex-wrap gap-3 items-center">
-                                    {(["primary", "secondary", "text", "error", "neutral"] as const).map(color => (
+                                    {(["neutral", "primary", "text", "secondary", "error"] as const).map(color => (
                                         <Button key={color} variant={variant} color={color}>{color.charAt(0).toUpperCase() + color.slice(1)}</Button>
                                     ))}
                                     <Button variant={variant} disabled>Disabled</Button>
@@ -745,22 +849,47 @@ selected: true }, { name: "Tags" }].map(c => (
                     SECTION: Form Inputs
                 ═══════════════════════════════════════════════ */}
                 <SectionBlock id="inputs" title="Form Inputs">
+                    <Typography variant="body2" color="secondary" className="mb-4 max-w-[68ch]">
+                        Two ways to label a field. A record form puts the label <em>above</em> the control
+                        (<code className="font-mono text-xs">FieldBlock</code>: 13px, primary ink, muted type icon) and the control is{" "}
+                        <code className="font-mono text-xs">small</code>, 32px. A dialog or a standalone control carries its label{" "}
+                        <em>inside</em> as the floating <code className="font-mono text-xs">label</code> prop and is{" "}
+                        <code className="font-mono text-xs">medium</code>, 40px. Every field has its hairline.
+                    </Typography>
                     <div className="grid grid-cols-12 gap-4">
                         <div className="col-span-12 sm:col-span-6">
-                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">TextField</Typography>
+                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">record form · size=&quot;small&quot;, label above</Typography>
+                            <div className="flex flex-col gap-5 mb-6">
+                                {([
+                                    ["Product name", "Italian coffee maker", "Shown on the storefront and in receipts.", false, false],
+                                    ["SKU", "SKU-57032", "Stock keeping unit — unique product identifier", true, false],
+                                    ["Brand", "Alessi", undefined, false, true]
+                                ] as const).map(([label, value, help, required, disabled]) => (
+                                    <div key={label} className="flex flex-col min-w-0">
+                                        <div className="flex items-center gap-1.5 font-medium leading-tight mb-1.5 text-[13px]">
+                                            <span className="shrink-0 text-text-disabled dark:text-text-disabled-dark"><FileTextIcon size={14}/></span>
+                                            <span className="truncate">{label}</span>
+                                            {required && <span className="text-red-500 dark:text-red-500 -ml-1">*</span>}
+                                        </div>
+                                        <TextField size="small" value={value} disabled={disabled} onChange={() => {}}/>
+                                        {help && <Typography variant="caption" color="disabled" className="mt-1.5 ml-0.5 leading-snug">{help}</Typography>}
+                                    </div>
+                                ))}
+                            </div>
+                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">TextField · floating label, size=&quot;medium&quot; (dialogs)</Typography>
                             <div className="flex flex-col gap-3">
-                                <TextField label="Default" placeholder="Type something…"/>
-                                <TextField label="With value" value="Filled value" onChange={() => {}}/>
-                                <TextField label="Error state" error value="Bad value" onChange={() => {}}/>
-                                <TextField label="Disabled" disabled value="Read only" onChange={() => {}}/>
+                                <TextField size="medium" label="Default" placeholder="Type something…"/>
+                                <TextField size="medium" label="With value" value="Filled value" onChange={() => {}}/>
+                                <TextField size="medium" label="Error state" error value="Bad value" onChange={() => {}}/>
+                                <TextField size="medium" label="Disabled" disabled value="Read only" onChange={() => {}}/>
                                 {/* The smaller sizes are the ones dialogs use, and they
                                     were absent here — which is how a labelled `small`
                                     field shipped with its label sitting on top of its
-                                    placeholder. Keep all four so the collision is
-                                    visible on this page rather than in a modal. */}
-                                <TextField size="medium" label="Medium" placeholder="Placeholder under the label"/>
+                                    placeholder. Keep them so the collision is visible on
+                                    this page rather than in a modal. */}
                                 <TextField size="small" label="Small" placeholder="Placeholder under the label"/>
                                 <TextField size="smallest" label="Smallest" value="Filled value" onChange={() => {}}/>
+                                <TextField size="large" label="Large" placeholder="The login screen only"/>
                             </div>
                         </div>
                         <div className="col-span-12 sm:col-span-6 flex flex-col gap-4">
@@ -791,6 +920,8 @@ selected: true }, { name: "Tags" }].map(c => (
                             <Typography variant="caption" color="secondary" className="block font-mono">BooleanSwitch</Typography>
                             <div className="flex items-center gap-2"><BooleanSwitch value={true} onValueChange={() => {}}/><span>On</span></div>
                             <div className="flex items-center gap-2"><BooleanSwitch value={false} onValueChange={() => {}}/><span>Off</span></div>
+                            <div className="flex items-center gap-2"><BooleanSwitch value={true} disabled/><span>Disabled on</span></div>
+                            <div className="flex items-center gap-2"><BooleanSwitch value={false} disabled/><span>Disabled off</span></div>
                         </div>
                         <div className="col-span-12">
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">SearchBar</Typography>
@@ -833,6 +964,11 @@ selected: true }, { name: "Tags" }].map(c => (
                         <Chip icon={<TagIcon size={12}/>} colorScheme="teal">With Icon</Chip>
                         <Chip>Default (no scheme)</Chip>
                         <Chip outlined>Default Outlined</Chip>
+                        {/* `tinted` is the default for any coloured chip; `filled` is the
+                            palette's solid stop, kept for swatches. Side by side so the
+                            difference is visible here rather than discovered in a table. */}
+                        <Chip colorScheme="green" variant="filled">Filled Green</Chip>
+                        <Chip colorScheme="greenDarker">Tinted Darker</Chip>
                     </div>
                     <Typography variant="caption" color="secondary" className="block mb-2 font-mono">FilterChip</Typography>
                     <div className="flex flex-wrap gap-2 items-center mb-6">
@@ -867,6 +1003,8 @@ selected: true }, { name: "Tags" }].map(c => (
                         </div>
                     </div>
                 </SectionBlock>
+
+                <CardsDataSection/>
 
                 {/* ═══════════════════════════════════════════════
                     SECTION: Management Screen
@@ -1030,24 +1168,23 @@ roles: [] }
     );
 }
 
-function SectionBlock({ id, title, wide, children }: { id: string; title: string; wide?: boolean; children: React.ReactNode }) {
-    return (
-        // `max-w-5xl` and `border-b` used to share this element, and they cannot.
-        // Several mocks here are app-scale and intrinsically wider than 64rem
-        // (the CRM dashboard reaches 1483px), so the section's own rule stopped
-        // at 1264px while its content ran past it — every such section read as a
-        // broken edge.
-        //
-        // Split instead: the SECTION spans the column, so its rule always
-        // reaches its own edges; the CONTENT keeps a measure, so a form column
-        // never stretches to 700px on a wide monitor. `wide` opts the app-scale
-        // mocks out of the measure — they pair it with `overflow-x-auto` so they
-        // scroll inside themselves rather than pushing the page.
-        <section id={id} className={cls("px-6 py-8 border-b scroll-mt-0", defaultBorderMixin)}>
-            <div className={wide ? undefined : "max-w-5xl"}>
-                <Typography variant="h5" className="mb-1">{title}</Typography>
-                <div className="mt-4">{children}</div>
-            </div>
-        </section>
-    );
-}
+/**
+ * Every Typography variant with the size, weight and tracking tier it resolves
+ * to in `index.css`, so the ladder reads as numbers and not only as a pangram.
+ */
+const TYPE_LADDER = [
+    ["h1", "36 · 600 · display"],
+    ["h2", "30 · 600 · display"],
+    ["h3", "24 · 600 · title"],
+    ["h4", "20 · 600 · title"],
+    ["h5", "18 · 500 · heading"],
+    ["h6", "16 · 500 · heading"],
+    ["lead", "16 · 400 · relaxed"],
+    ["subtitle1", "14 · 500 · heading"],
+    ["subtitle2", "14 · 500"],
+    ["body1", "14 · 400"],
+    ["body2", "12 · 400"],
+    ["caption", "11 · 400"],
+    ["label", "12 · 500 · wide"],
+    ["button", "14 · 500"]
+] as const;

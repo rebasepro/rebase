@@ -59,7 +59,11 @@ export function NavigationGroup({
                 color="secondary"
                 className={cls(
                     "px-4 py-1 rounded",
-                    "font-medium text-[10px] uppercase tracking-[0.08em] text-primary/50 dark:text-primary/70"
+                    // The muted tier, not a half-strength primary: a group label
+                    // names a region and carries no state, and it was the one
+                    // blue on the home page that meant nothing. Same voice as the
+                    // drawer's group labels.
+                    "font-medium text-[10px] uppercase tracking-[0.08em] text-surface-400 dark:text-surface-400"
                 )}
             >
                 {currentGroupLabel}
@@ -118,7 +122,7 @@ export function NavigationGroup({
                         "rounded flex items-center justify-between w-full",
                         "hover:bg-transparent",
                         "cursor-pointer select-none",
-                        collapsed && "bg-surface-100 dark:bg-surface-900/50"
+                        collapsed && "bg-surface-field"
                     )}
                     innerClassName={cls("mt-4", !minimised ? "pt-0" : "")}
                     title={
@@ -132,7 +136,7 @@ export function NavigationGroup({
                     }
                 >
                     {minimised ? (
-                        <div className={cls("mt-4 p-8 bg-surface-accent-200 dark:bg-surface-accent-800 rounded-lg")}
+                        <div className={cls("mt-4 p-8 bg-surface-raised rounded-lg")}
                             style={{ minHeight: "50px" }}>
                         </div>
                     ) : (
@@ -159,7 +163,7 @@ export function NavigationGroup({
 
                     {!collapsed && (
                         minimised ? (
-                            <div className={cls("mt-4 p-8 bg-surface-accent-200 dark:bg-surface-accent-800 rounded-lg")}
+                            <div className={cls("mt-4 p-8 bg-surface-raised rounded-lg")}
                                 style={{ minHeight: "50px" }}>
                             </div>
                         ) : (

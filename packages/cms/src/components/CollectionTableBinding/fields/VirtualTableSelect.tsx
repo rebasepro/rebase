@@ -80,6 +80,7 @@ export function VirtualTableSelect(props: {
     return (
         multiple
             ? <MultiSelect
+                invisible={true}
                 inputRef={ref}
                 className="w-full h-full p-0 bg-transparent outline-none"
                 position={"item-aligned"}
@@ -104,6 +105,10 @@ export function VirtualTableSelect(props: {
             </MultiSelect>
             : <Select
                 inputRef={ref}
+                // The cell draws the frame when it is selected; the control
+                // inside must not draw its own field box on top of it, or a
+                // selected enum cell shows two outlines. Same as the user select.
+                invisible={true}
                 fullWidth={true}
                 className="w-full h-full p-0 bg-transparent outline-none [&_button]:ring-0 [&_button]:ring-offset-0"
                 inputClassName="ring-0 ring-offset-0 focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-offset-0"

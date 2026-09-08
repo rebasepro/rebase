@@ -67,9 +67,9 @@ export function ColorPicker({
                     onClick={() => onChange(undefined)}
                     className={cls(
                         "flex items-center gap-2 px-2 py-1 rounded-lg text-sm transition-colors duration-150",
-                        "hover:bg-surface-accent-100 dark:hover:bg-surface-accent-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                        "hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                         disabled && "opacity-50 cursor-not-allowed",
-                        !value && "bg-surface-accent-100 dark:bg-surface-accent-800 font-medium"
+                        !value && "bg-surface-raised font-medium"
                     )}
                 >
                     <div className={cls(

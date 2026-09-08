@@ -38,7 +38,7 @@ export const TableBody = React.memo(({
                               ...rest
                           }: TableBodyProps) => (
     <tbody
-        className={cls("bg-white dark:bg-surface-900 text-sm divide-y divide-surface-100 dark:divide-surface-700 dark:divide-opacity-70 dark:divide-surface-700/70", className)}
+        className={cls("bg-surface-card text-sm divide-y divide-hairline", className)}
         {...rest}
     >
     {children}
@@ -60,7 +60,7 @@ export const TableHeader = React.memo(({
         className={cls(
             defaultBorderMixin,
             "text-sm font-medium text-surface-700 dark:text-surface-accent-300",
-            "bg-surface-accent-50 border-b dark:bg-surface-800",
+            "bg-surface-sheet border-b",
             className
         )}
     >
@@ -87,8 +87,8 @@ export const TableRow = React.memo(({
         onClick={onClick}
         style={style}
         className={cls(
-            "bg-white dark:bg-surface-900",
-            onClick ? "transition-colors duration-150 hover:bg-primary/5 cursor-pointer" : "",
+            "bg-surface-card",
+            onClick ? "transition-colors duration-150 hover:bg-surface-card-hover cursor-pointer" : "",
             className
         )}
         {...rest}

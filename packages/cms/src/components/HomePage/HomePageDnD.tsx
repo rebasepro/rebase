@@ -142,7 +142,7 @@ export function NavigationGroupDroppable({
             ref={setNodeRef}
             className={cls(
                 isPotentialCardDropTarget
-                    ? "p-2 bg-surface-accent-200 dark:bg-surface-accent-800 rounded-lg"
+                    ? "p-2 bg-surface-raised rounded-lg"
                     : undefined,
                 "transition-all duration-200 ease-in-out"
             )}
@@ -716,8 +716,8 @@ export function NewGroupDropZone({
             className={cls(
                 "fixed right-8 top-1/2 -translate-y-1/2 w-[200px] h-[120px] border border-dashed rounded-lg flex items-center justify-center transition-all",
                 isOver
-                    ? "bg-surface-accent-100 dark:bg-surface-accent-800 border-surface-300 dark:border-surface-600"
-                    : "bg-surface-50 dark:bg-surface-900 border-surface-200 dark:border-surface-700"
+                    ? "bg-surface-raised border-hairline-strong"
+                    : "bg-surface-card border-hairline-strong"
             )}>
             <div className="text-center p-4">
                 <span className="block font-medium text-sm">

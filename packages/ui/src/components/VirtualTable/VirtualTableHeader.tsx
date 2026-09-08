@@ -110,9 +110,9 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                     className={cls("flex py-0 px-3 h-full text-xs uppercase font-semibold relative select-none items-center",
                         isDragging
                             ? "bg-primary-bg dark:bg-primary-bg-dark"
-                            : "bg-surface-50 dark:bg-surface-900",
+                            : "bg-surface-sheet",
                         "text-text-secondary hover:text-text-primary dark:text-text-secondary-dark dark:hover:text-text-primary-dark",
-                        !isDragging && "hover:bg-surface-100 dark:hover:bg-surface-900 hover:bg-opacity-50 hover:bg-surface-100/50 dark:hover:bg-opacity-50 dark:hover:bg-surface-900/50",
+                        !isDragging && "hover:bg-surface-hover",
                         column.frozen ? "sticky left-0 z-10" : "relative z-0",
                         isDraggable && "cursor-grab"
                     )}
@@ -166,7 +166,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                                     invisible={!sort}>
                                     <IconButton
                                         size={"small"}
-                                        className={onHover || openFilter ? "bg-white dark:bg-surface-900" : undefined}
+                                        className={onHover || openFilter ? "bg-surface-card" : undefined}
                                         // Shift keeps the sort already in place
                                         // and adds this column beneath it, which
                                         // is how a two-key order is built from
@@ -215,7 +215,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                                 modal={true}
                                 trigger={
                                     <IconButton
-                                        className={onHover || openFilter ? "bg-white dark:bg-surface-900" : undefined}
+                                        className={onHover || openFilter ? "bg-surface-card" : undefined}
                                         size={"small"}
                                         onClick={handleSettingsClick}>
                                         <FilterIcon size={14} className="flex-shrink-0"/>
@@ -240,7 +240,7 @@ export const VirtualTableHeader = React.memo<VirtualTableHeaderProps<Record<stri
                         data-no-dnd="true"
                         className={cls(
                             "absolute h-full w-[6px] top-0 right-0 cursor-col-resize",
-                            hovered && "bg-surface-300 dark:bg-surface-700"
+                            hovered && "bg-hairline-strong"
                         )}
                         onPointerDown={(e) => {
                             e.stopPropagation();

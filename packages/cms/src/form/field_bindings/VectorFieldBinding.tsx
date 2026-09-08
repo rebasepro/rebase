@@ -38,7 +38,7 @@ export function VectorFieldBinding({
     property,
     includeDescription,
     hideLabel,
-    size = "large"
+    size = "small"
 }: FieldProps<VectorProperty>) {
     const isVectorObject = (val: unknown): val is { value: number[] } => {
         return typeof val === "object" && val !== null && "value" in val;
@@ -110,7 +110,7 @@ export function VectorFieldBinding({
                 <div className="w-full">
                     {!isEditing ? (
                         /* Compact Preview Card */
-                        <div className={cls("flex flex-col gap-3 p-4 rounded-xl border bg-surface-50/50 dark:bg-surface-800/20 backdrop-blur-sm transition-all duration-200", defaultBorderMixin)}>
+                        <div className={cls("flex flex-col gap-3 p-4 rounded-xl border bg-surface-field transition-all duration-200", defaultBorderMixin)}>
                             <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div className="flex items-center gap-2.5">
                                     {/* Status Dot */}
@@ -119,7 +119,7 @@ export function VectorFieldBinding({
                                         {isPopulated ? `${arrayValue.length} Dimensions` : "Empty Vector"}
                                     </span>
                                     {isPopulated && (
-                                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark px-2 py-0.5 rounded-full bg-surface-100 dark:bg-surface-800 font-medium">
+                                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark px-2 py-0.5 rounded-full bg-surface-raised font-medium">
                                             Embedding
                                         </span>
                                     )}
@@ -156,14 +156,14 @@ export function VectorFieldBinding({
 
                             {/* Collapsible scrollable numbers list */}
                             {showValues && isPopulated && (
-                                <div className="mt-1 p-3 rounded-lg bg-surface-100/50 dark:bg-surface-900/40 border border-surface-200/50 dark:border-surface-800/50 max-h-36 overflow-y-auto font-mono text-[11px] leading-relaxed text-text-secondary dark:text-text-secondary-dark break-all selection:bg-primary-100 dark:selection:bg-primary-900/40">
+                                <div className="mt-1 p-3 rounded-lg bg-surface-well border border-hairline max-h-36 overflow-y-auto font-mono text-[11px] leading-relaxed text-text-secondary dark:text-text-secondary-dark break-all selection:bg-primary-100 dark:selection:bg-primary-900/40">
                                     {arrayValue.join(", ")}
                                 </div>
                             )}
                         </div>
                     ) : (
                         /* Editing View: Text Input */
-                        <div className={cls("flex flex-col gap-2 p-4 rounded-xl border bg-surface-50/20 dark:bg-surface-800/10", defaultBorderMixin)}>
+                        <div className={cls("flex flex-col gap-2 p-4 rounded-xl border bg-surface-field", defaultBorderMixin)}>
                             <TextField
                                 size={size}
                                 aria-label={`${property.name ?? propertyKey} vector values`}

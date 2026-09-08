@@ -256,7 +256,8 @@ export const MultiSelect = React.forwardRef<
                                 "select-none rounded-lg text-sm",
                                 "focus:ring-0 focus-visible:ring-0 outline-none focus:outline-none focus-visible:outline-none",
                                 invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
-                                disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
+                                // An invisible field has no hover fill of its own: whatever frames it (a table cell) carries the hover.
+                disabled ? fieldBackgroundDisabledMixin : (invisible ? "" : fieldBackgroundHoverMixin),
                                 "relative flex items-center",
                                 className,
                                 inputClassName
@@ -321,7 +322,7 @@ export const MultiSelect = React.forwardRef<
                     <PopoverPrimitive.Portal container={finalContainer}>
                         <PopoverPrimitive.Content
                             data-multi-select-content
-                            className={cls("z-50 overflow-hidden border bg-white dark:bg-surface-800 rounded-lg w-[400px]", defaultBorderMixin)}
+                            className={cls("z-50 overflow-hidden border bg-surface-card rounded-lg w-[400px]", defaultBorderMixin)}
                             align="start"
                             sideOffset={8}
                             onEscapeKeyDown={() => onPopoverOpenChange(false)}
@@ -357,8 +358,8 @@ export const MultiSelect = React.forwardRef<
                                                     "m-1",
                                                     "ring-offset-transparent",
                                                     "p-1 rounded-md aria-[selected=true]:outline-none aria-[selected=true]:ring-2 aria-[selected=true]:ring-primary aria-[selected=true]:ring-opacity-75 aria-[selected=true]:ring-primary/75 aria-[selected=true]:ring-offset-2",
-                                                    "aria-[selected=true]:bg-surface-accent-100 aria-[selected=true]:dark:bg-surface-accent-900",
-                                                    "cursor-pointer p-2 rounded-md aria-[selected=true]:bg-surface-accent-100 aria-[selected=true]:dark:bg-surface-accent-900"
+                                                    "aria-[selected=true]:bg-surface-active",
+                                                    "cursor-pointer p-2 rounded-md aria-[selected=true]:bg-surface-active"
                                                 )
                                             }
                                         >
@@ -409,13 +410,13 @@ export const MultiSelectItem = React.memo(function MultiSelectItem<T extends Mul
         }}
         className={cls(
             "flex flex-row items-center gap-1.5",
-            isSelected ? "bg-surface-accent-200 dark:bg-surface-accent-950" : "",
+            isSelected ? "bg-surface-active" : "",
             "cursor-pointer",
             "m-1",
             "ring-offset-transparent",
             "p-1 rounded-md aria-[selected=true]:outline-none aria-[selected=true]:ring-2 aria-[selected=true]:ring-primary aria-[selected=true]:ring-opacity-75 aria-[selected=true]:ring-primary/75 aria-[selected=true]:ring-offset-2",
-            "aria-[selected=true]:bg-surface-accent-100 aria-[selected=true]:dark:bg-surface-accent-900",
-            "cursor-pointer p-2 rounded-md aria-[selected=true]:bg-surface-accent-100 aria-[selected=true]:dark:bg-surface-accent-900",
+            "aria-[selected=true]:bg-surface-active",
+            "cursor-pointer p-2 rounded-md aria-[selected=true]:bg-surface-active",
             "text-surface-accent-700 dark:text-surface-accent-300",
             className
         )}
@@ -435,7 +436,7 @@ const InnerCheckBox = React.memo(function InnerCheckBox({ checked }: { checked: 
             className={cls(
                 "border-2 relative transition-colors ease-in-out duration-150",
                 "w-4 h-4 rounded-sm flex items-center justify-center",
-                (checked ? "bg-primary" : "bg-white dark:bg-surface-accent-900"),
+                (checked ? "bg-primary" : "bg-surface-card"),
                 (checked) ? "text-surface-accent-100 dark:text-surface-accent-900" : "",
                 (checked ? "border-transparent" : "border-surface-accent-800 dark:border-surface-accent-200")
             )}>

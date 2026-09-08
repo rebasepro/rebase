@@ -83,10 +83,10 @@ export function BoardSortableList<T>({
         // there were more below the fold.
         "flex flex-col p-2 transition-opacity duration-100 transition-bg ease-linear w-full overflow-y-auto flex-1 min-h-0 rounded-md",
         isDragging && isDragOverColumn
-            ? "bg-surface-accent-200 dark:bg-surface-900"
+            ? "bg-surface-active"
             : isDragging
-                ? "bg-surface-50 dark:bg-surface-900 hover:bg-surface-accent-100 dark:hover:bg-surface-800"
-                : "bg-surface-50 dark:bg-surface-900"
+                ? "bg-surface-field hover:bg-surface-hover"
+                : "bg-surface-field"
     ), [isDragging, isDragOverColumn]);
 
     return (

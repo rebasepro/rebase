@@ -101,10 +101,10 @@ export function CollectionJsonImportDialog({
             <DialogContent className="flex flex-col gap-4">
                 <Typography variant="body2" color="secondary">
                     Paste a JSON object representing your collection configuration.
-                    The JSON must include <code className="bg-surface-200 dark:bg-surface-700 px-1 rounded">id</code>,
-                    <code className="bg-surface-200 dark:bg-surface-700 px-1 rounded">name</code>,
-                    <code className="bg-surface-200 dark:bg-surface-700 px-1 rounded">path</code>, and
-                    <code className="bg-surface-200 dark:bg-surface-700 px-1 rounded">properties</code>.
+                    The JSON must include <code className="bg-surface-raised px-1 rounded">id</code>,
+                    <code className="bg-surface-raised px-1 rounded">name</code>,
+                    <code className="bg-surface-raised px-1 rounded">path</code>, and
+                    <code className="bg-surface-raised px-1 rounded">properties</code>.
                 </Typography>
 
                 <TextField

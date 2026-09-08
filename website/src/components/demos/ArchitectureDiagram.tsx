@@ -9,12 +9,12 @@ function Tip({ children, text }: { children: ReactNode; text: string }) {
             {children}
             {show && (
                 <span
-                    className="absolute z-50 bottom-full left-1/2 mb-1.5 px-2.5 py-1.5 rounded-lg bg-[#09090b] border border-surface-800 text-[11px] text-surface-300 leading-snug shadow-2xl shadow-black/60 max-w-[240px] w-max pointer-events-none"
+                    className="absolute z-50 bottom-full left-1/2 mb-1.5 px-2.5 py-1.5 rounded-lg bg-[#09090b] border border-hairline text-[11px] text-surface-300 leading-snug shadow-2xl shadow-black/60 max-w-[240px] w-max pointer-events-none"
                     style={{ animation: "archTip 120ms ease-out", transform: "translateX(-50%)" }}
                 >
                     {text}
                     <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
-                        <span className="block w-1.5 h-1.5 rotate-45 bg-[#09090b] border-r border-b border-surface-800" />
+                        <span className="block w-1.5 h-1.5 rotate-45 bg-[#09090b] border-r border-b border-hairline" />
                     </span>
                 </span>
             )}
@@ -27,7 +27,7 @@ function Tip({ children, text }: { children: ReactNode; text: string }) {
 function Tag({ children, tip, color }: { children: ReactNode; tip?: string; color?: string }) {
     const c = color ?? "surface";
     const base = c === "surface"
-        ? "border-surface-800/60 bg-surface-900/40 text-surface-300 hover:border-surface-700 hover:text-white"
+        ? "border-hairline bg-surface-raised text-surface-300 hover:border-hairline-strong hover:text-white"
         : `border-${c}-500/20 bg-${c}-500/5 text-${c}-300/90 hover:border-${c}-500/40 hover:text-${c}-200`;
     const el = (
         <span className={`inline-flex items-center px-2.5 py-1 rounded-md border text-[11px] font-medium transition-all duration-150 cursor-default select-none whitespace-nowrap ${base}`}>
@@ -79,7 +79,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 
 export function ArchitectureDiagram() {
     return (
-        <div className="rounded-2xl border border-surface-800 bg-surface-950/80 shadow-2xl overflow-hidden">
+        <div className="rounded-2xl border border-hairline bg-surface-well/85 shadow-2xl overflow-hidden">
 
             {/* Main grid: core stack + CLI sidebar */}
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px]">
@@ -88,9 +88,9 @@ export function ArchitectureDiagram() {
                 <div className="p-5 sm:p-6 space-y-0">
 
                     {/* ▸ DATABASE ────────────────────────────────────────── */}
-                    <div className="rounded-xl border border-surface-800/60 bg-surface-900/20 p-4">
+                    <div className="rounded-xl border border-hairline bg-surface-field p-4">
                         <div className="flex items-center gap-2.5 mb-3">
-                            <div className="h-7 w-7 rounded-lg bg-surface-800/50 border border-surface-700/40 flex items-center justify-center">
+                            <div className="h-7 w-7 rounded-lg bg-surface-raised border border-hairline flex items-center justify-center">
                                 <svg className="w-4 h-4 text-surface-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
                             </div>
                             <span className="text-sm font-semibold text-white">Database Layer</span>
@@ -129,13 +129,13 @@ export function ArchitectureDiagram() {
                     <Conn />
 
                     {/* ▸ BaaS CORE ───────────────────────────────────────── */}
-                    <div className="rounded-xl border border-amber-500/10 bg-surface-900/20 p-4">
+                    <div className="rounded-xl border border-amber-500/10 bg-surface-field p-4">
                         <div className="flex items-center gap-2.5 mb-3">
                             <div className="h-7 w-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
                                 <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                             </div>
                             <span className="text-sm font-semibold text-white">BaaS Core</span>
-                            <code className="text-[10px] bg-surface-900/60 border border-surface-800/60 px-1.5 py-0.5 rounded text-surface-500 font-mono">server</code>
+                            <code className="text-[10px] bg-surface-raised border border-hairline px-1.5 py-0.5 rounded text-surface-500 font-mono">server</code>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -197,14 +197,14 @@ export function ArchitectureDiagram() {
                                 <Label color="text-violet-500/60">Compute & Services</Label>
                                 <div className="space-y-2">
                                     <div className="grid grid-cols-2 gap-2">
-                                        <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-surface-800/40 bg-surface-900/20">
+                                        <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-hairline bg-surface-field">
                                             <svg className="w-3.5 h-3.5 text-violet-400/60 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                                             <div>
                                                 <div className="text-[11px] font-semibold text-surface-300">Cron Scheduler</div>
                                                 <div className="text-[10px] text-surface-600">5-field parser, DB logs</div>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-surface-800/40 bg-surface-900/20">
+                                        <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-hairline bg-surface-field">
                                             <svg className="w-3.5 h-3.5 text-violet-400/60 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
                                             <div>
                                                 <div className="text-[11px] font-semibold text-surface-300">Custom Functions</div>
@@ -226,7 +226,7 @@ export function ArchitectureDiagram() {
                     <Conn />
 
                     {/* ▸ API LAYER ───────────────────────────────────────── */}
-                    <div className="rounded-xl border border-blue-500/10 bg-surface-900/20 p-4">
+                    <div className="rounded-xl border border-blue-500/10 bg-surface-field p-4">
                         <div className="flex items-center gap-2.5 mb-2.5">
                             <div className="h-7 w-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
                                 <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
@@ -240,7 +240,7 @@ export function ArchitectureDiagram() {
                                 ["WebSocket", "Subs, broadcast, presence"],
                                 ["OpenAPI", "3.0 spec + Swagger UI"],
                             ] as const).map(([title, desc]) => (
-                                <div key={title} className="rounded-lg border border-surface-800/40 bg-[#0f0f11] p-3 hover:border-blue-500/20 transition-colors">
+                                <div key={title} className="rounded-lg border border-hairline bg-[#0f0f11] p-3 hover:border-blue-500/20 transition-colors">
                                     <div className="text-xs font-semibold text-white leading-tight">{title}</div>
                                     <div className="text-[10px] text-surface-500 leading-snug mt-0.5">{desc}</div>
                                 </div>
@@ -286,9 +286,9 @@ export function ArchitectureDiagram() {
                 </div>
 
                 {/* ──── CLI Sidebar ──── */}
-                <div className="p-4 bg-[#0c0c0e] border-t lg:border-t-0 lg:border-l border-surface-800/40 flex flex-col overflow-hidden">
+                <div className="p-4 bg-[#0c0c0e] border-t lg:border-t-0 lg:border-l border-hairline flex flex-col overflow-hidden">
                     <div className="flex items-center gap-2 mb-1">
-                        <div className="h-6 w-6 rounded-lg bg-surface-800/50 border border-surface-700/30 flex items-center justify-center">
+                        <div className="h-6 w-6 rounded-lg bg-surface-raised border border-hairline flex items-center justify-center">
                             <svg className="w-3.5 h-3.5 text-surface-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
                         </div>
                         <span className="text-xs font-semibold text-white">CLI</span>
@@ -315,7 +315,7 @@ export function ArchitectureDiagram() {
                             </div>
                         ))}
                     </div>
-                    <div className="mt-3 pt-2.5 border-t border-dashed border-surface-800/30">
+                    <div className="mt-3 pt-2.5 border-t border-dashed border-hairline">
                         <p className="text-[9px] text-surface-600 leading-relaxed">
                             Orchestrates schema, migrations, SDK codegen, dev server, and builds.
                         </p>
@@ -324,9 +324,9 @@ export function ArchitectureDiagram() {
             </div>
 
             {/* ──── Full-width: Frontend Layer ──── */}
-            <div className="p-5 sm:p-6 border-t border-surface-800/40">
+            <div className="p-5 sm:p-6 border-t border-hairline">
 
-                <div className="rounded-xl border border-violet-500/10 bg-surface-900/20 p-4">
+                <div className="rounded-xl border border-violet-500/10 bg-surface-field p-4">
                     <div className="flex items-center gap-2.5 mb-3">
                         <div className="h-7 w-7 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
                             <svg className="w-4 h-4 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
@@ -338,10 +338,10 @@ export function ArchitectureDiagram() {
                     <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-2.5 mb-2.5">
 
                     {/* Rebase Platform: Studio + Admin */}
-                    <div className="rounded-lg border border-surface-800/30 bg-[#0c0c0e] p-3">
+                    <div className="rounded-lg border border-hairline bg-[#0c0c0e] p-3">
                         <div className="flex items-center gap-2 mb-2.5">
                             <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-surface-500">Rebase Platform</span>
-                            <div className="flex-1 h-px bg-surface-800/30" />
+                            <div className="flex-1 h-px bg-surface-field" />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                             {/* Studio */}
@@ -400,9 +400,9 @@ export function ArchitectureDiagram() {
                     </div>
 
                     {/* Your Application */}
-                    <div className="rounded-lg border border-dashed border-surface-800/40 bg-surface-900/10 p-3.5 flex flex-col">
+                    <div className="rounded-lg border border-dashed border-hairline bg-surface-field p-3.5 flex flex-col">
                         <div className="flex items-center gap-2.5 mb-2.5">
-                            <div className="h-6 w-6 rounded-lg bg-surface-800/40 border border-surface-700/30 flex items-center justify-center">
+                            <div className="h-6 w-6 rounded-lg bg-surface-raised border border-hairline flex items-center justify-center">
                                 <svg className="w-3.5 h-3.5 text-surface-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                             </div>
                             <span className="text-xs font-semibold text-white">Your Application</span>
@@ -420,7 +420,7 @@ export function ArchitectureDiagram() {
                                 ["Node.js", "#339933"],
                                 ["Mobile", "#A4C639"],
                             ] as const).map(([name, color]) => (
-                                <div key={name} className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-surface-800/40 bg-[#0f0f11] hover:border-surface-700/60 transition-colors cursor-default">
+                                <div key={name} className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-hairline bg-[#0f0f11] hover:border-hairline-strong transition-colors cursor-default">
                                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color, opacity: 0.6 }} />
                                     <span className="text-[10px] font-medium text-surface-300">{name}</span>
                                 </div>
@@ -431,7 +431,7 @@ export function ArchitectureDiagram() {
                     </div>
 
                     {/* UI Kit */}
-                    <div className="rounded-lg border border-surface-800/40 bg-[#0f0f11] p-3.5 mb-2.5">
+                    <div className="rounded-lg border border-hairline bg-[#0f0f11] p-3.5 mb-2.5">
                         <div className="flex items-center gap-2 mb-2.5">
                             <span className="text-xs font-semibold text-primary-light">UI Kit</span>
                             <code className="text-[10px] bg-primary/5 border border-primary/15 px-1.5 py-0.5 rounded text-primary-light/70 font-mono">@rebasepro/ui</code>
@@ -457,7 +457,7 @@ export function ArchitectureDiagram() {
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-2.5 border-t border-surface-800/60 bg-surface-900/30">
+            <div className="px-5 py-2.5 border-t border-hairline bg-surface-field">
                 <p className="text-center text-[10px] text-surface-500 font-mono">
                     Schema-as-Code · Git-Backed · Hot Reload · Self-Hostable · TypeScript End-to-End · 21 Packages
                 </p>

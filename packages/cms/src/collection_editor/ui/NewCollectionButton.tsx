@@ -11,7 +11,7 @@ export function NewCollectionButton() {
         return null;
     }
 
-    return <div className={"bg-surface-50 dark:bg-surface-900 min-w-fit rounded-xs"}>
+    return <div className={"min-w-fit rounded-xs"}>
         <Button className={"min-w-fit"}
 
             onClick={() => collectionEditorController.createCollection({

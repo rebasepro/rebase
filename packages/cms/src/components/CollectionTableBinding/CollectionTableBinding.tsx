@@ -359,7 +359,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
 
         <div ref={ref}
             style={style}
-            className={cls("h-full w-full flex flex-col bg-white dark:bg-surface-900", className)}>
+            className={cls("h-full w-full flex flex-col bg-surface-card", className)}>
 
             {!hideToolbar && <CollectionTableToolbar
                 onTextSearch={onTextSearch}

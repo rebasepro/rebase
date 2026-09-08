@@ -376,7 +376,7 @@ function ConditionRow({
     return (
         <div className={cls(
             "flex items-center gap-2 p-2 rounded-md",
-            hasError ? "bg-red-50 dark:bg-red-900/20" : "bg-surface-100 dark:bg-surface-800"
+            hasError ? "bg-red-50 dark:bg-red-900/20" : "bg-surface-raised"
         )}>
             {/* Field selector with colored badge */}
             <Select
@@ -537,7 +537,7 @@ rules: [...group.rules, defaultRule] });
     };
 
     return (
-        <div className={cls("p-3 bg-surface-50 dark:bg-surface-800 rounded-lg border", defaultBorderMixin)}>
+        <div className={cls("p-3 bg-surface-sheet rounded-lg border", defaultBorderMixin)}>
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                     <Typography variant="label" className="font-medium text-primary">
@@ -586,7 +586,7 @@ rules: [...group.rules, defaultRule] });
                 variant="outlined"
                 className={cls(
                     "mt-3 w-full border-dashed",
-                    "hover:bg-surface-100 dark:hover:bg-surface-800",
+                    "hover:bg-surface-hover",
                     "text-secondary"
                 )}
                 onClick={handleAddRule}

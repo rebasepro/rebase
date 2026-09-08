@@ -200,7 +200,7 @@ function SideDialogView({
                 >
                     {panel &&
                         <div
-                            className={"transform max-w-[100vw] lg:max-w-[95vw] flex flex-col h-full transition-all duration-250 ease-in-out bg-white dark:bg-surface-800 "}
+                            className={"transform max-w-[100vw] lg:max-w-[95vw] flex flex-col h-full transition-all duration-250 ease-in-out bg-surface-card "}
                             style={{
                                 width: panel.width,
                                 transform: `translateX(-${offsetPosition * 200}px)`

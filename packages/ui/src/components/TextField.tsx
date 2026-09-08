@@ -135,7 +135,7 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                 style={inputStyle}
                 className={cls(
                     invisible ? focusedInvisibleMixin : "",
-                    "rounded-lg resize-none w-full outline-none text-base bg-transparent min-h-[64px] px-3",
+                    "rounded-lg resize-none w-full outline-none text-sm bg-transparent min-h-[64px] px-3",
                     label ? "pt-8 pb-2" : "py-2",
                     disabled && "outline-none opacity-50 text-surface-accent-600 dark:text-surface-accent-500",
                     inputClassName
@@ -154,11 +154,15 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                 disabled={disabled}
                 style={inputStyle}
                 className={cls(
-                    "w-full outline-none bg-transparent leading-normal px-3",
+                    "w-full outline-none bg-transparent leading-normal px-3 text-sm",
                     "rounded-lg",
                     "focused:text-text-primary focused:dark:text-text-primary-dark",
                     invisible ? focusedInvisibleMixin : "",
-                    disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
+                    // No fill, hover or disabled tint on the input itself: the
+                    // wrapper carries all three. Both used to carry the hover
+                    // fill, so a hovered field painted the alpha twice — once on
+                    // the box and once on the input a pixel inside its border,
+                    // at the same radius — and read as a box inside a box.
                     {
                         "min-h-[28px]": size === "smallest",
                         "min-h-[32px]": size === "small",
@@ -205,7 +209,8 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                 className={cls(
                     "rounded-lg relative max-w-full",
                     invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
-                    disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
+                    // An invisible field has no hover fill of its own: whatever frames it (a table cell) carries the hover.
+                disabled ? fieldBackgroundDisabledMixin : (invisible ? "" : fieldBackgroundHoverMixin),
                     error ? "border border-red-500 dark:border-red-600" : "",
                     {
                         "min-h-[28px]": size === "smallest",

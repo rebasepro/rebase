@@ -64,7 +64,7 @@ export function ReadOnlyFieldBinding({
                         // the text beside it. It was `px-4 md:px-6`, which in a
                         // one-column span spent a sixth of the box on empty
                         // margin and pushed short values towards the middle.
-                        : "rounded-lg border border-surface-200 dark:border-surface-700 px-3 min-h-12 opacity-80"
+                        : "rounded-lg border border-hairline-strong px-3 min-h-12 opacity-80"
                 )}>
 
                 <ErrorBoundary>

@@ -29,8 +29,8 @@ export function SplitLayerDemo() {
         <div className="frame w-full overflow-hidden">
 
             {/* Segmented control */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4 border-b border-surface-800/80 bg-surface-900/50">
-                <div className="inline-flex rounded-lg bg-surface-950/80 p-1 ring-1 ring-surface-800 self-start">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4 border-b border-hairline bg-surface-raised">
+                <div className="inline-flex rounded-lg bg-surface-well/85 p-1 ring-1 ring-surface-800 self-start">
                     <button
                         type="button"
                         onClick={() => setMode("backend")}
@@ -57,7 +57,7 @@ export function SplitLayerDemo() {
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-surface-800/60">
+            <div className="grid grid-cols-1 lg:grid-cols-3 divide-y lg:divide-y-0 lg:divide-x divide-hairline">
 
                 {/* 1 — the project */}
                 <div className="p-4 sm:p-5">
@@ -112,7 +112,7 @@ export function SplitLayerDemo() {
                         <pre className={`font-mono text-[11px] leading-relaxed overflow-x-auto rounded-r-lg border-l-2 pl-3 py-1 transition-colors duration-300 ${
                             full
                                 ? "border-emerald-400/60 bg-emerald-400/[0.04] text-surface-300"
-                                : "border-surface-700 text-surface-600 line-through decoration-surface-600/60"
+                                : "border-hairline-strong text-surface-600 line-through decoration-surface-600/60"
                         }`}><code>{`  admin: {
     icon: "Users",
     group: "Settings",
@@ -138,7 +138,7 @@ export function SplitLayerDemo() {
                                 identical
                             </span>
                         </div>
-                        <div className="rounded-lg bg-surface-950 ring-1 ring-surface-800/60 p-3 font-mono text-[10px] leading-relaxed">
+                        <div className="rounded-lg bg-surface-frame ring-1 ring-surface-800/60 p-3 font-mono text-[10px] leading-relaxed">
                             <div className="text-surface-400">
                                 <span className="text-emerald-400">GET</span> /api/data/users
                             </div>
@@ -154,22 +154,22 @@ export function SplitLayerDemo() {
                         </p>
 
                         {full ? (
-                            <div className="rounded-lg bg-surface-950 ring-1 ring-surface-800/60 overflow-hidden">
-                                <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-surface-800/60">
+                            <div className="rounded-lg bg-surface-frame ring-1 ring-surface-800/60 overflow-hidden">
+                                <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-hairline">
                                     <span className="h-2 w-2 rounded-full bg-primary"/>
                                     <span className="text-[10px] text-surface-400">Users</span>
                                 </div>
                                 <div className="grid grid-cols-2 text-[10px]">
-                                    <div className="px-2.5 py-1.5 text-surface-500 border-b border-surface-800/40">Name</div>
-                                    <div className="px-2.5 py-1.5 text-surface-500 border-b border-surface-800/40">Email</div>
-                                    <div className="px-2.5 py-1.5 text-surface-300 border-b border-surface-800/20">Ada</div>
-                                    <div className="px-2.5 py-1.5 text-surface-300 border-b border-surface-800/20 truncate">ada@…</div>
+                                    <div className="px-2.5 py-1.5 text-surface-500 border-b border-hairline">Name</div>
+                                    <div className="px-2.5 py-1.5 text-surface-500 border-b border-hairline">Email</div>
+                                    <div className="px-2.5 py-1.5 text-surface-300 border-b border-hairline">Ada</div>
+                                    <div className="px-2.5 py-1.5 text-surface-300 border-b border-hairline truncate">ada@…</div>
                                     <div className="px-2.5 py-1.5 text-surface-300">Grace</div>
                                     <div className="px-2.5 py-1.5 text-surface-300 truncate">grace@…</div>
                                 </div>
                             </div>
                         ) : (
-                            <div className="rounded-lg border border-dashed border-surface-800 p-4 text-center">
+                            <div className="rounded-lg border border-dashed border-hairline p-4 text-center">
                                 <p className="text-[11px] text-surface-500">Not installed.</p>
                                 <p className="mt-1 text-[10px] text-surface-600">Nothing is served, nothing is bundled.</p>
                             </div>
@@ -178,7 +178,7 @@ export function SplitLayerDemo() {
                 </div>
             </div>
 
-            <div className="px-4 sm:px-5 py-3 border-t border-surface-800/80 bg-surface-900/40">
+            <div className="px-4 sm:px-5 py-3 border-t border-hairline bg-surface-sheet">
                 <p className="text-xs text-surface-400">
                     The only thing that changed is what a human can see.
                 </p>

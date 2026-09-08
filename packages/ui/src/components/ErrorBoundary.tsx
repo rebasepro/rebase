@@ -144,7 +144,7 @@ showDetails: false });
         return (
             <div className={cls(
                 "flex items-center justify-center min-h-[400px] h-full w-full",
-                "bg-surface-50 dark:bg-surface-950"
+                "bg-surface-sheet"
             )}>
                 <div className="flex flex-col items-center max-w-md px-6 py-10 text-center">
                     <div className={cls(
@@ -152,7 +152,7 @@ showDetails: false });
                         isPermission
                             ? "bg-amber-100 dark:bg-amber-900/30"
                             : isStaleChunk
-                                ? "bg-surface-100 dark:bg-surface-800"
+                                ? "bg-surface-raised"
                                 : "bg-red-100 dark:bg-red-900/30"
                     )}>
                         <Icon
@@ -220,7 +220,7 @@ showDetails: false });
                             {showDetails && (
                                 <div className={cls(
                                     "mt-3 p-3 rounded-lg text-left text-xs",
-                                    "bg-surface-100 dark:bg-surface-800/50",
+                                    "bg-surface-field",
                                     "text-text-secondary dark:text-text-secondary-dark",
                                     "font-mono break-all"
                                 )}>

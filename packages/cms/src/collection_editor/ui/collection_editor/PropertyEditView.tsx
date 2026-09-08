@@ -836,7 +836,7 @@ function WidgetSelectView({
             }}
             className={cls(
                 "select-none rounded-md text-sm py-2 px-1 transition-colors duration-200",
-                !disabled && "hover:bg-surface-50 dark:hover:bg-surface-800 cursor-pointer",
+                !disabled && "hover:bg-surface-hover cursor-pointer",
                 "relative flex items-center mb-2"
             )}>
             {!value && <em>Select a property widget</em>}

@@ -40,7 +40,7 @@ export function StorageItemPreview({
 
             {!placeholder && !disabled &&
                 <div
-                    className="absolute rounded-full -top-2 -right-2 z-10 bg-white dark:bg-surface-900">
+                    className="absolute rounded-full -top-2 -right-2 z-10 bg-surface-card">
 
                     <Tooltip
                         asChild={true}

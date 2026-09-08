@@ -434,17 +434,17 @@ sql: DEFAULT_SQL }];
     };
 
     return (
-        <div className="flex h-[560px] w-full rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl text-surface-300 text-sm pointer-events-none select-none">
+        <div className="flex h-[560px] w-full rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-frame shadow-2xl text-surface-300 text-sm pointer-events-none select-none">
             {/* ── Sidebar ── */}
-            <div className="w-[200px] border-r border-surface-800/40 flex flex-col shrink-0">
+            <div className="w-[200px] border-r border-hairline flex flex-col shrink-0">
                 {/* Sidebar tabs */}
-                <div className="flex border-b border-surface-800/40 bg-surface-900/60">
+                <div className="flex border-b border-hairline bg-surface-sheet">
                     {(["schema", "snippets", "history"] as const).map(tab => (
                         <button
                             key={tab}
                             onClick={() => setSidebarTab(tab)}
                             className={`flex-1 py-2 text-[10px] uppercase tracking-wider font-semibold transition-colors ${
-                                sidebarTab === tab ? "text-primary border-b-2 border-primary bg-surface-900/40" : "text-surface-500 hover:text-surface-300"
+                                sidebarTab === tab ? "text-primary border-b-2 border-primary bg-surface-sheet" : "text-surface-500 hover:text-surface-300"
                             }`}
                         >
                             {tab}
@@ -467,18 +467,18 @@ sql: DEFAULT_SQL }];
                                 <div key={table.name}>
                                     <button
                                         onClick={() => toggleTable(table.name)}
-                                        className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-surface-400 hover:bg-surface-800/40 cursor-pointer w-full text-left transition-colors"
+                                        className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-surface-400 hover:bg-surface-hover cursor-pointer w-full text-left transition-colors"
                                     >
                                         <svg className="w-3 h-3 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h16M4 17h16"/></svg>
                                         <span className="truncate flex-1 font-mono text-[11px]">{table.name}</span>
                                         <span className="text-[10px] opacity-40">{table.columns.length}</span>
                                     </button>
                                     {expandedTables.has(table.name) && (
-                                        <div className="ml-5 border-l border-surface-800/40 pl-2 space-y-0.5 py-0.5">
+                                        <div className="ml-5 border-l border-hairline pl-2 space-y-0.5 py-0.5">
                                             {table.columns.map(col => (
                                                 <div
                                                     key={col.name}
-                                                    className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] text-surface-500 hover:text-surface-300 hover:bg-surface-800/30 cursor-pointer transition-colors"
+                                                    className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] text-surface-500 hover:text-surface-300 hover:bg-surface-hover cursor-pointer transition-colors"
                                                     onClick={() => handleSQLChange(activeTab.sql + col.name)}
                                                 >
                                                     {col.isPK ? (
@@ -520,7 +520,7 @@ sql: DEFAULT_SQL }];
             {/* ── Main Panel ── */}
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Toolbar */}
-                <div className="flex items-center justify-between px-1 border-b border-surface-800/40 bg-surface-950">
+                <div className="flex items-center justify-between px-1 border-b border-hairline bg-surface-frame">
                     {/* Tabs */}
                     <div className="flex items-center overflow-x-auto min-w-0">
                         {tabs.map(tab => (
@@ -529,7 +529,7 @@ sql: DEFAULT_SQL }];
                                 onClick={() => setActiveTabId(tab.id)}
                                 className={`group flex items-center gap-1.5 px-3 py-2 text-xs border-b-2 transition-colors whitespace-nowrap ${
                                     activeTabId === tab.id
-                                        ? "border-primary text-primary bg-surface-900/30"
+                                        ? "border-primary text-primary bg-surface-field"
                                         : "border-transparent text-surface-500 hover:text-surface-300"
                                 }`}
                             >
@@ -554,17 +554,17 @@ sql: DEFAULT_SQL }];
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16"/></svg>
                         </button>
                         <button className="px-2 py-1 text-[10px] text-surface-500 hover:text-surface-300 transition-colors">EXPLAIN</button>
-                        <div className="h-4 w-px bg-surface-800 mx-1"/>
+                        <div className="h-4 w-px bg-hairline mx-1"/>
                         <label className="flex items-center gap-1.5 cursor-pointer select-none" onClick={() => setAutoLimit(!autoLimit)}>
                             <span className="text-[10px] text-surface-500">LIMIT 1000</span>
-                            <div className={`w-3.5 h-3.5 rounded border ${autoLimit ? "bg-primary border-primary" : "border-surface-600"} flex items-center justify-center transition-colors`}>
+                            <div className={`w-3.5 h-3.5 rounded border ${autoLimit ? "bg-primary border-primary" : "border-hairline-strong"} flex items-center justify-center transition-colors`}>
                                 {autoLimit && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
                             </div>
                         </label>
-                        <div className="h-4 w-px bg-surface-800 mx-1"/>
+                        <div className="h-4 w-px bg-hairline mx-1"/>
 
                         {/* DB Selector */}
-                        <div className="px-2 py-1 rounded bg-surface-800/60 text-[10px] text-surface-400 font-mono flex items-center gap-1 cursor-pointer">
+                        <div className="px-2 py-1 rounded bg-surface-raised text-[10px] text-surface-400 font-mono flex items-center gap-1 cursor-pointer">
                             <svg className="w-3 h-3 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>
                             {selectedDb}
                         </div>
@@ -590,13 +590,13 @@ sql: DEFAULT_SQL }];
                     {/* Editor area */}
                     <div className="relative flex min-h-[200px]" style={{ height: "50%" }}>
                         {/* Line numbers */}
-                        <div className="py-3 px-2 text-right text-[11px] font-mono text-surface-600 leading-[1.6rem] select-none border-r border-surface-800/40 bg-surface-950 shrink-0">
+                        <div className="py-3 px-2 text-right text-[11px] font-mono text-surface-600 leading-[1.6rem] select-none border-r border-hairline bg-surface-frame shrink-0">
                             {sqlLines.map((_, i) => (
                                 <div key={i}>{i + 1}</div>
                             ))}
                         </div>
                         {/* Code display + hidden textarea */}
-                        <div className="flex-1 relative overflow-auto bg-surface-950">
+                        <div className="flex-1 relative overflow-auto bg-surface-frame">
                             <pre className="py-3 px-4 text-[12px] font-mono leading-[1.6rem] whitespace-pre-wrap pointer-events-none absolute inset-0 text-surface-300">
                                 {highlightSQL(activeTab.sql)}
                             </pre>
@@ -618,12 +618,12 @@ sql: DEFAULT_SQL }];
                     </div>
 
                     {/* Resize handle */}
-                    <div className="h-1 bg-surface-800/40 cursor-ns-resize hover:bg-primary/30 transition-colors"/>
+                    <div className="h-1 bg-surface-raised cursor-ns-resize hover:bg-primary/30 transition-colors"/>
 
                     {/* Results panel */}
-                    <div className="flex-1 flex flex-col min-h-0 bg-surface-950">
+                    <div className="flex-1 flex flex-col min-h-0 bg-surface-frame">
                         {/* Results header */}
-                        <div className="p-2 px-4 bg-surface-900/60 border-b border-surface-800/40 flex items-center shrink-0">
+                        <div className="p-2 px-4 bg-surface-sheet border-b border-hairline flex items-center shrink-0">
                             <span className="font-semibold text-surface-500 uppercase tracking-widest text-[10px]">QUERY RESULTS</span>
                         </div>
 
@@ -639,12 +639,12 @@ sql: DEFAULT_SQL }];
                             ) : result ? (
                                 <div className="flex flex-col h-full">
                                     {/* Execution info */}
-                                    <div className="flex items-center justify-between px-4 py-1.5 bg-surface-900/40 border-b border-surface-800/40 text-[10px] shrink-0">
+                                    <div className="flex items-center justify-between px-4 py-1.5 bg-surface-sheet border-b border-hairline text-[10px] shrink-0">
                                         <span className="text-green-400 font-medium">✓ {result.rowCount} rows · {result.execTime}ms</span>
                                         <span className="text-surface-500 font-mono">public.posts</span>
                                     </div>
                                     {/* Table header */}
-                                    <div className="flex text-[10px] font-semibold text-surface-500 tracking-wider uppercase border-b border-surface-700/40 bg-surface-900/30 shrink-0">
+                                    <div className="flex text-[10px] font-semibold text-surface-500 tracking-wider uppercase border-b border-hairline bg-surface-field shrink-0">
                                         {result.columns.map(col => (
                                             <div key={col} className="px-3 py-2 flex-1 min-w-[80px]">{col}</div>
                                         ))}
@@ -652,14 +652,14 @@ sql: DEFAULT_SQL }];
                                     {/* Table body */}
                                     <div className="flex-1 overflow-auto">
                                         {result.rows.map((row, i) => (
-                                            <div key={i} className="flex text-xs border-b border-surface-800/40 hover:bg-surface-800/20 transition-colors">
+                                            <div key={i} className="flex text-xs border-b border-hairline hover:bg-surface-hover transition-colors">
                                                 {result.columns.map(col => (
                                                     <div key={col} className="px-3 py-2 flex-1 min-w-[80px] truncate text-surface-300 font-mono text-[11px]">
                                                         {col === "status" ? (
                                                             <span className={`rounded-md px-1.5 py-0.5 text-[9px] font-medium ${
                                                                 row[col] === "published" ? "bg-green-950 text-green-300" :
                                                                 row[col] === "draft" ? "bg-amber-950 text-amber-300" :
-                                                                "bg-surface-800 text-surface-400"
+                                                                "bg-surface-raised text-surface-400"
                                                             }`}>{String(row[col])}</span>
                                                         ) : (
                                                             String(row[col] ?? "")
@@ -670,7 +670,7 @@ sql: DEFAULT_SQL }];
                                         ))}
                                     </div>
                                     {/* Footer */}
-                                    <div className="p-2 px-4 border-t border-surface-800/40 bg-surface-900/40 flex justify-between items-center shrink-0">
+                                    <div className="p-2 px-4 border-t border-hairline bg-surface-sheet flex justify-between items-center shrink-0">
                                         <div className="flex space-x-4">
                                             <div className="flex items-center text-[10px]">
                                                 <span className="font-semibold text-surface-600 mr-2 uppercase tracking-tighter">ROWS</span>
@@ -692,7 +692,7 @@ sql: DEFAULT_SQL }];
                                 <div className="flex items-center justify-center h-full text-surface-600">
                                     <div className="text-center">
                                         <svg className="w-10 h-10 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                        <p className="text-[11px]">Press <kbd className="px-1.5 py-0.5 rounded bg-surface-800 text-[10px] font-mono">⌘ Enter</kbd> to run</p>
+                                        <p className="text-[11px]">Press <kbd className="px-1.5 py-0.5 rounded bg-surface-raised text-[10px] font-mono">⌘ Enter</kbd> to run</p>
                                     </div>
                                 </div>
                             )}

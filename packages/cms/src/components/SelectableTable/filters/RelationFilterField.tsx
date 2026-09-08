@@ -218,7 +218,7 @@ export function RelationFilterField({
                   * *operand* is not — see `nullFilterOperatorFor`.
                   */}
                 <Label
-                    className="border cursor-pointer rounded-md p-2 flex items-center gap-2 bg-surface-50 dark:bg-surface-900 hover:bg-surface-100 dark:hover:bg-surface-800"
+                    className="border border-hairline cursor-pointer rounded-md p-2 flex items-center gap-2 bg-surface-field hover:bg-surface-field-hover"
                     htmlFor={nullFilterId}
                 >
                     <Checkbox

@@ -1,0 +1,1211 @@
+<title>Instatic, Distilled</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Sans:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /* ---------- document chrome (Rebase's voice) ---------- */
+  :root {
+    --bg: #f4f5f7;
+    --bg-raised: #ffffff;
+    --ink: #17181b;
+    --ink-2: #4b4f56;
+    --ink-3: #7a7f88;
+    --hair: #dfe2e7;
+    --hair-2: #eceef2;
+    --accent: #0a55d6;
+    --accent-ink: #0a55d6;
+    --note-bg: #eef3fd;
+    --note-hair: #c9d8f5;
+    --code-bg: #ebedf1;
+    --font-body: 'Inter', ui-sans-serif, system-ui, Helvetica, Arial, sans-serif;
+    --font-head: 'Instrument Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e0f11;
+      --bg-raised: #151619;
+      --ink: #ecedef;
+      --ink-2: #b4b8bd;
+      --ink-3: #8a8f97;
+      --hair: #26282d;
+      --hair-2: #1d1f23;
+      --accent: #6ea3ff;
+      --accent-ink: #8db6ff;
+      --note-bg: #14203a;
+      --note-hair: #27406f;
+      --code-bg: #1b1d21;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e0f11;
+    --bg-raised: #151619;
+    --ink: #ecedef;
+    --ink-2: #b4b8bd;
+    --ink-3: #8a8f97;
+    --hair: #26282d;
+    --hair-2: #1d1f23;
+    --accent: #6ea3ff;
+    --accent-ink: #8db6ff;
+    --note-bg: #14203a;
+    --note-hair: #27406f;
+    --code-bg: #1b1d21;
+  }
+
+  /* ---------- Instatic tokens (their voice; dark-only, never themed) ---------- */
+  :root {
+    --i-ground: #0a0a0a;
+    --i-panel: #111111;
+    --i-sheet: #131313;
+    --i-card: #151515;
+    --i-field: #1a1a1a;
+    --i-raised: #1f1f1f;
+    --i-hover: rgba(255,255,255,0.06);
+    --i-active: rgba(255,255,255,0.09);
+    --i-hair: rgba(255,255,255,0.08);
+    --i-hair-strong: rgba(255,255,255,0.14);
+    --i-text: #f2f2f2;
+    --i-text-2: #a1a1a1;
+    --i-text-3: #6e6e6e;
+    --i-green: #3ddc84;
+    --i-amber: #f5a524;
+    --i-blue: #4c8dff;
+    --i-purple: #a78bfa;
+    --i-red: #f2555a;
+    --i-teal: #2dd4bf;
+    --i-outline: #6ee787;
+    --i-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --i-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  a { color: var(--accent-ink); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  code, .mono { font-family: var(--font-mono); font-size: 0.86em; font-variant-numeric: tabular-nums; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  h1, h2, h3, h4 { font-family: var(--font-head); font-weight: 600; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2rem, 4.2vw, 3.25rem); line-height: 1; letter-spacing: -0.028em; }
+  h2 { font-size: 1.6rem; letter-spacing: -0.018em; line-height: 1.15; }
+  h3 { font-size: 1.1rem; letter-spacing: -0.01em; }
+  h4 { font-size: 0.95rem; letter-spacing: -0.005em; }
+  p { margin: 0; max-width: 66ch; }
+  p + p { margin-top: 0.85em; }
+  .muted { color: var(--ink-2); }
+  .quiet { color: var(--ink-3); }
+
+  /* masthead */
+  .masthead {
+    max-width: 1140px; margin: 0 auto; padding: 56px 28px 28px;
+    border-bottom: 1px solid var(--hair);
+  }
+  .masthead .lede { font-size: 1.1rem; color: var(--ink-2); margin-top: 18px; max-width: 58ch; }
+  .masthead .meta { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--ink-3); }
+  .masthead .meta span b { color: var(--ink-2); font-weight: 500; }
+
+  /* layout */
+  .layout { max-width: 1140px; margin: 0 auto; padding: 0 28px 96px; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 48px; }
+  .toc { position: sticky; top: 24px; align-self: start; padding-top: 40px; font-size: 13px; }
+  .toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .toc a { color: var(--ink-2); display: block; padding: 3px 0; border-left: 2px solid transparent; padding-left: 10px; margin-left: -12px; }
+  .toc a:hover { color: var(--ink); text-decoration: none; border-left-color: var(--hair); }
+  main { min-width: 0; padding-top: 40px; }
+  section { padding: 0 0 56px; margin-bottom: 40px; border-bottom: 1px solid var(--hair); scroll-margin-top: 24px; }
+  section:last-child { border-bottom: 0; }
+  .sec-head { margin-bottom: 22px; }
+  .sec-head p { margin-top: 12px; color: var(--ink-2); }
+  h3 { margin: 32px 0 10px; }
+  h3:first-of-type { margin-top: 0; }
+
+  /* principles */
+  .principles { display: grid; gap: 18px; counter-reset: p; margin-top: 8px; }
+  .principle { display: grid; grid-template-columns: 1fr; gap: 4px; padding: 18px 0; border-top: 1px solid var(--hair-2); }
+  .principle:first-child { border-top: 0; padding-top: 0; }
+  .principle h3 { margin: 0; }
+  .principle p { max-width: 68ch; color: var(--ink-2); }
+  .principle .ev { font-size: 13px; color: var(--ink-3); margin-top: 4px; }
+
+  /* stage: an Instatic specimen area */
+  .stage {
+    background: var(--i-ground); color: var(--i-text);
+    font-family: var(--i-sans); font-size: 13px; line-height: 1.4;
+    border-radius: 12px; border: 1px solid var(--hair);
+    padding: 24px; margin: 14px 0 18px; overflow-x: auto;
+  }
+  .stage-cap { font-size: 12px; color: var(--ink-3); margin-top: -8px; margin-bottom: 20px; }
+  .stage-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+  .stage-col { display: grid; gap: 12px; align-content: start; }
+  .label { font-family: var(--i-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--i-text-3); }
+  .stage .label { margin-bottom: 8px; }
+
+  /* tables */
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  .tbl-wrap { overflow-x: auto; margin: 12px 0 8px; border: 1px solid var(--hair); border-radius: 10px; background: var(--bg-raised); }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--hair-2); vertical-align: top; }
+  th { font-weight: 500; color: var(--ink-3); font-size: 12px; letter-spacing: 0.02em; }
+  tr:last-child td { border-bottom: 0; }
+  td .mono { color: var(--ink-2); }
+  td.gap { color: var(--ink); }
+  .sw { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 8px; border: 1px solid rgba(127,127,127,0.35); }
+
+  /* color ladders */
+  .ladder { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--i-hair-strong); }
+  .ladder div { padding: 44px 12px 12px; font-family: var(--i-mono); font-size: 11px; color: var(--i-text-2); }
+  .ladder div b { display: block; color: var(--i-text); font-weight: 500; font-family: var(--i-sans); font-size: 12px; margin-bottom: 2px; }
+  .text-ladder { display: grid; gap: 10px; }
+  .text-ladder div { display: flex; gap: 14px; align-items: baseline; }
+  .text-ladder .mono { color: var(--i-text-3); font-size: 11px; }
+  .hues { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .hue { border: 1px solid var(--i-hair); border-radius: 10px; padding: 12px; display: grid; gap: 8px; background: var(--i-card); }
+  .hue .top { display: flex; align-items: center; gap: 8px; }
+  .hue .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .hue .name { font-weight: 500; }
+  .hue .tint { height: 22px; border-radius: 6px; display: flex; align-items: center; padding: 0 8px; font-family: var(--i-mono); font-size: 10.5px; }
+  .hue .use { font-size: 11.5px; color: var(--i-text-2); line-height: 1.35; }
+
+  /* type specimens */
+  .type-rows { display: grid; gap: 18px; }
+  .type-row { display: grid; grid-template-columns: 150px 1fr; gap: 20px; align-items: baseline; border-top: 1px solid var(--i-hair); padding-top: 14px; }
+  .type-row:first-child { border-top: 0; padding-top: 0; }
+  .type-row .spec { font-family: var(--i-mono); font-size: 11px; color: var(--i-text-3); line-height: 1.5; }
+  .t-display { font-size: 44px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .t-stat { font-size: 36px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .t-title { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .t-nav { font-size: 13px; font-weight: 500; }
+  .t-body { font-size: 13px; font-weight: 400; }
+  .t-second { font-size: 12px; color: var(--i-text-2); }
+  .t-meta { font-family: var(--i-mono); font-size: 11px; color: var(--i-text-3); }
+  .t-micro { font-family: var(--i-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--i-text-3); }
+  .t-code { font-family: var(--i-mono); font-size: 11.5px; color: var(--i-text-2); background: var(--i-raised); padding: 2px 6px; border-radius: 5px; }
+
+  /* shape */
+  .radii { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+  .radii div { width: 84px; height: 64px; background: var(--i-field); border: 1px solid var(--i-hair-strong); display: flex; align-items: flex-end; padding: 8px; font-family: var(--i-mono); font-size: 10.5px; color: var(--i-text-2); }
+  .heights { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .heights div { background: var(--i-field); border: 1px solid var(--i-hair-strong); border-radius: 8px; padding: 0 12px; display: flex; align-items: center; font-family: var(--i-mono); font-size: 10.5px; color: var(--i-text-2); white-space: nowrap; }
+
+  /* ---------- Instatic components ---------- */
+  .i-svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .i-svg.sm { width: 13px; height: 13px; }
+
+  .i-nav { display: flex; align-items: center; height: 44px; background: var(--i-ground); padding: 0 12px; gap: 4px; border-bottom: 1px solid var(--i-hair); border-radius: 8px 8px 0 0; }
+  .i-nav .site { font-weight: 500; margin-right: 10px; }
+  .i-nav .tab { display: flex; align-items: center; gap: 6px; padding: 6px 8px; color: var(--i-text-2); font-weight: 500; font-size: 12.5px; border-radius: 6px; }
+  .i-nav .tab.on { color: var(--i-text); }
+  .i-nav .tab:hover { color: var(--i-text); }
+  .i-nav .sp { flex: 1; }
+  .i-nav .avatar { width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 40% 40%, #c4b5fd, var(--i-purple) 60%, #5b21b6); margin-left: 6px; }
+
+  .i-shell { display: flex; background: var(--i-ground); }
+  .i-side { width: 268px; background: var(--i-ground); padding: 14px 10px; display: grid; gap: 18px; }
+  .i-side .grp { display: grid; gap: 2px; }
+  .i-side .grp-head { display: flex; align-items: center; justify-content: space-between; padding: 0 10px 6px; }
+  .i-row { display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 10px; border-radius: 8px; color: var(--i-text); font-size: 13px; cursor: default; }
+  .i-row:hover { background: var(--i-hover); }
+  .i-row.on { background: var(--i-active); }
+  .i-row .cnt { margin-left: auto; font-family: var(--i-mono); font-size: 11px; color: var(--i-text-3); }
+  .i-row .i-svg { color: var(--i-text-2); width: 14px; height: 14px; }
+
+  .i-sheet { flex: 1; min-width: 380px; background: var(--i-sheet); border-radius: 14px 0 0 0; padding: 14px; }
+
+  .i-btn { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 8px; font-size: 12.5px; font-weight: 500; color: var(--i-text); background: #232323; border: 0; cursor: default; white-space: nowrap; }
+  .i-btn:hover { background: #2a2a2a; }
+  .i-btn.ghost { background: transparent; color: var(--i-text-2); }
+  .i-btn.ghost:hover { color: var(--i-text); background: var(--i-hover); }
+  .i-btn.light { background: #e9e9e9; color: #111; border-color: transparent; }
+  .i-btn.light:hover { background: #fff; }
+  .i-btn.sm { height: 26px; padding: 0 9px; font-size: 12px; }
+  .i-btn.danger { color: var(--i-red); }
+  .i-btn.split { padding-right: 6px; }
+  .i-btn.split .i-svg.caret { margin-left: 2px; opacity: 0.7; }
+  .i-ibtn { width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--i-text-2); background: transparent; }
+  .i-ibtn:hover { background: var(--i-hover); color: var(--i-text); }
+  .i-ibtn.on { background: #e9e9e9; color: #111; }
+
+  .i-field { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; background: var(--i-field); border: 1px solid var(--i-hair); border-radius: 8px; color: var(--i-text-3); font-size: 12.5px; min-width: 180px; }
+  .i-field.pill { border-radius: 999px; padding: 0 14px; }
+  .i-field.val { color: var(--i-text); font-family: var(--i-mono); font-size: 11.5px; }
+  .i-field .x { margin-left: auto; color: var(--i-text-3); }
+  .i-field.select { color: var(--i-text); }
+  .i-field.select .i-svg { margin-left: auto; color: var(--i-text-3); }
+
+  .i-seg { display: inline-flex; background: var(--i-field); border-radius: 8px; padding: 2px; gap: 2px; }
+  .i-seg span { padding: 4px 10px; border-radius: 6px; font-size: 12px; color: var(--i-text-2); }
+  .i-seg span.on { background: var(--i-raised); color: var(--i-text); }
+  .i-seg.big span { padding: 6px 22px; }
+  .i-seg.icons span { padding: 5px 8px; display: inline-flex; }
+
+  .i-tabs { display: flex; gap: 2px; align-items: center; }
+  .i-tabs span { font-size: 12px; color: var(--i-text-2); padding: 3px 8px; border-radius: 6px; }
+  .i-tabs span.on { background: var(--i-active); color: var(--i-text); }
+
+  .i-chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--i-mono); font-size: 11px; padding: 2px 7px; border-radius: 5px; background: var(--i-raised); color: var(--i-text-2); }
+  .i-chip.tag { color: var(--i-text); }
+  .i-chip.cls { color: #b4a6ff; background: rgba(167,139,250,0.12); }
+  .i-chip.cls.on { color: var(--i-outline); background: rgba(110,231,135,0.12); }
+  .i-chip.path { color: var(--i-text); }
+
+  .i-card { position: relative; background: var(--i-card); border: 1px solid var(--i-hair); border-radius: 10px; padding: 16px 18px 14px; min-width: 200px; }
+  .i-card .mark { position: absolute; width: 5px; height: 5px; background: #6b6b6b; transform: rotate(45deg); }
+  .i-card .mark.tl { top: -3px; left: -3px; } .i-card .mark.tr { top: -3px; right: -3px; } .i-card .mark.bl { bottom: -3px; left: -3px; } .i-card .mark.br { bottom: -3px; right: -3px; }
+  .i-card .head { display: flex; align-items: center; gap: 7px; margin-bottom: 14px; }
+  .i-card .head .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .i-card .head .i-svg { width: 13px; height: 13px; color: var(--i-text-2); }
+  .i-card .big { font-size: 34px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .i-card .sub { font-family: var(--i-mono); font-size: 11px; color: var(--i-text-3); margin-top: 8px; }
+  .i-card .foot { font-family: var(--i-mono); font-size: 11px; color: var(--i-text-3); margin-top: 22px; display: flex; gap: 14px; }
+  .i-bar { height: 5px; border-radius: 3px; background: var(--i-raised); overflow: hidden; display: flex; margin-top: 14px; }
+  .i-bar i { display: block; height: 100%; }
+  .i-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 6px 14px; margin-top: 10px; font-family: var(--i-mono); font-size: 10.5px; color: var(--i-text-2); }
+  .i-legend span { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .i-legend .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  .i-status { display: grid; gap: 0; }
+  .i-status div { display: flex; align-items: center; gap: 9px; height: 30px; font-size: 12.5px; }
+  .i-status .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .i-status .v { margin-left: auto; font-family: var(--i-mono); font-size: 11px; color: var(--i-text-3); }
+
+  .i-act div { display: flex; align-items: center; gap: 9px; height: 34px; font-size: 12.5px; }
+  .i-act .av { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 40% 40%, #c4b5fd, var(--i-purple) 60%, #5b21b6); flex: none; }
+  .i-act .av.g { background: #2a2a2a; }
+  .i-act .t { margin-left: auto; font-family: var(--i-mono); font-size: 10.5px; color: var(--i-text-3); }
+
+  .i-prog { position: relative; display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 12px; border-radius: 8px; background: #181818; overflow: hidden; }
+  .i-prog .fill { position: absolute; inset: 0; width: var(--w, 0%); background: var(--tint, transparent); }
+  .i-prog > * { position: relative; }
+  .i-prog .tile { width: 26px; height: 26px; border-radius: 6px; background: var(--i-raised); display: flex; align-items: center; justify-content: center; color: var(--i-text-2); }
+  .i-prog .txt b { display: block; font-weight: 500; font-size: 12.5px; }
+  .i-prog .txt span { font-family: var(--i-mono); font-size: 10.5px; color: var(--i-text-3); }
+  .i-prog .n { margin-left: auto; font-family: var(--i-mono); font-size: 11px; color: var(--i-text-2); display: flex; align-items: center; gap: 10px; }
+  .i-prog .ring { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--i-text-3); }
+  .i-prog .ring.spin { border-color: var(--i-text-2); border-top-color: transparent; }
+  .i-prog .ok { color: var(--i-text); }
+  .i-prog.dim { opacity: 0.55; }
+  .i-track { height: 3px; background: var(--i-raised); border-radius: 2px; overflow: hidden; }
+  .i-track i { display: block; height: 100%; width: 61%; background: #f2f2f2; }
+
+  .i-steps { display: flex; gap: 26px; align-items: center; }
+  .i-steps span { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--i-text-2); }
+  .i-steps .c { width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-family: var(--i-mono); font-size: 9.5px; }
+  .i-steps .c.done { background: rgba(61,220,132,0.18); color: var(--i-green); }
+  .i-steps .c.cur { background: #e9e9e9; color: #111; font-weight: 500; }
+  .i-steps .cur-l { color: var(--i-text); }
+
+  .i-tile { width: 132px; }
+  .i-tile .th { aspect-ratio: 1; border-radius: 6px; background: var(--i-field); display: flex; align-items: center; justify-content: center; color: #6b6b6b; overflow: hidden; }
+  .i-tile .th.img { background: linear-gradient(160deg, #2a2a2a 0%, #6b6b6b 45%, #1a1a1a 100%); }
+  .i-tile .th.img2 { background: linear-gradient(200deg, #d9d9d9 0%, #7a7a7a 35%, #202020 100%); }
+  .i-tile .nm { font-size: 12.5px; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .i-tile .sz { font-family: var(--i-mono); font-size: 10.5px; color: var(--i-text-3); margin-top: 2px; }
+
+  .i-insp { width: 300px; display: grid; gap: 10px; }
+  .i-insp .r { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 10px; }
+  .i-insp .r .l { font-size: 12.5px; color: var(--i-text); }
+  .i-insp .i-field { min-width: 0; height: 30px; }
+  .i-insp .sec { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; background: #181818; border-radius: 8px; font-weight: 500; }
+  .i-insp .sec .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--i-green); }
+  .i-insp .sec .n { margin-left: auto; font-family: var(--i-mono); font-size: 11px; color: var(--i-text-3); font-weight: 400; }
+  .i-icons { display: flex; gap: 2px; background: var(--i-field); border-radius: 8px; padding: 2px; }
+  .i-icons span { flex: 1; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--i-text-2); }
+  .i-icons span.on { background: var(--i-raised); color: var(--i-text); }
+
+  .i-tree { width: 380px; display: grid; gap: 1px; }
+  .i-tree .n { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: 7px; font-size: 12.5px; }
+  .i-tree .n:hover { background: var(--i-hover); }
+  .i-tree .n.on { background: var(--i-active); }
+  .i-tree .n .chev { width: 12px; color: var(--i-text-3); display: inline-flex; }
+  .i-tree .n .box { width: 9px; height: 9px; border-radius: 2px; border: 1px solid var(--i-text-3); }
+  .i-tree .n .cls { margin-left: auto; }
+  .i-tree .n.d1 { padding-left: 24px; } .i-tree .n.d2 { padding-left: 40px; } .i-tree .n.d3 { padding-left: 56px; }
+
+  .i-rail { width: 44px; display: grid; gap: 6px; justify-items: center; padding: 8px 0; }
+  .i-rail span { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .i-rail span.on { background: rgba(245,165,36,0.16); }
+
+  .i-toolbar { display: inline-flex; align-items: center; gap: 2px; padding: 4px; background: var(--i-panel); border: 1px solid var(--i-hair-strong); border-radius: 999px; }
+  .i-toolbar span { width: 28px; height: 28px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; color: var(--i-text-2); }
+  .i-toolbar span.on { background: var(--i-blue); color: #fff; }
+  .i-toolbar span.danger { color: var(--i-red); }
+  .i-toolbar .sep { width: 1px; height: 16px; background: var(--i-hair-strong); margin: 0 4px; }
+
+  .i-canvas { background: #1c1c1c; border-radius: 10px; padding: 18px; position: relative; min-height: 120px; }
+  .i-sel { border: 1px solid var(--i-outline); border-radius: 2px; padding: 20px; position: relative; background: #0d0d0d; }
+  .i-sel::before { content: 'Desktop 1440px'; position: absolute; top: -18px; left: 0; font-family: var(--i-mono); font-size: 10px; color: var(--i-outline); }
+
+  .i-modal { width: 100%; max-width: 560px; background: #141414; border: 1px solid var(--i-hair-strong); border-radius: 12px; overflow: hidden; }
+  .i-modal .hd { padding: 14px 18px 12px; border-bottom: 1px solid var(--i-hair); display: flex; align-items: flex-start; }
+  .i-modal .hd .x { margin-left: auto; color: var(--i-text-3); }
+  .i-modal .bd { padding: 16px 18px; display: grid; gap: 14px; }
+  .i-modal .ft { padding: 12px 18px; border-top: 1px solid var(--i-hair); display: flex; align-items: center; font-size: 12px; color: var(--i-text-3); }
+  .i-modal .ft .i-btn { margin-left: auto; }
+
+  .i-greet { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .i-crumb { font-family: var(--i-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--i-text-3); display: flex; gap: 8px; }
+
+  /* notes and comparison */
+  .note { background: var(--note-bg); border: 1px solid var(--note-hair); border-radius: 10px; padding: 14px 16px; font-size: 14px; max-width: 72ch; }
+  .note b { font-weight: 600; }
+  .evidence { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
+  .ev-card { background: var(--bg-raised); border: 1px solid var(--hair); border-radius: 10px; padding: 12px 14px; font-size: 13px; }
+  .ev-card b { display: block; font-weight: 600; margin-bottom: 2px; }
+  .ev-card span { color: var(--ink-2); }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+  ul { margin: 8px 0 0; padding-left: 18px; max-width: 68ch; }
+  li { margin: 5px 0; color: var(--ink-2); }
+  li b { color: var(--ink); font-weight: 600; }
+  .keep { color: #1f8a4c; font-weight: 500; }
+  .change { color: #b8560f; font-weight: 500; }
+  :root[data-theme="dark"] .keep { color: #5fd08a; }
+  :root[data-theme="dark"] .change { color: #f0a15b; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .keep { color: #5fd08a; }
+    :root:not([data-theme="light"]) .change { color: #f0a15b; }
+  }
+
+  /* side-by-side surface comparison */
+  .cmp { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .cmp .frame { background: #0a0a0a; padding: 12px 0 0 12px; border-radius: 10px; border: 1px solid var(--i-hair); overflow: hidden; }
+  .cmp .frame .label { margin: 0 0 10px; }
+  .cmp .sheet { background: var(--s-sheet); border: 1px solid var(--s-sheet-hair, var(--s-hair)); border-right: 0; border-bottom: 0; border-radius: 12px 0 0 0; padding: 12px; }
+  .cmp .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .cmp .btn { height: 28px; padding: 0 10px; border-radius: 8px; background: var(--s-btn); font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; }
+  .cmp .btn.ghost { background: transparent; color: var(--i-text-2); }
+  .cmp .chip { height: 20px; padding: 0 9px; border-radius: 999px; background: var(--s-chip); font-size: 11px; color: var(--i-text-2); display: inline-flex; align-items: center; }
+  .cmp .field { height: 28px; padding: 0 10px; border-radius: 8px; background: var(--s-field); box-shadow: inset 0 1px 0 rgba(255,255,255,0.045); font-size: 12px; color: var(--i-text-3); display: inline-flex; align-items: center; min-width: 90px; }
+  .cmp .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cmp .card { position: relative; background: var(--s-card); border: 1px solid var(--s-hair); border-radius: 12px; padding: 12px; min-height: 96px; }
+  .cmp .card.hov { background: color-mix(in srgb, var(--s-card), var(--s-hover-solid, transparent)); }
+  .cmp .card.hov::after { content: ''; position: absolute; inset: 0; border-radius: 12px; background: var(--s-hover); pointer-events: none; }
+  .cmp .ttl { font-size: 13px; font-weight: 500; margin-bottom: 10px; }
+  .cmp .tiles { display: flex; gap: 8px; flex-wrap: wrap; }
+  .cmp .tile { background: var(--s-tile); border: 1px solid var(--s-tile-hair); border-radius: 8px; padding: 7px 10px; min-width: 70px; }
+  .cmp .tile span { display: block; font-family: var(--i-mono); font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--i-text-3); }
+  .cmp .tile b { display: block; font-size: 15px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .cmp .hint { position: absolute; right: 10px; bottom: 8px; font-family: var(--i-mono); font-size: 9.5px; color: var(--i-text-3); }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    .toc { position: static; padding-top: 28px; border-bottom: 1px solid var(--hair); padding-bottom: 20px; }
+    .toc ol { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .masthead { padding-top: 40px; }
+    .ladder { grid-template-columns: repeat(3, 1fr); }
+    .type-row { grid-template-columns: 1fr; gap: 6px; }
+    .i-shell { flex-wrap: wrap; }
+    .i-side { width: calc(100% - 44px); }
+    .i-sheet { min-width: 0; flex-basis: 100%; border-radius: 0; border-left: 0; }
+    .i-tree, .i-insp { width: 100%; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .i-row, .i-btn, .i-ibtn, .i-nav .tab, .i-tree .n { transition: background-color 120ms ease-out, color 120ms ease-out; }
+  }
+</style>
+
+<header class="masthead">
+  <h1>Instatic, Distilled</h1>
+  <p class="lede">What makes Instatic's admin look considered, reconstructed from four screenshots into tokens, type, shape, and components you can point at. Values are sampled from compressed captures, so treat every hex and pixel as a close estimate rather than a measurement.</p>
+  <div class="meta">
+    <span><b>Subject</b> Instatic CMS admin (media library, dashboard, importer, site editor)</span>
+    <span><b>For</b> the Rebase design conversation, September 2026</span>
+    <span><b>Rebase baseline</b> <code>packages/ui/src/theme.css</code> at 0.13.x, plus computed styles read off demo.rebase.pro in dark mode on 2026-09-08</span>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="toc" aria-label="Sections">
+    <ol>
+      <li><a href="#thesis">Why it reads as premium</a></li>
+      <li><a href="#color">Color</a></li>
+      <li><a href="#type">Typography</a></li>
+      <li><a href="#shape">Shape and space</a></li>
+      <li><a href="#depth">Depth and icons</a></li>
+      <li><a href="#shell">App shell</a></li>
+      <li><a href="#controls">Controls</a></li>
+      <li><a href="#data">Cards and data</a></li>
+      <li><a href="#flows">Flows and editor</a></li>
+      <li><a href="#motifs">Motifs</a></li>
+      <li><a href="#rebase">Against Rebase</a></li>
+      <li><a href="#surfaces">Surfaces, measured</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <section id="thesis">
+      <div class="sec-head">
+        <h2>Why it reads as premium</h2>
+        <p>Instatic does not look better because of one clever component. It looks better because six decisions are held everywhere at once, and nothing in the chrome argues with them.</p>
+      </div>
+      <div class="principles">
+        <div class="principle">
+          <h3>The chrome is monochrome. Color is information, never decoration.</h3>
+          <p>Every button, input, tab, and panel is a shade of near-black or white. Hue appears only where it means something: a 6px status dot, a 12% tint behind an active row, a green selection outline, a red delete icon. The one brand color in the whole shell is the purple avatar. Because color is so scarce, a single orange dot next to "Plugins · 1 update" carries real weight.</p>
+          <div class="ev">Evidence: the dashboard has four colored dots and one orange bar on a page with fourteen controls. The "Publish" button is gray.</div>
+        </div>
+        <div class="principle">
+          <h3>Two voices: a grotesque for words, a monospace for measurements.</h3>
+          <p>Anything a person reads is set in a neutral sans at 13px. Anything the system measured is set in a small muted monospace: counts, file sizes, timestamps, paths, class names, uppercase section labels. The eye learns the rule in seconds, and every list becomes scannable because the value column is always the same voice.</p>
+          <div class="ev">Evidence: "All files 74", "7.2 MB", "2M ago", ".site-header", "0 / 73", "ADMIN › DASHBOARD" are all monospace.</div>
+        </div>
+        <div class="principle">
+          <h3>Depth comes from lightness steps and hairlines, not shadows.</h3>
+          <p>Six surface values from #0a0a0a to #1f1f1f do all the layering. Large surfaces meet without a line: rail, sidebar, and sheet are separated by lightness alone, and a tile inside a card, a row inside a list, or a segment inside a track is a fill with no border. Hairlines are reserved for objects that sit on the ground, cards, the modal, floating toolbars, and for fields. Nothing floats on a drop shadow. The result is flat, calm, and consistent at every zoom.</p>
+        </div>
+        <div class="principle">
+          <h3>Extreme contrast of scale, with almost nothing in between.</h3>
+          <p>A 44px greeting and 36px stat numbers sit next to 11px monospace meta. The middle sizes barely exist. That gap is what makes the dashboard feel editorial rather than administrative: big things are very big, small things are very small, and there is no 16px "medium" competing for attention.</p>
+        </div>
+        <div class="principle">
+          <h3>Dense controls, generous containers.</h3>
+          <p>Buttons and inputs are 32px tall, list rows are 32 to 34px, filter tabs are 26px. But cards get 18 to 20px of padding, the media grid gets 28px gutters, and the sidebar sections get 20px between groups. Density lives inside the container; air lives between containers.</p>
+        </div>
+        <div class="principle">
+          <h3>A quiet vocabulary of technical motifs, used consistently.</h3>
+          <p>Corner diamond marks on dashboard cards, uppercase tracked micro-labels, dot indicators, leading-zero counters ("09 blocks"), the row that is its own progress bar. Each is small. Together they say "an instrument, not a form".</p>
+        </div>
+      </div>
+      <div class="evidence">
+        <div class="ev-card"><b>Media library</b><span>Icon rail, folders sidebar with counts, inset content sheet, 7-column tile grid, filter tabs, pill search.</span></div>
+        <div class="ev-card"><b>Dashboard</b><span>44px greeting, breadcrumb micro-label, stat cards with corner marks, status and activity lists, stacked storage bar.</span></div>
+        <div class="ev-card"><b>Importer modal</b><span>Four-step stepper, 61% headline, 3px track, per-category rows that fill as progress bars in their own hue.</span></div>
+        <div class="ev-card"><b>Site editor</b><span>Colored tool rail, layer tree with tag and class chips, floating pill toolbars, green selection outline, property inspector.</span></div>
+      </div>
+    </section>
+
+    <section id="color">
+      <div class="sec-head">
+        <h2>Color</h2>
+        <p>Instatic is dark-only in every capture. The palette is a lightness ladder plus five semantic hues, and a rule about how much of each hue is allowed on screen.</p>
+      </div>
+
+      <h3>Surface ladder</h3>
+      <div class="stage">
+        <div class="ladder">
+          <div style="background:#0a0a0a"><b>ground</b>#0a0a0a<br>nav, sidebar, page</div>
+          <div style="background:#111111"><b>panel</b>#111111<br>floating toolbars, modal chrome</div>
+          <div style="background:#131313"><b>sheet</b>#131313<br>inset content area</div>
+          <div style="background:#151515"><b>card</b>#151515<br>cards, inspector sections</div>
+          <div style="background:#1a1a1a"><b>field</b>#1a1a1a<br>inputs, tiles, thumbnails</div>
+          <div style="background:#1f1f1f"><b>raised</b>#1f1f1f<br>buttons, chips, segment active</div>
+        </div>
+        <div style="height:14px"></div>
+        <div class="stage-row">
+          <div class="stage-col" style="min-width:220px">
+            <span class="label">Hairlines</span>
+            <div style="border:1px solid var(--i-hair);border-radius:8px;padding:10px 12px;font-family:var(--i-mono);font-size:11px;color:var(--i-text-2)">rgba(255,255,255,0.08) · cards on the ground, fields</div>
+            <div style="border:1px solid var(--i-hair-strong);border-radius:8px;padding:10px 12px;font-family:var(--i-mono);font-size:11px;color:var(--i-text-2)">rgba(255,255,255,0.14) · floating, modal</div>
+            <div style="background:var(--i-field);border-radius:8px;padding:10px 12px;font-family:var(--i-mono);font-size:11px;color:var(--i-text-2)">none · sheet edge, rows, tiles, tracks, buttons</div>
+          </div>
+          <div class="stage-col" style="min-width:220px">
+            <span class="label">Interaction fills</span>
+            <div class="i-row" style="background:var(--i-hover)">hover <span class="cnt">white 6%</span></div>
+            <div class="i-row on">active / selected <span class="cnt">white 9%</span></div>
+          </div>
+          <div class="stage-col text-ladder" style="min-width:220px">
+            <span class="label">Text ladder</span>
+            <div><span style="color:var(--i-text)">Primary, labels, values</span><span class="mono">#f2f2f2</span></div>
+            <div><span style="color:var(--i-text-2)">Secondary, inactive nav</span><span class="mono">#a1a1a1</span></div>
+            <div><span style="color:var(--i-text-3)">Meta, placeholder, micro</span><span class="mono">#6e6e6e</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="stage-cap">Only one white fill exists in the chrome: the active view toggle and the progress track. Everything else that is "on" is one lightness step up.</p>
+
+      <h3>Semantic hues and how much of them is allowed</h3>
+      <div class="stage">
+        <div class="hues">
+          <div class="hue">
+            <div class="top"><span class="dot" style="background:var(--i-green)"></span><span class="name">Green</span><span class="t-meta">#3ddc84</span></div>
+            <div class="tint" style="background:rgba(61,220,132,0.14);color:var(--i-green)">tint 14%</div>
+            <div class="use">Live, done, "Draft saved", step complete, "has values" dot in the inspector. The editor's selection outline is a lighter mint, #6ee787.</div>
+          </div>
+          <div class="hue">
+            <div class="top"><span class="dot" style="background:var(--i-amber)"></span><span class="name">Amber</span><span class="t-meta">#f5a524</span></div>
+            <div class="tint" style="background:rgba(245,165,36,0.14);color:var(--i-amber)">tint 14%</div>
+            <div class="use">Attention without alarm: "1 update", the Posts card, the images share of storage, the active Layers tool.</div>
+          </div>
+          <div class="hue">
+            <div class="top"><span class="dot" style="background:var(--i-blue)"></span><span class="name">Blue</span><span class="t-meta">#4c8dff</span></div>
+            <div class="tint" style="background:rgba(76,141,255,0.14);color:var(--i-blue)">tint 14%</div>
+            <div class="use">Media and files: the media rail icon, the Pages card, the active select tool in the canvas toolbar. Never a button fill.</div>
+          </div>
+          <div class="hue">
+            <div class="top"><span class="dot" style="background:var(--i-purple)"></span><span class="name">Purple</span><span class="t-meta">#a78bfa</span></div>
+            <div class="tint" style="background:rgba(167,139,250,0.14);color:#b4a6ff">tint 14%</div>
+            <div class="use">Identity: the avatar, the Storage card, class-name chips in the layer tree. The nearest thing to a brand color, and it stays at avatar size.</div>
+          </div>
+          <div class="hue">
+            <div class="top"><span class="dot" style="background:var(--i-red)"></span><span class="name">Red</span><span class="t-meta">#f2555a</span></div>
+            <div class="tint" style="background:rgba(242,85,90,0.14);color:var(--i-red)">tint 14%</div>
+            <div class="use">Delete in the floating toolbar, the AI badge, the Scripts row tint. Icon color only; never a filled button.</div>
+          </div>
+          <div class="hue">
+            <div class="top"><span class="dot" style="background:var(--i-teal)"></span><span class="name">Teal</span><span class="t-meta">#2dd4bf</span></div>
+            <div class="tint" style="background:rgba(45,212,191,0.16);color:var(--i-teal)">tint 16%</div>
+            <div class="use">The importer's active row fill. Each import category owns a hue, applied only as a low-alpha fill behind the row.</div>
+          </div>
+        </div>
+      </div>
+      <p class="stage-cap">The rule: a hue may be a 6px dot, a 13px icon, a 1px outline, or a 12 to 16% tint. It is never a filled control and never a text color larger than 13px.</p>
+
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Token</th><th>Value</th><th>Where it appears</th></tr></thead>
+        <tbody>
+          <tr><td><span class="sw" style="background:#0a0a0a"></span>ground</td><td class="mono">#0a0a0a</td><td>Top nav, icon rail, sidebar, dashboard page</td></tr>
+          <tr><td><span class="sw" style="background:#131313"></span>sheet</td><td class="mono">#131313</td><td>The inset content area in the media library, with a 14px top-left radius</td></tr>
+          <tr><td><span class="sw" style="background:#151515"></span>card</td><td class="mono">#151515</td><td>Dashboard cards, importer rows, inspector section headers</td></tr>
+          <tr><td><span class="sw" style="background:#1a1a1a"></span>field</td><td class="mono">#1a1a1a</td><td>Inputs, selects, search, folder tiles, thumbnail ground</td></tr>
+          <tr><td><span class="sw" style="background:#1f1f1f"></span>raised</td><td class="mono">#1f1f1f</td><td>Default buttons, code chips, active segment, icon tiles</td></tr>
+          <tr><td><span class="sw" style="background:#e9e9e9"></span>inverse</td><td class="mono">#e9e9e9</td><td>Active view toggle, progress fill, the current step number</td></tr>
+          <tr><td><span class="sw" style="background:#6ee787"></span>outline</td><td class="mono">#6ee787</td><td>Selection and hover outline on the editor canvas, with its size label</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="type">
+      <div class="sec-head">
+        <h2>Typography</h2>
+        <p>A neutral grotesque, almost certainly Inter or Geist, carries every word. A monospace, close to Geist Mono or JetBrains Mono, carries every number and identifier. The scale has a hole in the middle on purpose.</p>
+      </div>
+      <div class="stage">
+        <div class="type-rows">
+          <div class="type-row"><div class="spec">display<br>44px · 700 · -0.03em<br>one per page</div><div class="t-display">Good afternoon, David.</div></div>
+          <div class="type-row"><div class="spec">stat<br>34-36px · 600 · -0.02em<br>tabular</div><div class="t-stat">264 MB</div></div>
+          <div class="type-row"><div class="spec">headline number<br>28px · 600<br>importer</div><div class="t-stat" style="font-size:28px">61%</div></div>
+          <div class="type-row"><div class="spec">title<br>16-18px · 600 · -0.01em<br>Overview, Folders, Layers, Importing</div><div class="t-title">Overview <span class="t-meta" style="margin-left:8px">09 blocks</span></div></div>
+          <div class="type-row"><div class="spec">nav / control<br>12.5-13px · 500</div><div class="t-nav">Dashboard &nbsp; Site &nbsp; Content &nbsp; Data &nbsp; Media</div></div>
+          <div class="type-row"><div class="spec">body / row<br>13px · 400</div><div class="t-body">Missing alt text &nbsp;·&nbsp; staircase-spiral.png &nbsp;·&nbsp; published the site</div></div>
+          <div class="type-row"><div class="spec">secondary<br>12px · 400 · #a1a1a1</div><div class="t-second">Your site at a glance. Configure the grid to surface exactly what you watch.</div></div>
+          <div class="type-row"><div class="spec">meta (mono)<br>10.5-11px · 400 · #6e6e6e</div><div class="t-meta">7.2 MB &nbsp; 2M &nbsp; 0 / 73 &nbsp; files · 258 MB &nbsp; used · SQLite · self-hosted</div></div>
+          <div class="type-row"><div class="spec">micro label (mono)<br>10.5px · uppercase · +0.08em</div><div class="t-micro">Library &nbsp;&nbsp; Pages &nbsp;&nbsp; Progress &nbsp;&nbsp; Admin › Dashboard</div></div>
+          <div class="type-row"><div class="spec">code chip (mono)<br>11.5px on raised</div><div><span class="t-code">/posts/untitled</span> &nbsp; <span class="t-code">elegant/assets/technology-ring.png</span> &nbsp; <span class="t-code">.hero.cine</span></div></div>
+        </div>
+      </div>
+      <p class="stage-cap">Weights are 400 and 500 everywhere except the display greeting and stat numbers. Nothing between 18px and 28px exists in the chrome.</p>
+      <div class="two">
+        <div>
+          <h4>What the monospace is allowed to carry</h4>
+          <ul>
+            <li>Counts and sizes: <b>74</b>, <b>7.2 MB</b>, <b>0 / 1</b></li>
+            <li>Time: <b>2M</b>, <b>3m ago</b>, <b>2h ago</b></li>
+            <li>Identifiers: paths, class names, HTML tags, emails</li>
+            <li>Section and card labels, always uppercase and tracked</li>
+            <li>Breadcrumbs, as a label rather than a sentence</li>
+          </ul>
+        </div>
+        <div>
+          <h4>What it never carries</h4>
+          <ul>
+            <li>Sentences, button labels, nav items, row titles</li>
+            <li>Anything above 12px</li>
+            <li>Anything in the primary text color at row size. Mono is muted by default and lifts to secondary only when it is the row's value.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="shape">
+      <div class="sec-head">
+        <h2>Shape and space</h2>
+        <p>One radius ladder, one height ladder, and a layout idea: the content area is a rounded sheet inset into a dark frame.</p>
+      </div>
+      <div class="stage">
+        <div class="stage-row">
+          <div class="stage-col">
+            <span class="label">Radius ladder</span>
+            <div class="radii">
+              <div style="border-radius:5px">5 · chip</div>
+              <div style="border-radius:6px">6 · thumb</div>
+              <div style="border-radius:8px">8 · control</div>
+              <div style="border-radius:10px">10 · card</div>
+              <div style="border-radius:12px">12 · modal</div>
+              <div style="border-radius:14px">14 · sheet</div>
+              <div style="border-radius:999px">pill · search</div>
+            </div>
+          </div>
+        </div>
+        <div style="height:22px"></div>
+        <div class="stage-row">
+          <div class="stage-col">
+            <span class="label">Control heights</span>
+            <div class="heights">
+              <div style="height:26px">26 · filter tab, segment</div>
+              <div style="height:30px">30 · tree row, icon button</div>
+              <div style="height:32px">32 · button, input, list row</div>
+              <div style="height:34px">34 · inspector section</div>
+              <div style="height:44px">44 · top nav</div>
+              <div style="height:46px">46 · importer row</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Measure</th><th>Value</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td>Base unit</td><td class="mono">4px</td><td>Everything lands on 4; most gaps on 8</td></tr>
+          <tr><td>Card padding</td><td class="mono">18-20px</td><td>Same on all four sides; the head row sits 14px above the number</td></tr>
+          <tr><td>Dashboard grid gap</td><td class="mono">16px</td><td>Corner marks sit exactly on the gap intersections</td></tr>
+          <tr><td>Media grid gap</td><td class="mono">28px</td><td>Seven columns at 1440; tiles are square with 6px radius</td></tr>
+          <tr><td>Sidebar group gap</td><td class="mono">20px</td><td>Between LIBRARY, FOLDERS, SYSTEM; rows inside are 2px apart</td></tr>
+          <tr><td>Icon rail</td><td class="mono">44-48px</td><td>30px icon buttons, 8px radius, tinted when active</td></tr>
+          <tr><td>Sidebar panel</td><td class="mono">300-350px</td><td>Layers panel is wider, ~400px, to fit tag and class chips</td></tr>
+          <tr><td>Inspector</td><td class="mono">~340px</td><td>Label column 96px, control column fills</td></tr>
+          <tr><td>Content sheet</td><td class="mono">14px radius, top-left only</td><td>The sheet is one step lighter than the frame and shares the frame's hairline</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="depth">
+      <div class="sec-head">
+        <h2>Depth and icons</h2>
+        <p>There are no drop shadows in any capture. Layering is lightness plus a hairline. Icons are thin outlines, sized to the text they sit beside.</p>
+      </div>
+      <div class="two">
+        <div>
+          <h4>Elevation without shadows</h4>
+          <ul>
+            <li><b>Level 0</b> ground #0a0a0a. Nav, rails, sidebars.</li>
+            <li><b>Level 1</b> sheet or card, one step lighter, 1px hairline at 8%.</li>
+            <li><b>Level 2</b> field or tile inside a card, one more step.</li>
+            <li><b>Level 3</b> raised control inside a field, one more step.</li>
+            <li><b>Floating</b> panel #111 with a 14% hairline and a pill radius. The canvas toolbars use this.</li>
+            <li><b>Modal</b> #141414, 12px radius, 14% hairline, over a dimmed backdrop.</li>
+          </ul>
+          <h4 style="margin-top:18px">Where hairlines go</h4>
+          <ul>
+            <li><b>Yes</b> dashboard cards on the #0a ground, the modal, floating toolbars, text fields and selects.</li>
+            <li><b>No</b> the sheet's edge against the frame, the sidebar against the rail, tiles inside cards, list and tree rows, segmented tracks, buttons, chips, importer rows. Those are fills, and the lightness step is the whole separation.</li>
+            <li><b>The rule</b> a line marks an object you can pick up or type into. A region you are inside gets a value, not an outline.</li>
+          </ul>
+        </div>
+        <div>
+          <h4>Iconography</h4>
+          <ul>
+            <li><b>Style</b> outline, roughly 1.5px stroke, rounded joins. Lucide or Phosphor Regular would match.</li>
+            <li><b>Size</b> 14px inside rows and chips, 15 to 16px in nav and toolbars, 18px in the tool rails.</li>
+            <li><b>Color</b> inherits the text tier: secondary when idle, primary when active.</li>
+            <li><b>Tiles</b> a leading icon in a list often sits in a 26 to 30px rounded square one step lighter. This gives rows a consistent left edge.</li>
+            <li><b>Hue on icons</b> only in the editor's tool rails, where each tool owns a color, and for delete.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="stage" style="margin-top:22px">
+        <div class="stage-row" style="align-items:center">
+          <div class="stage-col">
+            <span class="label">Floating canvas toolbar</span>
+            <div class="i-toolbar">
+              <span class="on"><svg class="i-svg" viewBox="0 0 24 24"><path d="M4 4l7 16 2.5-7L20 10.5z"/></svg></span>
+              <span><svg class="i-svg" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
+              <span><svg class="i-svg" viewBox="0 0 24 24"><path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/></svg></span>
+              <span class="sep"></span>
+              <span><svg class="i-svg" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-2"/></svg></span>
+              <span><svg class="i-svg" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h2"/></svg></span>
+              <span class="sep"></span>
+              <span class="danger"><svg class="i-svg" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></span>
+            </div>
+          </div>
+          <div class="stage-col">
+            <span class="label">Icon tile in a row</span>
+            <div class="i-prog" style="width:260px">
+              <div class="tile"><svg class="i-svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 9"/></svg></div>
+              <div class="txt"><b>Media</b><span>3 files</span></div>
+              <div class="n">2 / 3 <span class="ring spin"></span></div>
+            </div>
+          </div>
+          <div class="stage-col">
+            <span class="label">Tool rail with owned hues</span>
+            <div class="i-rail" style="grid-auto-flow:column;width:auto">
+              <span class="on"><svg class="i-svg" style="color:var(--i-amber);width:17px;height:17px" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17l9 5 9-5"/></svg></span>
+              <span><svg class="i-svg" style="color:var(--i-blue);width:17px;height:17px" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></span>
+              <span><svg class="i-svg" style="color:var(--i-green);width:17px;height:17px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/></svg></span>
+              <span><svg class="i-svg" style="color:var(--i-purple);width:17px;height:17px" viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h16"/></svg></span>
+              <span><svg class="i-svg" style="color:var(--i-red);width:17px;height:17px" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="shell">
+      <div class="sec-head">
+        <h2>App shell</h2>
+        <p>Top nav for products, icon rail for tools, a titled sidebar for navigation inside the tool, and the content as an inset sheet. Rendered here at the media library's proportions.</p>
+      </div>
+      <div class="stage" style="padding:0;overflow:hidden">
+        <div class="i-nav">
+          <span class="site">My Site</span>
+          <span class="tab"><svg class="i-svg sm" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Dashboard</span>
+          <span class="tab"><svg class="i-svg sm" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>Site</span>
+          <span class="tab"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/></svg>Content</span>
+          <span class="tab"><svg class="i-svg sm" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>Data</span>
+          <span class="tab on"><svg class="i-svg sm" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 9"/></svg>Media</span>
+          <span class="tab"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>Plugins</span>
+          <span class="tab"><svg class="i-svg sm" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14c3 0 5 2 5 5"/></svg>Users</span>
+          <span class="sp"></span>
+          <span class="tab"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>Uploads</span>
+          <span class="tab"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 13v6H5V6h6"/></svg></span>
+          <span class="avatar"></span>
+        </div>
+        <div class="i-shell">
+          <div class="i-rail">
+            <span style="background:rgba(76,141,255,0.16)"><svg class="i-svg" style="color:var(--i-blue)" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>
+            <span><svg class="i-svg" style="color:var(--i-blue)" viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4 4 0 0 1 0 8H7z"/><path d="M12 12v6M9 15l3-3 3 3"/></svg></span>
+          </div>
+          <div class="i-side">
+            <div class="grp">
+              <div class="grp-head"><span class="t-title" style="font-size:14px">Folders</span><svg class="i-svg sm" style="color:var(--i-text-3)" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+            </div>
+            <div class="grp">
+              <div class="grp-head"><span class="label" style="margin:0">Library</span></div>
+              <div class="i-row on"><svg class="i-svg" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>All files<span class="cnt">74</span></div>
+              <div class="i-row"><svg class="i-svg" viewBox="0 0 24 24"><path d="M12 3l9 18H3z"/><path d="M12 10v4M12 17h.01"/></svg>Missing alt text<span class="cnt">43</span></div>
+              <div class="i-row"><svg class="i-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v.01M12 11v5"/></svg>Missing title<span class="cnt">43</span></div>
+              <div class="i-row"><svg class="i-svg" viewBox="0 0 24 24"><path d="M3 12l9-9 9 9-9 9z"/></svg>Untagged<span class="cnt">74</span></div>
+              <div class="i-row"><svg class="i-svg" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16M12 4v16"/></svg>Large files<span class="cnt">34</span></div>
+              <div class="i-row"><svg class="i-svg" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5M20 12a8 8 0 0 1-14 5"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>Recently replaced<span class="cnt">0</span></div>
+            </div>
+            <div class="grp">
+              <div class="grp-head"><span class="label" style="margin:0">Folders</span><svg class="i-svg sm" style="color:var(--i-text-3)" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
+              <div class="i-row"><svg class="i-svg" style="width:10px;color:var(--i-text-3)" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><svg class="i-svg" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>assets</div>
+              <div class="i-row" style="padding-left:28px"><svg class="i-svg" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>screenshots</div>
+              <div class="i-row" style="padding-left:28px"><svg class="i-svg" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>uploads</div>
+            </div>
+            <div class="grp">
+              <div class="grp-head"><span class="label" style="margin:0">System</span></div>
+              <div class="i-row"><svg class="i-svg" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>Trash</div>
+            </div>
+          </div>
+          <div class="i-sheet">
+            <div style="display:flex;gap:8px;align-items:center">
+              <span class="i-btn"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>Upload</span>
+              <span class="i-field pill" style="flex:1"><svg class="i-svg sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Search media</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
+              <div class="i-tabs"><span class="on">All</span><span>Images</span><span>SVG</span><span>Videos</span><span>Other</span></div>
+              <span style="flex:1"></span>
+              <span class="i-field select" style="min-width:130px;height:28px">Newest<svg class="i-svg sm" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+              <span class="i-ibtn" style="width:26px;height:26px"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></span>
+              <span class="i-ibtn on" style="width:26px;height:26px"><svg class="i-svg sm" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+            </div>
+            <div class="t-second" style="margin:14px 0 12px">77 items</div>
+            <div style="display:flex;gap:20px;flex-wrap:wrap">
+              <div class="i-tile"><div class="th"><svg class="i-svg" style="width:30px;height:30px;stroke-width:1.2" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div><div class="nm">assets</div><div class="sz">3 items</div></div>
+              <div class="i-tile"><div class="th img"></div><div class="nm">tower-field-sunrise.png</div><div class="sz">7.2 MB</div></div>
+              <div class="i-tile"><div class="th img2"></div><div class="nm">staircase-spiral.png</div><div class="sz">8.9 MB</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="stage-cap">Hover the sidebar rows: the active row is 9% white, hover is 6%. The count column is monospace and muted. The sheet's top-left radius is the only rounded corner on the frame.</p>
+      <ul>
+        <li><b>Top nav</b> 44px, icon plus 12.5px medium label, secondary color when idle and primary when current. No underline, no pill. Product-level destinations only.</li>
+        <li><b>Icon rail</b> tool-level destinations for the current product, 30px buttons, tinted background when active.</li>
+        <li><b>Sidebar</b> a 14px title with a close control, then groups headed by uppercase mono labels. Rows are 32px with an 8px radius highlight; counts sit flush right.</li>
+        <li><b>Sheet</b> the content area is one lightness step up from the frame with a 14px top-left radius. Toolbar, tabs, count, then the grid.</li>
+      </ul>
+    </section>
+
+    <section id="controls">
+      <div class="sec-head">
+        <h2>Controls</h2>
+        <p>Every control is a monochrome rectangle at 32px with an 8px radius. Emphasis is one lightness step, never a hue.</p>
+      </div>
+      <div class="stage">
+        <div class="stage-row">
+          <div class="stage-col">
+            <span class="label">Buttons</span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <span class="i-btn split"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4 4 0 0 1 0 8H7z"/></svg>Publish<svg class="i-svg sm caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+              <span class="i-btn"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New page</span>
+              <span class="i-btn ghost"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg>Publish all</span>
+              <span class="i-btn ghost">Cancel</span>
+              <span class="i-btn sm"><svg class="i-svg sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Customize</span>
+              <span class="i-btn sm ghost"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add block</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+              <span class="i-ibtn"><svg class="i-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
+              <span class="i-ibtn"><svg class="i-svg" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 13v6H5V6h6"/></svg></span>
+              <span class="i-ibtn on"><svg class="i-svg" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+              <span class="i-ibtn" style="color:var(--i-red)"><svg class="i-svg" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></span>
+              <span class="t-meta">default · ghost · inverse · destructive icon</span>
+            </div>
+          </div>
+        </div>
+        <div style="height:22px"></div>
+        <div class="stage-row">
+          <div class="stage-col">
+            <span class="label">Fields</span>
+            <span class="i-field"><svg class="i-svg sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Search media</span>
+            <span class="i-field pill"><svg class="i-svg sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Search layers...</span>
+            <span class="i-field val">auto 1fr auto<span class="x"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span></span>
+            <span class="i-field select">header<svg class="i-svg sm" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+            <span class="i-field">Add or create class...</span>
+          </div>
+          <div class="stage-col">
+            <span class="label">Segmented controls</span>
+            <div class="i-seg"><span class="on">Today</span><span>7d</span><span>30d</span><span>All</span></div>
+            <div class="i-seg big"><span><svg class="i-svg sm" style="vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Flex</span><span class="on"><svg class="i-svg sm" style="vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Grid</span></div>
+            <div class="i-seg"><span class="on">2</span><span>3</span><span>4</span><span>5</span><span>6</span></div>
+            <span class="label" style="margin-top:6px">Filter tabs</span>
+            <div class="i-tabs"><span class="on">All</span><span>Images</span><span>SVG</span><span>Videos</span><span>Other</span></div>
+          </div>
+          <div class="stage-col">
+            <span class="label">Chips</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="i-chip tag">body</span><span class="i-chip tag">header</span><span class="i-chip tag">section</span><span class="i-chip tag">h1</span><span class="i-chip tag">img</span></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="i-chip cls">.site-header</span><span class="i-chip cls">.hero.cine</span><span class="i-chip cls">.display</span></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="i-chip cls on">.site-header</span><span class="t-meta" style="align-self:center">selected class</span></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="i-chip path">/posts/untitled</span><span class="i-chip path">ai@ai.com</span></div>
+            <span class="label" style="margin-top:6px">Indicators</span>
+            <div style="display:flex;gap:16px;align-items:center;font-size:12px">
+              <span style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--i-green)"></span>Draft saved</span>
+              <span style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--i-amber)"></span>1 update</span>
+              <span class="t-meta">− 55% +</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Control</th><th>Recipe</th></tr></thead>
+        <tbody>
+          <tr><td>Default button</td><td>32px, 8px radius, fill #1f1f1f, 1px hairline, 12.5px medium white label, 13px icon, 12px side padding. Hover lifts one step.</td></tr>
+          <tr><td>Ghost button</td><td>Same box, transparent, secondary text. Hover: 6% white fill, primary text. Used for "Publish all", "Cancel", "Add block".</td></tr>
+          <tr><td>Inverse</td><td>#e9e9e9 fill with #111 content. Reserved for the single "current" toggle in a group. There is no hue-filled primary button anywhere.</td></tr>
+          <tr><td>Text field</td><td>32px, 8px radius, fill #1a1a1a, hairline, placeholder #6e6e6e at 12.5px. Value in mono when it is a measurement.</td></tr>
+          <tr><td>Search</td><td>Same field with a pill radius and a leading magnifier. Full width in toolbars.</td></tr>
+          <tr><td>Segmented</td><td>Field-colored track with 2px inset, 6px inner radius; the current segment is one step lighter with primary text.</td></tr>
+          <tr><td>Filter tab</td><td>26px, 12px text, 6px radius; current tab gets the 9% active fill. No underline.</td></tr>
+          <tr><td>Chip</td><td>Mono 11px, 5px radius, raised fill. Class chips are tinted purple at 12%; the selected class is tinted mint.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="data">
+      <div class="sec-head">
+        <h2>Cards and data</h2>
+        <p>The dashboard card is the most reusable idea in the set: a labeled instrument with one big value, mono context underneath, and a consistent header grammar.</p>
+      </div>
+      <div class="stage">
+        <div class="i-crumb"><span>Admin</span><span>›</span><span>Dashboard</span></div>
+        <div style="display:flex;align-items:baseline;gap:10px;margin:14px 0 18px"><span class="t-title">Overview</span><span class="t-meta">09 blocks</span></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+          <div class="i-card"><span class="mark tl"></span><span class="mark tr"></span><span class="mark bl"></span><span class="mark br"></span>
+            <div class="head"><span class="dot" style="background:var(--i-blue)"></span><svg class="i-svg" viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/><path d="M14 3v6h6"/></svg><span class="label" style="margin:0">Pages</span></div>
+            <div class="big">6</div><div class="sub">Published +6 this week</div>
+            <div class="foot"><span>0 drafts</span><span>0 scheduled</span></div>
+          </div>
+          <div class="i-card"><span class="mark tl"></span><span class="mark tr"></span><span class="mark bl"></span><span class="mark br"></span>
+            <div class="head"><span class="dot" style="background:var(--i-amber)"></span><svg class="i-svg" viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13 7l4 4"/></svg><span class="label" style="margin:0">Posts</span></div>
+            <div class="big">1</div><div class="sub">Total · 1 category</div>
+            <div style="margin-top:26px;border-top:1px dashed rgba(245,165,36,0.5)"></div>
+          </div>
+          <div class="i-card"><span class="mark tl"></span><span class="mark tr"></span><span class="mark bl"></span><span class="mark br"></span>
+            <div class="head"><span class="dot" style="background:var(--i-green)"></span><svg class="i-svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 9"/></svg><span class="label" style="margin:0">Media</span></div>
+            <div class="big">74</div><div class="sub">files · 258 MB</div>
+            <div style="display:flex;gap:3px;margin-top:14px"><i style="flex:1;height:34px;border-radius:3px;background:linear-gradient(160deg,#333,#777)"></i><i style="flex:1;height:34px;border-radius:3px;background:linear-gradient(200deg,#ddd,#444)"></i><i style="flex:1;height:34px;border-radius:3px;background:linear-gradient(120deg,#222,#666)"></i><i style="flex:1;height:34px;border-radius:3px;background:linear-gradient(240deg,#999,#1a1a1a)"></i></div>
+          </div>
+          <div class="i-card"><span class="mark tl"></span><span class="mark tr"></span><span class="mark bl"></span><span class="mark br"></span>
+            <div class="head"><span class="dot" style="background:var(--i-purple)"></span><svg class="i-svg" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/></svg><span class="label" style="margin:0">Storage</span></div>
+            <div class="big">264 MB</div><div class="sub">used · SQLite · self-hosted</div>
+            <div class="i-bar"><i style="width:96%;background:var(--i-amber)"></i><i style="width:1%;background:var(--i-blue)"></i><i style="width:2%;background:var(--i-green)"></i></div>
+            <div class="i-legend">
+              <span><span class="dot" style="background:var(--i-amber)"></span>Images · 257 MB</span><span><span class="dot" style="background:var(--i-blue)"></span>Videos · 0 B</span>
+              <span><span class="dot" style="background:var(--i-text-3)"></span>Documents · 1 MB</span><span><span class="dot" style="background:var(--i-green)"></span>Plugins · 0 B</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:16px">
+          <div class="i-card"><span class="mark tl"></span><span class="mark tr"></span><span class="mark bl"></span><span class="mark br"></span>
+            <div class="head"><span class="dot" style="background:var(--i-blue)"></span><svg class="i-svg" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span class="label" style="margin:0">Activity</span></div>
+            <div class="i-act">
+              <div><span class="av"></span>published the site<span class="t">2M</span></div>
+              <div><span class="av"></span>created <span class="i-chip path">/posts/untitled</span><span class="t">4H</span></div>
+              <div><span class="av g"></span>added user <span class="i-chip path">ai@ai.com</span><span class="t">4H</span></div>
+            </div>
+          </div>
+          <div class="i-card"><span class="mark tl"></span><span class="mark tr"></span><span class="mark bl"></span><span class="mark br"></span>
+            <div class="head"><span class="dot" style="background:var(--i-green)"></span><svg class="i-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="label" style="margin:0">Status</span></div>
+            <div class="i-status">
+              <div><span class="dot" style="background:var(--i-green)"></span>Site<span class="v">Live</span></div>
+              <div><span class="dot" style="background:var(--i-green)"></span>Build<span class="v">3m ago</span></div>
+              <div><span class="dot" style="background:var(--i-green)"></span>Backup<span class="v">2h ago</span></div>
+              <div><span class="dot" style="background:var(--i-amber)"></span>Plugins<span class="v">1 update</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ul>
+        <li><b>Header grammar</b> 6px hue dot, 13px outline icon, uppercase mono label. The dot is the card's category color and is the only place that color appears on the card, except in its chart.</li>
+        <li><b>Value</b> 34 to 36px semibold, tabular, sitting 14px under the header. Context line in 11px mono, muted, separated by middle dots.</li>
+        <li><b>Footer</b> optional; mono, muted, 22px below the context line. Empty states are explicit: "0 drafts 0 scheduled", or a dashed amber line where a sparkline would go.</li>
+        <li><b>Corner marks</b> 5px rotated squares at each corner of every card, on the grid intersections. Decorative, but consistent enough to read as the dashboard's signature.</li>
+        <li><b>Lists inside cards</b> 30 to 34px rows, no dividers, avatar or dot on the left, mono value flush right.</li>
+      </ul>
+    </section>
+
+    <section id="flows">
+      <div class="sec-head">
+        <h2>Flows and editor</h2>
+        <p>The importer shows how the system handles a multi-step process. The editor shows how it handles density: a tree, a canvas, and a property inspector, each in the same vocabulary.</p>
+      </div>
+      <h3>Importer modal</h3>
+      <div class="stage">
+        <div class="i-modal">
+          <div class="hd"><div><div class="label" style="margin-bottom:2px">Instatic</div><div class="t-title">Importing</div></div><span class="x"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span></div>
+          <div class="bd">
+            <div class="i-steps">
+              <span><span class="c done"><svg class="i-svg" style="width:9px;height:9px;stroke-width:2.5" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span>Drop</span>
+              <span><span class="c done"><svg class="i-svg" style="width:9px;height:9px;stroke-width:2.5" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span>Review</span>
+              <span><span class="c done"><svg class="i-svg" style="width:9px;height:9px;stroke-width:2.5" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span>Conflicts</span>
+              <span class="cur-l"><span class="c cur">4</span>Import</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
+              <div class="tile" style="width:30px;height:30px;border-radius:7px;background:var(--i-raised);display:flex;align-items:center;justify-content:center;color:var(--i-text-2)"><svg class="i-svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 9"/></svg></div>
+              <div><div style="font-weight:500">Uploading media</div><div class="t-meta">2 of 3 files</div></div>
+              <div class="t-stat" style="margin-left:auto;font-size:28px">61%</div>
+            </div>
+            <div class="i-track"><i></i></div>
+            <div class="t-meta">elegant/assets/technology-ring.png</div>
+            <div class="label" style="margin:6px 0 -4px">Progress</div>
+            <div class="i-prog dim"><div class="tile"><svg class="i-svg" viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/></svg></div><div class="txt"><b>Pages</b><span>1 pages</span></div><div class="n">0 / 1 <span class="ring"></span></div></div>
+            <div class="i-prog dim"><div class="tile"><svg class="i-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg></div><div class="txt"><b>Style rules</b><span>73 rules</span></div><div class="n">0 / 73 <span class="ring"></span></div></div>
+            <div class="i-prog" style="--w:66%;--tint:rgba(45,212,191,0.16)"><div class="fill"></div><div class="tile"><svg class="i-svg" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M21 16l-5-5-8 9"/></svg></div><div class="txt"><b>Media</b><span>3 files</span></div><div class="n">2 / 3 <span class="ring spin"></span></div></div>
+            <div class="i-prog" style="--w:100%;--tint:rgba(167,139,250,0.12)"><div class="fill"></div><div class="tile"><span style="font-family:var(--i-sans);font-weight:600;font-size:12px">H</span></div><div class="txt"><b>Fonts</b><span>0 fonts</span></div><div class="n">0 / 0 <svg class="i-svg sm ok" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div></div>
+            <div class="i-prog" style="--w:100%;--tint:rgba(242,85,90,0.12)"><div class="fill"></div><div class="tile"><svg class="i-svg" viewBox="0 0 24 24"><path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/></svg></div><div class="txt"><b>Scripts</b><span>0 files</span></div><div class="n">0 / 0 <svg class="i-svg sm ok" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div></div>
+          </div>
+          <div class="ft">Keep this window open while importing...<span class="i-btn ghost sm">Cancel</span></div>
+        </div>
+      </div>
+      <ul>
+        <li><b>The row is the bar.</b> Progress fills the row itself with the category's hue at 12 to 16% alpha, from the left. No separate progress element per row; the single 3px white track at the top is for the overall job.</li>
+        <li><b>Stepper</b> 16px circles; done is a green tint with a green check, current is inverse with a number, labels in secondary except the current one.</li>
+        <li><b>Pending rows</b> are the same component at 55% opacity, not a different color.</li>
+        <li><b>Headline number</b> the percentage is the largest thing in the modal, set in the stat style at 28px.</li>
+      </ul>
+
+      <h3>Editor: tree, canvas, inspector</h3>
+      <div class="stage">
+        <div class="stage-row" style="gap:24px">
+          <div class="i-tree">
+            <span class="label">Layers</span>
+            <div class="n"><span class="chev"><svg class="i-svg" style="width:10px" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span><span class="box"></span><span class="i-chip tag">body</span><span class="i-chip cls">.instatic-import-scope</span></div>
+            <div class="n d1 on"><span class="chev"><svg class="i-svg" style="width:10px" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span><span class="box"></span><span class="i-chip tag">header</span>Container<span class="i-chip cls cls">.site-header</span></div>
+            <div class="n d1"><span class="chev"><svg class="i-svg" style="width:10px" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span><span class="box"></span><span class="i-chip tag">main</span>Container</div>
+            <div class="n d2"><span class="chev"><svg class="i-svg" style="width:10px" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span><span class="box"></span><span class="i-chip tag">section</span>Container<span class="i-chip cls">.hero.cine</span></div>
+            <div class="n d3"><span class="chev"></span><span class="box"></span><span class="i-chip tag">h1</span>Text<span class="i-chip cls">.display</span></div>
+            <div class="n d3"><span class="chev"></span><span class="box"></span><span class="i-chip tag">p</span>Text<span class="i-chip cls">.lede</span></div>
+            <div class="n d3"><span class="chev"></span><span class="box"></span><span class="i-chip tag">img</span>Image</div>
+          </div>
+          <div style="flex:1;min-width:260px;display:grid;gap:14px">
+            <div>
+              <span class="label">Canvas chrome</span>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <span class="i-field select" style="min-width:0;height:28px;padding-right:10px"><svg class="i-svg sm" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/></svg>Desktop<svg class="i-svg sm" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+                <span class="t-meta">− 55% +</span>
+                <span style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="width:6px;height:6px;border-radius:50%;background:var(--i-green)"></span>Draft saved</span>
+                <span class="i-btn split sm"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4 4 0 0 1 0 8H7z"/></svg>Publish<svg class="i-svg sm caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+              </div>
+            </div>
+            <div class="i-canvas">
+              <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%)" class="i-toolbar"><span><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-2"/></svg></span><span><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h2"/></svg></span><span class="sep"></span><span><svg class="i-svg sm" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg></span><span><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h16"/></svg></span><span class="on"><svg class="i-svg sm" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span></div>
+              <div style="height:44px"></div>
+              <div class="i-sel"><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--i-text-2)"><span style="font-weight:600;color:var(--i-text)">instatic</span><span>HOW IT WORKS &nbsp; INTERFACE &nbsp; PLUGINS &nbsp; CLUB</span><span>SIGN IN &nbsp; GITHUB</span></div></div>
+            </div>
+          </div>
+          <div class="i-insp">
+            <span class="label">Inspector · Container</span>
+            <div class="i-field" style="min-width:0"><span class="i-chip cls on">.site-header</span></div>
+            <div class="r"><span class="l">HTML tag</span><span class="i-field select">header<svg class="i-svg sm" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></div>
+            <div class="sec"><svg class="i-svg sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Layout<span class="dot"></span><span class="n">5 set</span></div>
+            <div class="i-seg big" style="display:flex"><span style="flex:1;text-align:center">Flex</span><span class="on" style="flex:1;text-align:center">Grid</span></div>
+            <div class="r"><span class="l">Columns</span><span class="i-field val">auto 1fr auto<span class="x"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></span></span></div>
+            <div class="r"><span class="l">Rows</span><div class="i-seg" style="display:flex"><span class="on">2</span><span>3</span><span>4</span><span>5</span><span>6</span></div></div>
+            <div class="r"><span class="l">Align</span><div class="i-icons"><span class="on"><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M4 4h16M8 8h8v8H8z"/></svg></span><span><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M4 12h16M8 8h8v8H8z"/></svg></span><span><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M4 20h16M8 8h8v8H8z"/></svg></span><span><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M12 4v16M8 8h8v8H8z"/></svg></span><span><svg class="i-svg sm" viewBox="0 0 24 24"><path d="M4 4h16M4 20h16M8 8h8v8H8z"/></svg></span></div></div>
+            <div class="r"><span class="l">Gap</span><span class="i-field val" style="color:var(--i-text-3)">0px</span></div>
+            <div class="r"><span class="l">Align self</span><span class="i-field select" style="color:var(--i-text-3)">auto<svg class="i-svg sm" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></div>
+            <div class="r"><span class="l">Row gap</span><span class="i-field val">24px</span></div>
+            <div class="r"><span class="l">Column gap</span><span class="i-field val">24px</span></div>
+          </div>
+        </div>
+      </div>
+      <ul>
+        <li><b>Tree rows</b> 30px, 7px radius, chevron then a 9px visibility box, then the tag as a mono chip, the element type as plain text, and the class as a purple-tinted mono chip flush right. Hover and active are the same 6% and 9% fills as everywhere else.</li>
+        <li><b>Inspector rows</b> 96px label column in 12.5px primary text, control fills the rest at 30px. Values that are measurements are mono; empty values are in the placeholder tier. Collapsible sections are 34px card-colored bars with a green "has values" dot and a mono count.</li>
+        <li><b>Canvas</b> #1c1c1c ground, a lighter gray than any panel, so the page under construction reads as separate from the tool. Selection is a 1px mint outline with a mono size label.</li>
+      </ul>
+    </section>
+
+    <section id="motifs">
+      <div class="sec-head">
+        <h2>Motifs</h2>
+        <p>What is system and what is content. Some of the effect in the screenshots comes from choices you can adopt, and some from the material Instatic happened to be showing.</p>
+      </div>
+      <div class="two">
+        <div>
+          <h4>System, adoptable</h4>
+          <ul>
+            <li><b>The greeting.</b> One display line per page, in the person's name, with the page's purpose in a 12px secondary line under it. It is the only large type in the product.</li>
+            <li><b>Mono meta everywhere.</b> The single biggest lever. It turns every list into a table without drawing one.</li>
+            <li><b>Uppercase mono labels</b> for groups, card heads, and breadcrumbs. Never for anything a person reads as a sentence.</li>
+            <li><b>Dots before words.</b> A 6px hue dot is the status vocabulary. No badges, no pills for status.</li>
+            <li><b>Leading zeros and counts</b> "09 blocks", "77 items", "5 set". The product counts things and shows you the count.</li>
+            <li><b>Corner marks</b> on the dashboard grid. A cheap signature that makes a card grid look drafted.</li>
+            <li><b>One hue per category</b> in tool rails and import rows, always as tint or icon, never fill.</li>
+          </ul>
+        </div>
+        <div>
+          <h4>Content, not system</h4>
+          <ul>
+            <li><b>Monochrome architecture renders.</b> The media library looks like a gallery because the assets are black-and-white brutalist images. With product photos on white it would look like a media library.</li>
+            <li><b>The hero copy</b> "YOUR WEBSITE. INSTANT. STATIC." in the editor canvas is the customer's site, not the tool.</li>
+            <li><b>Video overlays</b> the "7K stars" badge and the presenter are from the YouTube capture.</li>
+          </ul>
+          <div class="note" style="margin-top:18px"><b>Read this before adapting.</b> Half of the perceived quality in the media screenshot is the imagery. Judge the system on the dashboard and the importer, where the content is plain numbers and the chrome has to carry everything.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="rebase">
+      <div class="sec-head">
+        <h2>Against Rebase</h2>
+        <p>Rebase's token file has already moved most of the way here since July: near-black surfaces, Inter, a mono tier, a micro-label tier, a stat tier, lucide outlines, a 600 weight ceiling. The gap is not in the tokens. It is in how much color and weight the panel spends per screen.</p>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Axis</th><th>Instatic</th><th>Rebase today</th><th>Gap</th></tr></thead>
+        <tbody>
+          <tr><td>Surface ladder</td><td class="mono">#0a0a0a → #1f1f1f, six steps</td><td class="mono">surface-900 #0a0a0a, 800 #111111, 700 #262626</td><td class="keep">Already aligned. The dark ladder is nearly identical; only the #151515 to #1a1a1a middle steps are missing.</td></tr>
+          <tr><td>Hairlines</td><td>White 8% on cards on the ground and on fields; none between panels or on nested fills</td><td class="mono">surface-700/60 ≈ white 9%, drawn on the sheet edge, cards, and tiles alike</td><td class="change">Same weight, but Rebase draws it between surfaces and on nested fills, where Instatic uses a lightness step instead.</td></tr>
+          <tr><td>Body face</td><td>Inter-class grotesque, 13px</td><td>Inter, body1 at 14px</td><td class="keep">Same family. One size step denser.</td></tr>
+          <tr><td>Heading face</td><td>Same grotesque, heavier</td><td>Instrument Sans</td><td class="keep">A deliberate Rebase distinction; keep it.</td></tr>
+          <tr><td>Mono for measurements</td><td>All counts, sizes, times, ids, labels</td><td><code>typography-mono</code> exists; used selectively</td><td class="change">Token exists, discipline does not. Counts, timestamps, ids, and table headers in the panel are still in the sans.</td></tr>
+          <tr><td>Micro labels</td><td>10.5px mono uppercase +0.08em</td><td><code>typography-micro</code>: 11px sans uppercase +0.08em</td><td class="change">Rebase's is sans, and rare. Instatic's is mono, and heads every group and card.</td></tr>
+          <tr><td>Display and stat</td><td>44px greeting, 34-36px stat</td><td><code>text-display-2</code>, <code>typography-stat</code> at 30px</td><td class="keep">Tokens exist. The panel has no greeting surface that uses them yet.</td></tr>
+          <tr><td>Button weight</td><td>12.5px, 500, sentence case</td><td>14px, 600, +0.35px tracking, sentence case (measured: "Cards", "Filters", "Add Product")</td><td class="change">Same height, one size larger and one weight heavier. Rebase buttons shout.</td></tr>
+          <tr><td>Primary action color</td><td>Gray fill, or inverse white for the single current toggle</td><td><code>bg-primary</code> #0070F4 filled "Add Product"</td><td class="change">Instatic has no hue-filled control. Rebase spends its brand blue on every primary button.</td></tr>
+          <tr><td>Data chips</td><td>Mono, raised fill, tint only for class chips</td><td>Enum chips in solid fills with white text: green #338a17, blue #2750ae, pink #b2158b, purple #6b1cb0 (the <code>deep</code> tier in <code>chip_colors.ts</code>)</td><td class="change">Rebase encodes enum values as hue fills. Instatic would use a dot plus text, or a 14% tint.</td></tr>
+          <tr><td>Filter chips, avatar</td><td>Raised neutral</td><td><code>surface-accent-800</code> #1e293b, a slate blue-gray</td><td class="change">A tinted surface on a neutral ladder. It makes the neutrals next to it read colder and blacker.</td></tr>
+          <tr><td>Toggles</td><td>Not captured</td><td>Rose #E11D48 track when on (earlier capture, not verified on the demo)</td><td class="change">The secondary color is spent on a boolean. Instatic would use white or green.</td></tr>
+          <tr><td>Section labels</td><td>Neutral mono uppercase</td><td>Primary blue uppercase: "E-COMMERCE", "CONTENT", "SUPPORT"</td><td class="change">Blue eyebrows spend the brand color on structure. Instatic keeps labels in the muted tier.</td></tr>
+          <tr><td>Hover</td><td>White 6% fill</td><td><code>hover:bg-primary/5</code> blue tint on nav and cards; <code>group-hover:bg-black/10</code> darkens card images</td><td class="change">One hover tints blue, the other goes darker. Instatic hovers always go lighter and stay neutral.</td></tr>
+          <tr><td>Control height</td><td>32px default, 26 to 30 for secondary</td><td>Toolbar buttons 32px, medium controls 40px</td><td class="keep">The toolbar is already at Instatic's default. Forms are one size taller.</td></tr>
+          <tr><td>Radius</td><td>8 control, 10 card, 12 modal, pill search</td><td>rounded-lg 8 button, rounded-xl 12 card</td><td class="keep">Aligned. Cards are 2px rounder.</td></tr>
+          <tr><td>Icons</td><td>Outline, ~1.5px, 13-16px</td><td>lucide-react outline, verified on the demo</td><td class="keep">Aligned.</td></tr>
+          <tr><td>Shadows</td><td>None</td><td>Field inset highlight only; paper has no shadow</td><td class="keep">Aligned.</td></tr>
+          <tr><td>Card header</td><td>Dot, icon, mono label</td><td>Icon plus 14px title</td><td class="change">A missing pattern, cheap to add.</td></tr>
+          <tr><td>Status</td><td>6px dot before the word</td><td>Chips and alerts</td><td class="change">Different vocabulary. Instatic's is quieter and scans faster in lists.</td></tr>
+          <tr><td>Layout</td><td>Inset rounded sheet on a dark frame; icon rail plus titled sidebar</td><td>Icon rail plus an inset rounded sheet at #111, already on the demo</td><td class="keep">Aligned in structure. The lift is cancelled by the surfaces, see below.</td></tr>
+        </tbody>
+      </table></div>
+      <div class="note" style="margin-top:18px"><b>Where the adaptation conversation should start.</b> The structure and the tokens are already there. What differs is spend: how much hue and weight each screen uses, and how the surfaces stack. The surface question is measured in the next section because it is the cheapest lever and the one you raised. After that, four changes account for most of the remaining distance and none of them touch the token file: 500-weight 13px buttons, no hue-filled controls in the chrome, mono for every measured value, and dots or tints instead of solid chips for status.</div>
+    </section>
+
+    <section id="surfaces">
+      <div class="sec-head">
+        <h2>Surfaces, measured</h2>
+        <p>Computed backgrounds read off the demo's home page and products card view in dark mode. Across both pages, exactly two opaque surface values are on screen. Instatic uses six on any one screen. That gap is the whole of "it feels very dark", and it is a surface problem, not a color problem.</p>
+      </div>
+
+      <h3>Two ladders</h3>
+      <div class="stage">
+        <span class="label">Rebase, measured on the demo</span>
+        <div class="ladder" style="grid-template-columns:repeat(6,1fr)">
+          <div style="background:#0a0a0a"><b>surface-900</b>#0a0a0a<br>drawer, rail, page, and every card, tile and dialog</div>
+          <div style="background:#111111"><b>surface-800</b>#111111<br>the content sheet</div>
+          <div style="background:repeating-linear-gradient(135deg,#0f0f0f 0 6px,#141414 6px 12px);color:#6e6e6e"><b style="color:#8a8a8a">nothing</b>no opaque surface between #11 and #26</div>
+          <div style="background:repeating-linear-gradient(135deg,#0f0f0f 0 6px,#141414 6px 12px);color:#6e6e6e"><b style="color:#8a8a8a">nothing</b>fields are white 5.5%, so about #1a on a card</div>
+          <div style="background:#262626"><b>surface-700</b>#262626<br>neutral buttons only</div>
+          <div style="background:#1e293b"><b>surface-accent-800</b>#1e293b<br>filter chips, avatar (slate)</div>
+        </div>
+        <div style="height:18px"></div>
+        <span class="label">Instatic</span>
+        <div class="ladder">
+          <div style="background:#0a0a0a"><b>ground</b>#0a0a0a</div>
+          <div style="background:#111111"><b>panel</b>#111111</div>
+          <div style="background:#131313"><b>sheet</b>#131313</div>
+          <div style="background:#151515"><b>card</b>#151515</div>
+          <div style="background:#1a1a1a"><b>field</b>#1a1a1a</div>
+          <div style="background:#1f1f1f"><b>raised</b>#1f1f1f</div>
+        </div>
+      </div>
+      <p class="stage-cap">Both start at #0a0a0a. Instatic then climbs in four-unit steps and puts most of its pixels at #13 to #1a. Rebase climbs once, to #11, and then drops every card back to #0a.</p>
+
+      <h3>What the measurement says</h3>
+      <ul>
+        <li><b>Cards are darker than the sheet they sit on.</b> <code>cardMixin</code> paints <code>dark:bg-surface-900</code>, the ground value, on a sheet that is <code>surface-800</code>. Every card on the home page and every product card is a hole cut into the sheet, with a hairline around the hole. The sheet's lift, which the layout already pays for, is cancelled inside every card.</li>
+        <li><b>The largest areas carry the darkest value.</b> On the products view the cards cover most of the viewport, so most of what the eye lands on is #0a0a0a. Instatic's largest areas are its sheet and cards at #13 to #15.</li>
+        <li><b>There is no raised tier.</b> Between the sheet at #11 and neutral buttons at #26 nothing is opaque. Stat tiles on the home page are border-only on #0a. Fields lift by alpha, which is good, but they lift from #0a.</li>
+        <li><b>The one tinted surface is the wrong hue.</b> Filter chips and the avatar use slate #1e293b. Next to a neutral #0a it reads blue, and it makes the neutrals read blacker.</li>
+        <li><b>Hover goes the wrong way.</b> Card images darken on hover (<code>bg-black/10</code>) and nav rows tint blue (<code>bg-primary/5</code>). Instatic's only hover is white at 6%.</li>
+        <li><b>One hairline recipe at every level.</b> The sheet edge, every card, and every stat tile all draw <code>surface-700/60</code>. With only two surface values available, the line is doing the work a lightness step should do, so every region reads as an outlined box. Instatic never outlines a panel edge or a nested fill; the sheet, the tiles, the rows, and the tracks are fills, and only cards on the ground and fields get a line.</li>
+      </ul>
+
+      <h3>Today against a lifted ladder, side by side</h3>
+      <div class="stage" style="padding:16px">
+        <div class="cmp">
+          <div class="frame" style="--s-sheet:#111111;--s-card:#0a0a0a;--s-hair:rgba(38,38,38,0.6);--s-tile:transparent;--s-tile-hair:rgba(38,38,38,0.6);--s-field:rgba(255,255,255,0.055);--s-btn:#262626;--s-hover:rgba(0,112,244,0.05);--s-chip:#1e293b">
+            <div class="label">Rebase today · measured values</div>
+            <div class="sheet">
+              <div class="bar"><span class="btn">Cards</span><span class="btn ghost">Filters</span><span class="chip">Active products</span><span class="field">Search</span></div>
+              <div class="cards">
+                <div class="card">
+                  <div class="ttl">Orders</div>
+                  <div class="tiles"><div class="tile"><span>Confirmed</span><b>7</b></div><div class="tile"><span>Shipped</span><b>13</b></div></div>
+                </div>
+                <div class="card hov">
+                  <div class="ttl">Products</div>
+                  <div class="tiles"><div class="tile"><span>Catalog</span><b>200</b></div></div>
+                  <div class="hint">hover</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="frame" style="--s-sheet:#131313;--s-sheet-hair:transparent;--s-card:#181818;--s-hair:rgba(255,255,255,0.06);--s-tile:#1f1f1f;--s-tile-hair:transparent;--s-field:rgba(255,255,255,0.055);--s-btn:#262626;--s-hover:rgba(255,255,255,0.06);--s-chip:#232323">
+            <div class="label">Proposed · surfaces and hairlines only</div>
+            <div class="sheet">
+              <div class="bar"><span class="btn">Cards</span><span class="btn ghost">Filters</span><span class="chip">Active products</span><span class="field">Search</span></div>
+              <div class="cards">
+                <div class="card">
+                  <div class="ttl">Orders</div>
+                  <div class="tiles"><div class="tile"><span>Confirmed</span><b>7</b></div><div class="tile"><span>Shipped</span><b>13</b></div></div>
+                </div>
+                <div class="card hov">
+                  <div class="ttl">Products</div>
+                  <div class="tiles"><div class="tile"><span>Catalog</span><b>200</b></div></div>
+                  <div class="hint">hover</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="stage-cap">Nothing in the right frame changed except six background values and where the hairlines are drawn: the sheet edge and the tiles lost theirs, the cards keep one at 6%. Same type, same radii, same layout. The frame and the rail stay at #0a0a0a on both sides; the frame is supposed to be the darkest thing.</p>
+
+      <h3>The change list</h3>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Role</th><th>Today</th><th>Proposed</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr><td>Frame: drawer, rail, page</td><td class="mono">surface-900 #0a0a0a</td><td class="keep">Keep. This is the one place #0a belongs.</td><td class="mono">—</td></tr>
+          <tr><td>Sheet: content area</td><td class="mono">surface-800 #111111</td><td>#131313. A two-unit nudge to the 800 token, or leave it; the card change matters more.</td><td class="mono">theme.css</td></tr>
+          <tr><td>Card, paper, dialog, popover</td><td class="mono">surface-900 #0a0a0a</td><td class="change">New token <span class="mono">surface-750 #181818</span>, and cards paint it. A card must be lighter than what it sits on. Additive, so the public token contract holds.</td><td class="mono">theme.css; styles.ts cardMixin, paperMixin</td></tr>
+          <tr><td>Stat tile inside a card</td><td>Border only, on #0a</td><td class="change"><span class="mono">surface-700</span> fill or white 4%, no border.</td><td class="mono">home page tiles</td></tr>
+          <tr><td>Hairlines</td><td class="mono">surface-700/60 on the sheet edge, every card, every tile</td><td class="change">None on the sheet edge or on any fill nested in a lighter surface. Keep a line on cards that sit directly on the sheet, at 6% rather than 9%, and on fields. Once a card is lighter than its ground, even that line is optional.</td><td class="mono">Scaffold sheet; styles.ts cardMixin, defaultBorderMixin</td></tr>
+          <tr><td>Field</td><td class="mono">white 5.5% + inset highlight</td><td class="keep">Keep. It lifts automatically once the card under it is lighter.</td><td class="mono">—</td></tr>
+          <tr><td>Neutral button</td><td class="mono">surface-700 #262626</td><td class="keep">Keep. It becomes one step above the new card instead of three.</td><td class="mono">—</td></tr>
+          <tr><td>Hover</td><td class="mono">primary/5 tint; black/10 darkening</td><td class="change">White 6% everywhere. Hover always goes lighter and never changes hue.</td><td class="mono">styles.ts cardClickableMixin; EntityCardBinding.tsx</td></tr>
+          <tr><td>Filter chip, avatar</td><td class="mono">surface-accent-800 #1e293b</td><td class="change"><span class="mono">surface-750</span> or <span class="mono">surface-700</span>. No slate on the neutral ladder in dark mode.</td><td class="mono">FilterChip.tsx; Avatar.tsx</td></tr>
+          <tr><td>Selected row or card</td><td class="mono">primary-bg/10 + ring</td><td>Keep the primary ring; consider white 9% as the fill so selection and hover are the same family.</td><td class="mono">styles.ts cardSelectedMixin</td></tr>
+        </tbody>
+      </table></div>
+      <div class="note" style="margin-top:18px"><b>Why this is the right first move.</b> It is one added token and five mixin or class edits, it is reversible, and it changes what most of the pixels are without touching type, color, or any component's shape. It also stays inside the product principles: the panel is denser than Instatic and should stay so; a lifted card ladder makes density readable rather than heavy. The follow-on questions, chips as dots or tints, button weight, blue section labels, are each a separate decision and none depends on this one.</div>
+    </section>
+
+  </main>
+</div>

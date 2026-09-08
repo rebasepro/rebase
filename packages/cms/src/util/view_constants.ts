@@ -9,10 +9,10 @@ export const HISTORY_TAB_VALUE = "__rebase_history";
  * The tab row belongs to the header band above the record, not to the record
  * itself, so it carries the same surface the identity bar over it and the form
  * rail beside it carry. Against that, the active tab takes the record's own
- * white and reads as connected to what it opens; on a white row it had to be
+ * card surface and reads as connected to what it opens; on a card-coloured row it had to be
  * the tinted one, which is the relationship backwards.
  */
-export const ENTITY_VIEW_TAB_BAR_CLASS = "bg-surface-50 dark:bg-surface-900";
+export const ENTITY_VIEW_TAB_BAR_CLASS = "bg-surface-sheet";
 
 /**
  * Every tab in that row, a custom `tabComponent` included.
@@ -22,7 +22,7 @@ export const ENTITY_VIEW_TAB_BAR_CLASS = "bg-surface-50 dark:bg-surface-900";
  * tab's underline stopped short of the record it opens. Paired with
  * `items-stretch` on the Tabs root, which the variant leaves centred.
  */
-export const ENTITY_VIEW_TAB_CLASS = "h-full data-[state=active]:bg-white dark:data-[state=active]:bg-surface-800";
+export const ENTITY_VIEW_TAB_CLASS = "h-full";
 
 /**
  * Added on top for the tabs this row labels itself — a custom `tabComponent`

@@ -196,7 +196,7 @@ export function ListView<T>({
         return String(item);
     }, []);
 
-    const borderMixinClass = "border-surface-200 dark:border-surface-800";
+    const borderMixinClass = "border-hairline";
 
     return (
         <div
@@ -227,7 +227,13 @@ export function ListView<T>({
             ) : (
                 <>
                     {header}
-                    <div ref={rowsRef} style={{ height: totalHeight + footerHeight, position: "relative" }}>
+                    {/* `my-1.5`, not padding: the rows are absolutely positioned
+                        inside this box, and `top: 0` lands on the padding edge,
+                        so padding would not move them. A margin does, and it is
+                        what keeps the first row's rounded highlight from sitting
+                        on the header's rule (and the last from touching the
+                        bottom edge). */}
+                    <div ref={rowsRef} className="my-1.5" style={{ height: totalHeight + footerHeight, position: "relative" }}>
                         <div style={{ position: "absolute", top: offsetY, left: 0, right: 0 }}>
                             {visibleData.map((item, i) => {
                                 const actualIndex = startIndex + i;
@@ -255,10 +261,13 @@ export function ListView<T>({
                                             item,
                                             index: actualIndex,
                                             style: { height: estimatedRowHeight, overflow: "hidden" },
-                                            className: cls(
-                                                !isLast && "border-b",
-                                                !isLast && borderMixinClass
-                                            ),
+                                            // No divider between rows. Rows are inset, rounded
+                                            // highlights now (see the CMS list binding), and a
+                                            // hairline under each one turned every highlight into
+                                            // a pill floating on a ruled page. `py-0.5` inside the
+                                            // fixed-height slot gives two adjacent highlights 4px
+                                            // of air instead of a shared edge.
+                                            className: "py-0.5",
                                             selected,
                                             highlighted,
                                             isLast,
@@ -280,7 +289,7 @@ export function ListView<T>({
                         )}
                         {!dataLoading && noMoreToLoad && data.length > 0 && (
                             <div
-                                className="flex items-center justify-center py-2 dark:bg-surface-900"
+                                className="flex items-center justify-center py-2"
                                 style={{ position: "absolute", top: totalHeight, left: 0, right: 0 }}
                             >
                                 <Typography variant="caption" color="secondary">

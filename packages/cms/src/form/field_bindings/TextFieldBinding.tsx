@@ -37,7 +37,7 @@ export function TextFieldBinding<T extends string | number>({
                                                                 property,
                                                                 includeDescription,
                                                                 hideLabel,
-                                                                size = "large"
+                                                                size = "small"
                                                             }: FieldProps<StringProperty | NumberProperty>) {
 
     let multiline: boolean | undefined;
@@ -133,7 +133,7 @@ export function TextFieldBinding<T extends string | number>({
                             disabled={disabled}
                             aria-label={accessibleName}
                             className={cls(
-                                "rounded-md resize-none w-full outline-none text-base bg-transparent min-h-[64px] px-3",
+                                "rounded-md resize-none w-full outline-none text-sm bg-transparent min-h-[64px] px-3",
                                 label ? "pt-8 pb-2" : "py-2",
                                 disabled && "outline-none opacity-50 text-surface-accent-600 dark:text-surface-accent-500",
                                 showError && error ? "text-red-500 dark:text-red-600" : ""

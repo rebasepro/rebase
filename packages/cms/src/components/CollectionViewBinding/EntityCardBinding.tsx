@@ -107,13 +107,13 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                 "cursor-pointer overflow-hidden group relative",
                 "transition-all duration-200",
                 "hover:shadow-lg hover:-translate-y-0.5",
-                selected && "ring-2 ring-primary bg-surface-accent-50 dark:bg-surface-accent-900",
-                highlighted && !selected && "ring-2 ring-primary ring-opacity-50 bg-surface-accent-50/50 dark:bg-surface-accent-900"
+                selected && "ring-2 ring-primary bg-surface-raised",
+                highlighted && !selected && "ring-2 ring-primary/50 bg-surface-card-hover"
             )}
             onClick={handleClick}
         >
             {/* Thumbnail area — image slot */}
-            <div className="aspect-[4/3] relative overflow-hidden bg-surface-100 dark:bg-surface-900">
+            <div className="aspect-[4/3] relative overflow-hidden bg-surface-raised">
                 {slots.image ? (
                     <div className="w-full h-full">
                         <SlotValue slot={slots.image} size="medium" fill={true}/>
@@ -129,7 +129,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
 
                 {/* Hover overlay */}
                 <div className={cls(
-                    "absolute inset-0 bg-black/0 group-hover:bg-black/10",
+                    "absolute inset-0 bg-white/0 group-hover:bg-white/[0.06]",
                     "transition-colors duration-200"
                 )}/>
 

@@ -424,21 +424,21 @@ export default function ClientUIComponentsShowcase({
                 <Typography variant="subtitle2" component="div">Radio Group</Typography>
                 <RadioGroup className="flex items-center gap-2" defaultValue="black" id="color">
                     <Label
-                        className="border cursor-pointer rounded-lg p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-800"
+                        className="border cursor-pointer rounded-lg p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-raised"
                         htmlFor="color-black"
                     >
                         <RadioGroupItem id="color-black" value="black"/>
                         Black
                     </Label>
                     <Label
-                        className="border cursor-pointer rounded-lg p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-800"
+                        className="border cursor-pointer rounded-lg p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-raised"
                         htmlFor="color-white"
                     >
                         <RadioGroupItem id="color-white" value="white"/>
                         White
                     </Label>
                     <Label
-                        className="border cursor-pointer rounded-lg p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-800"
+                        className="border cursor-pointer rounded-lg p-2 flex items-center gap-2 [&:has(:checked)]:bg-surface-100 dark:[&:has(:checked)]:bg-surface-raised"
                         htmlFor="color-blue"
                     >
                         <RadioGroupItem id="color-blue" value="blue"/>
@@ -611,7 +611,7 @@ export default function ClientUIComponentsShowcase({
                 <Typography variant="subtitle2" component="div">Sheet</Typography>
                 <Button onClick={() => setSheetOpen(true)}>Open Sheet</Button>
                 <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
-                    <div className="bg-white dark:bg-surface-800 p-4 h-full">
+                    <div className="bg-surface-raised p-4 h-full">
                         This is a sample sheet
                     </div>
                 </Sheet>

@@ -63,7 +63,7 @@ export function GeopointFieldBinding({
     property,
     includeDescription,
     hideLabel,
-    size = "large"
+    size = "small"
 }: FieldProps<GeopointProperty>) {
 
     const coordinates = readCoordinates(value);

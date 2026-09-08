@@ -223,7 +223,7 @@ kind: "hasMany" });
                             <TableBody>
                                 {relations.map((relation, index) => (
                                     <TableRow key={index}
-                                              className="cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800"
+                                              className="cursor-pointer hover:bg-surface-hover"
                                               onClick={() => {
                                                   setEditingRelationIndex(index);
                                                   setEditingRelationState(relation as unknown as RelationDraft);
@@ -262,7 +262,7 @@ kind: "hasMany" });
                             <DialogTitle className="flex justify-between items-center w-full" variant="h6">
                                 {editingRelationIndex === -1 ? "New Relation" : "Edit Relation"}
                             </DialogTitle>
-                            <DialogContent includeMargin={false} className={cls("p-4 md:p-6 border-t bg-white dark:bg-surface-900", defaultBorderMixin)}>
+                            <DialogContent includeMargin={false} className={cls("p-4 md:p-6 border-t bg-surface-card", defaultBorderMixin)}>
                                 <div className="flex flex-col gap-4 max-w-2xl mx-auto">
                                     <TextField
                                         label="Relation Name"

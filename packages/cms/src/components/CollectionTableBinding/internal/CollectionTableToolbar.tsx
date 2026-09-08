@@ -1,6 +1,6 @@
 import React from "react";
 
-import { CircularProgress, cls, defaultBorderMixin, SearchBar } from "@rebasepro/ui";
+import { CircularProgress, cls, SearchBar } from "@rebasepro/ui";
 import { useLargeLayout, useTranslation } from "@rebasepro/app";
 
 interface CollectionTableToolbarProps {
@@ -47,7 +47,7 @@ export function CollectionTableToolbar({
 
     return (
         <div
-            className={cls(defaultBorderMixin, "no-scrollbar min-h-[52px] overflow-x-auto px-2 md:px-4 bg-surface-50 dark:bg-surface-900 border-b flex flex-row justify-between items-center w-full")}>
+            className={cls("no-scrollbar min-h-[52px] overflow-x-auto px-2 md:px-4 bg-surface-sheet flex flex-row justify-between items-center w-full")}>
 
             <div className="flex items-center gap-1 md:mr-4 mr-2 min-w-0">
 

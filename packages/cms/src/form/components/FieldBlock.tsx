@@ -150,7 +150,10 @@ export function FieldBlock({
                 <PropertyIdCopyTooltip propertyKey={propertyKey}>
                     <div className={cls(
                         "flex items-center gap-1.5 font-medium leading-tight mb-1.5",
-                        "text-[13px] text-text-secondary dark:text-text-secondary-dark"
+                        // Primary, not secondary: the label names the field and the
+                        // reference sets its labels in the primary ink; the type icon
+                        // beside it stays muted so the name carries the row.
+                        "text-[13px] text-text-primary dark:text-text-primary-dark"
                     )}>
                         {/* Small and quiet: enough to tell a number from a
                             relation at a glance, not enough to compete with the

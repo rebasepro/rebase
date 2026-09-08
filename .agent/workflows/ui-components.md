@@ -22,7 +22,7 @@ description: Rules for creating UI components in the Rebase codebase
 
 2. **Never use `as any`** in TypeScript code. Use proper typing or explicit type narrowing instead.
 
-3. **Follow existing patterns**: `UIReferenceView` (`packages/app/src/components/Debug/UIReferenceView.tsx`, served at `/debug/ui`) is the design source of truth for the kit. For layout, read `ContentHomePage`, `StudioHomePage` or `NavigationCardBinding` and follow how they compose kit components.
+3. **Follow existing patterns**: `UIReferenceView` (`packages/app/src/debug/UIReferenceView.tsx`, served at `/debug/ui`) is the design source of truth for the kit. For layout, read `ContentHomePage`, `StudioHomePage` or `NavigationCardBinding` and follow how they compose kit components.
 
 4. **Use `cls()` from `@rebasepro/ui`** for conditional class merging instead of template literals.
 
@@ -34,7 +34,15 @@ description: Rules for creating UI components in the Rebase codebase
 
 1. **All borders MUST use `defaultBorderMixin`** from `@rebasepro/ui` — the package barrel, not a `@rebasepro/ui/styles` subpath, which is not in the package's `exports` map and would not resolve for an installed consumer. NEVER hardcode border colors. Import and apply via `cls()`.
 
-2. **Use the established color token scale for interactive states**. Look at existing components in the codebase for the correct tokens. NEVER invent arbitrary color values — always reference the existing design system (`surface-accent-*`, `primary-*`, etc.).
+2. **A surface is named by role, never by a numbered pair.** Backgrounds use the semantic surface tokens from `@rebasepro/ui/theme.css`: `bg-surface-frame` (drawer, rail, app bar), `bg-surface-sheet` (the content area), `bg-surface-card` (cards, dialogs, menus, rows), `bg-surface-raised` (neutral buttons, chips, tiles), `bg-surface-lifted` (the active segment on a track), `bg-surface-field` (inputs and other inset regions), and the alpha interaction fills `hover:bg-surface-hover` / `bg-surface-active` on transparent things, `hover:bg-surface-card-hover` / `hover:bg-surface-raised-hover` on solid ones. Borders are `border-hairline` (objects on a surface) or `border-hairline-strong` (floating surfaces). NEVER write `bg-white dark:bg-surface-900` or any other light/dark pair, and NEVER paint a background with `surface-accent-*` — the theme decides the value, the component says what the surface is. See `packages/ui/DESIGN.md` for the ladder and the two rules behind it.
+
+   - **Hue is information, never decoration.** The chrome is monochrome. A colour may be a dot, an icon, a 1px outline, or a low-alpha tint behind hue-coloured text; it is never a filled control, except the ONE `color="primary"` filled `Button` a screen has for its main action. Every other button is `neutral`. `Chip` with a colour scheme is tinted by default (`variant="filled"` only for a swatch), `BooleanSwitch` is on = primary, and a list shows state as a dot before the word, not a badge. Button labels are sentence case at weight 500 (`typography-button`); never add `uppercase`, `font-semibold` or `tracking-wide` to a control label.
+
+   - **Shape.** Use the radius utilities, never a pixel value: `rounded-md` (chip, tile, well, segment), `rounded-lg` (control, row highlight, menu, folder tab, segmented track), `rounded-xl` (card, sheet, dialog); their values live in `theme.css` (6 / 9 / 13) and sit between Tailwind's defaults and the reference on purpose. Only search fields, the switch and avatars are `rounded-full`. A list row has NO fill of its own — only the hovered, selected or open row takes an alpha highlight. Tabs on a record or an editor sidebar are `variant="boxy"` folder tabs; never add dividers, underlines or a coloured edge bar to mark a selected tab or row.
+
+   - **Lines.** A hairline marks an object, never a region. Do not put a `border-b` under a toolbar, an identity bar or a header band that sits on the sheet, nor a `border-l`/`border-r` between two regions that already differ by a surface step (the form rail, the split list). The lines that stay hold something up: the sheet edge, the tab strip a folder tab sits on, a table or list header's rule.
+
+   - **Form density.** Record-form fields are `size="small"` (32px) with 14px text, and every field carries its hairline through `fieldBackgroundMixin`; never pass `size="large"` to a field binding (48px with 16px text is the hero-form scale, and eight of them in a row read as a wall). Field labels are 13px medium in the primary ink with a 14px muted type icon; helper text is `caption` (11px).
 
 3. **No gradients on icons or fallback placeholders** unless the design explicitly calls for it.
 

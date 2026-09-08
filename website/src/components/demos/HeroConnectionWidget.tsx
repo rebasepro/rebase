@@ -48,10 +48,10 @@ export default function HeroConnectionWidget() {
     return (
         <div className="w-full max-w-xl mx-auto not-content">
             {/* Widget Container */}
-            <div className="relative rounded-2xl border border-surface-700/80 bg-surface-900/60 shadow-[0_0_50px_rgba(0,112,244,0.15)] overflow-hidden transition-all duration-500 backdrop-blur-sm min-h-[350px] flex flex-col justify-between">
+            <div className="relative rounded-2xl border border-hairline-strong bg-surface-raised shadow-[0_0_50px_rgba(0,112,244,0.15)] overflow-hidden transition-all duration-500 backdrop-blur-sm min-h-[350px] flex flex-col justify-between">
                 
                 {/* Window header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800 bg-surface-950/50">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-hairline bg-surface-well/70">
                     <div className="flex items-center gap-1.5">
                     </div>
                     <div className="text-[11px] font-mono text-surface-500 flex items-center gap-1.5">
@@ -78,7 +78,7 @@ export default function HeroConnectionWidget() {
                             </div>
 
                             <div className="space-y-3">
-                                <div className="relative rounded-lg bg-surface-950 border border-surface-800 p-3 flex items-center gap-3">
+                                <div className="relative rounded-lg bg-surface-frame border border-hairline p-3 flex items-center gap-3">
                                     <span className="text-[10px] font-mono text-surface-500 uppercase tracking-wider select-none">DATABASE_URL</span>
                                     <input
                                         type="text"
@@ -104,7 +104,7 @@ export default function HeroConnectionWidget() {
                     {state === "connecting" && (
                         <div className="space-y-6 text-center animate-fade-in">
                             <div className="relative inline-flex items-center justify-center">
-                                <div className="h-16 w-16 rounded-full border-2 border-surface-800 flex items-center justify-center">
+                                <div className="h-16 w-16 rounded-full border-2 border-hairline flex items-center justify-center">
                                     <Database size={24} className="text-primary animate-pulse" />
                                 </div>
                                 <svg className="absolute top-0 left-0 w-16 h-16 transform -rotate-90">
@@ -166,29 +166,29 @@ export default function HeroConnectionWidget() {
                             </div>
 
                             {/* Spreadsheet Table layout */}
-                            <div className="rounded-lg border border-surface-800 bg-surface-950 overflow-hidden text-xs">
+                            <div className="rounded-lg border border-hairline bg-surface-frame overflow-hidden text-xs">
                                 {/* Header */}
-                                <div className="grid grid-cols-4 bg-surface-900 border-b border-surface-800 px-3 py-2 text-surface-400 font-medium font-mono text-[9px] uppercase tracking-wider">
+                                <div className="grid grid-cols-4 bg-surface-sheet border-b border-hairline px-3 py-2 text-surface-400 font-medium font-mono text-[9px] uppercase tracking-wider">
                                     <div>ID</div>
                                     <div>Name</div>
                                     <div>Category</div>
                                     <div className="text-right">Price</div>
                                 </div>
                                 {/* Rows */}
-                                <div className="divide-y divide-surface-900">
-                                    <div className="grid grid-cols-4 px-3 py-2.5 items-center hover:bg-surface-900/30">
+                                <div className="divide-y divide-hairline">
+                                    <div className="grid grid-cols-4 px-3 py-2.5 items-center hover:bg-surface-hover">
                                         <div className="font-mono text-surface-500 text-[10px]">p19X</div>
                                         <div className="text-white font-medium truncate">Wireless Mic</div>
                                         <div><span className="bg-blue-950 text-blue-300 rounded px-1.5 py-0.5 text-[9px] font-medium border border-blue-900/40">Audio</span></div>
                                         <div className="text-right text-surface-300 font-mono">$89.00</div>
                                     </div>
-                                    <div className="grid grid-cols-4 px-3 py-2.5 items-center hover:bg-surface-900/30">
+                                    <div className="grid grid-cols-4 px-3 py-2.5 items-center hover:bg-surface-hover">
                                         <div className="font-mono text-surface-500 text-[10px]">h38Y</div>
                                         <div className="text-white font-medium truncate">Studio Lights</div>
                                         <div><span className="bg-pink-950 text-pink-300 rounded px-1.5 py-0.5 text-[9px] font-medium border border-pink-900/40">Video</span></div>
                                         <div className="text-right text-surface-300 font-mono">$150.00</div>
                                     </div>
-                                    <div className="grid grid-cols-4 px-3 py-2.5 items-center hover:bg-surface-900/30">
+                                    <div className="grid grid-cols-4 px-3 py-2.5 items-center hover:bg-surface-hover">
                                         <div className="font-mono text-surface-500 text-[10px]">k12Z</div>
                                         <div className="text-white font-medium truncate">4K Camera</div>
                                         <div><span className="bg-pink-950 text-pink-300 rounded px-1.5 py-0.5 text-[9px] font-medium border border-pink-900/40">Video</span></div>
@@ -199,19 +199,19 @@ export default function HeroConnectionWidget() {
 
                             {/* Dynamic generated list badges */}
                             <div className="flex items-center gap-1.5 flex-wrap pt-2 justify-center">
-                                <span className="flex items-center gap-1 text-[10px] text-surface-400 bg-surface-950 border border-surface-800 px-2 py-1 rounded-full">
+                                <span className="flex items-center gap-1 text-[10px] text-surface-400 bg-surface-frame border border-hairline px-2 py-1 rounded-full">
                                     <TableProperties size={12} className="text-primary-light" />
                                     The panel
                                 </span>
-                                <span className="flex items-center gap-1 text-[10px] text-surface-400 bg-surface-950 border border-surface-800 px-2 py-1 rounded-full">
+                                <span className="flex items-center gap-1 text-[10px] text-surface-400 bg-surface-frame border border-hairline px-2 py-1 rounded-full">
                                     <Code size={12} className="text-primary-light" />
                                     Typed SDK
                                 </span>
-                                <span className="flex items-center gap-1 text-[10px] text-surface-400 bg-surface-950 border border-surface-800 px-2 py-1 rounded-full">
+                                <span className="flex items-center gap-1 text-[10px] text-surface-400 bg-surface-frame border border-hairline px-2 py-1 rounded-full">
                                     <Shield size={12} className="text-primary-light" />
                                     RLS Rules
                                 </span>
-                                <span className="flex items-center gap-1 text-[10px] text-surface-400 bg-surface-950 border border-surface-800 px-2 py-1 rounded-full">
+                                <span className="flex items-center gap-1 text-[10px] text-surface-400 bg-surface-frame border border-hairline px-2 py-1 rounded-full">
                                     <Sparkles size={12} className="text-primary-light" />
                                     MCP Tools
                                 </span>
@@ -222,7 +222,7 @@ export default function HeroConnectionWidget() {
                 </div>
 
                 {/* Footer status bar */}
-                <div className="px-4 py-2 border-t border-surface-800/40 bg-surface-950/20 text-[10px] text-surface-500 font-mono flex items-center justify-between">
+                <div className="px-4 py-2 border-t border-hairline bg-surface-well/40 text-[10px] text-surface-500 font-mono flex items-center justify-between">
                     <div>Status: Connected</div>
                     <div>v3.1.2</div>
                 </div>

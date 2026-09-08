@@ -137,10 +137,10 @@ export function BodyPartsDemo() {
     );
 
     return (
-        <div className="w-full h-full bg-surface-950 flex p-3 sm:p-4 font-sans select-none overflow-hidden no-scrollbar">
+        <div className="w-full h-full bg-surface-frame flex p-3 sm:p-4 font-sans select-none overflow-hidden no-scrollbar">
             <div className="flex flex-row gap-2 sm:gap-4 items-center justify-center w-full h-full max-w-full">
                 {/* Diagrams */}
-                <div className="rounded-xl border border-surface-800 bg-surface-900 p-2 flex-shrink-0">
+                <div className="rounded-xl border border-hairline bg-surface-card p-2 flex-shrink-0">
                     <div className="flex gap-2">
                         <div className="flex flex-col items-center">
                             {renderBodyView("front", "/img/body_front.webp")}
@@ -174,7 +174,7 @@ export function BodyPartsDemo() {
                             const isHovered = hoveredPart === entry.id;
                             
                             let btnClasses = "outline-transparent text-surface-400 hover:text-surface-200";
-                            let dotClasses = "bg-surface-700";
+                            let dotClasses = "bg-surface-raised-hover";
                             
                             if (isActive) {
                                 btnClasses = "outline-primary/50 bg-primary/10 text-primary font-semibold";

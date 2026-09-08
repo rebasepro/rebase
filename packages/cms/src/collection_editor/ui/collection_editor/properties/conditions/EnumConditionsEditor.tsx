@@ -358,7 +358,7 @@ function EnumConditionRow({
 
     return (
         <div className={cls(
-            "p-3 bg-surface-50 dark:bg-surface-800 rounded-lg border",
+            "p-3 bg-surface-sheet rounded-lg border",
             hasError ? "border-red-300 dark:border-red-700" : defaultBorderMixin
         )}>
             {/* Title line */}

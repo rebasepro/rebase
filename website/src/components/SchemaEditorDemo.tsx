@@ -51,7 +51,7 @@ function PropertyField({
         <div className="relative -ml-8" style={{ position: "relative" }}>
             {hasChildren && (
                 <div
-                    className="absolute border-l border-surface-200 border-opacity-40 dark:border-surface-700 dark:border-opacity-40"
+                    className="absolute border-l border-opacity-40 border-hairline-strong dark:border-opacity-40"
                     style={{
                         left: "32px",
                         top: "64px",
@@ -78,10 +78,10 @@ function PropertyField({
                             )}
                         </div>
                         <div
-                            className={`w-full flex flex-row gap-4 items-center border-opacity-40 rounded-md dark:border-opacity-40 dark:border-surface-700/40 m-1 hover:ring-2 hover:ring-primary cursor-pointer hover:bg-primary/20 dark:hover:bg-primary/10 ${
+                            className={`w-full flex flex-row gap-4 items-center border-opacity-40 rounded-md dark:border-opacity-40 border-hairline m-1 hover:ring-2 hover:ring-primary cursor-pointer hover:bg-primary/20 dark:hover:bg-primary/10 ${
                                 isSelected
                                     ? "bg-opacity-30 dark:bg-opacity-10 ring-opacity-75 bg-primary/10 dark:bg-primary/10 ring-1 ring-primary/75 border-primary"
-                                    : "bg-white dark:bg-surface-950 border-transparent"
+                                    : "bg-surface-card border-transparent"
                             } flex-grow p-4 border transition-colors duration-200`}>
                             <div className="w-full flex flex-col">
                                 <span
@@ -123,7 +123,7 @@ function PropertyTypeOption({
                             }: { icon: string; iconColor: string; title: string; description: string }) {
     return (
         <div
-            className="bg-white border border-opacity-40 rounded-md dark:bg-surface-950 dark:border-opacity-40 border-surface-200/40 dark:border-surface-700/40 hover:bg-surface-accent-100 dark:hover:bg-surface-accent-800 hover:ring-2 hover:ring-primary cursor-pointer flex flex-row items-center px-4 py-2 m-1">
+            className="border border-opacity-40 rounded-md bg-surface-frame dark:border-opacity-40 border-hairline hover:bg-surface-accent-100 dark:hover:bg-surface-accent-800 hover:ring-2 hover:ring-primary cursor-pointer flex flex-row items-center px-4 py-2 m-1">
             <div className="flex flex-row items-center text-base min-h-[48px]">
                 <div className="mr-8">
                     <div className="h-8 w-8 flex items-center justify-center rounded-full shadow text-white"
@@ -360,7 +360,7 @@ export function SchemaEditorDemo() {
         <div className="grid grid-cols-12 gap-2 h-[600px] bg-surface dark:bg-surface-dark relative pointer-events-none select-none rounded-xl overflow-hidden ring-1 ring-surface-700 shadow-2xl">
             {/* Left Panel - Properties List */}
             <div
-                className="bg-surface-50 dark:bg-surface-900 p-4 md:p-8 pb-20 col-span-12 lg:col-span-5 h-full overflow-hidden border-r border-opacity-40 dark:border-opacity-40 border-surface-200/40 dark:border-surface-700/40">
+                className="bg-surface-sheet p-4 md:p-8 pb-20 col-span-12 lg:col-span-5 h-full overflow-hidden border-r border-opacity-40 dark:border-opacity-40 border-hairline">
                 {/* Collection Name Header */}
                 <div className="flex my-2">
                     <div className="flex-grow mb-4">
@@ -379,13 +379,13 @@ export function SchemaEditorDemo() {
                     <div className="ml-1 mt-2 flex flex-row gap-2">
                         <button
                             type="button"
-                            className="cursor-pointer text-surface-accent-600 dark:text-surface-accent-300 bg-surface-accent-200 bg-opacity-50 dark:bg-surface-950 dark:bg-opacity-50 inline-flex items-center justify-center p-2 text-sm font-medium rounded-full w-10 h-10 min-w-10 min-h-10 hover:bg-opacity-75 dark:hover:bg-surface-accent-800 hover:scale-105 transition-transform"
+                            className="cursor-pointer text-surface-accent-600 dark:text-surface-accent-300 bg-surface-accent-200 bg-opacity-50 bg-surface-frame dark:bg-opacity-50 inline-flex items-center justify-center p-2 text-sm font-medium rounded-full w-10 h-10 min-w-10 min-h-10 hover:bg-opacity-75 dark:hover:bg-surface-accent-800 hover:scale-105 transition-transform"
                         >
                             <Icon iconKey="Code" size={24} className="select-none" />
                         </button>
                         <button
                             type="button"
-                            className="cursor-pointer text-surface-accent-600 dark:text-surface-accent-300 bg-surface-accent-200 bg-opacity-50 dark:bg-surface-950 dark:bg-opacity-50 inline-flex items-center justify-center p-2 text-sm font-medium rounded-full w-10 h-10 min-w-10 min-h-10 hover:bg-opacity-75 dark:hover:bg-surface-accent-800 hover:scale-105 transition-transform"
+                            className="cursor-pointer text-surface-accent-600 dark:text-surface-accent-300 bg-surface-accent-200 bg-opacity-50 bg-surface-frame dark:bg-opacity-50 inline-flex items-center justify-center p-2 text-sm font-medium rounded-full w-10 h-10 min-w-10 min-h-10 hover:bg-opacity-75 dark:hover:bg-surface-accent-800 hover:scale-105 transition-transform"
                         >
                             <Icon iconKey="RefreshCw" size={24} className="select-none" />
                         </button>
@@ -407,7 +407,7 @@ export function SchemaEditorDemo() {
                     {/* Publisher Group with Children */}
                     <div className="relative -ml-8">
                         <div
-                            className="absolute border-l border-surface-200 border-opacity-40 dark:border-surface-700 dark:border-opacity-40"
+                            className="absolute border-l border-opacity-40 border-hairline-strong dark:border-opacity-40"
                             style={{
                                 left: "32px",
                                 top: "64px",
@@ -424,7 +424,7 @@ export function SchemaEditorDemo() {
                                         </div>
                                     </div>
                                     <div
-                                        className="w-full flex flex-row gap-4 items-center bg-white dark:bg-surface-950 border-opacity-40 rounded-md dark:border-opacity-40 dark:border-surface-700/40 m-1 hover:ring-2 hover:ring-primary cursor-pointer hover:bg-primary/20 dark:hover:bg-primary/10 flex-grow p-4 border transition-colors duration-200 border-transparent">
+                                        className="w-full flex flex-row gap-4 items-center bg-surface-card border-opacity-40 rounded-md dark:border-opacity-40 border-hairline m-1 hover:ring-2 hover:ring-primary cursor-pointer hover:bg-primary/20 dark:hover:bg-primary/10 flex-grow p-4 border transition-colors duration-200 border-transparent">
                                         <div className="w-full flex flex-col">
                                             <span
                                                 className="typography-label text-text-primary dark:text-text-primary-dark flex-grow pr-2">Publisher</span>
@@ -553,7 +553,7 @@ export function SchemaEditorDemo() {
                         {/* Validation Collapsible */}
                         <div className="col-span-12">
                             <div
-                                className="border-opacity-40 dark:border-opacity-40 border-surface-200/40 dark:border-surface-700/40 border rounded-md w-full">
+                                className="border-opacity-40 dark:border-opacity-40 border-hairline border rounded-md w-full">
                                 <button
                                     type="button"
                                     className="rounded-t flex items-center justify-between w-full min-h-[52px] hover:bg-surface-accent-200/70 hover:dark:bg-white/[0.09] p-4 py-4 transition-all duration-200 bg-surface-accent-200/50 dark:bg-white/[0.055]"
@@ -628,7 +628,7 @@ export function SchemaEditorDemo() {
                          transition: "opacity 400ms ease-in-out"
                      }}>
                     <div
-                        className="h-[540px] overflow-hidden bg-white dark:bg-surface-950 border border-opacity-40 dark:border-opacity-40 border-surface-200/40 dark:border-surface-700/40 rounded-md shadow-xl w-11/12 max-w-4xl max-h-[90vh] flex flex-col">
+                        className="h-[540px] overflow-hidden bg-surface-card border border-opacity-40 dark:border-opacity-40 border-hairline rounded-md shadow-xl w-11/12 max-w-4xl max-h-[90vh] flex flex-col">
 
 
                         <div className="flex-grow my-6 mx-6">

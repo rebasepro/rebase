@@ -53,7 +53,7 @@ export function BinaryFieldBinding({
     property,
     includeDescription,
     hideLabel,
-    size = "large"
+    size = "small"
 }: FieldProps<BinaryProperty>) {
 
     const stored = typeof value === "string" ? value : "";
@@ -103,7 +103,7 @@ export function BinaryFieldBinding({
             <PropertyIdCopyTooltip propertyKey={propertyKey}>
                 <div className="w-full">
                     {!isEditing ? (
-                        <div className={cls("flex items-center justify-between gap-2 p-4 rounded-xl border bg-surface-50/50 dark:bg-surface-800/20", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between gap-2 p-4 rounded-xl border bg-surface-field", defaultBorderMixin)}>
                             <div className="flex items-center gap-2.5 min-w-0">
                                 <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isPopulated ? "bg-emerald-500" : "bg-surface-300 dark:bg-surface-600"}`}/>
                                 <span className="text-sm font-semibold text-text-primary truncate">

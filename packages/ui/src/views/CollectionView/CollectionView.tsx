@@ -408,7 +408,7 @@ export function CollectionView<T extends Record<string, unknown> = Record<string
         <div
             className={cls(
                 "overflow-hidden h-full w-full rounded-md flex flex-col",
-                "dark:bg-surface-800",
+                "bg-surface-sheet",
                 className
             )}
         >

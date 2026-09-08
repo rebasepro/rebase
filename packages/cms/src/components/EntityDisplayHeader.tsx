@@ -82,7 +82,7 @@ export function EntityDisplayHeader<M extends Record<string, unknown>>({
         <div className={cls("flex items-start gap-4 min-w-0", className)}>
 
             {hasImage && (
-                <div className={"shrink-0 w-16 h-16 rounded-lg overflow-hidden flex items-center justify-center bg-surface-100 dark:bg-surface-800"}>
+                <div className={"shrink-0 w-16 h-16 rounded-lg overflow-hidden flex items-center justify-center bg-surface-raised"}>
                     <RoleValue role={display.image} propertyFallback={
                         // A resolver's image is documented as a URL; a storage
                         // path only resolves when a property is behind it, which

@@ -164,16 +164,16 @@ code: "// New script\n" }]);
     }, []);
 
     return (
-        <div className="flex h-[520px] w-full rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl text-surface-300 text-sm">
+        <div className="flex h-[520px] w-full rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-frame shadow-2xl text-surface-300 text-sm">
             {/* ── Sidebar ── */}
-            <div className="w-[190px] border-r border-surface-800/40 flex flex-col shrink-0">
-                <div className="flex border-b border-surface-800/40 bg-surface-900/60">
+            <div className="w-[190px] border-r border-hairline flex flex-col shrink-0">
+                <div className="flex border-b border-hairline bg-surface-sheet">
                     {(["collections", "snippets", "history"] as const).map(tab => (
                         <button
                             key={tab}
                             onClick={() => setSidebarTab(tab)}
                             className={`flex-1 py-2 text-[9px] uppercase tracking-wider font-semibold transition-colors ${
-                                sidebarTab === tab ? "text-primary border-b-2 border-primary bg-surface-900/40" : "text-surface-500 hover:text-surface-300"
+                                sidebarTab === tab ? "text-primary border-b-2 border-primary bg-surface-sheet" : "text-surface-500 hover:text-surface-300"
                             }`}
                         >
                             {tab === "collections" ? "SDK" : tab}
@@ -188,7 +188,7 @@ code: "// New script\n" }]);
                                 <button
                                     key={col}
                                     onClick={() => handleCodeChange(`const result = await client.data\n  .collection("${col}")\n  .find({ limit: 10 });\n\nreturn result;`)}
-                                    className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-surface-400 hover:bg-surface-800/40 w-full text-left transition-colors"
+                                    className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-surface-400 hover:bg-surface-hover w-full text-left transition-colors"
                                 >
                                     <div className="w-4 h-4 rounded bg-indigo-500/20 flex items-center justify-center shrink-0">
                                         <svg className="w-2.5 h-2.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h16M4 17h16"/></svg>
@@ -201,7 +201,7 @@ code: "// New script\n" }]);
                                 <button
                                     key={method}
                                     onClick={() => handleCodeChange(`const result = await client.admin.${method}();\nreturn result;`)}
-                                    className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-surface-400 hover:bg-surface-800/40 w-full text-left transition-colors"
+                                    className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-surface-400 hover:bg-surface-hover w-full text-left transition-colors"
                                 >
                                     <svg className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                     <span className="font-mono text-[11px]">{method}()</span>
@@ -215,7 +215,7 @@ code: "// New script\n" }]);
                                 <button
                                     key={i}
                                     onClick={() => handleCodeChange(snippet.code)}
-                                    className="w-full text-left px-2 py-2 rounded hover:bg-surface-800/40 transition-colors"
+                                    className="w-full text-left px-2 py-2 rounded hover:bg-surface-hover transition-colors"
                                 >
                                     <div className="text-[11px] text-surface-300 font-medium">{snippet.name}</div>
                                     <div className="text-[10px] text-surface-600 font-mono truncate mt-0.5">{snippet.code.split("\n")[0]}</div>
@@ -235,7 +235,7 @@ code: "// New script\n" }]);
             {/* ── Main Panel ── */}
             <div className="flex-1 flex flex-col min-w-0">
                 {/* Toolbar */}
-                <div className="flex items-center justify-between px-1 border-b border-surface-800/40 bg-surface-950">
+                <div className="flex items-center justify-between px-1 border-b border-hairline bg-surface-frame">
                     <div className="flex items-center overflow-x-auto min-w-0">
                         {tabs.map(tab => (
                             <button
@@ -243,7 +243,7 @@ code: "// New script\n" }]);
                                 onClick={() => setActiveTabId(tab.id)}
                                 className={`group flex items-center gap-1.5 px-3 py-2 text-xs border-b-2 transition-colors whitespace-nowrap ${
                                     activeTabId === tab.id
-                                        ? "border-primary text-primary bg-surface-900/30"
+                                        ? "border-primary text-primary bg-surface-field"
                                         : "border-transparent text-surface-500 hover:text-surface-300"
                                 }`}
                             >
@@ -257,11 +257,11 @@ code: "// New script\n" }]);
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5 pr-2">
                         {/* User avatar */}
-                        <div className="flex items-center gap-1 px-2 py-1 rounded bg-surface-800/60 text-[10px] text-surface-400 cursor-pointer">
+                        <div className="flex items-center gap-1 px-2 py-1 rounded bg-surface-raised text-[10px] text-surface-400 cursor-pointer">
                             <div className="w-4 h-4 rounded-full bg-indigo-500/30 flex items-center justify-center text-[8px] text-indigo-300 font-semibold">A</div>
                             <span>Run as Admin</span>
                         </div>
-                        <div className="h-4 w-px bg-surface-800 mx-1"/>
+                        <div className="h-4 w-px bg-hairline mx-1"/>
                         <button className="p-1.5 text-surface-500 hover:text-surface-300 transition-colors" title="Save snippet">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
                         </button>
@@ -284,10 +284,10 @@ code: "// New script\n" }]);
                 <div className="flex-1 flex flex-col min-h-0">
                     {/* Editor */}
                     <div className="relative flex min-h-[180px]" style={{ height: "50%" }}>
-                        <div className="py-3 px-2 text-right text-[11px] font-mono text-surface-600 leading-[1.6rem] select-none border-r border-surface-800/40 bg-surface-950 shrink-0">
+                        <div className="py-3 px-2 text-right text-[11px] font-mono text-surface-600 leading-[1.6rem] select-none border-r border-hairline bg-surface-frame shrink-0">
                             {codeLines.map((_, i) => <div key={i}>{i + 1}</div>)}
                         </div>
-                        <div className="flex-1 relative overflow-auto bg-surface-950">
+                        <div className="flex-1 relative overflow-auto bg-surface-frame">
                             <pre className="py-3 px-4 text-[12px] font-mono leading-[1.6rem] whitespace-pre-wrap pointer-events-none absolute inset-0 text-surface-300">
                                 {highlightJS(activeTab.code)}
                             </pre>
@@ -306,22 +306,22 @@ code: "// New script\n" }]);
                         </div>
                     </div>
 
-                    <div className="h-1 bg-surface-800/40 cursor-ns-resize hover:bg-primary/30 transition-colors"/>
+                    <div className="h-1 bg-surface-raised cursor-ns-resize hover:bg-primary/30 transition-colors"/>
 
                     {/* Results */}
-                    <div className="flex-1 flex flex-col min-h-0 bg-surface-950">
-                        <div className="p-2 px-4 bg-surface-900/60 border-b border-surface-800/40 flex items-center shrink-0">
+                    <div className="flex-1 flex flex-col min-h-0 bg-surface-frame">
+                        <div className="p-2 px-4 bg-surface-sheet border-b border-hairline flex items-center shrink-0">
                             <span className="font-semibold text-surface-500 uppercase tracking-widest text-[10px]">RESULTS</span>
                             {result && (
                                 <>
                                     <div className="flex-grow"/>
-                                    <div className="flex rounded bg-surface-800/60 p-0.5 mr-2">
+                                    <div className="flex rounded bg-surface-raised p-0.5 mr-2">
                                         {["json", "console"].map(v => (
                                             <button
                                                 key={v}
                                                 onClick={() => setResultView(v as any)}
                                                 className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
-                                                    resultView === v ? "bg-surface-700 text-white" : "text-surface-500 hover:text-surface-300"
+                                                    resultView === v ? "bg-surface-raised-hover text-white" : "text-surface-500 hover:text-surface-300"
                                                 }`}
                                             >
                                                 {v.toUpperCase()}
@@ -377,7 +377,7 @@ code: "// New script\n" }]);
                                 <div className="flex items-center justify-center h-full text-surface-600">
                                     <div className="text-center">
                                         <svg className="w-10 h-10 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                        <p className="text-[11px]">Press <kbd className="px-1.5 py-0.5 rounded bg-surface-800 text-[10px] font-mono">⌘ Enter</kbd> to run</p>
+                                        <p className="text-[11px]">Press <kbd className="px-1.5 py-0.5 rounded bg-surface-raised text-[10px] font-mono">⌘ Enter</kbd> to run</p>
                                     </div>
                                 </div>
                             )}

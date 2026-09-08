@@ -127,7 +127,7 @@ export function McpSessionDemo() {
             <div className="grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr]">
 
                 {/* ── The key ───────────────────────────────────────── */}
-                <div className="border-b border-surface-800/60 p-5 sm:p-6 lg:border-b-0 lg:border-r">
+                <div className="border-b border-hairline p-5 sm:p-6 lg:border-b-0 lg:border-r">
                     <div className="mb-1 flex items-center gap-2">
                         <Icon name="key"/>
                         <span className="font-mono text-sm text-surface-200">support-agent</span>
@@ -204,7 +204,7 @@ export function McpSessionDemo() {
                             return (
                                 <div key={call.tool}
                                      className={`rounded-xl border p-3.5 transition-colors duration-300 ${
-                                         pass ? "border-white/5 bg-surface-950/40" : "border-rose-500/20 bg-rose-500/[0.04]"
+                                         pass ? "border-white/5 bg-surface-well/60" : "border-rose-500/20 bg-rose-500/[0.04]"
                                      }`}>
                                     <div className="flex items-start gap-2">
                                         <span className="mt-[3px] flex-none text-surface-600">
@@ -280,7 +280,7 @@ function Gate({ label, pass }: { label: string; pass: boolean }) {
 function Switch({ on, tone = "primary" }: { on: boolean; tone?: "primary" | "amber" }) {
     return (
         <span className={`relative inline-flex h-4 w-7 flex-none rounded-full transition-colors duration-300 ${
-            on ? (tone === "amber" ? "bg-amber-500" : "bg-primary") : "bg-surface-700"
+            on ? (tone === "amber" ? "bg-amber-500" : "bg-primary") : "bg-surface-raised-hover"
         }`}>
             <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all duration-300 ${
                 on ? "left-3.5" : "left-0.5 opacity-60"

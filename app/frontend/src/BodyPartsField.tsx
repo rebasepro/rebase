@@ -300,7 +300,7 @@ export default function BodyPartsField({
                     className={cls(
                         "rounded-xl border p-2",
                         defaultBorderMixin,
-                        "bg-surface-50 dark:bg-surface-900"
+                        "bg-surface-field"
                     )}
                 >
                     <div className="flex gap-2">

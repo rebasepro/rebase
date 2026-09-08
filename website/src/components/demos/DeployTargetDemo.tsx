@@ -170,7 +170,7 @@ export function DeployTargetDemo({ s = {} }: { s?: Record<string, string> }) {
         <div className="frame overflow-hidden">
 
             {/* Target picker */}
-            <div className="flex flex-wrap gap-2 border-b border-surface-800/60 bg-surface-950/50 px-4 py-3 sm:px-5">
+            <div className="flex flex-wrap gap-2 border-b border-hairline bg-surface-well/70 px-4 py-3 sm:px-5">
                 {TARGETS.map((t) => (
                     <button
                         key={t.id}
@@ -193,7 +193,7 @@ export function DeployTargetDemo({ s = {} }: { s?: Record<string, string> }) {
             <div
                 ref={scrollRef}
                 onClick={done ? undefined : skipToEnd}
-                className={`mx-5 mb-5 mt-4 h-[19rem] overflow-y-auto rounded-xl border border-surface-800/80 bg-[#0b0c0f] p-4 font-mono text-[12.5px] leading-[1.75] sm:mx-6 sm:mb-6 sm:p-5 ${
+                className={`mx-5 mb-5 mt-4 h-[19rem] overflow-y-auto rounded-xl border border-hairline bg-[#0b0c0f] p-4 font-mono text-[12.5px] leading-[1.75] sm:mx-6 sm:mb-6 sm:p-5 ${
                     done ? "" : "cursor-pointer"
                 }`}>
                 {lines.slice(0, step).map((line, i) => (
@@ -209,7 +209,7 @@ export function DeployTargetDemo({ s = {} }: { s?: Record<string, string> }) {
             </div>
 
             {/* Footer */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-surface-800/60 bg-surface-950/40 px-5 py-3 sm:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline bg-surface-well/60 px-5 py-3 sm:px-6">
                 <p className="text-[11px] leading-relaxed text-surface-500">
                     {T("dt.footnote")}
                 </p>

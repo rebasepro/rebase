@@ -25,13 +25,13 @@ export function RbacMiniDemo() {
     }, []);
 
     return (
-        <div className="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 flex flex-col pointer-events-none select-none p-3 overflow-hidden relative">
+        <div className="h-32 w-full bg-surface-frame rounded-lg border border-hairline mb-6 flex flex-col pointer-events-none select-none p-3 overflow-hidden relative">
             <div className="flex items-center gap-2 mb-3">
                 <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 <span className="text-[11px] font-semibold text-white">Row Level Security</span>
             </div>
 
-            <div className="bg-surface-900/50 rounded border border-surface-800/50 flex flex-col divide-y divide-surface-800/50">
+            <div className="bg-surface-raised rounded border border-hairline flex flex-col divide-y divide-hairline">
                 {/* Admin row */}
                 <div className="flex justify-between items-center p-2">
                     <span className="text-[9px] text-surface-300 font-mono">role === &apos;admin&apos;</span>
@@ -51,7 +51,7 @@ export function RbacMiniDemo() {
                         {step >= 3 && <span className="text-[8px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded flex items-center gap-1">SELECT <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/></svg></span>}
 
                         {step === 2 && (
-                            <div className="absolute top-5 right-0 bg-surface-800 border border-surface-700 shadow-xl rounded-sm w-16 z-10 py-1">
+                            <div className="absolute top-5 right-0 bg-surface-raised border border-hairline-strong shadow-xl rounded-sm w-16 z-10 py-1">
                                 <div className="text-[8px] text-surface-400 px-2 py-0.5">DENIED</div>
                                 <div className="text-[8px] text-white px-2 py-0.5 bg-primary/20">SELECT</div>
                             </div>

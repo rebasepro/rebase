@@ -134,11 +134,11 @@ export function EntityHistoryEntry({
         </div>
         <div
             className={cls(
-                "bg-white dark:bg-surface-900",
+                "bg-surface-card",
                 "min-h-[44px]",
                 "w-full",
                 "items-center",
-                hover ? "hover:bg-surface-accent-50 dark:hover:bg-surface-800" : "",
+                hover ? "hover:bg-surface-hover" : "",
                 size === "small" ? "p-1" : "px-2 py-1",
                 "flex border rounded-lg",
                 defaultBorderMixin

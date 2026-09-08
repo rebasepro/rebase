@@ -243,7 +243,8 @@ hour12: false,
                 className={cls(
                     "rounded-lg relative max-w-full",
                     !invisible && fieldBackgroundMixin,
-                    disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
+                    // An invisible field has no hover fill of its own: whatever frames it (a table cell) carries the hover.
+                disabled ? fieldBackgroundDisabledMixin : (invisible ? "" : fieldBackgroundHoverMixin),
                     {
                         "min-h-[28px]": size === "smallest",
                         "min-h-[32px]": size === "small",
@@ -291,7 +292,7 @@ hour12: false,
                     onBlur={handleBlur}
                     disabled={disabled}
                     className={cls(
-                        "w-full outline-hidden bg-transparent leading-normal text-base px-3",
+                        "w-full outline-hidden bg-transparent leading-normal text-sm px-3",
                         clearable ? "pr-14" : "pr-12",
                         "rounded-lg",
                         {
@@ -300,7 +301,7 @@ hour12: false,
                             "min-h-[40px]": size === "medium",
                             "min-h-[48px]": size === "large"
                         },
-                        // A flat py-2 (16px) plus the text-base line box floored
+                        // A flat py-2 (16px) plus the line box floored
                         // the field at 40px, so smallest/small/medium all
                         // rendered the same height. Scale it with `size`.
                         label

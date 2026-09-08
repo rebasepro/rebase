@@ -102,8 +102,8 @@ export const CollectionRowActions = function CollectionRowActions({
             className={cls(
                 "h-full flex items-center justify-center flex-col z-10",
                 isSelected
-                    ? "bg-surface-accent-50 dark:bg-surface-accent-900"
-                    : "bg-surface-50/90 dark:bg-surface-900/90",
+                    ? "bg-surface-raised"
+                    : "bg-surface-card",
                 frozen ? "sticky left-0" : ""
             )}
             onClick={useCallback((event: React.MouseEvent) => {
@@ -230,7 +230,7 @@ export const CollectionRowActions = function CollectionRowActions({
                 style={sortableStyle}
                 className={cls(
                     "flex-shrink-0",
-                    frozen && "sticky left-0 z-10 bg-white dark:bg-surface-900"
+                    frozen && "sticky left-0 z-10 bg-surface-card"
                 )}
                 {...sortableAttrsWithoutTabIndex}
             >

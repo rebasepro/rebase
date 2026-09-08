@@ -69,15 +69,15 @@ export const BoardColumn = memo(function BoardColumn<T>({
     const dragListeners = allowReorder ? listeners : {};
 
     const columnClassName = useMemo(() => cls(
-        "border h-full w-80 min-w-80 mx-2 flex flex-col rounded-md border-surface-200 dark:border-surface-800",
+        "border h-full w-80 min-w-80 mx-2 flex flex-col rounded-md border-hairline",
         isColumnBeingDragged ? "ring-2 ring-primary" : ""
     ), [isColumnBeingDragged]);
 
     const headerClassName = useMemo(() => cls(
         "flex items-center justify-between px-2 rounded-t-md transition-colors duration-200 ease-in-out",
         isColumnBeingDragged
-            ? "bg-surface-100 dark:bg-surface-700"
-            : "bg-surface-50 hover:bg-surface-100 dark:bg-surface-800 dark:hover:bg-surface-700",
+            ? "bg-surface-active"
+            : "bg-surface-field hover:bg-surface-field-hover",
         allowReorder ? "cursor-grab" : ""
     ), [isColumnBeingDragged, allowReorder]);
 

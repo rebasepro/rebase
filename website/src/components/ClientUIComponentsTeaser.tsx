@@ -33,7 +33,7 @@ export default function ClientUIComponentsTeaser() {
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
     const [selectedValue, setSelectedValue] = useState<string>();
     const [multiSelectedValue, setMultiSelectedValue] = useState<string[]>();
-    const cardClasses = "relative p-4 flex flex-col gap-2 break-inside-avoid dark:bg-surface-950 mb-4 rounded-lg";
+    const cardClasses = "relative p-4 flex flex-col gap-2 break-inside-avoid bg-surface-frame mb-4 rounded-lg";
 
     return (
         <div className={"@container max-w-6xl mx-auto not-content my-8"}>
@@ -111,7 +111,7 @@ export default function ClientUIComponentsTeaser() {
                         </DialogActions>
                     </Dialog>
                     <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
-                        <div className="bg-white font-semibold dark:bg-surface-800 p-4 h-full">
+                        <div className="font-semibold bg-surface-raised p-4 h-full">
                             Sheet Content
                         </div>
                     </Sheet>

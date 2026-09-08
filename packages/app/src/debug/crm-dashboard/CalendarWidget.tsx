@@ -263,7 +263,7 @@ export function CalendarWidget({ loading, tasks, onOpenTask }: CalendarWidgetPro
                                         day.isToday && !isSelected && "ring-1 ring-primary/50",
                                         isSelected
                                             ? "bg-primary/10 dark:bg-primary/15 ring-1 ring-primary/60"
-                                            : "hover:bg-surface-100 dark:hover:bg-surface-800",
+                                            : "hover:bg-surface-hover",
                                         hasTasks && "cursor-pointer"
                                     )}
                                 >
@@ -339,7 +339,7 @@ export function CalendarWidget({ loading, tasks, onOpenTask }: CalendarWidgetPro
                                                 onClick={() => onOpenTask(task.id)}
                                                 className={cls(
                                                     "flex items-start gap-2 px-2 py-1.5 rounded-md text-left w-full",
-                                                    "hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors duration-100 focus:outline-none"
+                                                    "hover:bg-surface-hover transition-colors duration-100 focus:outline-none"
                                                 )}
                                             >
                                                 {/* Status dot */}

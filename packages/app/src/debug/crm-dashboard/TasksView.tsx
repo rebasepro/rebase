@@ -184,7 +184,7 @@ export function TasksView({
     const hasActiveFilter = quickFilter !== "all" || stageFilter !== null || clientFilter !== null || searchText !== "";
 
     return (
-        <div className="flex flex-col h-full bg-white dark:bg-surface-900">
+        <div className="flex flex-col h-full bg-surface-card">
             <div className="flex flex-col gap-4 overflow-y-auto flex-1">
                 <TaskFilters
                     quickFilter={quickFilter}

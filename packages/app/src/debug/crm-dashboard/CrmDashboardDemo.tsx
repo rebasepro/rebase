@@ -678,7 +678,7 @@ export function CrmDashboardDemo() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 py-2 border-y border-surface-200 dark:border-surface-700">
+                <div className="grid grid-cols-2 gap-4 py-2 border-y border-hairline-strong">
                     <div>
                         <Typography variant="caption" color="secondary" className="uppercase text-[9px] tracking-wider block">Due Date</Typography>
                         <Typography variant="body2" className="font-medium mt-0.5 inline-flex items-center gap-1">
@@ -704,11 +704,11 @@ export function CrmDashboardDemo() {
                     <div>
                         <Typography variant="caption" color="secondary" className="uppercase text-[9px] tracking-wider font-semibold block mb-1">Related Client</Typography>
                         <Card
-                            className="p-3 hover:bg-surface-accent-100 dark:hover:bg-surface-800 cursor-pointer transition-colors duration-150"
+                            className="p-3 hover:bg-surface-hover cursor-pointer transition-colors duration-150"
                             onClick={() => openClientDrawer(clientInfo.id)}
                         >
                             <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-full bg-surface-200 dark:bg-surface-700 text-surface-500 flex items-center justify-center font-semibold">
+                                <div className="w-8 h-8 rounded-full bg-surface-raised text-surface-500 flex items-center justify-center font-semibold">
                                     {clientInfo.name[0].toUpperCase()}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -728,7 +728,7 @@ export function CrmDashboardDemo() {
                 {task.values.description && (
                     <div>
                         <Typography variant="caption" color="secondary" className="uppercase text-[9px] tracking-wider block mb-0.5">Description</Typography>
-                        <div className="p-3 bg-surface-50 dark:bg-surface-900 rounded-md border border-surface-200 dark:border-surface-700">
+                        <div className="p-3 bg-surface-field rounded-md border border-hairline">
                             <Typography variant="body2" className="whitespace-pre-wrap text-text-primary dark:text-text-primary-dark">
                                 {task.values.description}
                             </Typography>
@@ -770,7 +770,7 @@ export function CrmDashboardDemo() {
                     </div>
                 </div>
 
-                <div className="space-y-2.5 py-3 border-y border-surface-200 dark:border-surface-700">
+                <div className="space-y-2.5 py-3 border-y border-hairline-strong">
                     <div className="flex items-center gap-2 text-surface-600 dark:text-surface-300">
                         <MailIcon className="h-4 w-4 text-surface-400" />
                         <Typography variant="body2">{client.email}</Typography>
@@ -790,7 +790,7 @@ export function CrmDashboardDemo() {
                             {clientTasks.map(t => (
                                 <Card
                                     key={t.id}
-                                    className="p-2.5 hover:bg-surface-accent-100 dark:hover:bg-surface-800 cursor-pointer transition-colors duration-150"
+                                    className="p-2.5 hover:bg-surface-hover cursor-pointer transition-colors duration-150"
                                     onClick={() => openTaskDrawer(t.id)}
                                 >
                                     <div className="flex items-start gap-2">
@@ -913,7 +913,7 @@ export function CrmDashboardDemo() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-6 border-t border-surface-200 dark:border-surface-700 mt-6">
+                <div className="flex items-center gap-2 pt-6 border-t border-hairline-strong mt-6">
                     <Button
                         variant="outlined"
                         color="neutral"
@@ -937,7 +937,7 @@ export function CrmDashboardDemo() {
     };
 
     return (
-        <div className="relative w-full border rounded-xl bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-700 shadow-sm flex flex-row">
+        <div className="relative w-full border rounded-xl bg-surface-sheet border-hairline-strong shadow-sm flex flex-row">
             {/* Dashboard main workspace */}
             <div className="flex-1 flex flex-col p-4 md:p-6 transition-all duration-300">
                 {/* Header */}
@@ -1054,16 +1054,16 @@ export function CrmDashboardDemo() {
 
             {/* Custom Mock Side panel sliding in */}
             <div className={cls(
-                "fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-white dark:bg-surface-900 border-l border-surface-200 dark:border-surface-700 shadow-2xl z-40 transition-transform duration-300 ease-in-out flex flex-col",
+                "fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-surface-card border-l border-hairline-strong shadow-2xl z-40 transition-transform duration-300 ease-in-out flex flex-col",
                 activeSideEntity ? "translate-x-0" : "translate-x-full"
             )}>
-                <div className="p-4 flex items-center justify-between border-b border-surface-200 dark:border-surface-800">
+                <div className="p-4 flex items-center justify-between border-b border-hairline">
                     <Typography variant="subtitle1" className="font-semibold uppercase tracking-wider text-[10px] color-secondary">
                         {activeSideEntity?.type === "task" ? "Task Details" : activeSideEntity?.type === "client" ? "Client profile" : "Create Lead"}
                     </Typography>
                     <button
                         onClick={() => setActiveSideEntity(null)}
-                        className="p-1 rounded-md text-surface-400 hover:text-surface-700 hover:bg-surface-100 dark:hover:bg-surface-800 focus:outline-none"
+                        className="p-1 rounded-md text-surface-400 hover:text-surface-700 hover:bg-surface-hover focus:outline-none"
                     >
                         <XIcon className="h-4 w-4" />
                     </button>

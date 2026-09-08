@@ -47,8 +47,8 @@ export function CustomFieldsDemo() {
     }, []);
 
     return (
-        <div className="w-full h-full bg-surface-950 text-surface-200 flex flex-col font-sans select-none pointer-events-none p-6">
-            <div className="flex items-center gap-2 mb-6 border-b border-surface-800 pb-4">
+        <div className="w-full h-full bg-surface-frame text-surface-200 flex flex-col font-sans select-none pointer-events-none p-6">
+            <div className="flex items-center gap-2 mb-6 border-b border-hairline pb-4">
                 <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
                 <h3 className="text-sm font-semibold text-white">Custom Widget Configuration</h3>
             </div>
@@ -78,13 +78,13 @@ export function CustomFieldsDemo() {
                 <div className={`transition-opacity duration-300 ${step >= 3 ? 'opacity-100' : 'opacity-40'}`}>
                     <label className="block text-sm font-medium text-text-secondary-dark mb-2">Brand Color (ColorPicker Widget)</label>
                     <div className={`field flex items-center gap-4 p-3 transition-all ${step === 3 || step === 4 ? 'ring-2 ring-emerald-500/50' : ''}`}>
-                        <div className="w-10 h-10 rounded-full border-2 border-surface-700 shadow-inner transition-colors duration-500" style={{ backgroundColor: color }}></div>
+                        <div className="w-10 h-10 rounded-full border-2 border-hairline-strong shadow-inner transition-colors duration-500" style={{ backgroundColor: color }}></div>
                         <div className="flex-1">
                             <div className="flex gap-2">
                                 {['#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6'].map((preset) => (
                                     <div 
                                         key={preset}
-                                        className={`w-6 h-6 rounded border cursor-pointer transition-transform ${color === preset ? 'scale-110 border-white' : 'border-surface-600'}`}
+                                        className={`w-6 h-6 rounded border cursor-pointer transition-transform ${color === preset ? 'scale-110 border-white' : 'border-hairline-strong'}`}
                                         style={{ backgroundColor: preset }}
                                     ></div>
                                 ))}

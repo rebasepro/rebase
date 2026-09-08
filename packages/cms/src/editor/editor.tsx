@@ -278,7 +278,7 @@ view }), [state, view])}>
                 placement: "top",
                 offset: 6
               }}
-              className={cls("flex w-fit max-w-[90vw] h-10 overflow-hidden rounded border bg-white dark:bg-surface-800 shadow", defaultBorderMixin)}
+              className={cls("flex w-fit max-w-[90vw] h-10 overflow-hidden rounded border bg-surface-card shadow", defaultBorderMixin)}
             >
               <NodeSelector portalContainer={editorRef.current} open={openNode} onOpenChange={setOpenNode}/>
               <Separator orientation="vertical"/>

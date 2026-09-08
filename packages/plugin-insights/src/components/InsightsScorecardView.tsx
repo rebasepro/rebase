@@ -96,7 +96,7 @@ export function InsightsScorecardView({
             }
 
             comparisonElement = (
-                <span className={`font-medium ${compact ? "text-[10px]" : "text-xs"} ${colorClass}`}>
+                <span className={`font-mono tabular-nums font-medium ${compact ? "text-[10px]" : "text-xs"} ${colorClass}`}>
                     {formattedComparison}
                 </span>
             );
@@ -106,8 +106,9 @@ export function InsightsScorecardView({
     const isSmall = compact || (containerWidth !== null && containerWidth < 200);
 
     // Resolve icon via getIcon (Lucide-based resolution)
+    // 14px in the secondary tier, beside the label — the card header grammar.
     const iconElement = config.icon
-        ? getIcon(config.icon, "text-surface-400 dark:text-surface-500", undefined, isSmall ? 14 : 18)
+        ? getIcon(config.icon, "text-text-secondary dark:text-text-secondary-dark", undefined, 14)
         : null;
 
     // ── Compact card-inline layout ──────────────────────────────────────
@@ -130,29 +131,35 @@ export function InsightsScorecardView({
     // ── Standard scorecard layout ───────────────────────────────────────
     const baseClass = embedded
         ? `flex flex-col min-w-0 h-full ${isSmall ? "px-3.5 py-3" : "px-5 py-4"}`
-        : cls("rounded-lg flex flex-col min-w-0 bg-transparent border", defaultBorderMixin, isSmall ? "px-3.5 py-3" : "px-5 py-4");
+        // A card on the sheet: one step up and a hairline, like every other card.
+        // It was transparent with a border, a box drawn on the sheet rather
+        // than an object sitting on it.
+        : cls("rounded-xl flex flex-col min-w-0 bg-surface-card border", defaultBorderMixin, isSmall ? "px-3.5 py-3" : "px-5 py-4");
 
     return (
         <div ref={containerRef} className={baseClass} style={embedded ? undefined : fixedHeight ? { height: fixedHeight } : { minHeight: isSmall ? 68 : 92 }}>
-            {/* Title row */}
-            <div className={`flex items-center justify-between ${isSmall ? "mb-1" : "mb-2"}`}>
-                <div className="flex flex-col min-w-0">
-                    <span className={`font-medium leading-snug truncate text-surface-500 dark:text-surface-400 ${isSmall ? "text-[11px]" : "text-xs"}`}>
+            {/* Title row — the card header grammar the reference page documents:
+                a small icon in the secondary tier, then the label in the micro
+                tier, on ONE line. The icon used to sit alone at the far right,
+                which made every tile read as two unrelated corners. */}
+            <div className={`flex flex-col min-w-0 ${isSmall ? "mb-1" : "mb-2.5"}`}>
+                <div className="flex items-center gap-1.5 min-w-0">
+                    {iconElement && (
+                        <span className="shrink-0 flex items-center text-text-secondary dark:text-text-secondary-dark [&>svg]:size-3.5">{iconElement}</span>
+                    )}
+                    <span className="typography-micro truncate text-surface-400 dark:text-surface-400">
                         {title}
                     </span>
-                    {config.dateRange && !isSmall && (
-                        <span className="text-[10px] text-surface-400 dark:text-surface-500 truncate mt-0.5">
-                            {config.dateRange}
-                        </span>
-                    )}
                 </div>
-                {iconElement && (
-                    <span className="ml-2 shrink-0">{iconElement}</span>
+                {config.dateRange && !isSmall && (
+                    <span className="font-mono tabular-nums text-[10px] text-surface-400 dark:text-surface-500 truncate mt-1">
+                        {config.dateRange}
+                    </span>
                 )}
             </div>
 
             {/* Main value */}
-            <div className={`font-semibold leading-tight tracking-tight break-all text-surface-800 dark:text-surface-100 ${isSmall ? "text-lg" : (containerWidth !== null && containerWidth < 300) ? "text-xl" : "text-2xl"}`}>
+            <div className={`font-headers font-semibold leading-tight tracking-display tabular-nums break-all text-text-primary dark:text-text-primary-dark ${isSmall ? "text-lg" : (containerWidth !== null && containerWidth < 300) ? "text-xl" : "text-2xl"}`}>
                 {formattedValue}
             </div>
 

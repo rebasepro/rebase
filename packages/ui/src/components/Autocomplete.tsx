@@ -62,7 +62,7 @@ export function Autocomplete({
         <div ref={autocompleteRef}
              className={cls(
                  open ? paperMixin : "",
-                 "bg-surface-50 dark:bg-surface-800",
+                 "bg-surface-card",
                  className
              )}>
             {children}
@@ -85,7 +85,7 @@ export const AutocompleteItem = React.memo(function AutocompleteItem({
 
     return (
         <div
-            className={cls("flex w-full items-center h-[48px] cursor-pointer transition-colors duration-150 hover:bg-surface-accent-100 dark:hover:bg-surface-accent-800", className)}
+            className={cls("flex w-full items-center h-[48px] cursor-pointer transition-colors duration-150 hover:bg-surface-hover", className)}
             onClick={onClick}>
             {children}
         </div>

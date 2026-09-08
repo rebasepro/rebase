@@ -110,7 +110,7 @@ function StorageImage({ storagePath }: {
                         alt={"Content"}
                         className="w-full h-auto rounded-xl object-cover"
                         src={url}/>
-                    : <div className="w-full h-[240px] bg-surface-200 dark:bg-surface-700 animate-pulse rounded-xl"/>
+                    : <div className="w-full h-[240px] bg-surface-raised animate-pulse rounded-xl"/>
                 }
             </div>
         </Container>

@@ -103,7 +103,7 @@ export function AdoptionStackDemo({ backend, admin, studio, labels }: AdoptionSt
             {/* ── What that costs you ──────────────────────────────── */}
             <div className="frame overflow-hidden">
 
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-800/60 bg-surface-950/50">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-hairline bg-surface-well/70">
                     <span className="font-mono text-[11px] text-surface-500">package.json</span>
                 </div>
 
@@ -163,7 +163,7 @@ export function AdoptionStackDemo({ backend, admin, studio, labels }: AdoptionSt
                 </div>
 
                 {/* The constant */}
-                <div className="mt-7 border-t border-surface-800/60 bg-surface-950/50 px-6 py-5">
+                <div className="mt-7 border-t border-hairline bg-surface-well/70 px-6 py-5">
                     <div className="flex items-center justify-between gap-3 mb-2">
                         <span className="font-mono text-sm text-surface-200">
                             <span className="text-emerald-400 font-semibold">GET</span> /api/data/users
@@ -198,7 +198,7 @@ function Slab({ width, copy, active, optional, optionalLabel, alwaysLabel, onCli
             className={`${width} group relative block text-left rounded-2xl px-6 py-5 transition-all duration-300 ${
                 active
                     ? "border border-primary/40 bg-gradient-to-br from-surface-900/90 to-surface-950/80 shadow-[0_10px_0_-3px_rgba(10,12,18,0.9),0_18px_44px_rgba(0,112,244,0.12)]"
-                    : "border border-dashed border-surface-700/80 bg-surface-950/60 translate-y-2 hover:border-surface-600"
+                    : "border border-dashed border-hairline-strong bg-surface-well/80 translate-y-2 hover:border-hairline-strong"
             } ${optional ? "cursor-pointer" : ""}`}>
 
             {/* the same hover pool the rest of the page's cards use */}
@@ -227,12 +227,12 @@ function Slab({ width, copy, active, optional, optionalLabel, alwaysLabel, onCli
                             <span className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-colors duration-300 ${
                                 active
                                     ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/20"
-                                    : "bg-surface-800/60 text-surface-400 ring-1 ring-inset ring-surface-700/50"
+                                    : "bg-surface-raised text-surface-400 ring-1 ring-inset ring-surface-700/50"
                             }`}>
                                 {active ? "on" : optionalLabel}
                             </span>
                             <span className={`relative inline-flex h-4 w-7 rounded-full transition-colors duration-300 ${
-                                active ? "bg-primary" : "bg-surface-700"
+                                active ? "bg-primary" : "bg-surface-raised-hover"
                             }`}>
                                 <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all duration-300 ${
                                     active ? "left-3.5" : "left-0.5 opacity-60"

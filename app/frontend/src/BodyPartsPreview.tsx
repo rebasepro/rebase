@@ -160,7 +160,7 @@ export default function BodyPartsPreview({
     return (
         <div
             className={cls(
-                "flex rounded-xl border bg-surface-50 dark:bg-surface-900 border-surface-200 dark:border-surface-800 w-fit",
+                "flex rounded-xl border bg-surface-field border-hairline w-fit",
                 isCompact ? "gap-2 p-1" : "gap-6 p-3"
             )}
         >

@@ -1,6 +1,7 @@
 import React from "react";
 import { CHIP_COLORS, cls, getColorSchemeForKey } from "../util";
 import type { ChipColorKey, ChipColorScheme } from "../util/chip_colors";
+import { useIsDarkMode } from "../hooks/useIsDarkMode";
 
 export type { ChipColorKey, ChipColorScheme };
 
@@ -9,6 +10,15 @@ export interface ChipProps {
     children: React.ReactNode;
     size?: "smallest" | "small" | "medium" | "large";
     colorScheme?: ChipColorScheme | ChipColorKey;
+    /**
+     * How a coloured chip paints its hue. `tinted` (the default) is the hue at
+     * low alpha behind hue-coloured ink: a label, not a block, and the rule the
+     * chrome follows for colour everywhere else (a dot, an icon, an outline, a
+     * tint — never a fill). `filled` is the palette's solid stop, for the few
+     * places that want a swatch: a colour picker, a legend. A custom scheme
+     * without tint values falls back to `filled`.
+     */
+    variant?: "tinted" | "filled";
     error?: boolean;
     outlined?: boolean;
     onClick?: () => void;
@@ -24,15 +34,6 @@ const sizeClassNames = {
     small: "px-2 py-0.5 text-xs",
     medium: "px-2.5 py-1 text-xs",
     large: "px-3 py-1.5 text-sm"
-}
-
-/**
- * Detect if the app is currently in dark mode by checking the
- * Tailwind `dark` class on the document root.
- */
-function isDarkMode(): boolean {
-    return typeof document !== "undefined" &&
-        document.documentElement.classList.contains("dark");
 }
 
 /**
@@ -58,6 +59,7 @@ export function Chip({
                          colorScheme,
                          error,
                          outlined,
+                         variant = "tinted",
                          onClick,
                          icon,
                          size = "medium",
@@ -66,7 +68,9 @@ export function Chip({
                      }: ChipProps) {
 
     const usedColorScheme = typeof colorScheme === "string" ? getColorSchemeForKey(colorScheme) : colorScheme;
-    const dark = isDarkMode();
+    // Live, not read once: the ink is chosen in JS per theme, so a theme switch
+    // has to reach every mounted chip (see useIsDarkMode).
+    const dark = useIsDarkMode();
 
     const hasScheme = error || usedColorScheme;
 
@@ -98,19 +102,29 @@ export function Chip({
             bgColor = dark ? "rgba(220, 38, 38, 0.15)" : "rgba(239, 68, 68, 0.1)";
             border = `1px solid ${dark ? "rgba(220, 38, 38, 0.3)" : "rgba(239, 68, 68, 0.2)"}`;
         } else if (usedColorScheme) {
-            bgColor = dark && usedColorScheme.darkColor ? usedColorScheme.darkColor : usedColorScheme.color;
+            const tintColor = dark ? usedColorScheme.darkTintColor : usedColorScheme.tintColor;
+            const tintText = dark ? usedColorScheme.darkTintText : usedColorScheme.tintText;
+            if (variant === "tinted" && tintColor && tintText) {
+                bgColor = tintColor;
+                textColor = tintText;
+            } else {
+                bgColor = dark && usedColorScheme.darkColor ? usedColorScheme.darkColor : usedColorScheme.color;
+            }
         }
     }
 
     return (
         <div
-            className={cls("rounded-lg max-w-full w-max h-fit font-medium inline-flex gap-1",
+            // `rounded-md`, not `lg`: a radius is proportional to the thing it
+            // rounds. At a chip's 20-24px height the control radius makes a pill,
+            // and a pill is a different object (a segment, a search field).
+            className={cls("rounded-md max-w-full w-max h-fit font-medium inline-flex gap-1",
                 "text-ellipsis",
                 "items-center",
                 "transition-colors duration-150",
-                !hasScheme && "bg-surface-100 dark:bg-surface-800 text-text-secondary dark:text-text-secondary-dark border border-surface-200 dark:border-surface-700",
-                !hasScheme && outlined && "bg-transparent dark:bg-transparent",
-                onClick ? "cursor-pointer hover:bg-primary/5 dark:hover:bg-primary/5" : "",
+                !hasScheme && "bg-surface-raised text-text-secondary dark:text-text-secondary-dark",
+                !hasScheme && outlined && "bg-transparent border border-hairline-strong",
+                onClick ? "cursor-pointer hover:bg-surface-raised-hover" : "",
                 sizeClassNames[size],
                 className)}
             onClick={onClick}

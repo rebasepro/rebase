@@ -76,15 +76,18 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
                 color="primary">
                 {t("add_specific", { name: collection.singularName ?? collection.name })}
             </Button>
-            : <Button
+            // In the compact split-list toolbar the add action is the one filled
+            // control: a rounded square, so it reads as a button and not a badge.
+            : <IconButton
                 id={`add_entity_${path}`}
                 onClick={onNewClick}
                 variant="filled"
-                color={compact ? "neutral" : "primary"}
+                shape="square"
                 size="small"
+                aria-label={t("add_specific", { name: collection.singularName ?? collection.name })}
             >
                 <PlusIcon size={iconSize.small}/>
-            </Button>);
+            </IconButton>);
 
     // On a junction-backed tab, creating a row is only half of what "add" means:
     // the far more common act is attaching one that already exists. There was no

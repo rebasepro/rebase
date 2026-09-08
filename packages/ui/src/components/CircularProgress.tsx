@@ -40,7 +40,7 @@ export function CircularProgress({
                 borderClasses,
                 "inline-block shrink-0 rounded-full border-solid align-[-0.125em]",
                 "animate-[spin_0.7s_linear_infinite] motion-reduce:animate-[spin_1.5s_linear_infinite]",
-                "border-surface-200 dark:border-surface-700 border-t-primary dark:border-t-primary",
+                "border-hairline-strong border-t-primary dark:border-t-primary",
                 className)}
             role="status">
               <span

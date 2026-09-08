@@ -232,7 +232,7 @@ maxWidth: width,
 width }}
     >
       <div
-        className="flex py-0 px-3 h-full text-xs uppercase font-semibold select-none items-center bg-surface-50 dark:bg-surface-900 text-text-secondary dark:text-surface-400 relative"
+        className="flex py-0 px-3 h-full text-xs uppercase font-semibold select-none items-center bg-surface-sheet text-text-secondary dark:text-surface-400 relative"
         style={{ minWidth: width,
 maxWidth: width }}
       >
@@ -251,7 +251,7 @@ maxWidth: width }}
         </div>
         {showFilter && (
           <div className="relative inline-block">
-            <button aria-label="Filter column" className="p-1 rounded-full text-surface-400 hover:bg-surface-200/50 dark:hover:bg-surface-800/50">
+            <button aria-label="Filter column" className="p-1 rounded-full text-surface-400 hover:bg-surface-hover">
               <MI size={18}>filter_list</MI>
             </button>
           </div>
@@ -283,7 +283,7 @@ function EntityRow({
 
   return (
     <div
-      className={`flex min-w-full text-sm border-b border-surface-200/20 dark:border-surface-700/30 cursor-pointer transition-colors ${isSelected ? "bg-primary/5" : isHovered ? "bg-surface-100/50 dark:bg-surface-800/20" : ""}`}
+      className={`flex min-w-full text-sm border-b border-hairline cursor-pointer transition-colors ${isSelected ? "bg-primary/5" : isHovered ? "bg-surface-field" : ""}`}
       style={{ height: 54 }}
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
@@ -296,7 +296,7 @@ function EntityRow({
 maxWidth: 138,
 width: 138 }}
       >
-        <div className="h-full flex items-center justify-center flex-col bg-surface-50/90 dark:bg-surface-900/90">
+        <div className="h-full flex items-center justify-center flex-col bg-surface-sheet">
           <div className="w-34 flex justify-center gap-0.5">
             <button aria-label="Edit" className="p-1 rounded-full text-surface-400 hover:text-surface-600 dark:hover:text-surface-200">
               <MI size={18}>edit</MI>
@@ -305,7 +305,7 @@ width: 138 }}
               <MI size={20}>more_vert</MI>
             </button>
             <div className="p-1">
-              <div className="border-2 w-4 h-4 rounded flex items-center justify-center bg-white dark:bg-surface-900 border-surface-400 dark:border-surface-500"/>
+              <div className="border-2 w-4 h-4 rounded flex items-center justify-center bg-surface-card border-surface-400 border-hairline-strong"/>
             </div>
           </div>
           <div className="w-[138px] overflow-hidden truncate font-mono text-xs text-text-secondary dark:text-text-secondary-dark px-2 text-center">
@@ -373,7 +373,7 @@ maxWidth: 200,
 width: 200 }}
       >
         {entity.brand ? (
-          <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-200/20 dark:bg-surface-800/30">
+          <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-field">
             <div className="flex items-center gap-1 flex-1 min-w-0">
               <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-primary">
                 <MI size={20}>sell</MI>
@@ -389,7 +389,7 @@ width: 200 }}
             </MI>
           </div>
         ) : (
-          <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-200/20 dark:bg-surface-800/30 justify-between">
+          <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-field justify-between">
             <span className="text-surface-400">—</span>
             <MI size={16} className="text-surface-400">
               keyboard_arrow_down
@@ -405,7 +405,7 @@ width: 200 }}
 maxWidth: 240,
 width: 240 }}
       >
-        <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-200/20 dark:bg-surface-800/30">
+        <div className="min-h-[38px] py-1 px-2 w-full rounded-md text-sm flex items-center bg-surface-field">
           <div className="flex flex-wrap items-center gap-1 flex-1 min-w-0 overflow-hidden max-h-[38px]">
             <span
               className="chip chip-gray whitespace-nowrap"
@@ -804,7 +804,7 @@ active: activeCollection === "tags" }
   return (
     /* ── Scaffold root: exact Scaffold.tsx line 106 ── */
     <div
-      className="flex overflow-hidden bg-surface-50 dark:bg-surface-900 text-surface-900 dark:text-white pointer-events-none select-none relative"
+      className="flex overflow-hidden bg-surface-sheet text-surface-900 dark:text-white pointer-events-none select-none relative"
       style={{ height,
 width: "100%" }}
     >
@@ -820,7 +820,7 @@ width: "100%" }}
       >
         {/* Inner drawer — exact DrawerWrapper innerDrawer, relative mode */}
         <div
-          className="h-full no-scrollbar overflow-y-auto overflow-x-hidden relative bg-surface-50 dark:bg-surface-900"
+          className="h-full no-scrollbar overflow-y-auto overflow-x-hidden relative bg-surface-sheet"
           style={{ width: 72 }}
         >
           <div className="flex flex-col h-full">
@@ -846,13 +846,13 @@ width: "100%" }}
                 </div>
 
                 {/* Collapsible content with nav items — exact DrawerNavigationItem.tsx */}
-                <div className="overflow-hidden bg-surface-50 dark:bg-surface-800/30 rounded-lg">
+                <div className="overflow-hidden bg-surface-field rounded-lg">
                   {NAV_ITEMS.map((item) => (
                     <div key={item.label}>
                       <div
                         className={`rounded-lg truncate flex flex-row items-center h-10 font-semibold text-xs ${
                           item.active
-                            ? "bg-surface-accent-200/60 dark:bg-surface-800 dark:bg-opacity-50"
+                            ? "bg-surface-accent-200/60 bg-surface-raised dark:bg-opacity-50"
                             : "hover:bg-surface-accent-300/75 dark:hover:bg-surface-accent-800/75"
                         } text-text-primary dark:text-surface-200`}
                       >
@@ -873,7 +873,7 @@ width: "100%" }}
 
             {/* ─ DrawerToggle — exact DefaultDrawer.tsx DrawerToggle ─ */}
             <div className="shrink-0 mt-auto px-2 py-2">
-              <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 dark:hover:bg-surface-800 transition-colors duration-150 py-2">
+              <div className="flex flex-row items-center rounded-lg cursor-pointer hover:bg-surface-accent-100 hover:bg-surface-hover transition-colors duration-150 py-2">
                 <div className="shrink-0 flex items-center justify-center w-[56px] h-[24px] text-surface-500 dark:text-surface-400">
                   <MI size={18}>keyboard_double_arrow_right</MI>
                 </div>
@@ -888,13 +888,13 @@ width: "100%" }}
       {/* ═══ Main — exact Scaffold.tsx line 131-148 ═══ */}
       <main className="flex flex-col grow overflow-auto">
         {/* Collection container — exact Scaffold.tsx line 137 */}
-        <div className="border-surface-200/20 dark:border-surface-700/30 bg-surface-50 dark:bg-surface-900 grow overflow-auto m-0 mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border flex flex-col">
+        <div className="border-hairline bg-surface-sheet grow overflow-auto m-0 mt-1 lg:m-0 lg:mx-2 lg:mb-2 lg:rounded-lg lg:border flex flex-col">
           {/* ── Collection Toolbar ── */}
-          <div className="min-h-[48px] overflow-x-auto px-2 md:px-4 bg-surface-50 dark:bg-surface-900 border-b border-surface-200/40 dark:border-surface-700/40 flex flex-row justify-between items-center w-full shrink-0">
+          <div className="min-h-[48px] overflow-x-auto px-2 md:px-4 bg-surface-sheet border-b border-hairline flex flex-row justify-between items-center w-full shrink-0">
             {/* Left side */}
             <div className="flex items-center gap-1 mr-4">
               {/* View Mode Toggle — matches production ViewModeToggle */}
-              <div className="flex items-center bg-surface-100 dark:bg-surface-800 rounded-md p-0.5 gap-0.5">
+              <div className="flex items-center bg-surface-raised rounded-md p-0.5 gap-0.5">
                 {([
                   { mode: "list" as const, icon: "format_list_bulleted", label: "List" },
                   { mode: "table" as const, icon: "list", label: "Table" },
@@ -905,7 +905,7 @@ width: "100%" }}
                     key={mode}
                     className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
                       viewMode === mode
-                        ? "bg-white dark:bg-surface-900 shadow-sm text-primary"
+                        ? "bg-surface-card shadow-sm text-primary"
                         : "text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
                     }`}
                   >
@@ -914,14 +914,14 @@ width: "100%" }}
                   </button>
                 ))}
               </div>
-              <button aria-label="Filter" className="p-1.5 rounded-full text-surface-500 hover:bg-surface-200/50 dark:hover:bg-surface-800">
+              <button aria-label="Filter" className="p-1.5 rounded-full text-surface-500 hover:bg-surface-hover">
                 <MI size={18}>filter_list</MI>
               </button>
             </div>
             {/* Right side */}
             <div className="flex items-center gap-1">
               {/* Search bar — matches production SearchBar expandable */}
-              <div className="flex items-center h-8 rounded-lg bg-surface-accent-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700/60 px-2.5 gap-1.5 min-w-[160px]">
+              <div className="flex items-center h-8 rounded-lg bg-surface-accent-50 bg-surface-sheet border border-hairline px-2.5 gap-1.5 min-w-[160px]">
                 <MI size={16} className="text-surface-400">search</MI>
                 <span className="text-xs text-surface-400 whitespace-nowrap">Search</span>
               </div>
@@ -931,7 +931,7 @@ width: "100%" }}
               <button aria-label="Delete" className="p-1.5 rounded-full text-surface-500 opacity-50">
                 <MI size={18}>delete</MI>
               </button>
-              <button aria-label="Add new entry" className="flex items-center gap-1 min-h-[32px] px-2 rounded-lg border border-primary bg-primary text-white text-sm font-semibold tracking-wide">
+              <button aria-label="Add new entry" className="flex items-center gap-1 min-h-[32px] px-2 rounded-lg border border-primary bg-primary text-white text-sm font-medium">
                 <MI size={18}>add</MI>
               </button>
             </div>
@@ -940,10 +940,10 @@ width: "100%" }}
           {/* ── Content Area ── */}
           {(viewMode === "table" || viewMode === "list") ? (
             /* ── Table / List view ── */
-            <div className="h-full w-full flex flex-col bg-white dark:bg-surface-950 overflow-auto">
+            <div className="h-full w-full flex flex-col bg-surface-card overflow-auto">
               {/* Table header */}
               <div
-                className="sticky top-0 z-10 flex min-w-fit border-b border-surface-200/20 dark:border-surface-700/30 bg-surface-50 dark:bg-surface-900"
+                className="sticky top-0 z-10 flex min-w-fit border-b border-hairline bg-surface-sheet"
                 style={{ height: 44 }}
               >
                 <ColHeader label="" width={138} showFilter={false} align="center"/>
@@ -979,7 +979,7 @@ width: "100%" }}
             </div>
           ) : viewMode === "cards" ? (
             /* ── Cards Grid View ── */
-            <div className="h-full w-full overflow-auto bg-white dark:bg-surface-950 p-3 md:p-4">
+            <div className="h-full w-full overflow-auto bg-surface-card p-3 md:p-4">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {MOCK_ENTITIES.map((entity) => {
                   const merged = { ...entity, ...tableOverrides[entity.id] } as Entity;
@@ -988,7 +988,7 @@ width: "100%" }}
                   return (
                     <div
                       key={entity.id}
-                      className={`rounded-xl border overflow-hidden cursor-pointer transition-all duration-200 border-surface-200 dark:border-surface-700/60 bg-white dark:bg-surface-900 ${
+                      className={`rounded-xl border overflow-hidden cursor-pointer transition-all duration-200 border-hairline bg-surface-sheet ${
                         isHovered
                           ? "ring-1 ring-primary/50 shadow-md scale-[1.02]"
                           : "hover:shadow-sm"
@@ -1037,10 +1037,10 @@ width: "100%" }}
                   return (
                     <div
                       key={col.id}
-                      className="border h-full w-80 min-w-80 mx-2 flex flex-col rounded-md border-surface-200 dark:border-surface-800"
+                      className="border h-full w-80 min-w-80 mx-2 flex flex-col rounded-md border-hairline"
                     >
                       {/* Column header */}
-                      <div className="flex items-center justify-between px-2 rounded-t-md bg-surface-50 dark:bg-surface-800">
+                      <div className="flex items-center justify-between px-2 rounded-t-md bg-surface-raised">
                         <div className="py-3 px-3 flex-grow select-none flex items-center gap-3 text-sm font-semibold text-surface-800 dark:text-surface-200">
                           <div
                             className="w-3 h-3 rounded-full flex-shrink-0"
@@ -1067,7 +1067,7 @@ width: "100%" }}
                             return (
                               <div key={card.id} className="py-1">
                                 {/* Ghost placeholder */}
-                                <div className="h-[56px] rounded-lg border-2 border-dashed border-surface-300/40 dark:border-surface-700/50 bg-surface-100/30 dark:bg-surface-800/10 transition-all duration-200"/>
+                                <div className="h-[56px] rounded-lg border-2 border-dashed border-hairline bg-surface-field transition-all duration-200"/>
                               </div>
                             );
                           }
@@ -1075,7 +1075,7 @@ width: "100%" }}
                           return (
                             <div key={card.id} className="py-1">
                               <div
-                                className={`p-3 flex items-start border rounded-xl cursor-pointer transition-colors border-surface-200 dark:border-surface-700/60 bg-white dark:bg-surface-900 ${
+                                className={`p-3 flex items-start border rounded-xl cursor-pointer transition-colors border-hairline bg-surface-sheet ${
                                   isHighlighted
                                     ? "ring-2 ring-primary"
                                     : "hover:bg-primary/5 dark:hover:bg-primary/5"
@@ -1086,7 +1086,7 @@ width: "100%" }}
                                     <img src={card.image} {...imgDims(card.image)} alt={card.title} className="w-full h-full object-cover" loading="lazy"/>
                                   </div>
                                 ) : (
-                                  <div className="w-10 h-10 rounded-md bg-surface-100 dark:bg-surface-800 shrink-0 mr-2 flex items-center justify-center">
+                                  <div className="w-10 h-10 rounded-md bg-surface-raised shrink-0 mr-2 flex items-center justify-center">
                                     <MI size={18} className="text-surface-400">sell</MI>
                                   </div>
                                 )}
@@ -1145,7 +1145,7 @@ width: "100%" }}
                     }}
                   >
                     <div
-                      className="p-3 flex items-start border rounded-xl ring-2 ring-primary bg-white dark:bg-surface-900 border-surface-200 dark:border-surface-700/60"
+                      className="p-3 flex items-start border rounded-xl ring-2 ring-primary bg-surface-card border-hairline"
                       style={{
                         boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
                         opacity: 0.95
@@ -1156,7 +1156,7 @@ width: "100%" }}
                           <img src={draggedCard.image} {...imgDims(draggedCard.image)} alt={draggedCard.title} className="w-full h-full object-cover"/>
                         </div>
                       ) : (
-                        <div className="w-10 h-10 rounded-md bg-surface-100 dark:bg-surface-800 shrink-0 mr-2 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-md bg-surface-raised shrink-0 mr-2 flex items-center justify-center">
                           <MI size={18} className="text-surface-400">sell</MI>
                         </div>
                       )}
@@ -1184,17 +1184,17 @@ width: "100%" }}
       />
       {/* ═══ Side Panel — always rendered, slides in/out ═══ */}
       <div
-        className="absolute top-0 right-0 h-full w-[55%] max-w-[680px] min-w-[340px] z-40 bg-white dark:bg-surface-900 border-l border-surface-200/20 dark:border-surface-700/30 flex flex-col shadow-2xl transition-transform duration-300 ease-out"
+        className="absolute top-0 right-0 h-full w-[55%] max-w-[680px] min-w-[340px] z-40 bg-surface-card border-l border-hairline flex flex-col shadow-2xl transition-transform duration-300 ease-out"
         style={{ transform: panelOpen ? "translateX(0)" : "translateX(100%)" }}
       >
         {selectedEntity && (
           <>
             {/* Panel top bar */}
-            <div className="h-14 flex items-center px-3 border-b border-surface-200/20 dark:border-surface-700/30 shrink-0 gap-1">
-              <button aria-label="Close panel" className="p-1.5 rounded text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800">
+            <div className="h-14 flex items-center px-3 border-b border-hairline shrink-0 gap-1">
+              <button aria-label="Close panel" className="p-1.5 rounded text-surface-400 hover:bg-surface-hover">
                 <MI size={18}>close</MI>
               </button>
-              <button aria-label="Expand to full screen" className="p-1.5 rounded text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800">
+              <button aria-label="Expand to full screen" className="p-1.5 rounded text-surface-400 hover:bg-surface-hover">
                 <MI size={16}>open_in_full</MI>
               </button>
               <div className="flex-1"/>
@@ -1216,7 +1216,7 @@ width: "100%" }}
                       <MI size={12}>edit</MI> Modified
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-300 text-[10px] font-semibold border border-transparent" style={{ minWidth: 72 }}>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-raised text-surface-500 dark:text-surface-300 text-[10px] font-semibold border border-transparent" style={{ minWidth: 72 }}>
                       <MI size={12}>check</MI> Saved
                     </span>
                   )}
@@ -1228,7 +1228,7 @@ width: "100%" }}
                 </div>
 
                 {/* Path */}
-                <div className="w-full rounded-md bg-surface-100 dark:bg-surface-950 px-3 py-1.5 mb-6">
+                <div className="w-full rounded-md bg-surface-well px-3 py-1.5 mb-6">
                   <code className="text-[11px] text-surface-500">
                     products/{selectedEntityId}
                   </code>
@@ -1255,7 +1255,7 @@ width: "100%" }}
                       {formValues.image ? (
                         <img src={formValues.image} {...imgDims(formValues.image)} alt="" className="w-[100px] h-[100px] object-cover rounded-md"/>
                       ) : (
-                        <div className="w-[100px] h-[100px] rounded-md bg-surface-200/40 dark:bg-surface-700/50 flex items-center justify-center">
+                        <div className="w-[100px] h-[100px] rounded-md bg-surface-raised flex items-center justify-center">
                           <MI size={24} className="text-surface-400">image</MI>
                         </div>
                       )}
@@ -1350,7 +1350,7 @@ width: "100%" }}
             </div>
 
             {/* Panel bottom bar */}
-            <div className="flex items-center justify-between px-3 py-2.5 border-t border-surface-200/20 dark:border-surface-700/30 bg-white dark:bg-surface-900 shrink-0">
+            <div className="flex items-center justify-between px-3 py-2.5 border-t border-hairline bg-surface-card shrink-0">
               <div className="flex items-center gap-1">
                 <button aria-label="Copy" className="p-1.5 rounded text-surface-500">
                   <MI size={16}>content_copy</MI>
@@ -1360,16 +1360,16 @@ width: "100%" }}
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <button className="min-h-[40px] px-3 rounded-lg border border-transparent text-primary text-sm font-semibold tracking-wide">
+                <button className="min-h-[40px] px-3 rounded-lg border border-transparent text-primary text-sm font-medium">
                   Discard
                 </button>
                 <button
                   disabled={!formDirty || isSaving}
-                  className="min-h-[40px] px-3 rounded-lg border border-transparent text-primary text-sm font-semibold tracking-wide disabled:opacity-30"
+                  className="min-h-[40px] px-3 rounded-lg border border-transparent text-primary text-sm font-medium disabled:opacity-30"
                 >
                   {isSaving ? "Saving..." : "Save"}
                 </button>
-                <button className="min-h-[40px] px-3 rounded-lg border border-primary bg-primary text-white text-sm font-semibold tracking-wide">
+                <button className="min-h-[40px] px-3 rounded-lg border border-primary bg-primary text-white text-sm font-medium">
                   Save and close
                 </button>
               </div>

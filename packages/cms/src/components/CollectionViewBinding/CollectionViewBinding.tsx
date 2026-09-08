@@ -1211,7 +1211,7 @@ parentEntityIds,
             : innerView;
 
         const mainContent = (
-            <div className={cls("overflow-hidden h-full w-full rounded-md flex flex-col dark:bg-surface-800", className)}
+            <div className={cls("overflow-hidden h-full w-full rounded-md flex flex-col bg-surface-sheet", className)}
                 ref={containerRef}>
 
                 {countFetcher}
@@ -1533,7 +1533,7 @@ function EntityIdHeaderWidget({
                     </IconButton>
                 }>
                 <div
-                    className={cls("my-2 rounded-lg bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-white")}>
+                    className={cls("my-2 rounded-lg bg-surface-sheet text-surface-900 dark:text-white")}>
                     <form noValidate={true}
                         onSubmit={(e) => {
                             e.preventDefault();
@@ -1564,7 +1564,7 @@ function EntityIdHeaderWidget({
                                 }}
                                 value={searchString}
                                 className="flex-grow"
-                                inputClassName={cls("rounded-lg bg-white dark:bg-surface-900", focusedDisabled)}
+                                inputClassName={cls("rounded-lg bg-surface-card", focusedDisabled)}
                             />
                             <Button variant={"text"}
                                 disabled={!(searchString.trim())}

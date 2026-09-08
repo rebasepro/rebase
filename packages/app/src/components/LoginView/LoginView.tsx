@@ -410,7 +410,7 @@ export function LoginView({
     return (
         <div
             className={cls(
-                "relative flex items-center justify-center h-screen w-screen p-4 transition-opacity duration-500 bg-surface-50 dark:bg-surface-900 overflow-hidden",
+                "relative flex items-center justify-center h-screen w-screen p-4 transition-opacity duration-500 bg-surface-frame overflow-hidden",
                 fadeIn ? "opacity-100" : "opacity-0"
             )}>
 
@@ -431,7 +431,7 @@ export function LoginView({
                 </Menu>
             </div>
 
-            <div className="relative flex flex-col items-center w-[440px] max-w-full p-8 sm:p-10 bg-white/70 dark:bg-surface-800/70 backdrop-blur-xl border border-surface-200/50 dark:border-surface-700/50 rounded-2xl shadow-2xl z-10 transition-all duration-300 hover:shadow-primary-500/5">
+            <div className="relative flex flex-col items-center w-[440px] max-w-full p-8 sm:p-10 bg-surface-card/70 backdrop-blur-xl border border-hairline-strong rounded-2xl shadow-2xl z-10 transition-all duration-300 hover:shadow-primary-500/5">
                 {/* Logo */}
                 <div className="w-24 h-24 m-2 mb-4 drop-shadow-md">
                     {logoComponent}
@@ -1166,7 +1166,7 @@ function ForgotPasswordForm({
                     </IconButton>
                 </div>
 
-                <div className="text-center rounded-xl p-6 bg-surface-50 dark:bg-surface-900/60 dark:border dark:border-surface-700/50">
+                <div className="text-center rounded-xl p-6 bg-surface-raised">
                     <div className="text-3xl mb-3">📧</div>
                     <Typography variant="subtitle1" className="mb-2">
                         Check your email

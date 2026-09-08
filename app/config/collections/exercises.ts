@@ -325,7 +325,7 @@ const exercisesCollection: PostgresCollectionConfig = {
         icon: "Dumbbell",
         group: "Fitness",
         defaultViewMode: "table",
-        enabledViews: ["table", "cards"],
+        enabledViews: ["list", "table", "cards"],
         // `body_parts` is an array of enum values, so naming it as the tags path
         // (rather than computing the labels) is what keeps each chip its own
         // colour — the stated advantage of the path arm over a resolver.

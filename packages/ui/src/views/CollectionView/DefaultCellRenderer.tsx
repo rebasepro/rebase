@@ -232,7 +232,7 @@ function renderString(property: CollectionPropertyConfig, value: unknown): React
                 ) : null}
                 <div className={cls(
                     "w-full h-full items-center justify-center rounded",
-                    "bg-surface-100 dark:bg-surface-800 text-text-secondary dark:text-text-secondary-dark",
+                    "bg-surface-raised text-text-secondary dark:text-text-secondary-dark",
                     strValue ? "hidden" : "flex"
                 )}>
                     <ImageIcon size={iconSize.small} />

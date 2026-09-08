@@ -48,7 +48,7 @@ export function CollectionStudioView({ collectionId, onSave, onCancel, ...props 
     };
 
     return (
-        <div className="flex-grow flex flex-col h-full w-full bg-surface-50 dark:bg-surface-800">
+        <div className="flex-grow flex flex-col h-full w-full bg-surface-sheet">
             <AIModifiedPathsProvider>
                 {activeCollectionId ? (
                     <CollectionEditor

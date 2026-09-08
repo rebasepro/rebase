@@ -88,10 +88,10 @@ export function AdminDemoCarousel({
     // left-aligned heading and a left-aligned frame.
     <div className="not-content flex flex-col items-start" style={rootStyle}>
       {/* Browser frame */}
-      <div className="w-full rounded-2xl overflow-hidden border border-surface-800/80 bg-surface-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55),0_24px_120px_rgba(0,0,0,0.65)]">
+      <div className="w-full rounded-2xl overflow-hidden border border-hairline bg-surface-frame shadow-[0_0_0_1px_rgba(15,23,42,0.55),0_24px_120px_rgba(0,0,0,0.65)]">
         {/* Browser Chrome */}
         <div 
-          className="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 backdrop-blur-md"
+          className="px-4 py-3 border-b border-hairline bg-surface-raised backdrop-blur-md"
           style={{ display: "flex", alignItems: "center", gap: "8px" }}
         >
           <div style={{ display: "flex", flexDirection: "row", gap: "6px", width: "64px", flexShrink: 0 }}>
@@ -100,7 +100,7 @@ export function AdminDemoCarousel({
             <div style={{ width: "10px", height: "10px", borderRadius: "9999px", backgroundColor: "rgba(52, 211, 153, 0.8)", flexShrink: 0 }} />
           </div>
           <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
-            <div className="bg-surface-950/80 border border-surface-800/80 rounded-md px-3 py-1 text-[11px] font-mono text-surface-500" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <div className="bg-surface-well/85 border border-hairline rounded-md px-3 py-1 text-[11px] font-mono text-surface-500" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <Lock size={12} style={{ flexShrink: 0 }} />
               <span style={{ fontSize: "11px", fontFamily: "monospace" }}>admin.yourdomain.com</span>
             </div>
@@ -146,8 +146,8 @@ export function AdminDemoCarousel({
                 onClick={() => handleTabClick(index)}
                 className={`relative overflow-hidden flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium transition-all duration-300 cursor-pointer select-none ${
                   isActive
-                    ? "bg-surface-800/80 text-white border border-surface-700/60"
-                    : "bg-surface-900/40 text-surface-500 border border-surface-800/40 hover:text-surface-300 hover:border-surface-700/60"
+                    ? "bg-surface-raised text-white border border-hairline"
+                    : "bg-surface-raised text-surface-500 border border-hairline hover:text-surface-300 hover:border-hairline-strong"
                 }`}
               >
                 {/* Progress fill for active tab */}

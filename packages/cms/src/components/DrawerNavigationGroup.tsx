@@ -88,7 +88,7 @@ export function DrawerNavigationGroup({
             {!hideHeader && (
                 <div
                     className={cls("pl-3 pr-2 py-0.5 flex flex-row items-center transition-colors",
-                        drawerOpen ? "cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800/40 rounded-lg" : "opacity-0 invisible pointer-events-none"
+                        drawerOpen ? "cursor-pointer hover:bg-surface-hover rounded-lg" : "opacity-0 invisible pointer-events-none"
                     )}
                     onClick={drawerOpen ? onToggleCollapsed : undefined}
                 >

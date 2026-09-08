@@ -230,7 +230,7 @@ export function EuropeMapDemo({ s = {} }: { s?: Record<string, string> }) {
             <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_0.75fr]">
 
                 {/* ── The map ───────────────────────────────────────── */}
-                <div className="relative border-b border-surface-800/60 p-4 sm:p-6 lg:border-b-0 lg:border-r">
+                <div className="relative border-b border-hairline p-4 sm:p-6 lg:border-b-0 lg:border-r">
                     <div
                         className="pointer-events-none absolute inset-0"
                         aria-hidden="true"

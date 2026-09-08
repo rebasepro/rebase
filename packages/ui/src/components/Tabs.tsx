@@ -92,8 +92,8 @@ export function Tabs({
                     className={cls(
                         "absolute left-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center rounded-md transition-all h-8 w-6",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface-400",
-                        !showLeftScroll ? "pointer-events-none opacity-0" : "text-surface-600 dark:text-surface-400 hover:bg-surface-accent-200 dark:hover:bg-surface-accent-800",
-                        "bg-surface-50 dark:bg-surface-900 border shadow-sm", defaultBorderMixin
+                        !showLeftScroll ? "pointer-events-none opacity-0" : "text-surface-600 dark:text-surface-400 hover:bg-surface-hover",
+                        "bg-surface-card border shadow-sm", defaultBorderMixin
                     )}
                 >
                     <ChevronLeftIcon size={iconSize.smallest}/>
@@ -107,9 +107,11 @@ export function Tabs({
 msOverflowStyle: "none" }}
             >
                 <TabsPrimitive.List className={cls(
-                    variant === "standard" && "inline-flex h-9 items-center justify-start rounded-md bg-surface-50 p-1 text-surface-600 dark:bg-surface-900 dark:text-surface-400 gap-2 border",
-                    variant === "standard" && defaultBorderMixin,
-                    variant === "boxy" && "flex items-center h-full",
+                    // A segmented track is a region, not an object: an inset fill and no border.
+                    variant === "standard" && "inline-flex h-9 items-center justify-start rounded-md bg-surface-field p-1 text-surface-600 dark:text-surface-400 gap-2",
+                    // Folder tabs sit on the strip's bottom edge, so the list aligns
+                    // them to the end; the active tab overlaps that edge by 1px.
+                    variant === "boxy" && "flex items-end h-full",
                     variant === "pill" && "flex items-center gap-0.5",
                     innerClassName)
                 }>
@@ -125,8 +127,8 @@ msOverflowStyle: "none" }}
                     className={cls(
                         "absolute right-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center rounded-md transition-all h-8 w-6",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface-400",
-                        !showRightScroll ? "pointer-events-none opacity-0" : "text-surface-600 dark:text-surface-400 hover:bg-surface-accent-200 dark:hover:bg-surface-accent-800",
-                        "bg-surface-50 dark:bg-surface-900 border shadow-sm", defaultBorderMixin
+                        !showRightScroll ? "pointer-events-none opacity-0" : "text-surface-600 dark:text-surface-400 hover:bg-surface-hover",
+                        "bg-surface-card border shadow-sm", defaultBorderMixin
                     )}
                 >
                     <ChevronRightIcon size={iconSize.smallest}/>
@@ -161,14 +163,20 @@ export function Tab({
                 "inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-white transition-all",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface-400 focus-visible:ring-offset-2",
                 "disabled:pointer-events-none disabled:opacity-50",
-                variant === "standard" && "rounded-md px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-surface-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-surface-900 dark:data-[state=active]:text-surface-50",
+                variant === "standard" && "rounded-md px-3 py-1 data-[state=active]:bg-surface-lifted data-[state=active]:text-surface-900 data-[state=active]:shadow-sm dark:data-[state=active]:text-surface-50",
+                // A folder tab. The active one is cut from the same surface as the
+                // panel it opens and sits over the strip's hairline (`-mb-px`), so
+                // it reads as CONNECTED to what it shows rather than underlined,
+                // and the primary is not spent on it. The vertical dividers and
+                // the blue underline this variant used to draw were the boxiest
+                // thing on the record view; the reference separates tabs with
+                // nothing but their own rounded tops.
                 variant === "boxy" && cls(
-                    "flex-shrink-0 flex items-center gap-1.5 px-3.5 h-9 border-r border-surface-200 dark:border-surface-800 cursor-pointer text-xs font-medium transition-colors group relative box-border overflow-hidden",
-                    "border-b-2 border-b-transparent",
-                    "data-[state=active]:bg-surface-50 dark:data-[state=active]:bg-surface-900",
+                    "flex-shrink-0 flex items-center gap-1.5 px-3.5 h-9 cursor-pointer text-xs font-medium transition-colors group relative box-border",
+                    "rounded-t-lg -mb-px border border-transparent border-b-0",
+                    "data-[state=active]:bg-surface-card data-[state=active]:border-hairline",
                     "data-[state=active]:text-text-primary dark:data-[state=active]:text-text-primary-dark",
-                    "data-[state=active]:border-b-primary",
-                    "text-text-secondary dark:text-text-secondary-dark hover:bg-surface-100 dark:hover:bg-surface-800"
+                    "text-text-secondary dark:text-text-secondary-dark hover:bg-surface-hover"
                 ),
                 variant === "pill" && cls(
                     "px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors",

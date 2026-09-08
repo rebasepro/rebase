@@ -149,10 +149,10 @@ export function CollectionListView<T extends Record<string, unknown> = Record<st
                     style={style}
                     className={cls(
                         "flex items-center gap-3 px-4 cursor-pointer",
-                        "hover:bg-surface-50 dark:hover:bg-surface-700",
+                        "hover:bg-surface-hover",
                         "transition-colors duration-100",
                         selected && "bg-primary-50 dark:bg-primary-900/20",
-                        highlighted && "bg-surface-100 dark:bg-surface-800",
+                        highlighted && "bg-surface-raised",
                         rowClassName
                     )}
                     onClick={onClick}

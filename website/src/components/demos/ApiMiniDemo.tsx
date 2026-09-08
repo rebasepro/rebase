@@ -22,11 +22,11 @@ export function ApiMiniDemo() {
     }, []);
 
     return (
-        <div className="h-full w-full bg-surface-950 flex pointer-events-none select-none overflow-hidden relative">
+        <div className="h-full w-full bg-surface-frame flex pointer-events-none select-none overflow-hidden relative">
             {/* Left panel — endpoints list */}
-            <div className="w-[45%] border-r border-surface-800/60 bg-[#161618] flex flex-col">
+            <div className="w-[45%] border-r border-hairline bg-[#161618] flex flex-col">
                 {/* Endpoints header */}
-                <div className="px-3 py-2 border-b border-surface-800/40 text-[8px] font-semibold text-surface-500 uppercase tracking-wider">
+                <div className="px-3 py-2 border-b border-hairline text-[8px] font-semibold text-surface-500 uppercase tracking-wider">
                     Endpoints
                 </div>
                 {/* Active endpoint */}
@@ -52,7 +52,7 @@ export function ApiMiniDemo() {
                     <span className="text-[9px] font-mono text-surface-500">/api/data/posts/:id</span>
                 </div>
                 {/* Animated request line */}
-                <div className="mt-auto px-3 py-2 border-t border-surface-800/40">
+                <div className="mt-auto px-3 py-2 border-t border-hairline">
                     <div className={`h-[1px] w-full bg-gradient-to-r from-green-500/0 via-green-500 to-green-500/0 transform origin-left transition-transform duration-300 ${step >= 1 ? "scale-x-100 opacity-100" : "scale-x-0 opacity-0"}`}/>
                     <div className="text-[8px] text-surface-500 mt-1">{step >= 1 ? "200 OK · 12ms" : "Ready"}</div>
                 </div>
@@ -60,7 +60,7 @@ export function ApiMiniDemo() {
 
             {/* Right panel — response */}
             <div className="flex-1 bg-[#101012] font-mono text-[9px] relative overflow-hidden flex flex-col">
-                <div className="px-3 py-2 border-b border-surface-800/40 text-[8px] font-semibold text-surface-500 uppercase tracking-wider flex items-center gap-2">
+                <div className="px-3 py-2 border-b border-hairline text-[8px] font-semibold text-surface-500 uppercase tracking-wider flex items-center gap-2">
                     Response
                     {step >= 2 && <span className="text-green-400 text-[7px] font-normal normal-case">200 OK</span>}
                 </div>

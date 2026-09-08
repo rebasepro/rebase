@@ -152,7 +152,7 @@ export function CollectionEditorDialog(props: CollectionEditorDialogProps) {
             fullHeight={true}
             scrollable={false}
             maxWidth={"7xl"}
-            className="bg-surface-50 dark:bg-surface-800"
+            className="bg-surface-sheet"
             onOpenChange={(open) => !open ? handleCancel() : undefined}
         >
             <DialogTitle hidden>Collection editor</DialogTitle>
@@ -729,11 +729,11 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         }
     };
 
-    return <div className="h-full w-full flex flex-col bg-surface-50 dark:bg-surface-800">
+    return <div className="h-full w-full flex flex-col bg-surface-sheet">
         <Formex value={formController}>
 
             <>
-                {!isNewCollection && <div className={cls("px-4 py-2 w-full flex shrink-0 items-center justify-between gap-4 bg-surface-50 dark:bg-surface-900 border-b", defaultBorderMixin)}>
+                {!isNewCollection && <div className={cls("px-4 py-2 w-full flex shrink-0 items-center justify-between gap-4 border-b", defaultBorderMixin)}>
                     <div className="flex flex-1 items-center justify-end gap-4 min-w-0">
                         <Tabs value={currentView}
                             className="bg-transparent !w-fit max-w-full"
@@ -802,7 +802,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                     onSubmit={formController.handleSubmit}
                     className="flex-grow flex flex-col min-h-0 relative">
 
-                    <div className="flex-grow flex flex-col min-h-0 relative w-full h-full bg-surface-50 dark:bg-surface-800">
+                    <div className="flex-grow flex flex-col min-h-0 relative w-full h-full bg-surface-sheet">
 
                         {currentView === "loading" &&
                             <CircularProgressCenter/>}
@@ -911,7 +911,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
                     </div>
                     {(!fullScreen || isNewCollection || !!error) && (
-                        <div className="shrink-0 w-full p-4 sm:px-6 sm:py-4 border-t border-surface-200 dark:border-surface-900 flex items-center justify-between gap-4 bg-surface-50 dark:bg-surface-900">
+                        <div className="shrink-0 w-full p-4 sm:px-6 sm:py-4 border-t border-hairline flex items-center justify-between gap-4">
                             {error && <ErrorView error={error}/>}
 
                             {isNewCollection && includeTemplates && currentView === "import_data_mapping" &&

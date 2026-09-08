@@ -10,7 +10,6 @@ import {
     cls,
     CodeIcon,
     CopyIcon,
-    defaultBorderMixin,
     ExternalLinkIcon,
     HistoryIcon,
     IconButton,
@@ -175,9 +174,11 @@ export function EntityIdentityBar({
 
     return (
         <div className={cls(
-            "h-[52px] shrink-0 flex items-center gap-2 pl-1.5 pr-2 border-b",
-            "bg-surface-50 dark:bg-surface-900",
-            defaultBorderMixin
+            // No line under it: the bar and the tab strip below are one band on
+            // the sheet, and the strip already carries the edge the folder tab
+            // sits on. Regions meet with a step, not a rule.
+            "h-[52px] shrink-0 flex items-center gap-2 pl-1.5 pr-2",
+            "bg-surface-sheet"
         )}>
             {leading}
 
@@ -332,17 +333,18 @@ export function EntityIdentityBar({
 
             {trailing}
 
-            {/* Last, and behind a rule. A ✕ that sits flush against Save reads
-                as the next item in the action row, and the two adjacent controls
-                are then "commit this edit" and "abandon it". */}
-            {onClose && <>
-                <Separator orientation={"vertical"} className={"h-5 mx-1 shrink-0"}/>
+            {/* Last, and set apart by space rather than a rule. A ✕ flush against
+                Save reads as the next item in the action row, and the two
+                adjacent controls are then "commit this edit" and "abandon it";
+                the vertical separator that used to fence it off was the one
+                line on the bar, and a line marks an object, not a gap. */}
+            {onClose && (
                 <Tooltip title={`${t("close")} · Esc`}>
-                    <IconButton size={"small"} onClick={onClose} aria-label={t("close")}>
+                    <IconButton size={"small"} onClick={onClose} aria-label={t("close")} className={"ml-2"}>
                         <XIcon size={iconSize.smallest}/>
                     </IconButton>
                 </Tooltip>
-            </>}
+            )}
         </div>
     );
 }
@@ -417,8 +419,8 @@ function IdChip({ value }: { value: string }) {
                     // chip broke across two lines inside a 52px row.
                     "hidden md:inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap px-2 py-0.5 rounded-md",
                     "font-mono text-[11px] text-text-secondary dark:text-text-secondary-dark",
-                    "bg-surface-accent-200/50 dark:bg-white/[0.055]",
-                    "hover:bg-surface-accent-200/75 dark:hover:bg-white/[0.09] transition-colors"
+                    "bg-surface-field",
+                    "hover:bg-surface-field-hover transition-colors"
                 )}>
                 {truncated}
                 {copied ? <CheckIcon size={iconSize.smallest}/> : <CopyIcon size={iconSize.smallest}/>}

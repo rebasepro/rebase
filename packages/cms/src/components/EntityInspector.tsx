@@ -106,7 +106,7 @@ export function EntityInspector({
         // time watching it is worth anything.
         <div className={cls(
             "relative flex flex-col shrink-0 h-full w-full max-w-md border-l",
-            "bg-white dark:bg-surface-800",
+            "bg-surface-card",
             defaultBorderMixin
         )}
         role={"complementary"}

@@ -23,7 +23,7 @@ export function NumberPropertyPreview({
         const enumKey = numValue;
         const enumValues = enumToObjectEntries(property.enum);
         if (!enumValues)
-            return <span className={size === "small" ? "text-sm" : ""}>{numValue}</span>;
+            return <span className={size === "small" ? "font-mono tabular-nums text-sm" : "font-mono tabular-nums"}>{numValue}</span>;
         return <EnumValuesChip
             enumKey={enumKey}
             enumValues={enumValues}
@@ -32,7 +32,7 @@ export function NumberPropertyPreview({
         // `admin.format` only — an undeclared number renders as the number that
         // is in the database, which is the only thing we can honestly claim to
         // know about it.
-        return <span className={size === "small" ? "text-sm" : ""}>
+        return <span className={size === "small" ? "font-mono tabular-nums text-sm" : "font-mono tabular-nums"}>
             {formatNumber(numValue, property.admin?.format, customizationController?.locale)}
         </span>;
     }

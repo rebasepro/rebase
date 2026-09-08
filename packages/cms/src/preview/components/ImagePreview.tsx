@@ -40,7 +40,7 @@ export function ImagePreview({
     if (fill) {
         if (hasError) {
             return (
-                <div className="w-full h-full flex items-center justify-center bg-surface-100 dark:bg-surface-900 rounded-md">
+                <div className="w-full h-full flex items-center justify-center bg-surface-raised rounded-md">
                     <ImageOffIcon className="text-surface-400 dark:text-surface-500"/>
                 </div>
             );
@@ -58,7 +58,7 @@ export function ImagePreview({
     if (size === "small") {
         if (hasError) {
             return (
-                <div className="flex items-center justify-center bg-surface-100 dark:bg-surface-900 rounded-md"
+                <div className="flex items-center justify-center bg-surface-raised rounded-md"
                      style={{ width: imageSize,
 height: imageSize,
 maxHeight: "100%" }}>
@@ -97,7 +97,7 @@ maxHeight: "100%" }}>
             key={"image_preview_" + url}>
 
             {hasError ? (
-                <div className="w-full h-full flex items-center justify-center bg-surface-100 dark:bg-surface-900 rounded-md">
+                <div className="w-full h-full flex items-center justify-center bg-surface-raised rounded-md">
                     <ImageOffIcon className="text-surface-400 dark:text-surface-500"/>
                 </div>
             ) : (
