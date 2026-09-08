@@ -99,7 +99,8 @@ const LONE_DARK_ALLOWED = [
     ["packages/app/src/debug/crm-dashboard/CrmDashboardDemo.tsx", "the toast's inverse ground, the tooltip exception"],
     ["app/frontend/src/BodyPartsField.tsx", "a body-part marker dot, a glyph"]
 ];
-const STUDIO = /\/studio\//;
+// Studio joined the shared ladder on 2026-09-08; nothing is excluded any more.
+const STUDIO = /$^/;
 
 const EXTS = new Set([".tsx", ".ts", ".astro", ".mdx"]);
 const args = process.argv.slice(2);

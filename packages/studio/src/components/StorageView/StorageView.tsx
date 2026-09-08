@@ -199,7 +199,7 @@ function UploadDialog({
                             {selectedFiles.map((file, index) => (
                                 <div
                                     key={`${file.name}-${index}`}
-                                    className="flex items-center justify-between p-2 rounded bg-surface-100 dark:bg-surface-800"
+                                    className="flex items-center justify-between p-2 rounded bg-surface-raised"
                                 >
                                     <div className="flex-1 min-w-0 mr-2">
                                         <Typography variant="body2" className="truncate">
@@ -270,7 +270,7 @@ function FilePreviewPanel({
             <div className={cls(
                 "flex flex-col h-full border-l",
                 defaultBorderMixin,
-                "bg-white dark:bg-surface-800"
+                "bg-surface-card"
             )}>
                 {/* Header */}
                 <div className={cls("flex items-center justify-between p-3 border-b shrink-0", defaultBorderMixin)}>
@@ -305,7 +305,7 @@ function FilePreviewPanel({
 
                 {/* Preview */}
                 <div className="flex-1 overflow-auto">
-                    <div className={cls("flex flex-col items-center justify-center min-h-[200px] p-4 bg-surface-50 dark:bg-surface-800 border-b", defaultBorderMixin)}>
+                    <div className={cls("flex flex-col items-center justify-center min-h-[200px] p-4 bg-surface-sheet border-b", defaultBorderMixin)}>
                         {(() => {
                             const ext = getExtension(file.name)?.toLowerCase() || "";
                             const isImage = file.contentType?.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
@@ -410,7 +410,7 @@ function FilePreviewPanel({
                                 <div
                                     className={cls(
                                         "flex items-center gap-2 p-2 rounded cursor-pointer transition-colors",
-                                        "bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700"
+                                        "bg-surface-raised hover:bg-surface-raised-hover"
                                     )}
                                     onClick={() => {
                                         const fullUrl = downloadUrl.startsWith("http")
@@ -1040,7 +1040,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             defaultBorderMixin,
                                             isChecked
                                                 ? "bg-primary/5 dark:bg-primary/10"
-                                                : "hover:bg-surface-100 dark:hover:bg-surface-800"
+                                                : "hover:bg-surface-hover"
                                         )}
                                         onClick={(e) => handleItemClick(folder, e)}
                                         onDoubleClick={() => handleItemDoubleClick(folder)}
@@ -1093,7 +1093,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             defaultBorderMixin,
                                             isChecked
                                                 ? "bg-primary/5 dark:bg-primary/10"
-                                                : "hover:bg-surface-100 dark:hover:bg-surface-800"
+                                                : "hover:bg-surface-hover"
                                         )}
                                         onClick={(e) => handleItemClick(file, e)}
                                         onDoubleClick={() => handleItemDoubleClick(file)}
@@ -1168,7 +1168,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             "rounded-lg p-3 cursor-pointer border",
                                             "transition-colors duration-150",
                                             defaultBorderMixin,
-                                            "hover:bg-surface-100 dark:hover:bg-surface-800 hover:shadow-sm",
+                                            "hover:bg-surface-hover hover:shadow-sm",
                                             "flex items-center gap-2",
                                             isChecked && "ring-2 ring-primary bg-primary/5 dark:bg-primary/10"
                                         )}
@@ -1214,7 +1214,7 @@ message: e instanceof Error ? e.message : String(e) });
                                         onDoubleClick={() => handleItemDoubleClick(file)}
                                     >
                                         {/* Thumbnail or icon */}
-                                        <div className="aspect-square relative overflow-hidden bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
+                                        <div className="aspect-square relative overflow-hidden bg-surface-raised flex items-center justify-center">
                                             {isImage && file.downloadUrl ? (
                                                 <img
                                                     src={file.downloadUrl}
@@ -1254,12 +1254,12 @@ message: e instanceof Error ? e.message : String(e) });
     };
 
     return (
-        <div className="flex h-full w-full bg-white dark:bg-surface-800 overflow-hidden text-text-primary dark:text-text-primary-dark">
+        <div className="flex h-full w-full bg-surface-card overflow-hidden text-text-primary dark:text-text-primary-dark">
             <div className="flex h-full w-full">
                 {/* Main content */}
                 <div className="flex-grow flex flex-col min-w-0 h-full">
                             {/* Toolbar */}
-                            <div className={cls("flex items-center justify-between pr-2 border-b bg-white dark:bg-surface-800 shrink-0 h-10", defaultBorderMixin)}>
+                            <div className={cls("flex items-center justify-between pr-2 border-b bg-surface-card shrink-0 h-10", defaultBorderMixin)}>
                                 <div className="flex items-center gap-1.5 flex-grow overflow-hidden px-3 py-2">
                                     {/* Breadcrumbs — always visible */}
                                     {currentPath && (
@@ -1360,7 +1360,7 @@ message: e instanceof Error ? e.message : String(e) });
                                         <IconButton
                                             size="small"
                                             onClick={() => setViewMode("grid")}
-                                            className={cls(viewMode === "grid" && "bg-surface-100 dark:bg-surface-800")}
+                                            className={cls(viewMode === "grid" && "bg-surface-raised")}
                                         >
                                             <LayoutGridIcon size={iconSize.smallest}/>
                                         </IconButton>
@@ -1369,13 +1369,13 @@ message: e instanceof Error ? e.message : String(e) });
                                         <IconButton
                                             size="small"
                                             onClick={() => setViewMode("list")}
-                                            className={cls(viewMode === "list" && "bg-surface-100 dark:bg-surface-800")}
+                                            className={cls(viewMode === "list" && "bg-surface-raised")}
                                         >
                                             <ListIcon size={iconSize.smallest}/>
                                         </IconButton>
                                     </Tooltip>
 
-                                    <div className={cls("h-4 w-px mx-0.5", defaultBorderMixin, "bg-surface-200 dark:bg-surface-700")}/>
+                                    <div className={cls("h-4 w-px mx-0.5", defaultBorderMixin, "bg-surface-raised")}/>
 
                                     <Tooltip title="Refresh">
                                         <IconButton size="small" onClick={handleRefresh} disabled={loading}>
@@ -1422,7 +1422,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 {/* Drag overlay */}
                                 {isDragActive && (
                                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-primary/5 dark:bg-primary/10 backdrop-blur-[2px]">
-                                        <div className="flex flex-col items-center gap-2 p-6 rounded-xl border-2 border-dashed border-primary bg-white/80 dark:bg-surface-900/80">
+                                        <div className="flex flex-col items-center gap-2 p-6 rounded-xl border-2 border-dashed border-primary bg-surface-scrim">
                                             <UploadCloudIcon className="w-10 h-10 text-primary"/>
                                             <Typography variant="subtitle2" className="text-primary font-semibold">
                                                 Drop files to upload
@@ -1436,7 +1436,7 @@ message: e instanceof Error ? e.message : String(e) });
                             </div>
 
                             {/* Status bar */}
-                            <div className={cls("px-4 py-1.5 border-t bg-surface-50 dark:bg-surface-800 flex items-center justify-between shrink-0", defaultBorderMixin)}>
+                            <div className={cls("px-4 py-1.5 border-t bg-surface-sheet flex items-center justify-between shrink-0", defaultBorderMixin)}>
                                 <div className="flex items-center gap-4 text-[11px]">
                                     <span className="text-text-disabled dark:text-text-disabled-dark font-semibold uppercase tracking-tighter">
                                         Path

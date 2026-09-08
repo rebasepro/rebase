@@ -23,7 +23,8 @@ import {
     defaultBorderMixin,
     CircularProgress,
     ResizablePanels,
-    IconButton
+    IconButton,
+    useIsDarkMode
 } from "@rebasepro/ui";
 import {
     useStudioCollectionRegistry,
@@ -58,6 +59,11 @@ function SchemaVisualizerCanvas({
 }) {
     const reactFlowInstance = useReactFlow();
     const liveRls = useLiveRlsTables();
+    // React Flow stamps its own `light` / `dark` class on the canvas. Left at
+    // the default it stamps `light` under a dark app, which is a class our
+    // theme used to answer to, and the whole canvas re-lit itself. Follow the
+    // app instead so its controls, minimap and our tokens all agree.
+    const isDark = useIsDarkMode();
     const {
         nodes: layoutedNodes,
         edges: layoutedEdges,
@@ -230,14 +236,14 @@ duration: 400 }
             firstPanel={
                 <div
                     className={cls(
-                        "flex flex-col h-full w-full bg-white dark:bg-surface-950 border-r",
+                        "flex flex-col h-full w-full bg-surface-card border-r",
                         defaultBorderMixin
                     )}
                 >
                     {/* Sidebar header */}
                     <div
                         className={cls(
-                            "flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]",
+                            "flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]",
                             defaultBorderMixin
                         )}
                     >
@@ -256,7 +262,7 @@ duration: 400 }
                     </div>
 
                     {/* Search */}
-                    <div className="px-2 py-1.5 border-b border-surface-200/40 dark:border-surface-700/40">
+                    <div className="px-2 py-1.5 border-b border-hairline">
                         <SearchBar
                             size="smallest"
                             placeholder="Filter tables…"
@@ -283,7 +289,7 @@ duration: 400 }
                                             "flex items-center p-1.5 cursor-pointer rounded transition-colors group",
                                             isSelected
                                                 ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
-                                                : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-secondary dark:text-text-secondary-dark"
+                                                : "hover:bg-surface-hover text-text-secondary dark:text-text-secondary-dark"
                                         )}
                                     >
                                         <div className="shrink-0 mr-1.5 text-text-disabled dark:text-text-disabled-dark">
@@ -365,7 +371,7 @@ duration: 400 }
                                                     "flex items-center p-1.5 cursor-pointer rounded transition-colors",
                                                     isSelected
                                                         ? "bg-primary/10 text-primary dark:bg-primary/20"
-                                                        : "hover:bg-surface-100 dark:hover:bg-surface-950 text-text-disabled dark:text-text-disabled-dark"
+                                                        : "hover:bg-surface-hover text-text-disabled dark:text-text-disabled-dark"
                                                 )}
                                             >
                                                 <svg
@@ -398,7 +404,7 @@ duration: 400 }
                     {/* Stats footer */}
                     <div
                         className={cls(
-                            "px-3 py-2 border-t bg-surface-50 dark:bg-surface-900 space-y-1",
+                            "px-3 py-2 border-t bg-surface-sheet space-y-1",
                             defaultBorderMixin
                         )}
                     >
@@ -451,11 +457,11 @@ duration: 400 }
                 </div>
             }
             secondPanel={
-                <div className="flex-grow flex flex-col min-w-0 h-full w-full bg-white dark:bg-surface-950">
+                <div className="flex-grow flex flex-col min-w-0 h-full w-full bg-surface-card">
                     {/* Toolbar */}
                     <div
                         className={cls(
-                            "flex items-center justify-between pr-2 border-b bg-white dark:bg-surface-950 min-h-[46px]",
+                            "flex items-center justify-between pr-2 border-b bg-surface-card min-h-[46px]",
                             defaultBorderMixin
                         )}
                     >
@@ -530,19 +536,20 @@ duration: 400 }
                             minZoom={0.1}
                             maxZoom={2}
                             proOptions={{ hideAttribution: true }}
-                            className="bg-surface-50 dark:bg-surface-950"
+                            colorMode={isDark ? "dark" : "light"}
+                            className="bg-surface-well"
                         >
                             <Background
                                 variant={BackgroundVariant.Dots}
                                 gap={20}
                                 size={1}
-                                className="!bg-surface-50 dark:!bg-surface-950"
-                                color="var(--rf-bg-dot, #d4d4d8)"
+                                className="!bg-surface-well"
+                                color={isDark ? "#2a2a2a" : "#d9d9dc"}
                             />
                             <Controls
                                 showInteractive={false}
                                 // mb clears the legend overlay pinned at bottom-left
-                                className="!mb-16 !bg-white dark:!bg-surface-900 !border !border-surface-200/40 dark:!border-surface-700/40 !shadow-sm !rounded-lg dark:[--xy-controls-button-background-color:var(--color-surface-900)] dark:[--xy-controls-button-background-color-hover:var(--color-surface-800)] dark:[--xy-controls-button-color:var(--color-surface-300)] dark:[--xy-controls-button-color-hover:var(--color-surface-50)] dark:[--xy-controls-button-border-color:var(--color-surface-700)]"
+                                className="!mb-16 !bg-surface-card !border !border-hairline !shadow-sm !rounded-lg [--xy-controls-button-background-color:var(--color-surface-card)] [--xy-controls-button-background-color-hover:var(--color-surface-card-hover)] [--xy-controls-button-color:var(--color-text-secondary)] dark:[--xy-controls-button-color:var(--color-text-secondary-dark)] [--xy-controls-button-color-hover:var(--color-text-primary)] dark:[--xy-controls-button-color-hover:var(--color-text-primary-dark)] [--xy-controls-button-border-color:var(--color-hairline)]"
                             />
                             <MiniMap
                                 nodeStrokeColor={(n) => {
@@ -553,16 +560,18 @@ duration: 400 }
                                 }}
                                 nodeColor={(n) => {
                                     const d = n.data as TableNodeData;
-                                    if (d.isJunction) return "#ede9fe";
-                                    return "#eef2ff";
+                                    // Tinted, not white: the minimap is a card, and its nodes
+                                    // read as tiles on it in either theme.
+                                    if (d.isJunction) return isDark ? "#3b2f6b" : "#ede9fe";
+                                    return isDark ? "#2b2d4a" : "#eef2ff";
                                 }}
-                                maskColor="rgba(0,0,0,0.08)"
-                                className="!bg-white dark:!bg-surface-900 !border !border-surface-200/40 dark:!border-surface-700/40 !shadow-sm !rounded-lg"
+                                maskColor={isDark ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.08)"}
+                                className="!bg-surface-card !border !border-hairline !shadow-sm !rounded-lg"
                             />
                         </ReactFlow>
 
                         {/* Legend overlay */}
-                        <div className="absolute bottom-4 left-4 flex items-center gap-3 px-3 py-2 bg-white/90 dark:bg-surface-900/90 backdrop-blur-sm rounded-lg border border-surface-200/40 dark:border-surface-700/40 shadow-sm">
+                        <div className="absolute bottom-4 left-4 flex items-center gap-3 px-3 py-2 bg-surface-card/90 backdrop-blur-sm rounded-lg border border-hairline shadow-sm">
                             <div className="flex items-center gap-1.5">
                                 <div className="w-6 h-0.5 bg-indigo-500 rounded"/>
                                 <Typography
@@ -596,7 +605,7 @@ duration: 400 }
                                     Inverse
                                 </Typography>
                             </div>
-                            <div className="h-3 w-px bg-surface-200 dark:bg-surface-700"/>
+                            <div className="h-3 w-px bg-surface-raised"/>
                             <div className="flex items-center gap-1">
                                 <span className="text-[9px]">🔑</span>
                                 <Typography
@@ -680,7 +689,7 @@ export const SchemaVisualizer = () => {
     const collections = registryCollections;
 
     return (
-        <div className="flex h-full w-full bg-white dark:bg-surface-950 overflow-hidden text-text-primary dark:text-text-primary-dark">
+        <div className="flex h-full w-full bg-surface-card overflow-hidden text-text-primary dark:text-text-primary-dark">
             <ReactFlowProvider>
                 <SchemaVisualizerCanvas collections={collections}/>
             </ReactFlowProvider>

@@ -134,14 +134,14 @@ export function ApiKeysView() {
 
     return (
         <>
-            <div className="flex h-full w-full overflow-hidden bg-white dark:bg-surface-950">
+            <div className="flex h-full w-full overflow-hidden bg-surface-card">
                 {/* ── Key List ── */}
                 <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
-                    <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                    <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                         <div className="flex items-center gap-2">
                             <KeyRoundIcon size={iconSize.smallest} className="text-primary"/>
                             <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_api_keys")}</Typography>
-                            <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{activeKeys.length}</Chip>
+                            <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{activeKeys.length}</Chip>
                         </div>
                         <div className="flex items-center gap-1">
                             <IconButton size="small" onClick={loadKeys} title="Refresh"><RefreshCwIcon size={iconSize.smallest}/></IconButton>
@@ -192,7 +192,7 @@ export function ApiKeysView() {
                     ) : (
                         <>
                             {/* Header */}
-                            <div className={cls("flex items-center justify-between px-5 py-3 border-b bg-white dark:bg-surface-950 min-h-[56px]", defaultBorderMixin)}>
+                            <div className={cls("flex items-center justify-between px-5 py-3 border-b bg-surface-card min-h-[56px]", defaultBorderMixin)}>
                                 <div className="flex items-center gap-3 min-w-0">
                                     <KeyRoundIcon size={iconSize.small} className="text-primary shrink-0"/>
                                     <div className="min-w-0">
@@ -220,7 +220,7 @@ export function ApiKeysView() {
                             </div>
 
                             {/* Stats */}
-                            <div className="px-5 py-4 bg-surface-50 dark:bg-surface-900/50">
+                            <div className="px-5 py-4 bg-surface-sheet">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                     <StatCard label={t("studio_api_keys_stat_status")} value={t(`studio_api_keys_status_${keyStatus(selectedKey).kind}`)} className={keyStatus(selectedKey).color}/>
                                     <StatCard label={t("created")} value={formatRelative(selectedKey.created_at)}/>
@@ -239,9 +239,9 @@ export function ApiKeysView() {
                             </div>
 
                             {/* Permissions */}
-                            <div className={cls("flex items-center gap-2 px-5 py-2 border-y bg-white dark:bg-surface-950", defaultBorderMixin)}>
+                            <div className={cls("flex items-center gap-2 px-5 py-2 border-y bg-surface-card", defaultBorderMixin)}>
                                 <Typography variant="subtitle2" className="font-semibold text-[13px]">{t("studio_api_keys_permissions")}</Typography>
-                                <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
+                                <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">
                                     {selectedKey.permissions.length}
                                 </Chip>
                             </div>
@@ -381,7 +381,7 @@ function KeyListItem({ apiKey, selected, onClick }: { apiKey: ApiKeyMasked; sele
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all",
                 selected
                     ? "bg-primary/10 dark:bg-primary/15 ring-1 ring-primary/30"
-                    : "hover:bg-surface-100 dark:hover:bg-surface-950"
+                    : "hover:bg-surface-hover"
             )}
         >
             <div className={cls("w-2 h-2 rounded-full shrink-0",
@@ -408,7 +408,7 @@ function KeyListItem({ apiKey, selected, onClick }: { apiKey: ApiKeyMasked; sele
 
 function StatCard({ label, value, mono, className }: { label: string; value: string; mono?: boolean; className?: string }) {
     return (
-        <div className={cls("px-3 py-2 rounded-lg border bg-white dark:bg-surface-900", defaultBorderMixin)}>
+        <div className={cls("px-3 py-2 rounded-lg border bg-surface-card", defaultBorderMixin)}>
             <Typography variant="caption" color="secondary" className="text-[10px] uppercase tracking-wider font-medium">{label}</Typography>
             <Typography variant="body2" className={cls(
                 "mt-0.5 font-semibold text-[13px]",
@@ -460,7 +460,7 @@ function SecretDisplayDialog({ keyWithSecret, onClose }: { keyWithSecret: ApiKey
                     </Typography>
                 </div>
 
-                <div className={cls("flex items-center gap-2 p-3 rounded-lg border bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+                <div className={cls("flex items-center gap-2 p-3 rounded-lg border bg-surface-sheet", defaultBorderMixin)}>
                     <code className="flex-1 text-[12px] font-mono break-all text-surface-700 dark:text-surface-300 select-all">
                         {keyWithSecret.key}
                     </code>

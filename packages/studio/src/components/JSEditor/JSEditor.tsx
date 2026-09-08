@@ -678,10 +678,10 @@ message: t("studio_sql_markdown_copy_failed") });
                     secondPanel={
                         <div className="flex flex-col h-full overflow-hidden">
                             {/* Toolbar: matching SQL Editor layout */}
-                            <div className={cls("flex items-center justify-between pr-2 border-b bg-white dark:bg-surface-950", defaultBorderMixin)}>
+                            <div className={cls("flex items-center justify-between pr-2 border-b bg-surface-card", defaultBorderMixin)}>
                                 <div className="flex items-center flex-grow overflow-hidden mr-4">
                                     <div className="flex items-center no-scrollbar overflow-x-auto min-w-0">
-                                        <Tabs value={activeTabId} onValueChange={setActiveTabId} variant="boxy" className="w-[unset] flex-shrink-0" innerClassName="bg-white dark:bg-surface-950">
+                                        <Tabs value={activeTabId} onValueChange={setActiveTabId} variant="boxy" className="w-[unset] flex-shrink-0" innerClassName="bg-surface-card">
                                             {tabs.map(tab => (
                                                 <Tab key={tab.id} value={tab.id} className="flex items-center justify-between group max-w-[200px]">
                                                     <TerminalIcon size={iconSize.smallest} className="text-amber-500 mr-1.5 flex-shrink-0"/>
@@ -751,7 +751,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                     firstPanel={
                                         <div className="h-full w-full overflow-hidden flex flex-col">
                                             {/* Auth Simulation UI */}
-                                            <div className="p-2 px-3 border-b border-surface-200 dark:border-surface-950 bg-surface-50 dark:bg-surface-900 flex items-center shrink-0">
+                                            <div className="p-2 px-3 border-b border-hairline bg-surface-sheet flex items-center shrink-0">
                                                 <AuthSimulationSelector
                                                     authMode={authMode}
                                                     setAuthMode={setAuthMode}
@@ -775,9 +775,9 @@ message: t("studio_sql_markdown_copy_failed") });
                                         </div>
                                     }
                                     secondPanel={
-                                        <div className="h-full w-full flex flex-col bg-surface-50 dark:bg-surface-950 overflow-hidden min-h-0">
+                                        <div className="h-full w-full flex flex-col bg-surface-well overflow-hidden min-h-0">
                                             {/* Result header — matches SQL editor */}
-                                            <div className={cls("p-2 px-4 bg-surface-100 dark:bg-surface-900 border-b shrink-0 flex items-center", defaultBorderMixin)}>
+                                            <div className={cls("p-2 px-4 bg-surface-raised border-b shrink-0 flex items-center", defaultBorderMixin)}>
                                                 <Typography variant="caption" className="font-semibold text-text-disabled dark:text-text-disabled-dark uppercase tracking-widest text-[10px]">
                                                     {t("studio_sql_query_results")}
                                                 </Typography>
@@ -816,7 +816,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                                     <div className="flex-grow flex items-center justify-center text-text-disabled dark:text-text-disabled-dark">
                                                         <div className="text-center">
                                                             <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                                            <Typography variant="body2">Write JavaScript and press <kbd className="px-1.5 py-0.5 rounded bg-surface-200 dark:bg-surface-700 text-[11px] font-mono">⌘ Enter</kbd> to run</Typography>
+                                                            <Typography variant="body2">Write JavaScript and press <kbd className="px-1.5 py-0.5 rounded bg-surface-raised text-[11px] font-mono">⌘ Enter</kbd> to run</Typography>
                                                         </div>
                                                     </div>
                                                 )}
@@ -844,7 +844,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                                     <div className="flex-grow flex flex-col overflow-hidden min-h-0">
                                                         {/* Collection badges bar — matching SQL editor */}
                                                         {matchedCollections.length > 0 && (
-                                                            <div className={cls("px-4 py-1.5 border-b flex items-center gap-2 shrink-0 bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+                                                            <div className={cls("px-4 py-1.5 border-b flex items-center gap-2 shrink-0 bg-surface-sheet", defaultBorderMixin)}>
                                                                 <Tooltip title={t("studio_sql_admin_collections_tooltip")}>
                                                                     <Typography variant="caption" className="text-[10px] font-semibold uppercase tracking-widest text-text-disabled dark:text-text-disabled-dark mr-1 shrink-0 cursor-help">{t("studio_sql_collections_label")}</Typography>
                                                                 </Tooltip>
@@ -999,7 +999,7 @@ id: String(ra.entityId) })}
 
                                             {/* Footer bar — matching SQL editor */}
                                             {!isRunning && result && !result.error && resultView === "table" && tableData.data.length > 0 && (
-                                                <div className={cls("p-2 px-4 border-t bg-surface-50 dark:bg-surface-900 flex justify-between items-center shrink-0", defaultBorderMixin)}>
+                                                <div className={cls("p-2 px-4 border-t bg-surface-sheet flex justify-between items-center shrink-0", defaultBorderMixin)}>
                                                     <div className="flex space-x-4">
                                                         <div className="flex items-center text-[11px]">
                                                             <span className="font-semibold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_rows")}</span>

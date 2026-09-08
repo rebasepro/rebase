@@ -150,7 +150,7 @@ allEndpoints: [] };
                 className={cls(
                     "w-72 min-w-[272px] flex flex-col h-full overflow-hidden border-r",
                     defaultBorderMixin,
-                    "bg-surface-50 dark:bg-surface-900"
+                    "bg-surface-sheet"
                 )}
             >
                 {/* Header */}
@@ -203,7 +203,7 @@ allEndpoints: [] };
                                         className={cls(
                                             "!justify-between !px-2.5 !py-1.5 !text-left !text-sm",
                                             isSelected
-                                                ? "bg-surface-200 dark:bg-surface-800 font-medium"
+                                                ? "bg-surface-raised font-medium"
                                                 : "text-text-primary dark:text-text-primary-dark"
                                         )}
                                     >
@@ -241,7 +241,7 @@ allEndpoints: [] };
                             className={cls(
                                 "flex items-center justify-between px-5 py-3 gap-4 shrink-0 border-b z-10",
                                 defaultBorderMixin,
-                                "bg-surface-50/80 dark:bg-surface-950/80 backdrop-blur-md sticky top-0"
+                                "bg-surface-sheet/90 backdrop-blur-md sticky top-0"
                             )}
                         >
                             <div className="flex items-center gap-3 min-w-0">

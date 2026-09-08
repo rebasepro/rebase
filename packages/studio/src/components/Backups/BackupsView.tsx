@@ -126,14 +126,14 @@ export function BackupsView() {
     }
 
     return (
-        <div className="flex flex-col h-full w-full overflow-hidden bg-white dark:bg-surface-950">
+        <div className="flex flex-col h-full w-full overflow-hidden bg-surface-card">
             {/* Header */}
-            <div className={cls("flex items-center justify-between px-5 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+            <div className={cls("flex items-center justify-between px-5 py-2.5 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                 <div className="flex items-center gap-2">
                     <DatabaseIcon size={iconSize.small} className="text-primary"/>
                     <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_backups")}</Typography>
-                    <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{backups.length}</Chip>
-                    <Chip size="smallest" className="bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400 uppercase font-mono text-[10px]">{destinationKind}</Chip>
+                    <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{backups.length}</Chip>
+                    <Chip size="smallest" className="bg-surface-raised text-surface-500 dark:text-surface-400 uppercase font-mono text-[10px]">{destinationKind}</Chip>
                 </div>
                 <IconButton size="small" onClick={load} title="Refresh">
                     <RefreshCwIcon size={iconSize.smallest}/>
@@ -176,7 +176,7 @@ export function BackupsView() {
                         {backups.map(backup => (
                             <div
                                 key={backup.key}
-                                className={cls("flex items-center gap-3 px-4 py-3 rounded-lg border bg-white dark:bg-surface-900", defaultBorderMixin)}
+                                className={cls("flex items-center gap-3 px-4 py-3 rounded-lg border bg-surface-card", defaultBorderMixin)}
                             >
                                 <DatabaseIcon size={iconSize.small} className="text-surface-400 shrink-0"/>
                                 <div className="flex-1 min-w-0">

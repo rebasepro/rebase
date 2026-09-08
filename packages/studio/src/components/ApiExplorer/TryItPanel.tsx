@@ -261,7 +261,7 @@ value: "" }])}
                 )}
 
                 {/* URL Preview */}
-                <div className="rounded-lg bg-surface-100 dark:bg-surface-900 p-3">
+                <div className="rounded-lg bg-surface-raised p-3">
                     <Typography
                         variant="caption"
                         className="text-text-secondary dark:text-text-secondary-dark text-[10px] uppercase tracking-wider block mb-1"
@@ -294,7 +294,7 @@ value: "" }])}
                         <div
                             className={cls(
                                 "flex items-center justify-between px-4 py-2.5",
-                                "bg-surface-50 dark:bg-surface-900/50"
+                                "bg-surface-sheet"
                             )}
                         >
                             <div className="flex items-center gap-3">
@@ -316,8 +316,7 @@ value: "" }])}
                         <pre
                             className={cls(
                                 "p-4 text-xs font-mono overflow-auto max-h-96",
-                                "bg-surface-950 text-emerald-400",
-                                "dark:bg-surface-900 dark:text-emerald-400"
+                                "bg-surface-well text-emerald-700 dark:text-emerald-400"
                             )}
                         >
                             {response.body}

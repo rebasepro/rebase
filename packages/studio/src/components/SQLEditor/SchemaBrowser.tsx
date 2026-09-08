@@ -43,7 +43,7 @@ export const SchemaBrowser = ({
 
     return (
         <div className="flex flex-col h-full overflow-hidden">
-            <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+            <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                 <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_schema_tables")}</Typography>
                 <IconButton size="small" onClick={onRetrySchema} title="Refresh schema">
                     <RefreshCwIcon size={iconSize.smallest}/>
@@ -58,7 +58,7 @@ export const SchemaBrowser = ({
                 ) : Object.entries(schemas).map(([schemaName, tables]) => (
                     <div key={schemaName} className="mb-2">
                         <div
-                            className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors"
+                            className="flex items-center p-1 cursor-pointer hover:bg-surface-hover rounded transition-colors"
                             onClick={() => setExpandedSchemas(prev => ({ ...prev,
 [schemaName]: !prev[schemaName] }))}
                         >
@@ -71,7 +71,7 @@ export const SchemaBrowser = ({
                                 {tables.map(table => (
                                     <div key={table.tableName}>
                                         <div
-                                            className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors group relative"
+                                            className="flex items-center p-1 cursor-pointer hover:bg-surface-hover rounded transition-colors group relative"
                                             onClick={() => setExpandedTables(prev => ({ ...prev,
 [`${schemaName}.${table.tableName}`]: !prev[`${schemaName}.${table.tableName}`] }))}
                                         >
@@ -79,7 +79,7 @@ export const SchemaBrowser = ({
                                             <svg className="w-3.5 h-3.5 mr-1 shrink-0 text-text-disabled dark:text-text-disabled-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                             <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark text-xs truncate flex-1 min-w-0">{table.tableName}</Typography>
 
-                                            <div className="flex opacity-0 group-hover:opacity-100 focus-within:opacity-100 absolute right-1 items-center bg-surface-100 dark:bg-surface-800 px-1 gap-1 rounded transition-opacity">
+                                            <div className="flex opacity-0 group-hover:opacity-100 focus-within:opacity-100 absolute right-1 items-center bg-surface-raised px-1 gap-1 rounded transition-opacity">
                                                 <IconButton
                                                     size="small"
                                                     onClick={(e) => {
@@ -137,13 +137,13 @@ export const SchemaBrowser = ({
                                         {expandedTables[`${schemaName}.${table.tableName}`] && (
                                             <div className={cls("ml-5 mt-1 space-y-0.5 border-l", defaultBorderMixin)}>
                                                 {table.columns.map(col => (
-                                                    <div key={col.name} className="flex items-center p-1 group pl-2 hover:bg-surface-50 dark:hover:bg-surface-900 rounded-r relative min-h-[28px]">
+                                                    <div key={col.name} className="flex items-center p-1 group pl-2 hover:bg-surface-hover rounded-r relative min-h-[28px]">
                                                         <svg className="w-3 h-3 mr-1.5 text-text-disabled dark:text-text-disabled-dark shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 4.5v15m6-15v15m-10.5-1.5h15c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125h-15c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125Z"/></svg>
                                                         <Typography variant="caption" className="text-text-primary dark:text-text-primary-dark text-[11px] truncate flex-grow mr-2">{col.name}</Typography>
                                                         <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark text-[9px] truncate mr-1 uppercase shrink-0" title={col.dataType}>{col.dataType}</Typography>
                                                         <IconButton
                                                             size="smallest"
-                                                            className="opacity-0 group-hover:opacity-100 absolute right-1 bg-surface-50 dark:bg-surface-800 transition-colors pointer-events-auto"
+                                                            className="opacity-0 group-hover:opacity-100 absolute right-1 bg-surface-sheet transition-colors pointer-events-auto"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 navigator.clipboard.writeText(col.name);

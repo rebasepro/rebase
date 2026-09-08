@@ -220,8 +220,6 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
         const computedDrawerHovered = Boolean(largeLayout && onHover);
 
         const adminModeController = useAdminModeController();
-        const isStudioDark = adminModeController.mode === "studio";
-
 
         const hasAppBar = Boolean(appBarChildren.length > 0);
         const appContextValue = useMemo(() => ({
@@ -257,7 +255,6 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
                         onMouseLeave={setOnHoverFalse}
                         open={drawerOpen}
                         hovered={onHover}
-                        isStudioDark={isStudioDark}
                         setDrawerOpen={setDrawerOpen}>
                         {includeDrawer && drawerChildren}
                     </DrawerWrapper>
@@ -310,7 +307,6 @@ function DrawerWrapper(props: {
     open: boolean,
     logo?: string,
     hovered: boolean,
-    isStudioDark: boolean,
     setDrawerOpen: (open: boolean) => void,
     onMouseEnter: () => void,
     onMouseMove: () => void,

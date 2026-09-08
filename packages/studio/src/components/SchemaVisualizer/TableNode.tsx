@@ -93,10 +93,10 @@ top: midY });
     return (
         <div
             className={cls(
-                "relative rounded-lg border bg-white dark:bg-surface-900 shadow-sm transition-all duration-200 min-w-[240px] max-w-[320px]",
+                "relative rounded-lg border bg-surface-card shadow-sm transition-all duration-200 min-w-[240px] max-w-[320px]",
                 selected
                     ? "border-primary ring-2 ring-primary/20 shadow-md"
-                    : "border-surface-200/40 dark:border-surface-700/40 hover:shadow-md hover:border-surface-300 dark:hover:border-surface-600",
+                    : "border-hairline hover:shadow-md hover:border-hairline-strong",
                 isJunction && "border-dashed"
             )}
         >
@@ -105,8 +105,8 @@ top: midY });
                 className={cls(
                     "flex items-center gap-2 px-3 py-2 border-b rounded-t-lg",
                     isJunction
-                        ? "bg-surface-50 dark:bg-surface-950/50 border-surface-200/30 dark:border-surface-700/30"
-                        : "bg-surface-50 dark:bg-surface-950 border-surface-200/40 dark:border-surface-700/40"
+                        ? "bg-surface-sheet border-hairline"
+                        : "bg-surface-card border-hairline"
                 )}
             >
                 {icon && !isJunction && (
@@ -245,7 +245,7 @@ icon }}
                     position={h.position}
                     style={{ top: h.top }}
                     className={cls(
-                        "!w-2 !h-2 !border-2 !border-white dark:!border-surface-900",
+                        "!w-2 !h-2 !border-2 !border-surface-card",
                         h.type === "source" ? "!bg-blue-400" : "!bg-amber-400"
                     )}
                 />

@@ -136,9 +136,9 @@ export const PolicyEditor = ({
                 </IconButton>
             </Typography>
 
-            <DialogContent className="p-4 md:p-6 border-t dark:border-surface-950 bg-surface-50 dark:bg-surface-950" includeMargin={false}>
+            <DialogContent className="p-4 md:p-6 border-t border-hairline bg-surface-well" includeMargin={false}>
                 <div className="max-w-4xl mx-auto">
-                <Paper className={cls("p-4 md:p-6 flex flex-col gap-6 bg-white dark:bg-surface-900 border-none sm:border-solid rounded-none sm:rounded-xl", defaultBorderMixin)}>
+                <Paper className={cls("p-4 md:p-6 flex flex-col gap-6 bg-surface-card border-none sm:border-solid rounded-none sm:rounded-xl", defaultBorderMixin)}>
 
                     {/* Presets - only for new policies */}
                     {!policy && (
@@ -150,7 +150,7 @@ export const PolicyEditor = ({
                             onValueChange={handlePresetChange}
                             position="item-aligned"
                             placeholder={t("studio_policy_select_template")}
-                            className="bg-white dark:bg-surface-950"
+                            className="bg-surface-card"
                         >
                             {POLICY_PRESETS.map((preset) => (
                                 <SelectItem key={preset.id} value={preset.id}>
@@ -180,7 +180,7 @@ export const PolicyEditor = ({
                         {/* Behavior */}
                         <div className="flex flex-col gap-1.5">
                             <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">
-                                {t("studio_policy_behavior")} <code className="text-[10px] bg-surface-200 dark:bg-surface-950 text-text-secondary dark:text-text-secondary-dark px-1 py-0.5 rounded ml-1">AS</code>
+                                {t("studio_policy_behavior")} <code className="text-[10px] bg-hairline text-text-secondary dark:text-text-secondary-dark px-1 py-0.5 rounded ml-1">AS</code>
                             </Typography>
                             <Select
                                 value={behavior}
@@ -206,7 +206,7 @@ export const PolicyEditor = ({
                     {/* Command */}
                     <div className="flex flex-col gap-1.5">
                         <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">
-                            {t("studio_policy_command")} <code className="text-[10px] bg-surface-200 dark:bg-surface-950 text-text-secondary dark:text-text-secondary-dark px-1 py-0.5 rounded ml-1">FOR</code>
+                            {t("studio_policy_command")} <code className="text-[10px] bg-hairline text-text-secondary dark:text-text-secondary-dark px-1 py-0.5 rounded ml-1">FOR</code>
                         </Typography>
                         <div className="flex flex-wrap gap-1.5">
                             {COMMAND_OPTIONS.map(cmd => (
@@ -227,7 +227,7 @@ export const PolicyEditor = ({
                     {/* Roles */}
                     <div className="flex flex-col gap-1.5">
                         <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">
-                            {t("studio_policy_target_roles")} <code className="text-[10px] bg-surface-200 dark:bg-surface-950 text-text-secondary dark:text-text-secondary-dark px-1 py-0.5 rounded ml-1">TO</code>
+                            {t("studio_policy_target_roles")} <code className="text-[10px] bg-hairline text-text-secondary dark:text-text-secondary-dark px-1 py-0.5 rounded ml-1">TO</code>
                         </Typography>
                         <MultiSelect
                             size="small"
@@ -330,7 +330,7 @@ export const PolicyEditor = ({
                             <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark mb-1">
                                 {t("studio_policy_help_step3_desc")}
                             </Typography>
-                            <div className={cls("bg-surface-100 dark:bg-surface-950 px-3 py-2 rounded-md font-mono text-sm my-2", defaultBorderMixin)}>
+                            <div className={cls("bg-surface-well px-3 py-2 rounded-md font-mono text-sm my-2", defaultBorderMixin)}>
                                 Example: {RLS_UID_SQL} = uid
                             </div>
                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
@@ -343,7 +343,7 @@ export const PolicyEditor = ({
                             <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark mb-1">
                                 {t("studio_policy_help_step4_desc")}
                             </Typography>
-                            <div className={cls("bg-surface-100 dark:bg-surface-950 px-3 py-2 rounded-md font-mono text-sm my-2", defaultBorderMixin)}>
+                            <div className={cls("bg-surface-well px-3 py-2 rounded-md font-mono text-sm my-2", defaultBorderMixin)}>
                                 Example: {RLS_UID_SQL} = uid
                             </div>
                             <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark">
@@ -358,16 +358,16 @@ export const PolicyEditor = ({
                             </Typography>
                             <ul className="list-disc pl-5 space-y-2 text-sm text-text-secondary dark:text-text-secondary-dark font-normal">
                                 <li>
-                                    <code className="bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_UID_SQL}</code>
-                                    <span className="block mt-0.5">Returns the current user&apos;s ID as text. Example: <code className="bg-surface-100 dark:bg-surface-950 px-1 py-0.5 rounded text-[11px]">{RLS_UID_SQL} = uid</code></span>
+                                    <code className="bg-surface-well px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_UID_SQL}</code>
+                                    <span className="block mt-0.5">Returns the current user&apos;s ID as text. Example: <code className="bg-surface-well px-1 py-0.5 rounded text-[11px]">{RLS_UID_SQL} = uid</code></span>
                                 </li>
                                 <li>
-                                    <code className="bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_JWT_SQL}</code>
-                                    <span className="block mt-0.5">Returns the full JWT payload as JSONB so you can check custom claims. Example: <code className="bg-surface-100 dark:bg-surface-950 px-1 py-0.5 rounded text-[11px]">{RLS_JWT_SQL} -&gt;&gt; &apos;email&apos; = &apos;admin@example.com&apos;</code></span>
+                                    <code className="bg-surface-well px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_JWT_SQL}</code>
+                                    <span className="block mt-0.5">Returns the full JWT payload as JSONB so you can check custom claims. Example: <code className="bg-surface-well px-1 py-0.5 rounded text-[11px]">{RLS_JWT_SQL} -&gt;&gt; &apos;email&apos; = &apos;admin@example.com&apos;</code></span>
                                 </li>
                                 <li>
-                                    <code className="bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_ROLES_SQL}</code>
-                                    <span className="block mt-0.5">Returns the user&apos;s role IDs as a comma-separated string. Best used with: <code className="bg-surface-100 dark:bg-surface-950 px-1 py-0.5 rounded text-[11px]">string_to_array({RLS_ROLES_SQL}, &apos;,&apos;) @&gt; ARRAY[&apos;admin&apos;]</code></span>
+                                    <code className="bg-surface-well px-1.5 py-0.5 rounded mr-1 whitespace-nowrap">{RLS_ROLES_SQL}</code>
+                                    <span className="block mt-0.5">Returns the user&apos;s role IDs as a comma-separated string. Best used with: <code className="bg-surface-well px-1 py-0.5 rounded text-[11px]">string_to_array({RLS_ROLES_SQL}, &apos;,&apos;) @&gt; ARRAY[&apos;admin&apos;]</code></span>
                                 </li>
                             </ul>
                         </Paper>

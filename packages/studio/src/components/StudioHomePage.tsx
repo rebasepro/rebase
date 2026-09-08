@@ -153,7 +153,7 @@ export function StudioHomePage({
     const groupLabel = useNavigationGroupLabel();
 
     return (
-        <div ref={containerRef} className="py-2 overflow-auto h-full w-full bg-surface-50 dark:bg-surface-800">
+        <div ref={containerRef} className="py-2 overflow-auto h-full w-full bg-surface-sheet">
             <Container maxWidth="6xl">
                 <div className="mb-4 flex flex-col gap-2">
                     <SchemaDriftBanner />
@@ -188,7 +188,7 @@ export function StudioHomePage({
                                     "rounded flex items-center justify-between w-full",
                                     "hover:bg-transparent",
                                     "cursor-pointer select-none",
-                                    sectionCollapsed && "bg-surface-100 dark:bg-surface-900/50"
+                                    sectionCollapsed && "bg-surface-field"
                                 )}
                                 innerClassName="mt-4 pt-0"
                                 title={
@@ -198,7 +198,7 @@ export function StudioHomePage({
                                         color="secondary"
                                         className={cls(
                                             "px-4 py-1 rounded",
-                                            "font-medium text-[10px] uppercase tracking-[0.08em] text-primary/50 dark:text-primary/70"
+                                            "font-medium text-[10px] uppercase tracking-[0.08em] text-surface-400 dark:text-surface-400"
                                         )}
                                     >
                                         {groupLabel(section.label)}
@@ -219,7 +219,7 @@ export function StudioHomePage({
                                                 }}
                                                 className={cls(
                                                     "group h-full p-4 cursor-pointer transition-colors duration-150 ease-in-out",
-                                                    "hover:bg-primary/5 dark:hover:bg-primary/5"
+                                                    "hover:bg-surface-card-hover"
                                                 )}
                                             >
                                                 <div className="flex flex-col h-full">
@@ -268,7 +268,7 @@ export function StudioHomePage({
                             color="secondary"
                             className={cls(
                                 "px-4 py-1 rounded",
-                                "font-medium text-[10px] uppercase tracking-[0.08em] text-primary/50 dark:text-primary/70"
+                                "font-medium text-[10px] uppercase tracking-[0.08em] text-surface-400 dark:text-surface-400"
                             )}
                         >
                             Quick Start
@@ -283,9 +283,9 @@ export function StudioHomePage({
                         {" "}and start querying your data with full TypeScript autocompletion.
                     </Typography>
 
-                    <div className="rounded-lg border border-surface-200/40 dark:border-surface-700/40 bg-white dark:bg-surface-950 overflow-hidden">
+                    <div className="rounded-lg border border-hairline bg-surface-card overflow-hidden">
                         {/* Title bar */}
-                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-surface-200/40 dark:border-surface-700/40 bg-surface-50 dark:bg-surface-900/80">
+                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-hairline bg-surface-sheet">
                             <div className="flex items-center gap-2.5">
                                 <div className="flex gap-1.5">
                                     <span className="w-2.5 h-2.5 rounded-full bg-red-400/60"/>
@@ -317,7 +317,7 @@ export function StudioHomePage({
                             color="secondary"
                             className={cls(
                                 "px-4 py-1 rounded",
-                                "font-medium text-[10px] uppercase tracking-[0.08em] text-primary/50 dark:text-primary/70"
+                                "font-medium text-[10px] uppercase tracking-[0.08em] text-surface-400 dark:text-surface-400"
                             )}
                         >
                             {s.title}

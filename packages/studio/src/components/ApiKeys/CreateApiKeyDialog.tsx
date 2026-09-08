@@ -172,12 +172,12 @@ function OperationToggles({
                                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                                 active
                                     ? styles.on
-                                    : "bg-transparent ring-transparent text-surface-500 dark:text-surface-400 hover:bg-surface-accent-100 dark:hover:bg-surface-800"
+                                    : "bg-transparent ring-transparent text-surface-500 dark:text-surface-400 hover:bg-surface-hover"
                             )}
                         >
                             <span className={cls(
                                 "w-1.5 h-1.5 rounded-full transition-colors duration-150",
-                                active ? styles.dot : "bg-surface-300 dark:bg-surface-600"
+                                active ? styles.dot : "bg-surface-400"
                             )}/>
                             {op}
                         </button>
@@ -516,7 +516,7 @@ export function CreateApiKeyDialog({
 
                     {/* Plain-language read-back of the grant being built. */}
                     <div className={cls(
-                        "mt-3 rounded-lg border px-3 py-2.5 bg-surface-accent-50 dark:bg-surface-900",
+                        "mt-3 rounded-lg border px-3 py-2.5 bg-surface-field",
                         defaultBorderMixin
                     )}>
                         <Typography

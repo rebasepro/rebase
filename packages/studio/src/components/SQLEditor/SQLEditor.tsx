@@ -159,7 +159,7 @@ height: window.innerHeight });
         <div ref={anchorRef} className="w-full h-full min-h-[20px]">
             {createPortal(
                 <div
-                    className="fixed z-[9999] bg-surface-50 dark:bg-surface-900 border-2 border-primary dark:border-primary-dark shadow-xl flex flex-col"
+                    className="fixed z-[9999] bg-surface-sheet border-2 border-primary dark:border-primary-dark shadow-xl flex flex-col"
                     style={{
                         top,
                         left,
@@ -1011,7 +1011,7 @@ role: selectedRole });
                 const plan = results[0]["QUERY PLAN"][0].Plan;
                 if (plan) {
                     return (
-                        <div className="flex-grow overflow-auto p-4 bg-surface-50 dark:bg-surface-900 flex flex-col items-start">
+                        <div className="flex-grow overflow-auto p-4 bg-surface-sheet flex flex-col items-start">
                             <Typography variant="caption" className="font-semibold text-text-secondary mb-4 tracking-wider uppercase">{t("studio_sql_visual_execution_plan")}</Typography>
                             <div className="pb-12">
                                 <ExplainVisualizer plan={plan}/>
@@ -1027,7 +1027,7 @@ role: selectedRole });
         if (results.length === 0) {
             return (
                 <div className="flex-grow p-6 flex flex-col items-center justify-center">
-                    <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark font-mono border-b border-surface-200 dark:border-surface-950 pb-2 mb-2">{t("studio_sql_success")}</Typography>
+                    <Typography variant="body2" className="text-text-secondary dark:text-text-secondary-dark font-mono border-b border-hairline pb-2 mb-2">{t("studio_sql_success")}</Typography>
                     <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_no_results")}</Typography>
                 </div>
             );
@@ -1081,7 +1081,7 @@ resizable: false }, ...dataColumns]
             <div className="flex-grow flex flex-col overflow-hidden min-h-0">
                 {/* Collection Badges Bar */}
                 {actionableCollections.length > 0 && (
-                    <div className={cls("px-4 py-1.5 border-b flex items-center gap-2 shrink-0 bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+                    <div className={cls("px-4 py-1.5 border-b flex items-center gap-2 shrink-0 bg-surface-sheet", defaultBorderMixin)}>
                         <Tooltip title={t("studio_sql_admin_collections_tooltip")}>
                             <Typography variant="caption" className="text-[10px] font-semibold uppercase tracking-widest text-text-disabled dark:text-text-disabled-dark mr-1 shrink-0 cursor-help">{t("studio_sql_collections_label")}</Typography>
                         </Tooltip>
@@ -1204,7 +1204,7 @@ id: String(ra.entityId) })}
                     />
                 </div>
 
-                <div className={cls("p-2 px-4 border-t bg-surface-50 dark:bg-surface-900 flex justify-between items-center shrink-0", defaultBorderMixin)}>
+                <div className={cls("p-2 px-4 border-t bg-surface-sheet flex justify-between items-center shrink-0", defaultBorderMixin)}>
                     <div className="flex space-x-4">
                         <div className="flex items-center text-[11px]">
                             <span className="font-semibold text-text-disabled dark:text-text-disabled-dark mr-2 uppercase tracking-tighter">{t("studio_sql_rows")}</span>
@@ -1270,7 +1270,7 @@ id: String(ra.entityId) })}
     const isFavorite = activeSnippet?.isFavorite || false;
 
     return (
-        <div className="flex h-full w-full bg-white dark:bg-surface-950 overflow-hidden text-text-primary dark:text-text-primary-dark">
+        <div className="flex h-full w-full bg-surface-card overflow-hidden text-text-primary dark:text-text-primary-dark">
             <ResizablePanels
                 orientation="horizontal"
                 panelSizePercent={sidebarSize}
@@ -1292,10 +1292,10 @@ id: String(ra.entityId) })}
                 secondPanel={
                     <div className="flex-grow flex flex-col min-w-0 h-full w-full">
                         {/* Toolbar */}
-                        <div className={cls("flex items-center justify-between pr-2 border-b bg-white dark:bg-surface-950", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between pr-2 border-b bg-surface-card", defaultBorderMixin)}>
                             <div className="flex items-center flex-grow overflow-hidden mr-4">
                                 <div className="flex items-center no-scrollbar overflow-x-auto min-w-0">
-                                    <Tabs value={activeTabId} onValueChange={handleTabChange} variant="boxy" className="w-[unset] flex-shrink-0" innerClassName="bg-white dark:bg-surface-950">
+                                    <Tabs value={activeTabId} onValueChange={handleTabChange} variant="boxy" className="w-[unset] flex-shrink-0" innerClassName="bg-surface-card">
                                         {tabs.map(tab => (
                                             <Tab key={tab.id} value={tab.id} className="flex items-center justify-between group max-w-[200px]">
                                                 <TerminalIcon size={iconSize.smallest} className="text-blue-500 mr-1.5 flex-shrink-0"/>
@@ -1352,7 +1352,7 @@ id: String(ra.entityId) })}
                                     {t("studio_sql_explain")}
                                 </Button>
 
-                                <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-1"></div>
+                                <div className="h-4 w-px bg-hairline mx-1"></div>
 
                                 <div className="flex items-center space-x-2 px-2" onClick={(e) => {
                                     setAutoLimit(!autoLimit);
@@ -1369,7 +1369,7 @@ id: String(ra.entityId) })}
                                     </div>
                                 </div>
 
-                                <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-1"></div>
+                                <div className="h-4 w-px bg-hairline mx-1"></div>
 
                                 <Tooltip title={isFavorite ? t("studio_sql_remove_from_favorites") : t("studio_sql_add_to_favorites")}>
                                     <IconButton
@@ -1398,7 +1398,7 @@ isFavorite: !s.isFavorite } : s));
                                     {t("studio_sql_save")}
                                 </Button>
 
-                                <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-1"></div>
+                                <div className="h-4 w-px bg-hairline mx-1"></div>
 
                                 <Menu
                                     trigger={
@@ -1417,7 +1417,7 @@ isFavorite: !s.isFavorite } : s));
                                     }
                                 >
                                     <div className="max-h-64 overflow-y-auto">
-                                        <div className="px-3 py-1.5 border-b border-surface-200 dark:border-surface-950 mb-1">
+                                        <div className="px-3 py-1.5 border-b border-hairline mb-1">
                                             <Typography variant="caption" className="font-semibold uppercase tracking-wider text-[9px] text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_database")}</Typography>
                                         </div>
                                         {isLoadingConfig ? (
@@ -1436,7 +1436,7 @@ isFavorite: !s.isFavorite } : s));
                                                     </MenuItem>
                                                 ))}
 
-                                                <div className="px-3 py-1.5 border-y border-surface-200 dark:border-surface-950 mb-1 mt-1">
+                                                <div className="px-3 py-1.5 border-y border-hairline mb-1 mt-1">
                                                     <Typography variant="caption" className="font-semibold uppercase tracking-wider text-[9px] text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_role")}</Typography>
                                                 </div>
                                                 {availableRoles.map(role => (
@@ -1477,8 +1477,8 @@ isFavorite: !s.isFavorite } : s));
                                 </div>
                             }
                             secondPanel={
-                                <div className="h-full w-full flex flex-col bg-surface-50 dark:bg-surface-950 overflow-hidden min-h-0">
-                                    <div className={cls("p-2 px-4 bg-surface-100 dark:bg-surface-900 border-b shrink-0 flex items-center", defaultBorderMixin)}>
+                                <div className="h-full w-full flex flex-col bg-surface-well overflow-hidden min-h-0">
+                                    <div className={cls("p-2 px-4 bg-surface-raised border-b shrink-0 flex items-center", defaultBorderMixin)}>
                                         <Typography variant="caption" className="font-semibold text-text-disabled dark:text-text-disabled-dark uppercase tracking-widest text-[10px]">{t("studio_sql_query_results")}</Typography>
                                     </div>
                                     <div className="flex-grow flex flex-col min-h-0 overflow-hidden">

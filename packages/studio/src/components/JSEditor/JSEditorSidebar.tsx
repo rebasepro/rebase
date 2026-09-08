@@ -94,8 +94,8 @@ export const JSEditorSidebar = ({
     const [activeTab, setActiveTab] = useState<"collections" | "snippets" | "history" | "reference">("collections");
 
     return (
-        <div className={cls("flex flex-col h-full w-full bg-white dark:bg-surface-950 border-r", defaultBorderMixin)}>
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "collections" | "snippets" | "history" | "reference")} variant="boxy" className="border-b border-surface-200 dark:border-surface-950">
+        <div className={cls("flex flex-col h-full w-full bg-surface-card border-r", defaultBorderMixin)}>
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "collections" | "snippets" | "history" | "reference")} variant="boxy" className="border-b border-hairline">
                 <Tab value="collections">
                     <Tooltip title="Browse collections">
                         <span className="text-xs">Collections</span>
@@ -118,7 +118,7 @@ export const JSEditorSidebar = ({
                 {/* Collections browser */}
                 {activeTab === "collections" && (
                     <div className="flex flex-col h-full">
-                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                             <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                 Collections
                             </Typography>
@@ -146,7 +146,7 @@ export const JSEditorSidebar = ({
                 {/* Quick reference */}
                 {activeTab === "reference" && (
                     <div className="flex flex-col h-full">
-                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                             <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                 SDK Reference
                             </Typography>
@@ -157,7 +157,7 @@ export const JSEditorSidebar = ({
                                     key={i}
                                     className={cls(
                                         "group p-2.5 rounded-lg border hover:border-primary/40 dark:hover:border-primary/40",
-                                        "bg-white dark:bg-surface-900 transition-all cursor-pointer",
+                                        "bg-surface-card transition-all cursor-pointer",
                                         defaultBorderMixin
                                     )}
                                     onClick={() => onInsertCode(ref.code)}
@@ -186,7 +186,7 @@ export const JSEditorSidebar = ({
 
                     return (
                         <div className="flex flex-col h-full">
-                            <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                            <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                                 <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">Snippets</Typography>
                             </div>
                             <div className="flex-grow overflow-y-auto p-2 space-y-2 no-scrollbar">
@@ -235,7 +235,7 @@ export const JSEditorSidebar = ({
                 {/* History */}
                 {activeTab === "history" && (
                     <div className="flex flex-col h-full">
-                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                             <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">History</Typography>
                         </div>
                         <div className="flex-grow overflow-y-auto p-1 space-y-1 no-scrollbar">
@@ -249,7 +249,7 @@ export const JSEditorSidebar = ({
                                 [...history].reverse().map((code, i) => (
                                     <div
                                         key={i}
-                                        className="p-2 py-1.5 rounded hover:bg-surface-100 dark:hover:bg-surface-900 cursor-pointer group transition-colors flex items-start"
+                                        className="p-2 py-1.5 rounded hover:bg-surface-hover cursor-pointer group transition-colors flex items-start"
                                         onClick={() => onSelectSnippet(code)}
                                     >
                                         <svg className="w-3 h-3 mt-1 mr-2 text-text-disabled dark:text-text-disabled-dark group-hover:text-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -277,7 +277,7 @@ function CollectionItem({ collection, onInsertCode }: { collection: CollectionIn
     return (
         <div>
             <div
-                className="flex items-center p-1 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors group relative"
+                className="flex items-center p-1 cursor-pointer hover:bg-surface-hover rounded transition-colors group relative"
                 onClick={() => setExpanded(!expanded)}
             >
                 <svg
@@ -310,7 +310,7 @@ function CollectionItem({ collection, onInsertCode }: { collection: CollectionIn
                     {collection.properties.map(prop => (
                         <div
                             key={prop}
-                            className="flex items-center p-1 pl-2 hover:bg-surface-50 dark:hover:bg-surface-900 rounded-r cursor-pointer transition-colors group/prop relative min-h-[28px]"
+                            className="flex items-center p-1 pl-2 hover:bg-surface-hover rounded-r cursor-pointer transition-colors group/prop relative min-h-[28px]"
                             onClick={() => onInsertCode(`"${prop}"`)}
                         >
                             <svg className="w-3 h-3 mr-1.5 text-text-disabled dark:text-text-disabled-dark shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 4.5v15m6-15v15m-10.5-1.5h15c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125h-15c-.621 0-1.125.504-1.125 1.125v12.75c0 .621.504 1.125 1.125 1.125Z"/></svg>
@@ -326,7 +326,7 @@ function CollectionItem({ collection, onInsertCode }: { collection: CollectionIn
 function SnippetItem({ snippet, onSelect, onDelete }: { snippet: JSSnippet; onSelect: (code: string) => void; onDelete: (id: string) => void }) {
     return (
         <div
-            className={cls("group p-2 rounded border hover:border-surface-400 dark:hover:border-surface-600 bg-white dark:bg-surface-900 transition-all cursor-pointer relative", defaultBorderMixin)}
+            className={cls("group p-2 rounded border hover:border-hairline-strong bg-surface-card transition-all cursor-pointer relative", defaultBorderMixin)}
             onClick={() => onSelect(snippet.code)}
         >
             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-[13px] truncate pr-6">

@@ -111,7 +111,7 @@ replacement is a whole-pair match so a stray `dark:` half is never left behind.
 | Pattern | Becomes | Note |
 |---|---|---|
 | `bg-white dark:bg-surface-900` | `bg-surface-card` | cards, dialogs, menus, table bodies |
-| `bg-white dark:bg-surface-950` | `bg-surface-card` | Studio panels; see Stage 3 |
+| `bg-white dark:bg-surface-950` | `bg-surface-card` | Studio panels; done in Stage 3 |
 | `bg-white dark:bg-surface-800` | `bg-surface-card` | select and multiselect popovers |
 | `bg-surface-50 dark:bg-surface-900` | `bg-surface-frame` | the scaffold, headers, table headers; reviewed per file |
 | `bg-surface-50 dark:bg-surface-800` | `bg-surface-sheet` | the content sheet |
@@ -136,10 +136,14 @@ replacement is a whole-pair match so a stray `dark:` half is never left behind.
    flags as ambiguous. *Done in the same pass as Stage 1: the unambiguous pairs
    were cheap to apply everywhere at once, and the flagged files are listed by
    the script for review.*
-3. **Studio.** Studio paints `dark:bg-surface-950` in 56 places on purpose,
-   because it runs darker than the panel (`isStudioDark`). It gets the same
-   roles but keeps its own ladder if the owner wants it darker; decide after
-   Stages 1 and 2 are in.
+3. **Studio.** Studio painted `dark:bg-surface-950` in 56 places on purpose,
+   because it ran darker than the panel (`isStudioDark`). *Done 2026-09-08: it
+   is on the shared ladder now (sheet sidebars, card panels, the well under
+   editors and canvases), `isStudioDark` is gone, and the gate covers
+   `packages/studio/src`. One trap surfaced on the way: React Flow stamps a
+   `light` class on its own root, and `theme.css` used to answer to `.light`,
+   so the schema canvas re-lit itself on a dark page. The selector is gone and
+   the canvas follows `useIsDarkMode()` through `colorMode`.*
 4. **Documentation.** `packages/ui/DESIGN.md` records the surface system;
    `.agent/workflows/ui-components.md` adds the rule that a surface is named by
    role and never by a numbered pair; the UI reference view gains a "Surfaces"

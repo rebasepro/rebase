@@ -51,7 +51,7 @@ export function AuthSimulationSelector({
 
             {authMode === "jwt" && (
                 <>
-                    <div className="w-px h-4 bg-surface-300 dark:bg-surface-600 mx-1" />
+                    <div className="w-px h-4 bg-hairline-strong mx-1" />
                     <Typography
                         variant="caption"
                         className="text-text-secondary dark:text-text-secondary-dark text-xs font-medium"

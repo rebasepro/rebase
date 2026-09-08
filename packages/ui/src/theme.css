@@ -238,8 +238,11 @@
  * The full reasoning, with the measurements, is in
  * docs/plans/surface-system-2026-09.md and docs/design/instatic-distilled.html.
  * ------------------------------------------------------------------------- */
+/* No `.light` class here on purpose: nothing in the app sets one, and third-party
+   widgets (React Flow) stamp `light` on their own root, which re-lit every token
+   under them on a dark page. The light ladder is the root; `[data-theme]` and
+   `.dark` are the only switches. */
 :root,
-.light,
 [data-theme="light"] {
     --surface-frame: #f0f0f2;
     --surface-sheet: #f9f9fa;

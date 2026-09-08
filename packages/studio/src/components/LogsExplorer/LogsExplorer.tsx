@@ -112,7 +112,7 @@ export function LogsExplorer() {
     }, [logs, autoScroll]);
 
     return (
-        <div className="flex flex-col h-[calc(100vh-64px)] w-full bg-surface-50 dark:bg-surface-800">
+        <div className="flex flex-col h-[calc(100vh-64px)] w-full bg-surface-sheet">
             {/* Toolbar */}
             <div className={cls(
                 "flex gap-2 p-3 border-b items-center flex-wrap shrink-0",
@@ -227,7 +227,7 @@ export function LogsExplorer() {
                         <div
                             key={log.id}
                             className={cls(
-                                "flex gap-4 px-4 py-[6px] border-b hover:bg-surface-100 dark:hover:bg-surface-900 transition-colors",
+                                "flex gap-4 px-4 py-[6px] border-b hover:bg-surface-hover transition-colors",
                                 defaultBorderMixin
                             )}
                         >

@@ -197,14 +197,14 @@ export function BranchesView() {
     const selected = branches.find(b => b.name === selectedBranch);
 
     return (
-        <div className="flex h-full w-full overflow-hidden bg-white dark:bg-surface-950">
+        <div className="flex h-full w-full overflow-hidden bg-surface-card">
             {/* ── Branch List ── */}
             <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
-                <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                     <div className="flex items-center gap-2">
                         <GitBranchIcon size={iconSize.small} className="text-primary"/>
                         <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_branches")}</Typography>
-                        <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{branches.length}</Chip>
+                        <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{branches.length}</Chip>
                     </div>
                     <div className="flex items-center gap-1">
                         <IconButton size="small" onClick={loadBranches} title="Refresh">
@@ -248,7 +248,7 @@ export function BranchesView() {
                                     "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all",
                                     selectedBranch === branch.name
                                         ? "bg-primary/10 dark:bg-primary/15 ring-1 ring-primary/30"
-                                        : "hover:bg-surface-100 dark:hover:bg-surface-950"
+                                        : "hover:bg-surface-hover"
                                 )}
                             >
                                 <div className="w-2 h-2 rounded-full shrink-0 bg-emerald-500"/>
@@ -281,7 +281,7 @@ export function BranchesView() {
                 ) : (
                     <>
                         {/* Header */}
-                        <div className={cls("flex items-center justify-between px-5 py-3 border-b bg-white dark:bg-surface-950 min-h-[56px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-5 py-3 border-b bg-surface-card min-h-[56px]", defaultBorderMixin)}>
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"/>
                                 <div className="min-w-0">
@@ -305,7 +305,7 @@ export function BranchesView() {
                         </div>
 
                         {/* Info Cards */}
-                        <div className="px-5 py-4 bg-surface-50 dark:bg-surface-900/50">
+                        <div className="px-5 py-4 bg-surface-sheet">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <StatCard label="Branch Name" value={selected.name} mono/>
                                 <StatCard label="Source Database" value={selected.parentDatabase} mono/>
@@ -319,13 +319,13 @@ export function BranchesView() {
                             <Alert color="info">
                                 <Typography variant="body2" className="text-[13px]">
                                     <strong>How to use this branch:</strong> point this checkout at it with
-                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-950 font-mono text-[12px]">rebase db branch switch {selected.name}</code>
+                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-well font-mono text-[12px]">rebase db branch switch {selected.name}</code>
                                     — every later command uses it, and
-                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-950 font-mono text-[12px]">rebase db branch switch --off</code>
+                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-well font-mono text-[12px]">rebase db branch switch --off</code>
                                     goes back to the main database. Changes made here don&apos;t affect it.
                                 </Typography>
                             </Alert>
-                            <div className="mt-4 p-4 rounded-lg border bg-surface-50 dark:bg-surface-900 border-surface-200 dark:border-surface-700">
+                            <div className="mt-4 p-4 rounded-lg border bg-surface-sheet border-hairline-strong">
                                 <Typography variant="caption" className="text-[10px] uppercase tracking-wider text-surface-400 mb-2 block font-medium">Connection Details</Typography>
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2">
@@ -441,7 +441,7 @@ function StatCard({ label, value, mono }: {
     label: string; value: string; mono?: boolean;
 }) {
     return (
-        <div className={cls("px-3 py-2 rounded-lg border bg-white dark:bg-surface-900", defaultBorderMixin)}>
+        <div className={cls("px-3 py-2 rounded-lg border bg-surface-card", defaultBorderMixin)}>
             <Typography variant="caption" color="secondary" className="text-[10px] uppercase tracking-wider font-medium">{label}</Typography>
             <Typography variant="body2" className={cls(
                 "mt-0.5 font-semibold text-[13px] truncate",

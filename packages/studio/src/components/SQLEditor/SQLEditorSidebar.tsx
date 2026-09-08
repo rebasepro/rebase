@@ -40,8 +40,8 @@ export const SQLEditorSidebar = ({
     const { t } = useTranslation();
 
     return (
-        <div className={cls("flex flex-col h-full w-full bg-white dark:bg-surface-950 border-r", defaultBorderMixin)}>
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "schema" | "snippets" | "history")} variant="boxy" className="border-b border-surface-200 dark:border-surface-950">
+        <div className={cls("flex flex-col h-full w-full bg-surface-card border-r", defaultBorderMixin)}>
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "schema" | "snippets" | "history")} variant="boxy" className="border-b border-hairline">
                 <Tab value="schema">{t("studio_sql_sidebar_schema")}</Tab>
                 <Tab value="snippets">{t("studio_sql_sidebar_snippets")}</Tab>
                 <Tab value="history">{t("studio_sql_sidebar_history")}</Tab>
@@ -64,7 +64,7 @@ export const SQLEditorSidebar = ({
 
                     return (
                         <div className="flex flex-col h-full">
-                            <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                            <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                                 <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_sidebar_snippets")}</Typography>
                             </div>
                             <div className="flex-grow overflow-y-auto p-2 space-y-2 no-scrollbar">
@@ -84,7 +84,7 @@ export const SQLEditorSidebar = ({
                                                     {favorites.map(snippet => (
                                                         <div
                                                             key={snippet.id}
-                                                            className={cls("group p-2 rounded border hover:border-surface-400 dark:hover:border-surface-600 bg-white dark:bg-surface-900 transition-all cursor-pointer relative", defaultBorderMixin)}
+                                                            className={cls("group p-2 rounded border hover:border-hairline-strong bg-surface-card transition-all cursor-pointer relative", defaultBorderMixin)}
                                                             onClick={() => onSelectSnippet(snippet.sql)}
                                                         >
                                                             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-[13px] truncate pr-6">{snippet.name}</Typography>
@@ -115,7 +115,7 @@ export const SQLEditorSidebar = ({
                                                     {others.map(snippet => (
                                                         <div
                                                             key={snippet.id}
-                                                            className={cls("group p-2 rounded border hover:border-surface-400 dark:hover:border-surface-600 bg-white dark:bg-surface-900 transition-all cursor-pointer relative", defaultBorderMixin)}
+                                                            className={cls("group p-2 rounded border hover:border-hairline-strong bg-surface-card transition-all cursor-pointer relative", defaultBorderMixin)}
                                                             onClick={() => onSelectSnippet(snippet.sql)}
                                                         >
                                                             <Typography variant="body2" className="text-text-primary dark:text-text-primary-dark font-medium text-[13px] truncate pr-6">{snippet.name}</Typography>
@@ -144,7 +144,7 @@ export const SQLEditorSidebar = ({
 
                 {activeTab === "history" && (
                     <div className="flex flex-col h-full">
-                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                             <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">{t("studio_sql_sidebar_history")}</Typography>
                         </div>
                         <div className="flex-grow overflow-y-auto p-1 space-y-1 no-scrollbar">
@@ -156,7 +156,7 @@ export const SQLEditorSidebar = ({
                                 [...history].reverse().map((sql, i) => (
                                     <div
                                         key={i}
-                                        className="p-2 py-1.5 rounded hover:bg-surface-100 dark:hover:bg-surface-950 cursor-pointer group transition-colors flex items-start"
+                                        className="p-2 py-1.5 rounded hover:bg-surface-hover cursor-pointer group transition-colors flex items-start"
                                         onClick={() => onSelectSnippet(sql)}
                                     >
                                         <svg className="w-3 h-3 mt-1 mr-2 text-text-disabled dark:text-text-disabled-dark group-hover:text-primary transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>

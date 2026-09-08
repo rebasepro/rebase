@@ -42,7 +42,7 @@ export function EndpointDetail({ endpoint, spec }: { endpoint: ParsedEndpoint; s
                     <div className={cls("rounded-lg border overflow-hidden", defaultBorderMixin)}>
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="bg-surface-100 dark:bg-surface-900 text-left">
+                                <tr className="bg-surface-raised text-left">
                                     <th className="px-4 py-2 font-medium text-text-secondary dark:text-text-secondary-dark">
                                         Name
                                     </th>
@@ -116,7 +116,7 @@ export function EndpointDetail({ endpoint, spec }: { endpoint: ParsedEndpoint; s
                             <div
                                 className={cls(
                                     "flex items-center gap-3 px-4 py-2.5",
-                                    "bg-surface-50 dark:bg-surface-900/50"
+                                    "bg-surface-sheet"
                                 )}
                             >
                                 <StatusBadge code={code}/>
@@ -207,7 +207,7 @@ function SchemaBlock({ schema, spec, depth }: { schema: OpenApiSchema; spec: Ope
                                             {prop.enum.map((v) => (
                                                 <span
                                                     key={String(v)}
-                                                    className="px-1.5 py-0.5 rounded bg-surface-200 dark:bg-surface-800 text-[10px] font-mono"
+                                                    className="px-1.5 py-0.5 rounded bg-surface-raised text-[10px] font-mono"
                                                 >
                                                     {String(v)}
                                                 </span>

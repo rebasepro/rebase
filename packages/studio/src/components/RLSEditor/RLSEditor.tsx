@@ -89,7 +89,7 @@ function SidebarSection({ title, icon, expanded, onToggle, count, children }: {
     return (
         <div className="mb-2">
             <div
-                className="flex items-center p-1.5 cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900 rounded transition-colors"
+                className="flex items-center p-1.5 cursor-pointer hover:bg-surface-hover rounded transition-colors"
                 onClick={onToggle}
             >
                 <svg className={cls("w-3 h-3 mr-1.5 transition-transform text-text-disabled dark:text-text-disabled-dark", expanded ? "rotate-90" : "")} fill="currentColor" viewBox="0 0 20 20"><path d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"/></svg>
@@ -123,7 +123,7 @@ function SidebarTableRow({ table, isSelected, onSelect, badge, dimmed, t }: {
                 "flex items-center p-1 cursor-pointer rounded transition-colors group relative",
                 isSelected
                     ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-light"
-                    : "hover:bg-surface-100 dark:hover:bg-surface-900 text-text-secondary dark:text-text-secondary-dark",
+                    : "hover:bg-surface-hover text-text-secondary dark:text-text-secondary-dark",
                 dimmed && !isSelected && "opacity-60"
             )}
         >
@@ -131,7 +131,7 @@ function SidebarTableRow({ table, isSelected, onSelect, badge, dimmed, t }: {
             <Typography variant="body2" className="text-xs truncate flex-1 min-w-0">{table.tableName}</Typography>
             <div className="flex items-center gap-1.5 shrink-0 ml-2">
                 {badge && (
-                    <span className="text-[9px] uppercase tracking-wider font-semibold text-text-disabled dark:text-text-disabled-dark bg-surface-200 dark:bg-surface-800 rounded px-1 py-px">
+                    <span className="text-[9px] uppercase tracking-wider font-semibold text-text-disabled dark:text-text-disabled-dark bg-surface-raised rounded px-1 py-px">
                         {badge}
                     </span>
                 )}
@@ -565,7 +565,7 @@ totalPolicies };
 
     const renderPolicyTag = (label: string, value: string) => {
         return (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-100 dark:bg-surface-950 border border-surface-200 dark:border-surface-700/50">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-well border border-hairline">
                 <span className="text-[10px] uppercase text-text-secondary dark:text-text-secondary-dark font-medium tracking-wider">
                     {label}:
                 </span>
@@ -577,15 +577,15 @@ totalPolicies };
     };
 
     return (
-        <div className="flex h-full w-full bg-white dark:bg-surface-950 overflow-hidden text-text-primary dark:text-text-primary-dark">
+        <div className="flex h-full w-full bg-surface-card overflow-hidden text-text-primary dark:text-text-primary-dark">
             <ResizablePanels
                 orientation="horizontal"
                 panelSizePercent={sidebarSize}
                 onPanelSizeChange={setSidebarSize}
                 minPanelSizePx={220}
                 firstPanel={
-                    <div className={cls("flex flex-col h-full w-full bg-white dark:bg-surface-950 border-r", defaultBorderMixin)}>
-                        <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as "tables" | "info")} variant="boxy" className="border-b border-surface-200 dark:border-surface-950">
+                    <div className={cls("flex flex-col h-full w-full bg-surface-card border-r", defaultBorderMixin)}>
+                        <Tabs value={sidebarTab} onValueChange={(v) => setSidebarTab(v as "tables" | "info")} variant="boxy" className="border-b border-hairline">
                             <Tab value="tables">Tables</Tab>
                             <Tab value="info">Info</Tab>
                         </Tabs>
@@ -593,7 +593,7 @@ totalPolicies };
                         <div className="flex-grow overflow-hidden relative">
                             {sidebarTab === "tables" && (
                                 <div className="flex flex-col h-full">
-                                    <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                                    <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                                         <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                             {t("studio_schema_tables")}
                                         </Typography>
@@ -690,13 +690,13 @@ totalPolicies };
 
                             {sidebarTab === "info" && (
                                 <div className="flex flex-col h-full">
-                                    <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                                    <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                                         <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                                             Overview
                                         </Typography>
                                     </div>
                                     <div className="flex-grow overflow-y-auto p-3 space-y-3 no-scrollbar">
-                                        <div className={cls("p-3 rounded-lg border bg-white dark:bg-surface-900", defaultBorderMixin)}>
+                                        <div className={cls("p-3 rounded-lg border bg-surface-card", defaultBorderMixin)}>
                                             <div className="flex items-center gap-2 mb-2">
                                                 <ShieldIcon size={iconSize.smallest} className="text-primary"/>
                                                 <Typography variant="body2" className="font-semibold text-[13px]">RLS Studio</Typography>
@@ -707,22 +707,22 @@ totalPolicies };
                                         </div>
 
                                         <div className="space-y-2">
-                                            <div className={cls("p-2.5 rounded border bg-white dark:bg-surface-900 flex items-center justify-between", defaultBorderMixin)}>
+                                            <div className={cls("p-2.5 rounded border bg-surface-card flex items-center justify-between", defaultBorderMixin)}>
                                                 <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[11px]">Total tables</Typography>
                                                 <Typography variant="body2" className="font-mono text-[13px] font-medium">{rlsStats.total}</Typography>
                                             </div>
-                                            <div className={cls("p-2.5 rounded border bg-white dark:bg-surface-900 flex items-center justify-between", defaultBorderMixin)}>
+                                            <div className={cls("p-2.5 rounded border bg-surface-card flex items-center justify-between", defaultBorderMixin)}>
                                                 <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[11px]">RLS enabled</Typography>
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
                                                     <Typography variant="body2" className="font-mono text-[13px] font-medium">{rlsStats.enabled}</Typography>
                                                 </div>
                                             </div>
-                                            <div className={cls("p-2.5 rounded border bg-white dark:bg-surface-900 flex items-center justify-between", defaultBorderMixin)}>
+                                            <div className={cls("p-2.5 rounded border bg-surface-card flex items-center justify-between", defaultBorderMixin)}>
                                                 <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[11px]">Tables with policies</Typography>
                                                 <Typography variant="body2" className="font-mono text-[13px] font-medium">{rlsStats.withPolicies}</Typography>
                                             </div>
-                                            <div className={cls("p-2.5 rounded border bg-white dark:bg-surface-900 flex items-center justify-between", defaultBorderMixin)}>
+                                            <div className={cls("p-2.5 rounded border bg-surface-card flex items-center justify-between", defaultBorderMixin)}>
                                                 <Typography variant="caption" className="text-text-secondary dark:text-text-secondary-dark text-[11px]">Total policies</Typography>
                                                 <Typography variant="body2" className="font-mono text-[13px] font-medium">{rlsStats.totalPolicies}</Typography>
                                             </div>
@@ -763,9 +763,9 @@ totalPolicies };
                     </div>
                 }
                 secondPanel={
-                    <div className="flex-grow flex flex-col min-w-0 h-full w-full bg-white dark:bg-surface-950">
+                    <div className="flex-grow flex flex-col min-w-0 h-full w-full bg-surface-card">
                         {/* Toolbar Header matching SQL/JS Editor style */}
-                        <div className={cls("flex items-center justify-between pr-2 border-b bg-white dark:bg-surface-950 min-h-[46px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between pr-2 border-b bg-surface-card min-h-[46px]", defaultBorderMixin)}>
                             <div className="flex items-center flex-grow overflow-hidden px-4">
                                 <Typography variant="subtitle2" className="font-mono text-text-secondary dark:text-text-secondary-dark truncate">
                                     {activeTableData ? `${activeTableData.schemaName}.${activeTableData.tableName}` : t("studio_rls_select_table")}
@@ -795,7 +795,7 @@ totalPolicies };
                                             {activeTableData.rlsEnabled ? t("studio_rls_disable_rls") : t("studio_rls_enable_rls")}
                                         </Button>
 
-                                        <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-1"/>
+                                        <div className="h-4 w-px bg-hairline mx-1"/>
 
                                         <Button
                                             variant="text"
@@ -806,7 +806,7 @@ totalPolicies };
                                             Refresh
                                         </Button>
 
-                                        <div className="h-4 w-px bg-surface-200 dark:bg-surface-950 mx-1"/>
+                                        <div className="h-4 w-px bg-hairline mx-1"/>
 
                                         <Button
                                             size="small"
@@ -949,7 +949,7 @@ message: e instanceof Error ? e.message : String(e) });
                             />
                         ) : (
                             <div className="flex-grow flex flex-col overflow-hidden">
-                                <div className="p-6 pt-4 flex-grow overflow-auto bg-surface-50 dark:bg-surface-900">
+                                <div className="p-6 pt-4 flex-grow overflow-auto bg-surface-sheet">
                                     <div className="max-w-4xl mx-auto flex flex-col gap-6">
                                     {/* Context-aware banner based on table category */}
                                     {activeTableData && activeTableCategory === "internal" && (

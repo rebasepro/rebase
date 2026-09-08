@@ -253,14 +253,14 @@ message: e instanceof Error ? e.message : String(e) });
     );
 
     return (
-        <div className="flex h-full w-full overflow-hidden bg-white dark:bg-surface-950">
+        <div className="flex h-full w-full overflow-hidden bg-surface-card">
             {/* ── Job List ── */}
             <div className={cls("flex flex-col w-[340px] min-w-[280px] border-r h-full", defaultBorderMixin)}>
-                <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-50 dark:bg-surface-900 min-h-[48px]", defaultBorderMixin)}>
+                <div className={cls("flex items-center justify-between px-4 py-2.5 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                     <div className="flex items-center gap-2">
                         <CalendarIcon size={iconSize.smallest} className="text-primary"/>
                         <Typography variant="subtitle2" className="font-semibold">{t("studio_tool_cron")}</Typography>
-                        <Chip size="smallest" className="bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{jobs.length}</Chip>
+                        <Chip size="smallest" className="bg-surface-raised text-surface-600 dark:text-surface-300">{jobs.length}</Chip>
                     </div>
                     <IconButton size="small" onClick={refreshJobs} title="Refresh"><RefreshCwIcon size={iconSize.smallest}/></IconButton>
                 </div>
@@ -273,7 +273,7 @@ message: e instanceof Error ? e.message : String(e) });
                                 "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all",
                                 selectedId === job.id
                                     ? "bg-primary/10 dark:bg-primary/15 ring-1 ring-primary/30"
-                                    : "hover:bg-surface-100 dark:hover:bg-surface-950"
+                                    : "hover:bg-surface-hover"
                             )}
                         >
                             <div className={cls("w-2 h-2 rounded-full shrink-0", stateColors[job.state] || "bg-surface-400")}/>
@@ -296,7 +296,7 @@ message: e instanceof Error ? e.message : String(e) });
                 ) : (
                     <>
                         {/* Header */}
-                        <div className={cls("flex items-center justify-between px-5 py-3 border-b bg-white dark:bg-surface-950 min-h-[56px]", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-5 py-3 border-b bg-surface-card min-h-[56px]", defaultBorderMixin)}>
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className={cls("w-2.5 h-2.5 rounded-full", stateColors[selectedJob.state])}/>
                                 <div className="min-w-0">
@@ -321,7 +321,7 @@ message: e instanceof Error ? e.message : String(e) });
                         </div>
 
                         {/* Stats Cards */}
-                        <div className="px-5 py-4 bg-surface-50 dark:bg-surface-900/50">
+                        <div className="px-5 py-4 bg-surface-sheet">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 <StatCard label="Schedule" value={selectedJob.schedule} mono/>
                                 <StatCard label="Last Run" value={formatRelative(selectedJob.lastRunAt)}/>
@@ -345,7 +345,7 @@ message: e instanceof Error ? e.message : String(e) });
                         </div>
 
                         {/* Logs Section */}
-                        <div className={cls("flex items-center justify-between px-5 py-2 border-y bg-white dark:bg-surface-950", defaultBorderMixin)}>
+                        <div className={cls("flex items-center justify-between px-5 py-2 border-y bg-surface-card", defaultBorderMixin)}>
                             <div className="flex items-center gap-2">
                                 <HistoryIcon size={iconSize.smallest} className="text-surface-400"/>
                                 <Typography variant="subtitle2" className="font-semibold text-[13px]">Execution History</Typography>
@@ -378,7 +378,7 @@ function StatCard({ label, value, mono, chipColor, highlight }: {
     label: string; value: string; mono?: boolean; chipColor?: string; highlight?: boolean;
 }) {
     return (
-        <div className={cls("px-3 py-2 rounded-lg border bg-white dark:bg-surface-900", defaultBorderMixin)}>
+        <div className={cls("px-3 py-2 rounded-lg border bg-surface-card", defaultBorderMixin)}>
             <Typography variant="caption" color="secondary" className="text-[10px] uppercase tracking-wider font-medium">{label}</Typography>
             <Typography variant="body2" className={cls(
                 "mt-0.5 font-semibold text-[13px]",
@@ -395,7 +395,7 @@ function StatCard({ label, value, mono, chipColor, highlight }: {
 function LogRow({ log }: { log: CronJobLogEntry }) {
     const [expanded, setExpanded] = useState(false);
     return (
-        <div className="px-5 py-2.5 hover:bg-surface-50 dark:hover:bg-surface-950/50 transition-colors">
+        <div className="px-5 py-2.5 hover:bg-surface-hover transition-colors">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
                 {log.success
                     ? <CheckCircleIcon size={iconSize.smallest} className="text-emerald-500 shrink-0"/>
@@ -417,14 +417,14 @@ function LogRow({ log }: { log: CronJobLogEntry }) {
                         </div>
                     )}
                     {log.logs.length > 0 && (
-                        <div className="p-2 rounded bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 max-h-40 overflow-auto">
+                        <div className="p-2 rounded bg-surface-sheet border border-hairline-strong max-h-40 overflow-auto">
                             {log.logs.map((line, i) => (
                                 <div key={i} className="font-mono text-[11px] text-surface-600 dark:text-surface-400 leading-relaxed">{line}</div>
                             ))}
                         </div>
                     )}
                     {log.result !== undefined && (
-                        <div className="p-2 rounded bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700">
+                        <div className="p-2 rounded bg-surface-sheet border border-hairline-strong">
                             <Typography variant="caption" className="text-[10px] uppercase tracking-wider text-surface-400 mb-1 block">Result</Typography>
                             <pre className="font-mono text-[11px] text-surface-600 dark:text-surface-400 whitespace-pre-wrap break-all">{JSON.stringify(log.result, null, 2)}</pre>
                         </div>

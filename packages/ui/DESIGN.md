@@ -76,6 +76,14 @@ resolves under whichever dark selector the consumer uses (the panel sets
 `.dark` on `<html>`, the marketing site sets `data-theme="dark"`). In a plain
 `@theme` the alias would be computed once on `:root` and stay light.
 
+There is deliberately no `.light` class selector. Nothing in the app sets one,
+and a third-party root that stamps its own theme class (React Flow puts `light`
+or `dark` on `.react-flow`) would otherwise re-light every token under it on a
+dark page, which is exactly what the schema canvas did. Light is the `:root`
+ladder; the only switches are `.dark` and `[data-theme]`. A widget that carries
+its own theme class is told the app theme instead (`colorMode` from
+`useIsDarkMode()`), so its controls and our tokens agree.
+
 ### The numbered scale
 
 `surface-50` to `surface-950` and `surface-accent-*` keep their values and stay

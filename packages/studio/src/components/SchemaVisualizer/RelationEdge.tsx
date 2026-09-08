@@ -81,13 +81,13 @@ const RelationEdgeInner = ({
                         }}
                         className={cls(
                             "px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold leading-none",
-                            "bg-white dark:bg-surface-900 border",
+                            "bg-surface-card border",
                             selected
                                 ? "border-primary text-primary"
                                 : isJunction
                                   ? "border-violet-200 dark:border-violet-800 text-violet-600 dark:text-violet-400"
                                   : isInverse || isJoinPath
-                                    ? "border-surface-200 dark:border-surface-700 text-text-disabled dark:text-text-disabled-dark"
+                                    ? "border-hairline-strong text-text-disabled dark:text-text-disabled-dark"
                                     : "border-primary/30 dark:border-primary/30 text-primary"
                         )}
                     >
