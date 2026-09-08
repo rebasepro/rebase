@@ -38,16 +38,37 @@
  */
 
 /**
- * Canonical sort representation: `[fieldName, direction]`.
+ * Where NULLs sort relative to real values on one key.
  *
- * Used in `FindParams.orderBy`, `collection.sort`, and `FilterPreset.sort`.
- * The colon-string form (`"field:direction"`) exists only at the HTTP wire
- * boundary, handled by `serializeOrderBy` / `deserializeOrderBy` in
- * `@rebasepro/common`.
+ * Absent means the convention Postgres itself applies and the driver writes
+ * out: `NULLS LAST` ascending, `NULLS FIRST` descending. That convention was
+ * hardcoded and unstateable — a "newest first" list put every row with no date
+ * at the very top, and the only way out was to add a `is-not-null` filter and
+ * lose those rows entirely.
+ *
+ * The keyset comparison honours whatever is chosen here, so a cursor over a
+ * nullable key stays correct under either placement.
  *
  * @group Models
  */
-export type OrderByTuple<Key extends string = string> = [Key, "asc" | "desc"];
+export type NullsPlacement = "first" | "last";
+
+/**
+ * Canonical sort representation: `[fieldName, direction]`, optionally with a
+ * {@link NullsPlacement}.
+ *
+ * Used in `FindParams.orderBy`, `collection.sort`, and `FilterPreset.sort`.
+ * The colon-string form (`"field:direction"`, or `"field:direction:nulls"`)
+ * exists only at the HTTP wire boundary, handled by `serializeOrderBy` /
+ * `deserializeOrderBy` in `@rebasepro/common`.
+ *
+ * The third slot is optional so every `[field, direction]` written before it
+ * existed is still exactly this type, and every `const [field, direction] =`
+ * destructure still reads what it always read.
+ *
+ * @group Models
+ */
+export type OrderByTuple<Key extends string = string> = [Key, "asc" | "desc", NullsPlacement?];
 
 /**
  * One sort key, or several applied in order of significance.
@@ -89,7 +110,7 @@ export type SortKey<Key extends string = string> = Key | RelationAggregateSort;
  *
  * @group Models
  */
-export type OrderBySortTuple<Key extends string = string> = [SortKey<Key>, "asc" | "desc"];
+export type OrderBySortTuple<Key extends string = string> = [SortKey<Key>, "asc" | "desc", NullsPlacement?];
 
 /**
  * The aggregate functions a relation sort can apply.
@@ -419,6 +440,20 @@ export const REST_TO_CANONICAL: Readonly<Record<RestFilterOp, WhereFilterOp>> = 
  */
 export const NULL_OPS: ReadonlySet<WhereFilterOp> = new Set<WhereFilterOp>([
     "is-null", "is-not-null"
+]);
+
+/**
+ * Operators whose operand is a **list** of values rather than one value.
+ *
+ * On the wire that list is always parenthesised — `in.(draft,review)` — which
+ * is what lets the REST codec tell `?status=in.(a,b)` (the operator) from
+ * `?status=in.progress` (a value that happens to start with an operator's
+ * name). See `deserializeSingle` in `@rebasepro/common`.
+ *
+ * @group Models
+ */
+export const LIST_OPS: ReadonlySet<WhereFilterOp> = new Set<WhereFilterOp>([
+    "in", "not-in", "array-contains-any"
 ]);
 
 /**

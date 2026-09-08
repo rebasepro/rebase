@@ -741,8 +741,8 @@ code: "ERR_001" } }
                 rows: [{ id: "user1" }]
             }) });
 
-            expect(onUpdate1).toHaveBeenCalledWith([{ id: "user1" }]);
-            expect(onUpdate2).toHaveBeenCalledWith([{ id: "user1" }]);
+            expect(onUpdate1).toHaveBeenCalledWith([{ id: "user1" }], undefined);
+            expect(onUpdate2).toHaveBeenCalledWith([{ id: "user1" }], undefined);
         });
 
         it("creates separate subscriptions for different params", () => {
@@ -792,12 +792,12 @@ limit: 20 }, jest.fn());
                 rows: [{ id: "cached" }]
             }) });
 
-            expect(onUpdate1).toHaveBeenCalledWith([{ id: "cached" }]);
+            expect(onUpdate1).toHaveBeenCalledWith([{ id: "cached" }], undefined);
 
             // Late joiner should get cached data immediately
             const onUpdate2 = jest.fn();
             client.listenCollection({ path: "users" }, onUpdate2);
-            expect(onUpdate2).toHaveBeenCalledWith([{ id: "cached" }]);
+            expect(onUpdate2).toHaveBeenCalledWith([{ id: "cached" }], undefined);
         });
     });
 
@@ -2308,7 +2308,7 @@ code: "UNAUTHORIZED" } }
                 rows: [{ id: "post1" }]
             }) });
 
-            expect(onUpdate).toHaveBeenCalledWith([{ id: "post1" }]);
+            expect(onUpdate).toHaveBeenCalledWith([{ id: "post1" }], undefined);
             expect(onError).not.toHaveBeenCalled();
         });
     });

@@ -61,7 +61,7 @@ export { RebasePaginationError } from "@rebasepro/common";
 export type { PaginationErrorCode } from "@rebasepro/common";
 
 // Logical-condition helpers for `.where(or(...), and(...))`.
-export { QueryBuilder, or, and, cond } from "@rebasepro/common";
+export { QueryBuilder, or, and, not, cond } from "@rebasepro/common";
 
 // Auth: session/token types, config, and the pluggable storage strategies.
 export { createCookieStorage, createMemoryStorage } from "./auth";

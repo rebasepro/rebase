@@ -1,5 +1,7 @@
-import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, type UpdateValues, type UpsertOptions, SDKQueryBuilderInterface, sortKeyToString, type ComputedSortField, type FieldPath, type NonColumnFieldPath, type SearchMatch, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateParams, type AggregateRow, type AggregateSelect, type ComputedSortField, type FieldPath, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
+import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
+import { mergeIncludeSpecs } from "./include-spec";
 import { QueryBuilder } from "./query_builder";
 import { collectAllPages, paginateFind, resolveFindWindow } from "./paginate";
 import { normalizeOrderBy } from "./sort-dialect";
@@ -18,6 +20,35 @@ const noRealtime = (slug: string): string =>
 /** What a client says when its data source cannot count. */
 const noCount = (slug: string): string =>
     `Counting is not available for "${slug}": its data source does not support it.`;
+
+/**
+ * Derive the response key an aggregate comes back under.
+ *
+ * `sum(total)` → `sum_total`, `count()` → `count`. Written once, here, because
+ * the REST parser derives the same alias from `?select=sum(total)` and the two
+ * have to agree — a caller reading `row.sum_total` off an SDK result and off an
+ * HTTP response is reading the same key or the SDK is broken.
+ */
+export function aggregateAlias(fn: string, field?: string): string {
+    return field ? `${fn}_${field}` : fn;
+}
+
+function toDriverAggregate(
+    select: AggregateSelect<Record<string, unknown>>
+): { fn: "count" | "sum" | "avg" | "min" | "max"; field?: string; alias: string } {
+    const field = select.field as string | undefined;
+    return { fn: select.fn, field, alias: aggregateAlias(select.fn, field) };
+}
+
+/**
+ * What a client says when its data source cannot aggregate.
+ *
+ * A stub rather than a fallback that fetches and reduces in JavaScript: that
+ * would be wrong under a `limit` and unaffordable without one, and it would look
+ * like it had worked.
+ */
+const noAggregate = (slug: string): string =>
+    `Aggregates are not available for "${slug}": its data source does not implement them.`;
 
 export interface EntityDataOptions {
     /**
@@ -159,6 +190,16 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
             const { limit, offset, driverOffset } = resolveFindWindow(params);
 
+            // Keyset paging, through the same codec and the same driver
+            // comparison the HTTP route uses. The in-process accessor is a
+            // transport like any other: a walk that seeked differently here
+            // than over the wire would be a difference the types cannot see.
+            const cursor = params?.after ? decodeCursor(params.after) : undefined;
+            const orderBy = cursor
+                ? reconcileCursorOrder(cursor, normalizeOrderBy(params?.orderBy))
+                : normalizeOrderBy(params?.orderBy);
+            const startAfter = cursor ? cursorToStartAfter(cursor) : undefined;
+
             // One relation shape, whatever the call looks like.
             //
             // This used to fork on `include`: asking for one ran the REST
@@ -174,8 +215,20 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             // documents — so every read goes through it when the driver has
             // one. Drivers without one (every browser driver, and so the
             // admin's own path through `buildRebaseData`) are untouched.
+            //
+            // One row past the page, when seeking.
+            //
+            // `hasMore` on an offset page is `offset + rows.length < total`, and
+            // under a cursor that arithmetic is simply false: every seeked page
+            // runs at offset 0, so it compares one page against the whole
+            // collection and says "more" forever. Asking for `limit + 1` and
+            // looking at whether the extra row arrived is the answer keyset
+            // paging actually has — and it costs nothing, where the count it
+            // replaces was a second query per page.
+            const probeLimit = startAfter ? limit + 1 : limit;
+
             const fetchService = driver.restFetchService;
-            const rows = fetchService
+            const fetched = fetchService
                 ? await fetchService.fetchCollectionForRest(
                     slug,
                     {
@@ -184,26 +237,41 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                         // unfiltered — every row the caller's policies allow,
                         // in place of the ones they asked for.
                         logical: params?.logical,
-                        limit,
-                        offset: driverOffset,
-                        orderBy: normalizeOrderBy(params?.orderBy),
-                        searchString: params?.searchString
+                        limit: probeLimit,
+                        // A cursor and an offset describe the same window two
+                        // incompatible ways; seeking wins and the offset is not
+                        // sent, or the page would start `offset` rows past
+                        // where the cursor pointed.
+                        offset: startAfter ? undefined : driverOffset,
+                        startAfter,
+                        orderBy,
+                        searchString: params?.searchString,
+                        fields: params?.fields,
+                        distinct: params?.distinct
                     },
                     params?.include
                 )
                 : await driver.fetchCollection<M>({
                     path: slug,
-                    limit,
-                    offset: driverOffset,
+                    limit: probeLimit,
+                    offset: startAfter ? undefined : driverOffset,
+                    startAfter,
                     filter,
                     logical: params?.logical,
-                    orderBy: normalizeOrderBy(params?.orderBy),
-                    searchString: params?.searchString
+                    orderBy,
+                    searchString: params?.searchString,
+                    include: params?.include,
+                    fields: params?.fields,
+                    distinct: params?.distinct
                 });
+
+            // The probe row is evidence, not data — it is never served.
+            const seeking = startAfter !== undefined;
+            const rows = seeking ? fetched.slice(0, limit) : fetched;
 
             // Compute real total when count is available
             let total = rows.length + offset;
-            let hasMore = rows.length >= limit;
+            let hasMore = seeking ? fetched.length > limit : rows.length >= limit;
             if (driver.count) {
                 // The same narrowing the rows were read with. Counting only by
                 // `filter` reported the whole collection beside a narrowed
@@ -215,12 +283,25 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                     logical: params?.logical,
                     searchString: params?.searchString
                 });
-                hasMore = offset + rows.length < total;
+                // ...but only for an *offset* page. `offset` is 0 on every
+                // seeked page, so this arithmetic compares one page against the
+                // whole collection and says "more" forever; the probe row above
+                // is what answers it under a cursor.
+                if (!seeking) hasMore = offset + rows.length < total;
             }
+
+            // The cursor for the *next* page, from the last row served. Issued
+            // by the driver, which is the only layer that knows which columns
+            // address a row; absent where it cannot describe one, and the
+            // caller then pages by offset.
+            const last = rows[rows.length - 1] as Record<string, unknown> | undefined;
+            const nextCursor = (hasMore && last && driver.restFetchService?.cursorFor)
+                ? driver.restFetchService.cursorFor(slug, last, orderBy)
+                : undefined;
 
             return {
                 data: rows.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug, getPks())),
-                meta: { total, limit, offset, hasMore }
+                meta: { total, limit, offset, hasMore, ...(nextCursor && { nextCursor }) }
             };
         },
 
@@ -233,6 +314,22 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 : await driver.fetchOne<M>({ path: slug, id: id });
             return row ? rowToEntity<M>(row, slug, getPks()) : undefined;
         },
+
+        // Present only when the driver's fetch service implements it — the SDK
+        // wrapper turns an absent one into a stub that names the capability.
+        aggregate: driver.restFetchService?.aggregate
+            ? async (params: AggregateParams<M>): Promise<AggregateRow[]> =>
+                driver.restFetchService!.aggregate!(slug, {
+                    aggregates: params.select.map(toDriverAggregate),
+                    groupBy: params.groupBy as string[] | undefined,
+                    filter: params.where
+                        ? deserializeFilter(params.where as Record<string, unknown>)
+                        : undefined,
+                    logical: params.logical,
+                    searchString: params.searchString,
+                    limit: params.limit
+                })
+            : undefined,
 
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
             const row = await driver.save<M>({
@@ -511,9 +608,16 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
     }
 
     /** Called again, this adds a tie-breaker rather than replacing the sort. */
-    orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction: "asc" | "desc" = "asc"): this {
+    orderBy(
+        column: FieldPath<M> | ComputedSortField | RelationAggregateSort,
+        direction: "asc" | "desc" = "asc",
+        nulls?: NullsPlacement
+    ): this {
         const existing = normalizeOrderBy(this.params.orderBy) ?? [];
-        this.params.orderBy = [...existing, [sortKeyToString(column), direction] as OrderByTuple];
+        const key = sortKeyToString(column);
+        this.params.orderBy = [...existing, (nulls
+            ? [key, direction, nulls]
+            : [key, direction]) as OrderByTuple];
         return this;
     }
 
@@ -533,10 +637,39 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
         };
         return this;
     }
-    include(...relations: string[]): this { this.params.include = relations; return this; }
+    /**
+     * Load relations. Merges rather than replaces, so `.include("author")` then
+     * `.include({ comments: { limit: 5 } })` asks for both — a builder call that
+     * silently discarded an earlier one is the same defect `where` had.
+     */
+    include(...relations: (string | IncludeSpec)[]): this {
+        this.params.include = mergeIncludeSpecs(this.params.include, relations);
+        return this;
+    }
+
+    fields(...columns: (FieldPath<M> | string)[]): this {
+        this.params.fields = [...(this.params.fields ?? []), ...columns as string[]];
+        return this;
+    }
+
+    distinct(enabled = true): this { this.params.distinct = enabled; return this; }
+
+    after(cursor: string): this { this.params.after = cursor; return this; }
 
     async find(): Promise<FindResult<M>> {
         return this.client.find(this.params as FindParams<M>);
+    }
+
+    /** Aggregate the matching rows. See {@link SDKCollectionClient.aggregate}. */
+    async aggregate(
+        params: Omit<AggregateParams<M>, "where" | "logical" | "searchString">
+    ): Promise<AggregateRow[]> {
+        return this.client.aggregate({
+            ...params,
+            where: this.params.where as AggregateParams<M>["where"],
+            logical: this.params.logical,
+            searchString: this.params.searchString
+        });
     }
 
     /**
@@ -719,7 +852,11 @@ data: u.data as Partial<EntityValues<M>> }))
             }
             return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValueFor<WhereFilterOp, M[keyof M & string]>);
         },
-        orderBy: (column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction?: "asc" | "desc") => new SdkQueryBuilder<M>(client).orderBy(column, direction),
+        orderBy: (
+            column: FieldPath<M> | ComputedSortField | RelationAggregateSort,
+            direction?: "asc" | "desc",
+            nulls?: NullsPlacement
+        ) => new SdkQueryBuilder<M>(client).orderBy(column, direction, nulls),
         limit: (count: number) => new SdkQueryBuilder<M>(client).limit(count),
         offset: (count: number) => new SdkQueryBuilder<M>(client).offset(count),
         search: (searchString: string) => new SdkQueryBuilder<M>(client).search(searchString),
@@ -728,7 +865,13 @@ data: u.data as Partial<EntityValues<M>> }))
             vector: number[],
             options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
         ) => new SdkQueryBuilder<M>(client).vectorSearch(property, vector, options),
-        include: (...relations: string[]) => new SdkQueryBuilder<M>(client).include(...relations)
+        include: (...relations: (string | IncludeSpec)[]) => new SdkQueryBuilder<M>(client).include(...relations),
+        fields: (...columns: (FieldPath<M> | string)[]) => new SdkQueryBuilder<M>(client).fields(...columns),
+        distinct: (enabled?: boolean) => new SdkQueryBuilder<M>(client).distinct(enabled),
+        after: (cursor: string) => new SdkQueryBuilder<M>(client).after(cursor),
+        aggregate: snap.aggregate
+            ? (params: AggregateParams<M>) => snap.aggregate!(params)
+            : unsupportedMethod(noAggregate(slug))
     };
     return client;
 }
@@ -782,6 +925,9 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         // into a throw is worse than one that polls. The client's method is
         // always present now, so the capability is read off the stub instead.
         count: isUnsupported(sdk.count) ? undefined : (params?: FindParams<M>) => sdk.count(params),
+        aggregate: isUnsupported(sdk.aggregate)
+            ? undefined
+            : (params: AggregateParams<M>) => sdk.aggregate(params),
         listen: isUnsupported(sdk.listen)
             ? undefined
             : (params: FindParams<M> | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) =>

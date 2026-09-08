@@ -4,7 +4,7 @@ sidebar_label: Relations
 description: "Include related entities in a query, and read a child collection through its parent with the SDK's relation accessors."
 ---
 
-## Fetching Relations
+## Loading related rows
 
 Relations can be included so that related entities are returned alongside the primary data, instead of just their foreign key IDs.
 
@@ -16,11 +16,14 @@ const { data } = await client.data.posts
     .include("author", "categories")
     .find();
 
-// Include all defined relations
+// Include all defined relations, one hop deep
 const { data } = await client.data.posts
     .include("*")
     .find();
 ```
+
+Repeated calls **add** to each other rather than replacing, so
+`.include("author").include("categories")` asks for both.
 
 ### Using `find({ include })` (Params)
 
@@ -29,6 +32,85 @@ const { data } = await client.data.posts.find({
     include: ["author", "categories"]
 });
 ```
+
+### Nesting: relations of relations
+
+A dotted path loads a relation of a relation, up to **three hops**:
+
+```typescript
+// Each post's comments, and each comment's author.
+const { data } = await client.data
+    .collection<{ id: string; comments?: { author?: { name: string } }[] }>("posts")
+    .include("comments.author")
+    .find();
+
+console.log(data[0].comments?.[0].author?.name);
+```
+
+Naming the intermediate hop is optional — `comments.author` already implies
+`comments` — and sending both is the same request twice.
+
+Each hop is one batched query for the whole page, not one per row: a page of 50
+posts with `comments.author` is three queries, whatever the number of comments.
+The depth bound is what stops a self-referencing relation from walking forever;
+past it the request is a 400 `INCLUDE_TOO_DEEP`.
+
+### Narrowing what a relation loads
+
+The list form has nowhere to put a per-relation `limit`, so a relation that
+needs narrowing takes an options object instead:
+
+```typescript
+const { data } = await client.data.posts.include({
+    comments: {
+        limit: 5,
+        where: { published: ["==", true] },
+        orderBy: ["createdAt", "desc"],
+        fields: ["id", "body"],
+        include: { author: true }
+    }
+}).find();
+```
+
+| Option | What it does |
+|--------|--------------|
+| `limit` | Rows **per parent**, not across the page — five comments on each post, not five in total. |
+| `where` | The same filter dialect the top-level `where` uses. Pushed into the query, so the `limit` applies to rows that match. |
+| `logical` | An `or`/`and`/`not` group over the related rows. |
+| `orderBy` | The same sort spelling, including the [NULL placement](/docs/sdk/querying#where-nulls-sort). |
+| `fields` | Columns of the *related* row. Its key always survives, so the row stays addressable. |
+| `include` | Relations of the related row, in turn — this is how the tree nests. |
+
+`true` is the shorthand for "load it whole": `{ author: true }` and
+`["author"]` are the same request.
+
+### Unknown relation names are refused
+
+A name that is not a relation of the collection is a **400
+`UNKNOWN_RELATION`**, at every level of the tree — including inside a nested
+`include`. It used to be ignored, which answers 200 with the field simply
+missing, and a missing relation field is indistinguishable from a row that
+genuinely has no related row. A typo therefore looked exactly like empty data.
+
+With a generated `Database` type, it does not get that far: `include` keys are
+checked against the collection's real relations at compile time, recursively.
+See [Typed includes](#typed-includes).
+
+### On the wire
+
+`include` is one query parameter with two spellings, told apart by a leading
+brace:
+
+```
+GET /api/data/posts?include=author,comments.author
+GET /api/data/posts?include={"comments":{"limit":5,"include":{"author":true}}}
+```
+
+The flat form is what a human types and what most requests need; the JSON form
+exists because the flat one cannot carry per-relation options, and inventing a
+punctuation for them (`comments(limit:5)`) would be a third grammar to learn
+beside the two this API already has. Both are accepted on every list and
+get-by-id route, and the SDK picks whichever the query needs.
 
 ### Combining with Filters
 
@@ -61,6 +143,68 @@ for (const post of data) {
 ```
 
 > **Note:** Without `.include("author")`, only the scalar `authorId` field is returned. The hydrated `author` object will be `undefined`.
+
+### A `belongsTo` has three shapes
+
+One relation, three places it appears — and the wire is deliberately not
+symmetric about it, so it is worth knowing all three:
+
+| Where | Shape | Why |
+|-------|-------|-----|
+| **Write** | `{ author: id }` **or** `{ authorId: id }` | Both are accepted. The write transformer maps the relation property onto the foreign-key column, so the two are the same write. |
+| **Read** | `authorId` | It is a column. Every read returns it. |
+| **Read with `include`** | `author`, the target's own row | Loaded only when the query names it, so it is absent from every other read. |
+
+```typescript
+type Post = { id: string; title: string; authorId: string; author?: { name: string } };
+const posts = client.data.collection<Post>("posts");
+
+// Write: either spelling.
+await posts.create({ title: "Hello", author: authorId } as Partial<Post>);
+await posts.create({ title: "Hello", authorId });
+
+// Read: the key.
+const post = await posts.get(id);
+post.authorId;          // "uuid-1234"
+post.author;            // undefined — nothing asked for it
+
+// Read with include: the row.
+const { data } = await posts.include("author").find();
+data[0].authorId;       // "uuid-1234" — still there
+data[0].author?.name;   // "Jane Doe"
+```
+
+A generated `Database` types all three precisely: `Insert` and `Update` accept
+either write spelling, `Row` has `authorId` unconditionally, and `author` is
+optional on `Row` and **required** on the row a read with `include` returns —
+see [Typed includes](#typed-includes).
+
+The one case where the three collapse is a relation named identically to its own
+foreign key. There the included row is served *over* the column, and the
+generated type says so by typing that key as both.
+
+### Typed includes
+
+`rebase generate-sdk` writes the relation graph into your `Database` type, and
+two helpers built on it:
+
+```typescript no-verify
+import type { IncludeFor, RowWith } from "./database.types";
+
+const ok: IncludeFor<"posts"> = { comments: { limit: 5, include: { author: true } } };
+
+// @ts-expect-error — 'authr' is not a relation of 'comments'
+const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
+```
+
+`IncludeFor<A>` constrains an include's keys to relations that exist, at every
+level. `RowWith<A, I>` is the row that read returns, with every included
+relation made **required** — so after asking for the author, `row.author.name`
+needs no `?.`.
+
+Without a generated `Database`, `include` stays a plain `string[]` or tree: a
+hand-written row type has no relations in it to check against, and the server's
+400 is the backstop.
 
 ### Relation Names
 

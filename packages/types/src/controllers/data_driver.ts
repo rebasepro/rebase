@@ -4,7 +4,8 @@ import type { EntityStatus, EntityValues } from "../types/entities";
 import type { CollectionConfig, FilterValues } from "../types/collections";
 import type { OrderByTuple } from "../types/filter-operators";
 import type { RebaseCallContext } from "../call_context";
-import type { LogicalCondition } from "./data";
+import type { IncludeSpec, LogicalCondition } from "./data";
+import type { CollectionUpdateMeta } from "../types/websockets";
 
 
 /**
@@ -213,6 +214,20 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
      * worse answer than ignoring it.
      */
     withDeleted?: boolean | "only";
+    /**
+     * Relations to load — see {@link IncludeSpec}.
+     *
+     * Absent means *no* relations, the same as it does over REST. It used to be
+     * absent from this contract entirely, and the driver's own fetch then loaded
+     * every relation of every row unconditionally: `find()` returned a row with
+     * a foreign key and `listen()` returned the same row with a nested object
+     * where that key was, for the same query.
+     */
+    include?: IncludeSpec;
+    /** Columns to read, as a projection. See `FindParams.fields`. */
+    fields?: string[];
+    /** `SELECT DISTINCT` over the projection. See `FindParams.distinct`. */
+    distinct?: boolean;
 }
 
 /**
@@ -221,7 +236,15 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
 export type ListenCollectionProps<M extends Record<string, unknown> = Record<string, unknown>> =
     FetchCollectionProps<M> &
     {
-        onUpdate: (rows: Record<string, unknown>[]) => void;
+        /**
+         * Page number (1-indexed), as `FindParams.page`.
+         *
+         * A subscription could name a `limit` and an `offset` but not a `page`,
+         * so a live list on page three had to compute the offset itself — and
+         * the two spellings then disagreed about what a page was.
+         */
+        page?: number;
+        onUpdate: (rows: Record<string, unknown>[], meta?: CollectionUpdateMeta) => void;
         onError?: (error: Error) => void;
     };
 
@@ -648,9 +671,39 @@ export interface RestFetchService {
             vectorSearch?: VectorSearchParams;
             /** See {@link FetchCollectionProps.withDeleted}. */
             withDeleted?: boolean | "only";
+            /**
+             * Columns to read. A projection pushed into the SELECT, not a trim
+             * of the response — `excludeFromApi` still applies on top, and the
+             * primary key is always read whether or not it is named.
+             */
+            fields?: string[];
+            /** `SELECT DISTINCT` over the projection. See `FindParams.distinct`. */
+            distinct?: boolean;
         },
-        include?: string[]
+        include?: IncludeSpec
     ): Promise<Record<string, unknown>[]>;
+
+    /**
+     * The opaque cursor that continues a listing after `row`.
+     *
+     * On the driver rather than the route because deriving it needs the
+     * collection's primary key — which may be named anything and span several
+     * columns — and that is the driver's knowledge. The route holds the last
+     * row and the sort keys and asks for the string.
+     *
+     * `undefined` where no cursor can describe the page: an ordering with no
+     * stored value to compare against (relevance), or a row missing a value for
+     * one of the sort keys. The listing then reports no `nextCursor` and the
+     * caller pages by offset, which is what it did before cursors existed.
+     *
+     * Optional: a driver that cannot seek simply never issues one, and
+     * `meta.nextCursor` is absent for every read it serves.
+     */
+    cursorFor?(
+        collectionPath: string,
+        row: Record<string, unknown>,
+        orderBy?: OrderByTuple[]
+    ): string | undefined;
 
     /**
      * `count`/`sum`/`avg`/`min`/`max` over the rows a filter selects,
@@ -685,9 +738,13 @@ export interface RestFetchService {
     fetchOneForRest(
         collectionPath: string,
         id: string | number,
-        include?: string[],
+        include?: IncludeSpec,
         databaseId?: string,
-        /** See {@link FetchOneProps.withDeleted}. */
-        withDeleted?: boolean | "only"
+        options?: {
+            /** See `FetchCollectionProps.fields`. */
+            fields?: string[];
+            /** See {@link FetchOneProps.withDeleted}. */
+            withDeleted?: boolean | "only";
+        }
     ): Promise<Record<string, unknown> | null>;
 }

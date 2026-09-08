@@ -30,7 +30,7 @@ import {
 // A soft-deleted row must not come back through a relation either: a deleted
 // comment reappearing under its post is the same bug as one reappearing in the
 // listing. See `soft-delete.ts`.
-import { softDeleteCondition } from "./soft-delete";
+import { andSoftDelete, softDeleteCondition } from "./soft-delete";
 
 /**
  * The ids in a to-many relation write, whatever shape the caller sent.
@@ -85,6 +85,18 @@ function applyDynamicRelationQuery<T>(
     ...args: Parameters<typeof DrizzleConditionBuilder.buildRelationQuery>
 ): T {
     return DrizzleConditionBuilder.buildRelationQuery(...args) as unknown as T;
+}
+
+/**
+ * The relation's own matching condition, AND-ed with an include's `where`.
+ *
+ * Written once because the batch loaders reach the same decision from six
+ * places — one per relation kind, twice over for the to-one and to-many
+ * variants — and a `where` dropped from one of them is a filter the caller
+ * asked for that silently did not apply.
+ */
+function narrowed(base: SQL, narrow?: SQL): SQL {
+    return narrow ? and(base, narrow)! : base;
 }
 
 /**
@@ -659,13 +671,19 @@ export class RelationService {
     }
 
     /**
-     * Batch fetch related rows for multiple parent rows to avoid N+1 queries
+     * Batch fetch related rows for multiple parent rows to avoid N+1 queries.
+     *
+     * `narrow` is an extra condition on the *target* table — what a per-include
+     * `where` compiles to. It is pushed into the query rather than applied to
+     * the rows that come back, because filtering afterwards reads every related
+     * row of every parent in order to discard most of them.
      */
     async batchFetchRelatedEntities(
         parentCollectionPath: string,
         parentIds: (string | number)[],
         _relationKey: string,
-        relation: ResolvedRelation
+        relation: ResolvedRelation,
+        narrow?: SQL
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>>> {
         if (parentIds.length === 0) return new Map();
 
@@ -685,6 +703,18 @@ export class RelationService {
 
         // Parse all parent IDs once
         const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentIdInfo.fieldName]);
+
+        // Soft delete, once, for every branch below.
+        //
+        // These loaders are the only path an `include` takes now, and they
+        // reach the target four different ways — a `via` join, a junction, a
+        // foreign key, the dynamic relation builder. A `deleted_at IS NULL`
+        // written into one of them is a deleted comment that stays hidden under
+        // its post on one relation kind and reappears on another, which is
+        // exactly the rot `soft-delete.ts` exists to prevent. Folded into
+        // `narrow` here, it composes with the include's own `where` and every
+        // branch below applies both or neither.
+        const narrowTarget = andSoftDelete(narrow, targetCollection, targetTable);
 
         // Handle join path relations with batching
         if (relation.kind === "via") {
@@ -719,7 +749,7 @@ export class RelationService {
             }
 
             // Match every parent at once, each by its whole key.
-            query = query.where(this.parentKeyCondition(parentTable, parentPks, parentIds));
+            query = query.where(narrowed(this.parentKeyCondition(parentTable, parentPks, parentIds), narrowTarget));
 
             const results = await query;
             const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
@@ -783,13 +813,10 @@ export class RelationService {
             if (uniqueFkValues.length === 0) return new Map();
 
             // Step 2: Fetch all target rows in ONE query
-            const targetSoftDelete = softDeleteCondition(targetCollection, targetTable);
             const targetResults = await this.db
                 .select()
                 .from(targetTable)
-                .where(targetSoftDelete
-                    ? and(inArray(targetIdField, uniqueFkValues), targetSoftDelete)
-                    : inArray(targetIdField, uniqueFkValues));
+                .where(narrowed(inArray(targetIdField, uniqueFkValues), narrowTarget));
 
             // Index target rows by their ID
             const targetById = new Map<string, Record<string, unknown>>();
@@ -845,7 +872,10 @@ export class RelationService {
             parentIdCol,
             targetIdField,
             this.registry,
-            []
+            // Where a per-include `where` lands on this relation kind: the
+            // builder already AND-s `additionalFilters` into the relation's own
+            // conditions, so there is nothing to invent here.
+            narrowTarget ? [narrowTarget] : []
         );
 
         const results = await query;
@@ -887,7 +917,9 @@ export class RelationService {
         parentCollectionPath: string,
         parentIds: (string | number)[],
         _relationKey: string,
-        relation: ResolvedRelation
+        relation: ResolvedRelation,
+        /** An extra condition on the target — see {@link batchFetchRelatedEntities}. */
+        narrow?: SQL
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>[]>> {
         if (parentIds.length === 0) return new Map();
 
@@ -906,6 +938,18 @@ export class RelationService {
         const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
 
         const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentIdInfo.fieldName]);
+
+        // Soft delete, once, for every branch below.
+        //
+        // These loaders are the only path an `include` takes now, and they
+        // reach the target four different ways — a `via` join, a junction, a
+        // foreign key, the dynamic relation builder. A `deleted_at IS NULL`
+        // written into one of them is a deleted comment that stays hidden under
+        // its post on one relation kind and reappears on another, which is
+        // exactly the rot `soft-delete.ts` exists to prevent. Folded into
+        // `narrow` here, it composes with the include's own `where` and every
+        // branch below applies both or neither.
+        const narrowTarget = andSoftDelete(narrow, targetCollection, targetTable);
 
         // Handle join path relations (many-to-many through junction tables)
         if (relation.kind === "via") {
@@ -929,7 +973,7 @@ export class RelationService {
                 currentTable = joinTable;
             }
 
-            query = query.where(this.parentKeyCondition(parentTable, parentPks, parentIds));
+            query = query.where(narrowed(this.parentKeyCondition(parentTable, parentPks, parentIds), narrowTarget));
 
             const results = await query;
             const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
@@ -969,14 +1013,13 @@ export class RelationService {
             // SELECT target.*, junction.sourceColumn FROM junction
             // INNER JOIN target ON junction.targetColumn = target.id
             // WHERE junction.sourceColumn IN (parentIds)
-            const junctionSoftDelete = softDeleteCondition(targetCollection, targetTable);
+            // The target is joined in, so its soft-delete stamp is a condition
+            // this query can carry.
             const query = this.db
                 .select()
                 .from(junctionTable)
                 .innerJoin(targetTable, eq(targetJunctionCol, targetIdField))
-                .where(junctionSoftDelete
-                    ? and(inArray(sourceJunctionCol, parsedParentIds), junctionSoftDelete)
-                    : inArray(sourceJunctionCol, parsedParentIds));
+                .where(narrowed(inArray(sourceJunctionCol, parsedParentIds), narrowTarget));
 
             const results = await query;
             const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();
@@ -1026,7 +1069,7 @@ export class RelationService {
             parentIdCol,
             targetIdField,
             this.registry,
-            []
+            narrowTarget ? [narrowTarget] : []
         );
 
         const results = await query;

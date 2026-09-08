@@ -1,12 +1,9 @@
 import {
     DEFAULT_LIST_LIMIT,
-    FilterValues,
-    FieldPath,
     FindAllParams,
     FindParams,
     FindResult,
-    IterateParams,
-    WhereFilterOp
+    IterateParams
 } from "@rebasepro/types";
 import { normalizeOrderBy } from "./sort-dialect";
 
@@ -41,12 +38,15 @@ export type PaginationErrorCode =
     | "max-rows"
     /** The walk made its maximum number of requests without the server finishing. */
     | "max-pages"
-    /** A cursor row carried no value for the cursor column. */
+    /**
+     * The server said there was another page but issued no cursor to reach it.
+     *
+     * A query whose ordering has no stored value to seek on — relevance — is the
+     * case that produces this. Page it by offset instead.
+     */
     | "cursor-missing"
-    /** Two consecutive pages ended on the same cursor value, so the walk cannot advance. */
-    | "cursor-stalled"
-    /** A `cursor` was asked for on one column while `orderBy` sorted by another. */
-    | "cursor-order-mismatch";
+    /** Two consecutive pages returned the same cursor, so the walk cannot advance. */
+    | "cursor-stalled";
 
 /**
  * Thrown when a walk stops for a reason the caller needs to know about.
@@ -121,36 +121,6 @@ function normalizeMaxRows(raw: number | undefined): number {
 }
 
 /**
- * Add one condition to a `where` map without disturbing what is already there.
- *
- * The caller's own filter on the cursor column has to survive — dropping it
- * would widen the query, which is the silent-filter-loss failure mode — so a
- * second condition on the same column becomes the array-of-tuples form that
- * `FindParams.where` already accepts, and both are AND-ed.
- */
-function appendCondition<M extends Record<string, unknown>>(
-    where: FilterValues<FieldPath<M>> | undefined,
-    column: string,
-    condition: [WhereFilterOp, unknown]
-): FilterValues<FieldPath<M>> {
-    const next = { ...(where ?? {}) } as Record<string, unknown>;
-    const existing = next[column];
-    if (existing === undefined) {
-        next[column] = condition;
-    } else if (Array.isArray(existing) && existing.length > 0 && Array.isArray(existing[0])) {
-        next[column] = [...(existing as [WhereFilterOp, unknown][]), condition];
-    } else {
-        next[column] = [existing, condition];
-    }
-    return next as FilterValues<FieldPath<M>>;
-}
-
-function cursorEquals(a: unknown, b: unknown): boolean {
-    if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
-    return Object.is(a, b);
-}
-
-/**
  * Walk every row a query matches, yielding one row at a time and fetching the
  * next page only when the consumer asks for it.
  *
@@ -178,45 +148,38 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
     const pageCap = normalizeMaxPages(maxPages as number | undefined);
 
     // ── Cursor (keyset) setup ────────────────────────────────────────────────
-    const cursorField = typeof cursor === "string" ? cursor : cursor?.field;
-    const requestedDirection = (typeof cursor === "object" && cursor !== null)
-        ? cursor.direction
-        : undefined;
-
-    let direction: "asc" | "desc" = "asc";
-    if (cursorField) {
-        const orderBy = normalizeOrderBy(findParams.orderBy);
-        // A seek is one `>`/`<` on one column, so it can only follow a sort of
-        // one column. Over a multi-key sort the same comparison both repeats
-        // rows (every later key's ties) and skips them, which is the failure
-        // this error exists to prevent — name it rather than seek anyway.
-        if (orderBy && orderBy.length > 1) {
-            throw new RebasePaginationError(
-                "cursor-order-mismatch",
-                `Cannot seek on "${cursorField}" while ordering "${label}" by ` +
-                `${orderBy.map(([field]) => `"${field}"`).join(", ")}: ` +
-                `keyset pagination advances along a single column. ` +
-                `Order by "${cursorField}" alone, or drop the cursor and page by offset.`
-            );
+    //
+    // The walk no longer builds a keyset of its own. It used to: a `>`/`<` on
+    // one column, expressed as an extra `where`, which threw on any multi-key
+    // sort ("keyset pagination advances along a single column") and dropped
+    // every row whose sort value was NULL, because `> value` answers *unknown*
+    // against NULL. The driver has had a NULL-correct multi-key comparison all
+    // along and nothing over HTTP could reach it.
+    //
+    // So this is now a *request* for seeking, not an implementation of it: the
+    // server issues `meta.nextCursor` and the walk hands it back as `after`.
+    // Multi-key sorts and nullable keys work because the comparison is the
+    // driver's, and there is one of it.
+    const seekRequested = cursor !== undefined && cursor !== null;
+    if (seekRequested) {
+        // A named column still means "sort by this and seek along it", which is
+        // what every existing caller wrote. It is an `orderBy` now rather than
+        // a second pagination mode — the seeking itself needs no column named,
+        // since the cursor carries whatever keys the sort used.
+        const field = typeof cursor === "string" ? cursor : cursor.field;
+        const requested = (typeof cursor === "object" && cursor !== null) ? cursor.direction : undefined;
+        const explicit = normalizeOrderBy(findParams.orderBy);
+        // An explicit `orderBy` wins and the named column is redundant, not
+        // wrong: seeking follows whatever the query is sorted by, so there is
+        // no longer a mismatch to refuse.
+        if (!explicit) {
+            findParams.orderBy = [field, requested ?? "asc"] as FindParams<M>["orderBy"];
         }
-        if (orderBy && orderBy[0][0] !== cursorField) {
-            throw new RebasePaginationError(
-                "cursor-order-mismatch",
-                `Cannot seek on "${cursorField}" while ordering "${label}" by "${orderBy[0][0]}": ` +
-                `keyset pagination only advances along the column the query is sorted by. ` +
-                `Order by "${cursorField}", or drop the cursor and page by offset.`
-            );
-        }
-        direction = requestedDirection ?? orderBy?.[0][1] ?? "asc";
-        findParams.orderBy = [cursorField, direction] as FindParams<M>["orderBy"];
     }
-    const seekOp: WhereFilterOp = direction === "desc" ? "<" : ">";
-    const baseWhere = findParams.where;
 
     let offset = 0;
     let pages = 0;
-    let cursorValue: unknown;
-    let seeking = false;
+    let after: string | undefined;
 
     for (;;) {
         if (pages >= pageCap) {
@@ -229,10 +192,8 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
         }
 
         const pageParams: FindParams<M> = { ...findParams, limit: size };
-        if (cursorField) {
-            if (seeking) {
-                pageParams.where = appendCondition<M>(baseWhere, cursorField, [seekOp, cursorValue]);
-            }
+        if (seekRequested) {
+            if (after) pageParams.after = after;
         } else {
             pageParams.offset = offset;
         }
@@ -256,27 +217,25 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
         // there drops every row after it.
         if (page?.meta?.hasMore !== true) return;
 
-        if (cursorField) {
-            const last = rows[rows.length - 1] as Record<string, unknown>;
-            const nextValue = last?.[cursorField];
-            if (nextValue === undefined || nextValue === null) {
+        if (seekRequested) {
+            const next = page.meta.nextCursor;
+            if (!next) {
                 throw new RebasePaginationError(
                     "cursor-missing",
-                    `Cannot seek past the last row of "${label}": it has no value for the cursor ` +
-                    `column "${cursorField}". Pick a column that is present and non-null on every row.`
+                    `Cannot seek past the last row of "${label}": the server reported another page but ` +
+                    `issued no cursor for it. An ordering with no stored value to compare against — ` +
+                    `relevance (\`_score\`) — cannot key a cursor. Drop \`cursor\` to page by offset.`
                 );
             }
-            if (seeking && cursorEquals(nextValue, cursorValue)) {
+            if (next === after) {
                 throw new RebasePaginationError(
                     "cursor-stalled",
-                    `Iterating "${label}" is stuck: two pages in a row ended at ` +
-                    `${cursorField}=${String(nextValue)}. The cursor column has to be unique — a ` +
-                    `repeated value cannot be seeked past, and continuing would either loop forever ` +
-                    `or skip the duplicates. Use the primary key, or page by offset.`
+                    `Iterating "${label}" is stuck: two pages in a row ended on the same cursor, so the ` +
+                    `walk cannot advance. Continuing would loop forever. Page by offset instead, or ` +
+                    `report this — a cursor that does not move is a server-side bug.`
                 );
             }
-            cursorValue = nextValue;
-            seeking = true;
+            after = next;
         } else {
             // Advance by what actually arrived, not by the page size: a server
             // free to return fewer rows than asked for would otherwise leave a

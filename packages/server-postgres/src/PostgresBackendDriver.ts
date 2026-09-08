@@ -294,8 +294,8 @@ export class PostgresBackendDriver implements DataDriver {
                 const rows = await raw.fetchCollectionForRest(collectionPath, options, include);
                 return this.applyAfterReadForRest(rows, collectionPath);
             },
-            fetchOneForRest: async (collectionPath, id, include, databaseId, withDeleted) => {
-                const row = await raw.fetchOneForRest(collectionPath, id, include, databaseId, withDeleted);
+            fetchOneForRest: async (collectionPath, id, include, databaseId, options) => {
+                const row = await raw.fetchOneForRest(collectionPath, id, include, databaseId, options);
                 if (!row) return row;
                 const [masked] = await this.applyAfterReadForRest([row], collectionPath);
                 return masked;
@@ -2008,9 +2008,9 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                     return delegate.restFetchService.fetchCollectionForRest(collectionPath, options, include);
                 }, { accessMode: "read only" });
             },
-            fetchOneForRest: async (collectionPath, id, include, databaseId, withDeleted) => {
+            fetchOneForRest: async (collectionPath, id, include, databaseId, options) => {
                 return this.withTransaction(async (delegate) => {
-                    return delegate.restFetchService.fetchOneForRest(collectionPath, id, include, databaseId, withDeleted);
+                    return delegate.restFetchService.fetchOneForRest(collectionPath, id, include, databaseId, options);
                 }, { accessMode: "read only" });
             },
             // In the same read-only transaction as the two above, which is what

@@ -327,10 +327,31 @@ export function generateTypedefs(input: CollectionConfig[]): string {
 
         // ── Row Type ──
         //
-        // What a read serves. There is no field selection in the query API, so
-        // every column of a row comes back on every read; a column is optional
-        // here only because the value may be absent or null, never because the
-        // caller might not have asked for it.
+        // What a read serves.
+        //
+        // ## A `belongsTo` has three shapes, and all three are typed
+        //
+        // One relation, three places it appears, and the wire is not symmetric
+        // about it — so the types are not either:
+        //
+        //  1. **Write** — `Insert`/`Update` accept *either* the foreign key
+        //     under its own wire name (`{ authorId: 5 }`) or the relation
+        //     property (`{ author: 5 }`), because the write transformer maps
+        //     the second onto the first. Emitted by `emitWritableRelations`.
+        //  2. **Read** — a row carries `authorId`. Always: it is a column.
+        //  3. **Read with `include`** — the target's own row arrives under
+        //     `author`. Emitted below as optional, because it is absent from
+        //     every read that did not name it; the generated `RowWith` makes it
+        //     required for a read that did.
+        //
+        // The three collapse in exactly one case — a relation named identically
+        // to its own foreign key, where 3 is served *over* 2 — handled below.
+        //
+        // `fields` narrows which columns a read returns, but a column is
+        // optional here only because the value may be absent or null, never
+        // because the caller might not have asked for it: a projection is a
+        // choice made at one call site, and typing every column optional to
+        // describe it would make every row unusable everywhere else.
         lines.push("    Row: {");
         const emittedKeys = new Set<string>();
 
@@ -452,6 +473,30 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         emitWritableRelations(lines, collection, properties, resolvedRelations, emittedKeys, true);
         lines.push("    };");
 
+        // ── Relations ──
+        //
+        // Which relations this collection has, and which collection each one
+        // reaches. Not a shape a read ever returns — it is the *graph*, and
+        // `include` is the one parameter that needs it: `IncludeFor` below
+        // walks it to constrain an include's keys to relations that exist, at
+        // every level, and `RowWith` reads it to make an included relation
+        // non-optional on the row that comes back.
+        //
+        // Emitted as the accessor NAME rather than the target's `Row`, so a
+        // self-referencing or mutually-referencing relation is a finite string
+        // instead of a type that expands forever.
+        lines.push("    Relations: {");
+        for (const [key, relation] of Object.entries(resolvedRelations)) {
+            const target = resolveTargetCollection(relation);
+            const slug = target?.slug ?? relation.targetSlug;
+            const accessor = slug ? accessors.get(slug) : undefined;
+            // A target outside this generation run has no accessor to name, so
+            // the relation is typed as reaching nothing rather than as reaching
+            // something that does not exist.
+            lines.push(`      ${emitKey(key)}: ${accessor ? emitString(accessor) : "never"};`);
+        }
+        lines.push("    };");
+
         lines.push("  };");
     }
 
@@ -472,8 +517,97 @@ export function generateTypedefs(input: CollectionConfig[]): string {
     // its own published type.
     lines.push("export type CollectionsDictionary = typeof collectionsDictionary;");
     lines.push("");
+    lines.push(...includeHelperLines());
 
     return lines.join("\n");
+}
+
+/**
+ * The `include` type machinery, emitted into the generated file.
+ *
+ * It lives here rather than in `@rebasepro/types` because it is the *graph*
+ * that makes it work, and the graph only exists once a project's collections
+ * have been generated. `IncludeSpec` in `@rebasepro/types` is deliberately
+ * unconstrained — a hand-written row type has no relations in it to check
+ * against — and these narrow it for a project that does have them.
+ *
+ * Two things a caller gets:
+ *
+ * - `IncludeFor<"posts">` — an include whose keys are relations that exist,
+ *   recursively, so `include: { comments: { include: { authr: true } } }` is a
+ *   compile error rather than a 400 at runtime.
+ * - `RowWith<"posts", I>` — the row a read with that include returns, where
+ *   every included relation is **present** rather than optional. `Row` types a
+ *   relation as optional because it is absent from every read that did not ask
+ *   for it; once a read has asked, `row.author.name` should not need a `?.`.
+ *
+ * The depth bound matches the server's (`MAX_INCLUDE_DEPTH`), and is spelled as
+ * a decrementing tuple because TypeScript has no arithmetic — `Prev[3]` is `2`.
+ * Without a bound, a self-referencing relation makes the type infinite and the
+ * compiler gives up with "type instantiation is excessively deep".
+ */
+function includeHelperLines(): string[] {
+    return [
+        "/** Which collection each of `A`'s relations reaches. */",
+        "export type RelationsOf<A extends CollectionName> =",
+        "  Database[A] extends { Relations: infer R } ? R : Record<string, never>;",
+        "",
+        "/** The names of `A`'s relations. */",
+        "export type RelationKeys<A extends CollectionName> = keyof RelationsOf<A> & string;",
+        "",
+        "/** The collection a relation reaches, or `never` when it left this project. */",
+        "export type RelationTarget<A extends CollectionName, K extends RelationKeys<A>> =",
+        "  RelationsOf<A>[K] extends CollectionName ? RelationsOf<A>[K] : never;",
+        "",
+        "/** Counts `IncludeFor` down; TypeScript has no arithmetic. */",
+        "type Prev = [never, 0, 1, 2, 3];",
+        "",
+        "/**",
+        " * Per-relation options, minus `include` — which `IncludeFor` supplies at",
+        " * the next depth so the nested keys are checked against the *target's*",
+        " * relations rather than this collection's.",
+        " */",
+        "export interface IncludeOptionsFor<A extends CollectionName, K extends RelationKeys<A>, D extends number> {",
+        "  limit?: number;",
+        "  where?: Record<string, unknown>;",
+        "  logical?: unknown;",
+        "  orderBy?: unknown;",
+        "  fields?: string[];",
+        "  include?: RelationTarget<A, K> extends CollectionName",
+        "    ? IncludeFor<RelationTarget<A, K>, Prev[D]>",
+        "    : never;",
+        "}",
+        "",
+        "/**",
+        " * An `include` for collection `A`: its relation names, dotted paths, or the",
+        " * parametrised tree — with every key checked against the relations that",
+        " * actually exist, at every level.",
+        " */",
+        "export type IncludeFor<A extends CollectionName, D extends number = 3> =",
+        "  D extends 0",
+        "    ? never",
+        "    : | readonly (RelationKeys<A> | \"*\")[]",
+        "      | { [K in RelationKeys<A>]?: true | IncludeOptionsFor<A, K, D> };",
+        "",
+        "/** The relation names an include asks for at the top level. */",
+        "type IncludedKeys<A extends CollectionName, I> =",
+        "  I extends readonly (infer K)[]",
+        "    ? Extract<K, RelationKeys<A>>",
+        "    : Extract<keyof I, RelationKeys<A>>;",
+        "",
+        "/**",
+        " * The row a read with include `I` returns: `Row`, with every included",
+        " * relation made **required**.",
+        " *",
+        " * `Row` types a relation as optional because it is absent from every read",
+        " * that did not name it. Once a read has named it, it is there — and having",
+        " * to write `row.author?.name` after asking for the author is the type",
+        " * describing a possibility the query already ruled out.",
+        " */",
+        "export type RowWith<A extends CollectionName, I> =",
+        "  Database[A][\"Row\"] & Required<Pick<Database[A][\"Row\"], IncludedKeys<A, I> & keyof Database[A][\"Row\"]>>;",
+        ""
+    ];
 }
 
 /**

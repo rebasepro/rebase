@@ -425,9 +425,27 @@ function logicalOrders(condition: LogicalCondition | FilterCondition | undefined
  * separate answer, because a sort changes which rows come first and not which
  * rows match. See {@link isLocallySortable}.
  */
+/**
+ * Whether an `include` asks for anything, in any of its spellings.
+ *
+ * `include` is a list of names, a list of dotted paths, or a tree — and only
+ * the first two have a `length`. A `.length > 0` test read the tree form as
+ * "no relations", which is the answer that makes the local cache claim it can
+ * evaluate a relational query exactly.
+ */
+function hasAnyInclude(include: FindParams["include"]): boolean {
+    if (!include) return false;
+    if (Array.isArray(include)) return include.length > 0;
+    return Object.keys(include).length > 0;
+}
+
 export function isExactlyEvaluable(params?: FindParams): boolean {
     if (!params) return true;
-    if (params.include && params.include.length > 0) return false;
+    // Any include at all. Reading `.length` was only ever true of the flat
+    // spelling; `include` is also a tree now, whose length is `undefined`, and
+    // a tree read as "no relations" would have the cache answer a relational
+    // query from rows that hold no relations.
+    if (hasAnyInclude(params.include)) return false;
     if (params.searchString) return false;
     // Nearest-neighbour ordering is the server's to compute: the cache holds no
     // vectors, and even with them, answering from a subset would return the

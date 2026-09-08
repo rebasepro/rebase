@@ -560,12 +560,33 @@ name: "A" } }]));
         expect(r.data[0].author).toEqual({ id: 5,
 name: "A" });
     });
-    it("second include() overrides first", async () => {
+    it("second include() adds to the first rather than replacing it", async () => {
+        // Assigning discarded what an earlier call asked for, so
+        // `.include("author").include("tags")` loaded tags alone and the author
+        // came back as a bare foreign key — a missing relation, with nothing
+        // anywhere saying it had been dropped. Every other builder method
+        // accumulates; this one now does too.
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.include("author").include("tags").find();
-        const p = mockRequest.mock.calls[0][0] as string;
-        expect(p).toContain("include=tags"); expect(p).not.toContain("author");
+        const p = decodeURIComponent(mockRequest.mock.calls[0][0] as string);
+        expect(p).toContain("include=author,tags");
+    });
+
+    it("carries a dotted path and the parametrised tree", async () => {
+        const c = createCollectionClient<PostModel>(transport, "posts");
+        mockRequest.mockResolvedValueOnce(mockFindResponse([]));
+        await c.include("comments.author").find();
+        expect(decodeURIComponent(mockRequest.mock.calls[0][0] as string))
+            .toContain("include=comments.author");
+
+        mockRequest.mockResolvedValueOnce(mockFindResponse([]));
+        await c.include({ comments: { limit: 5, include: { author: true } } }).find();
+        // The flat spelling has nowhere to put a `limit`, so a relation
+        // carrying options goes over as JSON — which the server tells apart by
+        // the leading brace.
+        const parametrised = decodeURIComponent(mockRequest.mock.calls[1][0] as string);
+        expect(parametrised).toContain("include={\"comments\":{\"limit\":5");
     });
     it("include + orderBy", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
@@ -638,25 +659,32 @@ describe("listen() — include", () => {
             .toThrow("Listen is only available");
     });
     /**
-     * LIMITATION, not a contract: the realtime subscription payload
-     * (`FetchCollectionProps`) carries no `include` — the server pushes rows,
-     * not joined graphs — so a `listen({ include })` silently gets flat rows.
-     * The rest of the params must still survive the trip, which is the half of
-     * this that IS a contract.
+     * The subscribe protocol has learned `include`, so the limitation this
+     * test used to record — and instructed its reader to delete it over — is
+     * gone.
      *
-     * If the subscribe protocol ever learns `include`, DELETE this test rather
-     * than re-dropping the field to keep it green.
+     * It was not a small one. `listen({ include })` silently got flat rows
+     * while the identical `find({ include })` got the graph, so the same query
+     * answered in two shapes depending on which method asked; and the refetch
+     * behind the subscription, passing no `include` at all, took the driver
+     * path that loads EVERY relation — so what a subscriber actually received
+     * was neither of the two.
      */
-    it("listen carries every param the subscribe protocol has — include is not one of them", () => {
+    it("listen carries include, fields and the page, like find does", () => {
         const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
 listenOne: jest.fn().mockReturnValue(() => {}) } as any;
         const { transport } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
         c.listen!({ include: ["author"],
+fields: ["id", "title"],
+page: 3,
 limit: 10 }, jest.fn());
-        expect(mockWs.listenCollection.mock.calls[0][0].include).toBeUndefined();
-        expect(mockWs.listenCollection.mock.calls[0][0].path).toBe("posts");
-        expect(mockWs.listenCollection.mock.calls[0][0].limit).toBe(10);
+        const props = mockWs.listenCollection.mock.calls[0][0];
+        expect(props.include).toEqual(["author"]);
+        expect(props.fields).toEqual(["id", "title"]);
+        expect(props.page).toBe(3);
+        expect(props.path).toBe("posts");
+        expect(props.limit).toBe(10);
     });
     it("listen passes searchString to WS", () => {
         const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
