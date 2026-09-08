@@ -163,6 +163,7 @@ const COLLECTION_KEY_LIST = [
     "schema",
     "search",
     "indexes",
+    "softDelete",
     // FirebaseCollectionConfig / MongoDBCollectionConfig
     "path",
     "subcollections",
@@ -238,7 +239,7 @@ const BASE_PROPERTY_KEYS = [
  * every type, so a key added to the admin block later cannot be added here too.
  */
 const PROPERTY_KEYS_BY_TYPE = {
-    string: ["columnType", "isId", "enum", "storage", "userSelect", "email", "url"],
+    string: ["columnType", "isId", "enum", "storage", "userSelect", "email", "url", "autoValue"],
     number: ["columnType", "isId", "enum"],
     boolean: [],
     date: ["columnType", "mode", "timezone", "autoValue"],
@@ -931,6 +932,63 @@ function checkRelationPropertiesResolve(
     }
 }
 
+/** The field `softDelete: true` means, when the object form names none. */
+const DEFAULT_SOFT_DELETE_FIELD = "deletedAt";
+
+/**
+ * `softDelete` says what a column *means*. It does not create the column.
+ *
+ * So the collection has to declare it, as a `date`, and a config that turns the
+ * flag on without one has to be refused here rather than at the first delete —
+ * where the failure would be a 500 landing on whoever pressed the button, on a
+ * row that then either vanished or did not depending on which half of the
+ * feature was reached. Both halves need the column: the delete writes it and
+ * every read filters on it.
+ *
+ * A wrong *type* is refused for the same reason. `deletedAt: { type: "boolean" }`
+ * would let the delete write `now()` into a boolean column and fail at the
+ * database, which is the same failure one layer further from the cause.
+ */
+function checkSoftDelete(
+    collection: Record<string, unknown>,
+    at: string,
+    collect: ProblemCollector
+): void {
+    const declared = collection.softDelete;
+    if (declared === undefined || declared === false) return;
+
+    if (declared !== true && !isPlainObject(declared)) {
+        collect.error(`${at}.softDelete`, "`softDelete` must be `true` or `{ field }`.");
+        return;
+    }
+
+    const field = isPlainObject(declared) && typeof declared.field === "string" && declared.field
+        ? declared.field
+        : DEFAULT_SOFT_DELETE_FIELD;
+
+    const properties = isPlainObject(collection.properties) ? collection.properties : undefined;
+    const property = properties?.[field];
+
+    if (!property) {
+        collect.error(
+            `${at}.softDelete`,
+            `\`softDelete\` records the deletion in '${field}', and '${at}' has no such property. ` +
+            `Declare it — \`${field}: { type: "date" }\` — or name an existing date property with ` +
+            "`softDelete: { field: \"…\" }`. The flag says what a column means; it does not add one."
+        );
+        return;
+    }
+
+    const type = isPlainObject(property) ? property.type : undefined;
+    if (type !== "date") {
+        collect.error(
+            `${at}.softDelete`,
+            `\`softDelete\` stamps '${field}' with a timestamp, and that property is a ` +
+            `\`${String(type)}\`. It has to be a \`date\`.`
+        );
+    }
+}
+
 function checkCollection(
     collection: unknown,
     index: number,
@@ -979,6 +1037,7 @@ function checkCollection(
     }
 
     checkBoardConfig(collection, at, collect);
+    checkSoftDelete(collection, at, collect);
 
     if (Array.isArray(collection.relations)) {
         collection.relations.forEach((relation, i) => {

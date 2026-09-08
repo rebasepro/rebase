@@ -27,6 +27,10 @@ import {
     bindThroughJunction,
     removeJunctionLink
 } from "./junction-writes";
+// A soft-deleted row must not come back through a relation either: a deleted
+// comment reappearing under its post is the same bug as one reappearing in the
+// listing. See `soft-delete.ts`.
+import { softDeleteCondition } from "./soft-delete";
 
 /**
  * The ids in a to-many relation write, whatever shape the caller sent.
@@ -473,6 +477,11 @@ export class RelationService {
         // Build additional filter conditions
         const additionalFilters: SQL[] = [];
 
+        // Soft delete on the *target*: the rows being loaded belong to the
+        // target collection, so it is that collection's flag that decides.
+        const relatedSoftDelete = softDeleteCondition(targetCollection, targetTable);
+        if (relatedSoftDelete) additionalFilters.push(relatedSoftDelete);
+
         // Handle search conditions if searchString is provided
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
@@ -599,6 +608,11 @@ export class RelationService {
             : parsedParentId;
 
         if (matchValue === undefined) return 0;
+
+        // Soft delete, so a relation's count agrees with what loading it
+        // returns — `isRelated` gates writes on this number.
+        const countSoftDelete = softDeleteCondition(targetCollection, targetTable);
+        if (countSoftDelete) additionalFilters = [...additionalFilters, countSoftDelete];
 
         // Start count with distinct to avoid duplicates from junction tables
         let query = this.db.select({ count: sql<number>`count(distinct ${targetIdField})` }).from(targetTable).$dynamic();
@@ -769,10 +783,13 @@ export class RelationService {
             if (uniqueFkValues.length === 0) return new Map();
 
             // Step 2: Fetch all target rows in ONE query
+            const targetSoftDelete = softDeleteCondition(targetCollection, targetTable);
             const targetResults = await this.db
                 .select()
                 .from(targetTable)
-                .where(inArray(targetIdField, uniqueFkValues));
+                .where(targetSoftDelete
+                    ? and(inArray(targetIdField, uniqueFkValues), targetSoftDelete)
+                    : inArray(targetIdField, uniqueFkValues));
 
             // Index target rows by their ID
             const targetById = new Map<string, Record<string, unknown>>();
@@ -952,11 +969,14 @@ export class RelationService {
             // SELECT target.*, junction.sourceColumn FROM junction
             // INNER JOIN target ON junction.targetColumn = target.id
             // WHERE junction.sourceColumn IN (parentIds)
+            const junctionSoftDelete = softDeleteCondition(targetCollection, targetTable);
             const query = this.db
                 .select()
                 .from(junctionTable)
                 .innerJoin(targetTable, eq(targetJunctionCol, targetIdField))
-                .where(inArray(sourceJunctionCol, parsedParentIds));
+                .where(junctionSoftDelete
+                    ? and(inArray(sourceJunctionCol, parsedParentIds), junctionSoftDelete)
+                    : inArray(sourceJunctionCol, parsedParentIds));
 
             const results = await query;
             const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();

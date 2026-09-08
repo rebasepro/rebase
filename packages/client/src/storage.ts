@@ -54,10 +54,22 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         key,
         metadata,
         bucket,
-        public: isPublic
+        public: isPublic,
+        context
     }: UploadFileProps): Promise<UploadFileResult> {
         const formData = new FormData();
         formData.append("file", file);
+
+        // Which property this file is for, so the server can enforce that
+        // property's own `maxSize` and `acceptedFiles` — declared in the
+        // collection, rendered by the panel's picker, and previously checked by
+        // the browser alone. Two plain fields rather than a header: the request
+        // is already multipart, and a header would have to survive every proxy
+        // between here and the route.
+        if (context?.collection && context?.property) {
+            formData.append("collection", context.collection);
+            formData.append("property", context.property);
+        }
 
         // Public objects live under the public prefix so they can be served
         // token-less via a stable, permanent URL. Normalize the key here so the

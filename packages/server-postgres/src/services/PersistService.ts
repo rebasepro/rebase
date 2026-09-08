@@ -448,7 +448,7 @@ export class PersistService {
                 return currentId;
             });
         } catch (error: unknown) {
-            throw this.toUserFriendlyError(error, collection.slug);
+            throw this.toUserFriendlyError(error, collection.slug, collection);
         }
 
         // Fetch the saved row back through the same walk `GET /:id` serves, so a
@@ -490,8 +490,13 @@ export class PersistService {
 
     /**
      * Translate raw PostgreSQL / Drizzle errors into user-friendly messages.
+     *
+     * `collection` is passed so the SQLSTATE can be turned into a *field*: the
+     * error carries a physical column and the caller only ever sees wire names,
+     * so `author_id` had to be translated to `authorId` by whoever read the
+     * message — which nothing does. See `pgFieldViolations`.
      */
-    private toUserFriendlyError(error: unknown, collectionSlug: string): Error {
+    private toUserFriendlyError(error: unknown, collectionSlug: string, collection?: CollectionConfig): Error {
         // Deliberate API errors already carry their own status, code and wording.
         // Re-wrapping one flattens it into a generic Error, and the status is lost
         // on the way out — a policy rejection would surface as a 500. Matched by
@@ -503,7 +508,11 @@ export class PersistService {
         const pgError = extractPgError(error);
 
         if (pgError) {
-            const { message, code } = pgErrorToFriendlyMessage(pgError, collectionSlug);
+            const { message, code, violations } = pgErrorToFriendlyMessage(pgError, collectionSlug, { collection });
+            /** `details` for a 4xx, carrying the field(s) — never the values. */
+            const details = violations.length > 0
+                ? { collection: collectionSlug, violations }
+                : undefined;
             // This is the only layer that holds the SQLSTATE, so it is the only
             // one that can say whose fault a failure was. Returning a bare
             // `Error` threw that away, and the REST layer compensated by calling
@@ -514,8 +523,8 @@ export class PersistService {
             // *privilege* problem — is ours, and stays a 500.
             if (/^2[23]/.test(code)) {
                 return code === "23505"
-                    ? ApiError.conflict(message, `PG_${code}`)
-                    : ApiError.badRequest(message, `PG_${code}`);
+                    ? ApiError.conflict(message, `PG_${code}`, details)
+                    : ApiError.badRequest(message, `PG_${code}`, details);
             }
             // With one exception inside class 42: a row-level-security policy
             // refusing the caller is not a fault at all, it is access control

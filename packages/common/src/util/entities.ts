@@ -30,7 +30,14 @@ export function getDefaultValuesFor<M extends Record<string, unknown>>(propertie
 export function getDefaultValueFor(property?: Property): unknown {
     if (!property) return undefined;
     if (isPropertyBuilder(property)) return undefined;
-    if (property.defaultValue || property.defaultValue === null) {
+    // `defaultValue !== undefined`, not truthiness. The test used to be
+    // `property.defaultValue || property.defaultValue === null`, which special-
+    // cased exactly one falsy value and dropped the rest: `defaultValue: 0`
+    // fell through to the per-type default and became `null`, `defaultValue: ""`
+    // became `null`, and `defaultValue: false` survived only by coincidence
+    // (the per-type default for a boolean is also `false`). A default of zero
+    // is the most ordinary default a number column has.
+    if (property.defaultValue !== undefined) {
         return property.defaultValue;
     } else if (property.type === "map" && property.properties) {
         const defaultValuesFor = getDefaultValuesFor(property.properties as Properties);
@@ -97,6 +104,135 @@ export function updateDateAutoValues<M extends Record<string, unknown>>({
             }
         }
     ) ?? {} as M;
+}
+
+/**
+ * Stamp the acting user's uid into the `user_on_create` / `user_on_update`
+ * columns a collection declares.
+ *
+ * A deliberate sibling of {@link updateDateAutoValues} rather than another
+ * branch inside it. The two share a shape and nothing else: one takes an
+ * instant the server generates and the other takes an identity the request
+ * carries, so overloading the timestamp function would have meant threading a
+ * second, unrelated argument through every one of its callers and letting a
+ * `date` property and a `string` property compete for the same `autoValue`
+ * union. Called side by side in the driver.
+ *
+ * The stamped value overwrites whatever arrived in the body. A caller who can
+ * set `createdBy` is a caller who can attribute their write to somebody else,
+ * which is the one thing an audit column must not allow.
+ *
+ * `uid` is `undefined` for an anonymous request, a service token or an
+ * in-process write; the column is set to an explicit `null` there. Explicit
+ * matters on an update: leaving the key absent would keep whatever uid the
+ * column already held, so an anonymous edit would be recorded as the previous
+ * editor's. Refusing that write outright is `required`'s job, not this
+ * function's — see `assertWriteValuesValid`.
+ *
+ * Top-level properties only, deliberately, unlike {@link updateDateAutoValues}.
+ * `traverseValuesProperties` cannot express "set this key to null" — a `null`
+ * from its operation means "leave the key out" — and an audit column nested
+ * inside a `map` is not a column at all, so there is nothing down there to
+ * stamp.
+ *
+ * @group Driver
+ */
+export function updateUserAutoValues<M extends Record<string, unknown>>({
+    inputValues,
+    properties,
+    status,
+    uid
+}:
+    {
+        inputValues: Partial<EntityValues<M>>,
+        properties: Properties,
+        status: EntityStatus,
+        uid: string | undefined
+    }): EntityValues<M> {
+    const result = { ...(inputValues ?? {}) } as Record<string, unknown>;
+    for (const [key, property] of Object.entries(properties ?? {})) {
+        const prop = property as (Property & { autoValue?: string }) | undefined;
+        if (!prop || prop.type !== "string") continue;
+        const autoValue = prop.autoValue;
+        if (autoValue !== "user_on_create" && autoValue !== "user_on_update") continue;
+        // `user_on_create` says nothing about an update: the column holds the
+        // creator's uid and this write is not rewriting it.
+        if (status === "existing" && autoValue === "user_on_create") continue;
+        // A copy is a new row and gets a new author, exactly as it gets a new
+        // `created_on`.
+        result[key] = uid ?? null;
+    }
+    return result as EntityValues<M>;
+}
+
+/**
+ * Fill in the `defaultValue`s a create left unset.
+ *
+ * `defaultValue` was read by exactly one thing: the Studio's form, which uses it
+ * to prefill inputs. Every other way into the same collection — the REST create,
+ * the SDK, the socket, an import — stored whatever arrived and nothing where the
+ * key was absent. So `active: { type: "boolean", defaultValue: true }` produced
+ * rows with `active` unset through the API and `true` through the panel, from
+ * one declaration that reads like a promise about the data.
+ *
+ * Only genuinely absent keys are filled. An explicit `null` is a caller saying
+ * "no value", which is a different statement from not mentioning the field, and
+ * overwriting it would make the default impossible to opt out of.
+ *
+ * `getDefaultValuesFor` also invents a per-type default for properties with no
+ * `defaultValue` at all (`false` for a boolean, `[]` for an array, `null` for
+ * the rest) — right for a form, which must render *something* in every input,
+ * and wrong here, where an absent key must stay absent so the column's own
+ * DEFAULT applies. Only declared defaults are taken.
+ *
+ * @param values the caller's payload
+ * @param properties the collection's declared properties
+ * @group Driver
+ */
+export function applyDefaultValuesOnCreate<M extends Record<string, unknown>>(
+    values: Partial<EntityValues<M>> | undefined,
+    properties: Properties
+): Partial<EntityValues<M>> {
+    if (!properties) return values ?? {};
+    const result = { ...(values ?? {}) } as Record<string, unknown>;
+    const defaults = getDefaultValuesFor(properties) as Record<string, unknown>;
+
+    for (const [key, property] of Object.entries(properties)) {
+        if (!property) continue;
+        const declared = declaresDefault(property as Property);
+        if (!declared) continue;
+        if (result[key] !== undefined) {
+            // A map whose own sub-properties carry defaults is filled in
+            // field by field, so `{ notify: false }` keeps `notify` and still
+            // gains the siblings it did not mention.
+            if ((property as Property).type === "map" &&
+                (property as Property & { defaultValue?: unknown }).defaultValue === undefined &&
+                isPlainObject(result[key])) {
+                result[key] = {
+                    ...(defaults[key] as Record<string, unknown> ?? {}),
+                    ...(result[key] as Record<string, unknown>)
+                };
+            }
+            continue;
+        }
+        if (defaults[key] !== undefined) result[key] = defaults[key];
+    }
+    return result as Partial<EntityValues<M>>;
+}
+
+/** Does this property, or something nested under it, state a `defaultValue`? */
+function declaresDefault(property: Property): boolean {
+    if (isPropertyBuilder(property)) return false;
+    if (property.defaultValue !== undefined) return true;
+    if (property.type === "map" && property.properties) {
+        return Object.values(property.properties as Properties)
+            .some(child => child && declaresDefault(child as Property));
+    }
+    return false;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**

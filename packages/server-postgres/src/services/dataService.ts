@@ -2,6 +2,7 @@
 import { FilterValues, LogicalCondition, OrderByTuple } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
 import { FetchService } from "./FetchService";
+import type { WithDeleted } from "./soft-delete";
 import { PersistService } from "./PersistService";
 import { RelationService } from "./RelationService";
 import { DataRepository, FetchCollectionOptions, SearchOptions, CountOptions, DrizzleClient } from "../interfaces";
@@ -49,9 +50,11 @@ export class DataService implements DataRepository {
     async fetchOne<M extends Record<string, unknown>>(
         collectionPath: string,
         id: string | number,
-        databaseId?: string
+        databaseId?: string,
+        /** See `FetchCollectionProps.withDeleted`. */
+        withDeleted?: WithDeleted
     ): Promise<Record<string, unknown> | undefined> {
-        return this.fetchService.fetchOne<M>(collectionPath, id, databaseId);
+        return this.fetchService.fetchOne<M>(collectionPath, id, databaseId, withDeleted);
     }
 
     /**
@@ -71,6 +74,8 @@ export class DataService implements DataRepository {
             searchString?: string;
             databaseId?: string;
             vectorSearch?: VectorSearchParams;
+            /** See `FetchCollectionProps.withDeleted`. */
+            withDeleted?: WithDeleted;
         } = {}
     ): Promise<Record<string, unknown>[]> {
         return this.fetchService.fetchCollection<M>(collectionPath, options);
@@ -109,6 +114,8 @@ export class DataService implements DataRepository {
             databaseId?: string;
             /** Only the `threshold` narrows the count — see `FetchService.count`. */
             vectorSearch?: VectorSearchParams;
+            /** See `FetchCollectionProps.withDeleted`. */
+            withDeleted?: WithDeleted;
         } = {}
     ): Promise<number> {
         return this.fetchService.count<M>(collectionPath, options);

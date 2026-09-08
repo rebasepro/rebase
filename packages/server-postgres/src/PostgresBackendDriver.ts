@@ -23,6 +23,9 @@ import {
     UpdateManyProps,
     DeleteManyProps,
     EntityValues,
+    EntityStatus,
+    Properties,
+    Property,
     TableColumnInfo,
     TableForeignKeyInfo,
     TableJunctionInfo,
@@ -31,12 +34,13 @@ import {
     User
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
-import { buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, resolveCollectionRelations, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
+import { applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, resolveCollectionRelations, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress } from "./services/collection-helpers";
+import { resolveSoftDelete } from "./services/soft-delete";
 import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
-import { logger } from "@rebasepro/server";
+import { ApiError, logger } from "@rebasepro/server";
 import { isRoleSwitchingPermissionError } from "./utils/pg-error-utils";
 import { applyAuthContext } from "./security/rls-enforcement";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
@@ -100,6 +104,46 @@ export class RoleSwitchUnavailableError extends Error {
         this.name = "RoleSwitchUnavailableError";
         this.role = role;
         this.pgError = pgError;
+    }
+}
+
+/**
+ * Refuse a write that would leave a *required* `created_by` / `updated_by`
+ * column null because nobody is acting.
+ *
+ * A `user_on_create` column takes the uid from the call context, and an
+ * anonymous request, a service token and an in-process write all have none.
+ * Storing `null` is the right answer where the column allows it — plenty of
+ * rows are legitimately written by the server. Where the collection has said
+ * `required`, it is not: that declaration means "a row must record who made
+ * it", and a write that cannot answer the question is a write this collection
+ * does not accept. Better a 400 naming the field than a 23502 naming the
+ * column, three layers down, after the hooks have run.
+ */
+function assertActingUserForAutoValues(
+    properties: Properties,
+    status: EntityStatus,
+    uid: string | undefined,
+    path: string
+): void {
+    if (uid) return;
+    for (const [key, property] of Object.entries(properties)) {
+        const prop = property as (Property & { autoValue?: string }) | undefined;
+        if (!prop || prop.type !== "string") continue;
+        if (prop.autoValue !== "user_on_create" && prop.autoValue !== "user_on_update") continue;
+        if (!prop.validation?.required) continue;
+        // `user_on_create` says nothing about an update — the column already
+        // holds the creator's uid, and this write is not rewriting it.
+        if (status === "existing" && prop.autoValue === "user_on_create") continue;
+        throw ApiError.badRequest(
+            `'${key}' on '${path}' records the acting user and is required, and this request has none. ` +
+            "Sign in, or drop `required` from the property to let the server write rows anonymously.",
+            "VALIDATION_CONSTRAINT",
+            {
+                collection: path,
+                violations: [{ field: key, code: "required", message: `'${key}' records the acting user, and there is none.` }]
+            }
+        );
     }
 }
 
@@ -249,8 +293,8 @@ export class PostgresBackendDriver implements DataDriver {
                 const rows = await raw.fetchCollectionForRest(collectionPath, options, include);
                 return this.applyAfterReadForRest(rows, collectionPath);
             },
-            fetchOneForRest: async (collectionPath, id, include, databaseId) => {
-                const row = await raw.fetchOneForRest(collectionPath, id, include, databaseId);
+            fetchOneForRest: async (collectionPath, id, include, databaseId, withDeleted) => {
+                const row = await raw.fetchOneForRest(collectionPath, id, include, databaseId, withDeleted);
                 if (!row) return row;
                 const [masked] = await this.applyAfterReadForRest([row], collectionPath);
                 return masked;
@@ -586,12 +630,14 @@ export class PostgresBackendDriver implements DataDriver {
                                                              path,
                                                              id,
                                                              databaseId,
-                                                             collection
+                                                             collection,
+                                                             withDeleted
                                                          }: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
         let row = await this.dataService.fetchOne<M>(
             path,
             id,
-            databaseId || collection?.databaseId
+            databaseId || collection?.databaseId,
+            withDeleted
         );
 
         const {
@@ -700,6 +746,22 @@ export class PostgresBackendDriver implements DataDriver {
         let updatedValues = values;
         const contextForCallback = this.buildCallContext();
 
+        // Declared defaults are filled in BEFORE the hooks, not after, so a
+        // `beforeSave` sees the row as it will be stored rather than a version
+        // of it missing every key the caller happened to omit. A hook that
+        // reads `values.currency` to pick a tax rate was reading `undefined`
+        // on exactly the writes the default exists to cover.
+        //
+        // Before validation too: `required` on create is satisfied by a
+        // default, which is why `assertWriteValuesValid` skips a property that
+        // declares one.
+        if ((status === "new" || status === "copy") && resolvedCollection?.properties) {
+            updatedValues = applyDefaultValuesOnCreate<M>(
+                updatedValues,
+                resolvedCollection.properties
+            ) as Partial<EntityValues<M>>;
+        }
+
         // Fetch previous values for callbacks AND history recording. Same walk
         // as the saved row the callbacks receive (`fetchOneForRest`), so
         // `values` and `previousValues` compare like with like — a Date on one
@@ -783,6 +845,22 @@ export class PostgresBackendDriver implements DataDriver {
                 properties: resolvedCollection.properties,
                 status: status ?? "new",
                 timestampNowValue: new Date()
+            });
+            // The identity half of the same idea: `created_by` / `updated_by`
+            // taken from the call context, never from the body. Stamped after
+            // the hooks for the same reason the timestamps are — a hook must
+            // not be able to attribute a write to another user either.
+            assertActingUserForAutoValues(
+                resolvedCollection.properties,
+                status ?? "new",
+                this.user?.uid,
+                path
+            );
+            updatedValues = updateUserAutoValues({
+                inputValues: updatedValues,
+                properties: resolvedCollection.properties,
+                status: status ?? "new",
+                uid: this.user?.uid
             });
         }
 
@@ -893,9 +971,13 @@ export class PostgresBackendDriver implements DataDriver {
                 throw toCallbackError(callbackError, "afterSave", path);
             }
 
-            // Record row history (fire-and-forget, never blocks the save)
+            // Awaited, inside the write's transaction, so the entry commits with
+            // its row. It used to be dispatched and dropped — the promise was
+            // not held, the service swallowed its own errors — which meant the
+            // audit trail of a collection that opted into one had silent,
+            // unbounded gaps. See `HistoryService.recordHistory` for the trade.
             if (this.historyService && resolvedCollection?.history) {
-                this.historyService.recordHistory({
+                await this.historyService.recordHistory({
                     tableName: path,
                     id: savedId,
                     action: status === "new" ? "create" : "update",
@@ -1125,7 +1207,8 @@ export class PostgresBackendDriver implements DataDriver {
     async deleteMany<M extends Record<string, unknown>>({
         path,
         ids,
-        collection
+        collection,
+        hard
     }: DeleteManyProps<M>): Promise<void> {
         await this.db.transaction(async (tx) => {
             const txDriver = new PostgresBackendDriver(
@@ -1160,7 +1243,8 @@ export class PostgresBackendDriver implements DataDriver {
                             path,
                             values: existing as Partial<EntityValues<M>>
                         },
-                        collection
+                        collection,
+                        hard
                     });
                 } catch (error) {
                     throw Object.assign(
@@ -1178,7 +1262,8 @@ export class PostgresBackendDriver implements DataDriver {
 
     async delete<M extends Record<string, unknown>>({
                                                               row,
-                                                              collection
+                                                              collection,
+                                                              hard
                                                           }: DeleteProps<M>): Promise<void> {
 
         const targetPath = row.path;
@@ -1255,11 +1340,27 @@ export class PostgresBackendDriver implements DataDriver {
             throw toCallbackError(callbackError, "beforeDelete", targetPath);
         }
 
-        await this.dataService.delete(
-            targetPath,
-            row.id,
-            resolvedCollection?.databaseId
-        );
+        // A soft delete is a delete as far as everything above this line is
+        // concerned — `beforeDelete` can still veto it, `afterDelete` still
+        // fires, the realtime event below still says the row is gone. What
+        // changes is only how the table records it: a timestamp in the declared
+        // field instead of a `DELETE`. `hard` opts back into the real thing and
+        // needs no extra permission, because it is the same verb.
+        const softDelete = hard ? undefined : resolveSoftDelete(resolvedCollection as CollectionConfig | undefined);
+        if (softDelete) {
+            await this.dataService.save(
+                targetPath,
+                { [softDelete.field]: new Date() } as Partial<EntityValues<M>>,
+                row.id,
+                resolvedCollection?.databaseId
+            );
+        } else {
+            await this.dataService.delete(
+                targetPath,
+                row.id,
+                resolvedCollection?.databaseId
+            );
+        }
 
         // Same contract as `afterSave`: inside the transaction, awaited, and a
         // throw undoes the delete rather than leaving the row gone and the
@@ -1301,9 +1402,11 @@ export class PostgresBackendDriver implements DataDriver {
             throw toCallbackError(callbackError, "afterDelete", targetPath);
         }
 
-        // Record delete history (fire-and-forget)
+        // Awaited, for the same reason the save's entry is: a delete is the one
+        // change whose history nothing else can reconstruct, because the row it
+        // describes is gone.
         if (this.historyService && resolvedCollection?.history) {
-            this.historyService.recordHistory({
+            await this.historyService.recordHistory({
                 tableName: targetPath,
                 id: row.id.toString(),
                 action: "delete",
@@ -1359,7 +1462,8 @@ export class PostgresBackendDriver implements DataDriver {
                                                                filter,
                                                                logical,
                                                                searchString,
-                                                               vectorSearch
+                                                               vectorSearch,
+                                                               withDeleted
                                                            }: FetchCollectionProps<M>): Promise<number> {
         return this.dataService.count(
             path,
@@ -1368,10 +1472,13 @@ export class PostgresBackendDriver implements DataDriver {
                 // Counted as well as filtered, or `meta.total` describes a
                 // different set of rows from the `data` beside it. The same
                 // held for a `vectorSearch` carrying a `threshold`: it narrows
-                // the fetch, so it has to narrow the count.
+                // the fetch, so it has to narrow the count. And the same for
+                // soft delete: a listing that hides four rows and a total that
+                // counts them is a page saying "1 of 5".
                 logical,
                 searchString,
-                vectorSearch
+                vectorSearch,
+                withDeleted
             }
         );
     }
@@ -1772,9 +1879,9 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                     return delegate.restFetchService.fetchCollectionForRest(collectionPath, options, include);
                 }, { accessMode: "read only" });
             },
-            fetchOneForRest: async (collectionPath, id, include, databaseId) => {
+            fetchOneForRest: async (collectionPath, id, include, databaseId, withDeleted) => {
                 return this.withTransaction(async (delegate) => {
-                    return delegate.restFetchService.fetchOneForRest(collectionPath, id, include, databaseId);
+                    return delegate.restFetchService.fetchOneForRest(collectionPath, id, include, databaseId, withDeleted);
                 }, { accessMode: "read only" });
             },
             // In the same read-only transaction as the two above, which is what

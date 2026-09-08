@@ -479,6 +479,30 @@ export interface StringProperty extends BaseProperty {
      * renders it — as a link, an image, a video — is `admin.urlPreview`.
      */
     url?: boolean;
+
+    /**
+     * Stamp this column with the **uid of the acting user**, on creation only
+     * (`user_on_create`) or on every write including creation
+     * (`user_on_update`). The `created_by` / `updated_by` twin of
+     * {@link DateProperty.autoValue}, which has always done the same for
+     * timestamps.
+     *
+     * The value is taken from the call context, not from the request body: a
+     * caller cannot claim to be somebody else by sending the field, because the
+     * driver overwrites whatever arrived. That is the whole point — a column
+     * whose value the caller supplies is not an audit column.
+     *
+     * With no acting user (an anonymous request, a service token, a seed
+     * script) the column is set to `null`. If it is also
+     * `validation: { required: true }`, that is a 400 rather than a null: a
+     * collection that demands to know who wrote a row is a collection that
+     * cannot accept an anonymous write.
+     *
+     * There is no foreign key here. The uid is a string, the user store may be
+     * another database entirely, and a deleted user must not take their audit
+     * trail with them — declare a `relation` if you want the join.
+     */
+    autoValue?: "user_on_create" | "user_on_update";
 }
 
 export interface NumberProperty extends BaseProperty {

@@ -38,11 +38,30 @@ export class HistoryService {
     }
 
     /**
-     * Record a history entry for an row change.
-     * This is intentionally fire-and-forget safe — errors are logged but never
-     * bubble up to block the main save/delete operation.
+     * Record a history entry for a row change.
      *
-     * After inserting, kicks off a non-blocking pruning pass for this row.
+     * ## Why this is allowed to fail the write
+     *
+     * It used to swallow every error into a log line, and the driver called it
+     * without `await`, so the promise was dropped on the floor. Both halves of
+     * that made the same claim: that the audit trail is a nice-to-have. It is
+     * not — `history: true` is opted into by collections whose changes somebody
+     * has to be able to reconstruct, and a trail with gaps is worse than no
+     * trail, because nothing distinguishes "no change was made" from "the entry
+     * did not get written". The gaps were silent and unbounded: a transient
+     * error on the history insert lost the entry for a row that committed
+     * anyway, and nobody found out.
+     *
+     * So it throws, and the driver awaits it inside the write's transaction.
+     * The row and its history entry commit together or neither does. That is a
+     * real trade — a broken `rebase.entity_history` now fails writes to the
+     * collections that declare history, where before it failed quietly — and it
+     * is the right side of it for a table that exists to answer "who changed
+     * this". The table is created at boot (`ensureHistoryTableExists`), so the
+     * failure mode is a database that is broken in other ways too.
+     *
+     * The pruning pass stays non-blocking: a prune that does not run leaves
+     * *extra* history, which is not a loss and is fixed by the next write.
      */
     async recordHistory(params: RecordHistoryParams): Promise<void> {
         const {
@@ -67,7 +86,7 @@ export class HistoryService {
 
         try {
             await this.db.execute(sql`
-                INSERT INTO rebase.entity_history 
+                INSERT INTO rebase.entity_history
                     (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by)
                 VALUES (
                     ${tableName},
@@ -79,14 +98,27 @@ export class HistoryService {
                     ${updatedBy ?? null}
                 )
             `);
-
-            // Non-blocking prune for this specific row
-            this.pruneEntity(tableName, id).catch(err =>
-                logger.error("History prune failed", { error: err })
-            );
         } catch (error) {
-            logger.error("Failed to record row history", { error: error });
+            logger.error("Failed to record row history", { error });
+            // Rethrown, not swallowed. See the docblock: the entry commits with
+            // its row or the write does not happen. Wrapped so the caller reads
+            // a sentence naming the audit trail rather than a bare SQLSTATE
+            // from a table they did not know they were writing to.
+            throw new Error(
+                `Could not record the history entry for "${tableName}" (${String(id)}). ` +
+                "The write was rolled back: this collection declares `history: true`, and a row " +
+                "that commits without its audit entry leaves a gap nothing can distinguish from " +
+                "\"no change was made\".",
+                { cause: error }
+            );
         }
+
+        // Non-blocking prune for this specific row. Outside the try, and
+        // deliberately not awaited: a prune that fails leaves *extra* history,
+        // which is not a loss and is fixed by the next write to this row.
+        this.pruneEntity(tableName, id).catch(err =>
+            logger.error("History prune failed", { error: err })
+        );
     }
 
     /**

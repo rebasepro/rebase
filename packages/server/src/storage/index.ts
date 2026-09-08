@@ -22,6 +22,15 @@ export * from "./storage-registry";
 export { parseTransformOptions, transformImage, isTransformableImage, TransformCache } from "./image-transform";
 export type { ImageTransformOptions } from "./image-transform";
 export { TusHandler } from "./tus-handler";
+export {
+    createUploadConstraintResolver,
+    assertUploadWithinPropertyLimits,
+    isAcceptedFile,
+    readUploadPropertyContext,
+    UPLOAD_COLLECTION_FIELD,
+    UPLOAD_PROPERTY_FIELD
+} from "./property-limits";
+export type { UploadConstraints, ResolveUploadConstraints } from "./property-limits";
 
 import { BackendStorageConfig, StorageController } from "./types";
 import { LocalStorageController } from "./LocalStorageController";

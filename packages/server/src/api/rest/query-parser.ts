@@ -3,6 +3,7 @@ import { toCanonicalOp, resolveClientListLimit, ListLimitError, DEFAULT_LIST_LIM
 import { deserializeFilter, deserializeLogicalCondition, UnknownFilterOperatorError } from "@rebasepro/common";
 import { QueryOptions } from "../types";
 import { ApiError } from "../errors";
+import { DELETED_QUERY_PARAM, HARD_DELETE_QUERY_PARAM, parseWithDeleted } from "./soft-delete-params";
 
 export const mapOperator = (op: string) => toCanonicalOp(op) ?? null;
 
@@ -406,6 +407,10 @@ export function parseQueryOptions(
     const options: QueryOptions = {};
     const rawLimit = getLastValue(query.limit) as number | string | null | undefined;
 
+    // `?deleted=include|only` — soft delete. See `soft-delete-params.ts`.
+    const withDeleted = parseWithDeleted(getLastValue(query[DELETED_QUERY_PARAM]));
+    if (withDeleted !== undefined) options.withDeleted = withDeleted;
+
     const offsetVal = getLastValue(query.offset);
     if (offsetVal) options.offset = parseWindowParam(offsetVal, "offset", 0, "INVALID_OFFSET");
 
@@ -450,7 +455,7 @@ export function parseQueryOptions(
     // `/aggregate` they are the request, and left out of this list
     // `?select=sum(total)` compiles into the filter as a comparison on a
     // column named "select" — a 400 on the one endpoint that requires it.
-    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString", "searchExplain", "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and", "where", "select", "groupBy"];
+    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString", "searchExplain", "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and", "where", "select", "groupBy", DELETED_QUERY_PARAM, HARD_DELETE_QUERY_PARAM];
     const filterDict: Record<string, unknown> = {};
     for (const [key, rawValue] of Object.entries(query)) {
         if (reservedQueryKeys.includes(key)) continue;
