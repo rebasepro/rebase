@@ -25,7 +25,9 @@ import {
     CollectionIndexConfigError,
     MAX_INDEX_KEYS
 } from "../src/schema/collection-index";
-import { generatePostgresDdl, resolveColumnName } from "../src/schema/generate-postgres-ddl-logic";
+import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
+import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
+import { resolveColumnName } from "../src/schema/column-plan-helpers";
 
 const posts = (indexes: unknown[], extra: Record<string, unknown> = {}): CollectionConfig =>
     ({
@@ -284,5 +286,73 @@ describe("the plan and the generated DDL", () => {
         expect(specs(posts([]))).toEqual([]);
         const bare = { slug: "posts", table: "posts", properties: { id: { type: "string", isId: true } } } as unknown as CollectionConfig;
         expect(specs(bare)).toEqual([]);
+    });
+});
+
+/**
+ * …and `schema.generated.ts`, which they did not reach at all.
+ *
+ * `index` was not so much as imported by the Drizzle generator, so a project's
+ * declared indexes existed in `schema.sql` and at boot and were absent from the
+ * file a developer running drizzle-kit themselves diffs against — where an
+ * index that is in the database and not in the schema file is one drizzle-kit
+ * plans a DROP for. Same names as the other two emitters, from the same specs.
+ */
+describe("the generated Drizzle schema", () => {
+    const generated = (indexes: unknown[], extra: Record<string, unknown> = {}) =>
+        generateSchema([posts(indexes, extra)]);
+
+    it("declares each index under the name the other two emitters use", async () => {
+        const declared = [
+            { on: ["status"], reason: "dashboard filter" },
+            { on: ["email"], unique: true, reason: "one account per email" }
+        ];
+        const schema = await generated(declared);
+
+        for (const spec of specs(posts(declared))) {
+            const builder = spec.unique ? "uniqueIndex" : "index";
+            expect(schema).toContain(`${builder}("${spec.indexName}")`);
+            // The name is derived, never re-derived: it is the same string the
+            // DDL's CREATE INDEX carries, hash included.
+            expect(spec.indexName).toBe(deriveIndexName({ ...spec, indexName: undefined } as never));
+        }
+        expect(schema).toContain("import {");
+        expect(schema).toMatch(/import \{[^}]*\bindex\b/);
+    });
+
+    it("carries direction, nulls placement, the access method and a partial predicate", async () => {
+        const schema = await generated([
+            { on: [{ prop: "createdAt", direction: "desc" }], reason: "feed order" },
+            { using: "gin", on: ["tags"], reason: "tag lookups" },
+            { on: ["status"], where: { prop: "status", op: "=", value: "live" }, reason: "live only" }
+        ]);
+
+        expect(schema).toContain(".on(table.createdAt.desc().nullsFirst())");
+        expect(schema).toContain('.using("gin", table.tags');
+        expect(schema).toContain(".where(sql`\"status\" = 'live'`)");
+    });
+
+    it("keys the index by the property name, not the column", async () => {
+        // The spec holds columns; the generated table object is keyed by field
+        // name. `created_at` is not a key on it, and emitting one produces a
+        // file that does not compile.
+        const schema = await generated([{ on: ["createdAt"], reason: "feed order" }]);
+        expect(schema).toContain("table.createdAt");
+        expect(schema).not.toContain("table.created_at");
+    });
+
+    it("says on the line itself when INCLUDE cannot be expressed", async () => {
+        // drizzle-orm's index builder has no INCLUDE. The database still gets
+        // one — `schema.sql` and boot-ensure both emit it — and this file
+        // cannot say so in code, so it says so in a comment rather than
+        // pretending the two are the same index.
+        const schema = await generated([{ on: ["createdAt"], include: ["status"], reason: "covering" }]);
+        expect(schema).toMatch(/\/\/ INCLUDE \(status\).*schema\.sql/);
+    });
+
+    it("leaves a collection with no indexes exactly as it was", async () => {
+        const schema = await generated([]);
+        expect(schema).not.toContain("index(");
+        expect(schema).not.toMatch(/import \{[^}]*\bindex\b/);
     });
 });

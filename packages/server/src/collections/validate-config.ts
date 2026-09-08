@@ -1,7 +1,7 @@
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
 import type { CollectionConfig, PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property } from "@rebasepro/types";
 
-import { getTableName } from "@rebasepro/common";
+import { getTableName, isRelationalCollection } from "@rebasepro/common";
 import { suggestNearMiss } from "@rebasepro/utils";
 
 import { logger } from "../utils/logger";
@@ -636,6 +636,27 @@ function checkEnumValues(
         }
     };
 
+    // An `enum` with nothing in it is not an under-specified dropdown; it is a
+    // column with a Postgres type nobody creates. `CREATE TYPE … AS ENUM ()` is
+    // not valid SQL, so all three emitters "handled" it by skipping the type and
+    // typing the column with it anyway: the generated Drizzle file referenced an
+    // enum variable it never declared (so the file does not compile), the DDL
+    // named a type nothing creates, and boot-ensure's `ADD COLUMN` failed —
+    // which is not a survivable action, so the boot died. Said here, where the
+    // property has a name, rather than in a Postgres error later.
+    const empty = Array.isArray(values)
+        ? values.length === 0
+        : isPlainObject(values) && Object.keys(values).length === 0;
+    if (empty) {
+        collect.error(
+            path,
+            "`enum` is empty. The values become the labels of one Postgres enum type, and a type with " +
+            "no labels cannot be created — so the column would reference a type nothing creates and the " +
+            "schema fails to build. List the values, or drop the `enum` for a plain column."
+        );
+        return;
+    }
+
     if (Array.isArray(values)) {
         values.forEach((entry, index) => {
             if (!isPlainObject(entry)) {
@@ -989,6 +1010,76 @@ function checkSoftDelete(
     }
 }
 
+/**
+ * The primary key, against what a SQL store can actually be given.
+ *
+ * Three claims a collection can make that no generator can honour, each of
+ * which used to be discovered somewhere worse:
+ *
+ * - **Two `isId` properties.** Rebase does not model a composite primary key,
+ *   and the three emitters each invented a different wrong answer: two
+ *   `.primaryKey()` columns in the generated Drizzle file, two inline
+ *   `PRIMARY KEY` clauses in one `CREATE TABLE` (which Postgres refuses), and a
+ *   boot-time ensure that created the table with the *first* id and silently
+ *   never added the second column at all.
+ * - **`isId: "cuid"`.** It has always emitted `DEFAULT cuid()` against a
+ *   function Rebase has never created — not by a generator, not at boot, not in
+ *   a migration — so the column has never had a working default on Postgres and
+ *   the first insert relying on it failed with `function cuid() does not exist`.
+ * - **`columnType` beside `isId: "increment"`.** An identity key is INTEGER,
+ *   because every column that points at a numeric primary key is INTEGER; a
+ *   BIGINT one would be referenced by int4 foreign keys. The width is ignored
+ *   rather than honoured, so this warns instead of failing a boot that has been
+ *   working — but it says so, which is the part that was missing.
+ *
+ * Only for collections a SQL toolchain owns: a Firestore or MongoDB collection
+ * has no `CREATE TABLE` for any of this to be wrong in.
+ */
+function checkPrimaryKeyStrategy(
+    collection: Record<string, unknown>,
+    at: string,
+    collect: ProblemCollector
+): void {
+    if (!isPlainObject(collection.properties)) return;
+    if (!isRelationalCollection(collection as unknown as CollectionConfig)) return;
+
+    const ids = Object.entries(collection.properties)
+        .filter(([, property]) => isPlainObject(property) && Boolean(property.isId))
+        .map(([key, property]) => [key, property as Record<string, unknown>] as const);
+
+    if (ids.length > 1) {
+        collect.error(
+            `${at}.properties`,
+            `${ids.length} properties are marked \`isId\` (${ids.map(([key]) => `\`${key}\``).join(", ")}), ` +
+            "and composite primary keys are not supported: the generated table would carry two PRIMARY KEY " +
+            "clauses, which Postgres refuses, and the boot-time schema ensure would create the table without " +
+            "the second column. Give exactly one property `isId`, and express the second key with " +
+            "`indexes: [{ on: [...], unique: true, reason: \"…\" }]`."
+        );
+    }
+
+    for (const [key, property] of ids) {
+        if (property.isId === "cuid") {
+            collect.error(
+                `${at}.properties.${key}.isId`,
+                "`isId: \"cuid\"` cannot be honoured on Postgres: the generated column gets " +
+                "`DEFAULT cuid()`, and no `cuid()` function is ever created, so every insert that relies " +
+                "on it fails. Use `isId: \"uuid\"`, or give the strategy as SQL — " +
+                "``isId: \"sql`my_id()`\"`` — and create that function in a migration."
+            );
+        }
+        if (property.isId === "increment" && property.columnType !== undefined) {
+            collect.warn(
+                `${at}.properties.${key}.columnType`,
+                `\`columnType: "${String(property.columnType)}"\` is not read beside \`isId: "increment"\`. ` +
+                "An increment key is `INTEGER GENERATED BY DEFAULT AS IDENTITY` on every path, because every " +
+                "foreign key and junction column that points at a numeric primary key is INTEGER — a wider " +
+                "key would be referenced by narrower columns. Remove the `columnType`."
+            );
+        }
+    }
+}
+
 function checkCollection(
     collection: unknown,
     index: number,
@@ -1032,6 +1123,7 @@ function checkCollection(
     if (isPlainObject(collection.properties)) {
         checkProperties(collection.properties, `${at}.properties`, collect);
         checkRelationPropertiesResolve(collection, at, collect);
+        checkPrimaryKeyStrategy(collection, at, collect);
     } else if (collection.properties !== undefined) {
         collect.error(`${at}.properties`, "`properties` must be an object keyed by property name.");
     }

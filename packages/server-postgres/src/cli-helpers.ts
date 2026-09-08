@@ -713,8 +713,9 @@ export async function getForeignIndexExcludes(
  */
 async function managedIndexNames(collectionsPath: string): Promise<Set<string>> {
     const collections = await loadCollectionsForCli(collectionsPath);
-    const { resolveColumnName, searchExcludePatterns, vectorExcludePatterns } =
+    const { searchExcludePatterns, vectorExcludePatterns } =
         await import("./schema/generate-postgres-ddl-logic");
+    const { resolveColumnName } = await import("./schema/column-plan-helpers");
     const { buildCollectionIndexPlan } = await import("./schema/collection-index");
 
     const names = new Set<string>(

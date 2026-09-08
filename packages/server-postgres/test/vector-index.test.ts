@@ -19,7 +19,8 @@ import {
     VectorIndexConfigError,
     MAX_INDEXABLE_VECTOR_DIMENSIONS
 } from "../src/schema/vector-index";
-import { generatePostgresDdl, resolveColumnName } from "../src/schema/generate-postgres-ddl-logic";
+import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
+import { resolveColumnName } from "../src/schema/column-plan-helpers";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
 
 const collection = (properties: Record<string, unknown>, extra: Record<string, unknown> = {}): CollectionConfig =>

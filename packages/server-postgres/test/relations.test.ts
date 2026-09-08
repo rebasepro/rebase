@@ -267,8 +267,8 @@ relationName: "books" }
 
             // Should create junction table
             expect(cleanResult).toContain("export const authorBooks = pgTable(\"author_books\"");
-            expect(cleanResult).toContain("author_id: text(\"author_id\").notNull().references(() => authors.id, { onDelete: \"cascade\" })");
-            expect(cleanResult).toContain("book_id: text(\"book_id\").notNull().references(() => books.id, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("author_id: text(\"author_id\").notNull().references((): AnyPgColumn => authors.id, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("book_id: text(\"book_id\").notNull().references((): AnyPgColumn => books.id, { onDelete: \"cascade\" })");
             expect(cleanResult).toContain("export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ \"books\": many(authorBooks, { relationName: \"books\" }) }));");
         });
 
@@ -384,13 +384,17 @@ relationName: "author" }
             const cleanResult = cleanSchema(result);
 
             // Should create FK on profiles table
-            expect(cleanResult).toContain("authorId: text(\"author_id\").references(() => authors.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("authorId: text(\"author_id\").references((): AnyPgColumn => authors.id, { onDelete: \"set null\" })");
 
             // Should create owning relation on profiles
             expect(cleanResult).toContain("export const profilesRelations = drizzleRelations(profiles, ({ one, many }) => ({ \"author\": one(authors, { fields: [profiles.authorId], references: [authors.id], relationName: \"profiles_authorId\" }) }));");
 
-            // Should create inverse relation on authors — inverse side has NO fields/references
-            expect(cleanResult).toContain("export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ \"profile\": one(profiles, { relationName: \"profiles_authorId\" }) }));");
+            // Should create inverse relation on authors. The FK-less side is a
+            // bare `one(profiles)`: it has no fields/references to give, and
+            // `one(t, { relationName })` is neither valid against drizzle's
+            // types nor survivable at runtime — see the one-to-one pairing test
+            // below.
+            expect(cleanResult).toContain("export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ \"profile\": one(profiles) }));");
         });
 
         it("should generate owning one-to-many relations", async () => {
@@ -426,7 +430,7 @@ relationName: "category" }
             const cleanResult = cleanSchema(result);
 
             // Should create FK on posts table
-            expect(cleanResult).toContain("categoryId: text(\"category_id\").references(() => categories.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("categoryId: text(\"category_id\").references((): AnyPgColumn => categories.id, { onDelete: \"set null\" })");
             // Should create owning relation on posts
             expect(cleanResult).toContain("export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ \"category\": one(categories, { fields: [posts.categoryId], references: [categories.id], relationName: \"posts_categoryId\" }) }));");
         });
@@ -483,11 +487,11 @@ relationName: "author" }
             const cleanResult = cleanSchema(result);
 
             // Check owning relation from author to publisher
-            expect(cleanResult).toContain("publisherId: text(\"publisher_id\").references(() => publishers.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("publisherId: text(\"publisher_id\").references((): AnyPgColumn => publishers.id, { onDelete: \"set null\" })");
             expect(cleanResult).toContain("\"publisher\": one(publishers, { fields: [authors.publisherId], references: [publishers.id], relationName: \"authors_publisherId\" })");
 
             // Check owning relation from book to author
-            expect(cleanResult).toContain("authorId: text(\"author_id\").references(() => authors.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("authorId: text(\"author_id\").references((): AnyPgColumn => authors.id, { onDelete: \"set null\" })");
             expect(cleanResult).toContain("\"author\": one(authors, { fields: [books.authorId], references: [authors.id], relationName: \"books_authorId\" })");
         });
     });
@@ -587,8 +591,8 @@ relationName: "friends" }
 
             // Should handle self-referencing relations
             expect(cleanResult).toContain("export const userFriends = pgTable(\"user_friends\"");
-            expect(cleanResult).toContain("user_id: text(\"user_id\").notNull().references(() => users.id, { onDelete: \"cascade\" })");
-            expect(cleanResult).toContain("friend_id: text(\"friend_id\").notNull().references(() => users.id, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("user_id: text(\"user_id\").notNull().references((): AnyPgColumn => users.id, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("friend_id: text(\"friend_id\").notNull().references((): AnyPgColumn => users.id, { onDelete: \"cascade\" })");
         });
 
         it("should handle mixed ID types in relations", async () => {
@@ -632,8 +636,8 @@ relationName: "categories" }
             // The primary key should be sku
             expect(cleanResult).toContain("sku: text(\"sku\").primaryKey()");
             expect(cleanResult).not.toContain("id: serial(\"id\").primaryKey()");
-            expect(cleanResult).toContain("product_sku: text(\"product_sku\").notNull().references(() => products.sku, { onDelete: \"cascade\" })");
-            expect(cleanResult).toContain("category_id: text(\"category_id\").notNull().references(() => categories.id, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("product_sku: text(\"product_sku\").notNull().references((): AnyPgColumn => products.sku, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("category_id: text(\"category_id\").notNull().references((): AnyPgColumn => categories.id, { onDelete: \"cascade\" })");
         });
 
         it("should handle circular references", async () => {
@@ -682,7 +686,7 @@ relationName: "a_entity" }
             // The 'owning' relation on bCollection should correctly generate the FK
             expect(cleanResult).toContain("export const aEntities = pgTable(\"a_entities\"");
             expect(cleanResult).toContain("export const bEntities = pgTable(\"b_entities\"");
-            expect(cleanResult).toContain("aEntityId: text(\"a_entity_id\").references(() => aEntities.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("aEntityId: text(\"a_entity_id\").references((): AnyPgColumn => aEntities.id, { onDelete: \"set null\" })");
             // Check that both drizzle relations are generated
             expect(cleanResult).toContain("\"b_entities\": many(bEntities, { relationName: \"b_entities_aEntityId\" })");
             expect(cleanResult).toContain("\"a_entity\": one(aEntities, { fields: [bEntities.aEntityId], references: [aEntities.id], relationName: \"b_entities_aEntityId\" })");
@@ -771,7 +775,7 @@ relationName: "company" }
         expect(matchingNames).toHaveLength(2);
     });
 
-    it("should emit identical relationName for one-to-one owning + inverse pair", async () => {
+    it("emits the FK-less side of a one-to-one as a bare one(), which is the only form drizzle accepts", async () => {
         const usersCollection: CollectionConfig = {
             slug: "users",
             table: "users",
@@ -813,20 +817,26 @@ relationName: "user" }
 
         const expectedSharedName = "profiles_userId";
 
-        // Owning side (profiles → users)
+        // Owning side (profiles → users) — unchanged: it has the foreign key,
+        // so it carries fields, references and the shared name.
         expect(cleanResult).toContain(
             `"user": one(users, { fields: [profiles.userId], references: [users.id], relationName: \"${expectedSharedName}\" })`
         );
 
-        // Inverse side (users → profiles) — no fields/references, paired by relationName only
-        expect(cleanResult).toContain(
-            `"profile": one(profiles, { relationName: \"${expectedSharedName}\" })`
-        );
-
-        // Both must match
-        const allNames = extractRelationNames(result);
-        const matchingNames = allNames.filter(n => n === expectedSharedName);
-        expect(matchingNames).toHaveLength(2);
+        // Inverse side (users → profiles). The foreign key is on the TARGET, so
+        // this side has no `fields`/`references` to give — and drizzle has no
+        // third form. `one(profiles, { relationName })` was emitted for it, and
+        // that is not a `RelationConfig` (TS2345) *and* not something the
+        // runtime survives: `createOne` reads `config.fields.reduce(...)`
+        // unconditionally, so building the relational config threw "Cannot read
+        // properties of undefined (reading 'reduce')" — every generated schema
+        // with a `hasOne` inverse broke drizzle's relational queries outright.
+        //
+        // A bare `one(profiles)` is drizzle's documented FK-less form:
+        // `normalizeRelation` pairs it with the `belongsTo` on the target that
+        // points back here.
+        expect(cleanResult).toContain(`"profile": one(profiles)`);
+        expect(cleanResult).not.toContain(`one(profiles, { relationName`);
     });
 
     it("should emit different shared names for multiple relations between same tables", async () => {

@@ -79,7 +79,34 @@ const posts: CollectionConfig = {
     }
 } as unknown as CollectionConfig;
 
-const collections = [posts, authors, tags, users];
+/**
+ * A REQUIRED link, of both spellings.
+ *
+ * The fixture above has only optional ones, which is why the parity tests below
+ * missed the disagreement they were written to catch: `RelationalColumnPlan`
+ * carried the column's type and its constraint but not `required`, so
+ * boot-ensure added `author_id` bare while `db push` made it NOT NULL. Four of
+ * four required links in the audit's diff were nullable on the managed path —
+ * the one with no developer in the loop.
+ */
+const profiles: CollectionConfig = {
+    slug: "profiles",
+    table: "profiles",
+    name: "Profiles",
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        bio: { type: "string" },
+        author: {
+            type: "relation",
+            validation: { required: true },
+            relation: { kind: "belongsTo", target: () => authors, relationName: "author" }
+        },
+        // The other spelling of a foreign key, on the same terms.
+        primaryTag: { type: "reference", path: "tags", validation: { required: true } }
+    }
+} as unknown as CollectionConfig;
+
+const collections = [posts, authors, tags, users, profiles];
 const emptyDb = (): ExistingSchema => ({ tables: new Map(), enums: new Set(), constraints: new Set() });
 
 /** Constraint names in the order the generator writes them. */
@@ -224,6 +251,42 @@ describe("boot-ensure agrees with db push", () => {
         it("carries validation.required and validation.unique onto a new table", async () => {
             const fromEnsure = plannedColumnDefs(planCollectionSchemaEnsure(collections, emptyDb()));
             expect(fromEnsure.get("public.authors")!.get("name")).toBe("TEXT NOT NULL");
+        });
+
+        it("makes a required link NOT NULL on both paths, in both spellings", async () => {
+            const fromPush = generatedColumnDefs(await generatePostgresDdl(collections));
+            const fromEnsure = plannedColumnDefs(planCollectionSchemaEnsure(collections, emptyDb()));
+
+            // Named rather than left to the whole-table comparison above,
+            // because this is the class the fixture used not to contain: the
+            // plan boot-ensure reads carried no `required`, so the column came
+            // out nullable on the managed path and NOT NULL after a push.
+            for (const source of [fromPush, fromEnsure]) {
+                expect(source.get("public.profiles")!.get("author_id")).toBe("UUID NOT NULL");
+                expect(source.get("public.profiles")!.get("primary_tag")).toBe("INTEGER NOT NULL");
+            }
+            // The optional link on the same table stays nullable, on both.
+            expect(fromPush.get("public.posts")!.get("author_id")).toBe("UUID");
+            expect(fromEnsure.get("public.posts")!.get("author_id")).toBe("UUID");
+        });
+
+        it("withholds NOT NULL on a required link added to a table that already holds rows", () => {
+            // The other half of the rule, and the reason it is not simply
+            // "always NOT NULL": this module runs unattended against live
+            // customer data, and a constraint checked against existing rows can
+            // abort the boot. Withheld, and *reported* — the silence was the
+            // bug, not the caution.
+            const populated: ExistingSchema = {
+                tables: new Map([["public.profiles", new Set(["id"])]]),
+                enums: new Set(),
+                constraints: new Set(),
+                populatedTables: new Set(["public.profiles"])
+            };
+            const plan = planCollectionSchemaEnsure(collections, populated);
+            const column = plan.actions.find(a => a.target === "public.profiles.author_id");
+            expect(column!.sql).toContain('"author_id" UUID;');
+            expect(column!.sql).not.toContain("NOT NULL");
+            expect(plan.withheldConstraints.map(w => w.target)).toContain("public.profiles.author_id");
         });
 
         it("leaves an EXISTING table's added column unconstrained", () => {

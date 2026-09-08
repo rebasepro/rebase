@@ -28,9 +28,9 @@ import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import {
     generatePostgresDdl,
     generatePostgresVectorDdl,
-    resolveColumnName,
     vectorExcludePatterns
 } from "../src/schema/generate-postgres-ddl-logic";
+import { resolveColumnName } from "../src/schema/column-plan-helpers";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
 import {
     buildVectorColumnSpecs,

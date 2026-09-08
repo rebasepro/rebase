@@ -345,6 +345,90 @@ describe("enum ids and labels", () => {
             { id: "published", label: "Published" }
         ])])).toEqual([]);
     });
+
+    // An empty list is not an under-specified dropdown. `CREATE TYPE … AS ENUM
+    // ()` is not valid SQL, so every emitter skipped the type and typed the
+    // column with it anyway: the generated Drizzle file referenced an enum
+    // variable it never declared and stopped compiling, and boot-ensure's
+    // `ADD COLUMN` failed — which is fatal, on a managed tenant.
+    it("errors on an empty enum, in either form", () => {
+        for (const empty of [[], {}]) {
+            const [problem] = errors([withEnum(empty)]);
+            expect(problem?.path).toBe("posts.properties.status.enum");
+            expect(problem?.message).toContain("`enum` is empty");
+        }
+    });
+
+    it("refuses to boot on an empty enum", () => {
+        expect(() => assertCollectionConfigs([withEnum([])])).toThrow(/`enum` is empty/);
+    });
+});
+
+/**
+ * A primary key a SQL store cannot be given.
+ *
+ * All three of these produced something rather than an error: a table Postgres
+ * refuses (or, at boot, one silently missing a column), and a default calling a
+ * function that does not exist.
+ */
+describe("primary keys a generator cannot honour", () => {
+    const withIds = (properties: Record<string, unknown>) => {
+        const collection = valid();
+        return { ...collection, properties: { ...collection.properties, ...properties } };
+    };
+
+    it("errors on two `isId` properties, naming both", () => {
+        const [problem] = errors([withIds({
+            id: { name: "ID", type: "string", isId: true },
+            tenant: { name: "Tenant", type: "string", isId: true }
+        })]);
+
+        expect(problem?.path).toBe("posts.properties");
+        expect(problem?.message).toContain("composite primary keys are not supported");
+        expect(problem?.message).toContain("`id`");
+        expect(problem?.message).toContain("`tenant`");
+    });
+
+    it("errors on `isId: \"cuid\"`, and says what to use instead", () => {
+        const [problem] = errors([withIds({ id: { name: "ID", type: "string", isId: "cuid" } })]);
+
+        expect(problem?.path).toBe("posts.properties.id.isId");
+        expect(problem?.message).toContain("no `cuid()` function is ever created");
+        expect(problem?.message).toContain("isId: \"uuid\"");
+    });
+
+    it("warns that `columnType` is ignored beside `isId: \"increment\"`", () => {
+        const found = warnings([withIds({
+            id: { name: "ID", type: "number", isId: "increment", columnType: "bigint" }
+        })]);
+
+        expect(found[0]?.path).toBe("posts.properties.id.columnType");
+        expect(found[0]?.message).toContain("not read beside `isId: \"increment\"`");
+        // A warning, not an error: the width is ignored, and projects that
+        // wrote it have been booting on an INTEGER key all along.
+        expect(errors([withIds({
+            id: { name: "ID", type: "number", isId: "increment", columnType: "bigint" }
+        })])).toEqual([]);
+    });
+
+    it("says nothing about a collection a SQL toolchain does not own", () => {
+        // A Firestore collection has no CREATE TABLE for any of this to be
+        // wrong in, and `isId` there means something else entirely.
+        expect(errors([{
+            ...withIds({
+                id: { name: "ID", type: "string", isId: true },
+                tenant: { name: "Tenant", type: "string", isId: true }
+            }),
+            engine: "firestore",
+            path: "posts"
+        }])).toEqual([]);
+    });
+
+    it("says nothing about one `isId` with a supported strategy", () => {
+        expect(findCollectionConfigProblems([withIds({
+            id: { name: "ID", type: "string", isId: "uuid" }
+        })])).toEqual([]);
+    });
 });
 
 describe("unrecognised keys", () => {
