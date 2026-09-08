@@ -7,10 +7,8 @@ import {
     declaresEnumType,
     enumLabelsOf,
     getPrimaryKeyName,
-    getPrimaryKeyProp,
     idColumnDefault,
     isIdProperty,
-    isNumericId,
     primaryKeyColumnBuilder,
     resolveColumnName
 } from "./column-plan-helpers";

@@ -33,10 +33,8 @@ import {
     declaresEnumType,
     enumLabelsOf,
     getPrimaryKeyName,
-    getPrimaryKeyProp,
     idColumnDefaultSql,
     isIdProperty,
-    isNumericId,
     primaryKeyColumnType,
     resolveColumnName
 } from "./column-plan-helpers";
