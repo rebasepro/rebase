@@ -334,15 +334,15 @@ function RelationDialogBindingComponent({ propertyKey, internalValue, updateValu
 }
 
 /** Stable component for relation fields rendered with the inline selector */
-function RelationSelectorBindingComponent({ propertyKey, internalValue, updateValue, disabled, property }: TableFieldBindingProps) {
+function RelationSelectorBindingComponent({ propertyKey, internalValue, updateValue, disabled, property, size }: TableFieldBindingProps) {
     const relProp = property as RelationProperty;
     return (
         <TableRelationSelectorField
+            size={getPreviewSizeFrom(size) === "small" ? "compact" : "medium"}
             name={propertyKey}
             internalValue={internalValue as EntityRelation}
             updateValue={updateValue}
             disabled={disabled}
-            size={"small"}
             relation={relProp.relation!}
             fixedFilter={relProp.admin?.fixedFilter}
         />

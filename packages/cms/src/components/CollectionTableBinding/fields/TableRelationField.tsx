@@ -15,6 +15,7 @@ import { cls, PencilIcon } from "@rebasepro/ui";
 import { EntityPreviewContainer } from "../../EntityPreviewBinding";
 import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
 import { TableMultipleRelationField } from "./TableMultipleRelationField";
+import { CompactEntityCellField } from "./CompactEntityCellField";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */
 function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
@@ -165,6 +166,28 @@ export const TableRelationFieldInternal = React.memo(
 
         if (!collection)
             return <ErrorView error={"The specified collection does not exist"}/>;
+
+        // Text rows: see CompactEntityCellField.
+        if (getPreviewSizeFrom(size) === "small") {
+            const items = !internalValue ? [] : (Array.isArray(internalValue) ? internalValue : [internalValue]);
+            return <CompactEntityCellField empty={valueNotSet}
+                disabled={disabled}
+                onEdit={handleOpen}
+                onClear={() => updateValue(multiselect ? [] : null)}
+                emptyLabel={title}>
+                {items.map((item, index) => {
+                    const relationItem = normalizeToEntityRelation(item);
+                    if (!relationItem) return null;
+                    return <RelationPreview key={`compact_rel__`}
+                        size={"small"}
+                        relation={relationItem}
+                        hover={false}
+                        previewProperties={previewProperties}
+                        includeId={includeId}
+                        includeEntityLink={includeEntityLink}/>;
+                })}
+            </CompactEntityCellField>;
+        }
 
         return (
             <div className="w-full group">

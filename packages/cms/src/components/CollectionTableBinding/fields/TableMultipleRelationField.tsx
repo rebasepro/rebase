@@ -13,6 +13,8 @@ import { CollectionSize, AdminCollection } from "@rebasepro/cms-types";
 import { } from "@rebasepro/app";
 import { ErrorView } from "@rebasepro/app";
 import { EntityPreviewContainer } from "../../EntityPreviewBinding";
+import { getPreviewSizeFrom } from "../../../preview/util";
+import { CompactEntityCellField } from "./CompactEntityCellField";
 
 type TableMultipleRelationFieldProps = {
     name: string;
@@ -47,7 +49,8 @@ export const TableMultipleRelationFieldInternal = React.memo(
             fixedFilter,
             collection,
             includeId,
-            includeEntityLink
+            includeEntityLink,
+            size
         } = props;
 
         const value = Array.isArray(internalValue) ? internalValue : [];
@@ -107,6 +110,27 @@ export const TableMultipleRelationFieldInternal = React.memo(
 
         if (!collection)
             return <ErrorView error={"The specified collection does not exist"}/>;
+
+        // Text rows: see CompactEntityCellField.
+        if (getPreviewSizeFrom(size) === "small") {
+            return <CompactEntityCellField empty={valueNotSet}
+                disabled={disabled}
+                onEdit={handleOpen}
+                onClear={() => updateValue([])}
+                emptyLabel={title}>
+                {value.map((item, index) => {
+                    const relationItem = normalizeToEntityRelation(item);
+                    if (!relationItem) return null;
+                    return <RelationPreview key={`compact_rel__`}
+                        size={"small"}
+                        relation={relationItem}
+                        hover={false}
+                        previewProperties={previewProperties}
+                        includeId={includeId}
+                        includeEntityLink={includeEntityLink}/>;
+                })}
+            </CompactEntityCellField>;
+        }
 
         return (
             <div className="w-full group">

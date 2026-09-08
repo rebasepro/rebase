@@ -13,6 +13,7 @@ import { cls, PencilIcon } from "@rebasepro/ui";
 import { EntityPreviewContainer } from "../../EntityPreviewBinding";
 import { getReferenceFrom } from "@rebasepro/common";
 import { useCollectionRegistryController } from "../../../hooks/navigation/contexts/CollectionRegistryContext";
+import { CompactEntityCellField } from "./CompactEntityCellField";
 
 type TableReferenceFieldProps = {
     name: string;
@@ -166,6 +167,30 @@ export const TableReferenceFieldInternal = React.memo(
 
         if (!collection)
             return <ErrorView error={"The specified collection does not exist"}/>;
+
+        // Text rows: the resting inline line stays (its title opens the record),
+        // plus a pencil to pick and a cross to clear. The card layout below is
+        // for the rows tall enough to hold it.
+        if (getPreviewSizeFrom(size) === "small") {
+            const refs: EntityReference[] = !internalValue ? [] : (Array.isArray(internalValue) ? internalValue : [internalValue]);
+            return <CompactEntityCellField empty={valueNotSet}
+                disabled={disabled}
+                onEdit={handleOpen}
+                onClear={() => updateValue(multiselect ? [] : null)}
+                emptyLabel={title}>
+                {refs.map((reference, index) =>
+                    reference && reference.isEntityReference && reference.isEntityReference()
+                        ? <ReferencePreview key={`compact_ref__`}
+                            size={"small"}
+                            reference={reference}
+                            hover={false}
+                            disabled={!path}
+                            previewProperties={previewProperties}
+                            includeId={includeId}
+                            includeEntityLink={includeEntityLink}/>
+                        : <ErrorView key={`compact_ref__`} error={"Value is not a reference"}/>)}
+            </CompactEntityCellField>;
+        }
 
         return (
             <div className="w-full group">

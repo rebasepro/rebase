@@ -16,7 +16,7 @@ interface RelationSelectorFieldProps {
     /** Force filter to be applied to the relation search */
     fixedFilter?: FilterValues<string>;
     /** Collection size for display */
-    size?: "small" | "medium";
+    size?: "compact" | "small" | "medium";
 }
 
 /** Thin wrapper around RelationSelector for table cells */

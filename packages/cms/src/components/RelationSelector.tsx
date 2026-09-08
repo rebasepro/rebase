@@ -27,6 +27,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { Entity, EntityRelation, FilterValues, Relation, getCollectionDataPath } from "@rebasepro/types";
 import { EntityPreviewBindingData } from "./EntityPreviewBinding";
+import { InlineEntityPreview } from "./InlineEntityPreview";
 import { getTitlePropertyKey, useData, usePermissions, useRelationSelector, useTranslation } from "@rebasepro/app";
 import { useSidePanel } from "../hooks/useSidePanel";
 import { normalizeToEntityRelation } from "@rebasepro/common";
@@ -63,9 +64,13 @@ export interface RelationSelectorProps {
      * scale, so a relation picker lines up with the text field beside it.
      *
      * `small` and `medium` predate that scale (42 and 56) and are kept as they
+     *
+     * `compact` is the 32px trigger for a selected table cell in a text row:
+     * the chosen records as inline lines (each opens its record), a chevron,
+     * nothing else.
      * are because the table cells and the filter row are built around them.
      */
-    size?: "small" | "medium" | "large";
+    size?: "compact" | "small" | "medium" | "large";
     useChips?: boolean;
     disabled?: boolean;
     invisible?: boolean;
@@ -622,6 +627,7 @@ relation } as RelationItem;
                             }}
                             className={cls(
                                 {
+                                    "min-h-8 py-0.5 px-2": size === "compact",
                                     "min-h-[42px] py-1 px-2": size === "small",
                                     "min-h-[56px] py-2 px-4": size === "medium",
                                     "min-h-[48px] py-1 px-4": size === "large"
@@ -646,6 +652,21 @@ relation } as RelationItem;
                                         className="flex flex-wrap items-center gap-1.5 text-start flex-1 min-w-0 mr-2">
                                         {selectedItems.map((item) => {
                                             if (!useChips || !multiple) {
+                                                if (size === "compact") {
+                                                    return item.data
+                                                        ? <InlineEntityPreview key={String(item.id)}
+                                                            entity={item.data}
+                                                            onClick={() => {
+                                                                closePopover();
+                                                                sidePanelController.open({
+                                                                    entityId: item.data!.id,
+                                                                    path: item.data!.path,
+                                                                    collection,
+                                                                    updateUrl: true
+                                                                });
+                                                            }}/>
+                                                        : <span key={String(item.id)} className="text-sm truncate">{item.label}</span>;
+                                                }
 
                                                 return (
                                                     <div key={String(item.id)}
@@ -695,7 +716,7 @@ relation } as RelationItem;
                                     )}
 
                                 <div className="flex items-center flex-shrink-0">
-                                    {!multiple && selectedItems.length === 1 && selectedItems[0]?.data && (
+                                    {size !== "compact" && !multiple && selectedItems.length === 1 && selectedItems[0]?.data && (
                                         <Tooltip title={`Open ${selectedItems[0].label}`}>
                                             <IconButton
                                                 component={"div"}
@@ -719,7 +740,7 @@ relation } as RelationItem;
                                         </Tooltip>
                                     )}
                                     <ChevronDownIcon
-                                        size={size === "small" ? iconSize.small : iconSize.medium}
+                                        size={size === "small" || size === "compact" ? iconSize.small : iconSize.medium}
                                         className={cls("transition", isPopoverOpen ? "rotate-180" : "")}
                                     />
                                 </div>
