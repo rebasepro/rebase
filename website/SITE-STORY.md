@@ -19,7 +19,7 @@ and beat table, §6 additions, and §7, which is new.
 Two products, one definition. That is the whole story, and every page is a view
 onto it.
 
-**Order matters.** The backend leads. The admin panel is the layer you opt into.
+**Order matters.** The backend leads. The admin panel comes second and it comes with it — never framed as optional, an add-on, or something you opt into (Francesco, repeatedly).
 See `~/.claude/.../memory/backend-first-positioning.md` — the site used to sell
 the panel first, which undersells the product and mispositions it against
 Supabase-class competitors.
@@ -117,7 +117,7 @@ under one umbrella, not a parent with two children.
 | **Rebase Studio** | SQL editor, schema visualizer, RLS editor, logs, API explorer. *Studio is the developer workspace. It registers inside the same panel as CMS.* | The developer, again, day to day |
 
 Told in that order it is ADDITIVE, which carries claim 3 structurally instead of
-asserting it: the panel is obviously optional because the reader was shown what
+asserting it: the panel is obviously a layer over the backend because the reader was shown what
 came before it. It also stops the product reading as "a way to generate REST
 routes", which is what happens when only the middle product is described.
 
@@ -147,7 +147,7 @@ Every major page is a variation on the same three acts:
 |-----|------|--------------|
 | I | Point it at Postgres → APIs appear | `TerminalInit`, `HeroConnectionWidget`, `ApiMiniDemo` |
 | II | One collection is the source of truth | `CollectionPowerSection` (home), `CollectionLayersSection` (/product — same sample, forked into the two layers), `SdkMiniDemo`, `RLSEditorDemo` |
-| III | The panel is optional | `SplitLayerDemo`, `AdoptionStackDemo`, `AdminDemoCarousel` |
+| III | The panel is the same definition, one layer up | `SplitLayerDemo`, `AdoptionStackDemo`, `AdminDemoCarousel` |
 
 ## 4. Information architecture
 
@@ -157,7 +157,7 @@ Every major page is a variation on the same three acts:
 ├── /backend         Rebase Backend, in depth. Live proof per API surface.
 │   ├── /security    RLS-first security, rls-check, hosting & GDPR
 │   └── /ai          Agents: MCP, scoped keys, skills
-├── /cms             Rebase CMS — the optional panel; content & fields live here too
+├── /cms             Rebase CMS — the panel that ships with it; content & fields live here too
 └── /studio          Rebase Studio — the developer workspace (SQL, schema, RLS, logs)
 /developers          Build with Rebase — SDK, CLI, extending, deploying
 ├── /sdk             SDK tour
@@ -229,7 +229,7 @@ its own close and drops `ClosingCta`.
 | `/pricing` | What is free, what costs money, and who operates what? | — |
 | `/about` | Who builds this, and why? | The manifesto's why, the FireCMS heritage paragraph, the roadmap |
 | `/manifesto` | What do you believe? | Five beliefs, each one disagreeable |
-| `/startups`, `/agencies` | Why this for my kind of team? | The `/europe` spine — backend → the panel as opt-in → ownership. SpreadsheetDemo, BodyPartsDemo |
+| `/startups`, `/agencies` | Why this for my kind of team? | The `/europe` spine — backend → the panel on top of it → ownership. SpreadsheetDemo, BodyPartsDemo |
 | `/kit-digital` | Can my Spanish SME get this subsidised? | Sourced amounts; one product under five categories |
 | `/europe` | Can I run this myself, in Europe, and what does it cost? | Jurisdiction, DeployTarget, EuHostingCost |
 
@@ -237,7 +237,7 @@ its own close and drops `ClosingCta`.
 The page's job is to get a developer to run the command, not to win an
 argument. Seven beats, each with a product artifact, in the order a developer's
 curiosity runs: run it, see what appears, play with it, trust it, add the
-panel if you want, see who runs it, it is yours — then the ask. The argument lives on
+panel on top, see who runs it, it is yours — then the ask. The argument lives on
 the deep pages. This replaced a nine-beat page (thirteen sections, ~13,400px)
 that made five claims in sequence and read as a thesis.
 
@@ -249,7 +249,7 @@ that made five claims in sequence and read as a thesis.
 | 02 | `s-backend-engine` | The running backend: SDK, REST, realtime — live, press the buttons |
 | 03 | `s-security` | **Claim 1**, on the brand blue. Its figure (`PolicyPathsFigure`) is the villain and the fix in one frame: five ways into the same table with the rule in one of them, folding into the policy as Postgres holds it. Links to `/security` |
 | — | rls-check band | The proof for 03: "Don't take that on faith." Unnumbered |
-| 04 | `s-panel` | Claim 3 — the panel, when you want one: the carousel, then Rebase Backend / CMS / Studio beneath it |
+| 04 | `s-panel` | Claim 3 — the panel that ships with it: the carousel, then Rebase Backend / CMS / Studio beneath it |
 | 05 | `s-agent-era` | Claim 4 — the backend an agent can't screw up |
 | 06 | `s-case-study` | Real products, seven of them |
 | 07 | `s-opensource` | Claim 5 — it is yours. Cut into the close on 2026-09-03 and restored the same day from #45 as its own beat: the last argument before the ask |

@@ -5,7 +5,7 @@
 </p>
 
 <h1 align="center">Rebase</h1>
-<h3 align="center">The Open-Source Backend-as-a-Service for Postgres — with an Admin Panel when you want one</h3>
+<h3 align="center">The Open-Source Backend-as-a-Service for Postgres — with the Admin Panel that comes with it</h3>
 <p align="center">
   <strong>Point it at a database and get a working backend in minutes.</strong><br/>
   REST, auth, storage, realtime and backups over your own Postgres — then add a
@@ -47,7 +47,7 @@
 
 Rebase is a **developer-first**, open-source backend-as-a-service built on **PostgreSQL** — authentication, S3-compatible storage, realtime, backups and auto-generated REST APIs over a database you own. It is **self-hosted** and agent-native, with a built-in MCP server for AI-assisted development.
 
-The admin panel is a **layer you opt into**, not the price of entry. Add collection definitions and you get a schema-driven back-office built from them, extensible with your own **React** components, serverless functions, and scripts.
+The admin panel is the **second layer of the same definition**: add collection definitions and you get a schema-driven back-office built from them, extensible with your own **React** components, serverless functions, and scripts.
 
 ### Adopt only what you want
 

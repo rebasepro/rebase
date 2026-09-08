@@ -25,9 +25,9 @@ export const en = {
   "recognition.five": "Five ways in",
   "recognition.one": "One rule",
   "recognition.oneNote": "one rule, in Postgres, on every path",
-  // Beat 04 — the panel, when you want one (carousel + the three products).
-  "panel.badge": "The panel, when you want one",
-  "panel.title": "Add it the day a human needs to touch the data.",
+  // Beat 04 — the panel that ships with the backend (carousel + the three products).
+  "panel.badge": "The panel that ships with it",
+  "panel.title": "Your team's back office, rendered from the same definition.",
   "engine.badge": "What your app talks to",
   // Was "Everything your app calls, already running." — the third consecutive
   // beat heading to open on "Everything" (02 generated / 03 calls / 04 sits on),
@@ -51,7 +51,7 @@ export const en = {
   // for the third heading running. es/de/fr never drifted; this restores parity
   // with them rather than inventing new copy. The subtitle also stops listing
   // the layer stack, because the figure beside it already draws that.
-  "modes.subtitle": "The panel reads your data through the same API and the same policies your app does. Ship headless today and add it the day a human needs to touch the data — or never. Whatever you leave out, the API answers exactly the same.",
+  "modes.subtitle": "The panel reads your data through the same API and the same policies your app does. Your app talks to the backend, your team works in the panel, and both see one set of rules.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
     "REST, auth, storage, realtime and backups over your database. No UI, no React anywhere in the dependency tree.",
@@ -494,9 +494,9 @@ export const en = {
   "about.join.github": "Contribute on GitHub",
   "about.join.discord": "Join our Discord",
   "index.meta.title": "Rebase — The Open-Source Backend for Postgres: APIs, Auth, Realtime & CMS",
-  "index.meta.description": "Point Rebase at your Postgres and get REST APIs, auth, storage, realtime and backups — plus a schema-driven admin panel when you want one. Secured by row-level security. Open-source, deploy anywhere.",
-  "cms.meta.title": "Rebase CMS — the optional admin panel for your Rebase backend",
-  "cms.meta.description": "A generated back office on top of any Rebase backend: spreadsheet editing, media, roles and history — opt-in, extensible with your own React, and never required by the API.",
+  "index.meta.description": "Point Rebase at your Postgres and get REST APIs, auth, storage, realtime and backups, with a schema-driven admin panel for your team. Secured by row-level security. Open-source, deploy anywhere.",
+  "cms.meta.title": "Rebase CMS — the admin panel of your Rebase backend",
+  "cms.meta.description": "A generated back office on every Rebase backend: spreadsheet editing, media, roles and history — extensible with your own React, on the same API and policies as your app.",
   "backend.meta.title": "Rebase Backend — REST, typed SDK, realtime and RLS over your Postgres",
   "backend.meta.description": "Point it at a Postgres database and REST routes, an OpenAPI spec, typed SDK accessors, realtime subscriptions, auth, storage, functions and cron all come from one collection definition — with access control enforced by the database.",
   "ai.meta.title": "AI & Agents Infrastructure — Rebase",
@@ -516,7 +516,7 @@ export const en = {
   "ui.meta.title": "React UI Components — Rebase",
   "ui.meta.description": "The React component library the panel itself is built from — the same widgets, tables and field editors your custom views should use.",
   "startups.meta.title": "Rebase for startups — the backend first, the back office when you need it",
-  "startups.meta.description": "REST, a typed SDK, auth, storage and realtime over the Postgres you already run, with access control enforced by the database — and a generated back office the day a human needs one.",
+  "startups.meta.description": "REST, a typed SDK, auth, storage and realtime over the Postgres you already run, with access control enforced by the database — and a generated back office for your team from day one.",
   "agencies.meta.title": "Rebase for agencies — the client keeps the database, you keep the code",
   "agencies.meta.description": "Deliver a backend and a back office on the client's own Postgres. MIT-licensed end to end, self-hosted or on Rebase Cloud, with no per-seat licence standing between you and the handover.",
   "contact.meta.title": "Contact — Rebase",
@@ -532,7 +532,7 @@ export const en = {
   "product.meta.title":
     "Rebase — a backend for your Postgres, and the admin panel that comes with it",
   "product.meta.description":
-    "REST, a typed SDK, realtime, auth and storage over your Postgres — with access control enforced by the database. The admin panel renders from the same definition, when you want one.",
+    "REST, a typed SDK, realtime, auth and storage over your Postgres — with access control enforced by the database. The admin panel renders from the same definition.",
   "rebase-vs-supabase.meta.title": "Rebase vs Supabase — RLS and Local DX Comparison",
   "rebase-vs-supabase.meta.description": "An admin dashboard generated from the same definition as the API, and row-level security written beside the collection rather than in a separate editor.",
   "rebase-vs-payload.meta.title": "Rebase vs Payload CMS — Headless Postgres Comparison",
@@ -803,7 +803,7 @@ export const en = {
   "cmspage.14": "Mount it inside an existing React app, or give it a repo of its own — <code class=\"font-mono text-surface-300\">generate-sdk --from &lt;url&gt;</code> types it against the running backend, so it ships on its own cadence. npm packages, not a framework you move into.",
   "cmspage.15": "Where it fits",
   "cmspage.16": "Three layers, adopted in that order",
-  "cmspage.17": "REST, a typed SDK, auth, storage, realtime and RLS over your Postgres. Headless and React-free. Everything else is optional.",
+  "cmspage.17": "REST, a typed SDK, auth, storage, realtime and RLS over your Postgres. Headless and React-free. The panel renders on top of it.",
   "cmspage.18": "layer 02 · you are here",
   "cmspage.19": "The generated back office for the humans on your team, driven by the <code class=\"font-mono text-surface-300\">admin</code> block in your collections.",
   "cmspage.20": "SQL editor, schema visualizer, RLS policy editor, branches and API explorer. Studio is the developer workspace. It registers inside the same panel as CMS.",
@@ -830,7 +830,7 @@ export const en = {
   "sdkpage.15": "rebase.admin + rebase.storage",
 
   // ── productpage ─────────────────────────────────────────────────
-  "productpage.00": "The backend · and the panel, if you want one",
+  "productpage.00": "The backend · and the panel that comes with it",
   "productpage.01": "One definition.<br/>Everything it produces.",
   "productpage.02": "Rebase turns a Postgres database into a product backend — REST, a typed SDK, realtime, auth, storage and access control the database itself enforces. The admin panel renders from the same file, and only if you ask for it.",
   "productpage.03": "The part that runs without a browser",
@@ -1035,7 +1035,7 @@ export const en = {
   "devpage.01": "Schema as code.<br/>Everything else follows.",
   "devpage.02": "You write collections in TypeScript. Rebase keeps the database, the API, the types and — if you opted in — the panel in agreement with that one file. Run <code class=\"font-mono text-surface-200\">pnpm dlx @rebasepro/cli init</code>, then <code class=\"font-mono text-surface-200\">rebase dev</code>, and it is already up.",
   "devpage.03": "Four commands, and then you are just writing TypeScript",
-  "devpage.04": "Three folders, and one of them is optional",
+  "devpage.04": "Three folders, one definition",
   "devpage.05": "<code class=\"font-mono text-surface-300\">config/collections/</code> is the only place your data model is described. The backend reads it to serve APIs and generate the Drizzle schema; the panel reads the same files to render itself.",
   "devpage.06": "Delete <code class=\"font-mono text-surface-300\">frontend/</code> and you have a headless backend. Nothing under <code class=\"font-mono text-surface-300\">backend/</code> imports React, and the type system enforces it — an <code class=\"font-mono text-surface-300\">admin</code> key in a project that never opted in is a compile error.",
   "devpage.07": "after rebase init",
@@ -1929,7 +1929,7 @@ export const en = {
   "productpage.link.backendDemos": "Everything in the backend, with live demos",
   "productpage.link.panel": "What your team gets from the panel",
   "productpage.layer1.state": "always on",
-  "productpage.layer2.state": "opt in",
+  "productpage.layer2.state": "included",
   "productpage.be.rest.name": "REST API",
   "productpage.be.rest.note": "CRUD, filtering, sorting, pagination, relations",
   "productpage.be.sdk.name": "Typed SDK",

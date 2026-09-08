@@ -96,4 +96,4 @@ The lesson underneath all of it is one we keep relearning in different clothes: 
 
 This comes out of a wider habit: we keep a catalogue of bug *classes* alongside the gates, because a gate added after an incident is scoped to that incident's exact shape, and a net built that way grows one hole at a time.
 
-Rebase is an open-source backend-as-a-service for Postgres — REST, a typed SDK, auth, storage, realtime and row-level security over a database you own, with an admin panel when you want one. It is [MIT-licensed on GitHub](https://github.com/rebasepro/rebase), and it is in public beta: the [compatibility page](/docs/compatibility) sets out exactly what may change and what may not.
+Rebase is an open-source backend-as-a-service for Postgres — REST, a typed SDK, auth, storage, realtime and row-level security over a database you own, with the admin panel that comes with it. It is [MIT-licensed on GitHub](https://github.com/rebasepro/rebase), and it is in public beta: the [compatibility page](/docs/compatibility) sets out exactly what may change and what may not.

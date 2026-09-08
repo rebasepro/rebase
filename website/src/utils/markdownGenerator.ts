@@ -70,7 +70,7 @@ ${cleanHtml(tr("hero.subtitle"))}
 
 1. **One definition, every surface** — ${inline(tr("engine.title"))}: ${cleanHtml(tr("engine.subtitle"))}
 2. **Security lives in the database** — ${inline(tr("security.title"))}: ${cleanHtml(tr("security.desc"))}
-3. **The panel, when you want one** — ${inline(tr("panel.title"))}: ${cleanHtml(tr("modes.subtitle"))}
+3. **The panel that ships with it** — ${inline(tr("panel.title"))}: ${cleanHtml(tr("modes.subtitle"))}
 4. **Agent-native** — ${inline(tr("agentera.badge"))}: ${cleanHtml(tr("agentera.p1"))}
 5. **It is yours** — ${inline(tr("opensource.title"))}: ${cleanHtml(tr("opensource.desc"))}
 
@@ -84,7 +84,7 @@ Rebase is adopted in layers, and each one is additive:
 
 Authorization is Postgres row-level security in every mode. \`npx @rebasepro/rls-check\` audits any Postgres, read-only, with nothing installed.
 
-## The panel, when you want one
+## The panel that ships with it
 
 - **${inline(tr("modes.cms.title"))}** — ${cleanHtml(tr("modes.cms.desc"))}
 - **${inline(tr("modes.full.title"))}** — ${cleanHtml(tr("modes.full.desc"))}

@@ -23,9 +23,9 @@ export const es = {
   "recognition.five": "Cinco entradas",
   "recognition.one": "Una regla",
   "recognition.oneNote": "una regla, en Postgres, en cada camino",
-  // Beat 04 — the panel, when you want one (carousel + the three products).
-  "panel.badge": "El panel, cuando lo quieras",
-  "panel.title": "Añádelo el día que alguien tenga que tocar los datos.",
+  // Beat 04 — the panel that ships with the backend (carousel + the three products).
+  "panel.badge": "El panel que viene incluido",
+  "panel.title": "El back office de tu equipo, generado desde la misma definición.",
   "engine.badge": "Con lo que habla tu app",
   "engine.title": "Todo el backend, ya en marcha.",
   "engine.subtitle":
@@ -35,7 +35,7 @@ export const es = {
   "agentera.title": "El backend que un agente no puede estropear",
   "agentera.p1": "Un agente de IA puede montar un backend en una hora. Lo que no puede decirte es si ese backend es seguro. Los agentes son excelentes produciendo backends <em>plausibles</em> — y célebremente malos produciendo backends <em>seguros</em>. Rebase hace que el resultado seguro sea el único resultado posible, por construcción.",
   "agentera.link": "Explorar las funciones de IA y agentes",
-  "modes.subtitle": "El panel lee tus datos a través de la misma API y las mismas políticas que tu aplicación. Lanza headless hoy y añádelo el día que un humano necesite tocar los datos — o nunca. Dejes fuera lo que dejes, la API responde exactamente igual.",
+  "modes.subtitle": "El panel lee tus datos a través de la misma API y las mismas políticas que tu aplicación. Tu app habla con el backend, tu equipo trabaja en el panel y ambos ven el mismo conjunto de reglas.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
     "REST, auth, storage, tiempo real y backups sobre tu base de datos. Sin UI, sin React en ningún lugar del árbol de dependencias.",
@@ -157,7 +157,7 @@ export const es = {
   "nav.backend": "Backend y APIs",
   "nav.backend.desc": "REST, SDK tipado, tiempo real, auth, almacenamiento.",
   "nav.cms": "Rebase CMS",
-  "nav.cms.desc": "El back office opcional, desde la misma definición.",
+  "nav.cms.desc": "El back office de tu equipo, desde la misma definición.",
   "nav.ui": "Biblioteca de componentes",
   "nav.ui.desc":
     "Los componentes de React con los que está construido el panel.",
@@ -430,9 +430,9 @@ export const es = {
   "about.join.github": "Contribuir en GitHub",
   "about.join.discord": "Únete a nuestro Discord",
   "index.meta.title": "Rebase — El backend open-source para Postgres: APIs, auth, tiempo real y CMS",
-  "index.meta.description": "Apunta Rebase a tu Postgres y obtén APIs REST, auth, storage, tiempo real y backups — más un panel admin generado desde tu esquema cuando lo quieras. Protegido por row-level security. Open-source, despliégalo donde quieras.",
-  "cms.meta.title": "Rebase CMS — el panel de administración opcional sobre tu backend de Rebase",
-  "cms.meta.description": "Un back office generado sobre cualquier backend de Rebase: edición tipo hoja de cálculo, medios, roles e historial — opcional, ampliable con tu propio React y nunca requerido por la API.",
+  "index.meta.description": "Apunta Rebase a tu Postgres y obtén APIs REST, auth, storage, tiempo real y backups, con un panel admin generado desde tu esquema para tu equipo. Protegido por row-level security. Open-source, despliégalo donde quieras.",
+  "cms.meta.title": "Rebase CMS — el panel de administración de tu backend de Rebase",
+  "cms.meta.description": "Un back office generado sobre cada backend de Rebase: edición tipo hoja de cálculo, medios, roles e historial — ampliable con tu propio React, sobre la misma API y las mismas políticas que tu app.",
   "backend.meta.title": "Rebase Backend — REST, SDK tipado, realtime y RLS sobre tu Postgres",
   "backend.meta.description": "Apúntalo a una base de datos Postgres y las rutas REST, la especificación OpenAPI, los accesores tipados del SDK, las suscripciones en tiempo real, auth, almacenamiento, funciones y cron salen de una sola definición de colección — con el control de acceso aplicado por la base de datos.",
   "ai.meta.title": "Infraestructura para IA y Agentes — Rebase",
@@ -448,7 +448,7 @@ export const es = {
   "ui.meta.title": "Componentes UI React — Rebase",
   "ui.meta.description": "La biblioteca de componentes React con la que está construido el propio panel — los mismos widgets, tablas y editores de campo que deberían usar tus vistas personalizadas.",
   "startups.meta.title": "Rebase para startups — primero el backend, el back office cuando lo necesites",
-  "startups.meta.description": "REST, SDK tipado, auth, almacenamiento y realtime sobre el Postgres que ya ejecutas, con el control de acceso aplicado por la base de datos — y un back office generado el día que un humano lo necesite.",
+  "startups.meta.description": "REST, SDK tipado, auth, almacenamiento y realtime sobre el Postgres que ya ejecutas, con el control de acceso aplicado por la base de datos — y un back office generado para tu equipo desde el primer día.",
   "agencies.meta.title": "Rebase para agencias — el cliente se queda la base de datos, tú te quedas el código",
   "agencies.meta.description": "Entrega un backend y un back office sobre el Postgres del propio cliente. Licencia MIT de principio a fin, autoalojado o en Rebase Cloud, sin licencias por usuario entre tú y la entrega.",
   "contact.meta.title": "Contacto — Rebase",
@@ -458,7 +458,7 @@ export const es = {
   "product.meta.title":
     "Rebase — un backend para tu Postgres, y el panel de administración que viene con él",
   "product.meta.description":
-    "REST, un SDK tipado, tiempo real, autenticación y almacenamiento sobre tu Postgres — con el control de acceso aplicado por la base de datos. El panel se genera desde la misma definición, cuando lo quieras.",
+    "REST, un SDK tipado, tiempo real, autenticación y almacenamiento sobre tu Postgres — con el control de acceso aplicado por la base de datos. El panel se genera desde la misma definición.",
   "rebase-vs-supabase.meta.title": "Rebase vs Supabase — Comparativa de RLS y DX local",
   "rebase-vs-supabase.meta.description": "Un panel de administración generado desde la misma definición que la API, y seguridad a nivel de fila escrita junto a la colección en lugar de en un editor aparte.",
   "rebase-vs-payload.meta.title": "Rebase vs Payload CMS — Comparativa de Postgres Headless",
@@ -704,7 +704,7 @@ export const es = {
   "cmspage.14": "Móntalo dentro de una aplicación React existente, o dale su propio repositorio — <code class=\"font-mono text-surface-300\">generate-sdk --from &lt;url&gt;</code> lo tipa contra el backend en marcha, así que se despliega a su propio ritmo. Paquetes de npm, no un framework al que te mudas.",
   "cmspage.15": "Dónde encaja",
   "cmspage.16": "Tres capas, adoptadas en ese orden",
-  "cmspage.17": "REST, un SDK tipado, auth, almacenamiento, realtime y RLS sobre tu Postgres. Headless y sin React. Todo lo demás es opcional.",
+  "cmspage.17": "REST, un SDK tipado, auth, almacenamiento, realtime y RLS sobre tu Postgres. Headless y sin React. El panel se renderiza encima.",
   "cmspage.18": "capa 02 · estás aquí",
   "cmspage.19": "El back office generado para las personas de tu equipo, gobernado por el bloque <code class=\"font-mono text-surface-300\">admin</code> de tus colecciones.",
   "cmspage.20": "Editor SQL, visualizador de esquema, editor de políticas RLS, ramas y explorador de API. Studio es el espacio de trabajo del desarrollador. Se registra dentro del mismo panel que CMS.",
@@ -731,7 +731,7 @@ export const es = {
   "sdkpage.15": "rebase.admin + rebase.storage",
 
   // ── productpage ─────────────────────────────────────────────────
-  "productpage.00": "El backend · y el panel, si quieres uno",
+  "productpage.00": "El backend · y el panel que viene con él",
   "productpage.01": "Una definición.<br/>Todo lo que produce.",
   "productpage.02": "Rebase convierte una base de datos Postgres en un backend de producto — REST, un SDK tipado, realtime, auth, almacenamiento y control de acceso que aplica la propia base de datos. El panel de administración se renderiza desde el mismo archivo, y solo si lo pides.",
   "productpage.03": "La parte que funciona sin navegador",
@@ -936,7 +936,7 @@ export const es = {
   "devpage.01": "El esquema como código.<br/>Todo lo demás va detrás.",
   "devpage.02": "Escribes colecciones en TypeScript. Rebase mantiene la base de datos, la API, los tipos y — si lo has activado — el panel de acuerdo con ese único archivo. Ejecuta <code class=\"font-mono text-surface-200\">pnpm dlx @rebasepro/cli init</code>, luego <code class=\"font-mono text-surface-200\">rebase dev</code>, y ya está en marcha.",
   "devpage.03": "Cuatro comandos, y a partir de ahí solo escribes TypeScript",
-  "devpage.04": "Tres carpetas, y una es opcional",
+  "devpage.04": "Tres carpetas, una definición",
   "devpage.05": "<code class=\"font-mono text-surface-300\">config/collections/</code> es el único sitio donde se describe tu modelo de datos. El backend lo lee para servir las APIs y generar el esquema de Drizzle; el panel lee los mismos archivos para renderizarse.",
   "devpage.06": "Borra <code class=\"font-mono text-surface-300\">frontend/</code> y tienes un backend headless. Nada bajo <code class=\"font-mono text-surface-300\">backend/</code> importa React, y el sistema de tipos lo obliga: una clave <code class=\"font-mono text-surface-300\">admin</code> en un proyecto que nunca lo activó es un error de compilación.",
   "devpage.07": "after rebase init",
@@ -1830,7 +1830,7 @@ export const es = {
   "productpage.link.backendDemos": "Todo lo que trae el backend, con demos en vivo",
   "productpage.link.panel": "Lo que tu equipo obtiene del panel",
   "productpage.layer1.state": "siempre activo",
-  "productpage.layer2.state": "opcional",
+  "productpage.layer2.state": "incluido",
   "productpage.be.rest.name": "API REST",
   "productpage.be.rest.note": "CRUD, filtrado, ordenación, paginación, relaciones",
   "productpage.be.sdk.name": "SDK tipado",
