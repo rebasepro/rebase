@@ -1,14 +1,24 @@
 /**
  * Build drizzle tables at runtime from an introspected schema.
  *
- * A project with declared collections gets its drizzle tables from a generated `schema.generated.ts` that
- * the developer commits. BaaS mode has no such file — it points at a database
- * and serves it — so the equivalent table objects are constructed here from
- * `information_schema` metadata.
+ * **Every** data source's tables are built here, from `information_schema`,
+ * after boot-ensure has run — a project with declared collections included. The
+ * committed `schema.generated.ts` is a build artefact for Atlas, `db push`,
+ * `eject` and user code; the runtime does not read it for its tables, because a
+ * file that is one commit behind the database used to change what the server
+ * served (a renamed foreign-key column 500'd every request, a lost relation
+ * silently emptied a list). See `catalogue-schema.ts` for the caller.
  *
  * These are handed to drizzle as its schema, which keeps the relational query
  * path (`db.query.*`) working; without them FetchService would fall back to
  * plain selects and lose relation loading.
+ *
+ * Two things a caller has to supply for the tables to match what the generated
+ * module used to produce, both about *names*: the Drizzle object is keyed by the
+ * wire name of a column and not by the column (`authorId`, not `author_id`), and
+ * a relation is keyed by the collection's own relation key rather than by a
+ * guess made from the foreign key. Both come from the collections — see
+ * `columnKeysFromCollections` and `buildDrizzleRelationsFromCollections`.
  */
 import {
     bigint,
@@ -44,13 +54,43 @@ import {
     type PgTable
 } from "drizzle-orm/pg-core";
 
-import { relations, type Relations } from "drizzle-orm";
+import { relations, sql, type Relations } from "drizzle-orm";
+import { toWireKey } from "@rebasepro/utils";
 
 import type { TableColumn, TableMeta } from "./introspect-db-logic";
+
+/**
+ * The Drizzle object key a column is served under, given its table.
+ *
+ * Defaults to the column name — right for a junction table and for a database
+ * nothing declares — and is supplied from the collections wherever there is
+ * one, because there the wire name is the property key. Every read and write
+ * path in this driver indexes tables and rows by that key.
+ */
+export type ColumnKeyResolver = (tableName: string, columnName: string) => string;
+
+const columnNameAsKey: ColumnKeyResolver = (_table, column) => column;
 
 /** drizzle ships no bytea builder; binary must round-trip as a Buffer. */
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
     dataType: () => "bytea"
+});
+
+/**
+ * A full-text search column, declared with its real SQL type.
+ *
+ * Not cosmetic: `isSearchIndexColumn` asks the column for its type and drops
+ * every `tsvector` from the projection, so a search column that fell through to
+ * `text` (the old default for an unrecognised type) would be selected, returned
+ * to callers, and rendered in the admin as a wall of lexemes. drizzle ships no
+ * builder for these two.
+ */
+const tsvector = customType<{ data: string; driverData: string }>({
+    dataType: () => "tsvector"
+});
+
+const tsquery = customType<{ data: string; driverData: string }>({
+    dataType: () => "tsquery"
 });
 
 /**
@@ -99,10 +139,17 @@ function scalarBuilder(udtName: string, name: string, col: TableColumn): PgColum
             return time(name);
         case "timetz":
             return time(name, { withTimezone: true });
+        // `mode: "string"`, both of them, because that is what the generated
+        // module declared for every `date` property and therefore what every
+        // client, the OpenAPI document and the admin's view model have always
+        // been served: an ISO string. Drizzle's default mode is `date`, which
+        // hands back a `Date` — the same instant, a different wire value, and a
+        // difference that would have appeared only on the read path of a
+        // project that changed nothing.
         case "timestamp":
-            return timestamp(name);
+            return timestamp(name, { mode: "string" });
         case "timestamptz":
-            return timestamp(name, { withTimezone: true });
+            return timestamp(name, { withTimezone: true, mode: "string" });
         case "interval":
             return interval(name);
         case "bytea":
@@ -135,9 +182,19 @@ function scalarBuilder(udtName: string, name: string, col: TableColumn): PgColum
             const length = varlenLength(col);
             return length ? varchar(name, { length }) : text(name);
         }
+        case "tsvector":
+            return tsvector(name);
+        case "tsquery":
+            return tsquery(name);
         default:
             // Includes text, enums (pg enums are strings on the wire), citext,
             // geography, and anything else this driver hasn't met yet.
+            //
+            // An enum deliberately stays `text`, which is what the generated
+            // module's `pgEnum` column also serves: drizzle does no runtime
+            // validation of enum members either way, and Postgres rejects a
+            // label it does not have. The difference is only in the type the
+            // generated *types* carry, and those come from the collection.
             return text(name);
     }
 }
@@ -154,10 +211,13 @@ function columnBuilderFor(col: TableColumn): PgColumnBuilderBase {
 
 /**
  * Build one drizzle table per introspected table, keyed by table name.
+ *
+ * @param columnKey how a column is named on the wire — see {@link ColumnKeyResolver}.
  */
 export function buildDrizzleTablesFromSchema(
     tablesMap: Map<string, TableMeta>,
-    pgSchemaName = "public"
+    pgSchemaName = "public",
+    columnKey: ColumnKeyResolver = columnNameAsKey
 ): Record<string, PgTable> {
     const schema = pgSchemaName === "public" ? null : pgSchema(pgSchemaName);
     // The column set is only known at runtime, so drizzle's generic table
@@ -172,6 +232,7 @@ export function buildDrizzleTablesFromSchema(
 
     for (const [tableName, meta] of tablesMap) {
         const columns: Record<string, PgColumnBuilderBase> = {};
+        const keyOf = new Map<string, string>();
 
         for (const col of meta.columns) {
             let builder = columnBuilderFor(col);
@@ -184,8 +245,19 @@ export function buildDrizzleTablesFromSchema(
             if (meta.pks.length === 1 && meta.pks[0] === col.column_name) {
                 builder = (builder as unknown as { primaryKey(): PgColumnBuilderBase }).primaryKey();
             }
+            // A stored generated column must be left out of every INSERT, which
+            // is what `.generatedAlwaysAs` tells drizzle. The expression is
+            // carried through so a drizzle-kit run over these tables describes
+            // the column it actually found; nothing at runtime evaluates it.
+            if (col.is_generated === "ALWAYS") {
+                builder = (builder as unknown as {
+                    generatedAlwaysAs(expr: unknown): PgColumnBuilderBase
+                }).generatedAlwaysAs(sql.raw(col.generation_expression ?? ""));
+            }
 
-            columns[col.column_name] = builder;
+            const key = columnKey(tableName, col.column_name);
+            keyOf.set(col.column_name, key);
+            columns[key] = builder;
         }
 
         const isComposite = meta.pks.length > 1;
@@ -193,7 +265,7 @@ export function buildDrizzleTablesFromSchema(
             tableName,
             columns,
             isComposite
-                ? (t) => [primaryKey({ columns: meta.pks.map((pk) => t[pk]) as never })]
+                ? (t) => [primaryKey({ columns: meta.pks.map((pk) => t[keyOf.get(pk) ?? pk]) as never })]
                 : undefined
         );
     }
@@ -214,7 +286,8 @@ export function buildDrizzleTablesFromSchema(
  */
 export function buildDrizzleRelationsFromSchema(
     tablesMap: Map<string, TableMeta>,
-    tables: Record<string, PgTable>
+    tables: Record<string, PgTable>,
+    columnKey: ColumnKeyResolver = columnNameAsKey
 ): Record<string, Relations> {
     /** Owning side, per table: the `one()` relations from its foreign keys. */
     const owning = new Map<string, { key: string; targetTable: string; fkColumn: string; targetColumn: string; relationName: string }[]>();
@@ -223,14 +296,19 @@ export function buildDrizzleRelationsFromSchema(
 
     for (const [tableName, meta] of tablesMap) {
         if (!tables[tableName]) continue;
-        const columnNames = new Set(meta.columns.map((c) => c.column_name));
+        // The keys the table actually carries — what a relation key must not
+        // collide with, since both live in one Drizzle object.
+        const columnNames = new Set(meta.columns.map((c) => columnKey(tableName, c.column_name)));
 
         for (const fk of meta.fks) {
             if (!tables[fk.foreign_table_name]) continue;
 
             // Mirrors buildRelations in introspect-runtime: author_id -> author,
-            // falling back to the target table when the column name carries no hint.
-            let key = fk.column_name.replace(/_id$/, "");
+            // falling back to the target table when the column name carries no
+            // hint. `toWireKey` for the same reason it is there — the two keys
+            // must be the same string or the collection advertises a relation key
+            // drizzle has never heard of (`author_ref` here, `authorRef` there).
+            let key = toWireKey(fk.column_name.replace(/_id$/, ""));
             if (meta.pks.includes(fk.column_name) && key === fk.column_name) {
                 key = fk.foreign_table_name;
             }
@@ -244,11 +322,23 @@ export function buildDrizzleRelationsFromSchema(
 
             owning.set(tableName, [
                 ...(owning.get(tableName) ?? []),
-                { key, targetTable: fk.foreign_table_name, fkColumn: fk.column_name, targetColumn: fk.foreign_column_name, relationName }
+                {
+                    key,
+                    targetTable: fk.foreign_table_name,
+                    // The Drizzle keys, not the columns: `fields`/`references`
+                    // index the built table objects, which are keyed by the
+                    // wire name wherever a collection supplies one.
+                    fkColumn: columnKey(tableName, fk.column_name),
+                    targetColumn: columnKey(fk.foreign_table_name, fk.foreign_column_name),
+                    relationName
+                }
             ]);
 
             const backKey = tableName;
-            const targetColumns = new Set((tablesMap.get(fk.foreign_table_name)?.columns ?? []).map((c) => c.column_name));
+            const targetColumns = new Set(
+                (tablesMap.get(fk.foreign_table_name)?.columns ?? [])
+                    .map((c) => columnKey(fk.foreign_table_name, c.column_name))
+            );
             if (targetColumns.has(backKey)) continue;
 
             inverse.set(fk.foreign_table_name, [

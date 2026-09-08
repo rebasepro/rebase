@@ -42,6 +42,8 @@ export interface TableColumn {
     ordinal_position?: number;
     /** `"ALWAYS"` for a generated column, `"NEVER"` otherwise. */
     is_generated?: string;
+    /** The `GENERATED ALWAYS AS (…)` expression, when `is_generated` says so. */
+    generation_expression?: string | null;
     /** `"YES"` for an identity column. */
     is_identity?: string;
     /** `"ALWAYS"` or `"BY DEFAULT"` on an identity column. */
