@@ -5,10 +5,14 @@ import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
 import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { assertKnownWriteFields, assertWriteValuesValid, projectResponseFields } from "./write-validation";
+import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "./field-ops";
+import { resolveConflictTarget } from "./conflict-target";
+import { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag, versionProperty } from "./etag";
+import { assertRefsResolvable, parseBatchBody, type ParsedBatchOperation } from "./batch";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
-import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
+import { findRelation, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
 import {
     createIdempotencyStore,
     IDEMPOTENCY_HEADER,
@@ -30,6 +34,55 @@ async function parseJsonBody(c: Context<HonoEnv>): Promise<Record<string, unknow
     } catch {
         throw ApiError.badRequest("Invalid JSON body");
     }
+}
+
+/**
+ * Whether the caller asked not to be sent the row back.
+ *
+ * RFC 7240's `Prefer: return=minimal`. Every write on this API answers with the
+ * full row, which is the right default — it carries what the *server* decided,
+ * a serial id, an `autoValue` stamp, whatever `beforeSave` rewrote — and the
+ * wrong one for an import, where it is a row serialisation and (on Postgres) a
+ * read-back per written row, thrown away on arrival.
+ *
+ * A preference, not an instruction: a server is free to ignore it, so a client
+ * cannot depend on the 204 without checking. `Preference-Applied` on the
+ * response is how it finds out, and this API always applies it.
+ */
+function prefersMinimal(c: Context<HonoEnv>): boolean {
+    const header = c.req.header("Prefer");
+    if (!header) return false;
+    return header
+        .split(",")
+        .some((part) => part.trim().toLowerCase().replace(/\s*=\s*/, "=") === "return=minimal");
+}
+
+/** The `204` a minimal write answers with, saying that it honoured the ask. */
+function minimalResponse(): Response {
+    return new Response(null, {
+        status: 204,
+        headers: { "Preference-Applied": "return=minimal" }
+    });
+}
+
+/**
+ * What a minimal *bulk* answer carries: the ids, and nothing else.
+ *
+ * A 204 would be the symmetric answer and is the wrong one here. On a create
+ * the id is the one thing the caller cannot compute — it is the server's to
+ * assign — so a batch import that discarded them would have to re-read the
+ * table by some natural key to find out what it just wrote, which is more work
+ * than the rows it was trying not to receive.
+ *
+ * A single key comes back as the scalar; a composite key as an object of its
+ * columns, because there is no correct way to flatten two columns into one
+ * value that a caller could then use as an address.
+ */
+function rowIdentity(row: Record<string, unknown>, collection: CollectionConfig): unknown {
+    const keys = resolvePrimaryKeys(collection).map(info => info.fieldName);
+    if (keys.length === 0) return null;
+    if (keys.length === 1) return row[keys[0]] ?? null;
+    return Object.fromEntries(keys.map(key => [key, row[key] ?? null]));
 }
 
 /**
@@ -114,6 +167,10 @@ export class RestApiGenerator {
     generateRoutes(): Hono<HonoEnv> {
         this.nameTheCollection();
 
+        // Before the per-collection routes, so `_batch` can never be read as a
+        // collection slug — the same ordering `/bulk` relies on one level down.
+        this.createBatchRoute();
+
         this.collections.forEach(collection => {
             this.createCollectionRoutes(collection);
         });
@@ -127,6 +184,114 @@ export class RestApiGenerator {
         this.createUnmatchedRoute();
 
         return this.router;
+    }
+
+    /**
+     * `POST /api/data/_batch` — writes across collections, as one transaction.
+     *
+     * `/bulk` is one collection at a time, which is the wrong shape for the
+     * writes that most need to be atomic: an order and its line items, a user
+     * and their membership row, a document and its audit entry. Sent as
+     * separate requests those half-succeed, and the recovery — read back, work
+     * out which half landed, undo it — is code nobody writes and everybody
+     * needs.
+     *
+     * Underscored so it cannot collide with a collection: a slug is a table
+     * name and Postgres identifiers do not start with one, so `_batch` is a
+     * name no `db push` can produce.
+     *
+     * Every operation is checked before the transaction opens — shape, unknown
+     * collections, unknown fields, value constraints, field operations,
+     * conflict targets, forward `$ref`s — because a batch is all-or-nothing and
+     * finding a typo at operation 40 costs the rollback of the 39 writes before
+     * it. Inside, each operation runs the pipeline its single-row route runs:
+     * the same callbacks, the same row-level security, as the same role.
+     */
+    private createBatchRoute(): void {
+        const bySlug = new Map(this.collections.map(collection => [collection.slug, collection]));
+        const knownCollections = new Set(bySlug.keys());
+
+        this.router.post("/_batch", async (c) => {
+            const driver = this.getScopedDriver(c);
+            const body = await parseJsonBody(c) as { operations?: unknown };
+
+            const operations = parseBatchBody(body, {
+                knownCollections,
+                // The same cap as a bulk write, and for the same reason: one
+                // batch is one transaction and holds its locks for the whole of
+                // it, so an unbounded one is a self-inflicted outage.
+                maxOperations: this.maxBulkRows
+            });
+            if (operations.length === 0) {
+                return c.json({ data: [], meta: { operations: 0 } });
+            }
+            assertRefsResolvable(operations);
+
+            if (!driver.batchWrite) {
+                throw ApiError.badRequest(
+                    "This backend's data driver does not support cross-collection batches. " +
+                    "Send the writes as separate requests, or per-collection /bulk calls.",
+                    "BATCH_UNSUPPORTED"
+                );
+            }
+
+            // A permission per operation, against the collection that operation
+            // names — not one check for the request. A key scoped to write
+            // `orders` and nothing else must not be able to reach `users`
+            // because the two travelled in one body.
+            operations.forEach((operation, index) => {
+                this.enforceApiKeyPermission(
+                    { get: (key: string) => c.get(key as never), req: { method: operation.op === "delete" ? "DELETE" : "POST" } },
+                    operation.collection,
+                    operation.op === "delete" ? "delete" : "write"
+                );
+                const collection = bySlug.get(operation.collection)!;
+                if (!operation.values) return;
+                assertKnownWriteFields(operation.values, collection);
+                assertWriteValuesValid(operation.values, collection);
+                if (operation.op === "update") {
+                    assertFieldOpsValid(operation.values, collection, { operationIndex: index });
+                } else {
+                    // A create or an upsert may insert, so there is no stored
+                    // value for an operation to act on.
+                    assertNoFieldOpsOnCreate(operation.values, `Operation ${index}`);
+                }
+                if (operation.op === "upsert") {
+                    operation.onConflict = resolveConflictTarget(
+                        operation.onConflict,
+                        collection,
+                        { where: `Operation ${index}` }
+                    );
+                }
+            });
+
+            return this.runIdempotent(c, body, async () => {
+                const written = await driver.batchWrite!({
+                    operations: operations.map((operation: ParsedBatchOperation) => ({
+                        op: operation.op,
+                        path: getCollectionDataPath(bySlug.get(operation.collection)!),
+                        id: operation.id,
+                        values: operation.values,
+                        collection: bySlug.get(operation.collection),
+                        onConflict: operation.onConflict,
+                        ref: operation.ref
+                    }))
+                });
+                return {
+                    data: written.map((row) => (row ? this.formatResponse(row) : null)),
+                    meta: { operations: written.length }
+                };
+            }, (result) => {
+                if (!prefersMinimal(c)) return c.json(result as never);
+                const rows = ((result as { data?: unknown })?.data ?? []) as (Record<string, unknown> | null)[];
+                c.header("Preference-Applied", "return=minimal");
+                return c.json({
+                    data: rows.map((row, index) =>
+                        row ? rowIdentity(row, bySlug.get(operations[index].collection)!) : null),
+                    meta: (result as { meta?: unknown })?.meta
+                } as never);
+            });
+        });
     }
 
     /**
@@ -322,6 +487,122 @@ export class RestApiGenerator {
 
 
     /**
+     * Run a write under an idempotency key.
+     *
+     * Every keyed route needs the identical claim-before-write dance — claim,
+     * replay on a repeat, 409 while one is in flight, release on failure,
+     * complete on success — and getting one of those steps wrong is exactly the
+     * bug the key exists to prevent. Written once so they cannot drift into
+     * different notions of "already done".
+     *
+     * It lived inside `createCollectionRoutes` and served the three bulk routes
+     * only, which is why the single-row `PATCH` and `DELETE` ignored the header
+     * the SDK has always sent them: the mechanism was one closure away from
+     * them, and nothing said so. A method reaches every route, including the
+     * cross-collection batch.
+     *
+     * `body` is what the key is claimed *for*: the same key on a different
+     * request is a caller mistake, and replaying a create's answer to a delete
+     * would report a deletion that never happened.
+     *
+     * `respond` is applied to the *stored* result rather than the stored result
+     * being a response, so a replay honours the `Prefer` header of the request
+     * replaying it rather than the one that first answered.
+     */
+    private async runIdempotent(
+        c: Context<HonoEnv>,
+        body: unknown,
+        run: () => Promise<unknown>,
+        respond: (body: unknown) => Response
+    ): Promise<Response> {
+        const idempotencyKey = c.req.header(IDEMPOTENCY_HEADER);
+        const uid = (c.get("user") as { uid?: string } | undefined)?.uid;
+        const store = this.idempotency();
+        // Claimed before the write, not after: the two-step recall-then-write
+        // let concurrent replays of one key both through.
+        const claimed = idempotencyKey && store
+            ? await store.claim(idempotencyKey, uid, await requestFingerprint(c.req.method, c.req.path, body))
+            : undefined;
+        if (claimed?.status === "replay") {
+            return respond(claimed.response);
+        }
+        if (claimed?.status === "mismatch") {
+            throw idempotencyKeyReused(idempotencyKey!);
+        }
+        if (claimed?.status === "in-flight") {
+            throw ApiError.conflict(
+                `A request with Idempotency-Key '${idempotencyKey}' is already in progress. ` +
+                "Retry once it has answered; its result will be replayed.",
+                "IDEMPOTENCY_KEY_IN_PROGRESS"
+            );
+        }
+
+        let response: unknown;
+        try {
+            response = await run();
+        } catch (error) {
+            // Hand the key back, or one transient failure would refuse every
+            // retry of it until the row aged out.
+            if (claimed?.status === "claimed" && idempotencyKey && store) {
+                await store.release(idempotencyKey, uid);
+            }
+            throw error;
+        }
+
+        if (claimed?.status === "claimed" && idempotencyKey && store) {
+            await store.complete(idempotencyKey, uid, response);
+        }
+        return respond(response);
+    }
+
+    /**
+     * The row as the read routes serve it, for hashing into an `ETag`.
+     *
+     * A tag derived from a version column is the same whichever read produced
+     * the row, so nothing extra is fetched for it. The fallback hashes the row
+     * itself, and there the *shape* matters: `GET /:id` serves the REST walk
+     * while the write routes read through `driver.fetchOne` (the admin view
+     * model), so hashing whichever one happened to be in hand would give the
+     * same row two different tags and make every `If-Match` a coin toss.
+     */
+    private async rowForETag(
+        driver: DataDriver,
+        collection: CollectionConfig,
+        id: string,
+        alreadyRead: Record<string, unknown> | undefined
+    ): Promise<Record<string, unknown> | undefined> {
+        // A version column makes the tag independent of which read produced the
+        // row, so the one already in hand is the right one and costs nothing.
+        if (versionProperty(collection) && alreadyRead) return alreadyRead;
+        const fetchService = driver.restFetchService;
+        if (!fetchService) return alreadyRead;
+        return await fetchService.fetchOneForRest(collection.slug, id) as Record<string, unknown> | undefined;
+    }
+
+    /**
+     * Answer a bulk write, honouring `Prefer: return=minimal`.
+     *
+     * Minimal is a 200 carrying the ids rather than a 204 — see
+     * {@link rowIdentity} for why a batch keeps them when a single write does
+     * not. `meta.written` is unchanged either way, so a caller that only wants
+     * the count never has to ask for the rows.
+     */
+    private respondBulk(
+        c: Context<HonoEnv>,
+        result: unknown,
+        collection: CollectionConfig
+    ): Response {
+        if (!prefersMinimal(c)) return c.json(result as never);
+        const rows = ((result as { data?: unknown })?.data ?? []) as Record<string, unknown>[];
+        const meta = (result as { meta?: unknown })?.meta;
+        c.header("Preference-Applied", "return=minimal");
+        return c.json({
+            data: rows.map((row) => rowIdentity(row, collection)),
+            meta
+        } as never);
+    }
+
+    /**
      * Create REST routes for a collection using existing Rebase patterns
      */
     private createCollectionRoutes(collection: CollectionConfig): void {
@@ -452,6 +733,14 @@ export class RestApiGenerator {
                 throw this.entityNotFound(collection.slug, String(id));
             }
 
+            // The version this read saw, so the write that follows can name it
+            // and be refused if the row has moved on. Computed from the whole
+            // row, before `?fields=` narrows it: the tag identifies the row,
+            // not the projection the caller asked for, and two clients reading
+            // different columns of one row must agree about its version.
+            const etag = await rowETag(entity as Record<string, unknown>, resolvedCollection);
+            if (etag) c.header(ETAG_HEADER, etag);
+
             return c.json(projectResponseFields(
                 [entity as Record<string, unknown>],
                 queryOptions.fields,
@@ -459,65 +748,6 @@ export class RestApiGenerator {
                 { include: queryOptions.include }
             )[0]);
         });
-
-        /**
-         * Run a bulk handler under an idempotency key.
-         *
-         * All three bulk routes need the identical claim-before-write dance —
-         * claim, replay on a repeat, 409 while one is in flight, release on
-         * failure, complete on success — and getting one of those steps wrong
-         * is exactly the bug the key exists to prevent. Written once so the
-         * three cannot drift into three different notions of "already done".
-         *
-         * `body` is what the key is claimed *for*: the same key on a different
-         * request is a caller mistake, and replaying a create's answer to a
-         * delete would report a deletion that never happened.
-         */
-        const withIdempotency = async (
-            c: Context<HonoEnv>,
-            body: unknown,
-            run: () => Promise<unknown>,
-            respond: (body: unknown) => Response
-        ): Promise<Response> => {
-            const idempotencyKey = c.req.header(IDEMPOTENCY_HEADER);
-            const uid = (c.get("user") as { uid?: string } | undefined)?.uid;
-            const store = this.idempotency();
-            // Claimed before the write, not after: the two-step
-            // recall-then-write let concurrent replays of one key both through.
-            const claimed = idempotencyKey && store
-                ? await store.claim(idempotencyKey, uid, await requestFingerprint(c.req.method, c.req.path, body))
-                : undefined;
-            if (claimed?.status === "replay") {
-                return respond(claimed.response);
-            }
-            if (claimed?.status === "mismatch") {
-                throw idempotencyKeyReused(idempotencyKey!);
-            }
-            if (claimed?.status === "in-flight") {
-                throw ApiError.conflict(
-                    `A request with Idempotency-Key '${idempotencyKey}' is already in progress. ` +
-                    "Retry once it has answered; its result will be replayed.",
-                    "IDEMPOTENCY_KEY_IN_PROGRESS"
-                );
-            }
-
-            let response: unknown;
-            try {
-                response = await run();
-            } catch (error) {
-                // Hand the key back, or one transient failure would refuse every
-                // retry of it until the row aged out.
-                if (claimed?.status === "claimed" && idempotencyKey && store) {
-                    await store.release(idempotencyKey, uid);
-                }
-                throw error;
-            }
-
-            if (claimed?.status === "claimed" && idempotencyKey && store) {
-                await store.complete(idempotencyKey, uid, response);
-            }
-            return respond(response);
-        };
 
         /**
          * Validate the envelope every bulk route shares: an array, non-empty,
@@ -563,7 +793,7 @@ export class RestApiGenerator {
             const driver = this.getScopedDriver(c);
             const path = collection.slug;
 
-            const body = await parseJsonBody(c) as { rows?: unknown; upsert?: unknown };
+            const body = await parseJsonBody(c) as { rows?: unknown; upsert?: unknown; onConflict?: unknown };
 
             assertBulkShape(body?.rows, "rows", true);
             const rows = body.rows as Record<string, unknown>[];
@@ -572,6 +802,17 @@ export class RestApiGenerator {
             }
             if (body.upsert !== undefined && typeof body.upsert !== "boolean") {
                 throw ApiError.badRequest("`upsert` must be a boolean.", "INVALID_BULK_BODY");
+            }
+            // Checked whether or not `upsert` is set, so naming a target and
+            // forgetting the flag is an error rather than a silently ignored
+            // field that turns a re-runnable import into a duplicating one.
+            const onConflict = resolveConflictTarget(body.onConflict, resolvedCollection);
+            if (onConflict && body.upsert !== true) {
+                throw ApiError.badRequest(
+                    "`onConflict` names where an upsert matches, but `upsert` is not set. " +
+                    "Send `upsert: true`, or drop `onConflict`.",
+                    "INVALID_BULK_BODY"
+                );
             }
             if (!driver.saveMany) {
                 throw ApiError.badRequest(
@@ -586,24 +827,29 @@ export class RestApiGenerator {
             rows.forEach((row, rowIndex) => {
                 assertKnownWriteFields(row, resolvedCollection, { rowIndex });
                 assertWriteValuesValid(row, resolvedCollection, { rowIndex });
+                // This route inserts (or upserts), and an operation over a
+                // value that is not there yet has nothing to mean. Refused here
+                // rather than in the driver so the message names the row.
+                assertNoFieldOpsOnCreate(row, `Row ${rowIndex} of a bulk create`);
             });
 
             // A client that never sees the response cannot know whether the
             // batch committed, so it retries — and without a key the server
             // cannot tell that retry from a second genuine import. On a single
             // create that duplicates one row; here it duplicates the batch.
-            return withIdempotency(c, body, async () => {
+            return this.runIdempotent(c, body, async () => {
                 const written = await driver.saveMany!({
                     path,
                     rows,
                     collection: resolvedCollection,
-                    upsert: body.upsert === true
+                    upsert: body.upsert === true,
+                    onConflict
                 });
                 return {
                     data: written.map((row) => this.formatResponse(row)),
                     meta: { written: written.length }
                 };
-            }, (result) => c.json(result as never));
+            }, (result) => this.respondBulk(c, result, resolvedCollection));
         });
 
         // PATCH /collection/bulk — update many rows as one transaction.
@@ -647,9 +893,10 @@ export class RestApiGenerator {
                 }
                 assertKnownWriteFields(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex });
                 assertWriteValuesValid(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex });
+                assertFieldOpsValid(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex });
             });
 
-            return withIdempotency(c, body, async () => {
+            return this.runIdempotent(c, body, async () => {
                 const written = await driver.updateMany!({
                     path,
                     updates: updates.map((entry) => ({
@@ -662,7 +909,7 @@ export class RestApiGenerator {
                     data: written.map((row) => this.formatResponse(row)),
                     meta: { written: written.length }
                 };
-            }, (result) => c.json(result as never));
+            }, (result) => this.respondBulk(c, result, resolvedCollection));
         });
 
         // POST /collection/bulk/delete — delete many rows as one transaction.
@@ -700,7 +947,7 @@ export class RestApiGenerator {
                 );
             }
 
-            return withIdempotency(c, body, async () => {
+            return this.runIdempotent(c, body, async () => {
                 await driver.deleteMany!({
                     path,
                     ids: ids as (string | number)[],
@@ -725,6 +972,16 @@ export class RestApiGenerator {
 
             const body = await parseJsonBody(c);
 
+            // `?on_conflict=email` turns the create into an upsert on a natural
+            // key. A query parameter rather than a body field because the body
+            // is the row: mixing a directive into it would collide with a
+            // column of the same name the day someone declares one.
+            const onConflict = resolveConflictTarget(
+                c.req.query("on_conflict"),
+                resolvedCollection,
+                { where: "`on_conflict`" }
+            );
+
             const isAuth = collection.auth;
             const isAuthCollection = isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
 
@@ -740,6 +997,7 @@ export class RestApiGenerator {
             if (!isAuthCollection) {
                 assertKnownWriteFields(body, resolvedCollection);
                 assertWriteValuesValid(body, resolvedCollection);
+                assertNoFieldOpsOnCreate(body, "A create");
             } else {
                 const contract = this.authAdapter?.describeUserCreationContract?.(collectionAuthConfig);
                 if (contract?.validate) {
@@ -796,52 +1054,21 @@ values: entity as Record<string, unknown> },
             // response can carry a temporary password, and handing it out
             // again on a replayed key is a credential disclosure the plain
             // data path has no equivalent of.
-            const idempotencyKey = c.req.header(IDEMPOTENCY_HEADER);
-            const uid = (c.get("user") as { uid?: string } | undefined)?.uid;
-            const store = this.idempotency();
-            // Claimed before the write, not after: the two-step
-            // recall-then-write let concurrent replays of one key both
-            // through, which is the duplicate this exists to stop.
-            const claimed = idempotencyKey && store
-                ? await store.claim(idempotencyKey, uid, await requestFingerprint(c.req.method, c.req.path, body))
-                : undefined;
-            if (claimed?.status === "replay") {
-                return c.json(claimed.response as never, 201);
-            }
-            if (claimed?.status === "mismatch") {
-                throw idempotencyKeyReused(idempotencyKey!);
-            }
-            if (claimed?.status === "in-flight") {
-                throw ApiError.conflict(
-                    `A request with Idempotency-Key '${idempotencyKey}' is already in progress. ` +
-                    "Retry once it has answered; its result will be replayed.",
-                    "IDEMPOTENCY_KEY_IN_PROGRESS"
-                );
-            }
-
-            let response: unknown;
-            try {
+            return this.runIdempotent(c, body, async () => {
                 const entity = await driver.save({
                     path,
                     values: body,
                     collection: resolvedCollection,
-                    status: "new"
+                    status: "new",
+                    // An upsert only when a target was named. Left off, this is
+                    // the plain insert it has always been, and a duplicate key
+                    // still raises — which is the answer a create should give.
+                    ...(onConflict ? { upsert: true, onConflict } : {})
                 });
-                response = this.formatResponse(entity);
-            } catch (error) {
-                // Hand the key back, or one transient failure would refuse
-                // every retry of it until the row aged out.
-                if (claimed?.status === "claimed" && idempotencyKey && store) {
-                    await store.release(idempotencyKey, uid);
-                }
-                throw error;
-            }
-
-            if (claimed?.status === "claimed" && idempotencyKey && store) {
-                await store.complete(idempotencyKey, uid, response);
-            }
-
-            return c.json(response as never, 201);
+                return this.formatResponse(entity);
+            }, (result) => prefersMinimal(c)
+                ? minimalResponse()
+                : c.json(result as never, 201));
         });
 
         // PATCH /collection/:id — partial update. PUT is mounted on the same
@@ -868,23 +1095,46 @@ values: entity as Record<string, unknown> },
                 throw this.entityNotFound(collection.slug, String(id));
             }
 
+            // Before the key is claimed and before anything is written: a
+            // precondition that fails must leave the request as if it had not
+            // been sent, and a claimed key would refuse the caller's own retry
+            // after they re-read and fixed the conflict.
+            const ifMatch = c.req.header(IF_MATCH_HEADER);
+            if (ifMatch) {
+                await assertIfMatch(
+                    ifMatch,
+                    await this.rowForETag(driver, resolvedCollection, String(id), existingEntity),
+                    resolvedCollection,
+                    { collection: collection.slug, id: String(id) }
+                );
+            }
+
             const body = await parseJsonBody(c);
             assertKnownWriteFields(body, resolvedCollection);
             assertWriteValuesValid(body, resolvedCollection);
+            // `{ views: { $inc: 1 } }` and the rest. Validated here, against the
+            // collection's own property types, so a `$push` on a number is a
+            // 400 naming the field rather than a Postgres type error raised
+            // from inside the driver's transaction.
+            assertFieldOpsValid(body, resolvedCollection);
 
-            const entity = await driver.save({
-                path: getCollectionDataPath(collection),
-                id: String(id),
-                values: body,
-                collection: resolvedCollection,
-                status: "existing"
-            });
-
-            const response = this.formatResponse(entity);
-
-
-
-            return c.json(response);
+            // The SDK has sent `Idempotency-Key` on `update()` since the option
+            // existed; this route read it off no request at all. A `PATCH` is
+            // not naturally idempotent — the field operations above make it
+            // emphatically not — so a retry after a lost ACK applied the edit
+            // twice, and `$inc` twice is a number nobody asked for.
+            return this.runIdempotent(c, body, async () => {
+                const entity = await driver.save({
+                    path: getCollectionDataPath(collection),
+                    id: String(id),
+                    values: body,
+                    collection: resolvedCollection,
+                    status: "existing"
+                });
+                return this.formatResponse(entity);
+            }, (result) => prefersMinimal(c)
+                ? minimalResponse()
+                : c.json(result as never));
         };
 
         /**
@@ -945,22 +1195,40 @@ values: entity as Record<string, unknown> },
                 throw this.entityNotFound(collection.slug, String(id));
             }
 
-            await driver.delete({
-                row: {
-                    // The address is the one in the URL, not something read back
-                    // off the row: a row is only its columns, so `existingEntity.id`
-                    // is undefined for any table not keyed on `id` — and the delete
-                    // went looking for a row called "undefined".
-                    id: String(id),
-                    path: getCollectionDataPath(collection),
-                    values: existingEntity
-                },
-                collection: resolvedCollection
-            });
+            const ifMatch = c.req.header(IF_MATCH_HEADER);
+            if (ifMatch) {
+                // A conditional delete is the one that matters most: "remove
+                // the row I read" is a different instruction from "remove
+                // whatever is there now", and only the first is safe once
+                // somebody else has edited it in between.
+                await assertIfMatch(
+                    ifMatch,
+                    await this.rowForETag(driver, resolvedCollection, String(id), existingEntity),
+                    resolvedCollection,
+                    { collection: collection.slug, id: String(id) }
+                );
+            }
 
-
-
-            return new Response(null, { status: 204 });
+            // The header the SDK sends and this route ignored. A delete
+            // replayed after the first attempt committed answers 404 — which
+            // an offline queue reads as a permanent failure and surfaces to the
+            // user as an error for a delete that in fact succeeded.
+            return this.runIdempotent(c, { id: String(id) }, async () => {
+                await driver.delete({
+                    row: {
+                        // The address is the one in the URL, not something read
+                        // back off the row: a row is only its columns, so
+                        // `existingEntity.id` is undefined for any table not
+                        // keyed on `id` — and the delete went looking for a row
+                        // called "undefined".
+                        id: String(id),
+                        path: getCollectionDataPath(collection),
+                        values: existingEntity
+                    },
+                    collection: resolvedCollection
+                });
+                return null;
+            }, () => new Response(null, { status: 204 }));
         });
     }
 

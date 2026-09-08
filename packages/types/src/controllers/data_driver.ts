@@ -222,6 +222,23 @@ export interface SaveProps<M extends Record<string, unknown> = Record<string, un
      * them there is no conflict target and the row is inserted normally.
      */
     upsert?: boolean;
+
+    /**
+     * The columns the upsert matches a conflict on, instead of the primary key.
+     *
+     * The key is the only target that always exists, and it is the wrong one
+     * for the write an upsert is usually reached for: "this user, identified by
+     * their email, exists with these values". Keyed on the primary key that is
+     * an insert, because the caller does not know the serial id — so the row is
+     * duplicated on every run.
+     *
+     * Only column sets carrying a uniqueness guarantee are legal here; Postgres
+     * refuses anything else with 42P10, from inside a transaction. The REST
+     * layer checks the target against the collection's declarations first (see
+     * `resolveConflictTarget`), so the answer is a 400 naming the available
+     * targets rather than a 500 naming a constraint the caller never wrote.
+     */
+    onConflict?: readonly string[];
 }
 
 /**
@@ -237,6 +254,8 @@ export interface SaveManyProps<M extends Record<string, unknown> = Record<string
     collection?: CollectionConfig<M>;
     /** Apply every row as INSERT ... ON CONFLICT DO UPDATE. See {@link SaveProps.upsert}. */
     upsert?: boolean;
+    /** The conflict target for those upserts. See {@link SaveProps.onConflict}. */
+    onConflict?: readonly string[];
 }
 
 /**
@@ -271,6 +290,34 @@ export interface DeleteManyProps<M extends Record<string, unknown> = Record<stri
     path: string;
     ids: (string | number)[];
     collection?: CollectionConfig<M>;
+}
+
+/**
+ * One operation of a {@link DataDriver.batchWrite}.
+ *
+ * `path` rather than a slug, because a batch entry addresses rows exactly as
+ * the single-row props do and a nested path is a legal address there.
+ *
+ * @internal
+ */
+export interface BatchWriteOperation<M extends Record<string, unknown> = Record<string, unknown>> {
+    op: "create" | "update" | "upsert" | "delete";
+    path: string;
+    /** Required for `update` and `delete`. May be a `$ref` marker; see `batchWrite`. */
+    id?: unknown;
+    values?: Partial<EntityValues<M>>;
+    collection?: CollectionConfig<M>;
+    /** See {@link SaveProps.onConflict}. `upsert` only. */
+    onConflict?: readonly string[];
+    /** Names this operation's result, for a later `$ref`. */
+    ref?: string;
+}
+
+/**
+ * @internal
+ */
+export interface BatchWriteProps<M extends Record<string, unknown> = Record<string, unknown>> {
+    operations: BatchWriteOperation<M>[];
 }
 
 export type FilterCombinationValidProps = {
@@ -417,6 +464,34 @@ export interface DataDriver {
      * {@link SDKCollectionClient.deleteMany}. Optional, as `saveMany` is.
      */
     deleteMany?<M extends Record<string, unknown> = Record<string, unknown>>(props: DeleteManyProps<M>): Promise<void>;
+
+    /**
+     * Apply a mixed list of writes across collections as one unit of work.
+     *
+     * The capability `saveMany` and `deleteMany` cannot express between them: a
+     * batch that touches two tables. Sent as two requests those can
+     * half-succeed, and the recovery — read back, work out which half landed,
+     * undo it — is code nobody writes.
+     *
+     * Every operation runs the pipeline its single-row equivalent runs, in
+     * order, in one transaction, under the caller's own role. Operations may
+     * carry `{ "$ref": "<name>.<field>" }` markers in `values` or `id`, which
+     * the driver resolves against the rows earlier operations wrote — the
+     * driver, because inside the transaction is the only place those rows
+     * exist. `@rebasepro/server` exports `resolveBatchRefs` so the resolution
+     * is one implementation rather than one per driver.
+     *
+     * Resolves to one entry per operation, aligned to the input: the written
+     * row for a create, update or upsert, and `null` for a delete.
+     *
+     * Optional for the same reason `saveMany` is: a driver that cannot make it
+     * atomic must not pretend to. The REST layer answers `BATCH_UNSUPPORTED`
+     * rather than falling back to a loop, which would be the non-atomic
+     * sequence the caller reached for this to avoid.
+     */
+    batchWrite?<M extends Record<string, unknown> = Record<string, unknown>>(
+        props: BatchWriteProps<M>
+    ): Promise<(Record<string, unknown> | null)[]>;
 
     /**
      * Check if the given property is unique in the given collection

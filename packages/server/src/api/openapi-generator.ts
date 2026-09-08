@@ -236,6 +236,197 @@ description: "Whether more records exist beyond this page" }
     // and a strict generator refuses.
     const registeredSchemas = new Set((collections || []).map(schemaNameFor));
 
+    /**
+     * `Prefer: return=minimal`, on every route that would otherwise send a row
+     * back. Documented rather than left implicit because a client generated
+     * from this spec cannot send a header the spec does not mention.
+     */
+    const preferHeader = {
+        name: "Prefer",
+        in: "header",
+        required: false,
+        schema: { type: "string", enum: ["return=minimal"] },
+        description:
+            "`return=minimal` asks the server not to send the written row back. Single writes then " +
+            "answer `204 No Content`; bulk and batch writes answer `200` carrying the ids only. " +
+            "The response repeats it in `Preference-Applied` when it was honoured."
+    };
+
+    const ifMatchHeader = {
+        name: "If-Match",
+        in: "header",
+        required: false,
+        schema: { type: "string" },
+        description:
+            "The `ETag` this edit was made against, from the `GET` that read the row. The write is " +
+            "refused with `412` if the row has changed since — which is the difference between " +
+            "\"update the row I read\" and \"overwrite whatever is there now\". `*` means only that " +
+            "the row must exist."
+    };
+
+    const preconditionFailed = {
+        412: {
+            description:
+                "The row changed since the ETag in `If-Match` was issued. Nothing was written: " +
+                "re-read the row, re-apply the change, and send the new ETag",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        }
+    };
+
+    const minimalResponse = {
+        204: {
+            description: "Written. `Prefer: return=minimal` was honoured, so there is no body",
+            headers: {
+                "Preference-Applied": { schema: { type: "string" }, description: "`return=minimal`" }
+            }
+        }
+    };
+
+    // ── POST /data/_batch — writes across collections, one transaction ────
+    //
+    // Registered before the per-collection paths for the same reason the route
+    // is: `_batch` is not a collection, and reading it as one would document a
+    // table that does not exist.
+    if ((collections || []).length > 0) {
+        paths["/data/_batch"] = {
+            post: {
+                tags: ["Data"],
+                summary: "Write across collections in one transaction",
+                description:
+                    "All-or-nothing across collections — an order and its line items, a user and " +
+                    "their membership row. `/bulk` is one collection at a time, and sending the two " +
+                    "halves as separate requests is exactly the sequence that can half-succeed.\n\n" +
+                    "Operations run in order, each through the same pipeline its single-row route " +
+                    "uses: the same validation, callbacks and row-level security, as the same role. " +
+                    "An operation may name itself with `ref`, and a later one may stand " +
+                    "`{ \"$ref\": \"order.id\" }` wherever a value goes — in `values`, at any depth, " +
+                    "or as an `id`. Only backward references resolve.\n\n" +
+                    "Capped at the same number of entries as a bulk write, because one batch is one " +
+                    "transaction and holds its locks for the whole of it.",
+                operationId: "batchWrite",
+                parameters: [
+                    {
+                        name: "Idempotency-Key",
+                        in: "header",
+                        required: false,
+                        schema: { type: "string" },
+                        description:
+                            "Names this batch so a retry is recognised instead of repeated. Without it a " +
+                            "client that lost the response cannot tell a replay from a second batch, and " +
+                            "the whole batch is written twice."
+                    },
+                    preferHeader
+                ],
+                requestBody: {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: {
+                                type: "object",
+                                required: ["operations"],
+                                properties: {
+                                    operations: {
+                                        type: "array",
+                                        items: { $ref: "#/components/schemas/BatchOperation" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    200: {
+                        description:
+                            "One entry per operation, in order: the written row for a create, update or " +
+                            "upsert, and `null` for a delete",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    properties: {
+                                        data: { type: "array", items: { type: "object", nullable: true } },
+                                        meta: { type: "object", properties: { operations: { type: "integer" } } }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    400: {
+                        description:
+                            "Malformed body, an unknown collection or field, an illegal field operation " +
+                            "or conflict target, a forward `$ref`, or more operations than the limit. " +
+                            "Nothing was written",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    404: {
+                        description: "An `update` or `delete` names a row that does not exist; nothing was written",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    409: {
+                        description: "A request with the same Idempotency-Key is still in flight",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    422: {
+                        description: "The Idempotency-Key was already used for a different request",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    ...errorResponses(requireAuth)
+                }
+            }
+        };
+
+        schemas.FieldOperation = {
+            type: "object",
+            description:
+                "A change to the column's current value rather than the value to store. Exactly one " +
+                "operator per field. Only on an update: an operation over a value that does not exist " +
+                "yet is refused with a 400.",
+            properties: {
+                $inc: { type: "number", description: "Add to a `number` column; negative to subtract." },
+                $push: { description: "Append a value, or each of an array of values, to an `array` column." },
+                $pull: { description: "Remove every occurrence of a value from an `array` column." },
+                $merge: { type: "object", description: "Shallow-merge an object into a `map` column." }
+            }
+        };
+
+        schemas.BatchOperation = {
+            type: "object",
+            required: ["op", "collection"],
+            properties: {
+                op: { type: "string", enum: ["create", "update", "upsert", "delete"] },
+                collection: { type: "string", description: "The collection slug this operation writes to." },
+                id: {
+                    description:
+                        "Required for `update` and `delete`. May instead be a reference marker — an " +
+                        "object whose single key is `$ref` and whose value is `<ref name>.<field>`, " +
+                        "e.g. `{ \"$ref\": \"order.id\" }` — naming a column of the row an earlier " +
+                        "operation wrote. (Described rather than declared as a schema: `$ref` is a " +
+                        "reserved word to every OpenAPI reader, and a property named `$ref` is read " +
+                        "as a reference and mangled.)",
+                    oneOf: [{ type: "string" }, { type: "integer" }, { type: "object" }]
+                },
+                values: {
+                    type: "object",
+                    description:
+                        "The row's fields. Values may be `$ref` markers; an `update` may also carry " +
+                        "field operations.",
+                    additionalProperties: true
+                },
+                onConflict: {
+                    type: "array",
+                    items: { type: "string" },
+                    description:
+                        "`upsert` only: the columns the conflict is matched on. Must carry a declared " +
+                        "uniqueness guarantee. Defaults to the primary key."
+                },
+                ref: {
+                    type: "string",
+                    description: "Names this operation's result, so a later one can `$ref` its columns."
+                }
+            }
+        };
+    }
+
     // ── Collection routes ────────────────────────────────────────────────
     for (const collection of (collections || [])) {
         const schemaName = schemaNameFor(collection);
@@ -395,6 +586,22 @@ description: "Whether more records exist beyond this page" }
                 tags: [collection.name],
                 summary: `Create ${collection.singularName || collection.name}`,
                 operationId: `create${schemaName}`,
+                parameters: [
+                    {
+                        name: "on_conflict",
+                        in: "query",
+                        required: false,
+                        schema: { type: "string" },
+                        description:
+                            "Comma-separated columns to upsert on, turning the create into " +
+                            "INSERT ... ON CONFLICT DO UPDATE. They must carry a declared uniqueness " +
+                            "guarantee — `validation.unique`, a `unique` index, or the primary key — " +
+                            "or the request is refused with a 400 naming the targets that do exist. " +
+                            "Left off, this is a plain insert and a duplicate key still raises.",
+                        example: "email"
+                    },
+                    preferHeader
+                ],
                 requestBody: {
                     required: true,
                     content: {
@@ -412,6 +619,7 @@ description: "Whether more records exist beyond this page" }
                             }
                         }
                     },
+                    ...minimalResponse,
                     ...errorResponses(requireAuth)
                 }
             }
@@ -463,7 +671,7 @@ description: "Whether more records exist beyond this page" }
                     "security. Capped server-side because one batch holds its locks for its whole " +
                     "duration.",
                 operationId: `createMany${schemaName}`,
-                parameters: [idempotencyHeader],
+                parameters: [idempotencyHeader, preferHeader],
                 requestBody: {
                     required: true,
                     content: {
@@ -475,7 +683,15 @@ description: "Whether more records exist beyond this page" }
                                     rows: { type: "array", items: { $ref: `#/components/schemas/${schemaName}Input` } },
                                     upsert: {
                                         type: "boolean",
-                                        description: "Write each row as INSERT ... ON CONFLICT DO UPDATE on the primary key."
+                                        description: "Write each row as INSERT ... ON CONFLICT DO UPDATE."
+                                    },
+                                    onConflict: {
+                                        type: "array",
+                                        items: { type: "string" },
+                                        description:
+                                            "The columns the conflict is matched on, instead of the primary key. " +
+                                            "They must carry a declared uniqueness guarantee. Naming them without " +
+                                            "`upsert: true` is a 400 rather than a silently ignored field."
                                     }
                                 }
                             }
@@ -509,7 +725,7 @@ description: "Whether more records exist beyond this page" }
                     "than `id` a flat row cannot say whether a column is the address or a value to " +
                     "write. An id matching no row fails the batch.",
                 operationId: `updateMany${schemaName}`,
-                parameters: [idempotencyHeader],
+                parameters: [idempotencyHeader, preferHeader],
                 requestBody: {
                     required: true,
                     content: {
@@ -635,6 +851,14 @@ description: "Entity ID" },
                 responses: {
                     200: {
                         description: "Entity found",
+                        headers: {
+                            ETag: {
+                                schema: { type: "string" },
+                                description:
+                                    "This row's version. Send it back as `If-Match` on a later PATCH or " +
+                                    "DELETE to have the write refused if the row has changed in between."
+                            }
+                        },
                         content: {
                             "application/json": {
                                 schema: { $ref: `#/components/schemas/${schemaName}` }
@@ -646,7 +870,12 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
                     ...errorResponses(requireAuth)
                 }
             },
-            patch: updateOperation(collection, schemaName, requireAuth),
+            patch: updateOperation(collection, schemaName, requireAuth, {
+                ifMatchHeader,
+                preferHeader,
+                preconditionFailed,
+                minimalResponse
+            }),
             delete: {
                 tags: [collection.name],
                 summary: `Delete ${collection.singularName || collection.name}`,
@@ -656,12 +885,32 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
 in: "path",
 required: true,
 schema: { type: "string" },
-description: "Entity ID" }
+description: "Entity ID" },
+                    ifMatchHeader,
+                    {
+                        name: "Idempotency-Key",
+                        in: "header",
+                        required: false,
+                        schema: { type: "string" },
+                        description:
+                            "Names this delete so a retry replays its answer. A delete replayed after " +
+                            "the first attempt committed would otherwise answer 404 — which an offline " +
+                            "queue reads as a permanent failure for a delete that in fact succeeded."
+                    }
                 ],
                 responses: {
                     204: { description: "Deleted successfully" },
                     404: { description: "Entity not found",
 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+                    409: {
+                        description: "A request with the same Idempotency-Key is still in flight",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    422: {
+                        description: "The Idempotency-Key was already used for a different request",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    ...preconditionFailed,
                     ...errorResponses(requireAuth)
                 }
             }
@@ -989,15 +1238,42 @@ function buildCollectionSchema(
 function updateOperation(
     collection: CollectionConfig,
     schemaName: string,
-    requireAuth: boolean
+    requireAuth: boolean,
+    shared: {
+        ifMatchHeader: Record<string, unknown>;
+        preferHeader: Record<string, unknown>;
+        preconditionFailed: Record<string, unknown>;
+        minimalResponse: Record<string, unknown>;
+    }
 ): Record<string, unknown> {
     return {
         tags: [collection.name],
         summary: `Update ${collection.singularName || collection.name}`,
-        description: "Partial update: only the properties present in the body are written; the rest are left unchanged.",
+        description:
+            "Partial update: only the properties present in the body are written; the rest are left " +
+            "unchanged.\n\n" +
+            "A property's value may instead be a field operation — `{ \"views\": { \"$inc\": 1 } }`, " +
+            "`{ \"tags\": { \"$push\": \"new\" } }`, `{ \"tags\": { \"$pull\": \"old\" } }`, " +
+            "`{ \"meta\": { \"$merge\": { \"seen\": true } } }` — which is applied inside the " +
+            "statement holding the row lock. That is the difference between a counter that is correct " +
+            "under concurrency and one that silently loses increments, because expressing the same " +
+            "change as a value means reading it first. `$inc` needs a `number` property, `$push`/`$pull` " +
+            "an `array`, `$merge` a `map`; anything else is a 400. See the `FieldOperation` schema.",
         operationId: `update${schemaName}`,
         parameters: [
-            { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" }
+            { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" },
+            shared.ifMatchHeader,
+            shared.preferHeader,
+            {
+                name: "Idempotency-Key",
+                in: "header",
+                required: false,
+                schema: { type: "string" },
+                description:
+                    "Names this update so a retry replays its answer instead of applying the edit " +
+                    "again. A PATCH is not naturally idempotent — a field operation emphatically is " +
+                    "not — so a retry after a lost response applies it twice."
+            }
         ],
         requestBody: {
             required: true,
@@ -1020,6 +1296,16 @@ function updateOperation(
                 description: "Entity not found",
                 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
             },
+            409: {
+                description: "A request with the same Idempotency-Key is still in flight",
+                content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+            },
+            422: {
+                description: "The Idempotency-Key was already used for a different request",
+                content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+            },
+            ...shared.preconditionFailed,
+            ...shared.minimalResponse,
             ...errorResponses(requireAuth)
         }
     };

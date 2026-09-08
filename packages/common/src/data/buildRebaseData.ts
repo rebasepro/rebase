@@ -1,4 +1,4 @@
-import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type ComputedSortField, type FieldPath, type NonColumnFieldPath, type SearchMatch, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, type UpdateValues, type UpsertOptions, SDKQueryBuilderInterface, sortKeyToString, type ComputedSortField, type FieldPath, type NonColumnFieldPath, type SearchMatch, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
 import { collectAllPages, paginateFind, resolveFindWindow } from "./paginate";
@@ -245,11 +245,19 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         },
 
         createMany: driver.saveMany
-            ? async (data: Partial<EntityValues<M>>[], options?: { upsert?: boolean }): Promise<Entity<M>[]> => {
+            ? async (
+                data: Partial<EntityValues<M>>[],
+                options?: { upsert?: boolean; onConflict?: readonly string[] }
+            ): Promise<Entity<M>[]> => {
                 const rows = await driver.saveMany!<M>({
                     path: slug,
                     rows: data,
-                    upsert: options?.upsert
+                    upsert: options?.upsert,
+                    // Dropped here, an `upsert` on a natural key silently
+                    // became an upsert on the primary key — which for a serial
+                    // id is a plain insert, so the re-runnable import the
+                    // option exists for duplicated every row instead.
+                    onConflict: options?.onConflict
                 });
                 return rows.map((row) => rowToEntity<M>(row, slug, getPks()));
             }
@@ -629,10 +637,34 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
             const rows = await snap.createMany(data as Partial<EntityValues<M>>[], options);
             return rows.map(entityToRow);
         },
-        async update(id: string | number, data: Partial<M>): Promise<M> {
+        /**
+         * One row through the bulk path, because the bulk path is where the
+         * conflict target lives.
+         *
+         * `CollectionAccessor` has no single-row upsert and adding one would
+         * mean a second way to say the same thing to the same driver method —
+         * `saveMany` already takes `upsert` and `onConflict`, and a batch of
+         * one is exactly an upsert of one.
+         */
+        async upsert(data: Partial<M>, options?: UpsertOptions): Promise<M> {
+            if (!snap.createMany) {
+                throw new Error(
+                    "Upsert is not supported by this collection's data source: it needs a bulk write, " +
+                    "which this driver does not implement. Fall back to create() or update()."
+                );
+            }
+            const rows = await snap.createMany(
+                [data as Partial<EntityValues<M>>],
+                { upsert: true, onConflict: options?.onConflict }
+            );
+            const row = rows[0];
+            if (!row) throw new Error(`Upsert into "${slug}" returned no row.`);
+            return entityToRow(row);
+        },
+        async update(id: string | number, data: Partial<M> | UpdateValues<Partial<M>>): Promise<M> {
             return entityToRow(await snap.update(id, data as Partial<EntityValues<M>>));
         },
-        async updateMany(updates: { id: string | number; data: Partial<M> }[]): Promise<M[]> {
+        async updateMany(updates: { id: string | number; data: Partial<M> | UpdateValues<Partial<M>> }[]): Promise<M[]> {
             if (!Array.isArray(updates)) {
                 throw new TypeError("updateMany expects an array of { id, data } entries.");
             }
@@ -728,7 +760,10 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         // request per row and could neither be atomic nor upsert. It forwards to
         // the same `/bulk` route the SDK client uses.
         createMany: sdk.createMany
-            ? async (data: Partial<EntityValues<M>>[], options?: { upsert?: boolean }): Promise<Entity<M>[]> => {
+            ? async (
+                data: Partial<EntityValues<M>>[],
+                options?: { upsert?: boolean; onConflict?: readonly string[] }
+            ): Promise<Entity<M>[]> => {
                 const rows = await sdk.createMany!(data as Partial<M>[], options);
                 return rows.map((row) => rowToEntity<M>(row, slug, getPks()));
             }

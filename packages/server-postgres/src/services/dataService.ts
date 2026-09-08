@@ -165,7 +165,7 @@ export class DataService implements DataRepository {
         values: Partial<M>,
         id?: string | number,
         databaseId?: string,
-        options?: { upsert?: boolean }
+        options?: { upsert?: boolean; onConflict?: readonly string[] }
     ): Promise<Record<string, unknown>> {
         return this.persistService.save<M>(collectionPath, values, id, databaseId, options);
     }
