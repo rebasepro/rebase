@@ -49,7 +49,38 @@ export interface UploadFileProps {
      * permanent URL (safe to persist in a database and cache on a CDN).
      * Defaults to `false` (private, short-lived signed URLs).
      */
-    public?: boolean
+    public?: boolean,
+    /**
+     * Which property this file is being uploaded *for* — the collection's slug
+     * and the property path within it (`coverImage`, `meta.avatar`,
+     * `gallery` for an array of files).
+     *
+     * The server reads it to enforce that property's own `storage.maxSize` and
+     * `storage.acceptedFiles`, which were declared per property, published in
+     * the generated types, rendered by the panel's file picker, and until now
+     * enforced by nothing on the server — so a `curl` past the picker put a
+     * 40 MB executable in a bucket whose config said "images, under 200 KB".
+     *
+     * Advisory in one direction only. The rules are resolved from the server's
+     * own registry by slug, so naming a property can make an upload *stricter*
+     * or leave it at the global cap; it can never widen anything.
+     *
+     * Omitted, the upload is checked against the deployment's global
+     * `maxFileSize` exactly as before.
+     */
+    context?: UploadPropertyContext
+}
+
+/**
+ * The property an upload is destined for.
+ *
+ * @group Models
+ */
+export interface UploadPropertyContext {
+    /** The collection's slug, as the server registered it. */
+    collection: string;
+    /** Dotted path to the property — `coverImage`, `meta.avatar`. */
+    property: string;
 }
 
 /**

@@ -19,6 +19,11 @@ import { logger } from "../utils/logger.js";
 import { ApiError } from "../api/errors";
 import { triggerUser } from "./triggers";
 import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError, canonicalStorageId } from "./keys";
+import {
+    assertUploadWithinPropertyLimits,
+    readUploadPropertyContext,
+    type ResolveUploadConstraints
+} from "./property-limits";
 
 /** Metadata for an in-progress resumable upload. */
 interface TusUpload {
@@ -134,7 +139,17 @@ export class TusHandler {
          * and written to disk. Told up front, the refusal costs one request
          * instead of an hour of the customer's bandwidth.
          */
-        private maxFileSize?: number
+        private maxFileSize?: number,
+        /**
+         * The destination property's own `maxSize` / `acceptedFiles`.
+         *
+         * Read from `Upload-Metadata` (`collection` and `property`), which is
+         * where a resumable upload carries everything else about its
+         * destination. Checked at `create`, from the declared `Upload-Length`
+         * and the metadata's content type, so a file the property will not
+         * accept is refused before the first chunk rather than after the last.
+         */
+        private uploadConstraints?: ResolveUploadConstraints
     ) {
         this.tusDir = join(storageBaseDir, ".tus-uploads");
     }
@@ -233,6 +248,22 @@ export class TusHandler {
         }
 
         const metadata = this.parseMetadata(c.req.header("Upload-Metadata") || "");
+
+        // The property's own limits, judged from the declared length and the
+        // metadata's filename/type — before a single chunk is accepted. The
+        // controller's own check runs at finalize, which is an hour of the
+        // customer's bandwidth too late.
+        const uploadContext = readUploadPropertyContext(metadata);
+        if (uploadContext && this.uploadConstraints) {
+            assertUploadWithinPropertyLimits(
+                this.uploadConstraints(uploadContext.collection, uploadContext.property),
+                {
+                    size: uploadLength,
+                    type: metadata.filetype || metadata.contentType,
+                    name: metadata.filename || metadata.key
+                }
+            );
+        }
 
         const id = randomUUID();
 

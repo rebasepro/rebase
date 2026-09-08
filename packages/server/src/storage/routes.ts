@@ -15,6 +15,11 @@ import { StorageController, type StorageAuthorize, type StorageAuthorizeData, ty
 import { LocalStorageController } from "./LocalStorageController";
 import { UnknownStorageSourceError, type StorageRegistry } from "./storage-registry";
 import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
+import {
+    assertUploadWithinPropertyLimits,
+    readUploadPropertyContext,
+    type ResolveUploadConstraints
+} from "./property-limits";
 import { objectValidators, isNotModified, applyCacheHeaders, buildEntityTag } from "./cache-headers";
 import { parseRange, contentRange, unsatisfiableContentRange } from "./range";
 import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTokenAuth, fileTokenAuth, publicObjectAuth } from "../auth/middleware";
@@ -207,6 +212,18 @@ export interface StorageRoutesConfig {
      * controller's check runs at finalize, after every byte is on disk.
      */
     maxFileSize?: number;
+    /**
+     * Per-property upload limits, looked up by collection slug and property
+     * path — `StorageConfig.maxSize` and `StorageConfig.acceptedFiles`.
+     *
+     * The global `maxFileSize` above is a ceiling for the *endpoint*; these are
+     * the rules a particular property declared, and until now the only thing
+     * enforcing them was the browser's file picker. See `property-limits.ts`.
+     *
+     * Omitted, or handed a request with no property context, uploads fall back
+     * to the global cap exactly as before.
+     */
+    uploadConstraints?: ResolveUploadConstraints;
     /**
      * When provided, storage routes delegate auth to this adapter instead
      * of the built-in JWT module. This mirrors how data routes use
@@ -645,6 +662,20 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const bucket = canonicalBucketOrBadRequest(typeof body["bucket"] === "string" ? body["bucket"] : undefined);
 
         const finalKey = canonicalKeyOrBadRequest(key || uploadedFile.name || "unnamed");
+
+        // Before authorization and before a byte is stored. The property the
+        // file is destined for declares its own `maxSize` and `acceptedFiles`,
+        // and until now only the browser's file picker read them — so a `curl`
+        // past the picker put whatever it liked in the avatar bucket. Absent
+        // context leaves the global cap in charge, which is what every existing
+        // client relies on.
+        const uploadContext = readUploadPropertyContext(body as Record<string, unknown>);
+        if (uploadContext && config.uploadConstraints) {
+            assertUploadWithinPropertyLimits(
+                config.uploadConstraints(uploadContext.collection, uploadContext.property),
+                { size: uploadedFile.size, type: uploadedFile.type, name: uploadedFile.name }
+            );
+        }
 
         // Extract custom metadata from request body
         const metadata: Record<string, unknown> = {};
@@ -1133,7 +1164,12 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             : undefined,
         // What this deployment accepts, so the resumable path refuses a file
         // that is too large at creation rather than after receiving it.
-        config.maxFileSize
+        config.maxFileSize,
+        // And what the destination *property* accepts. A limit enforced on
+        // `POST /upload` alone would leave the resumable route as the way
+        // around it — which is exactly how the global cap came to be missing
+        // from this path in the first place.
+        config.uploadConstraints
     );
     tusHandler.startCleanup();
 
