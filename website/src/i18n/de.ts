@@ -1,9 +1,9 @@
 export const de = {
   "hero.badge": "Open-Source · Überall deploybar · Postgres-nativ",
-  "hero.title.part1": "Das Postgres, das du schon hast.",
-  "hero.title.part2": "Das Backend, das du immer wolltest.",
+  "hero.title.part1": "Die meisten Backends sind heute fünf zusammengeflickte Dienste.",
+  "hero.title.part2": "Rebase ist ein Programm auf dem Postgres, das du schon hast.",
   "hero.subtitle":
-    "Verbinde es mit dem Postgres, das du schon betreibst. REST, ein typisiertes SDK, Realtime und Auth erscheinen — und jede Zugriffsregel setzt die Datenbank selbst durch.",
+    "Ein Datenbank-Hoster, ein Auth-Anbieter, ein Storage-Bucket, eine Functions-Runtime und ein Admin-Panel. Rebase ist stattdessen ein einziger Prozess: REST, ein typisiertes SDK, Realtime, Auth, Storage und Functions auf deiner eigenen Datenbank, und jede Zugriffsregel setzt Postgres selbst durch.",
   "hero.cta.demo": "Demo testen",
 
   "rlscheck.title": "Glaub uns das nicht einfach.",
