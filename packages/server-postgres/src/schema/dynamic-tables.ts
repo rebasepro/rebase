@@ -140,12 +140,13 @@ function scalarBuilder(udtName: string, name: string, col: TableColumn): PgColum
         case "timetz":
             return time(name, { withTimezone: true });
         // `mode: "string"`, both of them, because that is what the generated
-        // module declared for every `date` property and therefore what every
-        // client, the OpenAPI document and the admin's view model have always
-        // been served: an ISO string. Drizzle's default mode is `date`, which
-        // hands back a `Date` — the same instant, a different wire value, and a
-        // difference that would have appeared only on the read path of a
-        // project that changed nothing.
+        // module declared for every `date` property: the value Postgres sent,
+        // untouched. Drizzle's default mode is `date`, which parses it into a
+        // `Date` — the same instant in a different shape, and a difference that
+        // would have appeared only on the read path of a project that changed
+        // nothing. (`parsePropertyFromServer` normalises either shape to an ISO
+        // string for a declared `date` property, so what a REST caller sees is
+        // the same; a raw `db.select()` is where the two differ.)
         case "timestamp":
             return timestamp(name, { mode: "string" });
         case "timestamptz":
