@@ -18,13 +18,18 @@
  * the same {@link sharedRelationName} — only built against tables read back from
  * `information_schema` rather than against a file.
  */
-import { relations, type Relations } from "drizzle-orm";
+import { getTableColumns, relations, type Relations } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
 import { fieldKeyForColumn, getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 
 import { sharedRelationName } from "./relation-names";
+
+/** A collection's table, with any schema prefix stripped — as the DDL creates it. */
+export function bareTableName(name: string): string {
+    return name.includes(".") ? name.split(".").pop()! : name;
+}
 
 /**
  * The field key a collection's rows are addressed by, as the generated module
@@ -43,10 +48,23 @@ function primaryKeyFieldKey(collection: CollectionConfig): string {
     return "id";
 }
 
-/** A column of a built table, or `undefined` when the catalogue has no such key. */
+/**
+ * A column of a built table, by its Drizzle key or by its column name.
+ *
+ * The key is the answer in the ordinary case, and the name is the fallback for
+ * the one place a caller holds a column and not a field: a junction table's two
+ * foreign keys, which are keyed by column *unless* the project also declares a
+ * collection over that table, in which case they are keyed by its property
+ * names. Looking both up costs a scan of one table and removes the difference.
+ */
 function columnOf(table: PgTable | undefined, key: string): unknown {
     if (!table) return undefined;
-    return (table as unknown as Record<string, unknown>)[key];
+    const direct = (table as unknown as Record<string, unknown>)[key];
+    if (direct) return direct;
+    for (const column of Object.values(getTableColumns(table))) {
+        if ((column as { name?: unknown })?.name === key) return column;
+    }
+    return undefined;
 }
 
 interface OneSpec {
@@ -92,7 +110,7 @@ export function buildDrizzleRelationsFromCollections(
 
     const byTable = new Map<string, CollectionConfig>();
     for (const collection of collections) {
-        const table = getTableName(collection);
+        const table = bareTableName(getTableName(collection));
         if (table && tables[table]) byTable.set(table, collection);
     }
 
@@ -109,7 +127,7 @@ export function buildDrizzleRelationsFromCollections(
                 logger.debug(`[schema] Relation ${collection.slug}.${relationKey} has no resolvable target`, { error: err });
                 continue;
             }
-            const targetTableName = getTableName(target);
+            const targetTableName = bareTableName(getTableName(target));
             const targetTable = tables[targetTableName];
             const name = sharedRelationName(relation, collection);
 
@@ -155,9 +173,7 @@ export function buildDrizzleRelationsFromCollections(
                 }
 
                 case "manyToMany": {
-                    const junctionName = relation.through.table.includes(".")
-                        ? relation.through.table.split(".").pop()!
-                        : relation.through.table;
+                    const junctionName = bareTableName(relation.through.table);
                     const junction = tables[junctionName];
                     if (!junction) continue;
                     if (!claim(tableName, name, relation.kind)) continue;
@@ -188,7 +204,7 @@ export function buildDrizzleRelationsFromCollections(
             } catch {
                 continue;
             }
-            const targetTableName = getTableName(target);
+            const targetTableName = bareTableName(getTableName(target));
             const targetTable = tables[targetTableName];
             if (!targetTable) continue;
 
@@ -265,8 +281,8 @@ function addJunctionSides(
     claim: (table: string, name: string, kind: string) => boolean
 ): void {
     const junction = tables[junctionName];
-    const sourceTable = tables[getTableName(sourceCollection)];
-    const targetTable = tables[getTableName(targetCollection)];
+    const sourceTable = tables[bareTableName(getTableName(sourceCollection))];
+    const targetTable = tables[bareTableName(getTableName(targetCollection))];
     if (!junction || !sourceTable || !targetTable) return;
 
     const sourceName = sharedRelationName(relation, sourceCollection);
@@ -276,7 +292,7 @@ function addJunctionSides(
     // synthesized one.
     const inverse = Object.values(resolveCollectionRelations(targetCollection))
         .find(r => r.kind === "manyToMany"
-            && (r.through.table.split(".").pop() === junctionName));
+            && bareTableName(r.through.table) === junctionName);
     const targetName = inverse
         ? sharedRelationName(inverse, targetCollection)
         : `${junctionName}_${relation.through.targetColumn}`;

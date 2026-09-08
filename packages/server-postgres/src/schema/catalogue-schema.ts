@@ -29,15 +29,10 @@ import { CollectionConfig } from "@rebasepro/types";
 import { fieldKeyForColumn, getTableName, resolveJunctionSpecs } from "@rebasepro/common";
 
 import { buildDrizzleRelationsFromSchema, buildDrizzleTablesFromSchema, type ColumnKeyResolver } from "./dynamic-tables";
-import { buildDrizzleRelationsFromCollections } from "./config-relations";
+import { bareTableName, buildDrizzleRelationsFromCollections } from "./config-relations";
 import { introspectSchema, type Queryable } from "./introspect-runtime";
 import type { TableMeta } from "./introspect-db-logic";
 import { searchColumnNames } from "./search-column";
-
-/** A collection's table, with any schema prefix stripped — as the DDL creates it. */
-export function bareTableName(name: string): string {
-    return name.includes(".") ? name.split(".").pop()! : name;
-}
 
 /** The Postgres schema a collection's table lives in. */
 export function schemaOfCollection(collection: CollectionConfig, fallback: string): string {

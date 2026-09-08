@@ -25,6 +25,7 @@ import { fieldKeyForColumn, getTableName } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 
 import type { TableMeta } from "./introspect-db-logic";
+import { bareTableName } from "./config-relations";
 
 export type SchemaDifferenceKind =
     | "missing-table"
@@ -167,7 +168,7 @@ export function diffGeneratedSchemaAgainstCatalogue(options: {
     const collectionByTable = new Map<string, CollectionConfig>();
     for (const collection of collections) {
         const table = getTableName(collection);
-        if (table) collectionByTable.set(table.includes(".") ? table.split(".").pop()! : table, collection);
+        if (table) collectionByTable.set(bareTableName(table), collection);
     }
 
     const differences: SchemaDifference[] = [];
