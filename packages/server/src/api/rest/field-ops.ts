@@ -1,4 +1,4 @@
-import { CollectionConfig, FieldOperation, Property } from "@rebasepro/types";
+import { CollectionConfig, FieldOperation, FIELD_OPERATORS, isFieldOperation, Property } from "@rebasepro/types";
 import { ApiError } from "../errors";
 
 /**
@@ -24,9 +24,6 @@ import { ApiError } from "../errors";
  * @module
  */
 
-/** Every operator the write path understands. */
-export const FIELD_OPERATORS = ["$inc", "$push", "$pull", "$merge"] as const;
-
 export type FieldOperator = typeof FIELD_OPERATORS[number];
 
 /** One parsed operation: which operator, and what it was given. */
@@ -50,19 +47,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Whether a value is *trying* to be a field operation.
+ * Whether a value is *trying* to be a field operation, misspellings included.
  *
- * Any `$`-prefixed key makes it one — including a misspelled operator. That is
- * the point: `{ $increment: 1 }` silently stored as a jsonb document on a
- * number column is the failure mode this exists to make impossible, so an
- * attempted operation that is not a legal one has to be an error rather than a
- * value. No collection can declare a column whose value legitimately begins its
- * only key with `$`, because a `map` property's sub-keys are declared and `$`
- * is not a valid identifier in the DDL generators.
+ * That is the point: `{ $increment: 1 }` silently stored as a jsonb document on
+ * a number column is the failure mode this module exists to make impossible, so
+ * an attempted operation that is not a legal one has to be an error rather than
+ * a value. The predicate itself lives in `@rebasepro/types` beside the operator
+ * list, because the offline queue has to recognise one too and cannot import
+ * this package.
  */
-export function looksLikeFieldOp(value: unknown): boolean {
-    return isPlainObject(value) && Object.keys(value).some((key) => key.startsWith("$"));
-}
+export const looksLikeFieldOp = isFieldOperation;
 
 /** True when any value in the payload is (or is attempting to be) an operation. */
 export function hasFieldOps(values: Record<string, unknown> | undefined): boolean {
@@ -217,3 +211,4 @@ export function assertNoFieldOpsOnCreate(
 
 /** Re-exported so callers type against one definition of the wire shape. */
 export type { FieldOperation };
+export { FIELD_OPERATORS };

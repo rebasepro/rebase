@@ -29,6 +29,10 @@ jest.mock("@rebasepro/server", () => ({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     assertWriteRequestValid: require("../../server/src/api/rest/write-validation").assertWriteRequestValid,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    assertFieldOpsValid: require("../../server/src/api/rest/field-ops").assertFieldOpsValid,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    splitFieldOps: require("../../server/src/api/rest/field-ops").splitFieldOps,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     ApiError: require("../../server/src/api/errors").ApiError
 }));
 
@@ -163,6 +167,33 @@ describe("a write over the socket meets the same rules as a write over HTTP", ()
         await send(save({ age: 30, handle: "ada" }));
 
         expect(saved).toHaveLength(1);
+    });
+
+    it("refuses a field operation the property type does not define", async () => {
+        // The other half of the parity claim, on the feature added after it:
+        // `PATCH` answers 400 for `$push` on a number, and this door has to
+        // agree. The operators themselves reach the driver either way — they
+        // are compiled in `PersistService`, which both doors go through — so
+        // without this check the socket would *accept* the illegal one and
+        // fail on a Postgres type error inside the transaction.
+        const { ws, send } = connect();
+
+        await send(save({ age: { $push: 1 } }));
+
+        expect(saved).toEqual([]);
+        expect(lastFrame(ws)).toMatchObject({
+            type: "ERROR",
+            payload: { error: { code: "INVALID_FIELD_OPERATION" } }
+        });
+    });
+
+    it("passes a legal field operation through to the driver", async () => {
+        const { send } = connect();
+
+        await send(save({ age: { $inc: 1 } }));
+
+        expect(saved).toHaveLength(1);
+        expect(saved[0]).toMatchObject({ values: { age: { $inc: 1 } } });
     });
 
     it("says nothing about a path the registry does not know", async () => {

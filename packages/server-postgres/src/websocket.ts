@@ -8,7 +8,7 @@ import type { User } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, ApiError } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, ApiError } from "@rebasepro/server";
 import { logger } from "@rebasepro/server";
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
@@ -404,6 +404,15 @@ roles: verifiedUser.roles }
                     const collection = driver.registry?.getCollectionByPath(path);
                     if (!collection) return;
                     assertWriteRequestValid(values as Record<string, unknown>, collection);
+                    // Field operations (`{ views: { $inc: 1 } }`) reach the
+                    // driver through this door exactly as they reach it through
+                    // `PATCH`, and are compiled to SQL in the same place. What
+                    // the REST route adds is the type check — `$push` on a
+                    // number is a 400 naming the field, not a Postgres error
+                    // from inside the transaction — so the socket runs it too,
+                    // or the same payload is refused at one boundary and
+                    // accepted at the other.
+                    assertFieldOpsValid(values as Record<string, unknown>, collection);
                 };
 
                 // Helper to get correctly scoped delegate for the current request

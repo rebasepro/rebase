@@ -652,6 +652,43 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
  *
  * @group Data
  */
+/**
+ * The operator names, as a value.
+ *
+ * A runtime list beside the type because three layers have to *recognise* an
+ * operation, not just accept one: the REST validator, the driver that compiles
+ * it, and the offline queue that must refuse to apply one locally. Three copies
+ * of four strings is three chances for one of them to miss an operator added to
+ * the other two, and the failure is silent in the worst direction — an
+ * unrecognised marker is written to the column as a JSON document.
+ *
+ * @group Data
+ */
+export const FIELD_OPERATORS = ["$inc", "$push", "$pull", "$merge"] as const;
+
+/**
+ * Whether a value is *trying* to be a field operation — including a misspelled
+ * one, which is the case worth catching.
+ *
+ * Any `$`-prefixed key counts. No collection can declare a column whose value
+ * legitimately has a single key beginning with `$`: a `map` property's sub-keys
+ * are declared, and `$` is not valid in the identifiers the DDL generators emit.
+ *
+ * @group Data
+ */
+export function isFieldOperation(value: unknown): boolean {
+    return typeof value === "object"
+        && value !== null
+        && !Array.isArray(value)
+        && !(value instanceof Date)
+        && Object.keys(value).some((key) => key.startsWith("$"));
+}
+
+/** True when any value in a write payload is (or is attempting to be) one. @group Data */
+export function hasFieldOperation(values: Record<string, unknown> | undefined): boolean {
+    return !!values && Object.values(values).some(isFieldOperation);
+}
+
 export type FieldOperation =
     /** Add to a `number` column; negative to subtract. `SET col = col + n`. */
     | { $inc: number }
@@ -801,6 +838,23 @@ export interface WriteOptions {
      * use a row the server never sent.
      */
     returning?: boolean;
+
+    /**
+     * The version of the row this write was made against, so it is refused if
+     * the row has moved on.
+     *
+     * The `ETag` from the read that produced the row — `etagOf(row)` on a row
+     * from `findById`, or the `ETag` response header. A mismatch answers `412`
+     * rather than writing, which is the difference between "update the row I
+     * read" and "overwrite whatever is there now". Without it a read, an edit
+     * and a write is last-writer-wins over everything the write did not send,
+     * and the loser is told nothing.
+     *
+     * `"*"` asserts only that the row exists.
+     *
+     * Honoured on `update` and `delete`.
+     */
+    ifMatch?: string;
 }
 
 export interface SDKCollectionClient<

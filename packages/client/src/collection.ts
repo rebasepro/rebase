@@ -1,4 +1,4 @@
-import { buildQueryString, FindParams, RebaseApiError, Transport } from "./transport";
+import { buildQueryString, FindParams, RebaseApiError, Transport, type ResponseMeta } from "./transport";
 import { RebaseWebSocketClient } from "./websocket";
 import {
     FindAllParams,
@@ -10,6 +10,8 @@ import {
     WhereFilterOp,
     WhereValueFor,
     WriteOptions,
+    type UpdateValues,
+    type UpsertOptions,
     isUnsupported,
     unsupportedMethod,
     type ComputedSortField,
@@ -57,6 +59,74 @@ function inflightCountsFor(transport: Transport): Map<string, Promise<number>> {
         inflightCounts.set(transport, map);
     }
     return map;
+}
+
+/**
+ * Where a fetched row's version is kept.
+ *
+ * Non-enumerable, so it does not appear in `Object.keys`, in `JSON.stringify`,
+ * in a spread into an update body, or in the generated `Row` type — a row's
+ * version is a fact about the *response*, not a column, and putting it in the
+ * row proper would mean the server having to strip it back off every write.
+ *
+ * A string key rather than a symbol so it survives the structured clone an
+ * offline store or a worker boundary does… which it does not, and that is the
+ * honest position: an etag is per-read, and a row that has been through a cache
+ * has not been read from the server. `etagOf` answers `undefined` there, and a
+ * conditional write without a tag is an unconditional one.
+ */
+const ETAG_KEY = "__etag";
+
+/**
+ * The version of a row, when it came straight from a read that reported one.
+ *
+ * ```ts
+ * const post = await client.data.posts.get(1);
+ * await client.data.posts.update(1, { title: "New" }, { ifMatch: etagOf(post) });
+ * ```
+ *
+ * `undefined` for a row from `find()` (a list response carries one ETag at
+ * most, and it would not be this row's), from the offline cache, or from a
+ * server that does not send them. Passing `undefined` as `ifMatch` sends no
+ * precondition, so the call above degrades to an ordinary update rather than
+ * failing — which is the right default, and the reason to read this at the call
+ * site where the choice is visible.
+ */
+export function etagOf(row: unknown): string | undefined {
+    if (!row || typeof row !== "object") return undefined;
+    const value = (row as Record<string, unknown>)[ETAG_KEY];
+    return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * The headers a write's options ask for.
+ *
+ * One function rather than a spread at each call site: the three headers are
+ * easy to add to one method and forget on the next, which is exactly how single
+ * `PATCH` and `DELETE` came to send an `Idempotency-Key` the server never read
+ * and `delete()` came to have no options at all.
+ */
+function writeHeaders(options?: WriteOptions): { headers: Record<string, string> } | undefined {
+    const headers: Record<string, string> = {};
+    if (options?.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
+    if (options?.ifMatch) headers["If-Match"] = options.ifMatch;
+    // A preference, not an instruction: the server answers `Preference-Applied`
+    // when it honoured it, and the methods below read the body they get rather
+    // than assuming a 204.
+    if (options?.returning === false) headers["Prefer"] = "return=minimal";
+    return Object.keys(headers).length > 0 ? { headers } : undefined;
+}
+
+/** Attach a version to a row without making it part of the row. */
+function withETag<T>(row: T, etag: string | undefined): T {
+    if (!etag || !row || typeof row !== "object") return row;
+    Object.defineProperty(row, ETAG_KEY, {
+        value: etag,
+        enumerable: false,
+        configurable: true,
+        writable: true
+    });
+    return row;
 }
 
 /**
@@ -173,9 +243,14 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
 
         async findById(id: string | number) {
             try {
-                const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, { method: "GET" });
+                const meta: ResponseMeta = {};
+                const raw = await transport.request<Record<string, unknown>>(
+                    `${basePath}/${encodeURIComponent(String(id))}`,
+                    { method: "GET" },
+                    meta
+                );
                 if (!raw) return undefined;
-                return raw as M;
+                return withETag(raw as M, meta.etag);
             } catch (err) {
                 if (err instanceof RebaseApiError && err.status === 404) {
                     return undefined;
@@ -206,14 +281,34 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             const raw = await transport.request<Record<string, unknown>>(basePath, {
                 method: "POST",
                 body: JSON.stringify(body),
-                ...(options?.idempotencyKey
-                    ? { headers: { "Idempotency-Key": options.idempotencyKey } }
-                    : {})
+                ...writeHeaders(options)
             });
             return raw as M;
         },
 
-        async createMany(data: Partial<M>[], options?: { upsert?: boolean } & WriteOptions) {
+        /**
+         * Insert, or replace the row already occupying the conflict target.
+         *
+         * One statement server-side (`INSERT ... ON CONFLICT DO UPDATE`), so
+         * unlike a `findById` followed by `create`-or-`update` it cannot lose
+         * the race between the two.
+         */
+        async upsert(data: Partial<M>, options?: UpsertOptions) {
+            const query = options?.onConflict?.length
+                ? `?on_conflict=${encodeURIComponent(options.onConflict.join(","))}`
+                : "";
+            const raw = await transport.request<Record<string, unknown>>(`${basePath}${query}`, {
+                method: "POST",
+                body: JSON.stringify(data),
+                ...writeHeaders(options)
+            });
+            return raw as M;
+        },
+
+        async createMany(
+            data: Partial<M>[],
+            options?: { upsert?: boolean; onConflict?: readonly string[] } & WriteOptions
+        ) {
             if (!Array.isArray(data)) {
                 throw new TypeError("createMany expects an array of records.");
             }
@@ -223,12 +318,16 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 method: "POST",
                 body: JSON.stringify({
                     rows: data,
-                    ...(options?.upsert ? { upsert: true } : {})
+                    ...(options?.upsert ? { upsert: true } : {}),
+                    ...(options?.onConflict?.length ? { onConflict: options.onConflict } : {})
                 }),
-                ...(options?.idempotencyKey
-                    ? { headers: { "Idempotency-Key": options.idempotencyKey } }
-                    : {})
+                ...writeHeaders(options)
             });
+            // With `returning: false` the server answers the ids rather than
+            // the rows, and those are not `M`. Handing back `[]` is the honest
+            // answer to "you said you did not want them": the alternative is a
+            // typed array of objects that have one field.
+            if (options?.returning === false) return [];
             return (raw.data || []) as M[];
         },
 
@@ -241,18 +340,19 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
          * and the route now name one verb, and a spec-validating gateway in
          * front of the API sees the operation the server actually implements.
          */
-        async update(id: string | number, data: Partial<M>, options?: WriteOptions) {
+        async update(id: string | number, data: Partial<M> | UpdateValues<Partial<M>>, options?: WriteOptions) {
             const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
                 method: "PATCH",
                 body: JSON.stringify(data),
-                ...(options?.idempotencyKey
-                    ? { headers: { "Idempotency-Key": options.idempotencyKey } }
-                    : {})
+                ...writeHeaders(options)
             });
             return raw as M;
         },
 
-        async updateMany(updates: { id: string | number; data: Partial<M> }[], options?: WriteOptions) {
+        async updateMany(
+            updates: { id: string | number; data: Partial<M> | UpdateValues<Partial<M>> }[],
+            options?: WriteOptions
+        ) {
             if (!Array.isArray(updates)) {
                 throw new TypeError("updateMany expects an array of { id, data } entries.");
             }
@@ -261,16 +361,21 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             const raw = await transport.request<{ data: Record<string, unknown>[] }>(`${basePath}/bulk`, {
                 method: "PATCH",
                 body: JSON.stringify({ updates }),
-                ...(options?.idempotencyKey
-                    ? { headers: { "Idempotency-Key": options.idempotencyKey } }
-                    : {})
+                ...writeHeaders(options)
             });
+            if (options?.returning === false) return [];
             return (raw.data || []) as M[];
         },
 
-        async delete(id: string | number) {
+        async delete(id: string | number, options?: WriteOptions) {
             await transport.request<void>(`${basePath}/${encodeURIComponent(String(id))}`, {
-                method: "DELETE"
+                method: "DELETE",
+                // The only write on this surface that took no options at all,
+                // so the one mutation a retry cannot make safe on its own — a
+                // replayed delete answers 404, which an offline queue reads as
+                // permanent failure — was also the one that could not carry a
+                // key or a precondition.
+                ...writeHeaders(options)
             });
         },
 
@@ -294,9 +399,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             await transport.request<void>(`${basePath}/bulk/delete`, {
                 method: "POST",
                 body: JSON.stringify({ ids }),
-                ...(options?.idempotencyKey
-                    ? { headers: { "Idempotency-Key": options.idempotencyKey } }
-                    : {})
+                ...writeHeaders(options)
             });
         },
 

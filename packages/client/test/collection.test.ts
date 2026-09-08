@@ -164,7 +164,9 @@ title: "Test" });
             const result = await client.findById("123");
             expect(result).toEqual({ id: "123",
 title: "Test" });
-            expect(mockRequest).toHaveBeenCalledWith("/data/posts/123", { method: "GET" });
+            // The third argument is the out-parameter `findById` reads the
+            // row's ETag from; see `etagOf`.
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/123", { method: "GET" }, expect.any(Object));
         });
 
         it("returns undefined when backend returns falsy", async () => {
@@ -181,7 +183,7 @@ title: "Test" });
 title: "Encoded" });
 
             await client.findById("a/b");
-            expect(mockRequest).toHaveBeenCalledWith("/data/posts/a%2Fb", { method: "GET" });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/a%2Fb", { method: "GET" }, expect.any(Object));
         });
 
         it("handles numeric IDs by converting to string", async () => {
@@ -190,7 +192,7 @@ title: "Encoded" });
 title: "Numeric" });
 
             await client.findById(42);
-            expect(mockRequest).toHaveBeenCalledWith("/data/posts/42", { method: "GET" });
+            expect(mockRequest).toHaveBeenCalledWith("/data/posts/42", { method: "GET" }, expect.any(Object));
         });
     });
 

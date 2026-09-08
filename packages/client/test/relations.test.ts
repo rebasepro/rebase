@@ -453,7 +453,7 @@ author: null });
         mockRequest.mockResolvedValueOnce({ id: "a/b",
 title: "E" });
         await c.findById("a/b");
-        expect(mockRequest).toHaveBeenCalledWith("/data/posts/a%2Fb", { method: "GET" });
+        expect(mockRequest).toHaveBeenCalledWith("/data/posts/a%2Fb", { method: "GET" }, expect.any(Object));
     });
     /**
      * LIMITATION, not a contract: `findById(id)` takes no params, so there is
