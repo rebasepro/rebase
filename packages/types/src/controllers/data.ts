@@ -1,7 +1,7 @@
 import type { VectorSearchParams } from "./data_driver";
 import type { ComputedSortField, SearchMatch } from "../types/search";
 import { Entity, EntityValues } from "../types/entities";
-import { WhereFilterOp, FieldPath, NonColumnFieldPath, FilterValues, OrderBySpec, RelationAggregateSort } from "../types/filter-operators";
+import { WhereFilterOp, FieldPath, NonColumnFieldPath, FilterValues, NullsPlacement, OrderBySpec, RelationAggregateSort } from "../types/filter-operators";
 
 /**
  * The element type of an array column, and the column's own type otherwise.
@@ -66,8 +66,24 @@ export type WhereValueFor<Op extends WhereFilterOp, T> =
                     ? null | undefined
                     : T | null;
 
+/**
+ * A group of conditions combined with `and`, `or`, or negated with `not`.
+ *
+ * ## `not`
+ *
+ * `not` negates the **conjunction** of its `conditions`: `not(a)` is `NOT a`,
+ * and `not(a, b)` is `NOT (a AND b)`. One rule, stated here and applied
+ * identically by the wire codec (`or(...)`/`and(...)`/`not(...)` in
+ * `@rebasepro/common`), the REST `?not=` parameter and every driver compiler,
+ * so a negation means the same thing whichever end writes it.
+ *
+ * Negation is not expressible by inverting the operators inside the group: SQL
+ * three-valued logic makes `NOT (a AND b)` and `(NOT a) OR (NOT b)` differ the
+ * moment a NULL is involved, and only one of them is what the caller wrote. It
+ * compiles to a real `NOT (...)`.
+ */
 export interface LogicalCondition {
-    type: "and" | "or";
+    type: "and" | "or" | "not";
     conditions: (FilterCondition | LogicalCondition)[];
 }
 
@@ -76,6 +92,73 @@ export interface FilterCondition {
     operator: WhereFilterOp;
     value: unknown;
 }
+
+/**
+ * How one relation is loaded by {@link FindParams.include}.
+ *
+ * `true` loads the relation whole. The object form narrows it — the same four
+ * knobs a top-level query has, applied to the rows *inside* one relation — and
+ * `include` nests, so a query can ask for "each post's five newest published
+ * comments, each with its author" in one request.
+ *
+ * ```ts
+ * include: {
+ *   comments: {
+ *     limit: 5,
+ *     where: { published: ["==", true] },
+ *     orderBy: ["created_at", "desc"],
+ *     include: { author: true }
+ *   }
+ * }
+ * ```
+ *
+ * Nesting is bounded at {@link MAX_INCLUDE_DEPTH} hops. Each hop is another
+ * batched query, and the bound is what stops one request from walking a
+ * self-referencing relation forever.
+ *
+ * @group Data
+ */
+export interface IncludeOptions {
+    /** Rows to load per parent row. Applied per parent, not across the page. */
+    limit?: number;
+    /** Filter the related rows, in the same dialect as {@link FindParams.where}. */
+    where?: FilterValues<string>;
+    /** An `and`/`or`/`not` group over the related rows. */
+    logical?: LogicalCondition;
+    /** Sort the related rows. */
+    orderBy?: OrderBySpec<string>;
+    /** Columns of the *related* row to return. `id` is always included. */
+    fields?: string[];
+    /** Relations of the related row to load in turn. */
+    include?: IncludeSpec;
+}
+
+/**
+ * The relations a read loads, as a list of (possibly dotted) names or as a
+ * tree.
+ *
+ * - `["author", "comments.author"]` — a dotted path is the same thing as the
+ *   nested object form, spelled flat. It is what the REST `?include=` parameter
+ *   carries, and the two forms compile to the same request.
+ * - `["*"]` — every relation, one hop deep. The admin panel's shape.
+ * - `{ comments: { limit: 5, include: { author: true } } }` — the parametrised
+ *   form.
+ *
+ * A name that is not a relation of the collection is a **400
+ * `UNKNOWN_RELATION`**, not a silent omission: a read that quietly drops an
+ * `include` answers 200 with the field missing, which is indistinguishable from
+ * a row that genuinely has no related row.
+ *
+ * @group Data
+ */
+export type IncludeSpec = string[] | Record<string, true | IncludeOptions>;
+
+/**
+ * Hops an {@link IncludeSpec} may nest. `comments.author` is two.
+ *
+ * @group Data
+ */
+export const MAX_INCLUDE_DEPTH = 3;
 
 /**
  * Parameters for querying a collection.
@@ -159,13 +242,62 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      */
     orderBy?: OrderBySpec<FieldPath<M> | ComputedSortField>;
     /**
-     * Relations to include in the response.
+     * Relations to load into the response — see {@link IncludeSpec}.
      *
-     * Deliberately `string[]` and not checked against `M`: a relation name
-     * comes from the collection's `relations`, not from its columns, so nothing
-     * in a generated row type can validate one.
+     * Not checked against `M` here: a relation name comes from the collection's
+     * `relations`, not from its columns, so nothing in a *hand-written* row type
+     * can validate one. A **generated** `Database` narrows this to the
+     * collection's actual relation keys, recursively — see `rebase codegen`.
+     *
+     * An unknown name is a 400 `UNKNOWN_RELATION`. It used to be ignored.
      */
-    include?: string[];
+    include?: IncludeSpec;
+
+    /**
+     * Columns to return, instead of all of them.
+     *
+     * A real column projection: only these columns are read from the database,
+     * so a query that needs two fields of a wide row does not pay for the rest.
+     * `excludeFromApi` still applies — naming such a column here does not
+     * un-hide it — and the primary key is always returned, because a row that
+     * cannot be addressed cannot be updated, deleted or paged past.
+     *
+     * A relation named in {@link FindParams.include} is loaded regardless of
+     * whether it appears here; use {@link IncludeOptions.fields} to narrow the
+     * columns *within* an included relation.
+     */
+    fields?: string[];
+
+    /**
+     * Collapse rows that are identical over the columns being returned.
+     *
+     * `SELECT DISTINCT` over the projection — so it is only meaningful
+     * alongside {@link FindParams.fields}, and with the primary key in the
+     * projection (which it always is) every row is already distinct. Pair it
+     * with `fields` naming the columns you actually want the distinct values of.
+     *
+     * `meta.total` counts distinct rows too, so a distinct listing's `hasMore`
+     * describes the set it is paging.
+     */
+    distinct?: boolean;
+
+    /**
+     * Continue from where a previous page ended — keyset ("seek") pagination.
+     *
+     * The value is the opaque `meta.nextCursor` of the previous response. It
+     * encodes the sort keys the query was ordered by and the last row's values
+     * for them, so a page picks up strictly after the last row served rather
+     * than at a row *count* that concurrent writes have already moved.
+     *
+     * It has to describe the same query: `after` alongside a different
+     * `orderBy` is a 400 `CURSOR_ORDER_MISMATCH` rather than a page of rows
+     * seeked in an order nobody asked for. Mutually exclusive with `offset` and
+     * `page` for the same reason.
+     *
+     * Multi-key sorts and nullable keys both work — the comparison is built
+     * over every key, in order, with the NULL placement the sort declared.
+     */
+    after?: string;
     /**
      * Text search string, AND-ed with `where`/`logical`. This is the value
      * behind the query builder's `.search()` method.
@@ -351,6 +483,14 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
      */
     count?(params?: FindParams<M>): Promise<number>;
 
+    /**
+     * {@link SDKCollectionClient.aggregate}. Optional here for the same reason
+     * `count` is: not every data source can compute one, and the SDK wraps an
+     * absent implementation in a stub that says so rather than returning a
+     * number nothing counted.
+     */
+    aggregate?(params: AggregateParams<M>): Promise<AggregateRow[]>;
+
     // Fluent Query Builder
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): QueryBuilderInterface<M>;
     where(logicalCondition: LogicalCondition): QueryBuilderInterface<M>;
@@ -389,6 +529,20 @@ export interface PaginationMeta {
     limit: number;
     offset: number;
     hasMore: boolean;
+    /**
+     * The opaque cursor that continues this listing — pass it back as
+     * {@link FindParams.after}.
+     *
+     * Present whenever there is a next page to describe (`hasMore` is true and
+     * the page returned at least one row). Absent on the last page, and absent
+     * on a query no cursor can describe (relevance ordering, whose scores are
+     * computed per query and are not comparable between two of them).
+     *
+     * Opaque on purpose: it encodes the sort keys *and* the last row's values
+     * for them, and a client that parsed it would be depending on an encoding
+     * that exists to be changed.
+     */
+    nextCursor?: string;
 }
 
 /**
@@ -451,6 +605,65 @@ export type QueryComputedFields = {
      */
     _distance?: number;
 };
+
+/**
+ * One aggregate a query asks for.
+ *
+ * `count` alone counts rows; every other function names a column, and `count`
+ * with a column counts its non-NULL values.
+ *
+ * The result key is derived rather than chosen: `sum(total)` comes back as
+ * `sum_total` and a bare `count()` as `count`. Letting a caller name it would
+ * mean checking their name is not also a `groupBy` field — a rule nobody would
+ * guess, and a silently overwritten value if it went unchecked.
+ *
+ * @group Data
+ */
+export type AggregateSelect<M extends Record<string, unknown> = Record<string, unknown>> =
+    | { fn: "count"; field?: Extract<keyof M, string> }
+    | { fn: "sum" | "avg" | "min" | "max"; field: Extract<keyof M, string> };
+
+/**
+ * One row of an aggregate result: the `groupBy` columns, plus one key per
+ * {@link AggregateSelect} under its derived alias.
+ *
+ * `count`, `sum` and `avg` arrive as numbers — Postgres returns bigint and
+ * numeric as strings, and they are parsed once at the driver rather than by
+ * every caller. `min`/`max` keep the column's own type.
+ *
+ * @group Data
+ */
+export type AggregateRow = Record<string, unknown>;
+
+/**
+ * What {@link SDKCollectionClient.aggregate} takes: the same narrowing a
+ * `find()` takes, minus the parts of it that describe a *page* of rows.
+ *
+ * `limit` survives and means what it means on the REST route — a bound on the
+ * number of **groups**, because grouping by a high-cardinality column is a whole
+ * table's worth of rows in one response. It is ignored when there is no
+ * `groupBy`, since an ungrouped aggregate is one row.
+ *
+ * `orderBy`, `include`, `after` and the rest are absent on purpose: an
+ * aggregate has no rows to sort, no relations to load and no page to continue.
+ * They were silently ignored on the REST route; here they do not typecheck.
+ *
+ * @group Data
+ */
+export interface AggregateParams<M extends Record<string, unknown> = Record<string, unknown>> {
+    /** The aggregates to compute. At least one. */
+    select: AggregateSelect<M>[];
+    /** Columns to group by. Omit for a single row over everything that matches. */
+    groupBy?: Extract<keyof M, string>[];
+    /** Filter conditions, as {@link FindParams.where}. */
+    where?: FilterValues<FieldPath<M>>;
+    /** An `and`/`or`/`not` group, AND-ed with `where`. */
+    logical?: LogicalCondition;
+    /** Text search, AND-ed with the filters. */
+    searchString?: string;
+    /** Most groups to return. Ignored without `groupBy`. */
+    limit?: number;
+}
 
 /**
  * Which column an iteration seeks on, for keyset ("seek") pagination.
@@ -565,7 +778,11 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
      * Sort by a column, a relation or JSON path, `_score`, or an aggregate over
      * a to-many relation — the same key set {@link FindParams.orderBy} takes.
      */
-    orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction?: "asc" | "desc"): this;
+    orderBy(
+        column: FieldPath<M> | ComputedSortField | RelationAggregateSort,
+        direction?: "asc" | "desc",
+        nulls?: NullsPlacement
+    ): this;
     limit(count: number): this;
     offset(count: number): this;
     search(searchString: string, options?: { explain?: boolean }): this;
@@ -584,8 +801,29 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
         vector: number[],
         options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
     ): this;
-    include(...relations: string[]): this;
+    /**
+     * Load relations — names, dotted paths (`"comments.author"`), or the
+     * parametrised tree. Repeated calls merge rather than replace.
+     */
+    include(...relations: (string | IncludeSpec)[]): this;
+    /**
+     * Return only these columns. A real projection: the columns are what is
+     * read from the database, not what survives a trim of the response.
+     */
+    fields(...columns: (FieldPath<M> | string)[]): this;
+    /** `SELECT DISTINCT` over the projection — see {@link FindParams.distinct}. */
+    distinct(enabled?: boolean): this;
+    /** Continue after a previous page's `meta.nextCursor`. */
+    after(cursor: string): this;
     find(): Promise<FindResult<M>>;
+    /**
+     * Aggregate the rows this query matches instead of returning them.
+     *
+     * The builder's `where`/`logical`/`search` narrow which rows are
+     * aggregated; its `orderBy`, `include` and window do not apply and are
+     * ignored, exactly as they are on the REST route.
+     */
+    aggregate(params: Omit<AggregateParams<M>, "where" | "logical" | "searchString">): Promise<AggregateRow[]>;
 
     /**
      * Page through everything this query matches, one row at a time.
@@ -964,12 +1202,42 @@ export interface SDKCollectionClient<
      */
     count(params?: FindParams<M>): Promise<number>;
 
+    /**
+     * `count`/`sum`/`avg`/`min`/`max` over the matching rows, optionally
+     * grouped — the SDK half of `GET /<collection>/aggregate`.
+     *
+     * The whole point is not to fetch rows in order to reduce them: "revenue by
+     * status" over a million orders is one query and one row per status here,
+     * and a `findAll()` plus a loop everywhere else — which is wrong under a
+     * `limit` and unaffordable without one. It runs through the same
+     * request-scoped handle as every other read, so RLS applies to the rows
+     * being aggregated.
+     *
+     * ```ts
+     * const rows = await rebase.data.orders.aggregate({
+     *     select: [{ fn: "sum", field: "total" }, { fn: "count" }],
+     *     groupBy: ["status"],
+     *     where: { created_at: [">=", startOfMonth] }
+     * });
+     * // [{ status: "paid", sum_total: 41822.5, count: 317 }, …]
+     * ```
+     *
+     * Always present; a backend whose driver cannot aggregate answers 501
+     * naming the capability rather than an empty result set, which would read
+     * as "nothing matched".
+     */
+    aggregate(params: AggregateParams<M>): Promise<AggregateRow[]>;
+
     // Fluent Query Builder
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): SDKQueryBuilderInterface<M>;
     /** A relation path (`author.name`) or a JSON path (`metadata->>tier`). */
     where(column: NonColumnFieldPath, operator: WhereFilterOp, value: unknown): SDKQueryBuilderInterface<M>;
     where(logicalCondition: LogicalCondition): SDKQueryBuilderInterface<M>;
-    orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction?: "asc" | "desc"): SDKQueryBuilderInterface<M>;
+    orderBy(
+        column: FieldPath<M> | ComputedSortField | RelationAggregateSort,
+        direction?: "asc" | "desc",
+        nulls?: NullsPlacement
+    ): SDKQueryBuilderInterface<M>;
     limit(count: number): SDKQueryBuilderInterface<M>;
     offset(count: number): SDKQueryBuilderInterface<M>;
     search(searchString: string, options?: { explain?: boolean }): SDKQueryBuilderInterface<M>;
@@ -983,7 +1251,13 @@ export interface SDKCollectionClient<
         vector: number[],
         options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
     ): SDKQueryBuilderInterface<M>;
-    include(...relations: string[]): SDKQueryBuilderInterface<M>;
+    include(...relations: (string | IncludeSpec)[]): SDKQueryBuilderInterface<M>;
+    /** {@link SDKQueryBuilderInterface.fields} */
+    fields(...columns: (FieldPath<M> | string)[]): SDKQueryBuilderInterface<M>;
+    /** {@link SDKQueryBuilderInterface.distinct} */
+    distinct(enabled?: boolean): SDKQueryBuilderInterface<M>;
+    /** {@link SDKQueryBuilderInterface.after} */
+    after(cursor: string): SDKQueryBuilderInterface<M>;
 }
 
 /**

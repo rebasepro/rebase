@@ -401,7 +401,53 @@ describe("pattern-matching and null operators", () => {
 
     it("normalizes null-operator values back to null on deserialize", () => {
         expect(deserializeFilter({ deleted_at: "isnull.null" })).toEqual({ deleted_at: ["is-null", null] });
-        expect(deserializeFilter({ published_at: "notnull.anything" })).toEqual({ published_at: ["is-not-null", null] });
+        // The spellings a null test actually has. `notnull.true` is what a hand
+        // written filter says; both mean "is not null".
+        expect(deserializeFilter({ published_at: "notnull.null" })).toEqual({ published_at: ["is-not-null", null] });
+        expect(deserializeFilter({ published_at: "notnull.true" })).toEqual({ published_at: ["is-not-null", null] });
+    });
+
+    /**
+     * The arity rule in `deserializeSingle`: an operator's name is only an
+     * operator when what follows it is an operand that operator has.
+     */
+    describe("a value whose first segment names an operator", () => {
+        it("stays a value when a list operator has no list", () => {
+            // The reported case. This used to compile to `status IN ('progress')`
+            // — a filter nobody wrote, matching the wrong rows.
+            expect(deserializeFilter({ status: "in.progress" })).toEqual({ status: ["==", "in.progress"] });
+            expect(deserializeFilter({ status: "nin.review" })).toEqual({ status: ["==", "nin.review"] });
+            expect(deserializeFilter({ tags: "csa.urgent" })).toEqual({ tags: ["==", "csa.urgent"] });
+        });
+
+        it("stays a value when a null operator is given an operand", () => {
+            expect(deserializeFilter({ reason: "notnull.reason" }))
+                .toEqual({ reason: ["==", "notnull.reason"] });
+            expect(deserializeFilter({ note: "isnull.yesterday" }))
+                .toEqual({ note: ["==", "isnull.yesterday"] });
+        });
+
+        it("is the operator when the operand is well-formed for it", () => {
+            expect(deserializeFilter({ status: "in.(draft,review)" }))
+                .toEqual({ status: ["in", ["draft", "review"]] });
+            expect(deserializeFilter({ deleted_at: "isnull.null" }))
+                .toEqual({ deleted_at: ["is-null", null] });
+            // A scalar operator's operand is unconstrained, so this one *is* a
+            // LIKE — see the docblock. Naming the operator (`eq.`) is how the
+            // literal is written, and it is what `serializeFilter` emits.
+            expect(deserializeFilter({ status: "like.that" }))
+                .toEqual({ status: ["like", "that"] });
+            expect(deserializeFilter({ status: "eq.like.that" }))
+                .toEqual({ status: ["==", "like.that"] });
+        });
+
+        it("round-trips a value that starts with an operator name", () => {
+            // What the SDK sends. The ambiguity never reaches the wire because
+            // the serializer always names the operator.
+            const original = { status: ["==", "in.progress"] } as const;
+            expect(deserializeFilter(serializeFilter(original as never) as Record<string, unknown>))
+                .toEqual(original);
+        });
     });
 
     it("round-trips null operators", () => {

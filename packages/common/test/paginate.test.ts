@@ -1,6 +1,7 @@
 import { buildSdkData } from "../src/data/buildRebaseData";
+import { decodeCursor, encodeCursor } from "../src/data/cursor";
 import { RebasePaginationError } from "../src/data/paginate";
-import { DataDriver, FetchCollectionProps, RebaseSdkData, SDKCollectionClient } from "@rebasepro/types";
+import { DataDriver, FetchCollectionProps, OrderByTuple, RebaseSdkData, SDKCollectionClient } from "@rebasepro/types";
 
 /**
  * `iterate()` / `findAll()` on the **in-process** accessor — `rebase.data.*`
@@ -147,28 +148,55 @@ describe("in-process accessor pagination", () => {
         expect((all[0] as Record<string, unknown>).values).toBeUndefined();
     });
 
-    it("cursor mode seeks with a where clause instead of an offset", async () => {
-        const calls: FetchCollectionProps[] = [];
-        const TOTAL = 3;
-        /** Rows strictly after the cursor the caller sent, if any. */
-        const remaining = (filter: unknown): Row[] => {
-            const seek = (filter as Record<string, [string, number]> | undefined)?.id;
-            const after = seek ? seek[1] : 0;
-            return rows(1, TOTAL).filter((r) => r.id > after);
+    /**
+     * A driver that seeks the way the real one does: it is handed a
+     * `startAfter` decoded from the cursor *it* issued, and it issues cursors
+     * through the shared codec.
+     *
+     * The walk no longer builds a keyset of its own — it used to express one as
+     * an extra `where`, which threw on any multi-key sort and dropped every row
+     * whose sort value was NULL. So what these tests assert is the handoff:
+     * `meta.nextCursor` out, `after` back in, `startAfter` at the driver.
+     */
+    function createSeekingDriver(total: number, calls: FetchCollectionProps[] = []): DataDriver {
+        // Rows carry every column the sorts below key on: a cursor is only
+        // issued when the last row has a value for each sort key, which is what
+        // stops a cursor being handed out that the next request would refuse.
+        const remaining = (startAfter: unknown): Row[] => {
+            const after = (startAfter as { id?: number } | undefined)?.id ?? 0;
+            return rows(1, total)
+                .map((r) => ({ ...r, name: `job-${r.id}` }))
+                .filter((r) => r.id > after);
         };
-        const driver = {
-            fetchCollection: jest.fn(async (props: FetchCollectionProps) => {
-                calls.push(props);
-                return remaining(props.filter).slice(0, props.limit ?? 20);
+        // A driver exposing a `restFetchService` reads through it — that is the
+        // published contract, and `find()` uses it in preference to
+        // `fetchCollection` so the in-process accessor and the HTTP API serve
+        // the same row shape.
+        const fetchService = {
+            fetchCollectionForRest: jest.fn(async (_path: string, options: FetchCollectionProps) => {
+                calls.push(options);
+                return remaining(options.startAfter).slice(0, options.limit ?? 20);
             }),
+            fetchOneForRest: jest.fn(),
+            cursorFor: (_path: string, row: Record<string, unknown>, orderBy?: OrderByTuple[]) =>
+                encodeCursor(orderBy, row, row.id)
+        };
+        return {
+            fetchCollection: jest.fn(),
             fetchOne: jest.fn(),
             save: jest.fn(),
             delete: jest.fn(),
-            // A real count applies the same filter, so once the cursor has moved
-            // the total is the number of rows *left* — which is what makes
-            // `hasMore` truthful in cursor mode.
-            count: jest.fn(async ({ filter }: { filter?: unknown }) => remaining(filter).length)
+            // A real count applies the same narrowing, so once the cursor has
+            // moved the total is the number of rows *left* — which is what
+            // makes `hasMore` truthful in cursor mode.
+            count: jest.fn(async ({ startAfter }: { startAfter?: unknown }) => remaining(startAfter).length),
+            restFetchService: fetchService
         } as unknown as DataDriver;
+    }
+
+    it("cursor mode seeks with the server's cursor instead of an offset", async () => {
+        const calls: FetchCollectionProps[] = [];
+        const driver = createSeekingDriver(3, calls);
 
         const seen: number[] = [];
         for await (const row of jobsOf(buildSdkData(driver)).iterate({ pageSize: 2, cursor: "id" })) {
@@ -178,16 +206,54 @@ describe("in-process accessor pagination", () => {
         expect(seen).toEqual([1, 2, 3]);
         expect(calls).toHaveLength(2);
         expect(calls[0].offset).toBeUndefined();
+        expect(calls[0].startAfter).toBeUndefined();
         expect(calls[0].orderBy).toEqual([["id", "asc"]]);
-        // The second page seeks past the last row it saw.
-        expect(calls[1].filter).toMatchObject({ id: [">", 2] });
+        // The second page seeks past the last row it saw, through the cursor
+        // the first page's `meta` carried — not through a `where` of its own.
+        expect(calls[1].startAfter).toMatchObject({ id: 2 });
+        expect(calls[1].filter).toBeUndefined();
         expect(calls[1].offset).toBeUndefined();
     });
 
-    it("cursor mode refuses a cursor that disagrees with orderBy", async () => {
+    /**
+     * The case the old single-column keyset refused outright
+     * (`cursor-order-mismatch`, "keyset pagination advances along a single
+     * column"). Seeking follows whatever the query is sorted by now, because
+     * the comparison is the driver's and it is built over every key.
+     */
+    it("cursor mode walks a multi-key sort instead of refusing it", async () => {
+        const calls: FetchCollectionProps[] = [];
+        const driver = createSeekingDriver(3, calls);
+
+        const seen: number[] = [];
+        for await (const row of jobsOf(buildSdkData(driver)).iterate({
+            pageSize: 2,
+            cursor: "id",
+            orderBy: [["name", "asc"], ["id", "desc"]]
+        })) {
+            seen.push(row.id as number);
+        }
+
+        expect(seen).toEqual([1, 2, 3]);
+        // The caller's sort is honoured whole, and the cursor carries both keys.
+        expect(calls[0].orderBy).toEqual([["name", "asc"], ["id", "desc"]]);
+        expect(decodeCursor(nextCursorOf(driver, 2)).orderBy)
+            .toEqual([["name", "asc"], ["id", "desc"]]);
+    });
+
+    /** The cursor a driver would issue for row `id`, for asserting its contents. */
+    function nextCursorOf(driver: DataDriver, id: number): string {
+        const cursorFor = driver.restFetchService?.cursorFor;
+        return cursorFor!("jobs", { id, name: `job-${id}` }, [["name", "asc"], ["id", "desc"]])!;
+    }
+
+    it("says so when the server reports another page but issues no cursor", async () => {
+        // Exactly what a relevance-ordered listing does: `hasMore` is true and
+        // no cursor can describe the page, because a `_score` is computed per
+        // query and is not stored anywhere to compare against.
         const data = buildSdkData(createPagedDriver(5));
         await expect((async () => {
-            for await (const _row of jobsOf(data).iterate({ cursor: "id", orderBy: ["name", "asc"] })) { /* drain */ }
-        })()).rejects.toMatchObject({ code: "cursor-order-mismatch" });
+            for await (const _row of jobsOf(data).iterate({ cursor: "id", pageSize: 2 })) { /* drain */ }
+        })()).rejects.toMatchObject({ code: "cursor-missing" });
     });
 });

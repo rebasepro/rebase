@@ -5,6 +5,8 @@ export * from "./data/buildRoutedRebaseData";
 export * from "./data/resolveDataSource";
 export * from "./data/query_builder";
 export * from "./data/paginate";
+export * from "./data/cursor";
+export * from "./data/include-spec";
 export * from "./data/filter-conditions";
 export * from "./data/filter-dialect";
 export * from "./data/sort-dialect";
