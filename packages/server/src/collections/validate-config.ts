@@ -238,7 +238,7 @@ const BASE_PROPERTY_KEYS = [
  * every type, so a key added to the admin block later cannot be added here too.
  */
 const PROPERTY_KEYS_BY_TYPE = {
-    string: ["columnType", "isId", "enum", "storage", "userSelect", "email", "url"],
+    string: ["columnType", "isId", "enum", "storage", "userSelect", "email", "url", "autoValue"],
     number: ["columnType", "isId", "enum"],
     boolean: [],
     date: ["columnType", "mode", "timezone", "autoValue"],
