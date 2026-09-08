@@ -17,6 +17,7 @@ import {
     RebaseData,
     RebaseSdkData,
     RestFetchService,
+    BatchWriteProps,
     SaveManyProps,
     SaveProps,
     StorageSource,
@@ -40,7 +41,7 @@ import { deriveRowAddress } from "./services/collection-helpers";
 import { resolveSoftDelete } from "./services/soft-delete";
 import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
-import { ApiError, logger } from "@rebasepro/server";
+import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { isRoleSwitchingPermissionError } from "./utils/pg-error-utils";
 import { applyAuthContext } from "./security/rls-enforcement";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
@@ -733,7 +734,8 @@ export class PostgresBackendDriver implements DataDriver {
                                                             values,
                                                             collection,
                                                             status,
-                                                            upsert
+                                                            upsert,
+                                                            onConflict
                                                         }: SaveProps<M>): Promise<Record<string, unknown>> {
 
         const {
@@ -870,7 +872,7 @@ export class PostgresBackendDriver implements DataDriver {
                 updatedValues,
                 id,
                 resolvedCollection?.databaseId,
-                { upsert }
+                { upsert, onConflict }
             );
 
             if (savedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
@@ -1061,24 +1063,30 @@ export class PostgresBackendDriver implements DataDriver {
      * Rows are applied in order, so a batch that touches the same key twice ends
      * with the last write winning, exactly as separate calls would.
      */
+    private bindToTransaction(tx: DrizzleClient): PostgresBackendDriver {
+        // Bind the whole batch to the transaction handle. Without this the rows
+        // would be written through `this.db` and survive a rollback.
+        const txDriver = new PostgresBackendDriver(
+            tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
+        );
+        txDriver.dataService = new DataService(tx, this.registry);
+        txDriver.client = this.client;
+        // Carry the caller's notification batching through, so a bulk write
+        // nested in an outer transaction still holds its events until commit.
+        txDriver._deferNotifications = this._deferNotifications;
+        txDriver._pendingNotifications = this._pendingNotifications;
+        return txDriver;
+    }
+
     async saveMany<M extends Record<string, unknown>>({
                                                           path,
                                                           rows,
                                                           collection,
-                                                          upsert
+                                                          upsert,
+                                                          onConflict
                                                       }: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
         return this.db.transaction(async (tx) => {
-            // Bind the whole batch to the transaction handle. Without this the
-            // rows would be written through `this.db` and survive a rollback.
-            const txDriver = new PostgresBackendDriver(
-                tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
-            );
-            txDriver.dataService = new DataService(tx, this.registry);
-            txDriver.client = this.client;
-            // Carry the caller's notification batching through, so a bulk write
-            // nested in an outer transaction still holds its events until commit.
-            txDriver._deferNotifications = this._deferNotifications;
-            txDriver._pendingNotifications = this._pendingNotifications;
+            const txDriver = this.bindToTransaction(tx);
 
             const saved: Record<string, unknown>[] = [];
 
@@ -1097,7 +1105,8 @@ export class PostgresBackendDriver implements DataDriver {
                         // Callers who want existing rows overwritten pass `upsert`.
                         collection,
                         status: "new",
-                        upsert
+                        upsert,
+                        onConflict
                     }));
                 } catch (error) {
                     // One bad row in ten thousand is impossible to find from a
@@ -1140,13 +1149,7 @@ export class PostgresBackendDriver implements DataDriver {
         collection
     }: UpdateManyProps<M>): Promise<Record<string, unknown>[]> {
         return this.db.transaction(async (tx) => {
-            const txDriver = new PostgresBackendDriver(
-                tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
-            );
-            txDriver.dataService = new DataService(tx, this.registry);
-            txDriver.client = this.client;
-            txDriver._deferNotifications = this._deferNotifications;
-            txDriver._pendingNotifications = this._pendingNotifications;
+            const txDriver = this.bindToTransaction(tx);
 
             const saved: Record<string, unknown>[] = [];
 
@@ -1211,13 +1214,7 @@ export class PostgresBackendDriver implements DataDriver {
         hard
     }: DeleteManyProps<M>): Promise<void> {
         await this.db.transaction(async (tx) => {
-            const txDriver = new PostgresBackendDriver(
-                tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
-            );
-            txDriver.dataService = new DataService(tx, this.registry);
-            txDriver.client = this.client;
-            txDriver._deferNotifications = this._deferNotifications;
-            txDriver._pendingNotifications = this._pendingNotifications;
+            const txDriver = this.bindToTransaction(tx);
 
             for (let i = 0; i < ids.length; i++) {
                 const id = ids[i];
@@ -1257,6 +1254,138 @@ export class PostgresBackendDriver implements DataDriver {
                     );
                 }
             }
+        });
+    }
+
+    /**
+     * A mixed list of writes across collections, as one unit of work.
+     *
+     * Same transaction, same tx-bound sub-driver and same per-entry error
+     * labelling as {@link saveMany} — deliberately the same plumbing rather
+     * than a second copy of it, because the three ways this could drift
+     * (notifications not deferred, the sub-driver not bound, an error losing
+     * its status) are all silent.
+     *
+     * The one thing this adds is `$ref`. An operation may name itself, and a
+     * later one may stand a `{ "$ref": "order.id" }` where a value goes; the
+     * substitution happens here because inside the transaction is the only
+     * place the row the reference points at exists. Backward references only —
+     * the REST layer refuses a forward one before the transaction opens, so a
+     * body that cannot work never costs a rollback.
+     */
+    async batchWrite<M extends Record<string, unknown>>({
+        operations
+    }: BatchWriteProps<M>): Promise<(Record<string, unknown> | null)[]> {
+        return this.db.transaction(async (tx) => {
+            const txDriver = this.bindToTransaction(tx);
+
+            const results: (Record<string, unknown> | null)[] = [];
+            /** What each named operation wrote, for the `$ref`s after it. */
+            const named = new Map<string, Record<string, unknown>>();
+
+            for (let i = 0; i < operations.length; i++) {
+                const operation = operations[i];
+                try {
+                    const values = operation.values
+                        ? resolveBatchRefs(operation.values, named) as Partial<EntityValues<M>>
+                        : undefined;
+                    const rawId = operation.id !== undefined
+                        ? resolveBatchRefs(operation.id, named)
+                        : undefined;
+                    const id = rawId === undefined || rawId === null ? undefined : String(rawId);
+
+                    let row: Record<string, unknown> | null = null;
+                    switch (operation.op) {
+                        case "create":
+                            row = await txDriver.save<M>({
+                                path: operation.path,
+                                values: values ?? ({} as Partial<EntityValues<M>>),
+                                collection: operation.collection,
+                                status: "new"
+                            });
+                            break;
+                        case "upsert":
+                            row = await txDriver.save<M>({
+                                path: operation.path,
+                                values: values ?? ({} as Partial<EntityValues<M>>),
+                                collection: operation.collection,
+                                status: "new",
+                                upsert: true,
+                                onConflict: operation.onConflict
+                            });
+                            break;
+                        case "update": {
+                            // Read first, so an id matching no row is a 404
+                            // rather than an UPDATE that matches nothing and
+                            // reports success — the same rule `updateMany` and
+                            // the single-row route both apply.
+                            const existing = await txDriver.fetchOne({
+                                path: operation.path,
+                                id: id!,
+                                collection: operation.collection as CollectionConfig
+                            });
+                            if (!existing) {
+                                throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
+                                    statusCode: 404,
+                                    code: "NOT_FOUND"
+                                });
+                            }
+                            row = await txDriver.save<M>({
+                                path: operation.path,
+                                id: id!,
+                                values: values ?? ({} as Partial<EntityValues<M>>),
+                                collection: operation.collection,
+                                status: "existing"
+                            });
+                            break;
+                        }
+                        case "delete": {
+                            const existing = await txDriver.fetchOne({
+                                path: operation.path,
+                                id: id!,
+                                collection: operation.collection as CollectionConfig
+                            });
+                            if (!existing) {
+                                throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
+                                    statusCode: 404,
+                                    code: "NOT_FOUND"
+                                });
+                            }
+                            await txDriver.delete<M>({
+                                row: {
+                                    id: id!,
+                                    path: operation.path,
+                                    values: existing as Partial<EntityValues<M>>
+                                },
+                                collection: operation.collection
+                            });
+                            row = null;
+                            break;
+                        }
+                    }
+
+                    if (operation.ref && row) named.set(operation.ref, row);
+                    results.push(row);
+                } catch (error) {
+                    // Which operation, as the bulk methods say which row: a
+                    // batch mixes collections, so "the batch failed" does not
+                    // even say which table to go and look at.
+                    throw Object.assign(
+                        new Error(
+                            `Operation ${i} of ${operations.length} (${operation.op} on "${operation.path}") failed: `
+                            + `${(error as Error)?.message ?? error}`,
+                            { cause: error }
+                        ),
+                        {
+                            statusCode: (error as { statusCode?: number })?.statusCode,
+                            code: (error as { code?: string })?.code,
+                            name: (error as Error)?.name
+                        }
+                    );
+                }
+            }
+
+            return results;
         });
     }
 
@@ -2021,6 +2150,38 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
      */
     async saveMany<M extends Record<string, unknown>>(props: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
         return this.withTransaction((delegate) => delegate.saveMany(props));
+    }
+
+    /**
+     * Present for the same reason `saveMany` is, and absent until now.
+     *
+     * Every request that reaches the REST layer is served by *this* class — the
+     * base driver never sees one — and the routes ask `if (!driver.updateMany)`
+     * before doing anything. So `PATCH /api/data/<c>/bulk` and
+     * `POST /api/data/<c>/bulk/delete` answered `BULK_UNSUPPORTED` on Postgres,
+     * the one backend that implements them, for every authenticated caller.
+     * The methods existed one class down and nothing forwarded to them.
+     */
+    async updateMany<M extends Record<string, unknown>>(props: UpdateManyProps<M>): Promise<Record<string, unknown>[]> {
+        return this.withTransaction((delegate) => delegate.updateMany(props));
+    }
+
+    async deleteMany<M extends Record<string, unknown>>(props: DeleteManyProps<M>): Promise<void> {
+        return this.withTransaction((delegate) => delegate.deleteMany(props));
+    }
+
+    /**
+     * One transaction, one RLS context, every collection the batch touches.
+     *
+     * The whole point is that it runs as the caller: a batch that dropped to
+     * the base driver would write across collections with row-level security
+     * switched off, which is the opposite of what a cross-collection write
+     * needs.
+     */
+    async batchWrite<M extends Record<string, unknown>>(
+        props: BatchWriteProps<M>
+    ): Promise<(Record<string, unknown> | null)[]> {
+        return this.withTransaction((delegate) => delegate.batchWrite(props));
     }
 
     async delete<M extends Record<string, unknown>>(props: DeleteProps<M>): Promise<void> {

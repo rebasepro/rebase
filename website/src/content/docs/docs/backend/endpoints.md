@@ -46,6 +46,7 @@ list. `:slug` is a collection's `slug`.
 | `POST` | `/api/data/:slug/bulk` | RLS | Insert many rows, optionally upserting — [REST API](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/bulk` | RLS | Update many rows by id — [REST API](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/bulk/delete` | RLS | Delete many rows by id — [REST API](/docs/backend/api/) |
+| `POST` | `/api/data/_batch` | RLS | Write across collections in one transaction — [Writing over REST](/docs/backend/writes/#cross-collection-batches) |
 | `GET` | `/api/data/:slug/:id/history` | RLS | [Entity History](/docs/backend/history/) |
 | `POST` | `/api/data/:slug/:id/history/:historyId/revert` | RLS | [Entity History](/docs/backend/history/) |
 

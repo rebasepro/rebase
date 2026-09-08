@@ -25,7 +25,8 @@ import {
     resolveNestedPath,
     type NestedPathHop
 } from "./nested-path";
-import { ApiError, logger } from "@rebasepro/server";
+import { ApiError, logger, splitFieldOps } from "@rebasepro/server";
+import { compileFieldOps } from "./field-op-sql";
 import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, isRowLevelSecurityDenial } from "../utils/pg-error-utils";
 import { explainZeroRowWrite } from "./write-denial";
 
@@ -179,17 +180,24 @@ export class PersistService {
      * Save an row (create or update)
      *
      * With `options.upsert`, the row is written with INSERT ... ON CONFLICT DO
-     * UPDATE against the primary key rather than a plain UPDATE. That is one
-     * statement, so it cannot lose a race the way a read-then-write can, and it
-     * does not care whether the row already exists — which is what a re-runnable
-     * import needs.
+     * UPDATE rather than a plain UPDATE. That is one statement, so it cannot
+     * lose a race the way a read-then-write can, and it does not care whether
+     * the row already exists — which is what a re-runnable import needs. The
+     * conflict is matched on the primary key unless `options.onConflict` names
+     * other columns; see {@link SaveProps.onConflict} for why that matters.
+     *
+     * `values` may carry field operations (`{ views: { $inc: 1 } }`). They are
+     * split out here rather than at the REST boundary because every request
+     * boundary — HTTP, the WebSocket, in-process `context.data` — reaches this
+     * one method, and a rule applied at one door is a rule the other doors do
+     * not have. What they compile to is `field-op-sql.ts`.
      */
     async save<M extends Record<string, unknown>>(
         collectionPath: string,
         values: Partial<M>,
         id?: string | number,
         databaseId?: string,
-        options?: { upsert?: boolean }
+        options?: { upsert?: boolean; onConflict?: readonly string[] }
     ): Promise<Record<string, unknown>> {
         // If saving under a nested relation path, resolve the relation it ends in.
         let effectiveCollectionPath = collectionPath;
@@ -275,9 +283,38 @@ export class PersistService {
             returningKeys[info.fieldName] = field;
         });
 
+        // Operations on the stored value, held back from every step below:
+        // `serializeDataToServer` would read `{ $inc: 1 }` on a number column
+        // as a value to coerce, and `sanitizeAndConvertDates` would hand the
+        // marker object to the column as data.
+        const { values: plainValues, fieldOps } = splitFieldOps(effectiveValues as Record<string, unknown>);
+        const fieldOpKeys = Object.keys(fieldOps);
+        if (fieldOpKeys.length > 0) {
+            // An operation describes a change to a value that is already
+            // stored, so there is nothing for it to act on here. Saying so is
+            // the whole point: `views + 1` over a row being inserted is just
+            // `1`, and accepting it would make `$inc` mean two different things
+            // depending on a race the caller cannot observe.
+            if (!id) {
+                throw ApiError.badRequest(
+                    `Field operations (${fieldOpKeys.map(k => `'${k}'`).join(", ")}) need an existing row to act on, ` +
+                    `and this write to "${effectiveCollectionPath}" is an insert. Send the value itself instead.`,
+                    "INVALID_FIELD_OPERATION"
+                );
+            }
+            if (options?.upsert) {
+                throw ApiError.badRequest(
+                    `Field operations (${fieldOpKeys.map(k => `'${k}'`).join(", ")}) cannot be combined with an upsert: ` +
+                    "an upsert may insert, and there would be no stored value to operate on. " +
+                    "Use an update, or send the value itself.",
+                    "INVALID_FIELD_OPERATION"
+                );
+            }
+        }
+
         // Separate relations that require special handling
         const relationValues: Record<string, unknown> = {};
-        const otherValues: Partial<M> = { ...effectiveValues };
+        const otherValues: Partial<M> = { ...(plainValues as Partial<M>) };
         const resolvedRelations = resolveCollectionRelations(collection);
 
         for (const key in resolvedRelations) {
@@ -305,6 +342,18 @@ export class PersistService {
             // a key that is not a column is silently left out rather than
             // refused. Say so here, while the key is still in hand.
             assertWritableColumns(entityData as Record<string, unknown>, table, effectiveCollectionPath);
+            // The same check for the operated columns. They never reach
+            // `entityData` — they are SQL, not values — so without this a
+            // `$inc` on a property with no column would be dropped from the
+            // statement and answered 200, which is the silent-write defect
+            // `assertWritableColumns` exists to prevent.
+            if (fieldOpKeys.length > 0) {
+                assertWritableColumns(
+                    Object.fromEntries(fieldOpKeys.map(key => [key, null])),
+                    table,
+                    effectiveCollectionPath
+                );
+            }
 
             savedId = await this.db.transaction(async (tx) => {
                 let currentId: string | number;
@@ -328,8 +377,18 @@ export class PersistService {
                     // When the payload contains only relation data, entityData is
                     // empty after relation stripping and Drizzle throws "No values to set".
                     const scalarKeys = Object.keys(entityData as Record<string, unknown>);
-                    if (scalarKeys.length > 0) {
-                        const updateQuery = tx.update(table).set(entityData as Record<string, unknown>);
+                    // Compiled here, inside the transaction that will run them:
+                    // an operation is an expression over the row's current
+                    // value, so it is only correct while the row is locked by
+                    // the very statement that reads it.
+                    const compiledOps = fieldOpKeys.length > 0
+                        ? compileFieldOps(table, fieldOps, { collectionPath: effectiveCollectionPath })
+                        : undefined;
+                    if (scalarKeys.length > 0 || compiledOps) {
+                        const updateQuery = tx.update(table).set({
+                            ...(entityData as Record<string, unknown>),
+                            ...(compiledOps ?? {})
+                        });
                         const conditions = [];
                         for (const info of idInfoArray) {
                             const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
@@ -364,20 +423,41 @@ export class PersistService {
 
                     const insertQuery = tx.insert(table).values(dataForInsert);
 
-                    // ON CONFLICT needs a real conflict target, and the only one
-                    // guaranteed to exist is the primary key. Without every key
-                    // column present there is nothing to match on, so the row is a
-                    // plain insert and a duplicate should still raise.
-                    const hasFullKey = idInfoArray.length > 0
-                        && idInfoArray.every((info) => dataForInsert[info.fieldName] !== undefined);
+                    // ON CONFLICT needs a real conflict target. The primary key
+                    // is the one guaranteed to exist and is the default; a
+                    // caller may name another column set, which the REST layer
+                    // has already checked carries a uniqueness guarantee (see
+                    // `resolveConflictTarget`). Either way every target column
+                    // must be present in the row, or there is nothing to match
+                    // on — the row is a plain insert and a duplicate should
+                    // still raise.
+                    const targetFields = options?.onConflict && options.onConflict.length > 0
+                        ? [...options.onConflict]
+                        : idInfoArray.map((info) => info.fieldName);
+                    const hasFullKey = targetFields.length > 0
+                        && targetFields.every((field) => dataForInsert[field] !== undefined);
 
                     let result;
                     if (options?.upsert && hasFullKey) {
-                        const target = idInfoArray.map((info) => table[info.fieldName as keyof typeof table] as AnyPgColumn);
+                        const target = targetFields.map((field) => {
+                            const column = table[field as keyof typeof table] as AnyPgColumn | undefined;
+                            if (!column) {
+                                throw ApiError.badRequest(
+                                    `'${field}' is not a column of "${effectiveCollectionPath}", so it cannot be an upsert target.`,
+                                    "INVALID_CONFLICT_TARGET"
+                                );
+                            }
+                            return column;
+                        });
                         const set = { ...dataForInsert };
-                        // Never reassign the key columns to themselves in the UPDATE
-                        // branch; Postgres rejects that against the conflict target.
+                        // Never reassign the target columns to themselves in the
+                        // UPDATE branch; Postgres rejects that against the
+                        // conflict target. The primary key is excluded as well
+                        // when the target is a natural key: a conflict means the
+                        // stored row already has a key, and overwriting it with
+                        // one the caller invented would move the row.
                         for (const info of idInfoArray) delete set[info.fieldName];
+                        for (const field of targetFields) delete set[field];
 
                         // A conflict means the row was already there, so its
                         // `on_create` stamp is a fact about the past and not

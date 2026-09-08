@@ -170,6 +170,24 @@ export * from "./api/errors";
 // driver packages are the other request boundary, and this is the rule they
 // have to apply to be that boundary rather than a way around it.
 export { assertWriteRequestValid } from "./api/rest/write-validation";
+// Same exception, same reason: a field operation arrives on the socket exactly
+// as it arrives on `PATCH`, and the driver that compiles it to SQL needs the
+// one definition of what the operators are rather than a second copy.
+export {
+    FIELD_OPERATORS,
+    assertFieldOpsValid,
+    assertNoFieldOpsOnCreate,
+    hasFieldOps,
+    looksLikeFieldOp,
+    parseFieldOp,
+    splitFieldOps
+} from "./api/rest/field-ops";
+export type { FieldOperator, ParsedFieldOp } from "./api/rest/field-ops";
+// `$ref` resolution runs inside the driver's transaction, because that is the
+// only place the rows earlier operations wrote exist.
+export { BATCH_REF_KEY, resolveBatchRefs } from "./api/rest/batch";
+export { declaredUniqueTargets, resolveConflictTarget } from "./api/rest/conflict-target";
+export { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag, versionProperty } from "./api/rest/etag";
 
 // =============================================================================
 // Email

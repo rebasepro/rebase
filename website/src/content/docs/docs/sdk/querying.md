@@ -78,36 +78,11 @@ Row-level security makes "no such row" and "not yours to read" the same answer,
 deliberately: a 404 that distinguished them would confirm the row exists.
 :::
 
-### Create
+### Writing
 
-```typescript
-const newProduct = await client.data.products.create({
-    name: "New Product",
-    price: 29.99,
-    active: true
-});
-
-// With a specific ID
-const newProduct = await client.data.products.create(
-    { name: "Custom ID Product" },
-    "my-custom-id"
-);
-```
-
-### Update
-
-```typescript
-const updated = await client.data.products.update(42, {
-    name: "Updated Name",
-    price: 39.99
-});
-```
-
-### Delete
-
-```typescript
-await client.data.products.delete(42);
-```
+`create`, `upsert`, `update`, `delete` and their batch forms are on
+**[Writing data](/docs/sdk/writing/)**, along with field operations, conditional
+writes and idempotency keys.
 
 ### Count
 
@@ -119,96 +94,6 @@ const activeCount = await client.data.products.count({
     where: { active: ["==", true] }
 });
 ```
-
-## Batch Writes
-
-Three operations write many rows in a **single request and a single
-transaction**. Every row still runs the normal pipeline — callbacks, relations,
-row-level security — so a batch is not a shortcut past your own rules; the win
-is one round trip and one transaction instead of N of each.
-
-All three are **all-or-nothing**. If any row is rejected, none of them land and
-the error names the offending index.
-
-```typescript
-// Create
-await client.data.products.createMany([
-    { name: "Widget", price: 9.99 },
-    { name: "Gadget", price: 19.99 }
-]);
-
-// Update — each entry names its row and the fields to change
-await client.data.orders.updateMany([
-    { id: "o-1", data: { status: "shipped" } },
-    { id: "o-2", data: { status: "shipped" } }
-]);
-
-// Delete — by id
-await client.data.sessions.deleteMany(["s-1", "s-2"]);
-```
-
-### Why `{ id, data }` rather than flat rows
-
-`createMany` takes flat rows because a row being created *is* its columns.
-`updateMany` names the address separately, because on a table keyed on something
-other than `id` — a `sku`, a composite key — a flat row cannot say whether a
-column is the address or a value to write. This mirrors single-row
-`update(id, data)` exactly.
-
-### Why `deleteMany` takes ids, not a filter
-
-A filter-shaped bulk delete is a different and far more dangerous operation: the
-failure mode is an omitted or mistyped condition emptying a table, and it cannot
-be reviewed at the call site the way an explicit list can. Read first, then pass
-the ids you meant:
-
-```typescript
-const stale = await client.data.sessions.findAll({
-    where: { expiresAt: ["<", cutoff] }
-});
-await client.data.sessions.deleteMany(stale.map(s => s.id as string));
-```
-
-### Retries and duplicates
-
-A client that never sees the response cannot know whether the batch committed,
-so it retries — and without a key the server cannot tell that retry from a
-second genuine batch. Pass an idempotency key on anything that may be resent:
-
-```typescript
-const attemptKey = crypto.randomUUID();
-await client.data.products.createMany(rows, { idempotencyKey: attemptKey });
-```
-
-A key names one request, not a job: it is recorded against the method, the path
-and the body it was sent with. Re-sending that exact request replays its answer;
-the same key on a different request is refused with `IDEMPOTENCY_KEY_REUSED`
-(422). So mint one per call rather than reusing a business id — an `importId`
-shared by the `createMany` and the `deleteMany` of one import would leave the
-delete silently unperformed.
-
-A retry that arrives while the first attempt is still being answered gets
-`IDEMPOTENCY_KEY_IN_PROGRESS` (409): send it again, and it will be answered with
-the first attempt's result once that lands. Keys are honoured for 24 hours, and
-only for a signed-in caller — there is no principal to scope one to otherwise.
-
-The offline queue sets a key automatically on every replay.
-
-### Limits
-
-Batches are capped server-side (1000 rows by default), because one batch holds
-its locks for the whole transaction. Going over is a `BULK_TOO_LARGE` error that
-names both the limit and your row count, so chunk to it:
-
-```typescript
-for (const chunk of chunks(rows, 1000)) {
-    await client.data.products.createMany(chunk, { upsert: true });
-}
-```
-
-A data source that cannot write atomically reports `BULK_UNSUPPORTED` rather
-than quietly looping single writes — which would give you neither the atomicity
-nor the single round trip you reached for a batch to get.
 
 ## Fluent Query Builder
 

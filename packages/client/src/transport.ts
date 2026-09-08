@@ -257,8 +257,30 @@ export function buildQueryString(params?: FindParams): string {
     return parts.length > 0 ? "?" + parts.join("&") : "";
 }
 
+/**
+ * Response metadata a caller can ask for, filled in by `request`.
+ *
+ * An out-parameter rather than a second return value, because every one of the
+ * fifty-odd call sites wants the body and nothing else, and changing the return
+ * shape would mean rewriting all of them to reach past a wrapper. It is also
+ * why this is a third *optional* parameter: a `Transport` stub in a test that
+ * ignores it is still a valid `Transport`.
+ *
+ * Only `ETag` for now, and only because a row's version is not part of the row.
+ * It cannot be: adding it as a column would put it in the generated `Row` type,
+ * in every `find()` result, in the offline cache and in what a caller sends
+ * back on the next write — a field the server would then have to strip. The
+ * header is where HTTP puts it, so the header is where this reads it.
+ */
+export interface ResponseMeta {
+    /** The `ETag` header, when the response carried one. */
+    etag?: string;
+    /** The HTTP status, for a caller that has to tell 200 from 204. */
+    status?: number;
+}
+
 export interface Transport {
-    request: <T = unknown>(path: string, init?: RequestInit) => Promise<T>;
+    request: <T = unknown>(path: string, init?: RequestInit, meta?: ResponseMeta) => Promise<T>;
     setToken: (newToken: string | null) => void;
     setAuthTokenGetter: (getter: () => Promise<string | null>) => void;
     setOnUnauthorized: (handler: () => Promise<boolean>) => void;
@@ -477,7 +499,7 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
         );
     }
 
-    async function request<T = unknown>(path: string, init?: RequestInit): Promise<T> {
+    async function request<T = unknown>(path: string, init?: RequestInit, meta?: ResponseMeta): Promise<T> {
         const url = resolveBaseUrl(config.baseUrl) + apiPath + path;
 
         let activeToken = token;
@@ -503,6 +525,11 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
 
         const res = await fetchFn(url, { ...init,
 headers });
+
+        if (meta) {
+            meta.status = res.status;
+            meta.etag = res.headers?.get?.("ETag") ?? undefined;
+        }
 
         if (res.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
 
@@ -547,6 +574,13 @@ headers });
                 const retryHeaders = getHeaders(retryToken, init) as Record<string, string>;
                 const retryRes = await fetchFn(url, { ...init,
 headers: retryHeaders });
+                // The retry is the response the caller gets, so it is the one
+                // whose metadata describes what they are holding — recording
+                // the 401's would hand back the ETag of an error page.
+                if (meta) {
+                    meta.status = retryRes.status;
+                    meta.etag = retryRes.headers?.get?.("ETag") ?? undefined;
+                }
                 if (retryRes.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
                 const retryText = await retryRes.text().catch(() => "");
                 let retryBody: Record<string, unknown> = {};

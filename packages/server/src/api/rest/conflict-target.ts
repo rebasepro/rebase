@@ -1,0 +1,128 @@
+import { CollectionConfig, Property } from "@rebasepro/types";
+import { resolvePrimaryKeys } from "@rebasepro/common";
+import { ApiError } from "../errors";
+
+/**
+ * Which columns an upsert may name as its `ON CONFLICT` target.
+ *
+ * Postgres will only match a conflict against a column set backed by a unique
+ * index. Ask it to match on anything else and it answers *there is no unique or
+ * exclusion constraint matching the ON CONFLICT specification* — a 42P10 raised
+ * from inside a transaction that, in a batch, has already written other rows.
+ * The caller sees a 500 naming a constraint they never wrote, after work has
+ * been rolled back.
+ *
+ * So the target is checked against the collection's own declarations before the
+ * statement is built, and the error says which columns *are* available. The
+ * declarations are the source of truth on purpose: a unique index that exists
+ * in the database but in no config is one `db push` away from being dropped,
+ * and an upsert that silently depends on it would break at that moment rather
+ * than at the moment it was written.
+ *
+ * @module
+ */
+
+/**
+ * Normalised so `["a","b"]` and `["b","a"]` are the same target.
+ *
+ * Joined on a character no column name can contain, rather than on a space or a
+ * comma: `["a b"]` and `["a", "b"]` are different targets and must not collapse
+ * onto one key, and a quoted identifier may legally contain either.
+ */
+const KEY_SEPARATOR = "\u0000";
+
+function key(columns: readonly string[]): string {
+    return [...columns].map(c => c.trim()).sort().join(KEY_SEPARATOR);
+}
+
+/**
+ * Every column set this collection declares a uniqueness guarantee over.
+ *
+ * Three sources, and they are not interchangeable:
+ * - the primary key, which is always there and is the default target;
+ * - `validation.unique` on a property, which compiles to an inline `UNIQUE`;
+ * - a `unique: true` btree index, which is the *only* way to declare a
+ *   composite guarantee (see `BtreeIndex.unique`).
+ */
+export function declaredUniqueTargets(collection: CollectionConfig): string[][] {
+    const targets: string[][] = [];
+
+    const pk = resolvePrimaryKeys(collection).map(info => info.fieldName);
+    if (pk.length > 0) targets.push(pk);
+
+    const properties = (collection.properties ?? {}) as Record<string, Property>;
+    for (const [name, property] of Object.entries(properties)) {
+        if ((property?.validation as { unique?: boolean } | undefined)?.unique) {
+            targets.push([name]);
+        }
+    }
+
+    // Read off a widened view: `CollectionConfig` is a union whose Firebase arm
+    // declares no `indexes`, and narrowing it here would mean this function
+    // knowing about drivers it has no business knowing about.
+    const indexes = (collection as { indexes?: readonly { on?: readonly unknown[]; unique?: boolean }[] }).indexes;
+    for (const index of indexes ?? []) {
+        if (!index?.unique) continue;
+        // An index key may be an object (`{ column, order }`) rather than a
+        // bare name; the guarantee is over the columns either way.
+        const columns = (index.on ?? []).map((entry) =>
+            typeof entry === "string" ? entry : String((entry as { column?: unknown })?.column ?? "")
+        );
+        if (columns.length > 0 && columns.every(Boolean)) targets.push(columns);
+    }
+
+    return targets;
+}
+
+/**
+ * Parse and check the columns an upsert wants to match on.
+ *
+ * Returns `undefined` when the caller named none, which means the primary key —
+ * the behaviour bulk `upsert: true` has always had.
+ */
+export function resolveConflictTarget(
+    raw: unknown,
+    collection: CollectionConfig,
+    options?: { where?: string }
+): string[] | undefined {
+    if (raw === undefined || raw === null || raw === "") return undefined;
+
+    const columns = (Array.isArray(raw) ? raw : String(raw).split(","))
+        .map((entry) => String(entry).trim())
+        .filter(Boolean);
+
+    const where = options?.where ? `${options.where}: ` : "";
+
+    if (columns.length === 0) {
+        throw ApiError.badRequest(
+            `${where}\`onConflict\` names no columns. Leave it out to upsert on the primary key.`,
+            "INVALID_CONFLICT_TARGET"
+        );
+    }
+
+    const properties = (collection.properties ?? {}) as Record<string, Property>;
+    const unknownColumn = columns.find((column) => !(column in properties));
+    if (unknownColumn) {
+        throw ApiError.badRequest(
+            `${where}'${unknownColumn}' is not a property of '${collection.slug}', so it cannot be an upsert target.`,
+            "INVALID_CONFLICT_TARGET",
+            { collection: collection.slug }
+        );
+    }
+
+    const available = declaredUniqueTargets(collection);
+    if (!available.some((candidate) => key(candidate) === key(columns))) {
+        throw ApiError.badRequest(
+            `${where}[${columns.join(", ")}] carries no uniqueness guarantee on '${collection.slug}', ` +
+            "so an upsert has nothing to match a conflict against. Declare `validation: { unique: true }` " +
+            "on the property, or a `unique: true` index over the columns. " +
+            (available.length > 0
+                ? `Targets available today: ${available.map(t => `[${t.join(", ")}]`).join(", ")}.`
+                : "This collection declares none."),
+            "INVALID_CONFLICT_TARGET",
+            { collection: collection.slug, requested: columns, available }
+        );
+    }
+
+    return columns;
+}

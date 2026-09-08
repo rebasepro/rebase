@@ -13,6 +13,8 @@ import { RebaseWebSocketClient } from "./websocket";
 import { RebaseRealtimeChannel, type ChannelOptions } from "./realtime-channel";
 import { OfflineManager, type OfflineApi, type OfflineConfig } from "./offline";
 import {
+    type BatchOperation,
+    type BatchResult,
     DEFAULT_STORAGE_SOURCE_KEY,
     InsertOf,
     RebaseClient,
@@ -21,7 +23,8 @@ import {
     StorageSource,
     StorageSourceDefinition,
     StorageSourceRegistry,
-    UpdateOf
+    UpdateOf,
+    type WriteOptions
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
@@ -110,6 +113,10 @@ export type {
 export type { OfflineApi, OfflineConfig, OfflineStatus } from "./offline";
 export { isOfflineError } from "./offline";
 export type { LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
+// The reader for a fetched row's version. A function rather than a field so the
+// version never enters the generated `Row` type — see `etagOf`.
+export { etagOf } from "./collection";
+export type { BatchOperation, BatchRef, BatchResult, FieldOperation, UpdateValues, UpsertOptions } from "@rebasepro/types";
 export type { OfflineStore, OfflineCacheEntry, OfflineCacheRecord, PendingMutation, MutationRollback } from "./offline-store";
 export { MemoryOfflineStore } from "./offline-store";
 
@@ -239,6 +246,42 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
      */
     call: <T = unknown>(endpoint: string, payload?: unknown) => Promise<T>;
     collection: <M extends Record<string, unknown> = Record<string, unknown>>(slug: string) => CollectionClient<M>;
+    /**
+     * Write across collections in one transaction.
+     *
+     * `createMany` and friends are one collection at a time, which is the wrong
+     * shape for the writes that most need to be atomic: an order and its line
+     * items, a user and their membership row, a document and its audit entry.
+     * Sent as separate calls those can half-succeed, and the recovery — read
+     * back, work out which half landed, undo it — is code nobody writes.
+     *
+     * Operations run in order, each through the pipeline its single-row
+     * equivalent uses: the same validation, callbacks and row-level security,
+     * as the same user. All of them land or none do.
+     *
+     * Name an operation with `ref` and a later one can stand
+     * `{ $ref: "<name>.<field>" }` wherever a value goes — which is the only
+     * way to express "insert the parent, then point the children at it" in a
+     * single request, since the parent's id does not exist until the server
+     * assigns it. Only backward references resolve.
+     *
+     * `data` is aligned to `operations`: the written row for a create, upsert
+     * or update, and `null` for a delete.
+     *
+     * @example
+     * ```ts
+     * await client.batch([
+     *     { op: "create", collection: "orders", values: { total: 40 }, ref: "order" },
+     *     { op: "create", collection: "order_items",
+     *       values: { order_id: { $ref: "order.id" }, sku: "A-1" } },
+     *     { op: "update", collection: "stock", id: "A-1", values: { count: { $inc: -1 } } }
+     * ]);
+     * ```
+     */
+    batch: (
+        operations: BatchOperation<DB>[],
+        options?: WriteOptions
+    ) => Promise<BatchResult>;
     data: TypedDataLayer<DB>;
     /** Present only when the client was created with `offline` enabled. */
     offline?: OfflineApi;
@@ -649,6 +692,25 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             return transport.request<T>(`${prefix}${endpoint}`, {
                 method: "POST",
                 body: payload ? JSON.stringify(payload) : undefined
+            });
+        },
+        batch: async (operations: unknown[], options?: WriteOptions): Promise<BatchResult> => {
+            if (!Array.isArray(operations)) {
+                throw new TypeError("batch expects an array of operations.");
+            }
+            // Answered locally rather than sent: an empty transaction is a
+            // round trip that cannot do anything, and the server would have to
+            // answer this same shape anyway.
+            if (operations.length === 0) return { data: [], meta: { operations: 0 } };
+
+            const headers: Record<string, string> = {};
+            if (options?.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
+            if (options?.returning === false) headers.Prefer = "return=minimal";
+
+            return transport.request<BatchResult>("/data/_batch", {
+                method: "POST",
+                body: JSON.stringify({ operations }),
+                ...(Object.keys(headers).length > 0 ? { headers } : {})
             });
         },
         data: dataProxy,

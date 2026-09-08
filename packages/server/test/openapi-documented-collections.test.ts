@@ -101,14 +101,35 @@ describe("/api/docs", () => {
     it("documents nothing it does not route", async () => {
         // The property, not the example: every documented `/data/...` path must
         // answer something other than 404 for the verb it declares.
+        //
+        // *For the verb it declares*, which is what the comment always said and
+        // the assertion never did: it sent a GET at every path and passed only
+        // because every path happened to have one. `/data/_batch` is POST-only,
+        // so a GET there is correctly a 404 — the endpoint is fine and the
+        // probe was wrong. Reading the verb off the document is also the
+        // stronger check: a path documenting a method the router does not serve
+        // is now caught, and was not before.
         const app = await boot();
 
-        const spec = await (await app.request("/api/docs")).json() as { paths: Record<string, unknown> };
+        const spec = await (await app.request("/api/docs")).json() as {
+            paths: Record<string, Record<string, unknown>>;
+        };
         const listPaths = Object.keys(spec.paths).filter(p => /^\/data\/[^/]+$/.test(p));
 
         expect(listPaths.length).toBeGreaterThan(0);
         for (const path of listPaths) {
-            expect({ path, status: (await app.request(`/api${path}`)).status }).not.toMatchObject({ status: 404 });
+            const methods = Object.keys(spec.paths[path])
+                .filter(m => ["get", "post", "patch", "put", "delete"].includes(m));
+            expect(methods.length).toBeGreaterThan(0);
+            for (const method of methods) {
+                const status = (await app.request(`/api${path}`, {
+                    method: method.toUpperCase(),
+                    ...(method === "get" || method === "delete"
+                        ? {}
+                        : { headers: { "Content-Type": "application/json" }, body: "{}" })
+                })).status;
+                expect({ path, method, status }).not.toMatchObject({ status: 404 });
+            }
         }
     });
 });
