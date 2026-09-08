@@ -43,7 +43,20 @@ import { generateSchema } from "../../packages/server-postgres/src/schema/genera
 import { generatePostgresDdl } from "../../packages/server-postgres/src/schema/generate-postgres-ddl-logic.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const DOC = "website/src/content/docs/docs/architecture/schema-as-code.md";
+const PAGE = "docs/architecture/schema-as-code.md";
+const CONTENT = "website/src/content/docs";
+const LOCALES = ["de", "es", "fr", "it", "pt"];
+
+/**
+ * All six copies of the page.
+ *
+ * Not the English one alone. A fabricated `serial("id")` reads exactly as wrong
+ * in German as it does in English, and the locale mirrors carried the same
+ * hand-written pair for as long as the source did. The blocks are generated
+ * output — the same bytes in every language — so there is nothing to translate
+ * and no reason for the five to be checked more loosely than the one.
+ */
+const DOCS = [`${CONTENT}/${PAGE}`, ...LOCALES.map((l) => `${CONTENT}/${l}/${PAGE}`)];
 
 const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const green = (s) => `\x1b[32m${s}\x1b[0m`;
@@ -71,76 +84,108 @@ function markedBlocks(text) {
     return blocks;
 }
 
-const docPath = path.join(ROOT, DOC);
-const text = fs.readFileSync(docPath, "utf8");
-const blocks = markedBlocks(text);
-
-const missing = ["collection", "drizzle", "sql"].filter((k) => !blocks.has(k));
-if (missing.length > 0) {
-    console.error(red(`✗ ${DOC} has no \`<!-- schema-sample: ${missing[0]} -->\` block.`));
-    console.error(dim(
-        `  Expected all three of collection, drizzle, sql; missing: ${missing.join(", ")}.\n` +
-        "  Without them this gate compares nothing, which is how the page drifted in the first place.\n"
-    ));
-    process.exit(1);
+/** What the generators emit for one page's sample collection. */
+async function expectedFor(collections) {
+    return {
+        // The header line the CLI writes into the file is kept, and a
+        // `// schema.generated.ts` line above it says which file this is.
+        drizzle: `// schema.generated.ts\n${(await generateSchema(collections)).trimEnd()}\n`,
+        // Exactly how `generate-postgres-ddl.ts` writes `drizzle/schema.sql`.
+        sql: `${(await generatePostgresDdl(collections, {
+            includePolicies: false,
+            includeSearch: false,
+            includeVector: false
+        })).trimEnd()}\n`
+    };
 }
 
-// The sample collection is read through the same evaluator the doc-examples gate
-// uses, so the page cannot show one collection and generate from another.
-const { results } = await collectionSnippets(ROOT, { globs: [DOC] });
-const collectionBody = blocks.get("collection").body.trim();
-const sample = results.find((r) => r.snippet.code.trim() === collectionBody);
+const problems = [];
+const rewritten = [];
+let checked = 0;
 
-if (!sample || sample.error || sample.collections.length === 0) {
-    console.error(red(`✗ The \`schema-sample: collection\` block in ${DOC} produced no collection.`));
-    if (sample?.error) console.error(dim(`  ${sample.error.message}`));
-    process.exit(1);
-}
-
-const collections = sample.collections;
-
-const expected = {
-    // The header line the CLI writes into the file is kept, and a `// schema.generated.ts`
-    // line above it says which file a reader is looking at.
-    drizzle: `// schema.generated.ts\n${(await generateSchema(collections)).trimEnd()}\n`,
-    sql: `${(await generatePostgresDdl(collections, {
-        includePolicies: false,
-        includeSearch: false,
-        includeVector: false
-    })).trimEnd()}\n`
-};
-
-const stale = [];
-for (const key of ["drizzle", "sql"]) {
-    if (blocks.get(key).body === expected[key]) continue;
-    stale.push(key);
-}
-
-if (stale.length === 0) {
-    console.log(green(`✓ Schema sample: the drizzle and SQL blocks in ${path.basename(DOC)} are what the generators emit.`));
-    process.exit(0);
-}
-
-if (write) {
-    // Back to front, so an earlier replacement does not move a later offset.
-    let next = text;
-    for (const key of ["sql", "drizzle"].filter((k) => stale.includes(k))) {
-        const { start, end } = blocks.get(key);
-        next = next.slice(0, start) + expected[key] + next.slice(end);
+for (const doc of DOCS) {
+    const docPath = path.join(ROOT, doc);
+    if (!fs.existsSync(docPath)) {
+        problems.push({ doc, message: "the page does not exist. A locale mirror of it is expected beside the English one." });
+        continue;
     }
-    fs.writeFileSync(docPath, next);
-    console.log(green(`✓ Rewrote ${stale.join(" and ")} in ${DOC} from the generators. Read the diff before committing.`));
+
+    const text = fs.readFileSync(docPath, "utf8");
+    const blocks = markedBlocks(text);
+    const missing = ["collection", "drizzle", "sql"].filter((k) => !blocks.has(k));
+    if (missing.length > 0) {
+        problems.push({
+            doc,
+            message:
+                `no \`<!-- schema-sample: ${missing.join(" -->\`, no \`<!-- schema-sample: ")} -->\` marker. ` +
+                "All three are needed — the collection to generate from, and the two blocks generated from it. " +
+                "Without them this gate compares nothing, which is how the page drifted in the first place. " +
+                "A re-translation that dropped the comments is the likely cause; put them back above the same fences."
+        });
+        continue;
+    }
+
+    // The sample collection is read through the same evaluator the doc-examples
+    // gate uses, so a page cannot show one collection and generate from another.
+    const { results } = await collectionSnippets(ROOT, { globs: [doc] });
+    const collectionBody = blocks.get("collection").body.trim();
+    const sample = results.find((r) => r.snippet.code.trim() === collectionBody);
+
+    if (!sample || sample.error || sample.collections.length === 0) {
+        problems.push({
+            doc,
+            message: `the \`schema-sample: collection\` block produced no collection${sample?.error ? ` — ${sample.error.message}` : ""}.`
+        });
+        continue;
+    }
+
+    checked++;
+    const expected = await expectedFor(sample.collections);
+    const stale = ["drizzle", "sql"].filter((key) => blocks.get(key).body !== expected[key]);
+    if (stale.length === 0) continue;
+
+    if (write) {
+        // Back to front, so an earlier replacement does not move a later offset.
+        let next = text;
+        for (const key of ["sql", "drizzle"].filter((k) => stale.includes(k))) {
+            const { start, end } = blocks.get(key);
+            next = next.slice(0, start) + expected[key] + next.slice(end);
+        }
+        fs.writeFileSync(docPath, next);
+        rewritten.push(`${doc} (${stale.join(", ")})`);
+        continue;
+    }
+
+    for (const key of stale) {
+        const got = blocks.get(key).body.split("\n");
+        const want = expected[key].split("\n");
+        const at = got.findIndex((line, i) => line !== want[i]);
+        problems.push({
+            doc,
+            message:
+                `the \`${key}\` block is not what the generator emits — first difference at line ${at + 1}:\n` +
+                `        page:      ${JSON.stringify(got[at] ?? "(end of block)")}\n` +
+                `        generator: ${JSON.stringify(want[at] ?? "(end of output)")}`
+        });
+    }
+}
+
+if (write && problems.length === 0) {
+    console.log(rewritten.length === 0
+        ? green("✓ Schema sample: every page already shows what the generators emit; nothing to write.")
+        : green(`✓ Rewrote ${rewritten.length} page(s) from the generators. Read the diff before committing:\n    ${rewritten.join("\n    ")}`));
     process.exit(0);
 }
 
-console.error(red(`\n✗ ${DOC} shows ${stale.length} block(s) the generators do not emit: ${stale.join(", ")}.\n`));
-for (const key of stale) {
-    const got = blocks.get(key).body.split("\n");
-    const want = expected[key].split("\n");
-    const at = got.findIndex((line, i) => line !== want[i]);
-    console.error(`    ${key}: first difference at line ${at + 1} of the block`);
-    console.error(dim(`      page:      ${JSON.stringify(got[at] ?? "(end of block)")}`));
-    console.error(dim(`      generator: ${JSON.stringify(want[at] ?? "(end of output)")}`));
+if (problems.length === 0) {
+    console.log(green(`✓ Schema sample: the drizzle and SQL blocks on all ${checked} copies of ${PAGE} are what the generators emit.`));
+    process.exit(0);
+}
+
+console.error(red(`\n✗ ${problems.length} problem(s) with the schema sample:\n`));
+for (const { doc, message } of problems) {
+    console.error(`    ${doc}`);
+    console.error(dim(`      ${message}`));
 }
 console.error(dim(
     "\n  Run `pnpm check:schema-sample --write` to regenerate the blocks, then read the diff:" +

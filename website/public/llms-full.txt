@@ -8875,6 +8875,7 @@ export const productsCollection = defineCollection({
 | `slug` | `string` | **Required.** URL-safe identifier. Used in the admin UI URL and REST API path (`/api/data/{slug}`). |
 | `name` | `string` | **Required.** Display name (plural). Shown in navigation and page headers. |
 | `singularName` | `string` | Display name for a single entity. Used in "New Product", "Edit Product", etc. |
+| `description` | `string` | A sentence about what this collection holds, shown above the list. Markdown. |
 | `table` | `string` | PostgreSQL table name. Defaults to `toSnakeCase(slug)` — set it only to decouple the URL from the table, e.g. an existing `blog_posts` table served at `/posts`. |
 | `admin.icon` | `string` | A [Lucide](https://lucide.dev/icons) icon name, e.g. `"FileText"`, `"ShoppingCart"`. A rendered element also works, but the name survives serialization, so it is what the schema editor writes back. |
 
@@ -8888,6 +8889,9 @@ export const productsCollection = defineCollection({
 | `indexes` | `CollectionIndex[]` | Postgres indexes this table needs. See [Indexes](/docs/backend/indexes). |
 | `search` | `SearchConfig` | Ranked full-text search over the fields you name, including JSONB and array content. Postgres only. See [Search](/docs/backend/search). |
 | `auth` | `boolean \| AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
+| `schema` | `string` | Postgres schema the table lives in — `"public"`, `"rebase"`, `"auth"`. Defaults to `"public"`. |
+| `disableDefaultPolicies` | `boolean` | Remove the baseline policies the generator injects — an admin/server SELECT, and on an auth collection a self-read plus an admin-only write gate — and take full responsibility for this collection's RLS. `false` by default. See [Security Rules](/docs/collections/security-rules). |
+| `strictWrites` | `boolean` | Reject a write that names a field this collection does not declare, with a 400. `true` by default. Set it to `false` only where the column genuinely exists and is not declared — filled by a trigger, or introspected rather than written down. |
 
 #### UI Configuration
 
@@ -8928,22 +8932,39 @@ Inside `admin`, except `history`, which is a backend feature and stays at the to
 
 #### Advanced
 
+At the top level, because the backend reads them:
+
 | Property | Type | Description |
 |----------|------|-------------|
 | `callbacks` | `CollectionCallbacks` | Lifecycle hooks (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
-| `entityActions` | `EntityAction[]` | Custom actions on entities (archive, publish, etc.) |
-| `Actions` | `React.ComponentType` | Custom toolbar actions component |
-| `entityViews` | `EntityCustomView[]` | Custom tabs in the entity detail view |
-| `additionalFields` | `AdditionalFieldDelegate[]` | Computed/virtual columns |
-| `childCollections` | `() => CollectionConfig[]` | Nested child collections |
-| `subcollections` | `() => CollectionConfig[]` | Nested collections (e.g., order → line items) |
-| `exportable` | `boolean \| ExportConfig` | Enable data export |
-| `ownerId` | `string` | Owner user ID (used by plugins/custom code) |
-| `overrides` | `EntityOverrides` | Overrides for the entity view |
-| `components` | `CollectionComponentOverrideMap` | Collection-scoped UI component overrides |
+| `childCollections` | `() => CollectionConfig[]` | The collections nested under an entity of this one. Filled in during normalization from whatever the driver expresses them with — a Firestore `subcollections`, a Postgres `hasMany` relation — so a custom driver is the only reason to set it by hand |
 | `dataSource` | `string` | Which registered data source backs this collection (default: the unnamed one) |
 | `engine` | `string` | The engine behind it — `"postgres"`, `"firestore"`, `"mongodb"`. Resolved from `dataSource`; set it only to override |
 | `databaseId` | `string` | Database or schema within the engine |
+| `metadata` | `Record<string, unknown>` | Anything your own code needs to hang off a collection. Rebase does not read it; it survives serialization unchanged |
+| `ownerId` | `string` | **Admin form only — not enforced by the API or the database.** The user id the collection editor stamps on a collection it creates, and shows beside its name. Nothing on the request path consults it |
+
+`subcollections` and `path` are on the **document-database** configs only —
+`FirebaseCollectionConfig` and, for `path`, `MongoDBCollectionConfig`:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `subcollections` | `() => CollectionConfig[]` | **Firestore only.** Collections nested under each document. A Postgres collection says the same thing with a `hasMany` [relation](/docs/collections/relations), which is what fills `childCollections` |
+| `path` | `string` | **Firestore and MongoDB only.** The path or collection name at the engine, when it differs from the slug |
+
+And inside `admin`, because only the panel draws them:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `admin.entityActions` | `EntityAction[]` | Custom actions on entities (archive, publish, etc.) |
+| `admin.Actions` | `React.ComponentType` | Custom toolbar actions component |
+| `admin.entityViews` | `EntityCustomView[]` | Custom tabs in the entity detail view |
+| `admin.additionalFields` | `AdditionalFieldDelegate[]` | Computed/virtual columns |
+| `admin.exportable` | `boolean \| ExportConfig` | Enable data export |
+| `admin.components` | `CollectionComponentOverrideMap` | Collection-scoped UI component overrides |
+
+Writing any of those six at the top level is a boot-time error, with a message
+naming the key and where it moved to.
 
 ### Entity display
 
@@ -9025,8 +9046,10 @@ When `display.title` is not set, the property used as the entity's display title
 #### Relation Previews in Tables
 When `propertiesOrder` is explicitly set, relation properties are **not** automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).
 
-#### resolveTitleToString Utility
-Rebase provides a `resolveTitleToString(title: any): string` helper to turn complex entity title values (including dates, arrays, or relation shapes like `{ __type: "relation", id, data: { values } }`) into clean, human-readable strings. It prioritizes common fields like `name`, `title`, `label`, and `displayName` from nested relation data.
+#### What a title value renders as
+Whatever the title property holds, the panel renders a string. A date is formatted, an array is joined, and a relation — which arrives as `{ id, data: { values } }` rather than as text — is looked through for the first of `name`, `title`, `label` or `displayName` on the related row, falling back to its id. So a title may name a `relation` property and still read as a name rather than a uuid.
+
+This is not an exported helper: it is what every surface that draws a record already does. Nothing to call, and nothing to import.
 
 ### Collection Builder
 
@@ -9048,20 +9071,36 @@ const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) 
 
 ### Filtering and Sorting
 
-You can set default or forced filters:
+You can set default or forced filters. All three are presentation — what the
+panel opens with — so they live in `admin`:
 
 ```typescript
-{
-    // Default filter — users can change it
-    defaultFilter: { active: ["==", true] },
 
-    // Fixed filter — cannot be changed
-    fixedFilter: { tenant_id: ["==", currentTenantId] },
+const invoices = defineCollection({
+    slug: "invoices",
+    name: "Invoices",
+    table: "invoices",
+    properties: {
+        active: { name: "Active", type: "boolean" },
+        tenantId: { name: "Tenant", type: "string" },
+        createdAt: { name: "Created", type: "date" }
+    },
+    admin: {
+        // Default filter — users can change it
+        defaultFilter: { active: ["==", true] },
 
-    // Default sort
-    sort: ["createdAt", "desc"]
-}
+        // Fixed filter — cannot be changed
+        fixedFilter: { tenantId: ["==", currentTenantId] },
+
+        // Default sort
+        sort: ["createdAt", "desc"]
+    }
+});
 ```
+
+A `fixedFilter` narrows what the panel *asks for*; it is not a boundary. What a
+caller is allowed to read is a [security rule](/docs/collections/security-rules),
+which the database enforces for every caller, panel or not.
 
 ### Next Steps
 
@@ -9113,8 +9152,18 @@ All property types share these options:
 | `propertyConfig` | `string` | Registered property config key |
 | `columnName` | `string` | Explicit database column name (bypasses snake_case conversion) |
 | `callbacks` | `PropertyCallbacks` | Hooks for `afterRead` and `beforeSave` transforms |
-| `dynamicProps` | `function` | Dynamic property builder (see Conditional Fields) |
-| `conditions` | `PropertyConditions` | Declarative JSON Logic conditions |
+| `excludeFromApi` | `boolean` | Never mention this column on the API surface, in either direction — for a password hash or a verification token. The value is still written and queryable server-side; it is stripped from every row the API serves, for every caller including admins and service keys, and it is absent from the generated `Row`, `Insert` and `Update` types and from the OpenAPI schema |
+| `metadata` | `Record<string, unknown>` | Anything your own code needs to hang off a property. Rebase does not read it; it survives serialization unchanged |
+| `dynamicProps` | `function` | Dynamic property builder (see [Conditional fields](/docs/collections/validation-and-conditions/#conditional-fields)). **Admin form only — not enforced by the API or the database.** |
+| `conditions` | `PropertyConditions` | Declarative JSON Logic conditions. **Admin form only — not enforced by the API or the database.** |
+
+:::note[What "admin form only" means]
+Several options below carry that label: they shape the form the panel draws and
+nothing else — the API accepts a write that ignores them, and no constraint
+stands behind them. A rule that must hold for every caller is a
+[validation rule](/docs/collections/validation-and-conditions/) or a
+[security rule](/docs/collections/security-rules/).
+:::
 
 #### UI Configuration (`admin`)
 
@@ -9226,19 +9275,19 @@ website: {
 
 #### File upload
 
-Set `storage` to render a file upload dropzone.
+Set `storage` to render a file upload dropzone. The column stays a string — what
+is written to it is the object's key in the bucket:
 
 ```typescript
 avatar: {
     type: "string",
     name: "Main image",
-    storage: {
-        storagePath: "avatars",
-        acceptedFiles: ["image/*"],
-        maxSize: 2 * 1024 * 1024
-    }
+    storage: { storagePath: "avatars", acceptedFiles: ["image/*"] }
 }
 ```
+
+Every option inside `storage`, and the multi-file form of the same field, are on
+[File uploads](/docs/collections/file-uploads).
 
 #### Select (enum)
 
@@ -9286,11 +9335,11 @@ locales: {
 | `admin.markdown` | `boolean` | Render as markdown editor |
 | `email` | `boolean` | Email format validation |
 | `url` | `boolean` | URL format validation |
-| `storage` | `StorageConfig` | Enable file upload |
+| `storage` | `StorageConfig` | Enable file upload — see [File uploads](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Render as select dropdown |
-| `columnType` | `string` | Database column: `"varchar"`, `"text"` |
-| `isId` | `string` | ID generation: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
-| `userSelect` | `boolean` | Render as a user picker |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | The database column. Defaults to `varchar`, or `uuid` when `isId` says so. `text` for unbounded strings, `char` for fixed width |
+| `isId` | `boolean \| string` | Marks the property as the primary key, and says who fills it: `"manual"` (you do), `"uuid"` (`gen_random_uuid()`), `"cuid"`, or any other string, which is used verbatim as the column's SQL default expression — `"nanoid()"`. `"increment"` is a **number** strategy and does nothing here |
+| `userSelect` | `boolean` | Render as a user picker. The value is a plain string column holding the user id — nothing resolves or checks it on the way in. **Admin form only — not enforced by the API or the database.** |
 | `admin.previewAsTag` | `boolean` | Render this string as a tag in previews |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 | `admin.urlPreview` | `PreviewType` | How to render a string that holds a URL: a link, or an inline image, audio or video preview. Presentation only — whether the value *is* a URL is the `url` flag on the property, which is what the OpenAPI contract is generated from |
@@ -9318,8 +9367,8 @@ Number fields render as a standard text input with numeric validation.
 | Property | Type | Description |
 |----------|------|-------------|
 | `enum` | `EnumValues` | Render as select with numeric values |
-| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
-| `isId` | `string` | ID generation strategy |
+| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"`. Defaults to `integer` where `validation.integer` or `isId` says the value is whole, `numeric` otherwise |
+| `isId` | `boolean \| string` | Marks the property as the primary key: `"manual"`, `"increment"` (`GENERATED BY DEFAULT AS IDENTITY`), or any other string used verbatim as the column's SQL default expression |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 | `admin.format` | `NumberFormatOptions` | Write the number out as currency, a percentage, or with fixed decimals. Omitted, the raw value renders — a number in the database is shown as the number in the database |
 
@@ -9398,10 +9447,10 @@ updatedAt: {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`) |
+| `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`). Picks the widget; the column is the same either way. **Admin form only — not enforced by the API or the database.** |
 | `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps |
-| `columnType` | `string` | `"timestamp"`, `"date"` |
-| `timezone` | `string` | Timezone string to evaluate the date in |
+| `columnType` | `"timestamp" \| "date" \| "time"` | The database column. Defaults to `timestamp` **with time zone** |
+| `timezone` | `string` | Which timezone the picker reads and writes the value in. **Admin form only — not enforced by the API or the database.** |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ### Array Properties
@@ -9420,18 +9469,8 @@ tags: {
 
 #### Multi file upload
 
-Combine `of` with `storage` for a multi-file upload.
-
-```typescript
-images: {
-    type: "array",
-    name: "Images",
-    of: {
-        type: "string",
-        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
-    }
-}
-```
+An array whose `of` carries the `storage` block is a multi-file upload — see
+[File uploads](/docs/collections/file-uploads).
 
 #### Block editor
 
@@ -9466,7 +9505,8 @@ content: {
 | Property | Type | Description |
 |----------|------|-------------|
 | `of` | `Property \| Property[]` | Property schema for array items |
-| `oneOf` | `object` | Array of typed objects with multiple discriminator types |
+| `oneOf` | `object` | Array of typed objects with multiple discriminator types. Takes `properties`, and optionally `propertiesOrder`, `typeField` (default `"type"`) and `valueField` (default `"value"`) |
+| `columnType` | `"json" \| "jsonb" \| "text[]" \| "integer[]" \| "boolean[]" \| "numeric[]"` | The database column. A primitive `of` defaults to the matching native Postgres array; anything else to `jsonb` |
 | `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
 | `admin.minimalistView` | `boolean` | Display child properties directly without extendable panel |
 | `admin.sortable` | `boolean` | Can elements be reordered (default: true) |
@@ -9511,7 +9551,29 @@ metadata: {
 | `admin.spreadChildren` | `boolean` | Render child properties as separate columns in table view |
 | `admin.minimalistView` | `boolean` | Display properties without a wrapping panel |
 | `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
-| `keyValue` | `boolean` | Render as arbitrary key-value pairs editor |
+| `keyValue` | `boolean` | Render as arbitrary key-value pairs editor. Not presentation despite the wording: it says the map has no declared shape, which is what the OpenAPI schema is generated from |
+| `columnType` | `"json" \| "jsonb"` | The database column. Defaults to `jsonb` |
+
+### Geopoint Properties
+
+A latitude/longitude pair, stored as `jsonb` — `{ latitude, longitude }`, which
+is what the generated TypeScript type, the OpenAPI schema and the form field all
+describe.
+
+```typescript
+location: {
+    type: "geopoint",
+    name: "Location"
+}
+```
+
+Writes take the same shape, or a `GeoPoint` from `@rebasepro/types`:
+`new GeoPoint(41.4036, 2.1744)`.
+
+There are no options beyond the ones every property has. The column is not
+spatially indexed and there is no distance operator to filter on: a geopoint is
+a value you store and show, not one you search by. For that, model the two
+numbers as columns of their own.
 
 ### Reference Properties
 
@@ -9598,6 +9660,88 @@ Enum values, validation rules and conditional fields have a page of their own:
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
 - **[Custom Fields](/docs/frontend/custom-fields)** — Build custom field components
 
+## File upload fields
+
+
+A file field is an ordinary **string** property with a `storage` block. The
+column holds text — the object's key in the bucket, or its URL if you ask for
+that — and the block says where the bytes go and what the form will accept.
+
+That split matters more than it looks. Most of `storage` is read by the admin
+panel's uploader on its way to the API, so a write that does not come from a
+form does not go through it. What the *server* enforces is listed as such below.
+
+### One file
+
+```typescript
+avatar: {
+    type: "string",
+    name: "Main image",
+    storage: {
+        storagePath: "avatars",
+        acceptedFiles: ["image/*"],
+        maxSize: 2 * 1024 * 1024
+    }
+}
+```
+
+### Several files
+
+An array of the same thing. The `storage` block moves to `of`, because it
+describes each element rather than the list:
+
+```typescript
+images: {
+    type: "array",
+    name: "Images",
+    of: {
+        type: "string",
+        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
+    }
+}
+```
+
+### Storage options
+
+Everything inside `storage`.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `storagePath` | `string \| function` | **Required.** Where in the bucket the file goes. A string with placeholders — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — or a function of the upload's context. **Admin form only — not enforced by the API or the database:** it is the panel's uploader that resolves it, and `client.storage.upload()` names its own key |
+| `fileName` | `string \| function` | The uploaded object's file name, with the same placeholders. **Admin form only — not enforced by the API or the database.** |
+| `storageSource` | `string` | Which registered bucket, when a project has more than one. The `bucket("media")` handle works here too |
+| `public` | `boolean` | Store under the public prefix and serve through a stable, token-less, cacheable URL. `false` by default, which means private objects and short-lived signed URLs |
+| `acceptedFiles` | `FileType[]` | MIME types this property takes. The asterisk form works — `image/*` |
+| `maxSize` | `number` | Largest accepted file, in bytes |
+| `metadata` | `Record<string, unknown>` | Object metadata to store alongside the file |
+| `includeBucketUrl` | `boolean` | Write `s3://my-bucket/path/to/file.png` into the column instead of `path/to/file.png`. `false` by default |
+| `storeUrl` | `boolean` | Write the download URL into the column instead of the key. `false` by default, and worth leaving that way: a URL that carries a token stops working when the token does, and the original reference is then gone |
+| `imageResize` | `ImageResize` | Resize and crop before uploading, for `image/jpeg`, `image/png` and `image/webp`. **Admin form only — not enforced by the API or the database.** |
+| `processFile` | `(file: File) => Promise<File>` | Transform the file before it is uploaded. Runs in the browser. **Admin form only — not enforced by the API or the database.** |
+| `postProcess` | `(pathOrUrl: string) => Promise<string>` | Transform the resolved path or URL before it is saved. Runs in the browser. **Admin form only — not enforced by the API or the database.** |
+| `previewUrl` | `(fileName: string) => string` | Build the preview URL, for when the file's real address is not the field's value. **Admin form only — not enforced by the API or the database.** |
+
+#### Resizing
+
+`imageResize` takes `maxWidth` and `maxHeight` in pixels, a `mode` of
+`"contain"` (scale down to fit, the default) or `"cover"` (fill the bounds and
+crop), a `format` of `"original"`, `"jpeg"`, `"png"` or `"webp"`, and a
+`quality` between 0 and 100 for the lossy formats — 80 by default. It happens in
+the browser, before the bytes are sent, so an upload that did not come from the
+panel is stored at its original size.
+
+#### Where the file is allowed to go
+
+`storagePath` is a default, not a boundary: nothing on the server confines an
+upload to that prefix. Deciding who may write where is what a storage
+authorization rule is for — see [Storage](/docs/backend/storage).
+
+### Next Steps
+
+- **[Properties](/docs/collections/properties)** — every property type and its options
+- **[Storage](/docs/backend/storage)** — buckets, signed URLs, and what the server does with an upload
+- **[Security Rules (RLS)](/docs/collections/security-rules)** — who may read the rows these files hang off
+
 ## Validation and conditions
 
 ### Enum Values
@@ -9625,29 +9769,89 @@ enum: [
 
 ### Validation
 
+Every rule lives in the property's `validation` block, and which rules a
+property accepts depends on its type — `min` counts characters on a string,
+compares magnitudes on a number, and counts elements on an array.
+
 ```typescript
-validation: {
-    required: true,             // Field is required
-    unique: true,               // Must be unique in the table
-    requiredMessage: "Custom error message",
-
-    // String-specific
-    min: 2,                     // Minimum length
-    max: 200,                   // Maximum length
-    matches: /^[a-z]+$/,       // Regex pattern
-    email: true,                // Email format
-    url: true,                  // URL format
-
-    // Number-specific
-    min: 0,                     // Minimum value
-    max: 1000,                  // Maximum value
-    integer: true,              // Must be integer
-
-    // Array-specific
-    min: 1,                     // Minimum items
-    max: 10,                    // Maximum items
-}
+const article = {
+    title: {
+        type: "string",
+        name: "Title",
+        validation: { required: true, min: 2, max: 200 }
+    },
+    slug: {
+        type: "string",
+        name: "Slug",
+        validation: {
+            unique: true,
+            matches: /^[a-z0-9-]+$/,
+            matchesMessage: "Lowercase letters, digits and hyphens only",
+            trim: true,
+            lowercase: true
+        }
+    },
+    readingMinutes: {
+        type: "number",
+        name: "Reading time",
+        validation: { integer: true, moreThan: 0, max: 120 }
+    }
+};
 ```
+
+#### Every type
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `required` | `boolean` | The value must be present |
+| `requiredMessage` | `string` | What the form says when it is not. **Admin form only — not enforced by the API or the database.** |
+| `unique` | `boolean` | Only one row in the table may hold this value |
+| `uniqueInArray` | `boolean` | Only one entry *per array* may hold it. Applies to a direct child of an `array` property, or a first-level child of a `map` inside one. **Admin form only — not enforced by the API or the database.** |
+
+#### Strings
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `number` | Fewest / most characters, inclusive. A `max` also sizes the column: it turns `TEXT` into `VARCHAR(max)`, so lowering it on a table that already holds longer rows is a migration the database refuses |
+| `length` | `number` | Exactly this many characters — a country code, a fixed-width reference |
+| `matches` | `string \| RegExp` | A pattern the whole value must match. A string is compiled per request, so one that will not compile is rejected at boot rather than quietly becoming no rule |
+| `matchesMessage` | `string` | What the form says when `matches` fails |
+| `trim` | `boolean` | Strip leading and trailing whitespace **before** saving. A transform, not a check — it changes what is written, which is what makes it the fix for "the same tag twice, one with a trailing space". **Admin form only — not enforced by the API or the database.** |
+| `lowercase` / `uppercase` | `boolean` | Case-fold the value before saving, like `trim`. **Admin form only — not enforced by the API or the database.** |
+
+Email and URL formats are **not** validation rules. `email` and `url` are flags
+on the property itself, beside `type` — statements about the data that the
+OpenAPI contract is generated from, rather than form behaviour:
+
+```typescript
+const contact = {
+    email: { type: "string", name: "Email", email: true },
+    website: { type: "string", name: "Website", url: true }
+};
+```
+
+See [String properties](/docs/collections/properties/#string-options).
+
+#### Numbers
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `number` | Smallest / largest accepted value, **inclusive** |
+| `moreThan` / `lessThan` | `number` | The exclusive twins of `min` and `max` |
+| `positive` / `negative` | `boolean` | Strictly above / below zero. `0` is rejected by both — use `min: 0` to allow it |
+| `integer` | `boolean` | No fractional part. Does not change the column type; `columnType` does |
+
+#### Dates
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `Date` | Earliest / latest accepted date, inclusive. A fixed instant, not "today" |
+
+#### Arrays
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `number` | Fewest / most elements, inclusive. Elements, not characters |
 
 ### Conditional Fields
 
@@ -9671,12 +9875,25 @@ price: {
 ```
 
 The conditions object gives you access to:
-- `disabled`, `hidden`, `readOnly`
-- `required`, `min`, `max`
+- `disabled`, `disabledMessage`, `clearOnDisabled`, `hidden`, `readOnly`
+- `required`, `requiredMessage`, `min`, `max`
 - `defaultValue`
 - `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
 - `referencePath`, `referenceFilter`
 - `canAddElements`, `sortable` (for arrays)
+- `acceptedFiles`, `maxFileSize` (for uploads)
+
+`disabledMessage` is the sentence a reader sees in place of the control. Without
+it a greyed-out field explains nothing, which is the difference between a form
+that is guiding someone and one that is refusing them.
+
+:::caution[Conditions are form behaviour]
+**Admin form only — not enforced by the API or the database.** They run in the
+browser, on the entity being edited, and shape what the panel offers. A rule
+that has to hold for every caller belongs in `validation`, which the server
+checks, or in a [security rule](/docs/collections/security-rules/), which the
+database enforces for anyone — panel, SDK or `curl`.
+:::
 
 #### 2. Property Builders (Programmatic)
 
@@ -9692,6 +9909,10 @@ price: {
     })
 }
 ```
+
+The same caveat applies, and more sharply: the function is bundled into the
+panel and called on every render of the form. **Admin form only — not enforced
+by the API or the database.**
 
 ### Next Steps
 
@@ -9885,7 +10106,9 @@ properties: {
         type: "relation",
         name: "Author",
         relation: { kind: "belongsTo", target: () => usersCollection },
-        widget: "select"           // "select" (dropdown) or "dialog" (full picker)
+        // Which control draws it is presentation, so it goes in the admin block:
+        // "select" (dropdown) or "dialog" (full picker).
+        admin: { widget: "select" }
     }
 }
 ```
@@ -31389,32 +31612,49 @@ This "UI as Code Generator" approach means visual edits produce the same clean T
 
 ### Schema Generation Pipeline
 
+Your collections are read once and emitted twice — as a Drizzle schema the
+running server queries through, and as SQL that describes the database you meant
+to have. It is the SQL that the database is brought into line with, by
+[Atlas](https://atlasgo.io), which diffs your desired schema against the live one
+and plans the change:
+
 ```
-TypeScript Collections
-        │
-        ▼
-  rebase schema generate
-        │
-        ▼
-  Drizzle Schema (schema.generated.ts)
-        │
-        ▼
-  rebase db generate
-        │
-        ▼
-  SQL Migration Files
-        │
-        ▼
-  rebase db migrate
-        │
-        ▼
-  PostgreSQL Tables
+                        Collections (TypeScript)
+                                  │
+            ┌─────────────────────┴─────────────────────┐
+            ▼                                           ▼
+   rebase schema generate                       (the same command also
+            │                                    writes the SQL below)
+            ▼                                           │
+  backend/src/schema.generated.ts                        ▼
+  the Drizzle schema the runtime            drizzle/schema.sql      ← Atlas's desired state
+  reads and writes rows through             policies.sql            ← RLS, applied separately
+                                            search.sql, vector.sql  ← Atlas cannot manage these
+                                                        │
+                                          ┌─────────────┴─────────────┐
+                                          ▼                           ▼
+                                   rebase db push              rebase db generate
+                                   Atlas plans the diff        Atlas writes the diff
+                                   and applies it now          to drizzle/migrations/
+                                          │                           │
+                                          │                           ▼
+                                          │                    rebase db migrate
+                                          │                    applies them in order
+                                          └─────────────┬─────────────┘
+                                                        ▼
+                                                  PostgreSQL
 ```
+
+`db push` is the development loop; `db generate` + `db migrate` is the
+reviewable one, and the one to use in production. Both go through the same
+generated SQL, so they cannot disagree about what your collections mean. See
+[Schema Generation](/docs/cli/schema) for every flag.
 
 #### Example
 
 Given this collection:
 
+<!-- schema-sample: collection -->
 ```typescript
 
 const productsCollection = defineCollection({
@@ -31430,31 +31670,58 @@ const productsCollection = defineCollection({
 });
 ```
 
-Rebase generates this Drizzle schema:
+Rebase generates this Drizzle schema — the whole file, `id` column, default
+policies and all:
 
+<!-- schema-sample: drizzle -->
 ```typescript
 // schema.generated.ts
+// This file is auto-generated by the Rebase Drizzle generator. Do not edit manually.
 
 export const products = pgTable("products", {
-    id: serial("id").primaryKey(),
-    name: varchar("name").notNull(),
+    name: text("name").notNull(),
     price: numeric("price"),
-    active: boolean("active").default(true),
-    created_at: timestamp("created_at").defaultNow()
-});
+    active: boolean("active"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
+    id: text("id").primaryKey()
+}, (table) => ([
+    pgPolicy("products_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("products_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("products_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("products_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+])).enableRLS();
+
+export const tables = { products };
+export const enums = {  };
+export const relations = {  };
 ```
 
-Which produces this SQL:
+Two things in there are worth reading twice. The `id` column you did not
+declare: every collection gets a `text` primary key unless a property claims
+`isId`. And the `pgPolicy` block: row level security is enabled on every table,
+and those baseline policies are what keep the trusted server context and the
+`admin` role able to read it at all — see
+[Security Rules](/docs/collections/security-rules).
 
+And this SQL, which is what Atlas is handed as the desired state:
+
+<!-- schema-sample: sql -->
 ```sql
-CREATE TABLE products (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR NOT NULL,
-    price NUMERIC,
-    active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT NOW()
+-- This file is auto-generated by the Rebase DDL generator. Do not edit manually.
+
+CREATE SCHEMA IF NOT EXISTS "rebase";
+
+CREATE TABLE "public"."products" (
+  "id" TEXT PRIMARY KEY,
+  "name" TEXT NOT NULL,
+  "price" NUMERIC,
+  "active" BOOLEAN,
+  "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 ```
+
+Policies, search columns and vector indexes are written to files of their own
+and applied by the CLI in their own right — Atlas manages none of the three.
 
 ### Safety & Unmapped Database Objects
 

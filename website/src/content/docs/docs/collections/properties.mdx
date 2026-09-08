@@ -51,12 +51,11 @@ All property types share these options:
 | `conditions` | `PropertyConditions` | Declarative JSON Logic conditions. **Admin form only — not enforced by the API or the database.** |
 
 :::note[What "admin form only" means]
-A few options below carry that label. They shape the form the panel draws and
-nothing else: the API accepts a write that ignores them, and the column has no
-constraint behind them. A rule that has to hold for every caller is a
-[validation rule](/docs/collections/validation-and-conditions/) the server
-checks, or a [security rule](/docs/collections/security-rules/) the database
-enforces.
+Several options below carry that label: they shape the form the panel draws and
+nothing else — the API accepts a write that ignores them, and no constraint
+stands behind them. A rule that must hold for every caller is a
+[validation rule](/docs/collections/validation-and-conditions/) or a
+[security rule](/docs/collections/security-rules/).
 :::
 
 ### UI Configuration (`admin`)
@@ -179,21 +178,21 @@ website: {
 
 ### File upload
 
-Set `storage` to render a file upload dropzone.
+Set `storage` to render a file upload dropzone. The column stays a string — what
+is written to it is the object's key in the bucket:
 
 ```typescript
 avatar: {
     type: "string",
     name: "Main image",
-    storage: {
-        storagePath: "avatars",
-        acceptedFiles: ["image/*"],
-        maxSize: 2 * 1024 * 1024
-    }
+    storage: { storagePath: "avatars", acceptedFiles: ["image/*"] }
 }
 ```
 
 <FieldWidgetPreview client:only="react" variant="file_upload" />
+
+Every option inside `storage`, and the multi-file form of the same field, are on
+[File uploads](/docs/collections/file-uploads).
 
 ### Select (enum)
 
@@ -245,7 +244,7 @@ locales: {
 | `admin.markdown` | `boolean` | Render as markdown editor |
 | `email` | `boolean` | Email format validation |
 | `url` | `boolean` | URL format validation |
-| `storage` | `StorageConfig` | Enable file upload — see [Storage options](#storage-options) |
+| `storage` | `StorageConfig` | Enable file upload — see [File uploads](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Render as select dropdown |
 | `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | The database column. Defaults to `varchar`, or `uuid` when `isId` says so. `text` for unbounded strings, `char` for fixed width |
 | `isId` | `boolean \| string` | Marks the property as the primary key, and says who fills it: `"manual"` (you do), `"uuid"` (`gen_random_uuid()`), `"cuid"`, or any other string, which is used verbatim as the column's SQL default expression — `"nanoid()"`. `"increment"` is a **number** strategy and does nothing here |
@@ -253,35 +252,6 @@ locales: {
 | `admin.previewAsTag` | `boolean` | Render this string as a tag in previews |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 | `admin.urlPreview` | `PreviewType` | How to render a string that holds a URL: a link, or an inline image, audio or video preview. Presentation only — whether the value *is* a URL is the `url` flag on the property, which is what the OpenAPI contract is generated from |
-
-### Storage options
-
-Everything inside `storage`. The column itself stays a string: what is written
-to it is the object's key in the bucket, or its URL if you ask for that.
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `storagePath` | `string \| function` | **Required.** Where in the bucket the file goes. A string with placeholders — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — or a function of the upload's context. **Admin form only — not enforced by the API or the database:** it is the panel's uploader that resolves it, and `client.storage.upload()` names its own key |
-| `fileName` | `string \| function` | The uploaded object's file name, with the same placeholders. **Admin form only — not enforced by the API or the database.** |
-| `storageSource` | `string` | Which registered bucket, when a project has more than one. The `bucket("media")` handle works here too. See [Storage](/docs/backend/storage) |
-| `public` | `boolean` | Store under the public prefix and serve through a stable, token-less, cacheable URL. `false` by default, which means private objects and short-lived signed URLs |
-| `acceptedFiles` | `FileType[]` | MIME types this property takes. The asterisk form works — `image/*` |
-| `maxSize` | `number` | Largest accepted file, in bytes |
-| `metadata` | `Record<string, unknown>` | Object metadata to store alongside the file |
-| `includeBucketUrl` | `boolean` | Write `s3://my-bucket/path/to/file.png` into the column instead of `path/to/file.png`. `false` by default |
-| `storeUrl` | `boolean` | Write the download URL into the column instead of the key. `false` by default, and worth leaving that way: a URL that carries a token stops working when the token does, and the original reference is then gone |
-| `imageResize` | `ImageResize` | Resize and crop before uploading, for `image/jpeg`, `image/png` and `image/webp`. **Admin form only — not enforced by the API or the database.** |
-| `processFile` | `(file: File) => Promise<File>` | Transform the file before it is uploaded. Runs in the browser. **Admin form only — not enforced by the API or the database.** |
-| `postProcess` | `(pathOrUrl: string) => Promise<string>` | Transform the resolved path or URL before it is saved. Runs in the browser. **Admin form only — not enforced by the API or the database.** |
-| `previewUrl` | `(fileName: string) => string` | Build the preview URL, for when the file's real address is not the field's value. **Admin form only — not enforced by the API or the database.** |
-
-`imageResize` takes `maxWidth` and `maxHeight` in pixels, a `mode` of
-`"contain"` (scale down to fit, the default) or `"cover"` (fill the bounds and
-crop), a `format` of `"original"`, `"jpeg"`, `"png"` or `"webp"`, and a
-`quality` between 0 and 100 for the lossy formats — 80 by default.
-
-For buckets, signed URLs and what the server does with an upload, see
-[Storage](/docs/backend/storage).
 
 ## Number Properties
 
@@ -418,18 +388,8 @@ tags: {
 
 ### Multi file upload
 
-Combine `of` with `storage` for a multi-file upload.
-
-```typescript
-images: {
-    type: "array",
-    name: "Images",
-    of: {
-        type: "string",
-        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
-    }
-}
-```
+An array whose `of` carries the `storage` block is a multi-file upload — see
+[File uploads](/docs/collections/file-uploads).
 
 <FieldWidgetPreview client:only="react" variant="multi_file_upload" />
 
@@ -535,20 +495,12 @@ location: {
 ```
 
 Writes take the same shape, or a `GeoPoint` from `@rebasepro/types`:
+`new GeoPoint(41.4036, 2.1744)`.
 
-```typescript
-import { GeoPoint } from "@rebasepro/types";
-
-await client.data.venues.create({
-    name: "Sagrada Família",
-    location: new GeoPoint(41.4036, 2.1744)
-});
-```
-
-There are no options beyond the ones every property has. Geopoint columns are
-not spatially indexed and there is no distance operator to filter on — a
-geopoint is a value you store and show, not one you search by. For that, model
-the two numbers as columns of their own.
+There are no options beyond the ones every property has. The column is not
+spatially indexed and there is no distance operator to filter on: a geopoint is
+a value you store and show, not one you search by. For that, model the two
+numbers as columns of their own.
 
 ## Reference Properties
 

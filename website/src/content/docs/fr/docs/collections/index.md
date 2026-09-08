@@ -1,5 +1,5 @@
 ---
-sourceHash: e9ad0454af0a8497
+sourceHash: 13dd95b04d6f92ce
 title: Collections
 sidebar_label: Collections
 description: Les collections sont le bloc de construction fondamental de Rebase — chaque collection est mappée à une table de base de données et définit son schéma, ses relations, sa sécurité et son comportement d'interface utilisateur.
@@ -178,15 +178,14 @@ Dans `admin`, sauf `history`, qui est une fonctionnalité du backend et reste au
 | Propriété | Type | Description |
 |----------|------|-------------|
 | `callbacks` | `CollectionCallbacks` | Hooks de cycle de vie (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
-| `entityActions` | `EntityAction[]` | Actions personnalisées sur les entités (archiver, publier, etc.) |
-| `Actions` | `React.ComponentType` | Composant d'actions de barre d'outils personnalisé |
-| `entityViews` | `EntityCustomView[]` | Onglets personnalisés dans la vue détaillée de l'entité |
-| `additionalFields` | `AdditionalFieldDelegate[]` | Colonnes calculées/virtuelles |
+| `admin.entityActions` | `EntityAction[]` | Actions personnalisées sur les entités (archiver, publier, etc.) |
+| `admin.Actions` | `React.ComponentType` | Composant d'actions de barre d'outils personnalisé |
+| `admin.entityViews` | `EntityCustomView[]` | Onglets personnalisés dans la vue détaillée de l'entité |
+| `admin.additionalFields` | `AdditionalFieldDelegate[]` | Colonnes calculées/virtuelles |
 | `childCollections` | `() => CollectionConfig[]` | Collections enfants imbriquées |
-| `subcollections` | `() => CollectionConfig[]` | Collections imbriquées (par exemple, commande → articles de ligne) |
-| `exportable` | `boolean \| ExportConfig` | Activer l'exportation de données |
-| `ownerId` | `string` | ID de l'utilisateur propriétaire (utilisé par les plugins/code personnalisé) |
-| `overrides` | `EntityOverrides` | Surcharges pour la vue d'entité |
+| `subcollections` | `() => CollectionConfig[]` | **Firestore only.** Collections imbriquées (par exemple, commande → articles de ligne) |
+| `admin.exportable` | `boolean \| ExportConfig` | Activer l'exportation de données |
+| `ownerId` | `string` | **Admin form only — not enforced by the API or the database.** ID de l'utilisateur propriétaire (utilisé par les plugins/code personnalisé) |
 | `driver` | `string` | Pilote de base de données à utiliser (par défaut : `"(default)"`) |
 | `databaseId` | `string` | ID de la base de données/schéma dans le pilote |
 

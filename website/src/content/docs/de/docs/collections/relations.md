@@ -1,5 +1,5 @@
 ---
-sourceHash: 8cb714b94b58f0a9
+sourceHash: b0070dc1781e9f2d
 title: Beziehungen
 sidebar_label: Beziehungen
 description: Definieren Sie Eins-zu-Eins-, Eins-zu-Viele- und Viele-zu-Viele-SQL-Beziehungen zwischen Sammlungen mit Fremdschlüsseln, Verbindungstabellen und Multi-Hop-Joins.
@@ -197,7 +197,9 @@ properties: {
         type: "relation",
         name: "Author",
         relation: { kind: "belongsTo", target: () => usersCollection },
-        widget: "select"           // "select" (dropdown) or "dialog" (full picker)
+        // Which control draws it is presentation, so it goes in the admin block:
+        // "select" (dropdown) or "dialog" (full picker).
+        admin: { widget: "select" }
     }
 }
 ```
