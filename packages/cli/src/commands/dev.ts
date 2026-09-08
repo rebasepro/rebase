@@ -561,10 +561,16 @@ function projectHasCollections(projectRoot: string): boolean {
  * Boot created all 30 tables through the additive ensure, `/health` answered
  * 200, auth worked, the admin panel loaded — and every single
  * `GET /api/data/*` returned a 500, `Table not found for collection 'posts'`,
- * because the driver looks the table up in the generated file rather than in the
- * database. A stranger following the README had no way to guess that
+ * because the driver looked the table up in the generated file rather than in
+ * the database. A stranger following the README had no way to guess that
  * `pnpm run schema:generate` was the missing step, and the README told them the
  * schema was pushed for them.
+ *
+ * That failure is fixed at the root — the driver builds its tables from
+ * `information_schema` now, so a stub `schema.generated.ts` cannot empty the
+ * API. This still runs, because the file is a real artifact for everything
+ * around the server: `db push` diffs it, Atlas plans from it, `eject` writes it
+ * out, and application code imports it.
  *
  * ## Why it runs unconditionally
  *
@@ -1287,14 +1293,17 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             // in a way nothing named. tsx restarts the backend on a config
             // change, boot's additive ensure adds the new column to the
             // database — and then the very first save of a row carrying it
-            // answered 400 VALIDATION_UNKNOWN_FIELDS, because the driver looks
+            // answered 400 VALIDATION_UNKNOWN_FIELDS, because the driver looked
             // its columns up in `backend/src/schema.generated.ts` and that file
-            // was still the one generated before the edit. The database was
-            // right; the generated module was the stale half.
+            // was still the one generated before the edit.
             //
-            // Regenerating it here is the same call `dev` already makes at
-            // startup: no database, idempotent, about two seconds. The reader's
-            // single instruction is now "save the file".
+            // The driver reads the database now, so that particular 400 is gone
+            // at the root. This stays because the file is still what `db push`,
+            // Atlas, `eject` and the developer's own imports read, and a file
+            // that silently falls behind the collections during a dev session is
+            // a surprise waiting at the next deploy. It is the same call `dev`
+            // already makes at startup: no database, idempotent, about two
+            // seconds. The reader's single instruction is still "save the file".
             const collectionsDir = path.join(projectRoot, "config", "collections");
             if (fs.existsSync(collectionsDir)) {
                 let driftDebounce: NodeJS.Timeout | null = null;

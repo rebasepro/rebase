@@ -562,6 +562,19 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     c.dataSource === sourceKey || (!c.dataSource && sourceKey === DEFAULT_DATA_SOURCE_KEY)
                 );
                 if (ownCollections.length > 0) {
+                    // Reading the catalogue is the first query this driver
+                    // issues, so it is the one that meets an unreachable
+                    // database — and the diagnosis that names the host, the
+                    // port and `docker compose up -d db` lives on the `SELECT
+                    // 1` further down, which would never be reached. Asked
+                    // here, in the same words, so a stopped database still says
+                    // so instead of failing inside the introspector.
+                    try {
+                        await rawClient.query("SELECT 1");
+                    } catch (err) {
+                        const fatal = diagnoseConnectFailure(err, pgConfig.connectionString);
+                        if (fatal) throw fatal;
+                    }
                     const catalogue = await readCatalogueSchema({
                         client: rawClient,
                         collections: ownCollections,

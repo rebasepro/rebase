@@ -369,8 +369,15 @@ export function staleVerdict(input: {
     return {
         lines: [
             ...found,
-            "  The database column has already been renamed at boot, so the generated schema no "
-            + "longer matches it and the server will refuse to start.",
+            // Not "the server will refuse to start" any more. The runtime builds
+            // its tables from `information_schema`, so a stale file changes
+            // nothing it serves — it warns once at boot and carries on. What the
+            // file still decides is everything around the server: Atlas plans
+            // migrations from it, `db push` diffs it, `eject` writes it out, and
+            // user code imports it.
+            "  The database column has already been renamed at boot. The server reads the database, "
+            + "so it will still start — but `db push`, Atlas, `eject` and any code importing this "
+            + "file are all reading a description that no longer matches.",
             "  Run `rebase schema generate` to regenerate it."
         ],
         exitCode: 1,
