@@ -18,8 +18,8 @@ import { drizzle } from "drizzle-orm/pglite";
 import { eq, getTableColumns } from "drizzle-orm";
 import type { CollectionConfig } from "@rebasepro/types";
 
-import { readCatalogueSchema } from "../src/schema/catalogue-schema";
-import type { Queryable } from "../src/schema/introspect-runtime";
+import { buildBaasSchema, readCatalogueSchema } from "../src/schema/catalogue-schema";
+import { buildCollectionsFromSchema, introspectSchema, type Queryable } from "../src/schema/introspect-runtime";
 import { hiddenColumnsOption } from "../src/schema/search-column";
 import { patchPgNumericToNumber } from "../src/utils/pg-numeric-number-patch";
 import { assertWritableColumns, getPrimaryKeys } from "../src/services/collection-helpers";
@@ -291,6 +291,48 @@ describe("tables built from the live catalogue", () => {
     });
 });
 
+describe("BaaS mode, where the database is the whole specification", () => {
+    let pg: PGlite;
+
+    beforeAll(async () => {
+        pg = await PGlite.create();
+        await pg.exec(`
+            CREATE TABLE customers (id text PRIMARY KEY, display_name text, signed_up_at timestamptz);
+        `);
+    }, 60_000);
+
+    afterAll(async () => {
+        await pg?.close();
+    });
+
+    it("serves every column under the same key the derived collection advertises", async () => {
+        const schema = await introspectSchema(pg as unknown as Queryable, "public");
+        const derived = buildCollectionsFromSchema(schema, "public");
+        const { tables } = buildBaasSchema(schema.tablesMap, "public", derived);
+
+        const properties = Object.keys(derived[0].properties ?? {});
+        const columns = Object.keys(getTableColumns(tables.customers));
+
+        // The two halves of one answer, and they used to disagree: the derived
+        // collection names its fields `displayName` (the wire name) while the
+        // table was keyed `display_name`, so `normalizeScalarValues` found no
+        // property for the key it was handed and DROPPED the column from every
+        // response. A BaaS project served nothing but its single-word columns.
+        expect(columns.sort()).toEqual(properties.sort());
+
+        const db = drizzle(pg, { schema: tables });
+        await db.insert(tables.customers).values({
+            id: "c1",
+            displayName: "Grace",
+            signedUpAt: "2026-02-03T00:00:00.000Z"
+        } as never);
+        const [row] = await db.select().from(tables.customers) as Record<string, unknown>[];
+
+        expect(row.displayName).toBe("Grace");
+        expect(typeof row.signedUpAt).toBe("string");
+    });
+});
+
 describe("a write against the catalogue, with a stale schema.generated.ts", () => {
     let pg: PGlite;
 
@@ -336,6 +378,34 @@ describe("a write against the catalogue, with a stale schema.generated.ts", () =
         await db.insert(catalogue.tables.notes).values({ id: "1", title: "t", subtitle: "s" } as never);
         const rows = await db.select().from(catalogue.tables.notes) as Record<string, unknown>[];
         expect(rows[0].subtitle).toBe("s");
+    });
+
+    it("names the field when a write uses the column name instead", async () => {
+        const withColumn = {
+            ...notes,
+            properties: {
+                ...(notes.properties as Record<string, unknown>),
+                subtitle: { name: "Subtitle", type: "string", columnName: "subtitle_text" }
+            }
+        } as unknown as CollectionConfig;
+
+        await pg.exec("ALTER TABLE notes ADD COLUMN IF NOT EXISTS subtitle_text text");
+        const catalogue = await readCatalogueSchema({
+            client: pg as unknown as Queryable,
+            collections: [withColumn],
+            defaultSchema: "public"
+        });
+
+        try {
+            assertWritableColumns({ subtitle_text: "s" }, catalogue.tables.notes, "notes");
+            throw new Error("should have thrown");
+        } catch (error) {
+            const message = (error as Error).message;
+            // "No such column" is the least helpful true statement available
+            // about a column that plainly exists. Say which name to use.
+            expect(message).toContain("'subtitle'");
+            expect(message).toContain("column name");
+        }
     });
 
     it("refuses a column the database does not have, and says the schema is unapplied", async () => {

@@ -149,6 +149,27 @@ export function assertWritableColumns(
     const unknown = Object.keys(values).filter(key => !(key in columns));
     if (unknown.length === 0) return;
 
+    // One key is worth naming precisely: the *column* of a field whose wire name
+    // differs from it. A table is keyed by the wire name — `authorId` for
+    // `author_id` — so writing the column reaches here as "no such column",
+    // which is the least helpful true statement available about it. Says the
+    // name to use instead.
+    const byColumnName = new Map<string, string>();
+    for (const [key, column] of Object.entries(columns)) {
+        const name = (column as { name?: unknown } | undefined)?.name;
+        if (typeof name === "string" && name !== key) byColumnName.set(name, key);
+    }
+    const misspelled = unknown.filter(key => byColumnName.has(key));
+    if (misspelled.length === unknown.length) {
+        throw ApiError.badRequest(
+            `'${collectionPath}' has no field ${misspelled.map(key => `'${key}'`).join(", ")} — ` +
+            `${misspelled.length > 1 ? "those are column names" : "that is a column name"}. ` +
+            `Write ${misspelled.map(key => `'${byColumnName.get(key)}'`).join(", ")} instead: a field is ` +
+            "addressed by its property key, and the column behind it is an implementation detail.",
+            "VALIDATION_UNKNOWN_FIELDS"
+        );
+    }
+
     // The offending keys, and deliberately not the list of real ones: this
     // error is reachable on paths where the REST field check was skipped, and
     // an `excludeFromApi` column is documented as never being served to a
