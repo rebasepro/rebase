@@ -81,7 +81,8 @@
     "jest": "^30.4.2",
     "ts-jest": "29.4.12",
     "typescript": "^6.0.3",
-    "vite": "^8.1.5"
+    "vite": "^8.1.5",
+    "zod-4-5": "npm:zod@4.5.4"
   },
   "peerDependencies": {
     "@aws-sdk/client-s3": "^3.1068.0",

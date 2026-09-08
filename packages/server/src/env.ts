@@ -18,43 +18,23 @@ function generateSecret(bytes = 48): string {
 const boolString = z.enum(["true", "false", ""]).default("false").transform(v => v === "true");
 
 /**
- * Refuse an `extend` schema that a *different copy* of zod built.
+ * Refuse an `extend` value that is not a usable schema.
  *
- * This has one specific, expensive failure behind it. A managed bundle that
- * installed its own zod ran with two copies loaded: the image's, which
- * `loadEnv` uses, and the project's, which built the schema handed to
- * `extend`. `.merge()` accepts it — the shapes are structurally identical — and
- * then `.parse()` rejects every field carrying a `.default()`, because a default
- * is recognised by class identity and these instances belong to the other copy.
- * The deploy came up, reported success, and ran zero crons. Nothing in the
- * failure mentioned zod.
+ * This used to refuse a schema built by a *different copy* of zod, reasoning
+ * that `instanceof` is false across copies. Under zod 4 it is not:
+ * `$constructor` installs a structural `Symbol.hasInstance`, so a foreign
+ * schema passes. The guard never fired once — including on the production boot
+ * it was written for, which came up, loaded no functions, and reported a bare
+ * `"expected": "nonoptional"` with nothing pointing at zod.
  *
- * `instanceof` is the probe precisely because it is what breaks: it is false
- * across two copies of the same package at the same version, which is the
- * condition we need to name. The `_def` check separates the two ways to be
- * wrong, so "you passed a plain object" does not get a lecture about
- * deduplication.
- *
- * Thrown, not warned. A boot that continues here is the outcome this exists to
- * prevent — a server that runs and quietly does less than it was asked to.
+ * A foreign copy is supported now: `loadEnv` parses each schema with its own
+ * `.parse()`, so nothing depends on shared class identity. What remains worth
+ * refusing is a value that cannot validate at all.
  */
-function assertSameZod(extend: unknown): void {
-    if (extend instanceof z.ZodType) return;
-
-    const looksLikeZod = typeof extend === "object" && extend !== null
-        && typeof (extend as { _def?: unknown })._def === "object"
-        && (extend as { _def: Record<string, unknown> })._def !== null;
-
-    if (looksLikeZod) {
-        throw new Error(
-            "loadEnv({ extend }) was given a schema built by a different copy of zod.\n" +
-            "  Two copies are loaded — the runtime's and this project's — and merging across them " +
-            "silently drops every `.default()`, so validation fails on fields you did set.\n" +
-            "  Fix: remove `zod` from your project's dependencies (the runtime provides it), or, if " +
-            "you must declare it, match the runtime's major and let your bundler dedupe it. " +
-            "Import `z` from the same place the rest of your backend does."
-        );
-    }
+function assertUsableSchema(extend: unknown): void {
+    const usable = typeof extend === "object" && extend !== null
+        && typeof (extend as { safeParse?: unknown }).safeParse === "function";
+    if (usable) return;
 
     throw new Error(
         "loadEnv({ extend }) expects a zod object schema — e.g. " +
@@ -326,15 +306,44 @@ export function loadEnv(options?: { extend?: z.ZodObject<z.ZodRawShape> }): Reco
         }
     }
 
-    if (options?.extend) assertSameZod(options.extend);
+    if (options?.extend) assertUsableSchema(options.extend);
 
-    // Merge base schema with user extensions (if provided).
-    const combinedSchema = options?.extend
-        ? rebaseEnvSchema.merge(options.extend)
-        : rebaseEnvSchema;
+    // Validate the base schema and any extension SEPARATELY, then merge the
+    // results.
+    //
+    // `rebaseEnvSchema.merge(extend)` was the obvious spelling, and it is the
+    // one that broke production. `.merge()` reaches into the other schema's
+    // internals, so it holds only when both schemas were built by the *same*
+    // copy of zod. This package inlines the zod it builds against, so an app
+    // that installs its own — most do — has two. The merged shape then loses
+    // every `ZodDefault` wrapper and each defaulted field comes back required:
+    //
+    //     [functions] Failed to load ops.js:
+    //       {"code":"invalid_type","expected":"nonoptional","path":["GEMINI_MODEL"]}
+    //
+    // The guard that used to stand here tried to catch that with
+    // `extend instanceof z.ZodType`, which cannot work: zod 4 defines
+    // `Symbol.hasInstance` structurally, so a foreign schema passes it.
+    //
+    // Parsing each schema with its own `.parse()` needs no shared identity, so
+    // two copies — or two versions — are simply fine now.
+    const baseResult = rebaseEnvSchema.safeParse(process.env);
+    const extendResult = options?.extend ? options.extend.safeParse(process.env) : undefined;
 
-    // Validate with production-specific refinements.
-    const schema = combinedSchema.superRefine((data, ctx) => {
+    const parseIssues = [
+        ...(baseResult.success ? [] : baseResult.error.issues),
+        ...(extendResult && !extendResult.success ? extendResult.error.issues : [])
+    ];
+    if (parseIssues.length > 0) throw new z.ZodError(parseIssues);
+
+    // The refinements below scan every entry, extension fields included, so
+    // they run against the merged object rather than either half.
+    const env = {
+        ...(baseResult.data as RebaseEnv & Record<string, unknown>),
+        ...((extendResult?.data ?? {}) as Record<string, unknown>)
+    } as RebaseEnv & Record<string, unknown>;
+
+    const refinements = z.custom<Record<string, unknown>>().superRefine((data, ctx) => {
         const d = data as RebaseEnv & Record<string, unknown>;
         if (d.NODE_ENV === "production" && !d.CORS_ORIGINS && !d.FRONTEND_URL) {
             ctx.addIssue({
@@ -369,7 +378,8 @@ export function loadEnv(options?: { extend?: z.ZodObject<z.ZodRawShape> }): Reco
         }
     });
 
-    const env = schema.parse(process.env);
+    const refined = refinements.safeParse(env);
+    if (!refined.success) throw refined.error;
 
     // Warn after successful parse so the server still starts in dev — and only
     // when the claim is true. See `secretsAreEphemeral`.

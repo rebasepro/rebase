@@ -22,7 +22,18 @@ const CONSUMER_EXTERNALS = [
     "ts-morph",
     "sharp",
     "nodemailer",
-    "google-auth-library"
+    "google-auth-library",
+    // Externalised so there is exactly ONE zod in the process.
+    //
+    // Inlining it made this package carry its own copy while the app resolved
+    // another from node_modules — different objects, and under our own `^4.4.3`
+    // range often different versions (we build against 4.4.3; apps install
+    // 4.5.x). Anything that crosses the two by class identity then misbehaves:
+    // `.merge()` silently dropped every `ZodDefault`, and a tenant came up
+    // reporting success while loading none of its functions. `z` is re-exported
+    // from here, so the copy an app gets from `@rebasepro/server` must be the
+    // same object as the one it gets from `zod`.
+    "zod"
 ];
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;

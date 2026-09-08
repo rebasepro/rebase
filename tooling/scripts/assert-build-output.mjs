@@ -138,6 +138,52 @@ implicit-any error in a consumer's own file, pointing at their code.
     process.exit(1);
 }
 
+/**
+ * A library this package re-exports must be external, never inlined.
+ *
+ * Bundling a dependency is normally fine and is what this repo does by default.
+ * It stops being fine the moment the package hands consumers that library's own
+ * objects: `@rebasepro/server` re-exports `z`, so inlining zod meant an app's
+ * `import { z } from "zod"` and `import { z } from "@rebasepro/server"` were two
+ * different sets of classes — and, under our own `^4.4.3` range, usually two
+ * different versions, because we build against 4.4.3 while apps install 4.5.x.
+ *
+ * Anything that compares by class identity across that seam then misbehaves
+ * without saying why. `.merge()` dropped every `ZodDefault`, so each field
+ * carrying a `.default()` came back required; a tenant booted, reported healthy,
+ * and loaded none of its functions, with nothing in the error mentioning zod.
+ *
+ * The rule is checked from what the build actually emitted rather than from the
+ * externals list, because the externals list is the thing that gets edited.
+ */
+const REEXPORTED_LIBRARIES = { z: "zod" };
+
+const mainEntry = [pkg.module, pkg.main, pkg.exports?.["."]?.import, pkg.exports?.["."]?.default]
+    .find(entry => typeof entry === "string" && entry.endsWith(".js"));
+
+if (mainEntry && existsSync(resolve(pkgDir, mainEntry))) {
+    const emitted = readFileSync(resolve(pkgDir, mainEntry), "utf8");
+    const inlined = [];
+
+    for (const [binding, library] of Object.entries(REEXPORTED_LIBRARIES)) {
+        const reExported = new RegExp(`\\b${binding}\\s*(,|\\}|as\\b)`).test(emitted)
+            && /export\s*\{/.test(emitted);
+        if (!reExported) continue;
+        if (!emitted.includes(`from "${library}"`)) inlined.push(library);
+    }
+
+    if (inlined.length > 0) {
+        console.error(`\n\x1b[31m✖ ${pkg.name} inlines a library it re-exports\x1b[0m: ${inlined.join(", ")}\n`);
+        console.error(`Add ${inlined.map(l => `"${l}"`).join(", ")} to the externals list in vite.config.ts.
+
+Consumers get this package's copy from its own exports and their copy from
+node_modules. Two copies of a validation library do not throw — they disagree
+quietly, and the failure surfaces somewhere that never mentions the library.
+`);
+        process.exit(1);
+    }
+}
+
 const suffix = redirects.length > 0
     ? `, ${redirects.length} redirect target${redirects.length === 1 ? "" : "s"} resolved`
     : "";

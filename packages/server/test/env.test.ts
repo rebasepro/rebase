@@ -165,14 +165,21 @@ describe("env configuration and localhost validation", () => {
  * A second copy of zod is the difference between a deploy that works and one
  * that comes up, reports success, and runs zero crons.
  *
- * A managed bundle that installed its own zod ran with two copies loaded: the
- * runtime's, which `loadEnv` uses, and the project's, which built the schema
- * passed to `extend`. `.merge()` accepts it — the shapes are structurally
- * identical — and then `.parse()` rejects every field carrying a `.default()`,
- * because a default is recognised by class identity. Nothing in that failure
- * mentioned zod, and it took the whole cron scheduler with it.
+ * This suite used to assert the opposite of what it asserts now, and passed
+ * while production burned. It built its "foreign" schema from `zod/v3` —
+ * genuinely different classes, so `instanceof` was false and the guard fired.
+ * A second copy of *zod 4* behaves nothing like that: `$constructor` installs a
+ * structural `Symbol.hasInstance`, so the foreign schema passes `instanceof`,
+ * the guard stayed silent, `.merge()` dropped every `ZodDefault`, and each
+ * defaulted field came back required:
+ *
+ *     {"code":"invalid_type","expected":"nonoptional","path":["GEMINI_MODEL"]}
+ *
+ * So the fixture is now a real second instance of the installed zod, and the
+ * expectation is that it simply works — `loadEnv` parses each schema with its
+ * own `.parse()` and never depends on shared identity.
  */
-describe("loadEnv({ extend }) and zod identity", () => {
+describe("loadEnv({ extend }) across two copies of zod", () => {
     const originalEnv = { ...process.env };
 
     beforeEach(() => {
@@ -186,24 +193,51 @@ describe("loadEnv({ extend }) and zod identity", () => {
     });
 
     /**
-     * A schema from a genuinely different zod implementation.
+     * A second instance of the *installed* zod, not a different one.
      *
-     * `zod/v3` is a separate set of classes shipped inside the same package, so
-     * `instanceof` against the runtime's `ZodType` is false while `_def` is
-     * present and populated — exactly the shape a second *installed* copy
-     * produces, without this test depending on one being installed.
+     * Purging zod out of the require cache and requiring it again builds a
+     * fresh set of classes. `loadEnv` keeps its reference to the first set, so
+     * the two halves are exactly what a project that installed its own zod
+     * alongside the runtime's produces — same version, different identity —
+     * without this test depending on a second version being installed.
      */
-    function foreignZodSchema(): unknown {
+    /**
+     * A schema built by the zod version tenants actually install.
+     *
+     * This is the pairing that failed in production, and it is a *version* gap,
+     * not merely two copies: `@rebasepro/server` inlines the zod it was built
+     * against (4.4.3, what this repo's lockfile resolves), while a project
+     * installing `zod` under our own `^4.4.3` range gets 4.5.x. Merging across
+     * those two loses every `ZodDefault`. Two copies of 4.4.3 merge fine, which
+     * is exactly why a same-version fixture proves nothing and why this one is
+     * pinned to 4.5.4 rather than resolved from the workspace.
+     */
+    function tenantZod(): { object: (shape: unknown) => unknown; string: () => { default: (v: string) => unknown } } {
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const foreign = require("zod/v3") as { z: { object: (shape: unknown) => unknown; string: () => { default: (v: string) => unknown } } };
-        return foreign.z.object({ STRIPE_KEY: foreign.z.string().default("sk_test") });
+        const fresh = require("zod-4-5") as { z: { object: (shape: unknown) => unknown; string: () => { default: (v: string) => unknown } } };
+        return fresh.z;
     }
 
-    it("fails loudly, naming zod, rather than dropping every default", () => {
-        const extend = foreignZodSchema() as never;
+    it("is not caught by instanceof — the reason the old guard never fired", () => {
+        const foreign = tenantZod();
+        expect(foreign).not.toBe(z);
+        // Structural `Symbol.hasInstance`: a foreign zod 4 schema passes.
+        expect(foreign.object({}) instanceof z.ZodType).toBe(true);
+    });
 
-        expect(() => loadEnv({ extend })).toThrow(/different copy of zod/);
-        expect(() => loadEnv({ extend })).toThrow(/dedupe|dependencies/);
+    it("applies defaults from a schema the other copy built", () => {
+        const foreign = tenantZod();
+        const env = loadEnv({
+            extend: foreign.object({ STRIPE_KEY: foreign.string().default("sk_test") }) as never
+        }) as Record<string, unknown>;
+
+        expect(env.STRIPE_KEY).toBe("sk_test");
+    });
+
+    it("still reports a genuine validation failure from the other copy", () => {
+        const foreign = tenantZod() as unknown as { object: (s: unknown) => unknown; string: () => unknown };
+        expect(() => loadEnv({ extend: foreign.object({ STRIPE_KEY: foreign.string() }) as never }))
+            .toThrow(/STRIPE_KEY/);
     });
 
     it("tells a caller who passed something that is not a schema at all", () => {
