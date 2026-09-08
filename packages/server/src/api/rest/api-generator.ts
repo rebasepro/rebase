@@ -585,7 +585,7 @@ export class RestApiGenerator {
             // should not be found by rolling the other 9,999 back.
             rows.forEach((row, rowIndex) => {
                 assertKnownWriteFields(row, resolvedCollection, { rowIndex });
-                assertWriteValuesValid(row, resolvedCollection, { rowIndex });
+                assertWriteValuesValid(row, resolvedCollection, { rowIndex, status: "new" });
             });
 
             // A client that never sees the response cannot know whether the
@@ -739,7 +739,7 @@ export class RestApiGenerator {
             // answered 201, while the same typo on `posts` was a 400.
             if (!isAuthCollection) {
                 assertKnownWriteFields(body, resolvedCollection);
-                assertWriteValuesValid(body, resolvedCollection);
+                assertWriteValuesValid(body, resolvedCollection, { status: "new" });
             } else {
                 const contract = this.authAdapter?.describeUserCreationContract?.(collectionAuthConfig);
                 if (contract?.validate) {
@@ -1160,7 +1160,7 @@ id: parsed.id });
             const targetCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
             if (targetCollection) {
                 assertKnownWriteFields(body, targetCollection);
-                assertWriteValuesValid(body, targetCollection);
+                assertWriteValuesValid(body, targetCollection, { status: "new" });
             }
 
             const entity = await driver.save({
