@@ -3,7 +3,7 @@ import React from "react";
 import { getTableCellAlignment, getTablePropertyColumnWidth } from "./internal/common";
 import { FilterValues } from "@rebasepro/types";
 import { VirtualTableColumn } from "@rebasepro/ui";
-import { getIconForProperty, getResolvedPropertyInPath } from "../../util/property_utils";
+import { getResolvedPropertyInPath } from "../../util/property_utils";
 import { getColumnKeysForProperty, isFilterableRelation } from "@rebasepro/app";
 
 export function buildIdColumn(largeLayout?: boolean): VirtualTableColumn {
@@ -59,7 +59,6 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
             return [{
                 key: key as string,
                 align: getTableCellAlignment(property),
-                icon: getIconForProperty(property, "small"),
                 title: property.name ?? key as string,
                 sortable: sortable && sortableProperty(property),
                 filter: !disabledFilter && filterable,

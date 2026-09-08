@@ -178,6 +178,42 @@ an edge on both themes. `medium` (40px) is the toolbar and dialog control
 height; `large` (48px) remains on the scale for the login screen and other
 one-field moments.
 
+## Table and list density
+
+Measured before the density pass (2026-09-08): the default table row was 140px
+(the old ladder was 54 / 80 / 140 / 280 / 400, every step sized for an image
+thumbnail), a reference cell rendered a bordered card with three lines inside
+it, the id column stacked three always-visible icon buttons over a truncated
+id, every header carried a property-type glyph, and the view presets were
+pills with a primary ring. The reference runs 40px rows of text.
+
+The ladder is now 36 / 42 / 48 / 96 / 160 (`xs` to `xl`, default `m` = 48).
+`xs`..`m` are text rows and get `small` previews: a chip, a date, a number, and
+a reference as one line (`InlineEntityPreview`: link glyph + title). `l` and
+`xl` are the thumbnail rows and get `medium` and `large` previews, the card
+included. The rules that fall out of it:
+
+1. **A reference is a line unless there is room for a card.** Small previews
+   render inline everywhere (cells, list rows, kanban cards); the card with
+   image, id, secondary lines and side-panel button is for the read view and
+   the tall rows.
+2. **The id cell rests on its id.** The row actions (edit, menu, select) are an
+   overlay that appears on hover, focus or while the row is selected, so the
+   resting table is text and a 36px row still fits its tools.
+3. **Headers are labels.** No property-type glyph before the column title; the
+   type is visible in the cell and in the column menu. Header height is 40px.
+4. **View presets take the row grammar, not the chip grammar.** Text at rest,
+   the alpha highlight when active, `rounded-md`. A hue tint or a primary ring
+   would read as an enum value, which they are not. The record count next to
+   them is a mono readout, not a badge.
+5. **Home cards carry readouts, not tiles.** A collection card's insight
+   figures are `LABEL value delta` text on the card, wrapping at their own
+   height; a bordered tile inside a bordered card inside the sheet was three
+   objects deep, and the estimated tile height kept every card in the row
+   tall and empty.
+6. **Read-view values are body size.** The detail view inherits `text-sm`;
+   only the last row of a summary section steps up to `text-base`.
+
 ## Type, color, control heights
 
 Recorded in `src/theme.css` and `src/index.css` with their reasoning inline:

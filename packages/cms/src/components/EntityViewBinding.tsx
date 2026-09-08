@@ -231,7 +231,7 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
                         anything longer simply grows. Matched to the form's row
                         rather than shrunk to the text: it is what keeps a value
                         from sitting directly on the label of the row below. */}
-                    <div className={"min-h-8 flex flex-col justify-center min-w-0 text-text-primary dark:text-text-primary-dark"}>
+                    <div className={"min-h-8 flex flex-col justify-center min-w-0 text-sm text-text-primary dark:text-text-primary-dark"}>
                         <PropertyPreview propertyKey={field.key}
                             value={getValueInPath(entity.values, field.key)}
                             property={property}

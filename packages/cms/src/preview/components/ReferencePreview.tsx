@@ -142,9 +142,10 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     const customizationController = useCustomizationController();
     const nested = useIsNestedEntityPreview();
 
-    // Nested inside another preview, or filling a title slot: one line of text,
-    // not a second card. See {@link InlineEntityPreview}.
-    const inline = nested || Boolean(textOnly);
+    // Nested inside another preview, filling a title slot, or rendered small
+    // (a table cell, a list row): one line of text, not a second card. The
+    // card only makes sense where there is room for it. See {@link InlineEntityPreview}.
+    const inline = nested || Boolean(textOnly) || size === "small";
 
     const {
         entity,

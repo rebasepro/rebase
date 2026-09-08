@@ -114,7 +114,7 @@ export function InsightsScorecardView({
     // ── Compact card-inline layout ──────────────────────────────────────
     if (compact) {
         return (
-            <div className={cls("flex flex-col gap-0.5 px-2.5 py-2 rounded-md bg-transparent border min-w-0", defaultBorderMixin)}>
+            <div className="flex items-baseline gap-1.5 min-w-0">
                 <span className="text-[10px] uppercase tracking-wider text-surface-400 dark:text-surface-500 truncate">
                     {title}
                 </span>

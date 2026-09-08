@@ -33,9 +33,8 @@ const sizeClasses = {
 /**
  * A toggle chip used for filter presets and similar multi-select controls.
  *
- * Uses an inset box-shadow for the active ring instead of `border` so the
- * chip size stays stable across states and the ring cannot be clipped by
- * parent `overflow-hidden` containers.
+ * Reads as a text tab: no fill at rest, the alpha highlight when active. It
+ * shares no grammar with the tinted enum {@link Chip}, which carries a hue.
  *
  * @group Interactive components
  */
@@ -56,7 +55,7 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(f
             onClick={onClick}
             disabled={disabled}
             className={cls(
-                "inline-flex items-center gap-1 rounded-full",
+                "inline-flex items-center gap-1 rounded-md",
                 "font-medium whitespace-nowrap select-none shrink-0",
                 "transition-colors duration-150",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
@@ -68,14 +67,15 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(f
                 // *replaces* the resting fill with a tint fainter than it — so
                 // pointing at a chip made its background vanish. The active chip
                 // had no hover state at all.
+                // These are view presets, not enum values, so they take the row
+                // grammar (an alpha highlight for the active one, text otherwise)
+                // and not the chip grammar (a hue tint). A primary ring here made
+                // every preset look like a selected enum cell.
                 active
-                    ? cls(
-                        "bg-primary/12 text-primary dark:bg-primary/20 dark:text-primary shadow-[inset_0_0_0_1.5px_var(--color-primary)]",
-                        !disabled && "hover:bg-primary/20 dark:hover:bg-primary/30"
-                    )
+                    ? "bg-surface-active text-text-primary dark:text-text-primary-dark"
                     : cls(
-                        "bg-surface-raised text-text-secondary dark:text-text-secondary-dark",
-                        !disabled && "hover:bg-surface-raised-hover"
+                        "bg-transparent text-text-secondary dark:text-text-secondary-dark",
+                        !disabled && "hover:bg-surface-hover"
                     ),
                 disabled && "opacity-50 cursor-not-allowed",
                 className

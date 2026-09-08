@@ -19,12 +19,11 @@ export function HomeCardInsightSlot({
 }) {
     if (!insights || insights.length === 0) return null;
 
-    // Each compact card row is ~42px; estimate 2 cards per row for wrapping
-    const estimatedRows = Math.ceil(insights.length / 2);
-    const minHeight = estimatedRows * 42 + (estimatedRows - 1) * 6; // 6px = gap-1.5
-
+    // Text readouts, not tiles: they wrap at their own height. The old
+    // estimated minHeight (42px a row) is what kept every card on the home
+    // page tall and empty.
     return (
-        <div className="flex flex-wrap items-center gap-1.5 mt-2" style={{ minHeight }}>
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-1.5">
             {insights.map((def) => (
                 <InsightWidget
                     key={def.id}

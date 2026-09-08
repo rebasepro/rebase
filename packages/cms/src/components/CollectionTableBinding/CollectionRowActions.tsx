@@ -103,7 +103,7 @@ export const CollectionRowActions = function CollectionRowActions({
                 "h-full flex items-center justify-center flex-col z-10",
                 isSelected
                     ? "bg-surface-raised"
-                    : "bg-surface-card",
+                    : "bg-surface-card group-hover:bg-surface-card-hover",
                 frozen ? "sticky left-0" : ""
             )}
             onClick={useCallback((event: React.MouseEvent) => {
@@ -111,13 +111,21 @@ export const CollectionRowActions = function CollectionRowActions({
             }, [])}
             style={{
                 width,
-                position: frozen ? "sticky" : "initial",
+                position: frozen ? "sticky" : "relative",
                 left: frozen ? 0 : "initial",
                 contain: "strict"
             }}>
 
+            {/* The row's resting content is its id. The actions (edit, menu,
+                select) cover it while the row is hovered, focused or selected,
+                so a 36px row carries one line and the tools still fit. */}
             {(hasActions || selectionEnabled) &&
-                <div className="flex items-center justify-center gap-0.5">
+                <div className={cls(
+                    "absolute inset-0 flex items-center justify-center gap-0.5",
+                    isSelected
+                        ? "bg-surface-raised"
+                        : "bg-surface-card group-hover:bg-surface-card-hover opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-100"
+                )}>
 
                     {uncollapsedActions.map((action, index) => {
                         const isEditAction = action.key === "edit";
@@ -202,7 +210,7 @@ export const CollectionRowActions = function CollectionRowActions({
 
                 </div>}
 
-            {!hideId && size !== "xs" && (
+            {!hideId && (
                 <div
                     className="w-[138px] overflow-hidden truncate font-mono text-xs text-text-secondary dark:text-text-secondary-dark max-w-full text-ellipsis px-2 align-center justify-center flex items-center gap-1"
                     onClick={(event) => {

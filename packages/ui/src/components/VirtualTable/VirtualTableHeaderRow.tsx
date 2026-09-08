@@ -124,7 +124,7 @@ export const VirtualTableHeaderRow = ({
     cellRenderer: CellRenderer,
     rowHeight = 54,
     draggingColumnId,
-    headerHeight = 48
+    headerHeight = 40
 }: VirtualTableContextProps<Record<string, unknown>>) => {
 
     const columnRefs = useMemo(() => columns.map(() => createRef<HTMLDivElement>()), [columns.length]);

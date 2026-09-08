@@ -68,10 +68,10 @@ export function getPreviewSizeFrom(size: CollectionSize): PreviewSize {
     switch (size) {
         case "xs":
         case "s":
-            return "small";
         case "m":
-            return "medium";
+            return "small";
         case "l":
+            return "medium";
         case "xl":
             return "large";
         default:
