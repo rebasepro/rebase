@@ -244,8 +244,13 @@ export class ApiError extends Error {
         return new ApiError(404, code, message);
     }
 
-    static conflict(message: string, code = "CONFLICT"): ApiError {
-        return new ApiError(409, code, message);
+    /**
+     * `details` because a 409 is usually a `23505`, and the one thing the
+     * caller needs is *which field* collided. The column name goes in; the
+     * value never does — see `pgFieldViolations`.
+     */
+    static conflict(message: string, code = "CONFLICT", details?: unknown): ApiError {
+        return new ApiError(409, code, message, details);
     }
 
     static internal(message: string, code = "INTERNAL_ERROR"): ApiError {
