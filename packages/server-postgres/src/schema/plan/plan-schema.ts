@@ -452,7 +452,8 @@ export const compileSecurityRule = (
     collection: CollectionConfig,
     rule: SecurityRule,
     resolveCollection: ResolveCollection,
-    injected: boolean
+    injected: boolean,
+    ruleKey = rule.name ?? "(unnamed)"
 ): PolicyPlan[] => {
     const tableName = getTableName(collection);
     const ops = rule.operations && rule.operations.length > 0 ? rule.operations : [rule.operation ?? "all"];
@@ -469,6 +470,7 @@ export const compileSecurityRule = (
         if (!withCheck && needsWithCheck) withCheck = "false";
         return {
             name: policyNames[index],
+            ruleKey,
             operation,
             mode: rule.mode ?? "permissive",
             roles: rule.pgRoles ? [...rule.pgRoles].sort() : ["public"],
@@ -687,7 +689,7 @@ function planCollectionTable(
             columns.push({
                 key: spec.column,
                 column: spec.column,
-                type: { kind: "text" },
+                type: authColumnType(spec.type),
                 nullable: spec.notNull !== true,
                 primaryKey: false,
                 unique: false,
@@ -745,8 +747,14 @@ function planCollectionTable(
     }
 
     const injected = new Set(getInjectedSecurityRules(collection).map(rule => rule.name));
-    const policies = getEffectiveSecurityRules(collection).flatMap(rule =>
-        compileSecurityRule(collection, rule, resolveCollection, Boolean(rule.name && injected.has(rule.name))));
+    const policies = getEffectiveSecurityRules(collection).flatMap((rule, index) =>
+        compileSecurityRule(
+            collection,
+            rule,
+            resolveCollection,
+            Boolean(rule.name && injected.has(rule.name)),
+            rule.name ?? `#${index}`
+        ));
 
     return {
         schema,
@@ -880,6 +888,34 @@ function planReferenceColumn(
     };
 }
 
+/**
+ * An auth-owned column's declared SQL type, as a tag.
+ *
+ * `auth-users-columns` states these as SQL because that is the grammar its three
+ * creators write in; the plan needs the tag so nothing downstream has to parse a
+ * type back apart. Deliberately exhaustive rather than a fallback: a column auth
+ * adds with a type nobody mapped should say so here, not turn into `TEXT` in a
+ * table the login flow reads.
+ */
+const AUTH_COLUMN_TYPES: Record<string, PgType> = {
+    "TEXT": { kind: "text" },
+    "TEXT[]": { kind: "array", of: { kind: "text" } },
+    "BOOLEAN": { kind: "boolean" },
+    "JSONB": { kind: "jsonb" },
+    "TIMESTAMP WITH TIME ZONE": { kind: "timestamptz" }
+};
+
+const authColumnType = (sqlType: string): PgType => {
+    const mapped = AUTH_COLUMN_TYPES[sqlType];
+    if (!mapped) {
+        throw new Error(
+            `\`auth-users-columns\` declares a column of type "${sqlType}", which the schema plan ` +
+            "has no tag for. Add it to `AUTH_COLUMN_TYPES` in schema/plan/plan-schema.ts."
+        );
+    }
+    return mapped;
+};
+
 // ── A junction table ─────────────────────────────────────────────────────────
 
 function planJunctionTable(
@@ -944,8 +980,9 @@ function planJunctionTable(
     // follow the declaring side's update rules. Without them they were the one
     // kind of generated table with no RLS at all.
     const policies = spec
-        ? getJunctionSecurityRules(spec).flatMap(rule =>
-            compileSecurityRule(getJunctionCollectionConfig(spec), rule, resolveCollection, false))
+        ? getJunctionSecurityRules(spec).flatMap((rule, index) =>
+            compileSecurityRule(
+                getJunctionCollectionConfig(spec), rule, resolveCollection, false, rule.name ?? `#${index}`))
         : [];
 
     return {

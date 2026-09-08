@@ -289,7 +289,15 @@ export function renderDrizzleSchema(plan: SchemaPlan, options: DrizzleRenderOpti
         const ordered = [
             ...table.columns.filter(c => c.source.kind !== "implicit-id"),
             ...table.columns.filter(c => c.source.kind === "implicit-id")
-        ].filter(c => !c.columnOwnedByProperty);
+        ].filter(c =>
+            !c.columnOwnedByProperty
+            // The auth columns a users collection does not itself declare —
+            // `is_anonymous`, `tokens_valid_after`. `db push` emits them because
+            // Atlas diffs the database against exactly what it is shown and
+            // would otherwise plan a DROP; drizzle-kit creates no auth table, so
+            // this file describes the collection as written and leaves auth's
+            // own contract to the SQL side that owns it.
+            && c.source.kind !== "auth");
 
         const lines = ordered.map(column => `    ${propKey(column.key)}: ${renderColumn(column, table, plan, uses)}`);
         // A junction's column list carries a trailing comma; a collection's does

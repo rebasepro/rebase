@@ -107,7 +107,7 @@ import { relations as drizzleRelations, sql } from 'drizzle-orm';
 export const products = pgTable("products", {
     name: text("name").notNull(),
     price: numeric("price"),
-    active: boolean("active"),
+    active: boolean("active").default(sql`TRUE`),
     createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     id: text("id").primaryKey()
 }, (table) => ([
@@ -141,7 +141,7 @@ CREATE TABLE "public"."products" (
   "id" TEXT PRIMARY KEY,
   "name" TEXT NOT NULL,
   "price" NUMERIC,
-  "active" BOOLEAN,
+  "active" BOOLEAN DEFAULT TRUE,
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 ```

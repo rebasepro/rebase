@@ -209,6 +209,14 @@ export interface ColumnPlan {
 /** One compiled RLS policy: the clauses, not the SQL and not the rule. */
 export interface PolicyPlan {
     name: string;
+    /**
+     * Which `SecurityRule` this came from.
+     *
+     * A rule with `operations: ["update", "delete"]` compiles to two policies,
+     * and the pair is still one thing the author wrote: `policies.sql` says
+     * "Rebase injected this" once above the run rather than once per statement.
+     */
+    ruleKey: string;
     operation: string;
     /** `permissive` | `restrictive`, lower-case as the rule spells it. */
     mode: string;
