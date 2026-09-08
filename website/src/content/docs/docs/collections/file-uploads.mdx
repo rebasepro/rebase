@@ -1,0 +1,90 @@
+---
+title: File upload fields
+sidebar_label: File uploads
+description: "Declaring a file or image field on a collection: the storage block, single and multi-file uploads, and which of its options the panel resolves rather than the server."
+---
+
+import { FieldWidgetPreview } from '../../../../components/docs/FieldWidgetPreview';
+
+A file field is an ordinary **string** property with a `storage` block. The
+column holds text — the object's key in the bucket, or its URL if you ask for
+that — and the block says where the bytes go and what the form will accept.
+
+That split matters more than it looks. Most of `storage` is read by the admin
+panel's uploader on its way to the API, so a write that does not come from a
+form does not go through it. What the *server* enforces is listed as such below.
+
+## One file
+
+```typescript
+avatar: {
+    type: "string",
+    name: "Main image",
+    storage: {
+        storagePath: "avatars",
+        acceptedFiles: ["image/*"],
+        maxSize: 2 * 1024 * 1024
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="file_upload" />
+
+## Several files
+
+An array of the same thing. The `storage` block moves to `of`, because it
+describes each element rather than the list:
+
+```typescript
+images: {
+    type: "array",
+    name: "Images",
+    of: {
+        type: "string",
+        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
+
+## Storage options
+
+Everything inside `storage`.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `storagePath` | `string \| function` | **Required.** Where in the bucket the file goes. A string with placeholders — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — or a function of the upload's context. **Admin form only — not enforced by the API or the database:** it is the panel's uploader that resolves it, and `client.storage.upload()` names its own key |
+| `fileName` | `string \| function` | The uploaded object's file name, with the same placeholders. **Admin form only — not enforced by the API or the database.** |
+| `storageSource` | `string` | Which registered bucket, when a project has more than one. The `bucket("media")` handle works here too |
+| `public` | `boolean` | Store under the public prefix and serve through a stable, token-less, cacheable URL. `false` by default, which means private objects and short-lived signed URLs |
+| `acceptedFiles` | `FileType[]` | MIME types this property takes. The asterisk form works — `image/*` |
+| `maxSize` | `number` | Largest accepted file, in bytes |
+| `metadata` | `Record<string, unknown>` | Object metadata to store alongside the file |
+| `includeBucketUrl` | `boolean` | Write `s3://my-bucket/path/to/file.png` into the column instead of `path/to/file.png`. `false` by default |
+| `storeUrl` | `boolean` | Write the download URL into the column instead of the key. `false` by default, and worth leaving that way: a URL that carries a token stops working when the token does, and the original reference is then gone |
+| `imageResize` | `ImageResize` | Resize and crop before uploading, for `image/jpeg`, `image/png` and `image/webp`. **Admin form only — not enforced by the API or the database.** |
+| `processFile` | `(file: File) => Promise<File>` | Transform the file before it is uploaded. Runs in the browser. **Admin form only — not enforced by the API or the database.** |
+| `postProcess` | `(pathOrUrl: string) => Promise<string>` | Transform the resolved path or URL before it is saved. Runs in the browser. **Admin form only — not enforced by the API or the database.** |
+| `previewUrl` | `(fileName: string) => string` | Build the preview URL, for when the file's real address is not the field's value. **Admin form only — not enforced by the API or the database.** |
+
+### Resizing
+
+`imageResize` takes `maxWidth` and `maxHeight` in pixels, a `mode` of
+`"contain"` (scale down to fit, the default) or `"cover"` (fill the bounds and
+crop), a `format` of `"original"`, `"jpeg"`, `"png"` or `"webp"`, and a
+`quality` between 0 and 100 for the lossy formats — 80 by default. It happens in
+the browser, before the bytes are sent, so an upload that did not come from the
+panel is stored at its original size.
+
+### Where the file is allowed to go
+
+`storagePath` is a default, not a boundary: nothing on the server confines an
+upload to that prefix. Deciding who may write where is what a storage
+authorization rule is for — see [Storage](/docs/backend/storage).
+
+## Next Steps
+
+- **[Properties](/docs/collections/properties)** — every property type and its options
+- **[Storage](/docs/backend/storage)** — buckets, signed URLs, and what the server does with an upload
+- **[Security Rules (RLS)](/docs/collections/security-rules)** — who may read the rows these files hang off

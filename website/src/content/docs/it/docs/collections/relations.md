@@ -1,5 +1,5 @@
 ---
-sourceHash: 8cb714b94b58f0a9
+sourceHash: b0070dc1781e9f2d
 title: Relazioni
 sidebar_label: Relazioni
 description: Definisci relazioni SQL uno-a-uno, uno-a-molti e molti-a-molti tra collezioni con chiavi esterne, tabelle di giunzione e join multi-hop.
@@ -194,7 +194,9 @@ properties: {
         type: "relation",
         name: "Author",
         relation: { kind: "belongsTo", target: () => usersCollection },
-        widget: "select"           // "select" (dropdown) or "dialog" (full picker)
+        // Which control draws it is presentation, so it goes in the admin block:
+        // "select" (dropdown) or "dialog" (full picker).
+        admin: { widget: "select" }
     }
 }
 ```

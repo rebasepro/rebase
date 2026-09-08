@@ -1,5 +1,5 @@
 ---
-sourceHash: e9ad0454af0a8497
+sourceHash: 13dd95b04d6f92ce
 title: Coleções
 sidebar_label: Coleções
 description: Coleções são o bloco de construção central do Rebase — cada coleção mapeia para uma tabela de banco de dados e define seu esquema, relações, segurança e comportamento da UI.
@@ -178,15 +178,14 @@ Dentro de `admin`, exceto `history`, que é um recurso do backend e permanece no
 | Propriedade | Tipo | Descrição |
 |----------|------|-------------|
 | `callbacks` | `CollectionCallbacks` | Hooks de ciclo de vida (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
-| `entityActions` | `EntityAction[]` | Ações personalizadas em entidades (arquivar, publicar, etc.) |
-| `Actions` | `React.ComponentType` | Componente de ações personalizadas da barra de ferramentas |
-| `entityViews` | `EntityCustomView[]` | Abas personalizadas na visualização de detalhes da entidade |
-| `additionalFields` | `AdditionalFieldDelegate[]` | Colunas calculadas/virtuais |
+| `admin.entityActions` | `EntityAction[]` | Ações personalizadas em entidades (arquivar, publicar, etc.) |
+| `admin.Actions` | `React.ComponentType` | Componente de ações personalizadas da barra de ferramentas |
+| `admin.entityViews` | `EntityCustomView[]` | Abas personalizadas na visualização de detalhes da entidade |
+| `admin.additionalFields` | `AdditionalFieldDelegate[]` | Colunas calculadas/virtuais |
 | `childCollections` | `() => CollectionConfig[]` | Coleções filhas aninhadas |
-| `subcollections` | `() => CollectionConfig[]` | Coleções aninhadas (por exemplo, pedido → itens de linha) |
-| `exportable` | `boolean \| ExportConfig` | Habilita a exportação de dados |
-| `ownerId` | `string` | ID do usuário proprietário (usado por plugins/código personalizado) |
-| `overrides` | `EntityOverrides` | Sobrescritas para a visualização da entidade |
+| `subcollections` | `() => CollectionConfig[]` | **Firestore only.** Coleções aninhadas (por exemplo, pedido → itens de linha) |
+| `admin.exportable` | `boolean \| ExportConfig` | Habilita a exportação de dados |
+| `ownerId` | `string` | **Admin form only — not enforced by the API or the database.** ID do usuário proprietário (usado por plugins/código personalizado) |
 | `driver` | `string` | Driver de banco de dados a ser usado (padrão: `"(default)"`) |
 | `databaseId` | `string` | ID do banco de dados/esquema dentro do driver |
 

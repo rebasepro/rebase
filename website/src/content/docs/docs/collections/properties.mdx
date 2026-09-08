@@ -45,8 +45,18 @@ All property types share these options:
 | `propertyConfig` | `string` | Registered property config key |
 | `columnName` | `string` | Explicit database column name (bypasses snake_case conversion) |
 | `callbacks` | `PropertyCallbacks` | Hooks for `afterRead` and `beforeSave` transforms |
-| `dynamicProps` | `function` | Dynamic property builder (see Conditional Fields) |
-| `conditions` | `PropertyConditions` | Declarative JSON Logic conditions |
+| `excludeFromApi` | `boolean` | Never mention this column on the API surface, in either direction — for a password hash or a verification token. The value is still written and queryable server-side; it is stripped from every row the API serves, for every caller including admins and service keys, and it is absent from the generated `Row`, `Insert` and `Update` types and from the OpenAPI schema |
+| `metadata` | `Record<string, unknown>` | Anything your own code needs to hang off a property. Rebase does not read it; it survives serialization unchanged |
+| `dynamicProps` | `function` | Dynamic property builder (see [Conditional fields](/docs/collections/validation-and-conditions/#conditional-fields)). **Admin form only — not enforced by the API or the database.** |
+| `conditions` | `PropertyConditions` | Declarative JSON Logic conditions. **Admin form only — not enforced by the API or the database.** |
+
+:::note[What "admin form only" means]
+Several options below carry that label: they shape the form the panel draws and
+nothing else — the API accepts a write that ignores them, and no constraint
+stands behind them. A rule that must hold for every caller is a
+[validation rule](/docs/collections/validation-and-conditions/) or a
+[security rule](/docs/collections/security-rules/).
+:::
 
 ### UI Configuration (`admin`)
 
@@ -168,21 +178,21 @@ website: {
 
 ### File upload
 
-Set `storage` to render a file upload dropzone.
+Set `storage` to render a file upload dropzone. The column stays a string — what
+is written to it is the object's key in the bucket:
 
 ```typescript
 avatar: {
     type: "string",
     name: "Main image",
-    storage: {
-        storagePath: "avatars",
-        acceptedFiles: ["image/*"],
-        maxSize: 2 * 1024 * 1024
-    }
+    storage: { storagePath: "avatars", acceptedFiles: ["image/*"] }
 }
 ```
 
 <FieldWidgetPreview client:only="react" variant="file_upload" />
+
+Every option inside `storage`, and the multi-file form of the same field, are on
+[File uploads](/docs/collections/file-uploads).
 
 ### Select (enum)
 
@@ -234,11 +244,11 @@ locales: {
 | `admin.markdown` | `boolean` | Render as markdown editor |
 | `email` | `boolean` | Email format validation |
 | `url` | `boolean` | URL format validation |
-| `storage` | `StorageConfig` | Enable file upload |
+| `storage` | `StorageConfig` | Enable file upload — see [File uploads](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Render as select dropdown |
-| `columnType` | `string` | Database column: `"varchar"`, `"text"` |
-| `isId` | `string` | ID generation: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
-| `userSelect` | `boolean` | Render as a user picker |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | The database column. Defaults to `varchar`, or `uuid` when `isId` says so. `text` for unbounded strings, `char` for fixed width |
+| `isId` | `boolean \| string` | Marks the property as the primary key, and says who fills it: `"manual"` (you do), `"uuid"` (`gen_random_uuid()`), `"cuid"`, or any other string, which is used verbatim as the column's SQL default expression — `"nanoid()"`. `"increment"` is a **number** strategy and does nothing here |
+| `userSelect` | `boolean` | Render as a user picker. The value is a plain string column holding the user id — nothing resolves or checks it on the way in. **Admin form only — not enforced by the API or the database.** |
 | `admin.previewAsTag` | `boolean` | Render this string as a tag in previews |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 | `admin.urlPreview` | `PreviewType` | How to render a string that holds a URL: a link, or an inline image, audio or video preview. Presentation only — whether the value *is* a URL is the `url` flag on the property, which is what the OpenAPI contract is generated from |
@@ -268,8 +278,8 @@ Number fields render as a standard text input with numeric validation.
 | Property | Type | Description |
 |----------|------|-------------|
 | `enum` | `EnumValues` | Render as select with numeric values |
-| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
-| `isId` | `string` | ID generation strategy |
+| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"`. Defaults to `integer` where `validation.integer` or `isId` says the value is whole, `numeric` otherwise |
+| `isId` | `boolean \| string` | Marks the property as the primary key: `"manual"`, `"increment"` (`GENERATED BY DEFAULT AS IDENTITY`), or any other string used verbatim as the column's SQL default expression |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 | `admin.format` | `NumberFormatOptions` | Write the number out as currency, a percentage, or with fixed decimals. Omitted, the raw value renders — a number in the database is shown as the number in the database |
 
@@ -354,10 +364,10 @@ updatedAt: {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`) |
+| `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`). Picks the widget; the column is the same either way. **Admin form only — not enforced by the API or the database.** |
 | `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps |
-| `columnType` | `string` | `"timestamp"`, `"date"` |
-| `timezone` | `string` | Timezone string to evaluate the date in |
+| `columnType` | `"timestamp" \| "date" \| "time"` | The database column. Defaults to `timestamp` **with time zone** |
+| `timezone` | `string` | Which timezone the picker reads and writes the value in. **Admin form only — not enforced by the API or the database.** |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ## Array Properties
@@ -378,18 +388,8 @@ tags: {
 
 ### Multi file upload
 
-Combine `of` with `storage` for a multi-file upload.
-
-```typescript
-images: {
-    type: "array",
-    name: "Images",
-    of: {
-        type: "string",
-        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
-    }
-}
-```
+An array whose `of` carries the `storage` block is a multi-file upload — see
+[File uploads](/docs/collections/file-uploads).
 
 <FieldWidgetPreview client:only="react" variant="multi_file_upload" />
 
@@ -428,7 +428,8 @@ content: {
 | Property | Type | Description |
 |----------|------|-------------|
 | `of` | `Property \| Property[]` | Property schema for array items |
-| `oneOf` | `object` | Array of typed objects with multiple discriminator types |
+| `oneOf` | `object` | Array of typed objects with multiple discriminator types. Takes `properties`, and optionally `propertiesOrder`, `typeField` (default `"type"`) and `valueField` (default `"value"`) |
+| `columnType` | `"json" \| "jsonb" \| "text[]" \| "integer[]" \| "boolean[]" \| "numeric[]"` | The database column. A primitive `of` defaults to the matching native Postgres array; anything else to `jsonb` |
 | `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
 | `admin.minimalistView` | `boolean` | Display child properties directly without extendable panel |
 | `admin.sortable` | `boolean` | Can elements be reordered (default: true) |
@@ -477,7 +478,29 @@ metadata: {
 | `admin.spreadChildren` | `boolean` | Render child properties as separate columns in table view |
 | `admin.minimalistView` | `boolean` | Display properties without a wrapping panel |
 | `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
-| `keyValue` | `boolean` | Render as arbitrary key-value pairs editor |
+| `keyValue` | `boolean` | Render as arbitrary key-value pairs editor. Not presentation despite the wording: it says the map has no declared shape, which is what the OpenAPI schema is generated from |
+| `columnType` | `"json" \| "jsonb"` | The database column. Defaults to `jsonb` |
+
+## Geopoint Properties
+
+A latitude/longitude pair, stored as `jsonb` — `{ latitude, longitude }`, which
+is what the generated TypeScript type, the OpenAPI schema and the form field all
+describe.
+
+```typescript
+location: {
+    type: "geopoint",
+    name: "Location"
+}
+```
+
+Writes take the same shape, or a `GeoPoint` from `@rebasepro/types`:
+`new GeoPoint(41.4036, 2.1744)`.
+
+There are no options beyond the ones every property has. The column is not
+spatially indexed and there is no distance operator to filter on: a geopoint is
+a value you store and show, not one you search by. For that, model the two
+numbers as columns of their own.
 
 ## Reference Properties
 

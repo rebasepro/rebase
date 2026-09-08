@@ -136,6 +136,7 @@ export default defineConfig({
                     items: [
                         { label: "Defining Collections", slug: "docs/collections" },
                         { label: "Properties", slug: "docs/collections/properties" },
+                        { label: "File uploads", slug: "docs/collections/file-uploads" },
                         { label: "Validation & conditions", slug: "docs/collections/validation-and-conditions" },
                         { label: "Relations", slug: "docs/collections/relations" },
                         { label: "Entity Callbacks", slug: "docs/collections/callbacks" },

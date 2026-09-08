@@ -1,5 +1,5 @@
 ---
-sourceHash: e9ad0454af0a8497
+sourceHash: 13dd95b04d6f92ce
 title: Sammlungen
 sidebar_label: Sammlungen
 description: Sammlungen sind der zentrale Baustein von Rebase – jede Sammlung bildet eine Datenbanktabelle ab und definiert deren Schema, Relationen, Sicherheit und UI-Verhalten.
@@ -178,15 +178,14 @@ Innerhalb von `admin`, außer `history` — das ist eine Backend-Funktion und bl
 | Eigenschaft | Typ | Beschreibung |
 |----------|------|-------------|
 | `callbacks` | `CollectionCallbacks` | Lebenszyklus-Hooks (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
-| `entityActions` | `EntityAction[]` | Benutzerdefinierte Aktionen für Entitäten (archivieren, veröffentlichen usw.) |
-| `Actions` | `React.ComponentType` | Benutzerdefinierte Symbolleisten-Aktionskomponente |
-| `entityViews` | `EntityCustomView[]` | Benutzerdefinierte Tabs in der Entitätsdetailansicht |
-| `additionalFields` | `AdditionalFieldDelegate[]` | Berechnete/virtuelle Spalten |
+| `admin.entityActions` | `EntityAction[]` | Benutzerdefinierte Aktionen für Entitäten (archivieren, veröffentlichen usw.) |
+| `admin.Actions` | `React.ComponentType` | Benutzerdefinierte Symbolleisten-Aktionskomponente |
+| `admin.entityViews` | `EntityCustomView[]` | Benutzerdefinierte Tabs in der Entitätsdetailansicht |
+| `admin.additionalFields` | `AdditionalFieldDelegate[]` | Berechnete/virtuelle Spalten |
 | `childCollections` | `() => CollectionConfig[]` | Verschachtelte Kindersammlungen |
-| `subcollections` | `() => CollectionConfig[]` | Verschachtelte Sammlungen (z.B. Bestellung → Posten) |
-| `exportable` | `boolean \| ExportConfig` | Datenexport aktivieren |
-| `ownerId` | `string` | Besitzer-Benutzer-ID (von Plugins/benutzerdefiniertem Code verwendet) |
-| `overrides` | `EntityOverrides` | Overrides für die Entitätsansicht |
+| `subcollections` | `() => CollectionConfig[]` | **Firestore only.** Verschachtelte Sammlungen (z.B. Bestellung → Posten) |
+| `admin.exportable` | `boolean \| ExportConfig` | Datenexport aktivieren |
+| `ownerId` | `string` | **Admin form only — not enforced by the API or the database.** Besitzer-Benutzer-ID (von Plugins/benutzerdefiniertem Code verwendet) |
 | `driver` | `string` | Zu verwendender Datenbanktreiber (Standard: `"(default)"`) |
 | `databaseId` | `string` | Datenbank-/Schema-ID innerhalb des Treibers |
 

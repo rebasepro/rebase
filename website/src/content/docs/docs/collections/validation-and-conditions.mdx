@@ -29,29 +29,89 @@ enum: [
 
 ## Validation
 
+Every rule lives in the property's `validation` block, and which rules a
+property accepts depends on its type — `min` counts characters on a string,
+compares magnitudes on a number, and counts elements on an array.
+
 ```typescript
-validation: {
-    required: true,             // Field is required
-    unique: true,               // Must be unique in the table
-    requiredMessage: "Custom error message",
-
-    // String-specific
-    min: 2,                     // Minimum length
-    max: 200,                   // Maximum length
-    matches: /^[a-z]+$/,       // Regex pattern
-    email: true,                // Email format
-    url: true,                  // URL format
-
-    // Number-specific
-    min: 0,                     // Minimum value
-    max: 1000,                  // Maximum value
-    integer: true,              // Must be integer
-
-    // Array-specific
-    min: 1,                     // Minimum items
-    max: 10,                    // Maximum items
+properties: {
+    title: {
+        type: "string",
+        name: "Title",
+        validation: { required: true, min: 2, max: 200 }
+    },
+    slug: {
+        type: "string",
+        name: "Slug",
+        validation: {
+            unique: true,
+            matches: /^[a-z0-9-]+$/,
+            matchesMessage: "Lowercase letters, digits and hyphens only",
+            trim: true,
+            lowercase: true
+        }
+    },
+    readingMinutes: {
+        type: "number",
+        name: "Reading time",
+        validation: { integer: true, moreThan: 0, max: 120 }
+    }
 }
 ```
+
+### Every type
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `required` | `boolean` | The value must be present |
+| `requiredMessage` | `string` | What the form says when it is not. **Admin form only — not enforced by the API or the database.** |
+| `unique` | `boolean` | Only one row in the table may hold this value |
+| `uniqueInArray` | `boolean` | Only one entry *per array* may hold it. Applies to a direct child of an `array` property, or a first-level child of a `map` inside one. **Admin form only — not enforced by the API or the database.** |
+
+### Strings
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `number` | Fewest / most characters, inclusive. A `max` also sizes the column: it turns `TEXT` into `VARCHAR(max)`, so lowering it on a table that already holds longer rows is a migration the database refuses |
+| `length` | `number` | Exactly this many characters — a country code, a fixed-width reference |
+| `matches` | `string \| RegExp` | A pattern the whole value must match. A string is compiled per request, so one that will not compile is rejected at boot rather than quietly becoming no rule |
+| `matchesMessage` | `string` | What the form says when `matches` fails |
+| `trim` | `boolean` | Strip leading and trailing whitespace **before** saving. A transform, not a check — it changes what is written, which is what makes it the fix for "the same tag twice, one with a trailing space". **Admin form only — not enforced by the API or the database.** |
+| `lowercase` / `uppercase` | `boolean` | Case-fold the value before saving, like `trim`. **Admin form only — not enforced by the API or the database.** |
+
+Email and URL formats are **not** validation rules. `email` and `url` are flags
+on the property itself, beside `type` — statements about the data that the
+OpenAPI contract is generated from, rather than form behaviour:
+
+```typescript
+properties: {
+    email: { type: "string", name: "Email", email: true },
+    website: { type: "string", name: "Website", url: true }
+}
+```
+
+See [String properties](/docs/collections/properties/#string-options).
+
+### Numbers
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `number` | Smallest / largest accepted value, **inclusive** |
+| `moreThan` / `lessThan` | `number` | The exclusive twins of `min` and `max` |
+| `positive` / `negative` | `boolean` | Strictly above / below zero. `0` is rejected by both — use `min: 0` to allow it |
+| `integer` | `boolean` | No fractional part. Does not change the column type; `columnType` does |
+
+### Dates
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `Date` | Earliest / latest accepted date, inclusive. A fixed instant, not "today" |
+
+### Arrays
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `number` | Fewest / most elements, inclusive. Elements, not characters |
 
 ## Conditional Fields
 
@@ -75,12 +135,25 @@ price: {
 ```
 
 The conditions object gives you access to:
-- `disabled`, `hidden`, `readOnly`
-- `required`, `min`, `max`
+- `disabled`, `disabledMessage`, `clearOnDisabled`, `hidden`, `readOnly`
+- `required`, `requiredMessage`, `min`, `max`
 - `defaultValue`
 - `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
 - `referencePath`, `referenceFilter`
 - `canAddElements`, `sortable` (for arrays)
+- `acceptedFiles`, `maxFileSize` (for uploads)
+
+`disabledMessage` is the sentence a reader sees in place of the control. Without
+it a greyed-out field explains nothing, which is the difference between a form
+that is guiding someone and one that is refusing them.
+
+:::caution[Conditions are form behaviour]
+**Admin form only — not enforced by the API or the database.** They run in the
+browser, on the entity being edited, and shape what the panel offers. A rule
+that has to hold for every caller belongs in `validation`, which the server
+checks, or in a [security rule](/docs/collections/security-rules/), which the
+database enforces for anyone — panel, SDK or `curl`.
+:::
 
 ### 2. Property Builders (Programmatic)
 
@@ -96,6 +169,10 @@ price: {
     })
 }
 ```
+
+The same caveat applies, and more sharply: the function is bundled into the
+panel and called on every render of the form. **Admin form only — not enforced
+by the API or the database.**
 
 ## Next Steps
 

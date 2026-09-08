@@ -1,5 +1,5 @@
 ---
-sourceHash: 07e5c8c96bde8798
+sourceHash: c3f56614f53a8814
 title: Propriedades
 sidebar_label: Propriedades
 description: Os tipos de propriedades definem o tipo de dado, validação e renderização da UI para cada campo em uma coleção. O Rebase suporta os tipos string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -127,7 +127,6 @@ Configure `email: true` para adicionar validação de formato de e-mail e render
 email: {
     type: "string",
     name: "User email",
-    email: true,
     validation: { required: true }
 }
 ```
@@ -212,9 +211,8 @@ locales: {
 | `url` | `boolean` | Validação de formato de URL |
 | `storage` | `StorageConfig` | Habilitar upload de arquivo |
 | `enum` | `EnumValues` | Renderizar como seletor dropdown |
-| `multiSelect` | `boolean` | Permitir múltiplas seleções de enum |
-| `columnType` | `string` | Coluna de banco de dados: `"varchar"`, `"text"` |
-| `isId` | `string` | Geração de ID: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | Coluna de banco de dados: `"varchar" \| "text" \| "char" \| "uuid"` |
+| `isId` | `boolean \| string` | Primary key, and who fills it: `"manual"`, `"uuid"`, `"cuid"`, or any other string used verbatim as the column's SQL default expression. `"increment"` is a **number** strategy and does nothing here |
 | `userSelect` | `boolean` | Renderizar como um seletor de usuário |
 | `admin.previewAsTag` | `boolean` | Renderizar esta string como uma tag nas pré-visualizações |
 | `admin.clearable` | `boolean` | Adicionar um ícone para limpar o valor (definir como nulo) |
@@ -317,7 +315,7 @@ updatedAt: {
 |----------|------|-------------|
 | `mode` | `"date" \| "date_time"` | Apenas data ou data + hora (padrão: `"date_time"`) |
 | `autoValue` | `"on_create" \| "on_update"` | Definir timestamps automaticamente |
-| `columnType` | `string` | `"timestamp"`, `"date"` |
+| `columnType` | `"timestamp" \| "date" \| "time"` | `"timestamp" \| "date" \| "time"` |
 | `timezone` | `string` | String de fuso horário para avaliar a data |
 | `admin.clearable` | `boolean` | Adicionar um ícone para limpar o valor (definir como nulo) |
 
@@ -507,8 +505,6 @@ validation: {
     min: 2,                     // Comprimento mínimo
     max: 200,                   // Comprimento máximo
     matches: /^[a-z]+$/,       // Padrão regex
-    email: true,                // Formato de e-mail
-    url: true,                  // Formato de URL
 
     // Específico para números
     min: 0,                     // Valor mínimo
@@ -518,6 +514,17 @@ validation: {
     // Específico para arrays
     min: 1,                     // Número mínimo de itens
     max: 10,                    // Número máximo de itens
+}
+```
+
+Email and URL formats are **not** validation rules. `email` and `url` are flags
+on the property itself, beside `type` — statements about the data that the
+OpenAPI contract is generated from, rather than form behaviour:
+
+```typescript
+properties: {
+    email: { type: "string", name: "Email", email: true },
+    website: { type: "string", name: "Website", url: true }
 }
 ```
 

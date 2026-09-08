@@ -199,6 +199,12 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
     /**
      * User id of the owner of this collection. This is used only by plugins, or if you
      * are writing custom code
+     *
+     * **Admin form only — not enforced by the API or the database.** The
+     * collection editor stamps it on a collection it creates and shows it
+     * beside the name; nothing on the request path consults it. It is not an
+     * ownership check, and a collection with somebody else's id here is served
+     * to exactly the same callers as one with none.
      */
     ownerId?: string;
 
