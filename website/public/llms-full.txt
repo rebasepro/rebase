@@ -9774,7 +9774,7 @@ property accepts depends on its type — `min` counts characters on a string,
 compares magnitudes on a number, and counts elements on an array.
 
 ```typescript
-const article = {
+properties: {
     title: {
         type: "string",
         name: "Title",
@@ -9796,7 +9796,7 @@ const article = {
         name: "Reading time",
         validation: { integer: true, moreThan: 0, max: 120 }
     }
-};
+}
 ```
 
 #### Every type
@@ -9824,10 +9824,10 @@ on the property itself, beside `type` — statements about the data that the
 OpenAPI contract is generated from, rather than form behaviour:
 
 ```typescript
-const contact = {
+properties: {
     email: { type: "string", name: "Email", email: true },
     website: { type: "string", name: "Website", url: true }
-};
+}
 ```
 
 See [String properties](/docs/collections/properties/#string-options).
