@@ -129,7 +129,7 @@ use `isnull` for that. The SDK serializes `.where("deleted_at", "==", null)` as
 
 ### Logical Operators
 
-Use `or` and `and` for complex conditions:
+Use `or`, `and` and `not` for complex conditions:
 
 ```bash
 # OR: match products that are either cheap or on sale
@@ -137,14 +137,24 @@ GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
 
 # AND: explicit conjunction
 GET /api/data/products?and=(active.eq.true,price.gt.0)
+
+# NOT: everything that is not a discontinued in-stock item
+GET /api/data/products?not=(discontinued.eq.true,stock.gt.0)
 ```
 
-**One group per request, and `or` wins.** If a request carries both `?or=` and
-`?and=`, the `and` is ignored — they are two spellings of the same slot, not two
-filters. Nest instead:
+`not` negates the **conjunction** of its conditions: `not(a)` is `NOT a`, and
+`not(a,b)` is `NOT (a AND b)`. It compiles to a real SQL `NOT (...)` rather than
+to inverted operators — SQL is three-valued, so `NOT (a AND b)` and
+`(NOT a) OR (NOT b)` stop agreeing the moment a NULL is involved. A negation
+therefore **includes rows whose column is NULL**, which is what `NOT` means; AND
+a `notnull` alongside it if that is not what you want.
+
+**One group per request: `or` wins over `and`, and both over `not`.** They are
+three spellings of the same slot, not three filters. Nest instead:
 
 ```bash
 GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
+GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 ```
 
 Groups may nest 32 levels deep; past that the request is refused with
@@ -227,6 +237,26 @@ paging over an order that is not total repeats and skips rows.
 A repeated `?orderBy=` parameter is not a multi-key sort — the last one wins, as
 it does for every other query parameter. Use the array.
 
+### Where NULLs sort
+
+By default NULLs sort **last ascending and first descending**, which is
+Postgres's own convention. A third colon-segment says otherwise:
+
+```bash
+# Newest first, with the undated rows at the end rather than the top
+GET /api/data/posts?orderBy=publishedAt:desc:last
+```
+
+The JSON array form takes a `"nulls"` key for the same thing:
+
+```bash
+GET /api/data/posts?orderBy=[{"field":"publishedAt","direction":"desc","nulls":"last"}]
+```
+
+Anything other than `first` or `last` is a 400, not a silently different order.
+The cursor below honours whatever the sort declared, so paging over a nullable
+key stays correct under either placement.
+
 ## Pagination
 
 Use `limit` and `offset`, or `page`:
@@ -247,6 +277,70 @@ itself: `INVALID_LIMIT`, `INVALID_OFFSET` (a whole number of 0 or more) and
 the one asked for cannot be told apart from having reached the end of the
 collection, which is why none of them is clamped or ignored.
 
+### Cursor pagination
+
+`offset` re-counts rows on every request, so a row inserted or deleted between
+two pages shifts the window and the walk silently skips or repeats rows.
+`?after=` seeks instead: the next page starts strictly after the last row
+served.
+
+Every list response carries `meta.nextCursor` while there is another page. Send
+it back unchanged:
+
+```bash
+GET /api/data/orders?orderBy=createdAt:desc&limit=100
+# → meta.nextCursor = "eyJrIjpbWyJjcmVhdGVkX2F0Iiw…"
+
+GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJjcmVhdGVkX2F0Iiw…
+```
+
+The cursor is **opaque** — it encodes the sort keys *and* the last row's values
+for them — so three rules follow, each a 400 rather than a wrong page:
+
+| Situation | Code |
+|-----------|------|
+| `after` with `offset` or `page` | `CURSOR_WITH_OFFSET` — both say where the page starts |
+| `after` with a different `orderBy` than it was issued under | `CURSOR_ORDER_MISMATCH` |
+| A cursor this API did not issue | `INVALID_CURSOR` |
+
+A request that names no `orderBy` **adopts the cursor's**, so passing
+`meta.nextCursor` back without restating the sort works.
+
+Multi-key sorts and nullable keys both page correctly: the comparison is built
+over every key in order, with the NULL placement the sort declared. The one
+ordering no cursor can describe is relevance (`_score`) — computed per query and
+stored nowhere — and such a listing simply carries no `nextCursor`.
+
+## Selecting columns
+
+`?fields=` narrows a read to the columns you name. It is a projection pushed
+into the query, not a trim of the response:
+
+```bash
+GET /api/data/posts?fields=id,title&limit=50
+```
+
+The primary key always comes back (a row that cannot be addressed cannot be
+updated, deleted, or paged past — and the cursor is derived from it), and
+`excludeFromApi` columns stay hidden whether or not they are named. An unknown
+column is a 400 `UNKNOWN_FIELD` rather than a row quietly missing a field.
+
+`?distinct=true` collapses rows identical over those columns:
+
+```bash
+# The statuses actually in use
+GET /api/data/posts?fields=status&distinct=true
+```
+
+It is refused (400) alongside a ranked `searchString` or a vector search, which
+attach a per-row score that makes every row distinct by construction, and when
+`orderBy` names a column `fields` does not return
+(`DISTINCT_ORDER_BY_NOT_SELECTED`) — Postgres cannot order a DISTINCT read by an
+expression outside its select list.
+
+`?fields=` and `?distinct=` work on the get-by-id route and the nested
+subcollection routes too.
+
 ### Response Format
 
 List responses include pagination metadata:
@@ -261,10 +355,15 @@ List responses include pagination metadata:
         "total": 150,
         "limit": 20,
         "offset": 0,
-        "hasMore": true
+        "hasMore": true,
+        "nextCursor": "eyJrIjpbWyJpZCIsImRlc2MiXV0sInYiOnsiaWQiOjJ9LCJpIjoyfQ"
     }
 }
 ```
+
+`nextCursor` is present while `hasMore` is true and the page returned at least
+one row; it is absent on the last page and on an ordering no cursor can
+describe.
 
 Single entity responses return a flat object:
 
@@ -356,9 +455,42 @@ Use the `include` parameter to embed related entities:
 # Include specific relations
 GET /api/data/articles?include=author,categories
 
-# Include all relations
+# Include all relations, one hop deep
 GET /api/data/articles?include=*
+
+# A relation of a relation — up to three hops
+GET /api/data/articles?include=comments.author
 ```
+
+A name that is not a relation of the collection is a **400
+`UNKNOWN_RELATION`**, at every level. It used to be ignored, which answers 200
+with the field simply missing — indistinguishable from a row that genuinely has
+no related row, so a typo looked exactly like empty data. A path deeper than
+three hops is `INCLUDE_TOO_DEEP`.
+
+### Narrowing one relation
+
+The comma-separated form has nowhere to put a per-relation `limit`, so
+`include` also accepts JSON — told apart by a leading brace:
+
+```bash
+GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",true]},"orderBy":"createdAt:desc","fields":["id","body"],"include":{"author":true}}}
+```
+
+| Key | Meaning |
+|-----|---------|
+| `limit` | Rows **per parent row**, not across the page |
+| `where` | The same filter dialect the top-level `where` uses |
+| `logical` | An `or`/`and`/`not` group over the related rows |
+| `orderBy` | The same sort spelling, including the NULL placement |
+| `fields` | Columns of the *related* row; its key always survives |
+| `include` | Relations of the related row, in turn |
+
+`true` means "load it whole", so `{"author":true}` and `author` are the same
+request. Both spellings work on the list route, the get-by-id route and the
+nested subcollection routes.
+
+Each hop is one batched query for the whole page, never one per row.
 
 Included relations are embedded directly in the response:
 
@@ -373,14 +505,6 @@ Included relations are embedded directly in the response:
         "email": "jane@example.com"
     }
 }
-```
-
-## Field Selection
-
-Use `fields` to select specific columns:
-
-```bash
-GET /api/data/products?fields=id,name,price
 ```
 
 ## Lifecycle Hook Pipeline

@@ -22,6 +22,25 @@ export function and(...conditions: (FilterCondition | LogicalCondition)[]): Logi
 conditions };
 }
 
+/**
+ * Negate a group: `not(a)` is `NOT a`, and `not(a, b)` is `NOT (a AND b)`.
+ *
+ * The conjunction, not the disjunction — one rule, stated on
+ * {@link LogicalCondition} and applied identically by the wire codec, the REST
+ * `?not=` parameter and every driver compiler. Groups nest, so De Morgan's
+ * other half is `not(or(a, b))`.
+ *
+ * It compiles to a real SQL `NOT (...)` rather than to inverted operators,
+ * which matters more than it looks: SQL is three-valued, so `NOT (a AND b)` and
+ * `(NOT a) OR (NOT b)` stop agreeing the moment a NULL is involved, and only
+ * one of them is the query the caller wrote. It also means a negation includes
+ * rows whose column is NULL — which is what `NOT` means.
+ */
+export function not(...conditions: (FilterCondition | LogicalCondition)[]): LogicalCondition {
+    return { type: "not",
+conditions };
+}
+
 export function cond(column: string, operator: WhereFilterOp, value: unknown): FilterCondition {
     return { column,
 operator,

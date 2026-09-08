@@ -82,8 +82,16 @@ const COMMENT_OPT_OUT = /<!--\s*docs-verify:\s*ignore\s*-->/;
  *
  * So: the number may go down, never up. Lower this constant when you clear
  * fences; raising it needs a reason written next to it.
+ *
+ * **+1 (99 → 100): `sdk/relations.md`'s typed-include sample.** It imports
+ * `IncludeFor` and `RowWith` from `./database.types` — a file the *reader's*
+ * project generates from *their* collections, so there is nothing in this
+ * workspace to compile it against. The types themselves are not unchecked:
+ * `packages/codegen/test/generated-output-compiles.test.ts` generates that file
+ * from a fixture schema and compiles a consumer of it, including the
+ * `@ts-expect-error` cases this fence shows.
  */
-export const NO_VERIFY_BUDGET = 99;
+export const NO_VERIFY_BUDGET = 100;
 
 /**
  * The repository's own agent instructions.
