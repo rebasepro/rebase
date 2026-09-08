@@ -15,6 +15,13 @@ export interface FetchOneProps<M extends Record<string, unknown> = Record<string
     id: string | number;
     databaseId?: string;
     collection?: CollectionConfig<M>
+    /**
+     * See {@link FetchCollectionProps.withDeleted}. A soft-deleted row is a 404
+     * here by default, so `findById` and `find` agree about which rows exist —
+     * a row you cannot find in a listing and can still open by id is the kind
+     * of inconsistency that makes a feature untrustworthy.
+     */
+    withDeleted?: boolean | "only";
 }
 
 /**
@@ -190,6 +197,22 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
     order?: "desc" | "asc";
     /** Vector similarity search configuration */
     vectorSearch?: VectorSearchParams;
+    /**
+     * What to do about rows a soft delete has stamped.
+     *
+     * Unset (the default) hides them, which is the whole point of the feature:
+     * a deleted row is deleted as far as the application is concerned. `true`
+     * includes them alongside the live ones — a trash view, an admin audit.
+     * `"only"` returns nothing but them, which is the trash view proper and is
+     * not expressible as a filter, because the field is not part of the
+     * caller's vocabulary.
+     *
+     * Ignored by collections that do not declare {@link
+     * PostgresCollectionConfig.softDelete}: there is no stamp to look at, and
+     * silently returning nothing for `"only"` on such a collection would be a
+     * worse answer than ignoring it.
+     */
+    withDeleted?: boolean | "only";
 }
 
 /**
@@ -262,6 +285,17 @@ export interface UpdateManyProps<M extends Record<string, unknown> = Record<stri
 export interface DeleteProps<M extends Record<string, unknown> = Record<string, unknown>> {
     row: { id: string | number; path: string; values?: Partial<EntityValues<M>> };
     collection?: CollectionConfig<M>;
+    /**
+     * Issue a real `DELETE` on a collection that declares
+     * {@link PostgresCollectionConfig.softDelete}.
+     *
+     * The row and every cascade behind it go. It needs the same permission an
+     * ordinary delete does and nothing more: it is the same verb, and a second
+     * access-control surface for one operation is a second thing to get wrong.
+     * No effect on a collection without soft delete, where every delete is
+     * already this one.
+     */
+    hard?: boolean;
 }
 
 /**
@@ -271,6 +305,8 @@ export interface DeleteManyProps<M extends Record<string, unknown> = Record<stri
     path: string;
     ids: (string | number)[];
     collection?: CollectionConfig<M>;
+    /** See {@link DeleteProps.hard}. */
+    hard?: boolean;
 }
 
 export type FilterCombinationValidProps = {
@@ -535,6 +571,8 @@ export interface RestFetchService {
             searchExplain?: boolean;
             databaseId?: string;
             vectorSearch?: VectorSearchParams;
+            /** See {@link FetchCollectionProps.withDeleted}. */
+            withDeleted?: boolean | "only";
         },
         include?: string[]
     ): Promise<Record<string, unknown>[]>;
@@ -561,6 +599,8 @@ export interface RestFetchService {
             logical?: LogicalCondition;
             searchString?: string;
             limit?: number;
+            /** See {@link FetchCollectionProps.withDeleted}. */
+            withDeleted?: boolean | "only";
         }
     ): Promise<Record<string, unknown>[]>;
 
@@ -571,6 +611,8 @@ export interface RestFetchService {
         collectionPath: string,
         id: string | number,
         include?: string[],
-        databaseId?: string
+        databaseId?: string,
+        /** See {@link FetchOneProps.withDeleted}. */
+        withDeleted?: boolean | "only"
     ): Promise<Record<string, unknown> | null>;
 }

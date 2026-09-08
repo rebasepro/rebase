@@ -24,6 +24,8 @@ import { PostgresCollectionRegistry } from "../collections/PostgresCollectionReg
 import { toFlatRow, toRestRow, isJunctionRelation } from "./row-pipeline";
 import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-column";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
+// One rule, one place. See `soft-delete.ts` for why every read has to ask.
+import { andSoftDelete, withSoftDelete, type WithDeleted } from "./soft-delete";
 import { ApiError, logger } from "@rebasepro/server";
 import { reachedDatabase } from "../utils/pg-error-utils";
 
@@ -585,6 +587,7 @@ target });
             startAfter?: Record<string, unknown>;
             searchString?: string;
             logical?: LogicalCondition;
+            withDeleted?: WithDeleted;
         },
         collectionPath: string,
         withConfig?: Record<string, unknown>,
@@ -607,6 +610,14 @@ target });
         const allConditions: SQL[] = [];
 
         if (scopeCondition) allConditions.push(scopeCondition);
+
+        // Soft delete, on the relational-query path.
+        withSoftDelete(
+            allConditions,
+            this.registry.getCollectionByPath(collectionPath) ?? undefined,
+            table,
+            options.withDeleted
+        );
 
         if (options.searchString) {
             const collection = getCollectionByPath(collectionPath, this.registry);
@@ -883,7 +894,8 @@ idColumn };
     async fetchOne<M extends Record<string, unknown>>(
         collectionPath: string,
         id: string | number,
-        databaseId?: string
+        databaseId?: string,
+        withDeleted?: WithDeleted
     ): Promise<Record<string, unknown> | undefined> {
         if (!await this.isAddressableUnder(collectionPath, id)) return undefined;
 
@@ -917,7 +929,10 @@ idColumn };
                 const hidden = hiddenColumnsOption(getTableColumns(table), collection);
 
                 const row = await qb.findFirst({
-                    where: eq(idField, parsedId),
+                    // Soft delete: a stamped row answers 404 like any other
+                    // absent one, so `findById` and `find` agree about which
+                    // rows exist.
+                    where: andSoftDelete(eq(idField, parsedId), collection, table, withDeleted),
                     with: withConfig,
                     ...(hidden ? { columns: hidden } : {})
                 } as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
@@ -945,7 +960,7 @@ idColumn };
         const result = await this.db
             .select(visibleOne as never)
             .from(table)
-            .where(eq(idField, parsedId))
+            .where(andSoftDelete(eq(idField, parsedId), collection, table, withDeleted))
             .limit(1);
 
         if (result.length === 0) return undefined;
@@ -1025,6 +1040,8 @@ idColumn };
             logical?: LogicalCondition;
             /** Narrow to the rows reachable from a parent through a relation. */
             relatedTo?: NestedPathHop;
+            /** See `FetchCollectionProps.withDeleted`. */
+            withDeleted?: WithDeleted;
         } = {}
     ): Promise<Record<string, unknown>[]> {
         const scopeCondition = options.relatedTo ? this.buildRelationScope(options.relatedTo) : undefined;
@@ -1404,6 +1421,8 @@ relatedTo: hop });
              * request that was served three rows was told there were nine.
              */
             vectorSearch?: VectorSearchParams;
+            /** See `FetchCollectionProps.withDeleted`. */
+            withDeleted?: WithDeleted;
         } = {}
     ): Promise<number> {
         // Same narrowing as the listing — and, unlike the count it replaces,
@@ -1419,6 +1438,10 @@ relatedTo: hop });
         const allConditions: SQL[] = [];
 
         if (hop) allConditions.push(this.buildRelationScope(hop));
+
+        // Soft delete. A listing that filters and a count that does not is a
+        // page saying "1 of 4 results".
+        withSoftDelete(allConditions, collection, table, options.withDeleted);
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
@@ -1490,6 +1513,8 @@ relatedTo: hop });
             logical?: LogicalCondition;
             searchString?: string;
             limit?: number;
+            /** See `FetchCollectionProps.withDeleted`. */
+            withDeleted?: WithDeleted;
         }
     ): Promise<Record<string, unknown>[]> {
         const collection = getCollectionByPath(collectionPath, this.registry);
@@ -1539,6 +1564,9 @@ relatedTo: hop });
         let query = this.db.select(selection).from(table).$dynamic();
 
         const conditions: SQL[] = [];
+        // Soft delete. A dashboard that sums deleted orders is reporting
+        // revenue that was withdrawn.
+        withSoftDelete(conditions, collection, table, options.withDeleted);
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
                 options.searchString, collection.properties, table, collection
@@ -1664,6 +1692,12 @@ relatedTo: hop });
             vectorSearch?: VectorSearchParams;
             /** Narrow to the rows reachable from a parent through a relation. */
             relatedTo?: NestedPathHop;
+            /**
+             * See `FetchCollectionProps.withDeleted`. Applied by
+             * `buildDrizzleQueryOptions` on the relational path and by
+             * `fetchRowsWithConditionsRaw` on the fallback, so it holds for both.
+             */
+            withDeleted?: WithDeleted;
         } = {},
         include?: string[]
     ): Promise<Record<string, unknown>[]> {
@@ -1814,7 +1848,8 @@ relatedTo: hop }, include
         collectionPath: string,
         id: string | number,
         include?: string[],
-        databaseId?: string
+        databaseId?: string,
+        withDeleted?: WithDeleted
     ): Promise<Record<string, unknown> | null> {
         if (!await this.isAddressableUnder(collectionPath, id)) return null;
 
@@ -1843,7 +1878,9 @@ relatedTo: hop }, include
 
 
                 const row = await qb.findFirst({
-                    where: eq(idField, parsedId),
+                    // Soft delete: a stamped row is a 404 through the REST read
+                    // too, so `GET /:id` and the listing agree.
+                    where: andSoftDelete(eq(idField, parsedId), collection, table, withDeleted),
                     ...(withConfig ? { with: withConfig } : {})
                 } as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
 
@@ -1870,7 +1907,7 @@ relatedTo: hop }, include
         const result = await this.db
             .select(visibleOne as never)
             .from(table)
-            .where(eq(idField, parsedId))
+            .where(andSoftDelete(eq(idField, parsedId), collection, table, withDeleted))
             .limit(1);
 
         if (result.length === 0) return null;
@@ -1955,6 +1992,8 @@ relatedTo: hop }, include
             searchExplain?: boolean;
             vectorSearch?: VectorSearchParams;
             relatedTo?: NestedPathHop;
+            /** See `FetchCollectionProps.withDeleted`. */
+            withDeleted?: WithDeleted;
         } = {}
     ): Promise<Record<string, unknown>[]> {
         const collection = getCollectionByPath(collectionPath, this.registry);
@@ -1999,6 +2038,11 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         const allConditions: SQL[] = [];
 
         if (options.relatedTo) allConditions.push(this.buildRelationScope(options.relatedTo));
+
+        // Soft delete, on the `db.select` path. Both paths serve the same
+        // request, so a deleted row must not come back down one and not the
+        // other — which is exactly what happens when each grows its own filter.
+        withSoftDelete(allConditions, collection, table, options.withDeleted);
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(

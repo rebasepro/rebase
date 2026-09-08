@@ -15,6 +15,7 @@ import {
     requestFingerprint,
     type IdempotencyStore
 } from "./idempotency";
+import { HARD_DELETE_QUERY_PARAM, parseHardDelete } from "./soft-delete-params";
 
 /**
  * Parse a JSON request body for a create/update. An empty body yields `{}`
@@ -410,7 +411,9 @@ export class RestApiGenerator {
                         orderBy: orderByEntriesToTuples(queryOptions.orderBy),
                         searchString,
                         searchExplain,
-                        vectorSearch: queryOptions.vectorSearch
+                        vectorSearch: queryOptions.vectorSearch,
+                        // `?deleted=include|only`. Unset hides soft-deleted rows.
+                        withDeleted: queryOptions.withDeleted
                     },
                     queryOptions.include
                 )
@@ -445,8 +448,8 @@ export class RestApiGenerator {
 
             // Use include-aware path when available
             const entity = fetchService
-                ? await fetchService.fetchOneForRest(collection.slug, String(id), queryOptions.include)
-                : await this.fetchRawEntity(driver, resolvedCollection, String(id));
+                ? await fetchService.fetchOneForRest(collection.slug, String(id), queryOptions.include, undefined, queryOptions.withDeleted)
+                : await this.fetchRawEntity(driver, resolvedCollection, String(id), queryOptions.withDeleted);
 
             if (!entity) {
                 throw this.entityNotFound(collection.slug, String(id));
@@ -702,6 +705,7 @@ export class RestApiGenerator {
 
             return withIdempotency(c, body, async () => {
                 await driver.deleteMany!({
+                    hard: parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM)),
                     path,
                     ids: ids as (string | number)[],
                     collection: resolvedCollection
@@ -946,6 +950,9 @@ values: entity as Record<string, unknown> },
             }
 
             await driver.delete({
+                // `?hard=true` — a real DELETE on a soft-delete collection. Same
+                // permission as the delete it replaces; see `soft-delete-params.ts`.
+                hard: parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM)),
                 row: {
                     // The address is the one in the URL, not something read back
                     // off the row: a row is only its columns, so `existingEntity.id`
@@ -1059,7 +1066,7 @@ id };
                 const queryOptions = this.parseQuery(c.req.queries());
                 const fetchService = driver.restFetchService;
                 const entity = fetchService
-                    ? await fetchService.fetchOneForRest(parsed.collectionPath, parsed.id, queryOptions.include)
+                    ? await fetchService.fetchOneForRest(parsed.collectionPath, parsed.id, queryOptions.include, undefined, queryOptions.withDeleted)
                     : await driver.fetchOne({ path: parsed.collectionPath,
 id: parsed.id });
                 if (!entity) throw this.entityNotFound(parsed.collectionPath, parsed.id);
@@ -1240,6 +1247,9 @@ id: parsed.id });
             if (!existingEntity) throw this.entityNotFound(parsed.collectionPath, parsed.id);
 
             await driver.delete({
+                // `?hard=true` — a real DELETE on a soft-delete collection. Same
+                // permission as the delete it replaces; see `soft-delete-params.ts`.
+                hard: parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM)),
                 row: {
                     // The address from the path, for the same reason as the
                     // collection-level delete above: a row carries no id.
@@ -1298,7 +1308,10 @@ id: parsed.id });
             offset: queryOptions.offset,
             searchString,
             searchExplain,
-            vectorSearch: queryOptions.vectorSearch
+            vectorSearch: queryOptions.vectorSearch,
+            // `?deleted=include|only`, on the driver-agnostic path too. A
+            // driver that does not soft-delete ignores it.
+            withDeleted: queryOptions.withDeleted
         });
 
         return entities;
@@ -1320,18 +1333,22 @@ id: parsed.id });
             // across pages that came back empty.
             logical: queryOptions.logical,
             searchString,
-            vectorSearch: queryOptions.vectorSearch
+            vectorSearch: queryOptions.vectorSearch,
+            // Same reasoning again, for soft delete: a listing that hides four
+            // rows and a total that counts them is a page saying "1 of 5".
+            withDeleted: queryOptions.withDeleted
         }) : 0;
     }
 
     /**
      * Fetch single entity raw data without Entity wrapper (fallback)
      */
-    private async fetchRawEntity(driver: DataDriver, collection: CollectionConfig, id: string) {
+    private async fetchRawEntity(driver: DataDriver, collection: CollectionConfig, id: string, withDeleted?: boolean | "only") {
         const entity = await driver.fetchOne({
             path: getCollectionDataPath(collection),
             id,
-            collection
+            collection,
+            withDeleted
         });
 
         return entity ?? null;

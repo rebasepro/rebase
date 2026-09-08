@@ -113,4 +113,10 @@ export interface QueryOptions {
     fields?: string[];
     /** Vector similarity search configuration */
     vectorSearch?: VectorSearchParams;
+    /**
+     * From `?deleted=include|only`. See `FetchCollectionProps.withDeleted` —
+     * unset hides the rows a soft delete has stamped, which is the default and
+     * the point of the feature.
+     */
+    withDeleted?: boolean | "only";
 }

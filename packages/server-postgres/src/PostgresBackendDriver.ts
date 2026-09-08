@@ -37,6 +37,7 @@ import { sql as drizzleSql } from "drizzle-orm";
 import { applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, resolveCollectionRelations, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress } from "./services/collection-helpers";
+import { resolveSoftDelete } from "./services/soft-delete";
 import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
 import { ApiError, logger } from "@rebasepro/server";
@@ -292,8 +293,8 @@ export class PostgresBackendDriver implements DataDriver {
                 const rows = await raw.fetchCollectionForRest(collectionPath, options, include);
                 return this.applyAfterReadForRest(rows, collectionPath);
             },
-            fetchOneForRest: async (collectionPath, id, include, databaseId) => {
-                const row = await raw.fetchOneForRest(collectionPath, id, include, databaseId);
+            fetchOneForRest: async (collectionPath, id, include, databaseId, withDeleted) => {
+                const row = await raw.fetchOneForRest(collectionPath, id, include, databaseId, withDeleted);
                 if (!row) return row;
                 const [masked] = await this.applyAfterReadForRest([row], collectionPath);
                 return masked;
@@ -629,12 +630,14 @@ export class PostgresBackendDriver implements DataDriver {
                                                              path,
                                                              id,
                                                              databaseId,
-                                                             collection
+                                                             collection,
+                                                             withDeleted
                                                          }: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
         let row = await this.dataService.fetchOne<M>(
             path,
             id,
-            databaseId || collection?.databaseId
+            databaseId || collection?.databaseId,
+            withDeleted
         );
 
         const {
@@ -1204,7 +1207,8 @@ export class PostgresBackendDriver implements DataDriver {
     async deleteMany<M extends Record<string, unknown>>({
         path,
         ids,
-        collection
+        collection,
+        hard
     }: DeleteManyProps<M>): Promise<void> {
         await this.db.transaction(async (tx) => {
             const txDriver = new PostgresBackendDriver(
@@ -1239,7 +1243,8 @@ export class PostgresBackendDriver implements DataDriver {
                             path,
                             values: existing as Partial<EntityValues<M>>
                         },
-                        collection
+                        collection,
+                        hard
                     });
                 } catch (error) {
                     throw Object.assign(
@@ -1257,7 +1262,8 @@ export class PostgresBackendDriver implements DataDriver {
 
     async delete<M extends Record<string, unknown>>({
                                                               row,
-                                                              collection
+                                                              collection,
+                                                              hard
                                                           }: DeleteProps<M>): Promise<void> {
 
         const targetPath = row.path;
@@ -1334,11 +1340,27 @@ export class PostgresBackendDriver implements DataDriver {
             throw toCallbackError(callbackError, "beforeDelete", targetPath);
         }
 
-        await this.dataService.delete(
-            targetPath,
-            row.id,
-            resolvedCollection?.databaseId
-        );
+        // A soft delete is a delete as far as everything above this line is
+        // concerned — `beforeDelete` can still veto it, `afterDelete` still
+        // fires, the realtime event below still says the row is gone. What
+        // changes is only how the table records it: a timestamp in the declared
+        // field instead of a `DELETE`. `hard` opts back into the real thing and
+        // needs no extra permission, because it is the same verb.
+        const softDelete = hard ? undefined : resolveSoftDelete(resolvedCollection as CollectionConfig | undefined);
+        if (softDelete) {
+            await this.dataService.save(
+                targetPath,
+                { [softDelete.field]: new Date() } as Partial<EntityValues<M>>,
+                row.id,
+                resolvedCollection?.databaseId
+            );
+        } else {
+            await this.dataService.delete(
+                targetPath,
+                row.id,
+                resolvedCollection?.databaseId
+            );
+        }
 
         // Same contract as `afterSave`: inside the transaction, awaited, and a
         // throw undoes the delete rather than leaving the row gone and the
@@ -1440,7 +1462,8 @@ export class PostgresBackendDriver implements DataDriver {
                                                                filter,
                                                                logical,
                                                                searchString,
-                                                               vectorSearch
+                                                               vectorSearch,
+                                                               withDeleted
                                                            }: FetchCollectionProps<M>): Promise<number> {
         return this.dataService.count(
             path,
@@ -1449,10 +1472,13 @@ export class PostgresBackendDriver implements DataDriver {
                 // Counted as well as filtered, or `meta.total` describes a
                 // different set of rows from the `data` beside it. The same
                 // held for a `vectorSearch` carrying a `threshold`: it narrows
-                // the fetch, so it has to narrow the count.
+                // the fetch, so it has to narrow the count. And the same for
+                // soft delete: a listing that hides four rows and a total that
+                // counts them is a page saying "1 of 5".
                 logical,
                 searchString,
-                vectorSearch
+                vectorSearch,
+                withDeleted
             }
         );
     }
@@ -1853,9 +1879,9 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                     return delegate.restFetchService.fetchCollectionForRest(collectionPath, options, include);
                 }, { accessMode: "read only" });
             },
-            fetchOneForRest: async (collectionPath, id, include, databaseId) => {
+            fetchOneForRest: async (collectionPath, id, include, databaseId, withDeleted) => {
                 return this.withTransaction(async (delegate) => {
-                    return delegate.restFetchService.fetchOneForRest(collectionPath, id, include, databaseId);
+                    return delegate.restFetchService.fetchOneForRest(collectionPath, id, include, databaseId, withDeleted);
                 }, { accessMode: "read only" });
             },
             // In the same read-only transaction as the two above, which is what
