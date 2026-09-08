@@ -1,4 +1,4 @@
-import { PgTable, AnyPgColumn } from "drizzle-orm/pg-core";
+import { PgTable, AnyPgColumn, getTableConfig } from "drizzle-orm/pg-core";
 import { getTableColumns } from "drizzle-orm";
 import { CollectionConfig, Property, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
@@ -68,6 +68,30 @@ export function idCanAddressTable(
     return isAddressableId(id, columnBacked);
 }
 
+/**
+ * The columns of a table's composite primary-key constraint, or `[]`.
+ *
+ * Fails open for anything that is not a real Drizzle table — a test double, a
+ * hand-built registry entry — because "no key" is a legitimate answer here and
+ * throwing would take out every caller that only wanted to ask.
+ */
+function compositePrimaryKeyColumns(table: PgTable): AnyPgColumn[] {
+    try {
+        const config = getTableConfig(table);
+        return (config.primaryKeys?.[0]?.columns ?? []) as AnyPgColumn[];
+    } catch {
+        return [];
+    }
+}
+
+/** The Drizzle key a column is registered under, falling back to its name. */
+function columnFieldName(table: PgTable, column: AnyPgColumn): string {
+    for (const [key, candidate] of Object.entries(getTableColumns(table))) {
+        if (candidate === column) return key;
+    }
+    return (column as unknown as { name: string }).name;
+}
+
 export function getCollectionByPath(collectionPath: string, registry: PostgresCollectionRegistry): CollectionConfig {
     const collection = registry.getCollectionByPath(collectionPath);
     if (!collection) {
@@ -79,6 +103,14 @@ export function getCollectionByPath(collectionPath: string, registry: PostgresCo
 
 /**
  * Reject a write naming something that is not a column of the table.
+ *
+ * "The table" is the one read back from `information_schema` at boot — see
+ * `catalogue-schema.ts` — so this asks the database, not a file. It used to ask
+ * the generated module, which made the commonest cause of this error a stale
+ * `schema.generated.ts`: a property added to a collection was created in the
+ * database by boot-ensure and still answered `400` on its first save, because
+ * the module had not been regenerated. That cause no longer exists, and the
+ * remedy below no longer names it.
  *
  * Drizzle builds INSERT from `Object.entries(table[Symbol.Columns])` and UPDATE
  * from `Object.keys(tableColumns)`, so a key the table does not carry is not
@@ -117,23 +149,44 @@ export function assertWritableColumns(
     const unknown = Object.keys(values).filter(key => !(key in columns));
     if (unknown.length === 0) return;
 
+    // One key is worth naming precisely: the *column* of a field whose wire name
+    // differs from it. A table is keyed by the wire name — `authorId` for
+    // `author_id` — so writing the column reaches here as "no such column",
+    // which is the least helpful true statement available about it. Says the
+    // name to use instead.
+    const byColumnName = new Map<string, string>();
+    for (const [key, column] of Object.entries(columns)) {
+        const name = (column as { name?: unknown } | undefined)?.name;
+        if (typeof name === "string" && name !== key) byColumnName.set(name, key);
+    }
+    const misspelled = unknown.filter(key => byColumnName.has(key));
+    if (misspelled.length === unknown.length) {
+        throw ApiError.badRequest(
+            `'${collectionPath}' has no field ${misspelled.map(key => `'${key}'`).join(", ")} — ` +
+            `${misspelled.length > 1 ? "those are column names" : "that is a column name"}. ` +
+            `Write ${misspelled.map(key => `'${byColumnName.get(key)}'`).join(", ")} instead: a field is ` +
+            "addressed by its property key, and the column behind it is an implementation detail.",
+            "VALIDATION_UNKNOWN_FIELDS"
+        );
+    }
+
     // The offending keys, and deliberately not the list of real ones: this
     // error is reachable on paths where the REST field check was skipped, and
     // an `excludeFromApi` column is documented as never being served to a
     // caller. Naming what was sent is the actionable half anyway.
     //
-    // The remedy is named because the overwhelmingly common cause is not a
-    // typo. It is a property that was added to the collection while the
-    // generated schema module still describes the table as it was: the column
-    // exists in the database — boot's additive ensure created it — and this
-    // check reads the module, so the first save of a row carrying the new
-    // property answered 400 and said only that the column did not exist.
+    // The remedy names the schema, not the schema *file*: the columns here were
+    // read from the database this request is about to write to, so a key that is
+    // not among them is a key no column exists for — either a typo, or a
+    // property whose column was never created because nothing has applied the
+    // collection schema to this database yet.
     throw ApiError.badRequest(
         `'${collectionPath}' has no column${unknown.length > 1 ? "s" : ""} ` +
         `${unknown.map(key => `'${key}'`).join(", ")}, so the value${unknown.length > 1 ? "s" : ""} ` +
         "would have been dropped before the statement was built. " +
         "If you just added the propert" + (unknown.length > 1 ? "ies" : "y") +
-        ", the generated schema is behind the collection: run `rebase schema generate`.",
+        ", the database does not have the column yet: apply the schema " +
+        "(`rebase db push`, or redeploy so boot creates it).",
         "VALIDATION_UNKNOWN_FIELDS"
     );
 }
@@ -175,9 +228,15 @@ export function getTableForCollection(collection: CollectionConfig, registry: Po
  * The key columns a collection's rows are addressed by.
  *
  * Three tiers, in order: properties marked `isId`, the primary keys of the
- * drizzle schema, and finally a column literally named `id`. Only the first is
- * visible to the browser, which is why a key known only to drizzle is reported
+ * registered table, and finally a column literally named `id`. Only the first is
+ * visible to the browser, which is why a key known only to the table is reported
  * at boot — see {@link warnOnKeysTheAdminCannotResolve}.
+ *
+ * The second tier reads the table the registry holds, which is built from
+ * `information_schema` — the database's own primary key, not a generated file's
+ * claim about it. Composite keys are declared as a table constraint rather than
+ * on each column (that is the only legal way to say it), so both shapes are
+ * asked for.
  *
  * Returns `[]` when nothing resolves, rather than throwing. It used to open by
  * resolving the table, which throws when there is none — so the `isId` tier,
@@ -223,6 +282,23 @@ export function getPrimaryKeys(collection: CollectionConfig, registry: PostgresC
             keys.push({ fieldName: key,
 type,
 isUUID });
+        }
+    }
+
+    // A composite key is not a flag on each column — Postgres has one
+    // constraint naming several, and that is how the table declares it too. The
+    // generated module happened to mark each member `primaryKey()` individually,
+    // which is not valid DDL but did leave `col.primary` set; reading the
+    // constraint is what keeps a two-column key resolvable now that the table
+    // describes it honestly.
+    if (keys.length === 0) {
+        for (const column of compositePrimaryKeyColumns(table)) {
+            const meta = getColumnMeta(column);
+            keys.push({
+                fieldName: columnFieldName(table, column),
+                type: column.dataType === "number" || meta.columnType === "PgSerial" || meta.columnType === "PgInteger" ? "number" : "string",
+                isUUID: meta.columnType === "PgUUID"
+            });
         }
     }
 

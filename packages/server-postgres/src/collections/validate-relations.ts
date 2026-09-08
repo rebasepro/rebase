@@ -9,6 +9,13 @@ import { PostgresCollectionRegistry } from "./PostgresCollectionRegistry";
 /**
  * Check every relation against the schema it actually runs on, at boot.
  *
+ * "Actually runs on" is now literal: the registry's tables are read back from
+ * `information_schema` (see `catalogue-schema.ts`), so this compares the
+ * collections against the database. It used to compare them against the
+ * committed `schema.generated.ts`, which made a *stale file* able to refuse a
+ * boot — the exact incident class from 0.13, where boot-ensure had already
+ * renamed the column and the file had not caught up.
+ *
  * The tagged union made the *shape* of a relation impossible to get wrong: a
  * `manyToMany` cannot carry a `foreignKeyOnTarget`, a to-many cannot carry a
  * `localKey`. What it cannot know is whether any of the names are real —
@@ -60,22 +67,21 @@ const quote = (xs: Iterable<string>) => Array.from(xs).map(s => `\`${s}\``).join
 const asColumns = (value: string | string[]): string[] => Array.isArray(value) ? value : [value];
 
 /**
- * Distinguish "this column name is wrong" from "the generated schema is old".
+ * Distinguish "this column name is wrong" from "this database was never
+ * migrated".
  *
- * They present identically here — a relation asks for a column the registered
- * table does not have — but they are opposite problems with opposite fixes, and
- * getting them the wrong way round is how the 0.12 → 0.13 upgrade bricked
- * projects.
+ * They present identically here — a relation asks for a column the table does
+ * not have — but they are opposite problems with opposite fixes, and getting
+ * them the wrong way round is how the 0.12 → 0.13 upgrade bricked projects.
  *
- * The registered table is not the database. It comes from the project's
- * checked-in `backend/src/schema.generated.ts`, and 0.13 changed the rule that
- * derives foreign-key names: `categories` yields `category_id` where it used to
- * yield `categorie_id`. Boot-ensure renames the database column to match, so by
- * the time this runs the *database* is correct and the *generated module* is the
- * stale one. Reporting "not a column" then points at the wrong artifact, and the
- * generic fix — "set `through.targetColumn` to one of: …", listing the legacy
- * name because that is what the stale module still has — talks the reader into
- * pinning a column that no longer exists.
+ * 0.13 changed the rule that derives foreign-key names: `categories` yields
+ * `category_id` where it used to yield `categorie_id`. Boot-ensure renames the
+ * database column to match — but only in a process that provisions. Where
+ * nothing has, the database still carries the old spelling while the config
+ * derives the new one, and the generic fix ("set `through.targetColumn` to one
+ * of: …", listing the legacy name because that is what the table still has)
+ * talks the reader into pinning a column that is about to be renamed out from
+ * under them.
  *
  * So when the wanted name is what the current rule derives, and the table
  * carries what the *previous* rule would have derived from the same source, say
@@ -111,13 +117,13 @@ function staleCodegenDefect(
 ): Pick<RelationDefect, "problem" | "fix"> {
     return {
         problem:
-            `the generated Drizzle schema still declares \`${legacy}\` on \`${table}\`, but this ` +
-            `release derives \`${current}\` — the generated schema predates the foreign-key ` +
-            "naming fix and no longer describes the database",
+            `the database still has \`${legacy}\` on \`${table}\`, but this release derives ` +
+            `\`${current}\` — the column predates the foreign-key naming fix and nothing has ` +
+            "renamed it yet",
         fix:
-            "regenerate it with `rebase schema generate` (or `pnpm run schema:generate`). The " +
-            "database column has already been renamed for you at boot, so nothing else is needed. " +
-            `To keep \`${legacy}\` instead, name it explicitly on the relation and regenerate.`
+            "let boot-ensure rename it (redeploy, or start with schema provisioning enabled), or " +
+            "run `rebase db push`. Then run `rebase schema generate` so the committed schema file " +
+            `agrees. To keep \`${legacy}\` instead, name it explicitly on the relation.`
     };
 }
 
@@ -379,24 +385,20 @@ export function assertRelationsResolve(
 
     throw new Error(
         `${defects.length} relation${defects.length === 1 ? "" : "s"} cannot resolve against ` +
-        "`backend/src/schema.generated.ts`.\n\n" +
+        "the database this server is connected to.\n\n" +
         "Each of these would return no rows at query time rather than reporting an error, " +
         "so they are fatal at boot instead.\n\n" +
-        // This reads the *generated file*, not the database, and the difference
-        // is the whole diagnosis after an upgrade. Boot-ensure renames columns
-        // in the database — a 0.12 → 0.13 upgrade singularises a junction key,
-        // `categorie_id` → `category_id` — and the checked-in file still
-        // declares the old name. The config is then correct and the file is
-        // stale, so the per-defect advice below, which lists the columns this
-        // file has, names a column that no longer exists in the database.
-        // Following it turns a recoverable state into a broken config.
-        //
-        // Hence the ordering: regenerate first, and only then consider that the
-        // collection might be the thing that is wrong.
-        "If the database was migrated recently — an upgrade, a `db push`, a restore — this file is\n" +
-        "probably older than the schema it describes. Regenerate it before changing anything else:\n\n" +
-        "    rebase schema generate\n\n" +
-        "If it is already current, then the collection is what disagrees with it:\n\n" +
+        // The columns listed below were read from `information_schema`, not from
+        // `schema.generated.ts`. That distinction is the whole diagnosis after an
+        // upgrade: this check used to read the committed file, so a file older
+        // than the database refused a boot that was fine, and its advice named
+        // columns that no longer existed. What is left is a real disagreement
+        // between the collections and the database — either the schema has not
+        // been applied here, or the relation names something that was never
+        // there.
+        "If the schema has not been applied to this database yet, apply it — `rebase db push`\n" +
+        "(dev), `rebase db migrate` (prod), or a redeploy, which creates tables at boot. If it\n" +
+        "has, then the collection is what disagrees with the database:\n\n" +
         lines.join("\n\n") + "\n"
     );
 }

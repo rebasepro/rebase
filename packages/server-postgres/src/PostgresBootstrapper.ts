@@ -6,7 +6,7 @@
 
 import { Relations, sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { PgEnum, PgTable } from "drizzle-orm/pg-core";
+import { PgTable } from "drizzle-orm/pg-core";
 import type { RebasePgTable } from "./types";
 import {
     type AuthAdapter,
@@ -38,7 +38,9 @@ import { ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { patchPgNumericToNumber } from "./utils/pg-numeric-number-patch";
 import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./schema/introspect-runtime";
-import { buildDrizzleTablesFromSchema, buildDrizzleRelationsFromSchema } from "./schema/dynamic-tables";
+import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
+import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
+import type { TableMeta } from "./schema/introspect-db-logic";
 import { detectConnectionPosture, ensureAppRole, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
@@ -51,6 +53,16 @@ export interface PostgresDriverConfig {
     adminConnectionString?: string;
     readConnectionString?: string;
     connection?: unknown;
+    /**
+     * The project's generated Drizzle module, for **diagnostics only**.
+     *
+     * The tables this driver serves are read from `information_schema` at boot
+     * (see `catalogue-schema.ts`); the only thing this is used for is telling
+     * the developer that their committed `schema.generated.ts` no longer
+     * describes the database, which still matters for Atlas, `db push`, `eject`
+     * and any code importing it. Leaving it out costs the warning and nothing
+     * else.
+     */
     schema?: {
         tables?: Record<string, unknown>;
         enums?: Record<string, unknown>;
@@ -508,46 +520,72 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 }
 
                 introspectedCollections = buildCollectionsFromSchema(schema, pgSchemaName);
-                introspectedTables = buildDrizzleTablesFromSchema(schema.tablesMap, pgSchemaName);
-                // Without these, drizzle's relational path can't resolve the
-                // relations the collections above advertise.
-                introspectedRelations = buildDrizzleRelationsFromSchema(schema.tablesMap, introspectedTables);
+                // Tables keyed the way the collections above name their fields,
+                // and relations derived from the foreign keys — the only
+                // evidence a database with no config offers. Without the
+                // relations, drizzle's relational path can't resolve the ones
+                // those collections advertise.
+                ({ tables: introspectedTables, relations: introspectedRelations } =
+                    buildBaasSchema(schema.tablesMap, pgSchemaName, introspectedCollections));
                 logger.info(
                     `🔍 [PostgresRegistry] BaaS mode: derived ${introspectedCollections.length} collections from schema "${pgSchemaName}" [${introspectedCollections.map(c => c.slug).join(", ")}]`
                 );
             }
 
-            // ── Declared collections, no generated schema: read the tables back ──
-            // Only the default source is handed the bundle's Drizzle schema; a
-            // second database (`database("analytics")`) has collections routed
-            // to it and no schema at all. Its tables were just provisioned from
-            // those collections, so they are read back from the catalogue —
-            // restricted to the collections that are this source's, because
-            // the driver is handed every collection the project declares and
-            // must not go looking for the default's tables in the analytics
-            // database. Without this the registry held no table for `events`,
-            // and every routed write failed with "table not found" on a
-            // database that had the table.
+            // ── Declared collections: read the tables back from the database ──
+            //
+            // Every source, the default included. The bundle's generated Drizzle
+            // module used to be authoritative here for the default source, and a
+            // file one commit behind the database changed what the server did:
+            // a renamed foreign-key column 500'd every request in production, a
+            // property boot-ensure had already created answered 400
+            // VALIDATION_UNKNOWN_FIELDS on first save, and relations the module
+            // lacked went silently missing from list reads. Boot-ensure runs
+            // before this, so `information_schema` is the current, complete
+            // description of what is actually there — and it cannot drift from
+            // itself. The module is now read only to tell the developer their
+            // file is stale (`warnOnGeneratedSchemaDrift`, below).
+            //
+            // Restricted to the collections that are this source's, because the
+            // driver is handed every collection the project declares and must
+            // not go looking for the default's tables in the analytics database.
+            // Without that filter the registry held no table for `events`, and
+            // every routed write failed with "table not found" on a database
+            // that had the table.
             let ownTables: Record<string, PgTable> | undefined;
             let ownRelations: Record<string, Relations> | undefined;
+            let ownCatalogue: Map<string, TableMeta> | undefined;
+            let ownCollections: CollectionConfig[] = [];
             const sourceKey = (config as { dataSourceKey?: string }).dataSourceKey ?? DEFAULT_DATA_SOURCE_KEY;
-            if (!introspectedCollections && !pgConfig.schema?.tables && collections && collections.length > 0) {
-                const own = collections.filter(c =>
+            if (!introspectedCollections && collections && collections.length > 0) {
+                ownCollections = collections.filter(c =>
                     c.dataSource === sourceKey || (!c.dataSource && sourceKey === DEFAULT_DATA_SOURCE_KEY)
                 );
-                if (own.length > 0) {
-                    const pgSchemaName = pgConfig.introspectionSchema ?? "public";
-                    const live = await introspectSchema(rawClient, pgSchemaName);
-                    const wanted = new Set(own.map(c => getCollectionTableName(c)));
-                    for (const table of [...live.tablesMap.keys()]) {
-                        if (!wanted.has(table) && !live.joinTables.has(table)) live.tablesMap.delete(table);
+                if (ownCollections.length > 0) {
+                    // Reading the catalogue is the first query this driver
+                    // issues, so it is the one that meets an unreachable
+                    // database — and the diagnosis that names the host, the
+                    // port and `docker compose up -d db` lives on the `SELECT
+                    // 1` further down, which would never be reached. Asked
+                    // here, in the same words, so a stopped database still says
+                    // so instead of failing inside the introspector.
+                    try {
+                        await rawClient.query("SELECT 1");
+                    } catch (err) {
+                        const fatal = diagnoseConnectFailure(err, pgConfig.connectionString);
+                        if (fatal) throw fatal;
                     }
-                    ownTables = buildDrizzleTablesFromSchema(live.tablesMap, pgSchemaName);
-                    ownRelations = buildDrizzleRelationsFromSchema(live.tablesMap, ownTables);
-                    const missing = [...wanted].filter(t => !live.tablesMap.has(t));
-                    if (missing.length > 0) {
+                    const catalogue = await readCatalogueSchema({
+                        client: rawClient,
+                        collections: ownCollections,
+                        defaultSchema: pgConfig.introspectionSchema ?? "public"
+                    });
+                    ownTables = catalogue.tables;
+                    ownRelations = catalogue.relations;
+                    ownCatalogue = catalogue.meta;
+                    if (catalogue.missing.length > 0) {
                         logger.warn(
-                            `[PostgresRegistry] Data source "${sourceKey}" has no table yet for: ${missing.join(", ")}. ` +
+                            `[PostgresRegistry] Data source "${sourceKey}" has no table yet for: ${catalogue.missing.join(", ")}. ` +
                             "Their collections will answer \"table not found\" until the schema is provisioned."
                         );
                     }
@@ -555,17 +593,33 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             }
 
             const activeCollections = introspectedCollections ?? collections;
-            const schemaTables = introspectedTables ?? pgConfig.schema?.tables ?? ownTables;
-            const schemaRelations = introspectedRelations
-                ?? (pgConfig.schema?.relations as Record<string, Relations> | undefined)
-                ?? ownRelations;
+            const schemaTables = introspectedTables ?? ownTables;
+            const schemaRelations = introspectedRelations ?? ownRelations;
+
+            // The one remaining reader of the generated module: a warning per
+            // difference, and no effect on anything served. Wrapped because a
+            // diagnostic must never be the reason a server does not start.
+            if (ownCatalogue) {
+                try {
+                    warnOnGeneratedSchemaDrift(diffGeneratedSchemaAgainstCatalogue({
+                        generated: pgConfig.schema?.tables,
+                        catalogue: ownCatalogue,
+                        collections: ownCollections
+                    }));
+                } catch (err) {
+                    logger.debug("[schema] Could not compare schema.generated.ts against the database", { error: err });
+                }
+            }
 
             // Create a fresh registry for this driver. Registration order is
             // load-bearing, so it lives in one place — see `buildCollectionRegistry`.
+            //
+            // No enums: a catalogue-built enum column is `text`, which is what a
+            // generated `pgEnum` column served anyway (drizzle validates no
+            // labels; Postgres does), and nothing reads the registry's enum map.
             const registry = buildCollectionRegistry({
                 collections: activeCollections,
                 tables: schemaTables,
-                enums: pgConfig.schema?.enums as Record<string, PgEnum<[string, ...string[]]>> | undefined,
                 relations: schemaRelations
             });
 

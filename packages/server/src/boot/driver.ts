@@ -104,6 +104,10 @@ export interface InitializedDataSource {
     connection: DriverConnection;
 }
 
+/**
+ * The generated Drizzle module a bundle ships — a diagnostic, not the schema an
+ * adapter serves. See `BundleSchemaExports` in ./bundle.ts.
+ */
 export interface BundleSchema {
     tables?: Record<string, unknown>;
     enums?: Record<string, unknown>;
@@ -342,10 +346,13 @@ export function adapterToBootstrapper(
 /**
  * Build a driver for one data source.
  *
- * Only the default source receives the bundle's Drizzle schema: the schema
- * describes the tables generated from this project's collections, which live in
- * the default database. Handing it to a secondary source would tell that
- * driver's adapter about tables it does not have.
+ * Only the default source receives the bundle's Drizzle schema, which is now a
+ * diagnostic rather than a description: every adapter reads its tables out of
+ * the database it is connected to, and this is what the boot-time check
+ * compares against to say the committed `schema.generated.ts` has fallen
+ * behind. The default source is where the generated file's tables live, and a
+ * secondary source's stale-file warning is not worth handing a second adapter a
+ * module describing a database it is not connected to.
  */
 export async function initializeDataSource(
     source: ResolvedDataSourceConfig,

@@ -100,6 +100,12 @@ export async function introspectSchema(client: Queryable, pgSchema: string): Pro
             c.udt_name,
             c.is_nullable,
             c.column_default,
+            -- A stored generated column must be declared as one, or drizzle
+            -- writes DEFAULT into it on every INSERT. Postgres tolerates that
+            -- today; the generated module has always declared them properly,
+            -- and the runtime tables are built to match it.
+            c.is_generated,
+            c.generation_expression,
             (SELECT a.atttypmod FROM pg_attribute a
              JOIN pg_class pc ON a.attrelid = pc.oid
              WHERE pc.relname = c.table_name

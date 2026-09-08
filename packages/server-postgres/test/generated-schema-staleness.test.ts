@@ -300,10 +300,15 @@ describe("the verdict schema stale prints", () => {
 
     it("fails, and says why, when the generated schema is behind", () => {
         const verdict = staleVerdict({ ...clean, stale: behind });
+        const printed = verdict.lines.join("\n");
 
         expect(verdict.exitCode).toBe(1);
-        expect(verdict.lines.join("\n")).toContain("refuse to start");
-        expect(verdict.lines.join("\n")).toContain("rebase schema generate");
+        // Not "the server will refuse to start": the runtime builds its tables
+        // from the database, so a stale file no longer stops a boot. What it
+        // does stop is every tool that reads the file.
+        expect(printed).not.toContain("refuse to start");
+        expect(printed).toContain("db push");
+        expect(printed).toContain("rebase schema generate");
     });
 
     it("stays silent under --fix when there is nothing to fix", () => {

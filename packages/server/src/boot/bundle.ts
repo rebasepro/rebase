@@ -260,6 +260,14 @@ spa: item.spa !== false } : undefined;
 /**
  * The Drizzle schema a bundle ships: tables, enums and relations, as generated
  * from the project's collections.
+ *
+ * **Not what the runtime serves.** The Postgres driver builds its tables from
+ * `information_schema` after boot-ensure has run, so this module is loaded for
+ * one purpose only: comparing it against the live database at boot and saying
+ * so when the committed file has fallen behind (`generated-schema-diff.ts` in
+ * `@rebasepro/server-postgres`). It used to be authoritative, and a file one
+ * commit behind the database was then able to 500 every request, refuse a boot,
+ * or lose a relation from a list read.
  */
 export interface BundleSchemaExports {
     tables?: Record<string, unknown>;
@@ -268,10 +276,11 @@ export interface BundleSchemaExports {
 }
 
 /**
- * Import the bundle's Drizzle schema module.
+ * Import the bundle's Drizzle schema module, for the boot-time staleness check.
  *
- * Returns `undefined` when the bundle declares none — `baas` mode introspects the
- * live database instead of shipping a schema.
+ * Returns `undefined` when the bundle declares none, and that is not a
+ * degraded boot: every table the server serves is read from the database. All
+ * that is lost is the warning that the committed file no longer describes it.
  */
 export async function loadBundleSchema(bundle: LoadedBundle): Promise<BundleSchemaExports | undefined> {
     const entry = bundle.manifest.entry?.schema;

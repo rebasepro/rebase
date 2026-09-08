@@ -14,6 +14,12 @@
  * This lives in a real file rather than a "jest" key in package.json so the
  * split is visible from `ls` alongside the vitest configs.
  *
+ * `pnpm test` runs jest with `NODE_OPTIONS=--experimental-vm-modules`, which the
+ * PGlite-backed tests need: PGlite reaches for `await import("fs")` while it
+ * boots, and jest's VM refuses a dynamic import without that flag
+ * (`ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING_FLAG`). A bare `npx jest` fails on
+ * those suites and on nothing else.
+ *
  * CommonJS (.cjs) because the package is "type": "module".
  *
  * @type {import("jest").Config}
