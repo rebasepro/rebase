@@ -125,8 +125,14 @@ export interface IncludeOptions {
     where?: FilterValues<string>;
     /** An `and`/`or`/`not` group over the related rows. */
     logical?: LogicalCondition;
-    /** Sort the related rows. */
-    orderBy?: OrderBySpec<string>;
+    /**
+     * Sort the related rows — the tuple form, or the `field:direction[:nulls]`
+     * shorthand the REST `?orderBy=` parameter uses.
+     *
+     * The string is accepted because this whole object travels over a query
+     * string, where a tuple is three characters of JSON heavier for no gain.
+     */
+    orderBy?: OrderBySpec<string> | string;
     /** Columns of the *related* row to return. `id` is always included. */
     fields?: string[];
     /** Relations of the related row to load in turn. */

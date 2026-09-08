@@ -54,11 +54,29 @@ export function generateOpenApiSpec(
         { name: "page", in: "query", schema: { type: "integer", minimum: 1 },
             description: "Page number (alternative to offset). Calculates offset as (page-1)*limit" },
         {
+            name: "after",
+            in: "query",
+            schema: { type: "string" },
+            description:
+                "Keyset cursor: continue after the row the previous page ended on. Pass back "
+                + "`meta.nextCursor` from that response, unchanged — it is opaque, and encodes both the "
+                + "sort keys and the last row's values for them. Unlike `offset`, a row inserted or "
+                + "deleted before the cursor cannot shift the window, so a walk neither repeats nor "
+                + "skips rows. Cannot be combined with `offset`/`page` (400 CURSOR_WITH_OFFSET), and an "
+                + "`orderBy` different from the one the cursor was issued under is refused "
+                + "(400 CURSOR_ORDER_MISMATCH) rather than seeked in an order nobody asked for."
+        },
+        {
             name: "orderBy",
             in: "query",
             schema: { type: "string" },
-            description: "Sort field and direction. Accepts `field:asc` or `field:desc`, or a JSON array `[{\"field\":\"name\",\"direction\":\"asc\"}]` — several entries sort by each in turn, the second breaking ties on the first.",
-            example: "created_at:desc"
+            description:
+                "Sort field and direction. Accepts `field:asc`, `field:desc`, or `field:desc:last` — "
+                + "the third segment places NULLs (`first`/`last`), defaulting to Postgres's own "
+                + "convention (last ascending, first descending). Also accepts a JSON array "
+                + "`[{\"field\":\"name\",\"direction\":\"asc\",\"nulls\":\"last\"}]` — several entries sort by "
+                + "each in turn, the second breaking ties on the first.",
+            example: "created_at:desc:last"
         },
         {
             name: "where",
@@ -83,18 +101,55 @@ export function generateOpenApiSpec(
             example: "(views.gte.10,status.eq.draft)"
         },
         {
+            name: "not",
+            in: "query",
+            schema: { type: "string" },
+            description:
+                "Negation, AND-ed with `where` and `searchString`. Negates the **conjunction** of its "
+                + "conditions: `not(a)` is `NOT a`, `not(a,b)` is `NOT (a AND b)`. Groups nest, so "
+                + "`not(or(a,b))` is the De Morgan case. Compiles to a real SQL `NOT (...)`, which — "
+                + "three-valued logic — also excludes rows whose column is NULL. Ignored when `or` or "
+                + "`and` is also present.",
+            example: "(status.eq.draft,views.gte.10)"
+        },
+        {
             name: "include",
             in: "query",
             schema: { type: "string" },
-            description: "Comma-separated list of relations to include (eager-load). Use `*` for all relations.",
-            example: "author,tags"
+            description:
+                "Relations to load, in either of two spellings. **Comma-separated names or dotted "
+                + "paths** — `author,comments.author`, up to 3 hops deep; `*` loads every relation one "
+                + "hop deep. **JSON**, when a relation needs narrowing — "
+                + "`{\"comments\":{\"limit\":5,\"where\":{\"published\":[\"==\",true]},"
+                + "\"orderBy\":\"created_at:desc\",\"fields\":\"id,body\",\"include\":{\"author\":true}}}`. "
+                + "A value starting with `{` is read as the JSON form. A name that is not a relation of "
+                + "the collection is a 400 UNKNOWN_RELATION, not a silently missing field.",
+            example: "author,comments.author"
         },
         {
             name: "fields",
             in: "query",
             schema: { type: "string" },
-            description: "Comma-separated list of fields to return (field selection)",
+            description:
+                "Comma-separated columns to return. A projection pushed into the SELECT, so a query "
+                + "that needs two fields of a wide row reads two columns. The primary key is always "
+                + "returned (a row that cannot be addressed cannot be updated, deleted, or paged past), "
+                + "and `excludeFromApi` columns stay hidden whether or not they are named here. An "
+                + "unknown column is a 400 UNKNOWN_FIELD.",
             example: "id,name,created_at"
+        },
+        {
+            name: "distinct",
+            in: "query",
+            schema: { type: "boolean" },
+            description:
+                "`SELECT DISTINCT` over the returned columns. Only meaningful alongside `fields`: the "
+                + "primary key is always in the projection, so without narrowing it every row is "
+                + "already distinct. `meta.total` counts distinct rows too. Refused (400) alongside "
+                + "`searchString` or a vector search, which attach a per-row score that makes every row "
+                + "distinct by construction, and (400 DISTINCT_ORDER_BY_NOT_SELECTED) when `orderBy` "
+                + "names a column `fields` does not return.",
+            example: "true"
         },
         {
             name: "searchString",
@@ -179,7 +234,16 @@ description: "Page size used for this query" },
                         offset: { type: "integer",
 description: "Number of records skipped" },
                         hasMore: { type: "boolean",
-description: "Whether more records exist beyond this page" }
+description: "Whether more records exist beyond this page" },
+                        nextCursor: {
+                            type: "string",
+                            description:
+                                "Opaque keyset cursor continuing this listing — pass it back as `?after=`. "
+                                + "Present when `hasMore` is true and the page returned at least one row; "
+                                + "absent on the last page and on an ordering no cursor can describe "
+                                + "(relevance, whose scores are computed per query and not stored). Do not "
+                                + "parse it: the encoding exists to be changed."
+                        }
                     }
                 }
             } as Record<string, unknown>,
@@ -624,12 +688,29 @@ in: "path",
 required: true,
 schema: { type: "string" },
 description: "Entity ID" },
+                    // The same two parameters the list route documents, and the
+                    // same code serves them — one row and a page of them go
+                    // through one pipeline, so anything true of `include` or
+                    // `fields` there is true here.
                     {
                         name: "include",
                         in: "query",
                         schema: { type: "string" },
-                        description: "Comma-separated list of relations to include",
-                        example: "author,tags"
+                        description:
+                            "Relations to load: comma-separated names or dotted paths "
+                            + "(`author,comments.author`, up to 3 hops), `*` for all one hop deep, or the "
+                            + "JSON form for per-relation `limit`/`where`/`orderBy`/`fields`. An unknown "
+                            + "name is a 400 UNKNOWN_RELATION.",
+                        example: "author,comments.author"
+                    },
+                    {
+                        name: "fields",
+                        in: "query",
+                        schema: { type: "string" },
+                        description:
+                            "Comma-separated columns to return, as a SELECT projection. The primary key "
+                            + "always survives and `excludeFromApi` columns stay hidden.",
+                        example: "id,title"
                     }
                 ],
                 responses: {

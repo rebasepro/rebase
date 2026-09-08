@@ -4,6 +4,7 @@ import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
 import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
+import { cursorToStartAfter, topLevelIncludeNames } from "@rebasepro/common";
 import { assertKnownWriteFields, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyOperation } from "../../auth/api-keys/api-key-permission-guard";
@@ -396,41 +397,13 @@ export class RestApiGenerator {
             const driver = this.getScopedDriver(c);
             const fetchService = driver.restFetchService;
 
-            // Use include-aware path when available
-            const entities = fetchService
-                ? await fetchService.fetchCollectionForRest(
-                    collection.slug,
-                    {
-                        filter: queryOptions.where,
-                        // `?or=`/`?and=` were parsed and then dropped right here,
-                        // so a filtered read returned every row RLS allowed.
-                        logical: queryOptions.logical,
-                        limit: queryOptions.limit,
-                        offset: queryOptions.offset,
-                        orderBy: orderByEntriesToTuples(queryOptions.orderBy),
-                        searchString,
-                        searchExplain,
-                        vectorSearch: queryOptions.vectorSearch
-                    },
-                    queryOptions.include
-                )
-                : await this.fetchRawCollection(driver, resolvedCollection, queryOptions, searchString, searchExplain);
-
-            const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
+            const page = await this.readPage(
+                driver, resolvedCollection, queryOptions, searchString, searchExplain
+            );
 
             return c.json({
-                data: projectResponseFields(
-                    entities as Record<string, unknown>[],
-                    queryOptions.fields,
-                    resolvedCollection,
-                    { include: queryOptions.include }
-                ),
-                meta: {
-                    total,
-                    limit: queryOptions.limit,
-                    offset: queryOptions.offset,
-                    hasMore: (queryOptions.offset || 0) + entities.length < total
-                }
+                data: page.rows,
+                meta: page.meta
             });
         });
 
@@ -443,21 +416,32 @@ export class RestApiGenerator {
             const driver = this.getScopedDriver(c);
             const fetchService = driver.restFetchService;
 
-            // Use include-aware path when available
+            // Use include-aware path when available. `fields` reaches the
+            // driver as a projection here too — the same columns a list read
+            // would select, so one row and a page of them cost the same per
+            // row rather than the get route paying for every column.
             const entity = fetchService
-                ? await fetchService.fetchOneForRest(collection.slug, String(id), queryOptions.include)
+                ? await fetchService.fetchOneForRest(
+                    collection.slug, String(id), queryOptions.include, undefined,
+                    { fields: queryOptions.fields }
+                )
                 : await this.fetchRawEntity(driver, resolvedCollection, String(id));
 
             if (!entity) {
                 throw this.entityNotFound(collection.slug, String(id));
             }
 
-            return c.json(projectResponseFields(
+            // One row, shaped exactly as this route's list shapes each of its
+            // own. Kept as a `body` rather than returned inline so the response
+            // stays easy to extend with headers a caller has to see.
+            const body = projectResponseFields(
                 [entity as Record<string, unknown>],
                 queryOptions.fields,
                 resolvedCollection,
-                { include: queryOptions.include }
-            )[0]);
+                { include: topLevelIncludeNames(queryOptions.include) }
+            )[0];
+
+            return c.json(body);
         });
 
         /**
@@ -1059,7 +1043,10 @@ id };
                 const queryOptions = this.parseQuery(c.req.queries());
                 const fetchService = driver.restFetchService;
                 const entity = fetchService
-                    ? await fetchService.fetchOneForRest(parsed.collectionPath, parsed.id, queryOptions.include)
+                    ? await fetchService.fetchOneForRest(
+                        parsed.collectionPath, parsed.id, queryOptions.include, undefined,
+                        { fields: queryOptions.fields }
+                    )
                     : await driver.fetchOne({ path: parsed.collectionPath,
 id: parsed.id });
                 if (!entity) throw this.entityNotFound(parsed.collectionPath, parsed.id);
@@ -1075,70 +1062,37 @@ id: parsed.id });
                     [entity as Record<string, unknown>],
                     queryOptions.fields,
                     nestedCollection,
-                    { include: queryOptions.include }
+                    { include: topLevelIncludeNames(queryOptions.include) }
                 )[0]);
             } else {
                 // GET /parent/:parentId/child — list entities.
                 //
-                // Same call the root list route makes. A child listing used to
-                // be served by a second, thinner pipeline that accepted these
-                // options and applied only `limit` — so `offset`, `orderBy` and
-                // `include` were dropped without a word, and `total` counted
-                // rows the filter would have excluded.
+                // Literally the same call the root list route makes, through
+                // the same `readPage`. A child listing used to be served by a
+                // second, thinner pipeline that accepted these options and
+                // applied only `limit` — so `offset`, `orderBy` and `include`
+                // were dropped without a word, and `total` counted rows the
+                // filter would have excluded. Rewriting it to match was not
+                // enough: every parameter added afterwards had to be remembered
+                // in two places, and this is the copy that kept being missed.
                 const queryDict = c.req.queries();
                 const queryOptions = this.parseQuery(queryDict);
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-                const fetchService = driver.restFetchService;
-                const listOptions = {
-                    filter: queryOptions.where,
-                    // Same omission the comment above describes, one parameter
-                    // later: parsed, then dropped, so `?or=` widened the read.
-                    logical: queryOptions.logical,
-                    limit: queryOptions.limit,
-                    offset: queryOptions.offset,
-                    orderBy: orderByEntriesToTuples(queryOptions.orderBy),
-                    searchString,
-                    // Parsed by the same `parseQuery` the root list uses and
-                    // then dropped here, so `?vector_search=…&vector=[…]` on a
-                    // child listing was served as an ordinary page: no distance
-                    // ordering, no `_distance`, no threshold. A silent
-                    // downgrade, which reads as "the collection has no
-                    // neighbours" rather than as "this route ignored you".
-                    vectorSearch: queryOptions.vectorSearch
-                };
-                const entities = fetchService
-                    ? await fetchService.fetchCollectionForRest(parsed.collectionPath, listOptions, queryOptions.include)
-                    : await driver.fetchCollection({ path: parsed.collectionPath,
-...listOptions });
-
-                const total = driver.count ? await driver.count({
-                    path: parsed.collectionPath,
-                    filter: queryOptions.where,
-                    logical: queryOptions.logical,
-                    searchString,
-                    // Wired together with the fetch above on purpose: a count
-                    // that ignores the threshold the listing applied reports a
-                    // `total` larger than the set that was served, and
-                    // `hasMore` promises a page that does not exist.
-                    vectorSearch: queryOptions.vectorSearch
-                }) : entities.length;
+                const searchExplainRaw = Array.isArray(queryDict.searchExplain) ? queryDict.searchExplain[queryDict.searchExplain.length - 1] : undefined;
 
                 const listCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
+                const page = await this.readPage(
+                    driver,
+                    listCollection ?? ({ slug: parsed.collectionPath } as CollectionConfig),
+                    queryOptions,
+                    searchString,
+                    searchExplainRaw === "true",
+                    parsed.collectionPath
+                );
+
                 return c.json({
-                    data: listCollection
-                        ? projectResponseFields(
-                            entities as Record<string, unknown>[],
-                            queryOptions.fields,
-                            listCollection,
-                            { include: queryOptions.include }
-                        )
-                        : entities,
-                    meta: {
-                        total,
-                        limit: queryOptions.limit,
-                        offset: queryOptions.offset,
-                        hasMore: (queryOptions.offset || 0) + entities.length < total
-                    }
+                    data: page.rows,
+                    meta: page.meta
                 });
             }
         });
@@ -1271,13 +1225,127 @@ id: parsed.id });
 
 
     /**
+     * One page of a listing: the rows, and the `meta` that describes them.
+     *
+     * Written once because it was written twice — the root listing and the
+     * nested one each built their own `meta`, from their own idea of what
+     * `hasMore` meant, over reads assembled from slightly different option
+     * lists. Anything added to one (a cursor, a distinct read, an `include`
+     * that now nests) had to be remembered in the other, and the nested route
+     * is the one that kept being forgotten.
+     *
+     * @param collectionPath the path to read — a nested listing passes its own
+     *   `parent/:id/child` path, which the driver resolves.
+     */
+    private async readPage(
+        driver: DataDriver,
+        collection: CollectionConfig,
+        queryOptions: QueryOptions,
+        searchString?: string,
+        searchExplain?: boolean,
+        collectionPath?: string
+    ): Promise<{ rows: Record<string, unknown>[]; meta: Record<string, unknown> }> {
+        const path = collectionPath ?? collection.slug;
+        const orderBy = orderByEntriesToTuples(queryOptions.orderBy);
+        const startAfter = queryOptions.cursor ? cursorToStartAfter(queryOptions.cursor) : undefined;
+        const seeking = startAfter !== undefined;
+
+        // One row past the page when seeking. `hasMore` on an offset page is
+        // `offset + rows.length < total`, and under a cursor that arithmetic is
+        // simply false: every seeked page runs at offset 0, so it compares one
+        // page against the whole collection and says "more" forever.
+        const limit = queryOptions.limit;
+        const probeLimit = (seeking && limit !== undefined) ? limit + 1 : limit;
+
+        const fetchService = driver.restFetchService;
+        const fetched = fetchService
+            ? await fetchService.fetchCollectionForRest(
+                path,
+                {
+                    filter: queryOptions.where,
+                    // `?or=`/`?and=` were parsed and then dropped right here,
+                    // so a filtered read returned every row RLS allowed.
+                    logical: queryOptions.logical,
+                    limit: probeLimit,
+                    // A cursor and an offset describe the same window two
+                    // incompatible ways. The parser refuses both together, so
+                    // reaching here with a cursor means there is no offset.
+                    offset: seeking ? undefined : queryOptions.offset,
+                    startAfter,
+                    orderBy,
+                    searchString,
+                    searchExplain,
+                    vectorSearch: queryOptions.vectorSearch,
+                    fields: queryOptions.fields,
+                    distinct: queryOptions.distinct
+                },
+                queryOptions.include
+            )
+            : await this.fetchRawCollection(
+                driver, collection, { ...queryOptions, limit: probeLimit }, searchString, searchExplain, path, startAfter
+            );
+
+        // The probe row is evidence, not data — it is never served.
+        const entities = (seeking && limit !== undefined)
+            ? (fetched as Record<string, unknown>[]).slice(0, limit)
+            : fetched as Record<string, unknown>[];
+
+        const total = await this.countRawEntities(driver, collection, queryOptions, searchString, path);
+
+        const rows = projectResponseFields(
+            entities,
+            queryOptions.fields,
+            collection,
+            { include: topLevelIncludeNames(queryOptions.include) }
+        );
+
+        const offset = queryOptions.offset ?? 0;
+        const hasMore = seeking
+            ? (fetched as unknown[]).length > (limit ?? 0)
+            : offset + entities.length < total;
+
+        // The cursor for the *next* page, from the last row served. Issued by
+        // the driver, which is the only layer that knows which columns address
+        // a row; absent where none can describe the page — an ordering with no
+        // stored value to seek on, such as relevance — and the caller then
+        // pages by offset, exactly as it did before cursors existed.
+        const last = entities[entities.length - 1];
+        const nextCursor = (hasMore && last && fetchService?.cursorFor)
+            ? fetchService.cursorFor(path, last, orderBy)
+            : undefined;
+
+        return {
+            rows,
+            meta: {
+                total,
+                limit: queryOptions.limit,
+                offset: queryOptions.offset,
+                hasMore,
+                ...(nextCursor && { nextCursor })
+            }
+        };
+    }
+
+    /**
      * Fetch raw collection data without Entity wrapper (fallback for non-Postgres)
      */
-    private async fetchRawCollection(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string, searchExplain?: boolean) {
+    private async fetchRawCollection(
+        driver: DataDriver,
+        collection: CollectionConfig,
+        queryOptions: QueryOptions,
+        searchString?: string,
+        searchExplain?: boolean,
+        collectionPath?: string,
+        startAfter?: Record<string, unknown>
+    ) {
         const entities = await driver.fetchCollection({
-            path: getCollectionDataPath(collection),
+            path: collectionPath ?? getCollectionDataPath(collection),
             collection,
             filter: queryOptions.where,
+            include: queryOptions.include,
+            fields: queryOptions.fields,
+            distinct: queryOptions.distinct,
+            startAfter,
             // The fallback every driver without a `restFetchService` uses —
             // mongo, firebase, anything a developer registers. It dropped the
             // group exactly as the Postgres path did.
@@ -1307,9 +1375,15 @@ id: parsed.id });
     /**
      * Count raw entities for a collection
      */
-    private async countRawEntities(driver: DataDriver, collection: CollectionConfig, queryOptions: QueryOptions, searchString?: string): Promise<number> {
+    private async countRawEntities(
+        driver: DataDriver,
+        collection: CollectionConfig,
+        queryOptions: QueryOptions,
+        searchString?: string,
+        collectionPath?: string
+    ): Promise<number> {
         return driver.count ? await driver.count({
-            path: getCollectionDataPath(collection),
+            path: collectionPath ?? getCollectionDataPath(collection),
             collection,
             filter: queryOptions.where,
             // Counted as well as fetched, or `total` describes a different set

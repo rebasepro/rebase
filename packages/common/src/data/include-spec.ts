@@ -1,6 +1,6 @@
 import { MAX_INCLUDE_DEPTH } from "@rebasepro/types";
 import type { FilterValues, IncludeOptions, IncludeSpec, LogicalCondition, OrderByTuple } from "@rebasepro/types";
-import { normalizeOrderBy } from "./sort-dialect";
+import { deserializeOrderByList, normalizeOrderBy } from "./sort-dialect";
 
 /**
  * The `include` codec: one shape, whatever spelling it arrived in.
@@ -110,7 +110,14 @@ function normalizeOptions(key: string, options: IncludeOptions, depth: number): 
     if (options.where) node.where = options.where;
     if (options.logical) node.logical = options.logical;
     if (options.fields && options.fields.length > 0) node.fields = [...options.fields];
-    const orderBy = normalizeOrderBy(options.orderBy);
+    // The same two spellings the top-level `?orderBy=` accepts: the
+    // `field:direction[:nulls]` shorthand a caller writes into a query string,
+    // and the tuple form a typed caller writes in code. Accepting only the
+    // tuples made the JSON include form — the one that exists *because* it
+    // travels over a query string — unable to express the shorthand beside it.
+    const orderBy = typeof options.orderBy === "string"
+        ? deserializeOrderByList(options.orderBy)
+        : normalizeOrderBy(options.orderBy);
     if (orderBy) node.orderBy = orderBy;
     if (options.include) {
         const nested = normalizeIncludeAt(options.include, depth + 1);
@@ -202,6 +209,24 @@ export function includePaths(tree: Record<string, IncludeNode>, prefix = ""): st
         out.push(...includePaths(node.children, path));
     }
     return out;
+}
+
+/**
+ * The relation names an `include` asks for at the top level.
+ *
+ * `["author", "comments.author"]` and `{author: true, comments: {...}}` both
+ * answer `["author", "comments"]` — a *hop*, not a path, because the only
+ * consumer is `?fields=`, which names keys on the row being returned and a
+ * nested relation is not one of those.
+ *
+ * Derived rather than passed: `include` has four spellings and three of them
+ * are not a `string[]`, so every consumer that wants the plain names either
+ * calls this or reimplements the flattening.
+ */
+export function topLevelIncludeNames(spec?: IncludeSpec): string[] {
+    const normalized = normalizeInclude(spec);
+    if (!normalized) return [];
+    return Object.keys(normalized.tree);
 }
 
 /** Whether any node in the tree carries per-relation options. */
