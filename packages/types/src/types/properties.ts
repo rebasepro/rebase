@@ -378,6 +378,12 @@ export interface BaseProperty<CustomProps = unknown> {
      * or on the entity's values. For example, you can make a field read-only if
      * another field has a certain value.
      * This function receives the same props as a `PropertyBuilder` and should return a partial `Property` object.
+     *
+     * **Admin form only — not enforced by the API or the database.** The
+     * function is bundled into the panel and called while a form renders. A
+     * write that never goes through a form never goes through it, so a rule
+     * that must hold for every caller belongs in {@link validation}, which the
+     * server checks, or in a security rule, which the database enforces.
      */
     dynamicProps?: (props: PropertyBuilderProps) => Partial<Property>;
 
@@ -388,6 +394,11 @@ export interface BaseProperty<CustomProps = unknown> {
      * - Stored in the database as JSON
      * - Edited via the collection editor UI
      * - Evaluated at runtime like property builders
+     *
+     * **Admin form only — not enforced by the API or the database.** Like
+     * {@link dynamicProps}, these are evaluated while a form renders and shape
+     * what the panel offers. `conditions.required` does not make a column
+     * `NOT NULL` and does not make a write fail.
      *
      * @see PropertyConditions for available condition options
      * @see https://jsonlogic.com/ for JSON Logic syntax
@@ -462,6 +473,11 @@ export interface StringProperty extends BaseProperty {
      * provider (e.g. the ID in your `users` table).
      * You can also use a property builder to specify the user path dynamically
      * based on other values of the entity.
+     *
+     * **Admin form only — not enforced by the API or the database.** The column
+     * is an ordinary string; there is no foreign key to the users table and
+     * nothing resolves or checks the id on the way in. To make the link real,
+     * declare a `relation` to the auth collection instead.
      */
     userSelect?: boolean;
 
@@ -643,10 +659,18 @@ export interface DateProperty extends BaseProperty {
      * Set the granularity of the field to a date or date + time.
      * Defaults to `date_time`.
      *
+     * **Admin form only — not enforced by the API or the database.** It picks
+     * the picker. The column is whatever {@link columnType} says, and the API
+     * accepts a full timestamp either way — narrowing the widget does not
+     * narrow the value.
      */
     mode?: "date" | "date_time";
     /**
      * Timezone string to evaluate the date in.
+     *
+     * **Admin form only — not enforced by the API or the database.** It is the
+     * zone the panel reads and writes the value in; what is stored is a
+     * `timestamptz`, which has no zone of its own.
      */
     timezone?: string;
     /**
@@ -963,7 +987,11 @@ export interface PropertyValidationSchema {
     required?: boolean;
 
     /**
-     * Customize the required message when the property is not set
+     * Customize the required message when the property is not set.
+     *
+     * **Admin form only — not enforced by the API or the database.** It is the
+     * sentence the panel shows under the field; an API rejection carries its
+     * own error code and message.
      */
     requiredMessage?: string;
 
@@ -978,6 +1006,11 @@ export interface PropertyValidationSchema {
      * once per entry in the parent `ArrayProperty`. It has no effect if this
      * property is not a child of an `ArrayProperty`. It works on direct
      * children of an `ArrayProperty` or first level children of `MapProperty`
+     *
+     * **Admin form only — not enforced by the API or the database.** Unlike
+     * {@link unique}, which compiles to a constraint, this one is checked as
+     * the form is filled in: the column holds a JSON array, and nothing in
+     * Postgres is looking inside it.
      */
     uniqueInArray?: boolean;
 }
@@ -1039,11 +1072,24 @@ export interface StringPropertyValidationSchema extends PropertyValidationSchema
      *
      * A transform, not a check: it changes the value that is written, which is
      * what makes it the fix for "the same tag twice, one with a trailing space".
+     *
+     * **Admin form only — not enforced by the API or the database.** The panel
+     * applies it on its way to the API; a value written any other way arrives
+     * as it was sent. A transform that must always happen is a `beforeSave`
+     * callback, which runs on the server for every write.
      */
     trim?: boolean;
-    /** Lowercase the value before saving. A transform, like {@link trim}. */
+    /**
+     * Lowercase the value before saving. A transform, like {@link trim}.
+     *
+     * **Admin form only — not enforced by the API or the database.**
+     */
     lowercase?: boolean;
-    /** Uppercase the value before saving. A transform, like {@link trim}. */
+    /**
+     * Uppercase the value before saving. A transform, like {@link trim}.
+     *
+     * **Admin form only — not enforced by the API or the database.**
+     */
     uppercase?: boolean;
 }
 
@@ -1106,6 +1152,10 @@ export type StorageConfig = {
      * Advanced image resizing and cropping configuration.
      * Applied before upload to optimize storage and bandwidth.
      * Only applies to image MIME types: image/jpeg, image/png, image/webp
+     *
+     * **Admin form only — not enforced by the API or the database.** The
+     * resizing happens in the browser, before the bytes are sent. An upload
+     * that does not go through the panel is stored at its original size.
      */
     imageResize?: ImageResize;
 
@@ -1128,6 +1178,9 @@ export type StorageConfig = {
      * - `{propertyKey}` - ID of this property
      * - `{path}` - Path of this entity
      *
+     * **Admin form only — not enforced by the API or the database.** The panel's
+     * uploader resolves it; `client.storage.upload()` names its own `key`.
+     *
      * @param context
      */
     fileName?: string | ((context: UploadedFileContext) => string | Promise<string>);
@@ -1144,6 +1197,12 @@ export type StorageConfig = {
      * - `{entityId}` - ID of the entity
      * - `{propertyKey}` - ID of this property
      * - `{path}` - Path of this entity
+     *
+     * **Admin form only — not enforced by the API or the database.** Required
+     * on the type because a file field in the panel has to put the object
+     * somewhere, but it is the panel's uploader that resolves it. Nothing on
+     * the server confines an upload to this prefix — that is what a storage
+     * authorization rule is for.
      */
     storagePath: string | ((context: UploadedFileContext) => string);
 
@@ -1177,6 +1236,10 @@ export type StorageConfig = {
     /**
      * Use this callback to process the file before uploading it to the storage.
      * If nothing is returned, the file is uploaded as it is.
+     *
+     * **Admin form only — not enforced by the API or the database.** It runs in
+     * the browser, on the file the reader picked.
+     *
      * @param file
      */
     processFile?: (file: File) => Promise<File> | undefined;
@@ -1184,12 +1247,17 @@ export type StorageConfig = {
     /**
      * Postprocess the saved value (storage path or URL)
      * after it has been resolved.
+     *
+     * **Admin form only — not enforced by the API or the database.**
      */
     postProcess?: (pathOrUrl: string) => Promise<string>;
 
     /**
      * You can use this prop in order to provide a custom preview URL.
      * Useful when the file's path is different from the original field value
+     *
+     * **Admin form only — not enforced by the API or the database.** It changes
+     * what the panel renders, never what is stored.
      */
     previewUrl?: (fileName: string) => string;
 }
