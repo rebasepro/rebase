@@ -1,31 +1,55 @@
 import { CollectionConfig, type EnumValues, type Property, type ResolvedBelongsTo } from "@rebasepro/types";
-import { enumToObjectEntries, fieldKeyForColumn, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
+import {
+    type FieldViewer,
+    canWriteField,
+    effectiveAccess,
+    enumToObjectEntries,
+    fieldKeyForColumn,
+    resolveCollectionRelations,
+    resolvePrimaryKeys,
+    restrictedFieldNames
+} from "@rebasepro/common";
 import { hydrateRegExp } from "@rebasepro/utils";
 import { ApiError } from "../errors";
 
 /**
- * The names `excludeFromApi` covers on this collection: the property keys, and
- * the physical column names behind them.
+ * The two ways a field can be closed to a write, told apart.
  *
- * `declared` is what has to leave the *known* set; `refused` is what a caller
- * must not name, which is the same set plus the column spellings — a caller who
- * knows the table can write `password_hash` as readily as `passwordHash`.
+ * `excluded` is `access.write: []` — the server's own column, closed to every
+ * caller at every privilege, which is what `excludeFromApi` expands to.
+ * `unwritable` is a non-empty role list this caller does not satisfy. They are
+ * one rule and two answers: the first is a property of the *collection* and the
+ * same for everybody, the second is a property of the *caller* and would be a
+ * 200 for their colleague. A client that retries after acquiring a role should
+ * be able to tell which it hit without parsing English.
  */
-function excludedApiNames(collection: CollectionConfig): { declared: string[]; refused: Set<string> } {
+function closedWriteNames(
+    collection: CollectionConfig,
+    viewer: FieldViewer | undefined
+): { excluded: Set<string>; unwritable: Map<string, string>; declared: string[] } {
+    const excluded = new Set<string>();
+    const unwritable = new Map<string, string>();
     const declared: string[] = [];
-    const refused = new Set<string>();
+
     for (const [name, property] of Object.entries(collection.properties ?? {})) {
-        if (!(property as { excludeFromApi?: boolean })?.excludeFromApi) continue;
+        const access = effectiveAccess(property as Property);
+        if (!access || access.write === undefined) continue;
+        if (canWriteField(property as Property, viewer)) continue;
+
         declared.push(name);
-        refused.add(name);
-        const columnName = (property as { columnName?: string })?.columnName;
-        if (columnName) refused.add(columnName);
+        const columnName = (property as Property).columnName;
+        const spellings = columnName ? [name, columnName] : [name];
+        if (access.write.length === 0) {
+            for (const spelling of spellings) excluded.add(spelling);
+        } else {
+            for (const spelling of spellings) unwritable.set(spelling, name);
+        }
     }
-    return { declared, refused };
+    return { excluded, unwritable, declared };
 }
 
 /**
- * Refuse a write naming a property the collection excluded from its API.
+ * Refuse a write naming a field this caller may not set.
  *
  * `excludeFromApi` means what the generated SDK already says it means: "absent
  * from Row, Insert and Update — the API surface does not mention it, in either
@@ -40,31 +64,60 @@ function excludedApiNames(collection: CollectionConfig): { declared: string[]; r
  * Everything else the flag protects is the same shape: a verification token, a
  * rotation counter, a secret the server owns.
  *
- * Refused for every caller, not only unprivileged ones, and regardless of
- * `strictWrites`. The framework's own auth paths do not come through here —
- * `prepareUserCreation` builds the row itself — so what is left is callers the
- * flag was written to exclude.
+ * `access.write: ["editor"]` is the same rule with a role list instead of an
+ * empty one, and answers `FIELD_NOT_WRITABLE` rather than
+ * `VALIDATION_EXCLUDED_FIELDS`. Both refuse rather than dropping the key: a
+ * write that silently discards a field reports success for an edit that did not
+ * happen, which is the one outcome a form cannot recover from.
+ *
+ * The empty-list half is refused for every caller, not only unprivileged ones,
+ * and regardless of `strictWrites`. The framework's own auth paths do not come
+ * through here — `prepareUserCreation` builds the row itself — so what is left
+ * is callers the rule was written to exclude.
  */
-function assertNoExcludedFields(
+function assertNoClosedFields(
     values: Record<string, unknown>,
     collection: CollectionConfig,
-    where: string
+    where: string,
+    viewer: FieldViewer | undefined
 ): void {
-    const { refused } = excludedApiNames(collection);
-    if (refused.size === 0) return;
-    const excluded = Object.keys(values).filter(key => refused.has(key));
-    if (excluded.length === 0) return;
+    const { excluded, unwritable } = closedWriteNames(collection, viewer);
+    if (excluded.size === 0 && unwritable.size === 0) return;
 
-    // Named separately from "no such field", because it is a different fact and
-    // the generic message would send the reader looking for a typo in a name
-    // that is spelled correctly.
+    const named = Object.keys(values).filter(key => excluded.has(key));
+    if (named.length > 0) {
+        // Named separately from "no such field", because it is a different fact
+        // and the generic message would send the reader looking for a typo in a
+        // name that is spelled correctly.
+        throw ApiError.badRequest(
+            `${where}${named.map(f => `'${f}'`).join(", ")} ` +
+            `${named.length > 1 ? "are" : "is"} excluded from the API on '${collection.slug}' ` +
+            `and cannot be written through it. ${named.length > 1 ? "These columns are" : "This column is"} ` +
+            "the server's to set.",
+            "VALIDATION_EXCLUDED_FIELDS",
+            { collection: collection.slug, fields: named }
+        );
+    }
+
+    const refused = Object.keys(values).filter(key => unwritable.has(key));
+    if (refused.length === 0) return;
+
+    // The wire name the caller sent, in `field`, so a form can mark the input it
+    // owns rather than the property key it may never have seen.
+    const violations: WriteViolation[] = refused.map(field => ({
+        field,
+        code: "access",
+        message: `'${field}' on '${collection.slug}' is not writable with your roles.`
+    }));
     throw ApiError.badRequest(
-        `${where}${excluded.map(f => `'${f}'`).join(", ")} ` +
-        `${excluded.length > 1 ? "are" : "is"} excluded from the API on '${collection.slug}' ` +
-        `and cannot be written through it. ${excluded.length > 1 ? "These columns are" : "This column is"} ` +
-        "the server's to set.",
-        "VALIDATION_EXCLUDED_FIELDS",
-        { collection: collection.slug, fields: excluded }
+        `${where}${violations.map(v => v.message).join(" ")}`,
+        "FIELD_NOT_WRITABLE",
+        {
+            collection: collection.slug,
+            fields: refused,
+            violations,
+            messages: violations.map(v => v.message)
+        }
     );
 }
 
@@ -96,7 +149,7 @@ function assertNoExcludedFields(
 export function assertKnownWriteFields(
     values: Record<string, unknown>,
     collection: CollectionConfig,
-    options?: { rowIndex?: number; extraKnownFields?: readonly string[] }
+    options?: { rowIndex?: number; extraKnownFields?: readonly string[]; viewer?: FieldViewer }
 ): void {
     // A collection that declares no properties describes nothing, so there is
     // nothing to check against — "no declared fields" is not the same claim as
@@ -118,7 +171,7 @@ export function assertKnownWriteFields(
     // below — and that refusal is a *security* rule, not a typo check. A
     // convenience flag must not be able to turn off a security rule; the two
     // facts are unrelated.
-    assertNoExcludedFields(values, collection, where);
+    assertNoClosedFields(values, collection, where, options?.viewer);
 
     // The opt-out lets a key through that this config does not describe; the
     // driver still requires a real column behind it.
@@ -126,7 +179,13 @@ export function assertKnownWriteFields(
 
     const known = new Set<string>(Object.keys(collection.properties));
 
-    for (const name of excludedApiNames(collection).declared) known.delete(name);
+    // A field this caller cannot write is not among the fields they may name,
+    // so it is absent from the "Known fields:" list the error prints. That list
+    // is an offer, and offering a field the next request would refuse is worse
+    // than saying nothing.
+    for (const name of restrictedFieldNames(collection, options?.viewer, "write").declared) {
+        known.delete(name);
+    }
 
     // An owning relation stores its target in a local FK column that usually
     // has no property of its own; writing it directly is legitimate. Under its
@@ -675,17 +734,21 @@ export function projectResponseFields<T extends Record<string, unknown>>(
  * validates what a *caller sent*, before `beforeSave` gets a chance to fill in
  * or rewrite anything. In-process writes through `rebase.data` are trusted
  * server code and are not run through it, which is the placement the REST layer
- * already chose.
+ * already chose — and which is why `excludeFromApi` and `access.write` are
+ * enforceable at all: something has to be able to store the password hash.
  *
  * @param values     the caller's payload, exactly as it arrived
  * @param collection resolved from the registry by path — never the copy the
  *                   client sent, or the rules would be the caller's to pick
+ * @param options.viewer the caller's roles, for per-field `access.write`.
+ *                   Omitted is the trusted plane, which satisfies every
+ *                   non-empty role list; an API boundary always has one.
  */
 export function assertWriteRequestValid(
     values: Record<string, unknown>,
     collection: CollectionConfig,
-    options?: { status?: "new" | "existing" | "copy" }
+    options?: { status?: "new" | "existing" | "copy"; viewer?: FieldViewer }
 ): void {
-    assertKnownWriteFields(values, collection);
+    assertKnownWriteFields(values, collection, { viewer: options?.viewer });
     assertWriteValuesValid(values, collection, options);
 }

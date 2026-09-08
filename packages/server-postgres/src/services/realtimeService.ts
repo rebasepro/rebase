@@ -11,6 +11,7 @@ import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfi
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { buildPropertyCallbacks, getTableName, OrderBySpecError, parseOrderBySpecStrict } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
+import { withFieldViewer } from "./field-viewer";
 import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
 import { logger, rawQueryLoggingEnabled } from "@rebasepro/server";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
@@ -966,7 +967,12 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // driver's read path, so realtime cannot leak rows the initial fetch hid.
             const activeAuth = authContext || { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] };
-            return await this.db.transaction(async (tx) => {
+            // The subscriber this frame is for, so per-field `access.read` is
+            // applied to it. A frame is a read like any other and reaches the
+            // same row pipeline; without this the initial `GET` would withhold a
+            // field and the first `.listen()` update would hand it over.
+            return await withFieldViewer({ roles: activeAuth.roles ?? [] }, async () =>
+                await this.db.transaction(async (tx) => {
                 await applyAuthContext(
                     tx,
                     { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
@@ -1056,7 +1062,8 @@ roles: activeAuth.roles },
                 }
 
                 return fetchedEntities;
-            });
+                })
+            );
         }
 
         // No driver — use dataService directly (no auth wrapping possible).
@@ -1166,7 +1173,12 @@ roles: activeAuth.roles },
             // Same read isolation as collection refetches: GUCs + reader-role downgrade.
             const activeAuth = authContext || { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] };
-            return await this.db.transaction(async (tx) => {
+            // The subscriber this frame is for, so per-field `access.read` is
+            // applied to it. A frame is a read like any other and reaches the
+            // same row pipeline; without this the initial `GET` would withhold a
+            // field and the first `.listen()` update would hand it over.
+            return await withFieldViewer({ roles: activeAuth.roles ?? [] }, async () =>
+                await this.db.transaction(async (tx) => {
                 await applyAuthContext(
                     tx,
                     { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
@@ -1223,7 +1235,8 @@ roles: activeAuth.roles },
                 }
 
                 return processedEntity;
-            });
+                })
+            );
         }
 
         return await this.dataService.fetchOne(notifyPath, id);

@@ -44,6 +44,7 @@ import { mergeDeep } from "@rebasepro/utils";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { isRoleSwitchingPermissionError } from "./utils/pg-error-utils";
 import { applyAuthContext } from "./security/rls-enforcement";
+import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
 
@@ -2036,7 +2037,16 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     ): Promise<T> {
         const pendingNotifications: PostgresBackendDriver["_pendingNotifications"] = [];
 
-        const result = await this.delegate.db.transaction(async (tx) => {
+        // The same identity the transaction is about to hand Postgres, made
+        // available to the row walk so per-field `access.read` is applied to
+        // whatever this read serves. Established here rather than threaded
+        // through `DataService` → `FetchService` → the pipeline for the reason
+        // set out in `field-viewer.ts`: those layers carry no user, and every
+        // exit from the pipeline needs it. `run` and not `enterWith`, so a
+        // `dataAsAdmin` read nested inside a user request restores the user's
+        // viewer when it returns.
+        const result = await withFieldViewer({ roles: this.user?.roles ?? [] }, async () =>
+            await this.delegate.db.transaction(async (tx) => {
             let uid = this.user?.uid;
             if (!uid) {
                 logger.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object", { detail: this.user });
@@ -2083,7 +2093,8 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             txDelegate.client = this.delegate.client;
 
             return await operation(txDelegate);
-        }, options);
+            }, options)
+        );
 
         for (const notification of pendingNotifications) {
             try {

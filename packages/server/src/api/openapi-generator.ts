@@ -1,5 +1,5 @@
 import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, isToMany, ResolvedRelation, VectorProperty, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations } from "@rebasepro/common";
+import { effectiveAccess, fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations } from "@rebasepro/common";
 
 /**
  * OpenAPI 3.0.3 specification generator.
@@ -1025,8 +1025,42 @@ description: `${collection.singularName || collection.name} ID` },
  * being fixed in one loop at a time: this is the same rule the SDK generator
  * applies to its `Row` type (`packages/codegen/src/generate-types.ts`).
  */
-function isDocumentedProperty(property: Property): boolean {
-    return !property.excludeFromApi;
+function isDocumentedProperty(property: Property, direction: "read" | "write" = "read"): boolean {
+    const access = effectiveAccess(property);
+    return access?.[direction]?.length !== 0;
+}
+
+/**
+ * The `x-rebase-access` annotation, or nothing for a field with no rule.
+ *
+ * A vendor extension rather than a schema keyword because OpenAPI has no way to
+ * say "this property is present for some callers" — `readOnly` is about the
+ * direction of a field, not about who. Generators ignore what they do not know,
+ * so a client built from this spec still compiles; a *human* reading `/docs`, or
+ * a gateway that wants to enforce the same rule at the edge, gets the role lists
+ * verbatim. Emitted for the role case only: a field closed to everybody is
+ * absent from the document entirely, which is a stronger statement.
+ */
+function accessAnnotation(property: Property): Record<string, unknown> | undefined {
+    const access = effectiveAccess(property);
+    if (!access) return undefined;
+    const annotation: Record<string, unknown> = {};
+    if (access.read !== undefined) annotation.read = [...access.read];
+    if (access.write !== undefined) annotation.write = [...access.write];
+    return Object.keys(annotation).length > 0 ? annotation : undefined;
+}
+
+/** The sentence `x-rebase-access` deserves in prose, for a reader of `/docs`. */
+function accessDescription(property: Property): string | undefined {
+    const access = effectiveAccess(property);
+    if (!access) return undefined;
+    const parts: string[] = [];
+    const phrase = (roles: readonly string[]) =>
+        roles.length === 0 ? "nobody through the API" : roles.map(r => `\`${r}\``).join(", ") + " (and `admin`)";
+    if (access.read !== undefined) parts.push(`readable by ${phrase(access.read)}`);
+    if (access.write !== undefined) parts.push(`writable by ${phrase(access.write)}`);
+    if (parts.length === 0) return undefined;
+    return `Field access: ${parts.join("; ")}. A caller without the role does not receive the field at all — it is absent, not null.`;
 }
 
 /**
@@ -1037,10 +1071,10 @@ function isDocumentedProperty(property: Property): boolean {
  * other name. Same pair, same reason, as `excludedApiKeys` in the SDK
  * generator.
  */
-function excludedApiKeys(collection: CollectionConfig): Set<string> {
+function excludedApiKeys(collection: CollectionConfig, direction: "read" | "write" = "read"): Set<string> {
     const excluded = new Set<string>();
     for (const [key, property] of Object.entries(collection.properties ?? {})) {
-        if (!(property as Property)?.excludeFromApi) continue;
+        if (isDocumentedProperty(property as Property, direction)) continue;
         excluded.add(key);
         const columnName = (property as { columnName?: unknown }).columnName;
         if (typeof columnName === "string") excluded.add(columnName);
@@ -1335,13 +1369,16 @@ function buildCollectionUpdateSchema(collection: CollectionConfig): Record<strin
 function buildCollectionInputSchema(collection: CollectionConfig): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
-    const excluded = excludedApiKeys(collection);
+    // The write half, not the read half: a field readable by nobody but
+    // writable by an `admin` belongs in the input body and not in the row, and
+    // the two schemas used to share one exclusion set and so got both wrong.
+    const excluded = excludedApiKeys(collection, "write");
     const emitted = new Set<string>(excluded);
     const idKey = idPropertyEntry(collection)?.[0] ?? "id";
 
     for (const [key, property] of Object.entries(collection.properties)) {
         if (property.type === "relation") continue;
-        if (!isDocumentedProperty(property)) continue;
+        if (!isDocumentedProperty(property, "write")) continue;
 
         // Skip auto-value date fields from the input schema
         if (property.type === "date" && property.autoValue) continue;
@@ -1432,6 +1469,22 @@ function emitWritableRelations(
  * Convert a Rebase Property to an OpenAPI 3.0 schema object.
  */
 function convertPropertyToSchema(property: Property): Record<string, unknown> {
+    const schema = convertPropertyTypeToSchema(property);
+    const annotation = accessAnnotation(property);
+    if (!annotation) return schema;
+
+    const sentence = accessDescription(property);
+    return {
+        ...schema,
+        ...(sentence
+            ? { description: schema.description ? `${schema.description} — ${sentence}` : sentence }
+            : {}),
+        "x-rebase-access": annotation
+    };
+}
+
+/** The JSON Schema a property's *type* compiles to, before any access annotation. */
+function convertPropertyTypeToSchema(property: Property): Record<string, unknown> {
     const base: Record<string, unknown> = {};
 
     if (property.name) {

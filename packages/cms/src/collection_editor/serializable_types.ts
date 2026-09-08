@@ -193,6 +193,14 @@ export interface SerializableBaseProperty {
      * so editing a collection in the panel silently unset it.
      */
     excludeFromApi?: boolean;
+    /**
+     * Per-field read/write roles. Plain data — two optional string arrays — so
+     * it round-trips through this mirror unchanged. Absent from it, the
+     * collection editor would silently unset a field's access rules the first
+     * time someone opened the collection in the panel and saved, which is the
+     * exact failure `excludeFromApi` above had.
+     */
+    access?: { read?: readonly string[]; write?: readonly string[] };
     validation?: PropertyValidationSchema;
     defaultValue?: unknown;
     /**
