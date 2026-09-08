@@ -37,8 +37,8 @@
     "watch": "vite build --watch",
     "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
     "test:lint": "eslint \"src/**\" --quiet",
-    "test": "jest",
-    "test:watch": "jest --watch",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",
     "smoke:baas": "tsx scripts/smoke-baas.ts",
@@ -71,6 +71,7 @@
   },
   "devDependencies": {
     "@rebasepro/client": "workspace:*",
+    "@electric-sql/pglite": "^0.5.6",
     "@hono/node-server": "^2.0.12",
     "@jest/globals": "^30.4.1",
     "@types/jest": "^30.0.0",

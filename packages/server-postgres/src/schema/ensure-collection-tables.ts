@@ -23,6 +23,7 @@
  */
 import {
     declaredDatabaseExtensions,
+    REBASE_SCHEMA,
     type CollectionConfig
 } from "@rebasepro/types";
 import { relationalCollections } from "@rebasepro/common";
@@ -373,30 +374,39 @@ export async function ensureCollectionTables(
     log?: (message: string) => void,
     options: EnsureOptions = {}
 ): Promise<EnsureOutcome> {
-    // Junctions live alongside the collections that declare them, so their
-    // schema has to be read too — otherwise an existing junction reads as
-    // missing and its constraints as unplanned.
-    const schemas = Array.from(new Set([
-        ...collections.map(schemaOf),
-        ...planJunctionTables(collections).map(j => j.schema)
-    ]));
-    for (const schema of schemas) {
-        assertSafeIdentifier(schema, "schema name");
-        if (schema !== "public") {
-            await client.query(`CREATE SCHEMA IF NOT EXISTS "${schema}";`);
-        }
-    }
-
-    const existing = await readExistingSchema(client, schemas);
     // This is the boundary, so this is where the world is read: the planner
     // itself takes the permission as an argument and never reaches for the
     // registry. By the time boot gets here `loadBundleResourceGraph` has
     // evaluated the project's `resources.ts`, so the declarations are there —
     // and a caller that already knows them can still say so.
-    const plan = planCollectionSchemaEnsure(collections, existing, {
-        ...options,
+    const schema = planSchema(collections, {
         databaseExtensions: options.databaseExtensions ?? declaredDatabaseExtensions()
     });
+
+    // Junctions live alongside the collections that declare them, so their
+    // schema has to be read too — otherwise an existing junction reads as
+    // missing and its constraints as unplanned. Taken off the plan, which lists
+    // both kinds of table.
+    const schemas = Array.from(new Set(schema.tables.map(table => table.schema)));
+    for (const name of schemas) {
+        assertSafeIdentifier(name, "schema name");
+        if (name !== "public") {
+            await client.query(`CREATE SCHEMA IF NOT EXISTS "${name}";`);
+        }
+    }
+    // `rebase` is where the `updated_at` trigger's function lives. Every real
+    // boot has the schema by the time this runs (auth ensures it first) and
+    // `db push` creates it in `schema.sql`, but this path is also driven by the
+    // live schema editor and by tests, where "the function's schema happens to
+    // exist already" is not a thing to rely on. Only when something needs it,
+    // so a project with no trigger issues no statement — and not added to the
+    // read set: what is *in* `rebase` is auth's business, not this planner's.
+    if (schema.tables.some(table => table.triggers.length > 0)) {
+        await client.query(`CREATE SCHEMA IF NOT EXISTS "${REBASE_SCHEMA}";`);
+    }
+
+    const existing = await readExistingSchema(client, schemas);
+    const plan = diffPlanAgainstCatalogue(schema, existing, { constraints: options.constraints });
     const failures: EnsureOutcome["failures"] = [];
 
     // Reported, not warned: this is a rename the ensure is about to perform, and
