@@ -75,8 +75,12 @@ const resolvePropertyKeyForColumn = (collection: CollectionConfig, column: strin
  */
 type BuilderUses = Set<string>;
 
-/** Record a builder and hand back its name, so a call site cannot use one silently. */
-const use = (uses: BuilderUses | undefined, builder: string): string => {
+/**
+ * Record a builder and hand back its name, so a call site cannot use one
+ * silently. Named `needs` rather than `use` because `use` is a React hook name
+ * and the repo's lint rules read it as one.
+ */
+const needs = (uses: BuilderUses | undefined, builder: string): string => {
     uses?.add(builder);
     return builder;
 };
@@ -167,21 +171,21 @@ export const getDrizzleColumn = (
                 const enumName = getEnumVarName(getTableName(collection), propName);
                 columnDefinition = `${enumName}(${quote(colName)})`;
             } else if ("isId" in stringProp && stringProp.isId === "uuid") {
-                columnDefinition = `${use(uses, "uuid")}(${quote(colName)})`;
+                columnDefinition = `${needs(uses, "uuid")}(${quote(colName)})`;
             } else if (stringProp.columnType === "uuid") {
-                columnDefinition = `${use(uses, "uuid")}(${quote(colName)})`;
+                columnDefinition = `${needs(uses, "uuid")}(${quote(colName)})`;
             } else if (stringProp.columnType === "char") {
-                columnDefinition = `${use(uses, "char")}(${quote(colName)}, { length: ${resolveStringColumnLength(stringProp)} })`;
+                columnDefinition = `${needs(uses, "char")}(${quote(colName)}, { length: ${resolveStringColumnLength(stringProp)} })`;
             } else if (stringProp.columnType === "varchar") {
                 // The length is not optional decoration: `varchar("col")` with
                 // no length is an UNBOUNDED varchar in Postgres, which is what
                 // this emitted while the DDL generator emitted VARCHAR(255) for
                 // the very same property.
-                columnDefinition = `${use(uses, "varchar")}(${quote(colName)}, { length: ${resolveStringColumnLength(stringProp)} })`;
+                columnDefinition = `${needs(uses, "varchar")}(${quote(colName)}, { length: ${resolveStringColumnLength(stringProp)} })`;
             } else {
                 // `text` is the default, and the only length-unbounded choice.
                 // Ask for `varchar` explicitly if you want the length constraint.
-                columnDefinition = `${use(uses, "text")}(${quote(colName)})`;
+                columnDefinition = `${needs(uses, "text")}(${quote(colName)})`;
             }
             break;
         }
@@ -200,15 +204,15 @@ export const getDrizzleColumn = (
             // emitted `.generatedByDefaultAsIdentity()` is not a method that
             // exists, so the file did not compile at all.
             if ("isId" in numProp && numProp.isId === "increment") {
-                columnDefinition = `${use(uses, "integer")}(${quote(colName)}).generatedByDefaultAsIdentity()`;
+                columnDefinition = `${needs(uses, "integer")}(${quote(colName)}).generatedByDefaultAsIdentity()`;
                 break;
             }
 
             let baseType = (numProp.validation?.integer || isId)
-                ? `${use(uses, "integer")}(${quote(colName)})`
-                : `${use(uses, "numeric")}(${quote(colName)})`;
+                ? `${needs(uses, "integer")}(${quote(colName)})`
+                : `${needs(uses, "numeric")}(${quote(colName)})`;
             if (numProp.columnType) {
-                if (numProp.columnType === "double precision") baseType = `${use(uses, "doublePrecision")}(${quote(colName)})`;
+                if (numProp.columnType === "double precision") baseType = `${needs(uses, "doublePrecision")}(${quote(colName)})`;
                 // `bigint` and `bigserial` are the only pg-core builders that
                 // *require* a config argument: without `mode`, drizzle cannot
                 // know whether to hand back a `number` or a `bigint`, and the
@@ -226,25 +230,25 @@ export const getDrizzleColumn = (
                 // switching the runtime type would be a breaking change to
                 // every consumer of the generated schema.
                 else if (numProp.columnType === "bigint" || numProp.columnType === "bigserial") {
-                    baseType = `${use(uses, numProp.columnType)}(${quote(colName)}, { mode: "number" })`;
+                    baseType = `${needs(uses, numProp.columnType)}(${quote(colName)}, { mode: "number" })`;
                 }
-                else baseType = `${use(uses, numProp.columnType)}(${quote(colName)})`;
+                else baseType = `${needs(uses, numProp.columnType)}(${quote(colName)})`;
             }
 
             columnDefinition = baseType;
             break;
         }
         case "boolean":
-            columnDefinition = `${use(uses, "boolean")}(${quote(colName)})`;
+            columnDefinition = `${needs(uses, "boolean")}(${quote(colName)})`;
             break;
         case "date": {
             const dateProp = prop as DateProperty;
             if (dateProp.columnType === "date") {
-                columnDefinition = `${use(uses, "date")}(${quote(colName)}, { mode: 'string' })`;
+                columnDefinition = `${needs(uses, "date")}(${quote(colName)}, { mode: 'string' })`;
             } else if (dateProp.columnType === "time") {
-                columnDefinition = `${use(uses, "time")}(${quote(colName)})`;
+                columnDefinition = `${needs(uses, "time")}(${quote(colName)})`;
             } else {
-                columnDefinition = `${use(uses, "timestamp")}(${quote(colName)}, { withTimezone: true, mode: 'string' })`;
+                columnDefinition = `${needs(uses, "timestamp")}(${quote(colName)}, { withTimezone: true, mode: 'string' })`;
             }
             // autoValue: database-level default for initial value on INSERT
             if (dateProp.autoValue === "on_create" || dateProp.autoValue === "on_update") {
@@ -255,9 +259,9 @@ export const getDrizzleColumn = (
         case "map": {
             const mapProp = prop as MapProperty;
             if (mapProp.columnType === "json") {
-                columnDefinition = `${use(uses, "json")}(${quote(colName)})`;
+                columnDefinition = `${needs(uses, "json")}(${quote(colName)})`;
             } else {
-                columnDefinition = `${use(uses, "jsonb")}(${quote(colName)})`;
+                columnDefinition = `${needs(uses, "jsonb")}(${quote(colName)})`;
             }
             break;
         }
@@ -268,7 +272,7 @@ export const getDrizzleColumn = (
             // and the caller dropped the column, so the DDL generator created a
             // column the Drizzle table had no key for — and every write to it
             // was silently discarded with a 201.
-            columnDefinition = `${use(uses, "jsonb")}(${quote(colName)})`;
+            columnDefinition = `${needs(uses, "jsonb")}(${quote(colName)})`;
             break;
         }
         case "array": {
@@ -286,27 +290,27 @@ export const getDrizzleColumn = (
             }
 
             if (colType === "json") {
-                columnDefinition = `${use(uses, "json")}(${quote(colName)})`;
+                columnDefinition = `${needs(uses, "json")}(${quote(colName)})`;
             } else if (colType === "text[]") {
-                columnDefinition = `${use(uses, "text")}(${quote(colName)}).array()`;
+                columnDefinition = `${needs(uses, "text")}(${quote(colName)}).array()`;
             } else if (colType === "integer[]") {
-                columnDefinition = `${use(uses, "integer")}(${quote(colName)}).array()`;
+                columnDefinition = `${needs(uses, "integer")}(${quote(colName)}).array()`;
             } else if (colType === "boolean[]") {
-                columnDefinition = `${use(uses, "boolean")}(${quote(colName)}).array()`;
+                columnDefinition = `${needs(uses, "boolean")}(${quote(colName)}).array()`;
             } else if (colType === "numeric[]") {
-                columnDefinition = `${use(uses, "numeric")}(${quote(colName)}).array()`;
+                columnDefinition = `${needs(uses, "numeric")}(${quote(colName)}).array()`;
             } else {
-                columnDefinition = `${use(uses, "jsonb")}(${quote(colName)})`;
+                columnDefinition = `${needs(uses, "jsonb")}(${quote(colName)})`;
             }
             break;
         }
         case "vector": {
             const vp = prop as VectorProperty;
-            columnDefinition = `${use(uses, "vector")}(${quote(colName)}, { dimensions: ${vp.dimensions} })`;
+            columnDefinition = `${needs(uses, "vector")}(${quote(colName)}, { dimensions: ${vp.dimensions} })`;
             break;
         }
         case "binary": {
-            columnDefinition = `${use(uses, "customType")}({ dataType() { return 'bytea'; } })(${quote(colName)})`;
+            columnDefinition = `${needs(uses, "customType")}({ dataType() { return 'bytea'; } })(${quote(colName)})`;
             break;
         }
         case "relation": {
@@ -345,7 +349,7 @@ export const getDrizzleColumn = (
             // `quote`, like every other column literal in this file: a column
             // name only has to be quotable in Postgres, and this one is derived
             // from a relation the author wrote.
-            const baseColumn = `${use(uses, primaryKeyColumnBuilder(targetCollection))}(${quote(fkColumnName)})`;
+            const baseColumn = `${needs(uses, primaryKeyColumnBuilder(targetCollection))}(${quote(fkColumnName)})`;
 
             const required = prop.validation?.required;
             // Same default as the DDL generator, lowercased for Drizzle's
@@ -353,7 +357,7 @@ export const getDrizzleColumn = (
             // default that differs between them makes `db push` plan a rewrite
             // of every required foreign key on every run.
             const onDelete = relation.onDelete ?? defaultBelongsToOnDelete(required).toLowerCase();
-            use(uses, "type AnyPgColumn");
+            needs(uses, "type AnyPgColumn");
             let columnDef = `${baseColumn}${referencesClause(targetTableVar, targetIdField, { onDelete, onUpdate: relation.onUpdate })}`;
 
             if (required) {
@@ -369,13 +373,13 @@ export const getDrizzleColumn = (
             const refProp = prop as ReferenceProperty;
             const targetCollection = collections.find(c => c.slug === refProp.path || getTableName(c) === refProp.path);
             if (!targetCollection) {
-                columnDefinition = `${use(uses, "text")}(${quote(colName)})`;
+                columnDefinition = `${needs(uses, "text")}(${quote(colName)})`;
                 break;
             }
 
             const targetTableVar = getTableVarName(getTableName(targetCollection));
             const targetIdField = getPrimaryKeyName(targetCollection);
-            const baseColumn = `${use(uses, primaryKeyColumnBuilder(targetCollection))}(${quote(colName)})`;
+            const baseColumn = `${needs(uses, primaryKeyColumnBuilder(targetCollection))}(${quote(colName)})`;
 
             const required = prop.validation?.required;
             // The same rule as `belongsTo`, from the same function. This arm
@@ -383,7 +387,7 @@ export const getDrizzleColumn = (
             // deliberately moved away from — so a required `reference` deleted
             // its children here and refused the delete everywhere else.
             const onDelete = defaultBelongsToOnDelete(required).toLowerCase();
-            use(uses, "type AnyPgColumn");
+            needs(uses, "type AnyPgColumn");
 
             columnDefinition = `${baseColumn}${referencesClause(targetTableVar, targetIdField, { onDelete })}`;
             if (required) {
@@ -440,7 +444,7 @@ export const getDrizzleColumn = (
             const targetCollection = owned.relation.target();
             const onDelete = owned.relation.onDelete
                 ?? defaultBelongsToOnDelete(owned.property.validation?.required).toLowerCase();
-            use(uses, "type AnyPgColumn");
+            needs(uses, "type AnyPgColumn");
             columnDefinition += referencesClause(
                 getTableVarName(getTableName(targetCollection)),
                 getPrimaryKeyName(targetCollection),
@@ -622,7 +626,7 @@ const indexExtras = (
 ): string[] => {
     const specs: CollectionIndexSpec[] = buildCollectionIndexSpecs(collection, resolveColumnName);
     return specs.map(spec => {
-        const builder = spec.unique ? use(uses, "uniqueIndex") : use(uses, "index");
+        const builder = spec.unique ? needs(uses, "uniqueIndex") : needs(uses, "index");
         // The spec holds COLUMN names; the generated table is keyed by field
         // name (`authorId` for `author_id`), and `fieldKeyForColumn` is the one
         // definition of that mapping.
@@ -681,7 +685,7 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
 
     let schemaDeclarations = "";
     if (uniqueSchemas.length > 0) {
-        use(uses, "pgSchema");
+        needs(uses, "pgSchema");
         uniqueSchemas.forEach(schema => {
             schemaDeclarations += `export const ${schema}Schema = pgSchema("${schema}");\n`;
         });
@@ -722,7 +726,7 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
             // does not exist in `public`.
             const declaration = collectionSchema
                 ? `${collectionSchema}Schema.enum(${quote(enumDbName)}, [${values.map(v => quote(v)).join(", ")}])`
-                : `${use(uses, "pgEnum")}(${quote(enumDbName)}, [${values.map(v => quote(v)).join(", ")}])`;
+                : `${needs(uses, "pgEnum")}(${quote(enumDbName)}, [${values.map(v => quote(v)).join(", ")}])`;
             body += `export const ${enumVarName} = ${declaration};\n`;
             if (!exportedEnumVars.includes(enumVarName)) exportedEnumVars.push(enumVarName);
         });
@@ -778,7 +782,7 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
             // created against `public.<junction>` — RLS enabled on one table,
             // rows written to another. The three generators have to agree, and
             // the other two already did.
-            const tableCreator = use(uses, "pgTable");
+            const tableCreator = needs(uses, "pgTable");
             const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
             const {
                 sourceColumn,
@@ -790,11 +794,11 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
             // `text`, matching the string default: a junction column must have the
             // same type as the primary key it references. One helper, because
             // this ladder was written out three times.
-            const sourceColType = use(uses, primaryKeyColumnBuilder(sourceCollection));
-            const targetColType = use(uses, primaryKeyColumnBuilder(targetCollection));
+            const sourceColType = needs(uses, primaryKeyColumnBuilder(sourceCollection));
+            const targetColType = needs(uses, primaryKeyColumnBuilder(targetCollection));
             const sourceId = getPrimaryKeyName(sourceCollection);
             const targetId = getPrimaryKeyName(targetCollection);
-            use(uses, "type AnyPgColumn");
+            needs(uses, "type AnyPgColumn");
 
             body += `export const ${tableVarName} = ${tableCreator}(\"${baseTableName}\", {\n`;
             // The junction block was the one place these three helpers were not
@@ -803,7 +807,7 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
             body += `    ${propKey(sourceColumn)}: ${sourceColType}(${quote(sourceColumn)}).notNull()${referencesClause(getTableVarName(getTableName(sourceCollection)), sourceId, { onDelete })},\n`;
             body += `    ${propKey(targetColumn)}: ${targetColType}(${quote(targetColumn)}).notNull()${referencesClause(getTableVarName(getTableName(targetCollection)), targetId, { onDelete })},\n`;
             body += "}, (table) => ([\n";
-            body += `    ${use(uses, "primaryKey")}({ columns: [${member("table", sourceColumn)}, ${member("table", targetColumn)}] }),\n`;
+            body += `    ${needs(uses, "primaryKey")}({ columns: [${member("table", sourceColumn)}, ${member("table", targetColumn)}] }),\n`;
 
             // Junctions are generated tables like any other: locked by default,
             // with derived policies (reads follow the endpoints, writes follow
@@ -814,14 +818,14 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
                 const junctionCollection = getJunctionCollectionConfig(junctionSpec);
                 const resolveCollection: ResolveCollection = (slug) => collections.find(c => c.slug === slug || getTableName(c) === slug);
                 getJunctionSecurityRules(junctionSpec).forEach((rule: SecurityRule, idx: number) => {
-                    use(uses, "pgPolicy");
+                    needs(uses, "pgPolicy");
                     body += generatePolicyCode(junctionCollection, rule, idx, resolveCollection);
                 });
             }
             body += "])).enableRLS();\n\n";
         } else if (!isJunction) {
             const schema = isPostgresCollectionConfig(collection) ? collection.schema : undefined;
-            const tableCreator = schema ? `${schema}Schema.table` : use(uses, "pgTable");
+            const tableCreator = schema ? `${schema}Schema.table` : needs(uses, "pgTable");
             const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
             body += `export const ${tableVarName} = ${tableCreator}(\"${baseTableName}\", {\n`;
             const columns = new Set<string>();
@@ -839,12 +843,12 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
             const searchSpec = buildSearchColumnSpec(collection);
             if (searchSpec) {
                 columns.add(
-                    `    ${propKey(searchSpec.column)}: ${use(uses, "customType")}({ dataType() { return 'tsvector'; } })(${quote(searchSpec.column)})` +
+                    `    ${propKey(searchSpec.column)}: ${needs(uses, "customType")}({ dataType() { return 'tsvector'; } })(${quote(searchSpec.column)})` +
                     `.generatedAlwaysAs(sql\`${searchSpec.expression}\`)`
                 );
                 if (searchSpec.fuzzy) {
                     columns.add(
-                        `    ${propKey(searchSpec.fuzzy.column)}: ${use(uses, "text")}(${quote(searchSpec.fuzzy.column)})` +
+                        `    ${propKey(searchSpec.fuzzy.column)}: ${needs(uses, "text")}(${quote(searchSpec.fuzzy.column)})` +
                         `.generatedAlwaysAs(sql\`${searchSpec.fuzzy.expression}\`)`
                     );
                 }
@@ -855,7 +859,7 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
             // and `derivePrimaryKeys` reads it back.
             const hasIdColumn = Array.from(columns).some(col => col.includes(".primaryKey()"));
             if (!hasIdColumn) {
-                columns.add(`    id: ${use(uses, "text")}("id").primaryKey()`);
+                columns.add(`    id: ${needs(uses, "text")}("id").primaryKey()`);
             }
 
             body += `${Array.from(columns).join(",\n")}`;
@@ -865,7 +869,7 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
             if (securityRules.length > 0) {
                 const resolveCollection: ResolveCollection = (slug) => collections.find(c => c.slug === slug || getTableName(c) === slug);
                 securityRules.forEach((rule: SecurityRule, idx: number) => {
-                    use(uses, "pgPolicy");
+                    needs(uses, "pgPolicy");
                     // `generatePolicyCode` returns one line per policy, already
                     // indented and comma-terminated.
                     extras.push(generatePolicyCode(collection, rule, idx, resolveCollection).replace(/\n$/, ""));
