@@ -46,7 +46,7 @@ import type {
     ClassifiedSchemaChanges
 } from "@rebasepro/types";
 import { getTableName } from "@rebasepro/common";
-import { resolveColumnName } from "./generate-postgres-ddl-logic";
+import { resolveColumnName } from "./column-plan-helpers";
 
 /**
  * The vocabulary lives in `@rebasepro/types` so that `@rebasepro/server`, which

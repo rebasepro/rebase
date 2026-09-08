@@ -25,7 +25,8 @@ import {
     CollectionIndexConfigError,
     MAX_INDEX_KEYS
 } from "../src/schema/collection-index";
-import { generatePostgresDdl, resolveColumnName } from "../src/schema/generate-postgres-ddl-logic";
+import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
+import { resolveColumnName } from "../src/schema/column-plan-helpers";
 
 const posts = (indexes: unknown[], extra: Record<string, unknown> = {}): CollectionConfig =>
     ({

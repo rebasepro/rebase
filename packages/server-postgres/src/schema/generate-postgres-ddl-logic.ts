@@ -1,5 +1,5 @@
 import { CollectionConfig, NumberProperty, Property, ResolvedRelation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty, isManyToMany, type ResolvedManyToMany, type ResolvedBelongsTo } from "@rebasepro/types";
-import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, getInjectedSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig, resolveStringColumnLength, relationalCollections } from "@rebasepro/common";
+import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, getInjectedSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig, resolveStringColumnLength, relationalCollections } from "@rebasepro/common";
 import { toSnakeCase, getPolicyNamesForRule, generateForeignKeyName, legacyForeignKeyName, toPostgresIdentifier } from "@rebasepro/utils";
 import { AUTH_USERS_COLUMNS, authUsersColumnDefinition, authUsersColumnSql, isAuthCollection } from "./auth-users-columns";
 import {
@@ -28,51 +28,26 @@ import {
     type VectorIndexPlan
 } from "./vector-index";
 import { buildCollectionIndexSpecs, collectionIndexStatements } from "./collection-index";
+import {
+    assertSinglePrimaryKey,
+    declaresEnumType,
+    enumLabelsOf,
+    getPrimaryKeyName,
+    getPrimaryKeyProp,
+    idColumnDefaultSql,
+    isIdProperty,
+    isNumericId,
+    primaryKeyColumnType,
+    resolveColumnName
+} from "./column-plan-helpers";
 import { REBASE_SCHEMA } from "@rebasepro/types";
 
 // --- Helper Functions ---
-
-export const resolveColumnName = (propName: string, prop?: Property | null): string => {
-    if (prop && "columnName" in prop && typeof prop.columnName === "string") {
-        return prop.columnName;
-    }
-    return toSnakeCase(propName);
-};
-
-export const getPrimaryKeyProp = (collection: CollectionConfig): { name: string, type: "string" | "number", isUuid: boolean } => {
-    if (collection.properties) {
-        const idPropEntry = Object.entries(collection.properties).find(([_, prop]) => "isId" in (prop as unknown as object) && Boolean((prop as unknown as Record<string, unknown>).isId));
-        if (idPropEntry) {
-            const prop = idPropEntry[1] as unknown as Property;
-            const isUuid = prop.type === "string" && "isId" in prop && (prop as unknown as StringProperty).isId === "uuid";
-            return { name: idPropEntry[0], type: prop.type === "number" ? "number" : "string", isUuid };
-        }
-    }
-    const idProp = collection.properties?.["id"] as unknown as Property | undefined;
-    if (idProp?.type === "number") {
-        return { name: "id", type: "number", isUuid: false };
-    }
-    const isUuid = idProp?.type === "string" && "isId" in idProp && (idProp as unknown as StringProperty).isId === "uuid";
-    return { name: "id", type: "string", isUuid: isUuid ?? false };
-};
-
-export const isNumericId = (collection: CollectionConfig): boolean => {
-    return getPrimaryKeyProp(collection).type === "number";
-};
-
-export const getPrimaryKeyName = (collection: CollectionConfig): string => {
-    return getPrimaryKeyProp(collection).name;
-};
-
-/** The column type a junction holds for one endpoint's primary key. */
-const junctionKeyType = (collection: CollectionConfig): string =>
-    isNumericId(collection) ? "INTEGER" : (getPrimaryKeyProp(collection).isUuid ? "UUID" : "TEXT");
-
-export const isIdProperty = (propName: string, prop: Property, collection: CollectionConfig): boolean => {
-    if ("isId" in prop && Boolean(prop.isId)) return true;
-    const hasExplicitId = Object.values(collection.properties ?? {}).some(p => "isId" in (p as unknown as object) && Boolean((p as unknown as Record<string, unknown>).isId));
-    return !hasExplicitId && propName === "id";
-};
+//
+// What a primary key is, what a column is called, what an id defaults to and
+// what labels an enum has all live in `column-plan-helpers`, which the Drizzle
+// generator and the boot-time ensure read too. They used to be private copies
+// here and private copies there, which is how the two generators drifted.
 
 
 type ResolveCollection = (slug: string) => CollectionConfig | undefined;
@@ -189,6 +164,10 @@ export const getSqlColumnType = (propName: string, prop: Property, collection: C
         case "string": {
             const stringProp = prop as StringProperty;
             if (stringProp.enum) {
+                // Throws on an empty list rather than naming a type nothing
+                // creates — the column type and the `CREATE TYPE` come from the
+                // same reading of `enum`.
+                enumLabelsOf(propName, prop, collection);
                 const tableName = getTableName(collection);
                 const colName = resolveColumnName(propName, prop);
                 const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
@@ -283,15 +262,13 @@ export const getSqlColumnType = (propName: string, prop: Property, collection: C
             } catch {
                 return "TEXT";
             }
-            const pkProp = getPrimaryKeyProp(targetCollection);
-            return pkProp.type === "number" ? "INTEGER" : (pkProp.isUuid ? "UUID" : "TEXT");
+            return primaryKeyColumnType(targetCollection);
         }
         case "reference": {
             const refProp = prop as ReferenceProperty;
             const targetCollection = collections.find(c => c.slug === refProp.path || getTableName(c) === refProp.path);
             if (!targetCollection) return "TEXT";
-            const pkProp = getPrimaryKeyProp(targetCollection);
-            return pkProp.type === "number" ? "INTEGER" : (pkProp.isUuid ? "UUID" : "TEXT");
+            return primaryKeyColumnType(targetCollection);
         }
         default:
             // A silent `TEXT` here is how the two generators drifted apart: the
@@ -531,6 +508,11 @@ export const generatePostgresDdl = async (
 ): Promise<string> => {
     // Only the collections this engine stores. See `relationalCollections`.
     const collections = relationalCollections(allCollections);
+    // Two `isId` properties used to produce two inline PRIMARY KEY clauses in
+    // one CREATE TABLE, which Postgres refuses — at apply time, in a file the
+    // author cannot fix without reading the SQL. Refused up front instead, by
+    // the same helper the other two emitters call.
+    collections.forEach(assertSinglePrimaryKey);
     let ddl = "-- This file is auto-generated by the Rebase DDL generator. Do not edit manually.\n\n";
 
     // 1. Create custom schemas.
@@ -601,18 +583,18 @@ export const generatePostgresDdl = async (
         const collectionTable = getTableName(collection);
         const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
         Object.entries(collection.properties ?? {}).forEach(([propName, prop]) => {
-            if (("enum" in prop) && (prop.type === "string" || prop.type === "number") && prop.enum) {
-                const enumDbName = `${collectionTable}_${resolveColumnName(propName, prop)}`;
-                const values = Array.isArray(prop.enum)
-                    ? (prop.enum as (string | number | { id: string | number })[]).map((v: string | number | { id: string | number }) =>
-                        String(typeof v === "object" && v !== null && "id" in v ? v.id : v)
-                    )
-                    : Object.keys(prop.enum);
-                if (values.length > 0 && !emittedEnums.has(`${schema}.${enumDbName}`)) {
-                    emittedEnums.add(`${schema}.${enumDbName}`);
-                    ddl += `CREATE TYPE "${schema}"."${enumDbName}" AS ENUM (${values.map(quoteSqlLiteral).join(", ")});\n`;
-                }
-            }
+            if (!("enum" in prop) || !prop.enum) return;
+            if (prop.type !== "string" && prop.type !== "number") return;
+            // Refuses an empty enum whatever the property's type, then emits a
+            // type only for the string ones — a number enum's column is NUMERIC
+            // or INTEGER on every path, so its type was created and used by
+            // nothing. See `declaresEnumType`.
+            const values = enumLabelsOf(propName, prop as Property, collection);
+            if (!declaresEnumType(prop as Property)) return;
+            const enumDbName = `${collectionTable}_${resolveColumnName(propName, prop as Property)}`;
+            if (emittedEnums.has(`${schema}.${enumDbName}`)) return;
+            emittedEnums.add(`${schema}.${enumDbName}`);
+            ddl += `CREATE TYPE "${schema}"."${enumDbName}" AS ENUM (${values.map(quoteSqlLiteral).join(", ")});\n`;
         });
     });
     if (ddl.endsWith(";\n")) ddl += "\n";
@@ -683,8 +665,8 @@ export const generatePostgresDdl = async (
 
             // TEXT, matching the string default: a junction column has to have the
             // same type as the primary key it references.
-            const sourceColType = isNumericId(sourceCollection) ? "INTEGER" : (getPrimaryKeyProp(sourceCollection).isUuid ? "UUID" : "TEXT");
-            const targetColType = isNumericId(targetCollection) ? "INTEGER" : (getPrimaryKeyProp(targetCollection).isUuid ? "UUID" : "TEXT");
+            const sourceColType = primaryKeyColumnType(sourceCollection);
+            const targetColType = primaryKeyColumnType(targetCollection);
             const sourceId = getPrimaryKeyName(sourceCollection);
             const targetId = getPrimaryKeyName(targetCollection);
 
@@ -738,10 +720,6 @@ export const generatePostgresDdl = async (
                         return;
                     }
 
-                    if (collection.properties[relInfo.localKey] && propName !== relInfo.localKey) {
-                        return;
-                    }
-
                     let targetCollection: CollectionConfig;
                     try {
                         targetCollection = relInfo.target();
@@ -753,14 +731,28 @@ export const generatePostgresDdl = async (
                     const targetSchema = isPostgresCollectionConfig(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";
                     const targetId = getPrimaryKeyName(targetCollection);
                     const fkColType = getSqlColumnType(propName, prop, collection, collections);
-                    
+
                     const onUpdate = relInfo.onUpdate ? ` ON UPDATE ${relInfo.onUpdate.toUpperCase()}` : "";
                     const required = prop.validation?.required;
                     const onDeleteVal = relInfo.onDelete ?? defaultBelongsToOnDelete(required);
-                    
-                    let colDef = `  "${relInfo.localKey}" ${fkColType}`;
-                    if (required) colDef += " NOT NULL";
-                    columns.push(colDef);
+
+                    // If a property of its own already declares this foreign
+                    // key, that property emits the column and the relation
+                    // emits only the constraint. Asked of the *field key*, not
+                    // the column: a property declared `postId` with
+                    // `columnName: "post_id"` did not answer to
+                    // `properties["post_id"]`, so both sides emitted and
+                    // `CREATE TABLE` failed with "column specified more than
+                    // once". The Drizzle generator was fixed to
+                    // `fieldKeyForColumn`; this was the copy that was not.
+                    const fkFieldKey = fieldKeyForColumn(collection, relInfo.localKey);
+                    const columnOwnedByProperty = Boolean(collection.properties[fkFieldKey]) && propName !== fkFieldKey;
+
+                    if (!columnOwnedByProperty) {
+                        let colDef = `  "${relInfo.localKey}" ${fkColType}`;
+                        if (required) colDef += " NOT NULL";
+                        columns.push(colDef);
+                    }
 
                     fkStatements.push(`ALTER TABLE "${schema}"."${baseTableName}" ADD CONSTRAINT "${toPostgresIdentifier(`${baseTableName}_${relInfo.localKey}_fkey`)}" FOREIGN KEY ("${relInfo.localKey}") REFERENCES "${targetSchema}"."${targetTable}" ("${targetId}") ON DELETE ${onDeleteVal.toUpperCase()}${onUpdate};`);
                 } else if (prop.type === "reference") {
@@ -815,15 +807,11 @@ export const generatePostgresDdl = async (
                         colDef += " PRIMARY KEY";
                     }
 
-                    if ("isId" in prop && prop.isId !== "manual" && prop.isId !== true && prop.isId !== "increment") {
-                        if (prop.isId === "uuid") {
-                            colDef += " DEFAULT gen_random_uuid()";
-                        } else if (prop.isId === "cuid") {
-                            colDef += " DEFAULT cuid()";
-                        } else if (typeof prop.isId === "string") {
-                            colDef += ` DEFAULT ${prop.isId}`;
-                        }
-                    }
+                    // One reading of `isId`, shared with the Drizzle generator
+                    // and boot-ensure. This arm used to write `DEFAULT ${isId}`
+                    // verbatim, so the documented ``sql`gen_id()` `` form
+                    // reached the file with its template wrapper still on it.
+                    colDef += idColumnDefaultSql(propName, prop, collection);
 
                     if (!isIdProperty(propName, prop, collection) && prop.validation?.unique) {
                         colDef += " UNIQUE";
@@ -980,6 +968,23 @@ export interface RelationalColumnPlan {
     column: string;
     /** Postgres type, exactly as the DDL generator declares it. */
     type: string;
+    /**
+     * `validation.required` on the property that owns the link.
+     *
+     * The plan carried the type and the constraint and not this, so boot-ensure
+     * added every relation and reference column bare while `db push` made the
+     * same column `NOT NULL`. A required `author_id` was therefore nullable on
+     * exactly the path with no developer in the loop — four of four required
+     * links in the audit's diff.
+     */
+    required: boolean;
+    /**
+     * True when a declared property emits this column and the relation
+     * contributes only the constraint — `postId` with `columnName: "post_id"`
+     * beside a `belongsTo` on `post_id`. Both used to emit, and `CREATE TABLE`
+     * failed with "column specified more than once".
+     */
+    columnOwnedByProperty?: boolean;
     /** Absent when the target collection is not part of this bundle. */
     foreignKey?: ForeignKeyPlan;
     /**
@@ -1084,8 +1089,13 @@ export const planRelationalColumns = (allCollections: CollectionConfig[]): Relat
                 const relInfo = findRelation(resolvedRelations, refProp.relation?.relationName ?? propName);
                 if (relInfo?.kind !== "belongsTo") continue;
                 // The relation and an explicit FK property can both be declared;
-                // the explicit one owns the column.
-                if (collection.properties[relInfo.localKey] && propName !== relInfo.localKey) continue;
+                // the explicit one owns the column, and the relation still owns
+                // the constraint. Asked of the field key rather than the column
+                // — `properties["post_id"]` is not where a property declared
+                // `postId: { columnName: "post_id" }` lives, so this used to
+                // plan the column twice.
+                const fkFieldKey = fieldKeyForColumn(collection, relInfo.localKey);
+                const columnOwnedByProperty = Boolean(collection.properties[fkFieldKey]) && propName !== fkFieldKey;
 
                 let targetCollection: CollectionConfig;
                 try {
@@ -1107,6 +1117,8 @@ export const planRelationalColumns = (allCollections: CollectionConfig[]): Relat
                     column: relInfo.localKey,
                     legacyColumn: derived && legacyKey !== relInfo.localKey ? legacyKey : undefined,
                     type: getSqlColumnType(propName, prop, collection, collections),
+                    required: required === true,
+                    columnOwnedByProperty,
                     foreignKey: foreignKeyPlan({
                         schema,
                         table,
@@ -1132,6 +1144,7 @@ export const planRelationalColumns = (allCollections: CollectionConfig[]): Relat
                     table,
                     column,
                     type,
+                    required: required === true,
                     foreignKey: targetCollection
                         ? foreignKeyPlan({
                             schema,
@@ -1181,8 +1194,8 @@ export const planJunctionTables = (allCollections: CollectionConfig[]): Junction
             return derived && legacy !== endpoint.junctionColumn ? legacy : undefined;
         };
         const columns = [
-            { name: source.junctionColumn, type: junctionKeyType(source.collection), legacyName: legacyFor(source) },
-            { name: target.junctionColumn, type: junctionKeyType(target.collection), legacyName: legacyFor(target) }
+            { name: source.junctionColumn, type: primaryKeyColumnType(source.collection), legacyName: legacyFor(source) },
+            { name: target.junctionColumn, type: primaryKeyColumnType(target.collection), legacyName: legacyFor(target) }
         ];
         // Every declaring side agrees on the edge's lifetime; the first one wins,
         // as it does in the generator's walk.

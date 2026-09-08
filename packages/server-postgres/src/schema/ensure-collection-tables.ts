@@ -47,12 +47,18 @@ import {
 } from "./search-column";
 import {
     getSqlColumnType,
-    resolveColumnName,
-    isIdProperty,
     planRelationalColumns,
     planJunctionTables,
     quoteSqlLiteral
 } from "./generate-postgres-ddl-logic";
+import {
+    assertSinglePrimaryKey,
+    declaresEnumType,
+    enumLabelsOf,
+    idColumnDefaultSql,
+    isIdProperty,
+    resolveColumnName
+} from "./column-plan-helpers";
 import {
     buildVectorColumnSpecs,
     buildVectorIndexPlan,
@@ -408,6 +414,12 @@ function qualified(collection: CollectionConfig): string {
  * a column added here has to reference the same type the generator would have
  * created — a second, differently-named type for the same field would be a
  * silent schema fork.
+ *
+ * The labels come from {@link enumLabelsOf}, which reads both forms of
+ * `EnumValues`. This walked `(p.enum as unknown[]).map(...)` — array form only
+ * — so the record form the docs recommend threw `p.enum.map is not a function`
+ * here, at boot, on a managed tenant, with nobody in the loop. The other two
+ * emitters handled both.
  */
 function requiredEnums(collection: CollectionConfig): { name: string; values: string[] }[] {
     const table = tableOf(collection);
@@ -417,14 +429,11 @@ function requiredEnums(collection: CollectionConfig): { name: string; values: st
         const p = prop as Property;
         if (!("enum" in p) || !p.enum) continue;
         if (p.type !== "string" && p.type !== "number") continue;
-        const values = (p.enum as unknown[])
-            .map(entry =>
-                entry && typeof entry === "object" && "id" in (entry as Record<string, unknown>)
-                    ? String((entry as Record<string, unknown>).id)
-                    : String(entry)
-            )
-            .filter(v => v.length > 0);
-        if (values.length === 0) continue;
+        // Refuses an empty list for either type; only a string enum gets a
+        // Postgres type (a number enum's column is NUMERIC or INTEGER, so the
+        // type nothing referenced was pure drift).
+        const values = enumLabelsOf(propName, p, collection);
+        if (!declaresEnumType(p)) continue;
         out.push({ name: `${schema}.${table}_${resolveColumnName(propName, p)}`, values });
     }
     return out;
@@ -455,6 +464,11 @@ export function planCollectionSchemaEnsure(
     assertSearchIsPostgresOnly(allCollections);
 
     const collections = relationalCollections(allCollections);
+    // Two `isId` properties used to create the table with the first id column
+    // and silently never add the second, so a managed tenant got a table
+    // missing a column its own collection reads. Refused by the same helper the
+    // two generators call.
+    collections.forEach(assertSinglePrimaryKey);
     const actions: EnsureAction[] = [];
     const plannedEnums = new Set<string>();
 
@@ -575,8 +589,13 @@ export function planCollectionSchemaEnsure(
             ? getSqlColumnType(idEntry![0], idProp, collection, collections)
             : "TEXT";
         let idDef = `"${assertSafeIdentifier(idName, "column name")}" ${idType} PRIMARY KEY`;
-        if (idProp?.type === "string" && (idProp as { isId?: unknown }).isId === "uuid") {
-            idDef += " DEFAULT gen_random_uuid()";
+        // Every id strategy, from the same helper the DDL generator renders
+        // from. This gave a default to `uuid` and to nothing else, so on the
+        // one path with no `db push` behind it a `cuid` or a custom `sql` id
+        // arrived with no default at all and the first insert failed on a NULL
+        // primary key.
+        if (idEntry && idProp) {
+            idDef += idColumnDefaultSql(idEntry[0], idProp, collection);
         }
         actions.push({
             kind: "create-table",
@@ -908,13 +927,46 @@ export function planCollectionSchemaEnsure(
         if (!plannedRelationColumns.has(relKey)) plannedRelationColumns.set(relKey, new Set());
         plannedRelationColumns.get(relKey)!.add(relational.column);
         if (relational.legacyColumn) plannedRelationColumns.get(relKey)!.add(relational.legacyColumn);
+        // A declared property already emits this column (an explicit `postId`
+        // beside the `belongsTo` that uses it); the plan contributes only the
+        // constraint, below.
+        if (relational.columnOwnedByProperty) continue;
         if (renameLegacyColumn(relKey, relational.schema, relational.table, relational.column, relational.legacyColumn)) continue;
+
+        // `NOT NULL` on the same terms as a scalar column: safe exactly when it
+        // cannot be checked against rows that are already there. Without this,
+        // a required `author_id` was NOT NULL after `db push` and nullable
+        // after a boot-ensure — on the one path that runs unattended.
+        const columnKey = `${relKey}.${relational.column}`;
+        const fresh = created.has(relKey);
+        const tableIsEmpty = existing.populatedTables !== undefined
+            && existing.tables.has(relKey)
+            && !existing.populatedTables.has(relKey);
+        const columnExists = existing.tables.get(relKey)?.has(relational.column) === true;
+        let definition = relational.type;
+        if (relational.required && !columnExists) {
+            if (fresh || tableIsEmpty) {
+                definition += " NOT NULL";
+            } else {
+                withheldConstraints.push({
+                    target: columnKey,
+                    kind: "not-null",
+                    reason:
+                        `"${relational.column}" is a required link, but "${relKey}" already holds rows and ` +
+                        "the column has no default to backfill them with, so NOT NULL would be checked " +
+                        "against data that does not have a value yet.",
+                    remedy:
+                        "Backfill the column, then add the constraint — or make the relation optional."
+                });
+            }
+        }
+
         addColumn(
             relKey,
             relational.schema,
             relational.table,
             relational.column,
-            relational.type
+            definition
         );
     }
 

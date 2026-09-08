@@ -343,6 +343,36 @@ describe("generatePostgresDdl", () => {
                 }
             },
             {
+                slug: "users_sql",
+                table: "users_sql",
+                name: "Users SQL",
+                // The documented template form. This used to be written into
+                // the file verbatim — wrapper and all — so `schema.sql` carried
+                // ``DEFAULT sql`gen_id()` ``, which is a syntax error.
+                properties: {
+                    sql_id: { type: "string", isId: "sql`gen_id()`" }
+                }
+            }
+        ];
+
+        const result = await generatePostgresDdl(collections);
+        const cleanResult = cleanDdl(result);
+
+        expect(cleanResult).toContain("\"uuid_id\" UUID PRIMARY KEY DEFAULT gen_random_uuid()");
+        expect(cleanResult).toContain("\"sql_id\" TEXT PRIMARY KEY DEFAULT gen_id()");
+        expect(cleanResult).not.toContain("DEFAULT sql`");
+        expect(cleanResult).toContain("\"created\" TIMESTAMP WITH TIME ZONE DEFAULT now()");
+    });
+
+    it("refuses `isId: \"cuid\"` rather than emitting a default nothing can run", async () => {
+        // `DEFAULT cuid()` has been emitted since the option existed and no
+        // `cuid()` function has ever been created — not by a generator, not by
+        // boot, not by a migration — so the column has never had a working
+        // default on Postgres and the first insert relying on it failed with
+        // `function cuid() does not exist`. Refused where the property has a
+        // name instead.
+        const collections: CollectionConfig[] = [
+            {
                 slug: "users_cuid",
                 table: "users_cuid",
                 name: "Users CUID",
@@ -352,12 +382,8 @@ describe("generatePostgresDdl", () => {
             }
         ];
 
-        const result = await generatePostgresDdl(collections);
-        const cleanResult = cleanDdl(result);
-
-        expect(cleanResult).toContain("\"uuid_id\" UUID PRIMARY KEY DEFAULT gen_random_uuid()");
-        expect(cleanResult).toContain("\"cuid_id\" TEXT PRIMARY KEY DEFAULT cuid()");
-        expect(cleanResult).toContain("\"created\" TIMESTAMP WITH TIME ZONE DEFAULT now()");
+        await expect(generatePostgresDdl(collections)).rejects.toThrow(/cuid/);
+        await expect(generatePostgresDdl(collections)).rejects.toThrow(/users_cuid/);
     });
 
     it("should generate RLS policies with ownerField and roles", async () => {
