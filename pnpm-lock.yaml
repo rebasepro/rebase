@@ -126,6 +126,9 @@ importers:
 
   app/config:
     dependencies:
+      '@rebasepro/cms':
+        specifier: workspace:*
+        version: link:../../packages/cms
       '@rebasepro/cms-types':
         specifier: workspace:*
         version: link:../../packages/cms-types

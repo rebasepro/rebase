@@ -17,6 +17,14 @@
     "types": ["node"],
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    // Every workspace package reached through these mappings must ALSO be a
+    // dependency in package.json. A mapping is invisible to pnpm, so an
+    // undeclared one leaves `pnpm -r build` free to schedule this package
+    // alongside the one it is compiling the source of: `@rebasepro/cms` was
+    // mapped here but not declared, and a parallel build failed with implicit
+    // anys and `Property 'getCollectionConfig' does not exist on type 'never'`
+    // in cms's own sources — cms was rewriting the dists those sources resolve
+    // against, at the same time. Serial builds passed, so it read as flaky.
     "paths": {
       "@rebasepro/types": ["../../packages/types/src/index.ts"],
       "@rebasepro/types/*": ["../../packages/types/src/*"],
