@@ -11,6 +11,8 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-09-07
+
 ### Fixed
 
 - **A project that installed its own zod booted, reported healthy, and loaded

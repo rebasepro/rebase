@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/plugin-insights",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "description": "Insights plugin for the Rebase admin panel: charts and saved queries over your collections.",
   "keywords": [
     "rebase",

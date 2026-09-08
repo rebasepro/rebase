@@ -2624,6 +2624,8 @@ backfilled after the fact.
 
 ### [Unreleased]
 
+### [0.19.1] - 2026-09-07
+
 #### Fixed
 
 - **A project that installed its own zod booted, reported healthy, and loaded
@@ -31524,7 +31526,7 @@ before it agrees to boot:
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.19.0", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.19.1", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -31575,7 +31577,7 @@ different one rather than start and misbehave later.
 This is why upgrading Rebase in a self-hosted deployment is a tag change:
 
 ```yaml
-image: rebasepro/server:0.19.0   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.19.1   # a newer tag — your bundle is untouched
 ```
 
 ### Development uses the same path
@@ -32579,7 +32581,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.19.0
+FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
@@ -32681,7 +32683,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  image = "rebasepro/server:0.19.0"
+  image = "rebasepro/server:0.19.1"
 
 [http_service]
   internal_port = 8080
@@ -32830,7 +32832,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ### Upgrading
 
 ```yaml
-image: rebasepro/server:0.19.0
+image: rebasepro/server:0.19.1
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that
@@ -33055,7 +33057,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.19.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.19.1"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Only the tag is usually worth pinning: the repository is inherited, so this is
@@ -33326,7 +33328,7 @@ rebase build
 For App Runner, which pulls from a registry, bake the bundle into a derived image. That is three lines and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.0
+FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
@@ -33427,7 +33429,7 @@ rebase build
 Cloud Run pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.0
+FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
@@ -33532,7 +33534,7 @@ rebase build
 Container Apps pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.0
+FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
@@ -33660,7 +33662,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 For a real deployment, prefer one of the two shapes that do not involve copying files to a box by hand:
 
-- **Bake it into an image** — `FROM rebasepro/server:0.19.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
+- **Bake it into an image** — `FROM rebasepro/server:0.19.1` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
 - **Serve it over HTTP** — set `REBASE_BUNDLE_URL` and the runtime fetches and unpacks the bundle on every start. This is what the Terraform module above does, and the same mechanism the Helm chart uses.
 
 ### 4. Configure and run
@@ -33804,7 +33806,7 @@ rebase build
 Serverless Containers pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.0
+FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
@@ -33916,7 +33918,7 @@ rebase build
 Commit a three-line `Dockerfile` at the repository root, so Railway's build step is a copy rather than a compilation:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.0
+FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
@@ -34010,7 +34012,7 @@ rebase build
 Commit a three-line `Dockerfile` at the project root:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.19.0
+FROM rebasepro/server:0.19.1
 COPY dist-bundle /bundle
 ```
 
