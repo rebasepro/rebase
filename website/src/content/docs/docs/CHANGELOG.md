@@ -9,6 +9,39 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ### Fixed
 
+- **A project that installed its own zod booted, reported healthy, and loaded
+  none of its functions.** The whole error was
+
+      [functions] Failed to load ops.js:
+        {"code":"invalid_type","expected":"nonoptional","path":["GEMINI_MODEL"]}
+
+  naming fields the project sets a `.default()` for, and never mentioning zod.
+
+  `loadEnv({ extend })` combined the two schemas with `rebaseEnvSchema.merge()`,
+  which reaches into the other schema's internals and therefore only holds when
+  both were built by the same copy of zod. This package inlined the zod it built
+  against while re-exporting `z`, so an app's `import { z } from "zod"` was a
+  different set of classes — and, under our own `^4.4.3` range, a different
+  version, since we build against 4.4.3 and apps install 4.5.x. Merging across
+  the two dropped every `ZodDefault` wrapper, so each defaulted field came back
+  required.
+
+  Fixed at both levels. zod is externalised, so an app gets one instance whether
+  it imports `z` from `zod` or from `@rebasepro/server`; and `loadEnv` now parses
+  the base schema and the extension each with its own `.parse()` and merges the
+  results, so it no longer depends on shared class identity at all. The
+  production-refinement pass still runs over the merged object, so a `.default()`
+  in an extension is still checked for a loopback host.
+
+  The guard added for this in 0.18 never fired once. It probed
+  `extend instanceof z.ZodType`, on the stated theory that `instanceof` is false
+  across two copies — true of zod 3, and false of zod 4, which installs a
+  structural `Symbol.hasInstance`. Its test passed because the fixture built its
+  "foreign" schema from `zod/v3`, which is a different implementation rather than
+  a second copy of the one that ships. That test now pins zod 4.5.4 as a separate
+  devDependency and asserts the pairing works; it fails against the old code. A
+  build gate refuses any package that inlines a library it re-exports.
+
 Five defects an end-to-end pass over a freshly installed project turned up.
 
 - **`rebase db push` could not finish against a database that had never booted.**
