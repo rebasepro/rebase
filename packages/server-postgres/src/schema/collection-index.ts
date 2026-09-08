@@ -419,9 +419,18 @@ export const buildCollectionIndexPlan = (
     collections: readonly CollectionConfig[],
     resolveColumnName: ResolveColumnName
 ): CollectionIndexSpec[] =>
-    collections
-        .flatMap(collection => buildCollectionIndexSpecs(collection, resolveColumnName))
-        .sort((a, b) =>
-            a.schema.localeCompare(b.schema) ||
-            a.table.localeCompare(b.table) ||
-            a.indexName.localeCompare(b.indexName));
+    sortIndexSpecs(collections.flatMap(collection => buildCollectionIndexSpecs(collection, resolveColumnName)));
+
+/**
+ * The stable order every consumer of a set of index specs uses.
+ *
+ * Exported because the boot-time diff reads the specs off the schema plan
+ * rather than rebuilding them, and it has to reach the same order the CLI's
+ * exclude list and `schema.sql` do — a second sort written out beside this one
+ * is a second order the moment either is edited.
+ */
+export const sortIndexSpecs = (specs: readonly CollectionIndexSpec[]): CollectionIndexSpec[] =>
+    [...specs].sort((a, b) =>
+        a.schema.localeCompare(b.schema) ||
+        a.table.localeCompare(b.table) ||
+        a.indexName.localeCompare(b.indexName));

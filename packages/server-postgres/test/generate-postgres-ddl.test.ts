@@ -382,8 +382,8 @@ describe("generatePostgresDdl", () => {
             }
         ];
 
-        await expect(generatePostgresDdl(collections)).rejects.toThrow(/cuid/);
-        await expect(generatePostgresDdl(collections)).rejects.toThrow(/users_cuid/);
+        expect(() => generatePostgresDdl(collections)).toThrow(/cuid/);
+        expect(() => generatePostgresDdl(collections)).toThrow(/users_cuid/);
     });
 
     it("should generate RLS policies with ownerField and roles", async () => {
