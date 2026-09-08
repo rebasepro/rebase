@@ -30,6 +30,7 @@ For each collection, the following endpoints are generated. Every other route th
 | `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
 | `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
 | `POST` | `/api/data/:slug/bulk/delete` | Delete many entities in one transaction |
+| `POST` | `/api/data/_batch` | Write **across** collections in one transaction |
 
 ### Subcollection Routes
 
@@ -382,6 +383,14 @@ Use `fields` to select specific columns:
 ```bash
 GET /api/data/products?fields=id,name,price
 ```
+
+## Writing
+
+Idempotency keys, conditional writes (`ETag` / `If-Match`), field operations
+(`$inc`, `$push`, `$pull`, `$merge`), upserting on a natural key,
+`Prefer: return=minimal`, and the cross-collection `POST /api/data/_batch`
+endpoint are all on their own page: **[Writing over
+REST](/docs/backend/writes/)**.
 
 ## Lifecycle Hook Pipeline
 

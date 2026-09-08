@@ -129,6 +129,8 @@ the ID you got. Read the response header.
 | --- | --- | --- | --- |
 | `AGGREGATE_NOT_SUPPORTED` | 501 | This driver cannot compute the requested aggregate. | Use a driver that can, or compute it in the client. |
 | `BRANCHING_UNSUPPORTED` | — | A database branch was requested over the Studio websocket on the managed development database (PGlite), where a branch *is* the parent and nothing would be isolated. The refusal is the same one `rebase db branch` prints. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one) and branch there. |
+| `BATCH_TOO_LARGE` | 400 | `POST /api/data/_batch` carries more operations than the per-batch limit (1000 by default). One batch is one transaction and holds its locks for the whole of it. | Send it in chunks; the message names the limit and your count. |
+| `BATCH_UNSUPPORTED` | 400 | This backend's driver cannot write across collections atomically, and a loop of single writes would be neither atomic nor one round trip. | Send the writes as separate requests, or as per-collection `/bulk` calls. |
 | `BULK_TOO_LARGE` | 400 | The bulk body exceeds the configured item limit. | Split the request. |
 | `BULK_UNSUPPORTED` | 400 | This collection or driver does not support bulk writes. | Write the rows one at a time. |
 | `CALLBACK_REJECTED` | 400 | A collection callback refused the write. A `throw` from `beforeSave`/`beforeDelete`/`after*` is a 400 carrying the author's own message; a `beforeDelete` that returns `false` is a 403. `details.stage` names which callback, `details.path` the collection. | Read the message — it was written by this project, not by Rebase. |
@@ -137,7 +139,11 @@ the ID you got. Read the response header.
 | `IDEMPOTENCY_KEY_REUSED` | 422 | The same `Idempotency-Key` arrived with a different body. | Use a new key, or send the original body. |
 | `INVALID_AGGREGATE_FUNCTION` | 400 | `?select=` named a function that is not `count`, `sum`, `avg`, `min` or `max`. | Use one of those; the message lists them. |
 | `INVALID_AGGREGATE_SELECT` | 400 | An `?select=` entry is not `fn(field)`, or a function other than `count()` was given no field. | Write `sum(total)`, `count()`, `avg(score)`. |
+| `INVALID_BATCH_BODY` | 400 | A `/_batch` operation is missing `op`, `collection`, `values` or `id`, names a collection this backend does not serve, or reuses a `ref` name. | See the message; it names the operation by index. |
+| `INVALID_BATCH_REF` | 400 | A `{ "$ref": "<name>.<field>" }` names no earlier operation, points forward, or asks for a field the referenced row does not have. Only backward references resolve. | Name the operation with `ref` *before* referencing it. |
 | `INVALID_BULK_BODY` | 400 | The bulk body is not the expected shape. | Send the documented `items` array. |
+| `INVALID_CONFLICT_TARGET` | 400 | An upsert's `on_conflict` / `onConflict` names columns carrying no uniqueness guarantee, or names them without `upsert: true`. Postgres would otherwise answer 42P10 from inside a transaction that has already done work. | Declare `validation: { unique: true }` or a `unique` index; the message lists the targets that do exist. |
+| `INVALID_FIELD_OPERATION` | 400 | A `$inc` / `$push` / `$pull` / `$merge` was used on a property type it is not defined on, with an operand of the wrong shape, with two operators on one field, misspelled, or on a create — where there is no stored value to operate on. | See [Writing over REST](/docs/backend/writes/#field-operations); the message names the field. |
 | `INVALID_FILTER_FIELD` | 400 | The filter names a property this collection does not have. | Check the spelling against the collection. |
 | `INVALID_FILTER_OPERATOR` | 400 | The operator is not one this property type supports. | See [Querying data](/docs/sdk/querying/). |
 | `INVALID_FILTER_VALUE` | 400 | A filter value cannot be read as the type of the column it was compared against: `?id=eq.abc` on an integer key, a label that is not in the enum, a timestamp that is not one, a number past the type's range. `details.dbCode` carries the SQLSTATE. | Send a value of the column's type. |
@@ -169,6 +175,7 @@ the ID you got. Read the response header.
 | `UNKNOWN_FILTER_FIELD` | 400 | The filter names a field this collection — or a relation's target — does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_FILTER_OPERATOR` | 400 | The filter names an operator that does not exist. | The message lists every operator. |
 | `UNKNOWN_ORDER_BY_FIELD` | 400 | The sort names a field this collection does not have. | Check the spelling; the message lists the valid fields. |
+| `PRECONDITION_FAILED` | 412 | An `If-Match` named a version of the row that is no longer current: somebody wrote to it between the read and this write. Nothing was written. | Re-read the row, re-apply the change, and send the new `ETag`. |
 | `UNKNOWN_RESPONSE_FIELD` | 400 | `?fields=` asks for a field the collection does not have. | Check the spelling; the message lists the known fields. |
 | `UNKNOWN_VECTOR_PROPERTY` | 400 | A vector search named a property that is not a `vector` on this collection. | The message lists the collection's vector properties. |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | The `Content-Type` is not one this route accepts. | Send the type the route documents. |
