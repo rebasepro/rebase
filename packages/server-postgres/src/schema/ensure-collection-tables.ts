@@ -159,8 +159,17 @@ export async function readExistingSchema(
         is_nullable: string;
         udt_name: string | null;
         column_default: string | null;
+        numeric_precision: number | null;
+        numeric_scale: number | null;
     }>(
-        `SELECT table_schema, table_name, column_name, is_nullable, udt_name, column_default
+        // `numeric_precision`/`numeric_scale` because `udt_name` is `numeric`
+        // for both `NUMERIC` and `NUMERIC(10, 2)`, and a property that declares
+        // a precision means it: money stored in an unbounded column keeps the
+        // third decimal the rounding was supposed to remove. Only carried for
+        // `numeric`, where the modifier changes what a value *is*; a `varchar`
+        // width is a limit on the same family and `typesAgree` ignores it.
+        `SELECT table_schema, table_name, column_name, is_nullable, udt_name, column_default,
+                numeric_precision, numeric_scale
          FROM information_schema.columns
          WHERE table_schema IN (${inList})`
     );
@@ -169,9 +178,27 @@ export async function readExistingSchema(
         if (!tables.has(key)) tables.set(key, new Set());
         tables.get(key)!.add(row.column_name);
         if (row.is_nullable === "NO") notNullColumns.add(`${key}.${row.column_name}`);
-        if (row.udt_name) columnTypes.set(`${key}.${row.column_name}`, row.udt_name);
+        if (row.udt_name) {
+            const modifier = row.udt_name === "numeric" && row.numeric_precision !== null
+                ? `(${row.numeric_precision},${row.numeric_scale ?? 0})`
+                : "";
+            columnTypes.set(`${key}.${row.column_name}`, `${row.udt_name}${modifier}`);
+        }
         if (row.column_default !== null) columnDefaults.add(`${key}.${row.column_name}`);
     }
+
+    // Trigger names, so `autoValue: "on_update"` is installed once rather than
+    // re-issued on every boot. `tgisinternal` excludes the ones Postgres itself
+    // creates to enforce foreign keys.
+    const triggers = new Set<string>();
+    const { rows: triggerRows } = await client.query<{ schema: string; table: string; name: string }>(
+        `SELECT n.nspname AS schema, c.relname AS table, t.tgname AS name
+         FROM pg_trigger t
+         JOIN pg_class c ON t.tgrelid = c.oid
+         JOIN pg_namespace n ON c.relnamespace = n.oid
+         WHERE NOT t.tgisinternal AND n.nspname IN (${inList})`
+    );
+    for (const row of triggerRows) triggers.add(`${row.schema}.${row.table}.${row.name}`);
 
     // Which tables hold rows. This is the only fact that decides whether a
     // NOT NULL can be added without reading the data, so it is worth a query.
@@ -278,7 +305,7 @@ export async function readExistingSchema(
 
     return {
         tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables, columnTypes,
-        columnDefaults
+        columnDefaults, triggers
     };
 }
 

@@ -77,6 +77,12 @@ export interface SchemaCommitPaths {
     searchFile: string;
     /** Vector columns and ANN indexes — like search, applied by Rebase not Atlas. */
     vectorFile: string;
+    /**
+     * `autoValue: "on_update"` triggers and the function they share. Atlas's
+     * free tier will not parse a desired state containing a function, so this
+     * is applied by Rebase like search and vector.
+     */
+    triggersFile: string;
 }
 
 export const DEFAULT_COMMIT_PATHS: SchemaCommitPaths = {
@@ -84,7 +90,8 @@ export const DEFAULT_COMMIT_PATHS: SchemaCommitPaths = {
     ddlFile: "drizzle/schema.sql",
     policiesFile: "drizzle/policies.sql",
     searchFile: "drizzle/search.sql",
-    vectorFile: "drizzle/vector.sql"
+    vectorFile: "drizzle/vector.sql",
+    triggersFile: "drizzle/triggers.sql"
 };
 
 /** One file the commit writes, as content rather than as a path on a disk. */

@@ -14,6 +14,7 @@ import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { computeSchemaVersion, CollectionConfig, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
+import { compareGeneratedDeclarations, describeDeclarationDifferences } from "./generated-schema-staleness";
 import { generateTypedefs } from "@rebasepro/codegen";
 import { getTableName, resolveCollectionRelations, findRelation, relationalCollections } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
@@ -221,22 +222,22 @@ issues };
     }
 
     try {
-        const expectedSchema = await generateSchema(postgresCollections);
-        const actualSchema = await fsPromises.readFile(schemaFilePath, "utf-8");
+        // Declaration by declaration, not byte by byte. The generated file is a
+        // flat list of `export const`s, each the rendering of one piece of the
+        // schema plan, so comparing them says *which* table or enum moved —
+        // which is what the reader is about to go looking for — and ignores the
+        // formatting and commentary the renderer is free to vary on its own.
+        const differences = compareGeneratedDeclarations(
+            generateSchema(postgresCollections),
+            await fsPromises.readFile(schemaFilePath, "utf-8")
+        );
 
-        // Normalize whitespace for comparison
-        const normalize = (s: string) =>
-            s
-                .replace(/\/\/.*$/gm, "") // strip single-line comments
-                .replace(/\/\*[\s\S]*?\*\//g, "") // strip multi-line comments
-                .replace(/\s+/g, " ")
-                .trim();
-
-        if (normalize(expectedSchema) !== normalize(actualSchema)) {
+        if (differences.length > 0) {
             issues.push({
                 severity: "warning",
                 category: "schema_stale",
-                message: "Generated schema is out of date — collection definitions have changed since last generation.",
+                message: "Generated schema is out of date — collection definitions have changed since last generation. "
+                    + `Differs in: ${describeDeclarationDifferences(differences)}.`,
                 fix: "Run `rebase schema generate`"
             });
         }

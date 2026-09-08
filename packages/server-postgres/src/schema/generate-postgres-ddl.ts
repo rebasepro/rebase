@@ -6,6 +6,7 @@ import {
     generatePostgresDdl,
     generatePostgresPoliciesDdl,
     generatePostgresSearchDdl,
+    generatePostgresTriggersDdl,
     generatePostgresVectorDdl
 } from "./generate-postgres-ddl-logic";
 import { CollectionConfig, declaredDatabaseExtensions } from "@rebasepro/types";
@@ -72,7 +73,7 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
         // policies, nor the search apparatus, nor the vector columns: Atlas
         // manages none of them, and in the search and vector cases cannot. All
         // three are written beside it and applied by the CLI in their own right.
-        const ddlContent = await generatePostgresDdl(collections, {
+        const ddlContent = generatePostgresDdl(collections, {
             includePolicies: false,
             includeSearch: false,
             includeVector: false
@@ -82,6 +83,7 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
         const vectorContent = generatePostgresVectorDdl(collections, {
             extensions: declaredDatabaseExtensions()
         });
+        const triggersContent = generatePostgresTriggersDdl(collections);
 
         if (outputPath) {
             const outputDir = path.dirname(outputPath);
@@ -115,6 +117,18 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string) 
                 out(`✅ PostgreSQL vector DDL generated successfully at ${vectorPath}`);
             } else if (fs.existsSync(vectorPath)) {
                 await fsPromises.rm(vectorPath);
+            }
+
+            // `autoValue: "on_update"`, on the same terms as the two above: a
+            // trigger is a function plus a binding, which Atlas's free tier
+            // will not parse, and a stale file would keep re-installing a
+            // trigger for a column nothing declares any more.
+            const triggersPath = path.join(outputDir, "triggers.sql");
+            if (triggersContent) {
+                await fsPromises.writeFile(triggersPath, triggersContent);
+                out(`✅ PostgreSQL trigger DDL generated successfully at ${triggersPath}`);
+            } else if (fs.existsSync(triggersPath)) {
+                await fsPromises.rm(triggersPath);
             }
         } else {
             out("✅ PostgreSQL DDL generated successfully.");
