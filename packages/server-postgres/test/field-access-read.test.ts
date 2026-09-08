@@ -145,16 +145,36 @@ describe("the column-name spelling", () => {
 });
 
 describe("`_matches`, the list of fields a search hit", () => {
+    /**
+     * `?searchExplain=true` answers with `[{ field, snippet }]` — the snippet is
+     * a `ts_headline` of the matched text, so an entry for a withheld field is
+     * the field's *contents*, quoted. The array itself is the caller's to see;
+     * the entries are filtered rather than the key deleted.
+     *
+     * A declared `search` block cannot name a restricted field (boot refuses
+     * it), so in practice this is the belt to that brace.
+     */
+    const matches = () => [
+        { field: "name", snippet: "<b>Ada</b>" },
+        { field: "salary", snippet: "<b>90000</b>" }
+    ];
+
     it("loses the entries a caller cannot read, and keeps the rest", () => {
-        const raw = { id: 1, name: "Ada", salary: 1, _matches: ["name", "salary"] };
+        const raw = { id: 1, name: "Ada", salary: 1, _matches: matches() };
         const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, staff));
-        expect(served._matches).toEqual(["name"]);
+        expect(served._matches).toEqual([{ field: "name", snippet: "<b>Ada</b>" }]);
     });
 
     it("is untouched for a caller who can read them all", () => {
-        const raw = { id: 1, name: "Ada", salary: 1, _matches: ["name", "salary"] };
+        const raw = { id: 1, name: "Ada", salary: 1, _matches: matches() };
         const served = withFieldViewer({ roles: ["hr"] }, () => stripUnreadable(raw, staff));
-        expect(served._matches).toEqual(["name", "salary"]);
+        expect(served._matches).toEqual(matches());
+    });
+
+    it("handles the bare-name shape too", () => {
+        const raw = { id: 1, name: "Ada", salary: 1, _matches: ["name", "salary"] };
+        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, staff));
+        expect(served._matches).toEqual(["name"]);
     });
 });
 

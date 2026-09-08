@@ -2047,52 +2047,52 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         // viewer when it returns.
         const result = await withFieldViewer({ roles: this.user?.roles ?? [] }, async () =>
             await this.delegate.db.transaction(async (tx) => {
-            let uid = this.user?.uid;
-            if (!uid) {
-                logger.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object", { detail: this.user });
-                uid = "anonymous";
-            }
+                let uid = this.user?.uid;
+                if (!uid) {
+                    logger.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object", { detail: this.user });
+                    uid = "anonymous";
+                }
 
-            const userRoles = this.user?.roles ?? [];
-            if (!this.user?.roles) {
-                logger.warn("[DataDriver] User roles are missing for authenticated delegate. Using empty array. User object", { detail: this.user });
-            }
+                const userRoles = this.user?.roles ?? [];
+                if (!this.user?.roles) {
+                    logger.warn("[DataDriver] User roles are missing for authenticated delegate. Using empty array. User object", { detail: this.user });
+                }
 
-            // Set the RLS GUCs and downgrade to the restricted user role so RLS
-            // binds every statement in this transaction — reads AND writes.
-            // This is user context: the collection's securityRules are the
-            // authorization model. The BASE driver never reaches here, so it
-            // stays on the owner connection and bypasses RLS — but note that
-            // `rebase.dataAsAdmin` is NOT the base driver: `init.ts` scopes it
-            // with `withAuth(SERVICE_IDENTITY)`, so it arrives here like any
-            // other user, with uid 'service' and the admin role, and its
-            // statements are RLS-evaluated. The comment used to list it as a
-            // bypass and five docblocks followed. The GUCs are transaction-local and
-            // remain readable after the role switch, so `rebase.uid()` /
-            // `rebase.roles()` in policies still resolve.
-            //
-            // Fails closed: if the switch cannot be performed, the transaction
-            // aborts rather than falling back to an RLS-bypassing connection.
-            // `isAnonymous` rides along so a policy can tell a GUEST from an
-            // account. Anonymous sign-in mints a real user row and a real uid,
-            // so without it the two are the same principal inside the database
-            // and every rule meaning "signed in" also means "anybody who called
-            // POST /auth/anonymous". See `rebase.is_anonymous()`.
-            await applyAuthContext(
-                tx,
-                { uid, roles: userRoles, isAnonymous: this.user?.isAnonymous === true },
-                this.delegate.rlsUserRole
-            );
+                // Set the RLS GUCs and downgrade to the restricted user role so RLS
+                // binds every statement in this transaction — reads AND writes.
+                // This is user context: the collection's securityRules are the
+                // authorization model. The BASE driver never reaches here, so it
+                // stays on the owner connection and bypasses RLS — but note that
+                // `rebase.dataAsAdmin` is NOT the base driver: `init.ts` scopes it
+                // with `withAuth(SERVICE_IDENTITY)`, so it arrives here like any
+                // other user, with uid 'service' and the admin role, and its
+                // statements are RLS-evaluated. The comment used to list it as a
+                // bypass and five docblocks followed. The GUCs are transaction-local and
+                // remain readable after the role switch, so `rebase.uid()` /
+                // `rebase.roles()` in policies still resolve.
+                //
+                // Fails closed: if the switch cannot be performed, the transaction
+                // aborts rather than falling back to an RLS-bypassing connection.
+                // `isAnonymous` rides along so a policy can tell a GUEST from an
+                // account. Anonymous sign-in mints a real user row and a real uid,
+                // so without it the two are the same principal inside the database
+                // and every rule meaning "signed in" also means "anybody who called
+                // POST /auth/anonymous". See `rebase.is_anonymous()`.
+                await applyAuthContext(
+                    tx,
+                    { uid, roles: userRoles, isAnonymous: this.user?.isAnonymous === true },
+                    this.delegate.rlsUserRole
+                );
 
-            const txEntityService = new DataService(tx, this.delegate.registry);
-            const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
+                const txEntityService = new DataService(tx, this.delegate.registry);
+                const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
 
-            txDelegate.dataService = txEntityService;
-            txDelegate._deferNotifications = true;
-            txDelegate._pendingNotifications = pendingNotifications;
-            txDelegate.client = this.delegate.client;
+                txDelegate.dataService = txEntityService;
+                txDelegate._deferNotifications = true;
+                txDelegate._pendingNotifications = pendingNotifications;
+                txDelegate.client = this.delegate.client;
 
-            return await operation(txDelegate);
+                return await operation(txDelegate);
             }, options)
         );
 

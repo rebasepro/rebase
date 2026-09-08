@@ -973,95 +973,95 @@ roles: ["anon"] };
             // field and the first `.listen()` update would hand it over.
             return await withFieldViewer({ roles: activeAuth.roles ?? [] }, async () =>
                 await this.db.transaction(async (tx) => {
-                await applyAuthContext(
-                    tx,
-                    { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
-                    this.rlsUserRole
-                );
-                const txEntityService = new DataService(tx, this.registry);
-                let fetchedEntities;
-                if (collectionRequest.searchString) {
-                    fetchedEntities = await txEntityService.searchRows(
-                        notifyPath,
-                        collectionRequest.searchString,
-                        {
+                    await applyAuthContext(
+                        tx,
+                        { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
+                        this.rlsUserRole
+                    );
+                    const txEntityService = new DataService(tx, this.registry);
+                    let fetchedEntities;
+                    if (collectionRequest.searchString) {
+                        fetchedEntities = await txEntityService.searchRows(
+                            notifyPath,
+                            collectionRequest.searchString,
+                            {
+                                filter: collectionRequest.filter as FilterValues<string>,
+                                // The subscription stored a group; the search branch
+                                // did not pass it on, so a filtered live search
+                                // widened to every row matching the text.
+                                logical: collectionRequest.logical,
+                                orderBy: collectionRequest.orderBy,
+                                order: collectionRequest.order,
+                                limit: collectionRequest.limit,
+                                databaseId: collectionRequest.databaseId,
+                                searchExplain: collectionRequest.searchExplain
+                            }
+                        );
+                    } else {
+                        fetchedEntities = await txEntityService.fetchCollection(notifyPath, {
                             filter: collectionRequest.filter as FilterValues<string>,
-                            // The subscription stored a group; the search branch
-                            // did not pass it on, so a filtered live search
-                            // widened to every row matching the text.
                             logical: collectionRequest.logical,
                             orderBy: collectionRequest.orderBy,
                             order: collectionRequest.order,
                             limit: collectionRequest.limit,
-                            databaseId: collectionRequest.databaseId,
-                            searchExplain: collectionRequest.searchExplain
-                        }
-                    );
-                } else {
-                    fetchedEntities = await txEntityService.fetchCollection(notifyPath, {
-                        filter: collectionRequest.filter as FilterValues<string>,
-                        logical: collectionRequest.logical,
-                        orderBy: collectionRequest.orderBy,
-                        order: collectionRequest.order,
-                        limit: collectionRequest.limit,
-                        offset: collectionRequest.offset,
-                        startAfter: collectionRequest.startAfter,
-                        databaseId: collectionRequest.databaseId
-                    });
-                }
+                            offset: collectionRequest.offset,
+                            startAfter: collectionRequest.startAfter,
+                            databaseId: collectionRequest.databaseId
+                        });
+                    }
 
-                // Re-apply `afterRead` lifecycle hooks to ensure consistent data structures
-                // between the initial driver fetch and this RLS-bound refetch.
-                const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                const resolvedCollection = collection ? { ...collection,
-...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
+                    // Re-apply `afterRead` lifecycle hooks to ensure consistent data structures
+                    // between the initial driver fetch and this RLS-bound refetch.
+                    const registryCollection = this.registry.getCollectionByPath(notifyPath);
+                    const resolvedCollection = collection ? { ...collection,
+    ...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
 
-                const callbacks = resolvedCollection?.callbacks;
-                const globalCallbacks = this.registry?.getGlobalCallbacks();
-                const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
+                    const callbacks = resolvedCollection?.callbacks;
+                    const globalCallbacks = this.registry?.getGlobalCallbacks();
+                    const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
-                if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
-                    const contextForCallback = {
-                        user: { uid: activeAuth.uid,
-roles: activeAuth.roles },
-                        driver: this.driver,
-                        data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
-                    } as unknown as RebaseCallContext;
+                    if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
+                        const contextForCallback = {
+                            user: { uid: activeAuth.uid,
+    roles: activeAuth.roles },
+                            driver: this.driver,
+                            data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
+                        } as unknown as RebaseCallContext;
 
-                    return await Promise.all(fetchedEntities.map(async (fetchedRow) => {
-                        let processedEntity = fetchedRow;
-                        // 1. Global callbacks first
-                        if (globalCallbacks?.afterRead) {
-                            processedEntity = await globalCallbacks.afterRead({
-                                collection: resolvedCollection,
-                                path: notifyPath,
-                                row: processedEntity,
-                                context: contextForCallback
-                            }) ?? processedEntity;
-                        }
-                        // 2. Collection callbacks second
-                        if (callbacks?.afterRead) {
-                            processedEntity = await callbacks.afterRead({
-                                collection: resolvedCollection,
-                                path: notifyPath,
-                                row: processedEntity,
-                                context: contextForCallback
-                            }) ?? processedEntity;
-                        }
-                        // 3. Property callbacks third
-                        if (propertyCallbacks?.afterRead) {
-                            processedEntity = await propertyCallbacks.afterRead({
-                                collection: resolvedCollection,
-                                path: notifyPath,
-                                row: processedEntity,
-                                context: contextForCallback
-                            }) ?? processedEntity;
-                        }
-                        return processedEntity;
-                    }));
-                }
+                        return await Promise.all(fetchedEntities.map(async (fetchedRow) => {
+                            let processedEntity = fetchedRow;
+                            // 1. Global callbacks first
+                            if (globalCallbacks?.afterRead) {
+                                processedEntity = await globalCallbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    row: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            // 2. Collection callbacks second
+                            if (callbacks?.afterRead) {
+                                processedEntity = await callbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    row: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            // 3. Property callbacks third
+                            if (propertyCallbacks?.afterRead) {
+                                processedEntity = await propertyCallbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    row: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            return processedEntity;
+                        }));
+                    }
 
-                return fetchedEntities;
+                    return fetchedEntities;
                 })
             );
         }
@@ -1179,62 +1179,62 @@ roles: ["anon"] };
             // field and the first `.listen()` update would hand it over.
             return await withFieldViewer({ roles: activeAuth.roles ?? [] }, async () =>
                 await this.db.transaction(async (tx) => {
-                await applyAuthContext(
-                    tx,
-                    { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
-                    this.rlsUserRole
-                );
-                const txEntityService = new DataService(tx, this.registry);
-                let processedEntity = await txEntityService.fetchOne(notifyPath, id, collection?.databaseId);
+                    await applyAuthContext(
+                        tx,
+                        { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
+                        this.rlsUserRole
+                    );
+                    const txEntityService = new DataService(tx, this.registry);
+                    let processedEntity = await txEntityService.fetchOne(notifyPath, id, collection?.databaseId);
 
-                if (processedEntity) {
-                    const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                    const resolvedCollection = collection ? { ...collection,
-...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
+                    if (processedEntity) {
+                        const registryCollection = this.registry.getCollectionByPath(notifyPath);
+                        const resolvedCollection = collection ? { ...collection,
+    ...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
 
-                    const callbacks = resolvedCollection?.callbacks;
-                    const globalCallbacks = this.registry?.getGlobalCallbacks();
-                    const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
+                        const callbacks = resolvedCollection?.callbacks;
+                        const globalCallbacks = this.registry?.getGlobalCallbacks();
+                        const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
-                    if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
-                        const contextForCallback = {
-                            user: { uid: activeAuth.uid,
-roles: activeAuth.roles },
-                            driver: this.driver,
-                            data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
-                        } as unknown as RebaseCallContext;
+                        if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
+                            const contextForCallback = {
+                                user: { uid: activeAuth.uid,
+    roles: activeAuth.roles },
+                                driver: this.driver,
+                                data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
+                            } as unknown as RebaseCallContext;
 
-                        // 1. Global callbacks first
-                        if (globalCallbacks?.afterRead) {
-                            processedEntity = await globalCallbacks.afterRead({
-                                collection: resolvedCollection,
-                                path: notifyPath,
-                                row: processedEntity,
-                                context: contextForCallback
-                            }) ?? processedEntity;
-                        }
-                        // 2. Collection callbacks second
-                        if (callbacks?.afterRead) {
-                            processedEntity = await callbacks.afterRead({
-                                collection: resolvedCollection,
-                                path: notifyPath,
-                                row: processedEntity,
-                                context: contextForCallback
-                            }) ?? processedEntity;
-                        }
-                        // 3. Property callbacks third
-                        if (propertyCallbacks?.afterRead) {
-                            processedEntity = await propertyCallbacks.afterRead({
-                                collection: resolvedCollection,
-                                path: notifyPath,
-                                row: processedEntity,
-                                context: contextForCallback
-                            }) ?? processedEntity;
+                            // 1. Global callbacks first
+                            if (globalCallbacks?.afterRead) {
+                                processedEntity = await globalCallbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    row: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            // 2. Collection callbacks second
+                            if (callbacks?.afterRead) {
+                                processedEntity = await callbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    row: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            // 3. Property callbacks third
+                            if (propertyCallbacks?.afterRead) {
+                                processedEntity = await propertyCallbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    row: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
                         }
                     }
-                }
 
-                return processedEntity;
+                    return processedEntity;
                 })
             );
         }
