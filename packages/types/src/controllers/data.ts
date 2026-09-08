@@ -667,21 +667,38 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
 export const FIELD_OPERATORS = ["$inc", "$push", "$pull", "$merge"] as const;
 
 /**
+ * The key of a {@link BatchRef}. Declared here, beside the field operators,
+ * because the two share one namespace: a `$`-prefixed key in a write payload is
+ * a marker, and every reader of that namespace has to know all of it.
+ *
+ * @group Data
+ */
+export const BATCH_REF_KEY = "$ref";
+
+/**
  * Whether a value is *trying* to be a field operation — including a misspelled
  * one, which is the case worth catching.
  *
- * Any `$`-prefixed key counts. No collection can declare a column whose value
- * legitimately has a single key beginning with `$`: a `map` property's sub-keys
- * are declared, and `$` is not valid in the identifiers the DDL generators emit.
+ * Any `$`-prefixed key counts, because `{ $increment: 1 }` written to a number
+ * column as a JSON document is the failure this exists to prevent. No collection
+ * can declare a column whose value legitimately has a key beginning with `$`: a
+ * `map` property's sub-keys are declared, and `$` is not valid in the
+ * identifiers the DDL generators emit.
+ *
+ * The one exception is `{ $ref: … }`, the batch's backward reference. It stands
+ * where a *value* goes and is resolved to one before the row is written, so it
+ * is not an operation on a column — reading it as a misspelled operator refused
+ * every `$ref` in a batch with "unknown field operator '$ref'".
  *
  * @group Data
  */
 export function isFieldOperation(value: unknown): boolean {
-    return typeof value === "object"
-        && value !== null
-        && !Array.isArray(value)
-        && !(value instanceof Date)
-        && Object.keys(value).some((key) => key.startsWith("$"));
+    if (typeof value !== "object" || value === null || Array.isArray(value) || value instanceof Date) {
+        return false;
+    }
+    const keys = Object.keys(value);
+    if (keys.length === 1 && keys[0] === BATCH_REF_KEY) return false;
+    return keys.some((key) => key.startsWith("$"));
 }
 
 /** True when any value in a write payload is (or is attempting to be) one. @group Data */

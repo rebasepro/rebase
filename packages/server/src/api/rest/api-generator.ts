@@ -1085,30 +1085,6 @@ values: entity as Record<string, unknown> },
             const driver = this.getScopedDriver(c);
 
 
-            const existingEntity = await driver.fetchOne({
-                path: getCollectionDataPath(collection),
-                id: String(id),
-                collection: resolvedCollection
-            });
-
-            if (!existingEntity) {
-                throw this.entityNotFound(collection.slug, String(id));
-            }
-
-            // Before the key is claimed and before anything is written: a
-            // precondition that fails must leave the request as if it had not
-            // been sent, and a claimed key would refuse the caller's own retry
-            // after they re-read and fixed the conflict.
-            const ifMatch = c.req.header(IF_MATCH_HEADER);
-            if (ifMatch) {
-                await assertIfMatch(
-                    ifMatch,
-                    await this.rowForETag(driver, resolvedCollection, String(id), existingEntity),
-                    resolvedCollection,
-                    { collection: collection.slug, id: String(id) }
-                );
-            }
-
             const body = await parseJsonBody(c);
             assertKnownWriteFields(body, resolvedCollection);
             assertWriteValuesValid(body, resolvedCollection);
@@ -1123,7 +1099,34 @@ values: entity as Record<string, unknown> },
             // not naturally idempotent — the field operations above make it
             // emphatically not — so a retry after a lost ACK applied the edit
             // twice, and `$inc` twice is a number nobody asked for.
+            //
+            // The existence read is *inside* the claim, so a replay is answered
+            // by the key rather than by re-reading. Outside it, a replay sent
+            // after the row was deleted in the meantime would 404 for an edit
+            // that had already committed — the same class of lie the delete
+            // route below exists to stop. A 404 or a failed precondition throws,
+            // which releases the key, so neither burns it.
             return this.runIdempotent(c, body, async () => {
+                const existingEntity = await driver.fetchOne({
+                    path: getCollectionDataPath(collection),
+                    id: String(id),
+                    collection: resolvedCollection
+                });
+
+                if (!existingEntity) {
+                    throw this.entityNotFound(collection.slug, String(id));
+                }
+
+                const ifMatch = c.req.header(IF_MATCH_HEADER);
+                if (ifMatch) {
+                    await assertIfMatch(
+                        ifMatch,
+                        await this.rowForETag(driver, resolvedCollection, String(id), existingEntity),
+                        resolvedCollection,
+                        { collection: collection.slug, id: String(id) }
+                    );
+                }
+
                 const entity = await driver.save({
                     path: getCollectionDataPath(collection),
                     id: String(id),
@@ -1185,35 +1188,39 @@ values: entity as Record<string, unknown> },
             const driver = this.getScopedDriver(c);
 
 
-            const existingEntity = await driver.fetchOne({
-                path: getCollectionDataPath(collection),
-                id: String(id),
-                collection: resolvedCollection
-            });
-
-            if (!existingEntity) {
-                throw this.entityNotFound(collection.slug, String(id));
-            }
-
-            const ifMatch = c.req.header(IF_MATCH_HEADER);
-            if (ifMatch) {
-                // A conditional delete is the one that matters most: "remove
-                // the row I read" is a different instruction from "remove
-                // whatever is there now", and only the first is safe once
-                // somebody else has edited it in between.
-                await assertIfMatch(
-                    ifMatch,
-                    await this.rowForETag(driver, resolvedCollection, String(id), existingEntity),
-                    resolvedCollection,
-                    { collection: collection.slug, id: String(id) }
-                );
-            }
-
-            // The header the SDK sends and this route ignored. A delete
-            // replayed after the first attempt committed answers 404 — which
-            // an offline queue reads as a permanent failure and surfaces to the
-            // user as an error for a delete that in fact succeeded.
+            // The header the SDK sends and this route ignored.
+            //
+            // The existence read is inside the claim, and on this route that is
+            // the entire mechanism: a delete replayed after the first attempt
+            // committed finds the row gone and answers 404 — which an offline
+            // queue reads as a permanent failure, and reports to the user as an
+            // error, for a delete that in fact succeeded. Under a key the
+            // replay is answered from the key and the row is never read again.
             return this.runIdempotent(c, { id: String(id) }, async () => {
+                const existingEntity = await driver.fetchOne({
+                    path: getCollectionDataPath(collection),
+                    id: String(id),
+                    collection: resolvedCollection
+                });
+
+                if (!existingEntity) {
+                    throw this.entityNotFound(collection.slug, String(id));
+                }
+
+                const ifMatch = c.req.header(IF_MATCH_HEADER);
+                if (ifMatch) {
+                    // A conditional delete is the one that matters most:
+                    // "remove the row I read" is a different instruction from
+                    // "remove whatever is there now", and only the first is
+                    // safe once somebody else has edited it in between.
+                    await assertIfMatch(
+                        ifMatch,
+                        await this.rowForETag(driver, resolvedCollection, String(id), existingEntity),
+                        resolvedCollection,
+                        { collection: collection.slug, id: String(id) }
+                    );
+                }
+
                 await driver.delete({
                     row: {
                         // The address is the one in the URL, not something read

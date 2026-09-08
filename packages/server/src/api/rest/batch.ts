@@ -1,3 +1,4 @@
+import { BATCH_REF_KEY } from "@rebasepro/types";
 import { ApiError } from "../errors";
 
 /**
@@ -18,8 +19,12 @@ import { ApiError } from "../errors";
  * @module
  */
 
-/** The marker key. One place, because both the parser and the driver read it. */
-export const BATCH_REF_KEY = "$ref";
+/**
+ * The marker key, re-exported from `@rebasepro/types` where it is declared
+ * beside the field operators — the two share the `$`-prefixed namespace, and
+ * the predicate that recognises a field operation has to know this one is not.
+ */
+export { BATCH_REF_KEY };
 
 /** Operations accepted in one batch, mirroring the single-row routes. */
 export const BATCH_OPS = ["create", "update", "upsert", "delete"] as const;
