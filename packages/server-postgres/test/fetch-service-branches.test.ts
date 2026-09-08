@@ -121,97 +121,138 @@ relationName: "tags" }
         });
     });
 
-    describe("junction relations are nested, plain ones are not", () => {
-
-        /** A FetchService whose `posts` query builder records what it was asked for. */
-        const setup = (rows: Record<string, unknown>[] = []) => {
-            const findMany = jest.fn().mockResolvedValue(rows);
-            const db = { query: { posts: { findMany } } };
-            return { service: new FetchService(db as any, registry),
-findMany };
+    /**
+     * A FetchService over a `db.select` chain that yields `rows`, with the
+     * relation batch loaders stubbed so a test can see exactly which relations
+     * a read asked for.
+     *
+     * `db.query` is deliberately absent. The relational query API is no longer
+     * reachable from any read: it compiles a to-many relation into a lateral
+     * join, which this file's own comments measured at 7s+ for 350 rows, and
+     * the batched loader below replaced it everywhere.
+     */
+    const selectService = (rows: Record<string, unknown>[]) => {
+        const chain: any = {
+            from: jest.fn(() => chain),
+            $dynamic: jest.fn(() => chain),
+            where: jest.fn(() => chain),
+            orderBy: jest.fn(() => chain),
+            limit: jest.fn(() => chain),
+            offset: jest.fn(() => chain),
+            then: (resolve: (r: unknown) => void) => resolve(rows)
         };
+        const db = { select: jest.fn(() => chain), selectDistinct: jest.fn(() => chain) };
+        const service = new FetchService(db as any, registry);
+        const one = jest.fn().mockResolvedValue(new Map());
+        const many = jest.fn().mockResolvedValue(new Map());
+        const relations = (service as any).relationService;
+        relations.batchFetchRelatedEntities = one;
+        relations.batchFetchRelatedEntitiesMany = many;
+        return { service, db, one, many };
+    };
 
-        it("nests a many-to-many through its junction and leaves a belongsTo flat", async () => {
-            const { service, findMany } = setup();
+    /** The relation keys a read loaded, whichever cardinality they were. */
+    const loadedRelations = (one: jest.Mock, many: jest.Mock): string[] => [
+        ...one.mock.calls.map(call => call[2] as string),
+        ...many.mock.calls.map(call => call[2] as string)
+    ].sort();
+
+    describe("include names exactly the relations that are loaded", () => {
+
+        it("loads each named relation once, in one batched query", async () => {
+            const { service, one, many } = selectService([{ id: 1, title: "Hello", author_id: 7 }]);
 
             await service.fetchCollectionForRest("posts", {}, ["tags", "author"]);
 
-            // The two shapes are the whole point of the branch. `tags` reaches
-            // its targets through `posts_tags`, so Drizzle needs a second level
-            // of `with` to get past the junction row; `author` is a foreign key
-            // on this very table and needs none. Collapse the distinction and a
-            // m2m read returns the junction rows themselves — `{ post_id, tag_id }`
-            // instead of the tags — with no error anywhere to say so.
-            expect(findMany).toHaveBeenCalledTimes(1);
-            expect(findMany.mock.calls[0][0].with).toEqual({
-                tags: { with: { tag_id: true } },
-                author: true
-            });
+            // One query per relation, not one per row — and no lateral join.
+            expect(loadedRelations(one, many)).toEqual(["author", "tags"]);
+            expect(one).toHaveBeenCalledTimes(1);
+            expect(many).toHaveBeenCalledTimes(1);
         });
 
-        it("nests nothing for a relation that is not a junction", async () => {
-            const { service, findMany } = setup();
+        it("loads nothing but what was named", async () => {
+            const { service, one, many } = selectService([{ id: 1, title: "Hello", author_id: 7 }]);
 
             await service.fetchCollectionForRest("posts", {}, ["author"]);
 
-            expect(findMany.mock.calls[0][0].with).toEqual({ author: true });
+            expect(loadedRelations(one, many)).toEqual(["author"]);
+        });
+
+        it("refuses a name that is not a relation instead of dropping it", async () => {
+            const { service } = selectService([{ id: 1, title: "Hello" }]);
+
+            // Silently ignoring it answers 200 with the field missing, which is
+            // indistinguishable from a row that has no related row — so a typo
+            // in an `include` looked exactly like empty data.
+            await expect(service.fetchCollectionForRest("posts", {}, ["authr"]))
+                .rejects.toMatchObject({ code: "UNKNOWN_RELATION" });
+        });
+
+        it("loads every relation for `*`", async () => {
+            const { service, one, many } = selectService([{ id: 1, title: "Hello", author_id: 7 }]);
+
+            await service.fetchCollectionForRest("posts", {}, ["*"]);
+
+            expect(loadedRelations(one, many)).toEqual(["author", "tags"]);
         });
     });
 
-    describe("fetchOneForRest eager-loads only what `include` asks for", () => {
+    describe("fetchOneForRest loads only what `include` asks for", () => {
 
-        /** `select` is only reached if the relational path bails; it returns nothing. */
-        const setup = (row: Record<string, unknown> | undefined) => {
-            const findFirst = jest.fn().mockResolvedValue(row);
+        /** `fetchOneForRest` reads one row through `db.select(...).limit(1)`. */
+        const oneRowService = (row: Record<string, unknown> | undefined) => {
             const chain: any = {
                 from: jest.fn(() => chain),
                 where: jest.fn(() => chain),
-                limit: jest.fn(() => Promise.resolve([]))
+                limit: jest.fn(() => Promise.resolve(row ? [row] : []))
             };
-            const db = {
-                query: { posts: { findFirst } },
-                select: jest.fn(() => chain)
-            };
-            return { service: new FetchService(db as any, registry),
-findFirst };
+            const db = { select: jest.fn(() => chain) };
+            const service = new FetchService(db as any, registry);
+            const one = jest.fn().mockResolvedValue(new Map());
+            const many = jest.fn().mockResolvedValue(new Map());
+            const relations = (service as any).relationService;
+            relations.batchFetchRelatedEntities = one;
+            relations.batchFetchRelatedEntitiesMany = many;
+            return { service, one, many };
         };
 
-        it("builds a `with` config for a non-empty include", async () => {
-            const { service, findFirst } = setup({ id: 1,
-title: "Hello" });
+        it("loads a named relation", async () => {
+            const { service, one, many } = oneRowService({ id: 1, title: "Hello", author_id: 7 });
 
             await service.fetchOneForRest("posts", 1, ["author"]);
 
-            expect(findFirst.mock.calls[0][0].with).toEqual({ author: true });
+            expect(loadedRelations(one, many)).toEqual(["author"]);
         });
 
-        it("omits `with` entirely for an empty include", async () => {
-            const { service, findFirst } = setup({ id: 1,
-title: "Hello" });
+        it("loads nothing for an empty include", async () => {
+            const { service, one, many } = oneRowService({ id: 1, title: "Hello" });
 
             await service.fetchOneForRest("posts", 1, []);
 
             // `include: []` means "no relations", not "all of them". The empty
-            // array is still truthy, so only the length test keeps it from
-            // reaching `buildWithConfig`, which reads an empty include as
-            // "include everything" — the request would silently JOIN every
-            // relation on the collection and pay for all of them.
-            expect(findFirst).toHaveBeenCalledTimes(1);
-            expect(findFirst.mock.calls[0][0]).not.toHaveProperty("with");
+            // array is still truthy, and reading it as the wildcard would load
+            // every relation on the collection and pay for all of them.
+            expect(loadedRelations(one, many)).toEqual([]);
         });
 
-        it("omits `with` entirely when include is absent", async () => {
-            const { service, findFirst } = setup({ id: 1,
-title: "Hello" });
+        it("loads nothing when include is absent", async () => {
+            const { service, one, many } = oneRowService({ id: 1, title: "Hello" });
 
             await service.fetchOneForRest("posts", 1, undefined);
 
-            // The undefined check has to come first: reading `.length` off an
-            // absent include throws inside the try, and the catch downgrades
-            // that to a warning and a fallback db.select — a silently slower
-            // read that still answers 200.
-            expect(findFirst).toHaveBeenCalledTimes(1);
-            expect(findFirst.mock.calls[0][0]).not.toHaveProperty("with");
+            expect(loadedRelations(one, many)).toEqual([]);
+        });
+
+        it("returns the same relation shape a list read does", async () => {
+            // The two used to be separate implementations — `findFirst({with})`
+            // here, `findMany({with})` there, each with its own fallback — and
+            // they disagreed about a to-one relation that resolves to nothing:
+            // absent on one, `null` on the other.
+            const { service } = oneRowService({ id: 1, title: "Hello", author_id: 7 });
+
+            const row = await service.fetchOneForRest("posts", 1, ["author"]);
+
+            expect(row).toMatchObject({ id: 1, author: null });
         });
     });
 

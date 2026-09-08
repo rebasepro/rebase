@@ -4,12 +4,12 @@ import { Client as PgClient } from "pg";
 import { randomUUID } from "crypto";
 import { DataService } from "./dataService";
 
-import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, OrderByTuple, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, CollectionUpdateMeta, IncludeSpec, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, OrderByTuple, CollectionConfig, RebaseCallContext, resolveClientListLimit, ListLimitError } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { buildPropertyCallbacks, getTableName, OrderBySpecError, parseOrderBySpecStrict } from "@rebasepro/common";
+import { buildPropertyCallbacks, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
 import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
 import { logger, rawQueryLoggingEnabled } from "@rebasepro/server";
@@ -102,6 +102,20 @@ type StoredCollectionRequest = {
     searchString?: string;
     /** Ask each row which declared search field matched — populates `_matches`. */
     searchExplain?: boolean;
+    /**
+     * Relations to load, exactly as a REST list would.
+     *
+     * A subscription could not name any, and the refetch loaded **every**
+     * relation because it passed none — so `find()` returned a row with a
+     * foreign key and `listen()` returned the same row with a nested object
+     * where that key was. Same query, two shapes, and a client rendering both
+     * saw the row change the moment a write landed.
+     */
+    include?: IncludeSpec;
+    /** Columns to return — the same projection `?fields=` asks for. */
+    fields?: string[];
+    /** `SELECT DISTINCT` over the projection. */
+    distinct?: boolean;
 };
 
 type RealTimeListenEntityProps = ListenOneProps & { subscriptionId: string };
@@ -621,11 +635,24 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     orderBy,
                     order: request.order,
                     limit: boundedLimit,
-                    offset: request.offset,
+                    // `page` wins over `offset`, exactly as `FindParams`
+                    // documents and the REST parser applies it — one rule, so a
+                    // live list and the fetch behind it land on the same window.
+                    offset: request.page != null && request.page > 0
+                        ? (request.page - 1) * boundedLimit
+                        : request.offset,
                     startAfter: request.startAfter as Record<string, unknown> | undefined,
                     databaseId: request.collection?.databaseId,
                     searchString: request.searchString,
-                    searchExplain: request.searchExplain
+                    searchExplain: request.searchExplain,
+                    // Stored, so every refetch answers the same query the
+                    // initial fetch did. A field declared on the incoming props
+                    // and not stored here is accepted over the wire and then
+                    // silently ignored — which is what `offset` and `logical`
+                    // both were.
+                    include: request.include,
+                    fields: request.fields,
+                    distinct: request.distinct
                 },
                 authContext,
                 started: 0,
@@ -647,9 +674,12 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 subscription.collectionRequest!,
                 authContext
             );
+            const meta = await this.collectionMetaWithAuth(
+                request.path, subscription.collectionRequest!, rows, authContext
+            );
 
             if (canDeliver()) {
-                this.sendCollectionUpdate(clientId, subscriptionId, rows, request.path);
+                this.sendCollectionUpdate(clientId, subscriptionId, rows, request.path, meta);
             }
 
         } catch (error) {
@@ -899,8 +929,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             const canDeliver = this.beginDelivery(subscriptionId, subscription);
             try {
                 const rows = await this.fetchCollectionWithAuth(notifyPath, subscription.collectionRequest!, subscription.authContext);
+                const meta = await this.collectionMetaWithAuth(
+                    notifyPath, subscription.collectionRequest!, rows, subscription.authContext
+                );
                 if (canDeliver()) {
-                    this.sendCollectionUpdate(subscription.clientId, subscriptionId, rows, notifyPath);
+                    this.sendCollectionUpdate(subscription.clientId, subscriptionId, rows, notifyPath, meta);
                 }
             } catch (error) {
                 const sanitized = sanitizeErrorForClient(error, notifyPath);
@@ -929,6 +962,10 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             try {
                 const rows = await this.fetchCollectionWithAuth(notifyPath, subscription.collectionRequest!, subscription.authContext);
                 if (canDeliver()) callback(rows);
+                // The driver-callback path takes rows only: `DataDriver.listen`
+                // hands its consumer an array, and widening that is a change to
+                // a contract outside this pipeline. The WebSocket path — the
+                // one the SDK uses — carries `meta`.
             } catch (error) {
                 logger.error(`❌ [RealtimeService] Error in debounced driver refetch for ${subscriptionId}`, { error: error });
             }
@@ -973,36 +1010,34 @@ roles: ["anon"] };
                     this.rlsUserRole
                 );
                 const txEntityService = new DataService(tx, this.registry);
-                let fetchedEntities;
-                if (collectionRequest.searchString) {
-                    fetchedEntities = await txEntityService.searchRows(
-                        notifyPath,
-                        collectionRequest.searchString,
-                        {
-                            filter: collectionRequest.filter as FilterValues<string>,
-                            // The subscription stored a group; the search branch
-                            // did not pass it on, so a filtered live search
-                            // widened to every row matching the text.
-                            logical: collectionRequest.logical,
-                            orderBy: collectionRequest.orderBy,
-                            order: collectionRequest.order,
-                            limit: collectionRequest.limit,
-                            databaseId: collectionRequest.databaseId,
-                            searchExplain: collectionRequest.searchExplain
-                        }
-                    );
-                } else {
-                    fetchedEntities = await txEntityService.fetchCollection(notifyPath, {
-                        filter: collectionRequest.filter as FilterValues<string>,
-                        logical: collectionRequest.logical,
-                        orderBy: collectionRequest.orderBy,
-                        order: collectionRequest.order,
-                        limit: collectionRequest.limit,
-                        offset: collectionRequest.offset,
-                        startAfter: collectionRequest.startAfter,
-                        databaseId: collectionRequest.databaseId
-                    });
-                }
+                // The REST pipeline, not the driver's own fetch.
+                //
+                // These are the rows a subscriber receives, and a subscriber
+                // asked the same question a `find()` asks. They used to be
+                // built by a different method, which nests a relation under a
+                // `{ __type: "relation" }` envelope and eagerly loaded every
+                // relation the collection declares — so `find()` and `listen()`
+                // answered one query with two different row shapes, and the
+                // generated types described only one of them. Search included:
+                // it forked to `searchRows` here for no reason other than that
+                // the branch existed.
+                const fetchedEntities = await txEntityService.fetchCollectionForRest(notifyPath, {
+                    filter: collectionRequest.filter as FilterValues<string>,
+                    // The subscription stored a group; the search branch used to
+                    // drop it, so a filtered live search widened to every row
+                    // matching the text.
+                    logical: collectionRequest.logical,
+                    orderBy: collectionRequest.orderBy,
+                    order: collectionRequest.order,
+                    limit: collectionRequest.limit,
+                    offset: collectionRequest.offset,
+                    startAfter: collectionRequest.startAfter,
+                    searchString: collectionRequest.searchString,
+                    searchExplain: collectionRequest.searchExplain,
+                    databaseId: collectionRequest.databaseId,
+                    fields: collectionRequest.fields,
+                    distinct: collectionRequest.distinct
+                }, collectionRequest.include);
 
                 // Re-apply `afterRead` lifecycle hooks to ensure consistent data structures
                 // between the initial driver fetch and this RLS-bound refetch.
@@ -1063,22 +1098,7 @@ roles: activeAuth.roles },
         // The `logical` group is carried here as well: this branch answers the
         // same subscription as the one above, and a fallback that drops a
         // condition returns *more* rows than the path it stands in for.
-        if (collectionRequest.searchString) {
-            return await this.dataService.searchRows(
-                notifyPath,
-                collectionRequest.searchString,
-                {
-                    filter: collectionRequest.filter as FilterValues<string>,
-                    logical: collectionRequest.logical,
-                    orderBy: collectionRequest.orderBy,
-                    order: collectionRequest.order,
-                    limit: collectionRequest.limit,
-                    databaseId: collectionRequest.databaseId,
-                    searchExplain: collectionRequest.searchExplain
-                }
-            );
-        }
-        return await this.dataService.fetchCollection(notifyPath, {
+        return await this.dataService.fetchCollectionForRest(notifyPath, {
             filter: collectionRequest.filter as FilterValues<string>,
             logical: collectionRequest.logical,
             orderBy: collectionRequest.orderBy,
@@ -1086,8 +1106,73 @@ roles: activeAuth.roles },
             limit: collectionRequest.limit,
             offset: collectionRequest.offset,
             startAfter: collectionRequest.startAfter,
+            searchString: collectionRequest.searchString,
+            searchExplain: collectionRequest.searchExplain,
+            databaseId: collectionRequest.databaseId,
+            fields: collectionRequest.fields,
+            distinct: collectionRequest.distinct
+        }, collectionRequest.include);
+    }
+
+    /**
+     * The `meta` a `collection_update` frame carries beside its rows.
+     *
+     * Frames used to carry rows and primary keys and nothing else, so the
+     * client issued a `GET /count` **per push** to fill in a total it needed to
+     * render the same list it had just been handed — one extra round trip per
+     * write, per subscriber, forever. The refetch already knows the query; it
+     * counts once, here, under the same RLS transaction that read the rows, so
+     * the total describes the same set they came from.
+     */
+    private async collectionMetaWithAuth(
+        notifyPath: string,
+        collectionRequest: StoredCollectionRequest,
+        rows: Record<string, unknown>[],
+        authContext?: SubscriptionAuthContext
+    ): Promise<CollectionUpdateMeta> {
+        const limit = collectionRequest.limit ?? rows.length;
+        const offset = collectionRequest.offset ?? 0;
+
+        const countOnce = async (service: DataService) => service.count(notifyPath, {
+            filter: collectionRequest.filter as FilterValues<string>,
+            logical: collectionRequest.logical,
+            searchString: collectionRequest.searchString,
             databaseId: collectionRequest.databaseId
         });
+
+        let total: number;
+        try {
+            if (this.driver) {
+                const activeAuth = authContext || { uid: ANONYMOUS_USER_ID, roles: ["anon"] };
+                total = await this.db.transaction(async (tx) => {
+                    await applyAuthContext(
+                        tx,
+                        { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
+                        this.rlsUserRole
+                    );
+                    return countOnce(new DataService(tx, this.registry));
+                });
+            } else {
+                total = await countOnce(this.dataService);
+            }
+        } catch (error) {
+            // A count that failed says nothing about the size of the
+            // collection, and a frame with no `meta` is one the client can fall
+            // back on. Reporting `rows.length` would claim a page read at
+            // offset 10 held two rows.
+            logger.warn(`[RealtimeService] Could not count '${notifyPath}' for a subscription frame`, { error });
+            return { limit, offset, hasMore: false, partial: true };
+        }
+
+        const last = rows[rows.length - 1];
+        const hasMore = offset + rows.length < total;
+        const nextCursor = (hasMore && last)
+            ? this.dataService.cursorFor?.(
+                notifyPath, last, normalizeDriverOrderBy(collectionRequest.orderBy, collectionRequest.order)
+            )
+            : undefined;
+
+        return { total, limit, offset, hasMore, ...(nextCursor && { nextCursor }) };
     }
 
     /**
@@ -1173,7 +1258,14 @@ roles: ["anon"] };
                     this.rlsUserRole
                 );
                 const txEntityService = new DataService(tx, this.registry);
-                let processedEntity = await txEntityService.fetchOne(notifyPath, id, collection?.databaseId);
+                // The REST pipeline, for the same reason the collection refetch
+                // uses it: `listenById()` and `findById()` are the same read,
+                // and `fetchOne` renders the admin's view model — every relation
+                // eagerly loaded, each under a `{ __type: "relation" }`
+                // envelope. A subscriber got one shape and a fetch the other.
+                let processedEntity = await txEntityService.fetchOneForRest(
+                    notifyPath, id, undefined, collection?.databaseId
+                ) ?? undefined;
 
                 if (processedEntity) {
                     const registryCollection = this.registry.getCollectionByPath(notifyPath);
@@ -1226,15 +1318,24 @@ roles: activeAuth.roles },
             });
         }
 
-        return await this.dataService.fetchOne(notifyPath, id);
+        return await this.dataService.fetchOneForRest(notifyPath, id) ?? undefined;
     }
 
-    private sendCollectionUpdate(clientId: string, subscriptionId: string, rows: Record<string, unknown>[], path: string) {
+    private sendCollectionUpdate(
+        clientId: string,
+        subscriptionId: string,
+        rows: Record<string, unknown>[],
+        path: string,
+        meta?: CollectionUpdateMeta
+    ) {
         const message: CollectionUpdateMessage = {
             type: "collection_update",
             subscriptionId,
             rows: rows,
-            pks: this.primaryKeysForPath(path)
+            pks: this.primaryKeysForPath(path),
+            // Beside the rows rather than fetched afterwards — see
+            // {@link CollectionUpdateMeta} for the round trip this removes.
+            ...(meta && { meta })
         };
         this.sendMessage(clientId, message);
     }

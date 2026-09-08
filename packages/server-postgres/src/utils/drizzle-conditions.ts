@@ -1,4 +1,4 @@
-import { and, eq, or, sql, SQL, ilike, inArray, getTableColumns } from "drizzle-orm";
+import { and, eq, not, or, sql, SQL, ilike, inArray, getTableColumns } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import {
     ALL_WHERE_FILTER_OPS,
@@ -842,7 +842,19 @@ export class DrizzleConditionBuilder {
                 .map(c => this.buildLogicalConditions(c, table, collectionPath, options))
                 .filter((sql): sql is SQL => sql !== null);
             if (subSQLs.length === 0) return null;
-            return (cond.type === "or" ? or(...subSQLs) : and(...subSQLs)) ?? null;
+            if (cond.type === "or") return or(...subSQLs) ?? null;
+            const conjunction = and(...subSQLs) ?? null;
+            // `not` negates the *conjunction* of its conditions — the rule
+            // stated on `LogicalCondition`, applied here as a real `NOT (...)`.
+            //
+            // Not by inverting the operators underneath: SQL is three-valued,
+            // so `NOT (a AND b)` and `(NOT a) OR (NOT b)` stop agreeing the
+            // moment a NULL is involved, and only one of them is the query the
+            // caller wrote. `NOT (status = 'draft')` also excludes rows whose
+            // status is NULL, which is what `NOT` means and what a caller
+            // reaching for it is asking for.
+            if (cond.type === "not") return conjunction ? not(conjunction) : null;
+            return conjunction;
         } else {
             // A dropped leaf is worse here than in a flat filter: inside an
             // `or(...)` the disjunction loses a branch, so the surviving

@@ -5,6 +5,7 @@ import type { CollectionConfig, FilterValues } from "../types/collections";
 import type { OrderByTuple } from "../types/filter-operators";
 import type { RebaseCallContext } from "../call_context";
 import type { IncludeSpec, LogicalCondition } from "./data";
+import type { CollectionUpdateMeta } from "../types/websockets";
 
 
 /**
@@ -212,7 +213,15 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
 export type ListenCollectionProps<M extends Record<string, unknown> = Record<string, unknown>> =
     FetchCollectionProps<M> &
     {
-        onUpdate: (rows: Record<string, unknown>[]) => void;
+        /**
+         * Page number (1-indexed), as `FindParams.page`.
+         *
+         * A subscription could name a `limit` and an `offset` but not a `page`,
+         * so a live list on page three had to compute the offset itself — and
+         * the two spellings then disagreed about what a page was.
+         */
+        page?: number;
+        onUpdate: (rows: Record<string, unknown>[], meta?: CollectionUpdateMeta) => void;
         onError?: (error: Error) => void;
     };
 

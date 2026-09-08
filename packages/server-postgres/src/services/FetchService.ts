@@ -1,8 +1,8 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
-import { CollectionConfig, FilterValues, OrderByTuple, ResolvedRelation, LogicalCondition, isManyToMany, parseRelationAggregateSort } from "@rebasepro/types";
-import type { VectorSearchParams } from "@rebasepro/types";
-import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, createRelationRefWithData, normalizeDriverOrderBy } from "@rebasepro/common";
+import { CollectionConfig, FilterValues, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, isManyToMany, parseRelationAggregateSort } from "@rebasepro/types";
+import type { IncludeSpec, NullsPlacement, VectorSearchParams } from "@rebasepro/types";
+import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import {
@@ -42,9 +42,40 @@ type DbQueryAccessor = Record<string, RelationalQueryBuilder<any, any>> | undefi
 type ResolvedOrderKey = {
     field: string;
     direction: "asc" | "desc";
+    /**
+     * Where this key's NULLs go. Absent means the direction's own convention —
+     * see {@link FetchService.nullsLast}, which is the one place the two
+     * functions that have to agree about it both read.
+     */
+    nulls?: NullsPlacement;
     target: AnyPgColumn | SQL;
     cursorTarget?: SQL;
 };
+
+/**
+ * Ascending comparison for two values of one column, with NULLs placed.
+ *
+ * Used only to order the rows *inside* one included relation, where the sort
+ * happens after a batched load rather than in SQL — see
+ * {@link FetchService.shapeRelatedRows}. The NULL placement is the same
+ * question the `ORDER BY` answers, and it is answered the same way here so a
+ * nested `orderBy` does not put its empty values at the opposite end from the
+ * identical top-level one.
+ */
+function compareForSort(a: unknown, b: unknown, nullsLast: boolean): number {
+    const aNull = a === null || a === undefined;
+    const bNull = b === null || b === undefined;
+    if (aNull && bNull) return 0;
+    if (aNull) return nullsLast ? 1 : -1;
+    if (bNull) return nullsLast ? -1 : 1;
+    // Dates compare as numbers; everything else falls back to a string
+    // comparison, which is what a mixed or unknown column has.
+    const av = a instanceof Date ? a.getTime() : a;
+    const bv = b instanceof Date ? b.getTime() : b;
+    if (typeof av === "number" && typeof bv === "number") return av - bv;
+    if (typeof av === "boolean" && typeof bv === "boolean") return (av ? 1 : 0) - (bv ? 1 : 0);
+    return String(av).localeCompare(String(bv));
+}
 
 /**
  * Service for handling all row read operations.
@@ -225,7 +256,7 @@ export class FetchService {
         cursorId?: unknown
     ): ResolvedOrderKey[] {
         const resolved: ResolvedOrderKey[] = [];
-        for (const [field, direction] of keys) {
+        for (const [field, direction, nulls] of keys) {
             // Checked before the column path: an aggregate key is not a column
             // name and would otherwise be reported as a typo'd one.
             const aggregate = this.resolveAggregateOrderTarget(table, field, collection, collectionPath);
@@ -233,6 +264,7 @@ export class FetchService {
                 resolved.push({
                     field,
                     direction,
+                    nulls,
                     target: aggregate,
                     // Built only when a cursor is in play: it is a second
                     // subquery, and a listing with no `startAfter` has nothing
@@ -248,9 +280,29 @@ export class FetchService {
             const target = this.resolveOrderTarget(table, field, collection, searchString);
             if (target) resolved.push({ field,
 direction,
+nulls,
 target });
         }
         return resolved;
+    }
+
+    /**
+     * Whether this key's NULLs sort *after* its real values.
+     *
+     * The default is Postgres's own — `NULLS LAST` ascending, `NULLS FIRST`
+     * descending — and it was previously hardcoded in two places that had to
+     * agree: the `ORDER BY` and the keyset comparison behind cursor paging. A
+     * key that states a placement overrides it, in both, because they read the
+     * answer from here.
+     *
+     * The default is also the thing a "newest first" list gets wrong: every row
+     * with no date sorts to the very top, ahead of everything real, and the only
+     * way out used to be an `is-not-null` filter that dropped those rows
+     * entirely. `orderBy: [["published_at", "desc", "last"]]` is the fix.
+     */
+    private static nullsLast(key: Pick<ResolvedOrderKey, "direction" | "nulls">): boolean {
+        if (key.nulls) return key.nulls === "last";
+        return key.direction === "asc";
     }
 
     /**
@@ -274,9 +326,18 @@ target });
      * end of a queue.
      */
     private buildOrderExpressions(keys: ResolvedOrderKey[], idField: AnyPgColumn): SQL[] {
-        const expressions = keys.map(({ direction, target }) => direction === "asc"
-            ? sql`${target} ASC NULLS LAST`
-            : sql`${target} DESC NULLS FIRST`);
+        // Four literal branches rather than a nested `sql` fragment for the
+        // placement: a nested fragment renders as a child SQL node, which is
+        // correct in the statement and invisible to anything reading the
+        // expression's own chunks — including the test that asserts a
+        // descending sort really does say `NULLS LAST` when it was asked to.
+        const expressions = keys.map((key) => {
+            const nullsLast = FetchService.nullsLast(key);
+            if (key.direction === "asc") {
+                return nullsLast ? sql`${key.target} ASC NULLS LAST` : sql`${key.target} ASC NULLS FIRST`;
+            }
+            return nullsLast ? sql`${key.target} DESC NULLS LAST` : sql`${key.target} DESC NULLS FIRST`;
+        });
         expressions.push(desc(idField));
         return expressions as SQL[];
     }
@@ -435,6 +496,337 @@ target });
         return null;
     }
 
+    // =============================================================
+    // THE INCLUDE PIPELINE
+    //
+    // One implementation, reached by every read: the REST list, the REST
+    // get-by-id, the in-process accessor and the realtime refetch. It used to
+    // be four. `db.query.findMany({ with })` served REST — the lateral-join
+    // path this file's own comments call "catastrophically slow… 7s+ for 350
+    // rows" — while the admin fetch batched through `RelationService` and the
+    // realtime refetch loaded EVERY relation because it passed no `include` at
+    // all. So `find()` and `listen()` answered the same query with different
+    // rows, and the fast path was the one nobody could reach.
+    //
+    // What runs now is the batched one, for all of them: one query per relation
+    // per level, never per row.
+    // =============================================================
+
+    /**
+     * The relations one level of an include tree names, resolved.
+     *
+     * A name that is not a relation is a **400 `UNKNOWN_RELATION`**. It used to
+     * be dropped silently, which answers 200 with the field missing — and a
+     * missing relation field is indistinguishable from a row that genuinely has
+     * no related row, so a typo in an `include` looked like empty data.
+     */
+    private resolveIncludeLevel(
+        collection: CollectionConfig,
+        tree: Record<string, IncludeNode>,
+        wildcard: boolean
+    ): { key: string; node: IncludeNode; relation: ResolvedRelation }[] {
+        const resolvedRelations = resolveCollectionRelations(collection);
+        const out: { key: string; node: IncludeNode; relation: ResolvedRelation }[] = [];
+
+        if (wildcard) {
+            // `*` is "every relation, one hop" — the admin panel's shape. A
+            // relation also named explicitly keeps its options.
+            for (const [key, relation] of Object.entries(resolvedRelations)) {
+                out.push({ key, node: tree[key] ?? { children: {} }, relation });
+            }
+        }
+
+        for (const [key, node] of Object.entries(tree)) {
+            if (wildcard && key in resolvedRelations) continue;
+            const relation = resolvedRelations[key];
+            if (!relation) {
+                const known = Object.keys(resolvedRelations).sort();
+                throw ApiError.badRequest(
+                    `Unknown relation '${key}' on collection '${collection.slug ?? collection.name}'`
+                    + (known.length > 0
+                        ? `. Its relations are: ${known.join(", ")}`
+                        : ". It declares no relations."),
+                    "UNKNOWN_RELATION",
+                    { relation: key, collection: collection.slug ?? collection.name, ...(known.length > 0 && { validRelations: known }) }
+                );
+            }
+            out.push({ key, node, relation });
+        }
+
+        return out;
+    }
+
+    /**
+     * The extra `WHERE` an include's own `where`/`logical` puts on the target.
+     *
+     * Pushed into the batch query rather than applied to the rows it returns:
+     * filtering afterwards reads every related row of every parent to throw
+     * most of them away, and on a to-many relation that is the whole table.
+     */
+    private includeNarrowing(node: IncludeNode, targetCollection: CollectionConfig): SQL | undefined {
+        if (!node.where && !node.logical) return undefined;
+        const targetPath = targetCollection.slug;
+        const targetTable = getTableForCollection(targetCollection, this.registry);
+        const conditions: SQL[] = [];
+        if (node.where) {
+            conditions.push(...this.buildFilterConditions(node.where, targetTable, targetPath));
+        }
+        if (node.logical) {
+            const logical = DrizzleConditionBuilder.buildLogicalConditions(
+                node.logical, targetTable, targetPath, this.filterContext(targetPath, targetTable)
+            );
+            if (logical) conditions.push(logical);
+        }
+        return conditions.length > 0
+            ? DrizzleConditionBuilder.combineConditionsWithAnd(conditions)
+            : undefined;
+    }
+
+    /**
+     * Sort, cap and project the rows of ONE to-many relation, per parent.
+     *
+     * `orderBy` and `limit` are applied here rather than in SQL because a limit
+     * on a batched relation load is *per parent*, and expressing that needs a
+     * LATERAL or a window function per relation kind — four of them, each with
+     * its own join shape. The rows were already narrowed by
+     * {@link includeNarrowing} in SQL, so what this sorts and cuts is the set
+     * the caller asked for and not the table.
+     */
+    private shapeRelatedRows(
+        rows: Record<string, unknown>[],
+        node: IncludeNode,
+        targetCollection: CollectionConfig
+    ): Record<string, unknown>[] {
+        let out = rows;
+        if (node.orderBy && node.orderBy.length > 0) {
+            const keys = node.orderBy;
+            out = [...out].sort((a, b) => {
+                for (const [field, direction, nulls] of keys) {
+                    const cmp = compareForSort(a[field], b[field], FetchService.nullsLast({ direction, nulls }));
+                    if (cmp !== 0) return direction === "desc" ? -cmp : cmp;
+                }
+                return 0;
+            });
+        }
+        if (node.limit !== undefined) out = out.slice(0, node.limit);
+        if (node.fields && node.fields.length > 0) {
+            const keep = new Set(node.fields);
+            // The key always survives: a related row nobody can address cannot
+            // be followed, updated or deduplicated by the caller.
+            for (const pk of getPrimaryKeys(targetCollection, this.registry)) keep.add(pk.fieldName);
+            out = out.map(row => {
+                const projected: Record<string, unknown> = {};
+                for (const [key, value] of Object.entries(row)) {
+                    if (keep.has(key)) projected[key] = value;
+                }
+                return projected;
+            });
+        }
+        return out;
+    }
+
+    /**
+     * Load an include tree onto `rows`, in place, one batched query per
+     * relation per level.
+     *
+     * Recurses into nested includes with the rows it just loaded, so
+     * `comments.author` is two queries for a page of posts rather than one per
+     * comment. The depth bound lives on the normalizer
+     * ({@link MAX_INCLUDE_DEPTH}); this asserts it again because the tree can
+     * also be built in-process, where nothing normalized it.
+     */
+    private async loadIncludes(
+        rows: Record<string, unknown>[],
+        collection: CollectionConfig,
+        collectionPath: string,
+        include: NormalizedInclude,
+        depth = 1
+    ): Promise<void> {
+        if (rows.length === 0 || depth > MAX_INCLUDE_DEPTH) return;
+
+        const idInfoArray = getPrimaryKeys(collection, this.registry);
+        if (idInfoArray.length === 0) return;
+
+        // The address the batch groups its results by. Both sides derive it the
+        // same way, so they agree by construction rather than by both happening
+        // to pick column zero.
+        const addressOf = (row: Record<string, unknown>): string | undefined => {
+            const address = buildCompositeId(row, idInfoArray);
+            return address && address.split(COMPOSITE_ID_SEPARATOR).some(part => part !== "")
+                ? address
+                : undefined;
+        };
+        const addressable = rows.filter(row => addressOf(row) !== undefined);
+        if (addressable.length === 0) return;
+        const rowIds = addressable.map(row => addressOf(row) as string);
+
+        const levels = this.resolveIncludeLevel(collection, include.tree, include.wildcard);
+
+        for (const { key, node, relation } of levels) {
+            const targetCollection = relation.target();
+            let narrow: SQL | undefined;
+            try {
+                narrow = this.includeNarrowing(node, targetCollection);
+            } catch (e) {
+                // A `where` inside an include that names a column the target
+                // does not have is the caller's mistake, and it is already an
+                // ApiError. Anything else is not this loop's to swallow.
+                throw e;
+            }
+
+            // Rows loaded at this level, to recurse into. Collected as the
+            // objects actually attached to the parents, so a nested include
+            // mutates what the caller will see rather than a copy of it.
+            const loaded: Record<string, unknown>[] = [];
+
+            try {
+                if (relation.cardinality === "one") {
+                    const results = await this.relationService.batchFetchRelatedEntities(
+                        collectionPath, rowIds, key, relation, narrow
+                    );
+                    for (const row of addressable) {
+                        const related = results.get(String(addressOf(row)));
+                        // `null`, not "absent": a to-one relation that reaches
+                        // nothing is a fact about the row, and leaving the key
+                        // off makes it indistinguishable from not having asked.
+                        if (!related) { row[key] = null; continue; }
+                        const [shaped] = this.shapeRelatedRows([{ ...related.values }], node, targetCollection);
+                        row[key] = shaped;
+                        loaded.push(shaped);
+                    }
+                } else {
+                    const results = await this.relationService.batchFetchRelatedEntitiesMany(
+                        collectionPath, rowIds, key, relation, narrow
+                    );
+                    for (const row of addressable) {
+                        const related = results.get(String(addressOf(row))) ?? [];
+                        const shaped = this.shapeRelatedRows(
+                            related.map(e => ({ ...e.values })), node, targetCollection
+                        );
+                        row[key] = shaped;
+                        loaded.push(...shaped);
+                    }
+                }
+            } catch (e) {
+                // An `include` that failed is not an `include` that matched
+                // nothing. A Postgres error also poisons the surrounding
+                // transaction, so swallowing one loses every later relation in
+                // the same request too — one failure, several missing fields.
+                if (e instanceof ApiError) throw e;
+                if (reachedDatabase(e)) throw e;
+                logger.warn(`[include] Failed to load relation '${key}' on ${collectionPath}`, { error: e });
+                continue;
+            }
+
+            const children = Object.keys(node.children).length > 0
+                ? { wildcard: false, tree: node.children }
+                : undefined;
+            if (children && loaded.length > 0) {
+                await this.loadIncludes(
+                    loaded, targetCollection, targetCollection.slug, children, depth + 1
+                );
+            }
+        }
+    }
+
+    /**
+     * The SELECT list for a read: the visible columns, narrowed to `fields`.
+     *
+     * `?fields=` used to be a trim of the *response* — every column read out of
+     * the database and most of them thrown away in JavaScript. It is a
+     * projection now, so asking for two columns of a wide row reads two
+     * columns; that is also what makes `distinct` mean anything.
+     *
+     * Two things survive a narrowing regardless:
+     *
+     * - the **primary key**, because a row nobody can address cannot be
+     *   updated, deleted, or paged past — and `meta.nextCursor` is derived from
+     *   it, so a projection without it would silently disable seeking;
+     * - the exclusions. `excludeFromApi` and the generated search columns are
+     *   removed *after* the narrowing, so naming one in `fields` does not
+     *   un-hide it. That was the shape of the `?searchString=` leak: a path
+     *   that skipped the projection returned a password hash the plain read
+     *   correctly withheld.
+     *
+     * An unknown column name is a 400 rather than a silent omission: a caller
+     * who mistypes `?fields=titel` otherwise gets rows without titles and no
+     * hint why.
+     */
+    private columnProjection(
+        table: PgTable<any>,
+        collection: CollectionConfig,
+        fields: string[] | undefined,
+        idInfoArray: { fieldName: string; type: "string" | "number" }[]
+    ): Record<string, unknown> | undefined {
+        const visible = visibleColumnProjection(getTableColumns(table), collection);
+        if (!fields || fields.length === 0) return visible;
+
+        let tableColumns: Record<string, unknown>;
+        try {
+            tableColumns = getTableColumns(table) as Record<string, unknown>;
+        } catch {
+            // Not a real drizzle table — a stub in a test, a derived path. No
+            // projection is the right answer, as it is for the exclusions.
+            return visible;
+        }
+        const available = visible ?? tableColumns;
+
+        const keep = new Set(fields);
+        for (const pk of idInfoArray) keep.add(pk.fieldName);
+
+        const projection: Record<string, unknown> = {};
+        for (const name of keep) {
+            const column = available[name];
+            if (column !== undefined) { projection[name] = column; continue; }
+            // Present on the table but not in `available` means it was excluded
+            // — hidden, and staying hidden. Absent from both is a typo.
+            if (tableColumns[name] !== undefined) continue;
+            throw ApiError.badRequest(
+                `Unknown field '${name}' in \`fields\` on collection `
+                + `'${collection.slug ?? collection.name}'. Valid fields: `
+                + Object.keys(available).sort().join(", "),
+                "UNKNOWN_FIELD",
+                { field: name, collection: collection.slug ?? collection.name }
+            );
+        }
+        return projection;
+    }
+
+    /**
+     * The opaque cursor that continues a listing after `row`. See
+     * {@link RestFetchService.cursorFor}.
+     *
+     * Here rather than at the route because deriving it needs the collection's
+     * primary key, which may be named anything and span several columns — the
+     * driver's knowledge, not the HTTP layer's.
+     */
+    cursorFor(
+        collectionPath: string,
+        row: Record<string, unknown>,
+        orderBy?: OrderByTuple[]
+    ): string | undefined {
+        // Relevance is computed per query rather than stored, so there is no
+        // value on this row to compare a later page against — and two requests
+        // with different search strings produce scores that are not on the same
+        // scale at all. `buildCursorConditions` refuses such a cursor; issuing
+        // one here would be handing out a string whose only use is a 400.
+        if (orderBy?.some(([field]) => field === FetchService.SCORE_FIELD)) return undefined;
+        try {
+            const collection = getCollectionByPath(collectionPath, this.registry);
+            const pks = getPrimaryKeys(collection, this.registry);
+            if (pks.length === 0) return undefined;
+            const address = buildCompositeId(row, pks);
+            if (!address || !address.split(COMPOSITE_ID_SEPARATOR).some(part => part !== "")) return undefined;
+            // The single-key value, not the composite token: the keyset
+            // comparison compares it against the id *column*.
+            return encodeCursor(orderBy, row, row[pks[0].fieldName]);
+        } catch {
+            // A path with no registered collection — a nested or derived one.
+            // No cursor is the honest answer; the listing pages by offset.
+            return undefined;
+        }
+    }
+
     /**
      * Post-fetch joinPath relations for a single flat row.
      * joinPath relations cannot be expressed via Drizzle's `with` config,
@@ -482,180 +874,6 @@ target });
             });
 
         await Promise.all(promises);
-    }
-
-    /**
-     * Resolves joinPath relations for raw REST rows and directly injects them.
-     * Uses RelationService to query the database and maps results back to the flattened objects.
-     */
-    private async resolveJoinPathRelationsBatchRest(
-        rows: Record<string, unknown>[],
-        collection: CollectionConfig,
-        collectionPath: string,
-        idInfoArray: { fieldName: string; type: "string" | "number" }[],
-        include?: string[]
-    ): Promise<void> {
-        if (rows.length === 0) return;
-
-        const resolvedRelations = resolveCollectionRelations(collection);
-        const propertyKeys = new Set(Object.keys(collection.properties || {}));
-        const shouldInclude = (key: string) =>
-            !include || include.length === 0 || include[0] === "*" || include.includes(key);
-
-        const joinPathRelations = Object.entries(resolvedRelations)
-            .filter(([key, relation]) => relation.kind === "via" && propertyKeys.has(key) && shouldInclude(key));
-
-        if (joinPathRelations.length === 0) return;
-
-        // These rows carry their key columns verbatim, so the parent's address
-        // is derived from them. It used to be parsed back out of a synthesized
-        // `id` — which no longer exists on a row, and threw (composite: parts
-        // mismatch; numeric: NaN) into the catch below, where a warning is all
-        // that separates "no relations" from "relations dropped".
-        //
-        // The whole key, because that is what the batch groups its results by:
-        // both sides derive the token the same way, so they agree by
-        // construction rather than by both happening to pick column zero.
-        const parentIdOf = (row: Record<string, unknown>): string | undefined => {
-            const address = buildCompositeId(row, idInfoArray);
-            return address && address.split(COMPOSITE_ID_SEPARATOR).some(part => part !== "") ? address : undefined;
-        };
-
-        for (const [key, relation] of joinPathRelations) {
-            try {
-                const addressable = rows.filter(r => parentIdOf(r) !== undefined && parentIdOf(r) !== null);
-                if (addressable.length === 0) continue;
-                const rowIds = addressable.map(r => parentIdOf(r) as string | number);
-
-                if (relation.cardinality === "one") {
-                    const resultMap = await this.relationService.batchFetchRelatedEntities(
-                        collectionPath,
-                        rowIds,
-                        key,
-                        relation
-                    );
-
-                    for (const row of addressable) {
-                        const relatedRow = resultMap.get(String(parentIdOf(row)));
-                        // Columns only: the target's address is the consumer's to
-                        // derive, and merging it last overwrote a real `id` column.
-                        row[key] = relatedRow ? { ...relatedRow.values } : null;
-                    }
-                } else if (relation.cardinality === "many") {
-                    const resultMap = await this.relationService.batchFetchRelatedEntitiesMany(
-                        collectionPath,
-                        rowIds,
-                        key,
-                        relation
-                    );
-
-                    for (const row of addressable) {
-                        const relatedList = resultMap.get(String(parentIdOf(row))) || [];
-                        row[key] = relatedList.map(e => ({ ...e.values }));
-                    }
-                }
-            } catch (e) {
-                // A relation that failed to load is not a relation that is absent.
-                // Without this the request answers 200 with the field quietly
-                // missing — and because a Postgres error poisons the surrounding
-                // transaction, every later relation in the same request is
-                // swallowed too, so one failure becomes a response missing
-                // several fields. Same guard the four other catches in this file
-                // already use.
-                if (reachedDatabase(e)) throw e;
-                logger.warn(`Could not batch resolve joinPath relation '${key}' for REST`, { error: e });
-            }
-        }
-    }
-
-    /**
-     * Build db.query-compatible options from standard fetch options.
-     * Handles filter, search, orderBy, limit, and cursor-based pagination.
-     */
-    private buildDrizzleQueryOptions<M extends Record<string, unknown>>(
-        table: PgTable<any>,
-        idField: AnyPgColumn,
-        idInfo: { fieldName: string; type: "string" | "number" },
-        options: {
-            filter?: FilterValues<Extract<keyof M, string>>;
-            orderBy?: string | OrderByTuple[];
-            order?: "desc" | "asc";
-            limit?: number;
-            offset?: number;
-            startAfter?: Record<string, unknown>;
-            searchString?: string;
-            logical?: LogicalCondition;
-        },
-        collectionPath: string,
-        withConfig?: Record<string, unknown>,
-        scopeCondition?: SQL
-    ): Record<string, unknown> {
-        const queryOpts: Record<string, unknown> = {};
-
-        // Same exclusion the `db.select` fallback applies, in the shape the
-        // relational query builder takes. Both paths serve the same request, so
-        // a row must not carry the search column down one and not the other.
-        const hidden = hiddenColumnsOption(
-            getTableColumns(table),
-            this.registry.getCollectionByPath(collectionPath) ?? undefined
-        );
-        if (hidden) queryOpts.columns = hidden;
-
-        if (withConfig) queryOpts.with = withConfig;
-
-        // Build where conditions
-        const allConditions: SQL[] = [];
-
-        if (scopeCondition) allConditions.push(scopeCondition);
-
-        if (options.searchString) {
-            const collection = getCollectionByPath(collectionPath, this.registry);
-            const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
-                options.searchString, collection.properties, table, collection
-            );
-            if (searchConditions.length === 0) {
-                // Return options that will produce empty results
-                queryOpts.where = and(eq(idField, -99999999)); // impossible condition
-                return queryOpts;
-            }
-            allConditions.push(DrizzleConditionBuilder.combineConditionsWithOr(searchConditions)!);
-        }
-
-        if (options.filter) {
-            const filterConditions = this.buildFilterConditions(options.filter, table, collectionPath);
-            if (filterConditions.length > 0) allConditions.push(...filterConditions);
-        }
-
-        if (options.logical) {
-            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath, this.filterContext(collectionPath, table));
-            if (logicalCondition) allConditions.push(logicalCondition);
-        }
-
-        // Cursor-based pagination (startAfter)
-        if (options.startAfter) {
-            const cursorConditions = this.buildCursorConditions(table, idField, idInfo, options, collectionPath);
-            if (cursorConditions.length > 0) allConditions.push(...cursorConditions);
-        }
-
-        if (allConditions.length > 0) {
-            queryOpts.where = and(...allConditions);
-        }
-
-        // OrderBy
-        const orderKeys = normalizeDriverOrderBy(options.orderBy, options.order);
-        const resolvedOrder = orderKeys
-            ? this.resolveOrderKeys(table, orderKeys, getCollectionByPath(collectionPath, this.registry), options.searchString)
-            : [];
-        queryOpts.orderBy = this.buildOrderExpressions(resolvedOrder, idField);
-
-        // Limit
-        const limitValue = options.searchString ? (options.limit || 50) : options.limit;
-        if (limitValue) queryOpts.limit = limitValue;
-
-        // Offset (numeric pagination)
-        if (options.offset && options.offset > 0) queryOpts.offset = options.offset;
-
-        return queryOpts;
     }
 
     /**
@@ -762,6 +980,11 @@ target });
         if (index >= keys.length) return lt(idField, cursorId);
 
         const { direction, cursorTarget } = keys[index];
+        // Which end the NULLs sort at — the direction's convention unless the
+        // key stated one. Read from the same place `buildOrderExpressions`
+        // reads it, because a comparison that disagrees with the ORDER BY it
+        // pages over repeats and skips rows and reports nothing wrong.
+        const nullsLast = FetchService.nullsLast(keys[index]);
         // A column or an expression. `_score` is an expression too, but a
         // cursor over relevance is refused before this is reached; an aggregate
         // over a relation is the one that gets here. Drizzle's comparison
@@ -779,30 +1002,40 @@ target });
         // `cursorTarget` references only the cursor id, never the outer row, so
         // Postgres evaluates it once for the whole statement rather than per
         // row — repeating it across the branches costs nothing.
+        // "Sorts after" for two non-null values is decided by the *direction*;
+        // where the NULLs sit is decided by `nullsLast`. The two used to be the
+        // same test, which was correct only while the placement was the
+        // direction's default and silently wrong the moment a key named one.
+        const after = (a: AnyPgColumn | SQL, b: unknown) =>
+            direction === "asc" ? gt(a as AnyPgColumn, b) : lt(a as AnyPgColumn, b);
+        const afterSql = (a: AnyPgColumn | SQL, b: SQL) =>
+            direction === "asc" ? sql`${a} > ${b}` : sql`${a} < ${b}`;
+
         if (cursorTarget) {
-            return direction === "asc"
+            return nullsLast
                 // NULLS LAST. A cursor row among the NULLs has only later NULLs
-                // after it; otherwise everything greater, then the NULLs, then
-                // the ties.
+                // after it; otherwise everything that sorts later, then the
+                // NULLs, then the ties.
                 ? or(
                     and(isNull(cursorTarget), isNull(target), rest),
                     and(
                         isNotNull(cursorTarget),
                         or(
-                            sql`${target} > ${cursorTarget}`,
+                            afterSql(target, cursorTarget),
                             isNull(target),
                             and(sql`${target} = ${cursorTarget}`, rest)
                         )
                     )
                 )!
                 // NULLS FIRST. A cursor row among the NULLs still has every
-                // non-null row after it.
+                // non-null row after it; a non-null cursor row has the NULLs
+                // already behind it.
                 : or(
                     and(isNull(cursorTarget), or(isNotNull(target), and(isNull(target), rest))),
                     and(
                         isNotNull(cursorTarget),
                         or(
-                            sql`${target} < ${cursorTarget}`,
+                            afterSql(target, cursorTarget),
                             and(sql`${target} = ${cursorTarget}`, rest)
                         )
                     )
@@ -811,17 +1044,18 @@ target });
 
         if (value === null) {
             // The cursor row sorts among the NULLs.
-            return direction === "asc"
+            return nullsLast
                 // NULLS LAST: nothing non-null is left, so only later NULLs.
                 ? and(isNull(target), rest)!
                 // NULLS FIRST: every non-null row is still ahead, plus later NULLs.
                 : or(isNotNull(target), and(isNull(target), rest))!;
         }
 
-        return direction === "asc"
+        return nullsLast
             // NULLS LAST, so the NULLs are still ahead of a non-null cursor row.
-            ? or(gt(target, value), isNull(target), and(eq(target, value), rest))!
-            : or(lt(target, value), and(eq(target, value), rest))!;
+            ? or(after(target, value), isNull(target), and(eq(target, value), rest))!
+            // NULLS FIRST, so they are behind it and nothing has to admit them.
+            : or(after(target, value), and(eq(target, value), rest))!;
     }
 
     /**
@@ -1025,9 +1259,23 @@ idColumn };
             logical?: LogicalCondition;
             /** Narrow to the rows reachable from a parent through a relation. */
             relatedTo?: NestedPathHop;
+            /**
+             * Relations to load. **Absent means none** — the same as it means
+             * over REST.
+             *
+             * It used to mean *all of them*, unconditionally, and this is the
+             * method the realtime refetch goes through. So a subscription was
+             * pushed rows carrying every relation the collection declares while
+             * the identical `find()` returned rows carrying none, and a client
+             * that rendered both saw the row change shape when a write landed.
+             */
+            include?: IncludeSpec;
+            /** Columns to read — a projection pushed into the SELECT. */
+            fields?: string[];
+            /** `SELECT DISTINCT` over the projection. */
+            distinct?: boolean;
         } = {}
     ): Promise<Record<string, unknown>[]> {
-        const scopeCondition = options.relatedTo ? this.buildRelationScope(options.relatedTo) : undefined;
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
@@ -1038,162 +1286,21 @@ idColumn };
             throw new Error(`ID field '${idInfo.fieldName}' not found in table for collection '${collectionPath}'`);
         }
 
-        // Primary path: use db.query.findMany with relation loading
-        // Skip when searchString is present (same reason as fetchCollectionForRest)
-        // Skip when collection has relations — lateral JOINs are catastrophically
-        // slow for large collections (7s+ for 350 rows). The db.select fallback
-        // path uses batch relation resolution which is 50x faster.
+        // ONE read, then relations.
+        //
+        // This method used to hold a `db.query.findMany` branch and a full
+        // second copy of the `db.select` builder below it — the same
+        // conditions, ordering, vector and rank handling as
+        // `fetchRowsWithConditionsRaw`, written out twice. Two copies of a
+        // query builder is two answers to every question asked of it, and they
+        // had already drifted: only one of them read `startAfter`, so cursor
+        // paging worked on one path and silently did nothing on the other.
+        const results = await this.fetchRowsWithConditionsRaw<M>(collectionPath, options);
 
-        const tableName = getTableName(table);
-
-        const qb = this.getQueryBuilder(tableName);
-        const withConfig = this.buildWithConfig(collection);
-        const hasRelations = withConfig && Object.keys(withConfig).length > 0;
-
-        // Skip db.query path when vectorSearch is present — it doesn't support
-        // custom SELECT expressions needed for the _distance column.
-        if (qb && !options.searchString && !hasRelations && !options.vectorSearch) {
-            try {
-                const queryOpts = this.buildDrizzleQueryOptions<M>(
-                    table, idField, idInfo, options, collectionPath, undefined, scopeCondition
-                );
-
-
-                const results = await qb.findMany(queryOpts as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
-
-                const rows = (results as Record<string, unknown>[]).map(row =>
-                    toFlatRow(row, collection, this.registry)
-                );
-
-                return rows;
-            } catch (e) {
-                if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
-                    logger.error(`[FetchService] ResolvedRelation inference error for collection '${collectionPath}': ${e.message}`);
-                    logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
-                }
-                if (reachedDatabase(e)) throw e;
-                logger.warn(`[FetchService] db.query.findMany failed for ${collectionPath}, falling back to db.select`, { error: e });
-            }
-        }
-
-        // Fallback: db.select + processRowResults (N+1 for relations)
-        // When vectorSearch is present, add _distance to the SELECT.
-        let vectorMeta: { orderBy: SQL; filter?: SQL; distanceSelect: SQL } | undefined;
-        if (options.vectorSearch) {
-            vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch);
-        }
-
-        // A generated search column is an index in column form; `SELECT *`
-        // would ship it to every caller. The projection is undefined — and the
-        // SQL therefore unchanged — for any table without one.
-        const visible = visibleColumnProjection(getTableColumns(table), collection);
-
-        // Relevance, alongside the row, exactly as `_distance` rides along with
-        // a vector search. Present only when the collection opted in and the
-        // request carried a search string, so a caller can order by it, show
-        // it, or blend it with a score of their own.
-        const rankSelect = options.searchString
-            ? DrizzleConditionBuilder.buildSearchRankExpression(options.searchString, table, collection)
-            : undefined;
-
-        // Only when asked: a `ts_headline` per declared field per row.
-        const matchesSelect = options.searchString && options.searchExplain
-            ? DrizzleConditionBuilder.buildSearchMatchesExpression(options.searchString, table, collection)
-            : undefined;
-
-        let query = vectorMeta
-            ? this.db.select({ table_row: (visible ?? table) as never,
-_distance: vectorMeta.distanceSelect }).from(table).$dynamic()
-            : rankSelect
-                ? this.db.select({
-                    table_row: (visible ?? table) as never,
-                    _score: rankSelect,
-                    ...(matchesSelect ? { _matches: matchesSelect } : {})
-                }).from(table).$dynamic()
-                : (visible ? this.db.select(visible as never).from(table).$dynamic() : this.db.select().from(table).$dynamic());
-        const allConditions: SQL[] = [];
-
-        if (scopeCondition) allConditions.push(scopeCondition);
-
-        if (options.searchString) {
-            const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
-                options.searchString, collection.properties, table, collection
-            );
-            if (searchConditions.length === 0) return [];
-            allConditions.push(DrizzleConditionBuilder.combineConditionsWithOr(searchConditions)!);
-        }
-
-        if (options.filter) {
-            const filterConditions = this.buildFilterConditions(options.filter, table, collectionPath);
-            if (filterConditions.length > 0) allConditions.push(...filterConditions);
-        }
-
-        if (options.logical) {
-            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath, this.filterContext(collectionPath, table));
-            if (logicalCondition) allConditions.push(logicalCondition);
-        }
-
-        // Vector distance threshold filter
-        if (vectorMeta?.filter) {
-            allConditions.push(vectorMeta.filter);
-        }
-
-        if (allConditions.length > 0) {
-            const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(allConditions);
-            if (finalCondition) query = query.where(finalCondition);
-        }
-
-        // Vector search overrides ORDER BY with distance (ascending = closest first)
-        const orderExpressions = vectorMeta
-            ? [asc(vectorMeta.orderBy), desc(idField)]
-            : this.buildOrderExpressions(
-                this.resolveOrderKeys(
-                    table,
-                    normalizeDriverOrderBy(options.orderBy, options.order) ?? [],
-                    collection,
-                    options.searchString
-                ),
-                idField
-            );
-        query = query.orderBy(...orderExpressions);
-
-        if (options.startAfter) {
-            const cursorConditions = this.buildCursorConditions(table, idField, idInfo, options, collectionPath);
-            if (cursorConditions.length > 0) {
-                allConditions.push(...cursorConditions);
-                const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(allConditions);
-                if (finalCondition) query = query.where(finalCondition);
-            }
-        }
-
-        const limitValue = options.vectorSearch
-            ? (options.limit || 10)
-            : options.searchString ? (options.limit || 50) : options.limit;
-        if (limitValue) query = query.limit(limitValue);
-
-        // Offset (numeric pagination)
-        if (options.offset && options.offset > 0) query = query.offset(options.offset);
-
-        const rawResults = await query;
-
-        // When vector search is active, unwrap the nested select shape and
-        // attach _distance to each row's values.
-        const results = vectorMeta
-            ? (rawResults as { table_row: Record<string, unknown>; _distance: unknown }[]).map(r => ({
-                ...r.table_row,
-                _distance: typeof r._distance === "number" ? r._distance : parseFloat(String(r._distance))
-            }))
-            // Same nested shape, unwrapped the same way, when a relevance
-            // score was selected instead.
-            : rankSelect
-                ? (rawResults as { table_row: Record<string, unknown>; _score: unknown; _matches?: unknown }[]).map(r => ({
-                    ...r.table_row,
-                    _score: typeof r._score === "number" ? r._score : parseFloat(String(r._score)),
-                    ...(matchesSelect ? { _matches: r._matches ?? [] } : {})
-                }))
-                : rawResults as Record<string, unknown>[];
-
-        return this.processRowResults<M>(results, collection, collectionPath, idInfo, options.databaseId, false, idInfoArray);
+        return this.processRowResults<M>(
+            results, collection, collectionPath, idInfo, options.databaseId,
+            normalizeInclude(options.include), idInfoArray
+        );
     }
 
     /**
@@ -1211,109 +1318,39 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         collectionPath: string,
         idInfo: { fieldName: string; type: "string" | "number" },
         _databaseId?: string,
-        skipRelations = false,
-        idInfoArray?: { fieldName: string; type: "string" | "number" }[]
+        /**
+         * The relations to load. **Absent means none.**
+         *
+         * It was a `skipRelations` boolean defaulting to *load everything*, and
+         * that default is what made the realtime refetch return rows of a
+         * different shape from the REST list serving the identical query. The
+         * parameter now says which relations rather than whether, so the two
+         * callers state the same thing and neither can quietly mean "all".
+         */
+        include?: NormalizedInclude,
+        _idInfoArray?: { fieldName: string; type: "string" | "number" }[]
     ): Promise<Record<string, unknown>[]> {
         if (results.length === 0) return [];
 
         // First pass: parse all rows WITHOUT per-row relation queries.
         // We deliberately omit db/registry so parseDataFromServer only does type
         // coercion (dates, numbers, FK→relation stubs for owning relations) and
-        // does NOT issue individual SQL queries for inverse relations.  The second
-        // pass below batch-loads all inverse/many relations in O(1) queries per
-        // relation type, avoiding the N+1 that plagued the old path.
-        const parsedRows = await Promise.all(results.map(async (rawRow: Record<string, unknown>) => {
-            const values = await parseDataFromServer(rawRow as M, collection) as Record<string, unknown>;
-            return {
-                rawRow,
-                values
-            };
-        }));
+        // does NOT issue individual SQL queries for inverse relations. The
+        // include pass below batch-loads what the caller asked for, one query
+        // per relation per level, avoiding the N+1 that plagued the old path.
+        void idInfo;
+        const values = await Promise.all(results.map(async (rawRow: Record<string, unknown>) =>
+            await parseDataFromServer(rawRow as M, collection) as Record<string, unknown>));
 
-        if (!skipRelations) {
-            // Second pass: batch load missing one-to-one relations
-            const resolvedRelations = resolveCollectionRelations(collection);
-            const propertyKeys = new Set(Object.keys(collection.properties));
-
-            for (const [key, relation] of Object.entries(resolvedRelations)) {
-                if (!propertyKeys.has(key) || relation.cardinality !== "one") continue;
-
-                const rowsMissingRelation = parsedRows.filter(item => {
-                    const val = item.values[key];
-                    if (val == null) return true;
-                    if (typeof val === "object" && !Array.isArray(val) && (val as Record<string, unknown>).__type === "relation" && (val as Record<string, unknown>).data == null) return true;
-                    return false;
-                });
-
-                if (rowsMissingRelation.length === 0) continue;
-
-                try {
-                    const rowIds = rowsMissingRelation.map(item => item.rawRow[idInfo.fieldName] as string | number);
-                    const relationResults = await this.relationService.batchFetchRelatedEntities(
-                        collectionPath,
-                        rowIds,
-                        key,
-                        relation
-                    );
-
-                    rowsMissingRelation.forEach(item => {
-                        const id = item.rawRow[idInfo.fieldName] as string | number;
-                        const relatedRow = relationResults.get(String(id));
-                        if (relatedRow) {
-                            item.values[key] = createRelationRefWithData(relatedRow.id, relatedRow.path, relatedRow);
-                        }
-                    });
-                } catch (e) {
-                    // A relation that failed to load is not a relation that is absent.
-                    // Without this the request answers 200 with the field quietly
-                    // missing — and because a Postgres error poisons the surrounding
-                    // transaction, every later relation in the same request is
-                    // swallowed too, so one failure becomes a response missing
-                    // several fields. Same guard the four other catches in this file
-                    // already use.
-                    if (reachedDatabase(e)) throw e;
-                    logger.warn(`Could not batch load one-to-one relation property: ${key}`, { error: e });
-                }
-            }
-
-            // Batch load many-cardinality relations (1 query per relation type
-            // instead of N queries per row)
-            const manyRelations = Object.entries(resolvedRelations)
-                .filter(([key, relation]) => propertyKeys.has(key) && relation.cardinality === "many");
-
-            for (const [key, relation] of manyRelations) {
-                try {
-                    const rowIds = parsedRows.map(item => item.rawRow[idInfo.fieldName] as string | number);
-                    const relationResults = await this.relationService.batchFetchRelatedEntitiesMany(
-                        collectionPath,
-                        rowIds,
-                        key,
-                        relation
-                    );
-
-                    parsedRows.forEach(item => {
-                        const id = String(item.rawRow[idInfo.fieldName]);
-                        const relatedRows = relationResults.get(id) || [];
-                        item.values[key] = relatedRows.map(e =>
-                            createRelationRefWithData(e.id, e.path, e)
-                        );
-                    });
-                } catch (e) {
-                    // A relation that failed to load is not a relation that is absent.
-                    // Without this the request answers 200 with the field quietly
-                    // missing — and because a Postgres error poisons the surrounding
-                    // transaction, every later relation in the same request is
-                    // swallowed too, so one failure becomes a response missing
-                    // several fields. Same guard the four other catches in this file
-                    // already use.
-                    if (reachedDatabase(e)) throw e;
-                    logger.warn(`Could not batch load many relation property: ${key}`, { error: e });
-                }
-            }
+        // Second pass: the relations the caller named, through the same batched
+        // loader every other read uses — so a row from here and a row from the
+        // REST list carry the same relations, loaded the same way.
+        if (include) {
+            await this.loadIncludes(values, collection, collectionPath, include);
         }
 
         // Columns only — the address is the consumer's to derive.
-        return parsedRows.map(item => item.values);
+        return values;
     }
 
     /**
@@ -1339,8 +1376,15 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             offset?: number;
             startAfter?: Record<string, unknown>;
             searchString?: string;
+            searchExplain?: boolean;
             databaseId?: string;
             vectorSearch?: VectorSearchParams;
+            /** Relations to load. Absent means none — see `fetchRowsWithConditions`. */
+            include?: IncludeSpec;
+            /** Columns to read — a projection pushed into the SELECT. */
+            fields?: string[];
+            /** `SELECT DISTINCT` over the projection. */
+            distinct?: boolean;
         } = {}
     ): Promise<Record<string, unknown>[]> {
         // A nested path is the target collection narrowed by a relation — the
@@ -1641,12 +1685,24 @@ relatedTo: hop });
     // =============================================================
 
     /**
-     * Fetch a collection of rows with optional relation includes.
-     * When `include` is provided, only the specified relations are populated
-     * with full row data (not just { id, path, __type }).
-     * When `include` is absent, no relation queries are made (fast path).
+     * Fetch a collection of rows, with the relations `include` names.
      *
-     * @param include - Array of relation keys to populate, or ["*"] for all
+     * ## Why this no longer uses `db.query.findMany({ with })`
+     *
+     * It used to, whenever a `db.query` builder existed for the table — which
+     * is Drizzle's relational API, and which compiles a to-many relation into a
+     * lateral join. This file's own comment on the *other* read path says what
+     * that costs: "catastrophically slow for large collections (7s+ for 350
+     * rows)". So the admin fetch avoided it and REST took it, and the fast,
+     * batched loader that the admin used was unreachable from the HTTP API.
+     *
+     * There is one loader now, {@link loadIncludes}, and every read reaches it:
+     * one query per relation per level, never one per row. That also makes this
+     * method and the realtime refetch the same code, which is what stops
+     * `find()` and `listen()` returning different shapes for one query.
+     *
+     * @param include - see {@link IncludeSpec}: names, dotted paths, `["*"]`,
+     *   or the parametrised tree. An unknown name is a 400 `UNKNOWN_RELATION`.
      */
     async fetchCollectionForRest<M extends Record<string, unknown>>(
         collectionPath: string,
@@ -1664,8 +1720,14 @@ relatedTo: hop });
             vectorSearch?: VectorSearchParams;
             /** Narrow to the rows reachable from a parent through a relation. */
             relatedTo?: NestedPathHop;
+            /** Columns to read — a projection pushed into the SELECT. */
+            fields?: string[];
+            /** `SELECT DISTINCT` over the projection. */
+            distinct?: boolean;
+            /** Ask each row which declared search fields matched. */
+            searchExplain?: boolean;
         } = {},
-        include?: string[]
+        include?: IncludeSpec
     ): Promise<Record<string, unknown>[]> {
         // Resolve a nested path here rather than at the route, so `include`,
         // `offset` and the rest reach a child listing by the same route they
@@ -1679,142 +1741,43 @@ relatedTo: hop }, include
                 );
             }
         }
-
-        const scopeCondition = options.relatedTo ? this.buildRelationScope(options.relatedTo) : undefined;
+        // `relatedTo` is applied by `fetchRowsWithConditionsRaw`, which builds
+        // the scope condition itself — this used to build a second one here and
+        // hand it to a `db.query` branch that no longer exists.
         const collection = getCollectionByPath(collectionPath, this.registry);
-        const table = getTableForCollection(collection, this.registry);
-        const idInfoArray = requirePrimaryKeys(collection, this.registry);
-        const idInfo = idInfoArray[0];
-        const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
-        // Primary path: use db.query.findMany
-        // NOTE: Skip db.query path when searchString is present because
-        // Drizzle's relational query API doesn't properly apply raw SQL
-        // ILIKE conditions — the fallback db.select path handles them correctly.
+        const normalizedInclude = normalizeInclude(include);
 
-        const tableName = getTableName(table);
-
-        const qb = this.getQueryBuilder(tableName);
-        // Skip db.query path when vectorSearch is present — needs custom SELECT
-        if (qb && !options.searchString && !options.vectorSearch) {
-            try {
-                const withConfig = (include && include.length > 0)
-                    ? this.buildWithConfig(collection, include)
-                    : undefined;
-
-                const queryOpts = this.buildDrizzleQueryOptions<M>(
-                    table, idField, idInfo, options, collectionPath, withConfig, scopeCondition
-                );
-
-
-                const results = await qb.findMany(queryOpts as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
-
-                const restRows = (results as Record<string, unknown>[]).map(row =>
-                    toRestRow(row, collection, this.registry)
-                );
-
-                // Drizzle relational query API doesn't resolve joinPath relations, fetch manually
-                await this.resolveJoinPathRelationsBatchRest(restRows, collection, collectionPath, idInfoArray, include);
-
-                return restRows;
-            } catch (e) {
-                if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
-                    logger.error(`[FetchService] ResolvedRelation inference error for collection '${collectionPath}': ${e.message}`);
-                    logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
-                }
-                if (reachedDatabase(e)) throw e;
-                logger.warn(`[fetchCollectionForRest] db.query.findMany failed for ${collectionPath}, falling back`, { error: e });
-            }
-        }
-
-        // Fallback: fetch base rows without relations.
-        //
-        // Rendered through the same `toRestRow` the primary path uses, and for
-        // the same two reasons: a column the collection marked
-        // `excludeFromApi` must not be on the wire, and a `number` property
-        // must not arrive as the string Postgres sends for NUMERIC. Neither
-        // used to happen here, and this is not a rare path — every read
-        // carrying a `searchString` or a `vectorSearch` skips `db.query`, as
-        // does any collection whose drizzle export name is not its table name
-        // (`weird_things` → `weirdThings`). So `?searchString=` was the way to
-        // read a password hash out of a collection whose plain reads correctly
-        // withheld it.
+        // Base rows first, relations after. One SELECT, then one query per
+        // relation per level of the include tree — never one per row, and never
+        // the lateral join the relational query API compiles a to-many into.
         const rows = (await this.fetchRowsWithConditionsRaw<M>(collectionPath, options))
             .map(row => toRestRow(row, collection, this.registry));
 
-        if (!include || include.length === 0) {
-            return rows;
-        }
-
-        // Fallback relation loading via batch
-        const resolvedRelations = resolveCollectionRelations(collection);
-        const propertyKeys = new Set(Object.keys(collection.properties || {}));
-        const shouldInclude = (key: string) =>
-            include[0] === "*" || include.includes(key);
-
-        const rowIds = rows.map(e => e[idInfo.fieldName] as string | number);
-
-        for (const [key, relation] of Object.entries(resolvedRelations)) {
-            if (!propertyKeys.has(key) || !shouldInclude(key) || relation.cardinality !== "one") continue;
-            try {
-                const batchResults = await this.relationService.batchFetchRelatedEntities(
-                    collectionPath, rowIds, key, relation
-                );
-                for (const row of rows) {
-                    const eid = row[idInfo.fieldName] as string | number;
-                    const related = batchResults.get(String(eid));
-                    if (related) {
-                        (row as Record<string, unknown>)[key] = { ...related.values };
-                    }
-                }
-            } catch (e) {
-                // A relation that failed to load is not a relation that is absent.
-                // Without this the request answers 200 with the field quietly
-                // missing — and because a Postgres error poisons the surrounding
-                // transaction, every later relation in the same request is
-                // swallowed too, so one failure becomes a response missing
-                // several fields. Same guard the four other catches in this file
-                // already use.
-                if (reachedDatabase(e)) throw e;
-                logger.warn(`[include] Failed to batch load one-to-one '${key}'`, { error: e });
-            }
-        }
-
-        for (const [key, relation] of Object.entries(resolvedRelations)) {
-            if (!propertyKeys.has(key) || !shouldInclude(key) || relation.cardinality !== "many") continue;
-            try {
-                const batchResults = await this.batchFetchManyRelatedRows(
-                    collectionPath, rowIds, key
-                );
-                for (const row of rows) {
-                    const eid = row[idInfo.fieldName] as string | number;
-                    const relatedList = batchResults.get(String(eid)) || [];
-                    (row as Record<string, unknown>)[key] = relatedList;
-                }
-            } catch (e) {
-                // A relation that failed to load is not a relation that is absent.
-                // Without this the request answers 200 with the field quietly
-                // missing — and because a Postgres error poisons the surrounding
-                // transaction, every later relation in the same request is
-                // swallowed too, so one failure becomes a response missing
-                // several fields. Same guard the four other catches in this file
-                // already use.
-                if (reachedDatabase(e)) throw e;
-                logger.warn(`[include] Failed to batch load many '${key}'`, { error: e });
-            }
+        if (normalizedInclude) {
+            await this.loadIncludes(rows, collection, collectionPath, normalizedInclude);
         }
 
         return rows;
     }
 
     /**
-     * Fetch a single row with optional relation includes for REST API.
+     * Fetch a single row, with the relations `include` names.
+     *
+     * The same two steps `fetchCollectionForRest` takes, for one row, through
+     * the same {@link loadIncludes}. It used to be a separate implementation on
+     * `db.query.findFirst({ with })` with a hand-written N+1 fallback beneath
+     * it, and the two disagreed: the primary path returned a to-one relation as
+     * the target's columns, the fallback merged an `id` over them, and a
+     * relation that resolved to nothing was *absent* on one path and `null` on
+     * the other. `find()[0]` and `findById()` now answer with the same row.
      */
     async fetchOneForRest<M extends Record<string, unknown>>(
         collectionPath: string,
         id: string | number,
-        include?: string[],
-        databaseId?: string
+        include?: IncludeSpec,
+        databaseId?: string,
+        options?: { fields?: string[] }
     ): Promise<Record<string, unknown> | null> {
         if (!await this.isAddressableUnder(collectionPath, id)) return null;
 
@@ -1830,100 +1793,23 @@ relatedTo: hop }, include
         const parsedIdObj = parseIdValues(id, idInfoArray);
         const parsedId = parsedIdObj[idInfo.fieldName];
 
-        // Primary path: use db.query.findFirst
-
-        const tableName = getTableName(table);
-
-        const qb = this.getQueryBuilder(tableName);
-        if (qb) {
-            try {
-                const withConfig = (include && include.length > 0)
-                    ? this.buildWithConfig(collection, include)
-                    : undefined;
-
-
-                const row = await qb.findFirst({
-                    where: eq(idField, parsedId),
-                    ...(withConfig ? { with: withConfig } : {})
-                } as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
-
-                if (!row) return null;
-
-                const restRow = toRestRow(row, collection, this.registry);
-
-                // Drizzle relational query API doesn't resolve joinPath relations, fetch manually
-                await this.resolveJoinPathRelationsBatchRest([restRow], collection, collectionPath, idInfoArray, include);
-
-                return restRow;
-            } catch (e) {
-                if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
-                    logger.error(`[FetchService] ResolvedRelation inference error for collection '${collectionPath}': ${e.message}`);
-                    logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
-                }
-                if (reachedDatabase(e)) throw e;
-                logger.warn(`[fetchOneForRest] db.query.findFirst failed for ${collectionPath}, falling back`, { error: e });
-            }
-        }
-
-        // Fallback: db.select + N+1 relation loading
-        const visibleOne = visibleColumnProjection(getTableColumns(table), collection);
+        const projection = this.columnProjection(table, collection, options?.fields, idInfoArray);
         const result = await this.db
-            .select(visibleOne as never)
+            .select(projection as never)
             .from(table)
             .where(eq(idField, parsedId))
             .limit(1);
 
         if (result.length === 0) return null;
 
-        // Same rendering as the primary path — see the sibling comment in
-        // `fetchCollectionForRest`'s fallback.
-        const flatEntity: Record<string, unknown> =
-            toRestRow(result[0] as Record<string, unknown>, collection, this.registry);
+        const row = toRestRow(result[0] as Record<string, unknown>, collection, this.registry);
 
-        if (!include || include.length === 0) {
-            return flatEntity;
+        const normalizedInclude = normalizeInclude(include);
+        if (normalizedInclude) {
+            await this.loadIncludes([row], collection, collectionPath, normalizedInclude);
         }
 
-        // Fallback relation population
-        const resolvedRelations = resolveCollectionRelations(collection);
-        const propertyKeys = new Set(Object.keys(collection.properties || {}));
-        const shouldInclude = (key: string) =>
-            include[0] === "*" || include.includes(key);
-
-        for (const [key, relation] of Object.entries(resolvedRelations)) {
-            if (!propertyKeys.has(key) || !shouldInclude(key)) continue;
-
-            try {
-                const relatedRows = await this.relationService.fetchRelatedEntities(
-                    collectionPath, parsedId, key, {}
-                );
-
-                if (relation.cardinality === "one") {
-                    if (relatedRows.length > 0) {
-                        const e = relatedRows[0];
-                        flatEntity[key] = { id: e.id,
-...e.values };
-                    }
-                } else {
-                    flatEntity[key] = relatedRows.map(e => ({
-                        id: e.id,
-...e.values
-                    }));
-                }
-            } catch (e) {
-                // A relation that failed to load is not a relation that is absent.
-                // Without this the request answers 200 with the field quietly
-                // missing — and because a Postgres error poisons the surrounding
-                // transaction, every later relation in the same request is
-                // swallowed too, so one failure becomes a response missing
-                // several fields. Same guard the four other catches in this file
-                // already use.
-                if (reachedDatabase(e)) throw e;
-                logger.warn(`[include] Failed to load relation '${key}'`, { error: e });
-            }
-        }
-
-        return flatEntity;
+        return row;
     }
 
     /**
@@ -1955,6 +1841,10 @@ relatedTo: hop }, include
             searchExplain?: boolean;
             vectorSearch?: VectorSearchParams;
             relatedTo?: NestedPathHop;
+            /** Columns to read — see {@link columnProjection}. */
+            fields?: string[];
+            /** `SELECT DISTINCT` over the projection. */
+            distinct?: boolean;
         } = {}
     ): Promise<Record<string, unknown>[]> {
         const collection = getCollectionByPath(collectionPath, this.registry);
@@ -1970,8 +1860,9 @@ relatedTo: hop }, include
 
         // A generated search column is an index in column form; `SELECT *`
         // would ship it to every caller. The projection is undefined — and the
-        // SQL therefore unchanged — for any table without one.
-        const visible = visibleColumnProjection(getTableColumns(table), collection);
+        // SQL therefore unchanged — for any table without one. `fields`
+        // narrows it further, in SQL rather than after the fact.
+        const visible = this.columnProjection(table, collection, options.fields, idInfoArray);
 
         // Relevance, alongside the row, exactly as `_distance` rides along with
         // a vector search. Present only when the collection opted in and the
@@ -1986,6 +1877,29 @@ relatedTo: hop }, include
             ? DrizzleConditionBuilder.buildSearchMatchesExpression(options.searchString, table, collection)
             : undefined;
 
+        // `SELECT DISTINCT`, over exactly the projection above.
+        //
+        // Only on the plain read. A vector or relevance query selects a
+        // per-row computed value beside the columns — a distance, a score —
+        // and DISTINCT over a set that includes one makes every row distinct
+        // by construction: it would answer 200 having done nothing, which is
+        // worse than refusing.
+        const wantsDistinct = options.distinct === true;
+        if (wantsDistinct && (vectorMeta || rankSelect)) {
+            throw ApiError.badRequest(
+                "`distinct` cannot be combined with a search or vector query: both attach a per-row "
+                + "score to every row, so no two rows are ever equal and DISTINCT would have no effect. "
+                + "Drop one of the two.",
+                "DISTINCT_NOT_APPLICABLE"
+            );
+        }
+        const selectFrom = () => {
+            const builder = wantsDistinct ? this.db.selectDistinct.bind(this.db) : this.db.select.bind(this.db);
+            return visible
+                ? builder(visible as never).from(table).$dynamic()
+                : builder().from(table).$dynamic();
+        };
+
         let query = vectorMeta
             ? this.db.select({ table_row: (visible ?? table) as never,
 _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
@@ -1995,7 +1909,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                     _score: rankSelect,
                     ...(matchesSelect ? { _matches: matchesSelect } : {})
                 }).from(table).$dynamic()
-                : (visible ? this.db.select(visible as never).from(table).$dynamic() : this.db.select().from(table).$dynamic());
+                : selectFrom();
         const allConditions: SQL[] = [];
 
         if (options.relatedTo) allConditions.push(this.buildRelationScope(options.relatedTo));
@@ -2027,19 +1941,50 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             if (finalCondition) query = query.where(finalCondition);
         }
 
+        const sortKeys = normalizeDriverOrderBy(options.orderBy, options.order) ?? [];
+
+        // Postgres requires every ORDER BY expression of a `SELECT DISTINCT` to
+        // be in the select list, and answers a bare `42P10` if one is not —
+        // which reaches the caller as a 500 quoting SQL they never wrote. The
+        // condition is knowable here, so it is a 400 that names the column and
+        // the fix instead.
+        if (wantsDistinct && visible) {
+            const selected = new Set(Object.keys(visible));
+            const missing = sortKeys.map(([field]) => field).filter(field => !selected.has(field));
+            if (missing.length > 0) {
+                throw ApiError.badRequest(
+                    `\`distinct\` cannot sort by ${missing.map(f => `'${f}'`).join(", ")}: a DISTINCT read `
+                    + "can only be ordered by columns it returns, or the rows it collapses have no "
+                    + `defined order. Add ${missing.map(f => `'${f}'`).join(", ")} to \`fields\`, or drop them `
+                    + "from `orderBy`.",
+                    "DISTINCT_ORDER_BY_NOT_SELECTED",
+                    { fields: missing }
+                );
+            }
+        }
+
         // Vector search overrides ORDER BY with distance (ascending = closest first)
         const orderExpressions = vectorMeta
             ? [asc(vectorMeta.orderBy), desc(idField)]
             : this.buildOrderExpressions(
-                this.resolveOrderKeys(
-                    table,
-                    normalizeDriverOrderBy(options.orderBy, options.order) ?? [],
-                    collection,
-                    options.searchString
-                ),
+                this.resolveOrderKeys(table, sortKeys, collection, options.searchString),
                 idField
             );
         query = query.orderBy(...orderExpressions);
+
+        if (options.startAfter) {
+            // Keyset seeking on the REST path. `startAfter` arrived on this
+            // signature from the beginning and was never read here, so
+            // `?after=` reached the driver and paged nothing: the cursor was
+            // decoded, handed over, and dropped one function short of the
+            // comparison built to consume it.
+            const cursorConditions = this.buildCursorConditions(table, idField, idInfo, options, collectionPath);
+            if (cursorConditions.length > 0) {
+                allConditions.push(...cursorConditions);
+                const finalCondition = DrizzleConditionBuilder.combineConditionsWithAnd(allConditions);
+                if (finalCondition) query = query.where(finalCondition);
+            }
+        }
 
         const limitValue = options.vectorSearch
             ? (options.limit || 10)
@@ -2067,64 +2012,5 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         }
 
         return rawResults as Record<string, unknown>[];
-    }
-
-    /**
-     * Check if the Drizzle instance has the relational query API available
-     * for a given collection path.
-     * Note: Primary path now uses inline `getQueryBuilder()` checks.
-     */
-    private hasDrizzleQueryAPI(collectionPath: string): boolean {
-
-        const qb = this.getQueryBuilder("__probe__");
-        if (!qb) {
-            // If getQueryBuilder returns undefined even for a probe, query API is not available
-            return false;
-        }
-        const collection = getCollectionByPath(collectionPath, this.registry);
-        const table = getTableForCollection(collection, this.registry);
-        const tableName = getTableName(table);
-        return !!this.getQueryBuilder(tableName);
-    }
-
-    /**
-     * Fallback path used when db.query is unavailable.
-     * The primary path uses db.query.findMany with `with` config, which
-     * loads all relations in a single query.
-     *
-     * Batch fetch many-to-many related rows for multiple parent IDs.
-     * Groups results by parent ID to avoid N+1.
-     */
-    private async batchFetchManyRelatedRows(
-        parentCollectionPath: string,
-        parentIds: (string | number)[],
-        relationKey: string
-    ): Promise<Map<string, Record<string, unknown>[]>> {
-        if (parentIds.length === 0) return new Map();
-
-        // Resolve the relation definition so we can use the true batch method
-        const collection = getCollectionByPath(parentCollectionPath, this.registry);
-        const resolvedRelations = resolveCollectionRelations(collection);
-        const relation = resolvedRelations[relationKey];
-
-        if (!relation) {
-            logger.warn(`[batchFetchManyRelatedRows] ResolvedRelation '${relationKey}' not found, skipping`);
-            return new Map();
-        }
-
-        // Delegate to RelationService.batchFetchRelatedEntitiesMany which
-        // uses a single SQL query with IN(...) — O(1) instead of O(N).
-        // RelationService returns RelatedRow shapes (id + path + values) — flatten to plain rows here.
-        const entityMap = await this.relationService.batchFetchRelatedEntitiesMany(
-            parentCollectionPath,
-            parentIds,
-            relationKey,
-            relation
-        );
-        const flatMap = new Map<string, Record<string, unknown>[]>();
-        for (const [key, rows] of entityMap) {
-            flatMap.set(key, rows.map(e => ({ ...e.values, id: e.id })));
-        }
-        return flatMap;
     }
 }

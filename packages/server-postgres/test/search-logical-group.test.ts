@@ -30,10 +30,15 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 
 /** The realtime refetch's seam: what it asks the search for is the assertion. */
 const searchRows = jest.fn().mockResolvedValue([]);
+const fetchCollectionForRest = jest.fn().mockResolvedValue([]);
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
         fetchCollection: jest.fn().mockResolvedValue([]),
         fetchOne: jest.fn().mockResolvedValue(null),
+        fetchOneForRest: jest.fn().mockResolvedValue(null),
+        count: jest.fn().mockResolvedValue(0),
+        cursorFor: jest.fn().mockReturnValue(undefined),
+        fetchCollectionForRest: (...args: unknown[]) => fetchCollectionForRest(...args),
         searchRows: (...args: unknown[]) => searchRows(...args)
     }))
 }));
@@ -175,8 +180,14 @@ describe("the same group survives a live search subscription", () => {
             }
         });
 
-        expect(searchRows).toHaveBeenCalledWith(
-            "docs", "auditor", expect.objectContaining({ logical: group })
+        // Through the REST pipeline, not a `searchRows` branch of its own: a
+        // subscription carrying a search string is still a subscription, and
+        // forking it into a second method is how the group came to be dropped
+        // on one path and applied on the other.
+        expect(fetchCollectionForRest).toHaveBeenCalledWith(
+            "docs",
+            expect.objectContaining({ searchString: "auditor", logical: group }),
+            undefined
         );
     });
 });

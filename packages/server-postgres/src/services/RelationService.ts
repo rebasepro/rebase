@@ -84,6 +84,18 @@ function applyDynamicRelationQuery<T>(
 }
 
 /**
+ * The relation's own matching condition, AND-ed with an include's `where`.
+ *
+ * Written once because the batch loaders reach the same decision from six
+ * places — one per relation kind, twice over for the to-one and to-many
+ * variants — and a `where` dropped from one of them is a filter the caller
+ * asked for that silently did not apply.
+ */
+function narrowed(base: SQL, narrow?: SQL): SQL {
+    return narrow ? and(base, narrow)! : base;
+}
+
+/**
  * The registry has no table for a collection a relation just asked about.
  *
  * "Parent table not found" was the whole message, four times over, and it names
@@ -645,13 +657,19 @@ export class RelationService {
     }
 
     /**
-     * Batch fetch related rows for multiple parent rows to avoid N+1 queries
+     * Batch fetch related rows for multiple parent rows to avoid N+1 queries.
+     *
+     * `narrow` is an extra condition on the *target* table — what a per-include
+     * `where` compiles to. It is pushed into the query rather than applied to
+     * the rows that come back, because filtering afterwards reads every related
+     * row of every parent in order to discard most of them.
      */
     async batchFetchRelatedEntities(
         parentCollectionPath: string,
         parentIds: (string | number)[],
         _relationKey: string,
-        relation: ResolvedRelation
+        relation: ResolvedRelation,
+        narrow?: SQL
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>>> {
         if (parentIds.length === 0) return new Map();
 
@@ -705,7 +723,7 @@ export class RelationService {
             }
 
             // Match every parent at once, each by its whole key.
-            query = query.where(this.parentKeyCondition(parentTable, parentPks, parentIds));
+            query = query.where(narrowed(this.parentKeyCondition(parentTable, parentPks, parentIds), narrow));
 
             const results = await query;
             const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
@@ -772,7 +790,7 @@ export class RelationService {
             const targetResults = await this.db
                 .select()
                 .from(targetTable)
-                .where(inArray(targetIdField, uniqueFkValues));
+                .where(narrowed(inArray(targetIdField, uniqueFkValues), narrow));
 
             // Index target rows by their ID
             const targetById = new Map<string, Record<string, unknown>>();
@@ -828,7 +846,10 @@ export class RelationService {
             parentIdCol,
             targetIdField,
             this.registry,
-            []
+            // Where a per-include `where` lands on this relation kind: the
+            // builder already AND-s `additionalFilters` into the relation's own
+            // conditions, so there is nothing to invent here.
+            narrow ? [narrow] : []
         );
 
         const results = await query;
@@ -870,7 +891,9 @@ export class RelationService {
         parentCollectionPath: string,
         parentIds: (string | number)[],
         _relationKey: string,
-        relation: ResolvedRelation
+        relation: ResolvedRelation,
+        /** An extra condition on the target — see {@link batchFetchRelatedEntities}. */
+        narrow?: SQL
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>[]>> {
         if (parentIds.length === 0) return new Map();
 
@@ -912,7 +935,7 @@ export class RelationService {
                 currentTable = joinTable;
             }
 
-            query = query.where(this.parentKeyCondition(parentTable, parentPks, parentIds));
+            query = query.where(narrowed(this.parentKeyCondition(parentTable, parentPks, parentIds), narrow));
 
             const results = await query;
             const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
@@ -956,7 +979,7 @@ export class RelationService {
                 .select()
                 .from(junctionTable)
                 .innerJoin(targetTable, eq(targetJunctionCol, targetIdField))
-                .where(inArray(sourceJunctionCol, parsedParentIds));
+                .where(narrowed(inArray(sourceJunctionCol, parsedParentIds), narrow));
 
             const results = await query;
             const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();
@@ -1006,7 +1029,7 @@ export class RelationService {
             parentIdCol,
             targetIdField,
             this.registry,
-            []
+            narrow ? [narrow] : []
         );
 
         const results = await query;

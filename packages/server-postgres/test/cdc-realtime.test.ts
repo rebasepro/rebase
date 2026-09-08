@@ -14,6 +14,12 @@ const mockFetchEntity = jest.fn().mockResolvedValue(
 );
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
+        // The refetch reads through the REST pipeline — the same methods the
+        // HTTP routes call — and counts beside the rows for the frame's `meta`.
+        fetchCollectionForRest: mockFetchCollection,
+        fetchOneForRest: mockFetchEntity,
+        count: jest.fn().mockResolvedValue(1),
+        cursorFor: jest.fn().mockReturnValue(undefined),
         fetchCollection: mockFetchCollection,
         fetchOne: mockFetchEntity,
         searchRows: jest.fn().mockResolvedValue([])
@@ -78,7 +84,11 @@ describe("RealtimeService — database-level CDC", () => {
 
     async function flushTimers() {
         jest.advanceTimersByTime(350);
-        for (let i = 0; i < 10; i++) await Promise.resolve();
+        // A drain, not a measurement: a delivery is a fetch, then the count
+        // that fills the frame's `meta`, then the hooks around both. Too few
+        // iterations here does not fail loudly — it observes the state before
+        // the delivery and asserts against it.
+        for (let i = 0; i < 30; i++) await Promise.resolve();
     }
 
     it("maps a table change to its collection and delivers via an RLS-bound refetch (no raw patch)", async () => {

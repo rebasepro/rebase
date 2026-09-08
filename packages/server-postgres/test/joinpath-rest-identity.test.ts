@@ -120,13 +120,27 @@ targetColumn: "id" }
     let batchFetch: jest.Mock;
     let batchFetchMany: jest.Mock;
 
-    /** A FetchService whose query builder returns `rows` verbatim. */
+    /**
+     * A FetchService whose `db.select` chain returns `rows` verbatim.
+     *
+     * `db.query` — Drizzle's relational API — is gone from every read path: it
+     * compiles a to-many relation into a lateral join, and the batched loader
+     * these tests stub replaced it. So the base rows come from a plain select
+     * and the relations from the batch, which is the whole shape under test.
+     */
     const setup = (rows: Record<string, unknown>[]) => {
+        const chain: any = {
+            from: jest.fn(() => chain),
+            $dynamic: jest.fn(() => chain),
+            where: jest.fn(() => chain),
+            orderBy: jest.fn(() => chain),
+            limit: jest.fn(() => chain),
+            offset: jest.fn(() => chain),
+            then: (resolve: (r: unknown) => void) => resolve(rows)
+        };
         const db = {
-            query: {
-                sku_items: { findMany: jest.fn().mockResolvedValue(rows) },
-                memberships: { findMany: jest.fn().mockResolvedValue(rows) }
-            }
+            select: jest.fn(() => chain),
+            selectDistinct: jest.fn(() => chain)
         };
         fetchService = new FetchService(db as any, registry);
 
@@ -164,7 +178,7 @@ label: "Gadget" }]);
         await fetchService.fetchCollectionForRest("sku_items", {}, ["warehouse"]);
 
         expect(batchFetch).toHaveBeenCalledWith(
-            "sku_items", ["ABC-1", "ABC-2"], "warehouse", expect.anything()
+            "sku_items", ["ABC-1", "ABC-2"], "warehouse", expect.anything(), undefined
         );
     });
 
@@ -211,7 +225,7 @@ user_id: 2 }]);
         const rows = await fetchService.fetchCollectionForRest("memberships", {}, ["warehouse"]);
 
         expect(batchFetch).toHaveBeenCalledWith(
-            "memberships", ["1:::2"], "warehouse", expect.anything()
+            "memberships", ["1:::2"], "warehouse", expect.anything(), undefined
         );
         expect(rows[0]).toMatchObject({ tenant_id: 1,
 user_id: 2 });
@@ -236,7 +250,7 @@ city: "Paris" } }
         const rows = await fetchService.fetchCollectionForRest("sku_items", {}, ["all_warehouses"]);
 
         expect(batchFetchMany).toHaveBeenCalledWith(
-            "sku_items", ["ABC-1"], "all_warehouses", expect.anything()
+            "sku_items", ["ABC-1"], "all_warehouses", expect.anything(), undefined
         );
         // The embedded rows carry the target's own columns — `id` here is the
         // integer column, not a re-merged string address.
