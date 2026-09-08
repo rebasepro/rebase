@@ -801,12 +801,21 @@ data: u.data as AnyRow })),
                     value as WhereValueFor<WhereFilterOp, M[keyof M & string]>
                 );
             },
-            orderBy: (column, direction) => new SDKQueryBuilder<M>(wrapped).orderBy(column, direction),
+            orderBy: (column, direction, nulls) => new SDKQueryBuilder<M>(wrapped).orderBy(column, direction, nulls),
             limit: (count) => new SDKQueryBuilder<M>(wrapped).limit(count),
             offset: (count) => new SDKQueryBuilder<M>(wrapped).offset(count),
             search: (searchString, options) => new SDKQueryBuilder<M>(wrapped).search(searchString, options),
             vectorSearch: (property, vector, options) => new SDKQueryBuilder<M>(wrapped).vectorSearch(property, vector, options),
             include: (...relations) => new SDKQueryBuilder<M>(wrapped).include(...relations),
+            fields: (...columns) => new SDKQueryBuilder<M>(wrapped).fields(...columns),
+            distinct: (enabled) => new SDKQueryBuilder<M>(wrapped).distinct(enabled),
+            after: (cursor) => new SDKQueryBuilder<M>(wrapped).after(cursor),
+
+            // Straight through to the server. An aggregate is a reduction over
+            // rows the cache does not necessarily hold, and answering one from
+            // a subset is a number that looks exactly like the right number —
+            // the same reason a vector search is not answered locally.
+            aggregate: inner.aggregate,
 
             // Carried over as-is when the inner client cannot listen, so the
             // wrapper does not turn "realtime is off on this client" into

@@ -1,4 +1,4 @@
-import { buildQueryString, FindParams, RebaseApiError, Transport } from "./transport";
+import { buildAggregateQueryString, buildQueryString, FindParams, RebaseApiError, Transport } from "./transport";
 import { RebaseWebSocketClient } from "./websocket";
 import {
     FindAllParams,
@@ -10,6 +10,11 @@ import {
     WhereFilterOp,
     WhereValueFor,
     WriteOptions,
+    type AggregateParams,
+    type AggregateRow,
+    type CollectionUpdateMeta,
+    type IncludeSpec,
+    type NullsPlacement,
     isUnsupported,
     unsupportedMethod,
     type ComputedSortField,
@@ -435,8 +440,12 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             }
             return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValueFor<WhereFilterOp, M[keyof M & string]>);
         },
-        orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction?: "asc" | "desc") {
-            return new SDKQueryBuilder<M>(client).orderBy(column, direction);
+        orderBy(
+            column: FieldPath<M> | ComputedSortField | RelationAggregateSort,
+            direction?: "asc" | "desc",
+            nulls?: NullsPlacement
+        ) {
+            return new SDKQueryBuilder<M>(client).orderBy(column, direction, nulls);
         },
         limit(count: number) {
             return new SDKQueryBuilder<M>(client).limit(count);
@@ -454,8 +463,34 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         ) {
             return new SDKQueryBuilder<M>(client).vectorSearch(property, vector, options);
         },
-        include(...relations: string[]) {
+        include(...relations: (string | IncludeSpec)[]) {
             return new SDKQueryBuilder<M>(client).include(...relations);
+        },
+        fields(...columns: (FieldPath<M> | string)[]) {
+            return new SDKQueryBuilder<M>(client).fields(...columns);
+        },
+        distinct(enabled?: boolean) {
+            return new SDKQueryBuilder<M>(client).distinct(enabled);
+        },
+        after(cursor: string) {
+            return new SDKQueryBuilder<M>(client).after(cursor);
+        },
+
+        /**
+         * `count`/`sum`/`avg`/`min`/`max` over the matching rows, optionally
+         * grouped — `GET /<collection>/aggregate`.
+         *
+         * The REST route has served this since aggregates landed and the SDK
+         * had no method for it, so the only way to reach it from a typed client
+         * was to hand-build the URL. `findAll()` and a reduce is the thing this
+         * exists to replace: wrong under a `limit`, unaffordable without one.
+         */
+        async aggregate(params: AggregateParams<M>): Promise<AggregateRow[]> {
+            const qs = buildAggregateQueryString(params);
+            const raw = await transport.request<{ data: AggregateRow[] }>(
+                `${basePath}/aggregate${qs}`, { method: "GET" }
+            );
+            return raw.data || [];
         },
 
         // `listen`/`listenById` are part of the contract, so they are always
@@ -490,6 +525,18 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     // handed "20" where it expected a keyset value, and the
                     // offset it does understand never arrived at all.
                     offset: window.driverOffset,
+                    // `page` reaches the server as itself rather than being
+                    // resolved here: `FindParams` says `page` wins over
+                    // `offset`, and two layers each applying that rule is two
+                    // chances to apply it differently.
+                    page: params?.page,
+                    // The three a subscription could not ask for. A `listen()`
+                    // is the same query as the `find()` beside it, so it takes
+                    // the same parameters — and until it did, the two returned
+                    // different row shapes for one query.
+                    include: params?.include,
+                    fields: params?.fields,
+                    distinct: params?.distinct,
                     // The list form, so a multi-key sort reaches the socket
                     // whole. Indexing `[0]`/`[1]` here read a tuple-of-tuples as
                     // a field name and a direction, and a live subscription came
@@ -507,7 +554,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     // `id DESC` listing with no `_distance` and no error.
                     vectorSearch: params?.vectorSearch
                 },
-                (incomingRows: Record<string, unknown>[]) => {
+                (incomingRows: Record<string, unknown>[], frameMeta?: CollectionUpdateMeta) => {
                     const currentUpdateId = ++lastUpdateId;
                     // What the server pages by when the caller names no limit.
                     // A hardcoded 20 here described a window the rows had not
@@ -519,47 +566,61 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     // WS client already delivers flat rows — just cast
                     const rows = incomingRows as M[];
 
-                    const emit = (total: number, hasMore: boolean) => {
+                    const emit = (total: number, hasMore: boolean, nextCursor?: string) => {
                         if (!active || currentUpdateId !== lastUpdateId) return;
                         onUpdate({
                             data: rows,
                             meta: {
                                 total,
-                                limit: requestedLimit,
-                                offset,
-                                hasMore
+                                limit: frameMeta?.limit ?? requestedLimit,
+                                offset: frameMeta?.offset ?? offset,
+                                hasMore,
+                                ...(nextCursor && { nextCursor })
                             }
                         });
                     };
 
-                    // One emission per push, and it waits for the count: a
-                    // subscriber is called back once, with metadata that
-                    // describes the rows beside it. (The docs used to promise
-                    // two emissions and an `estimated` flag; neither has ever
-                    // existed here.)
+                    // The frame's own metadata, when it carries any.
                     //
-                    // A push that lands while a count is in flight bumps
-                    // `lastUpdateId`, and `emit` drops the stale one — so the
+                    // Every push used to be followed by a `GET /count` from
+                    // here — one extra round trip per write, per subscriber,
+                    // forever, and a window in which the count and the rows
+                    // described different states of the collection. The server
+                    // already knows the query; it counts beside the rows now,
+                    // inside the same RLS-bound transaction that read them.
+                    if (frameMeta && frameMeta.total !== undefined) {
+                        lastKnownTotal = frameMeta.total;
+                        emit(frameMeta.total, frameMeta.hasMore, frameMeta.nextCursor);
+                        return;
+                    }
+
+                    // A frame whose count failed (`partial`), or a server too
+                    // old to send `meta` at all. A count that failed is not
+                    // evidence about the size of the collection, so keep the
+                    // last real answer.
+                    if (lastKnownTotal !== undefined) {
+                        emit(lastKnownTotal, offset + rows.length < lastKnownTotal, frameMeta?.nextCursor);
+                        return;
+                    }
+
+                    // Nothing to go on yet. Ask once — and only once, on the
+                    // first push of a subscription that has never had a total.
+                    //
+                    // A push that lands while the count is in flight bumps
+                    // `lastUpdateId`, and `emit` drops the stale one, so the
                     // wait cannot deliver a total belonging to an older page.
                     client.count(params)
                         .then((total) => {
                             lastKnownTotal = total;
-                            emit(total, offset + rows.length < total);
+                            emit(total, offset + rows.length < total, frameMeta?.nextCursor);
                         })
                         .catch(() => {
-                            // A count that failed is not evidence about the
-                            // size of the collection. Keep the last real
-                            // answer; only guess if there has never been one.
-                            if (lastKnownTotal !== undefined) {
-                                emit(lastKnownTotal, offset + rows.length < lastKnownTotal);
-                                return;
-                            }
                             // With no count to go on, the only defensible total
                             // is a lower bound: the rows on this page plus the
                             // ones paged past to reach them. Reporting
                             // `rows.length` claimed a collection read at offset
                             // 10 held two rows.
-                            emit(offset + rows.length, rows.length >= requestedLimit);
+                            emit(offset + rows.length, rows.length >= requestedLimit, frameMeta?.nextCursor);
                         });
                 },
                 onError
