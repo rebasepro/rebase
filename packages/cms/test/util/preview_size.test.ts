@@ -42,12 +42,14 @@ describe("getPreviewSizeFrom", () => {
         expect(getPreviewSizeFrom("s")).toBe("small");
     });
 
-    it("maps 'm' to 'medium'", () => {
-        expect(getPreviewSizeFrom("m")).toBe("medium");
+    // Density pass (2026-09-08): xs..m are text rows and take small previews;
+    // only l and xl make room for a thumbnail. See DESIGN.md "Table and list density".
+    it("maps 'm' to 'small'", () => {
+        expect(getPreviewSizeFrom("m")).toBe("small");
     });
 
-    it("maps 'l' to 'large'", () => {
-        expect(getPreviewSizeFrom("l")).toBe("large");
+    it("maps 'l' to 'medium'", () => {
+        expect(getPreviewSizeFrom("l")).toBe("medium");
     });
 
     it("maps 'xl' to 'large'", () => {

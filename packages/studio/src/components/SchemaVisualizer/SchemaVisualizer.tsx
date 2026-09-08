@@ -468,7 +468,7 @@ duration: 400 }
                         <div className="flex items-center gap-2 px-4">
                             <Typography
                                 variant="subtitle2"
-                                className="font-mono text-text-secondary dark:text-text-secondary-dark"
+                                className="font-medium text-text-primary dark:text-text-primary-dark"
                             >
                                 Schema Visualizer
                             </Typography>
