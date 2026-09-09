@@ -14,8 +14,10 @@ import { TEMPO } from "./beats";
  * EXCITING BECAUSE IT IS CONCRETE. No slogans, no taglines, nothing at
  * anyone's expense. The excitement is in what happens: nine critical
  * findings become a clean scan; one file becomes an API, an admin panel
- * and a safe place for agents; "point it at your database this afternoon"
- * is a thing you can actually do.
+ * and a safe place for agents. THE LAST LINE IS ABOUT THE PRODUCT: what
+ * you get when you point it at your database. The scan is the hook's
+ * device, not the point, and a close that ended on it ended on a side
+ * tool.
  *
  * EVERY LINE IS A SENTENCE, friendly and professional. About 200 words a
  * minute, with a breath between lines and a beat after every picture.
@@ -52,6 +54,6 @@ export const DESK_NARRATION: { at: number; words: string[] }[] = [
     { at: 2348, words: ["The", "schema,", "read", "live", "from", "your", "database,", "so", "it", "is", "always", "current."] },
     // studio
     { at: 2513, words: ["And", "a", "place", "to", "work", "on", "the", "database", "itself:", "SQL,", "schema,", "policies", "and", "logs,", "in", "the", "same", "app."] },
-    // close
-    { at: 2703, words: ["Rebase", "is", "open", "source,", "MIT", "licensed,", "and", "runs", "on", "your", "laptop,", "your", "own", "servers", "or", "any", "cloud.", "Three", "commands,", "on", "the", "Postgres", "you", "already", "have.", "Point", "it", "at", "your", "database", "this", "afternoon.", "Then", "run", "the", "scan."] },
+    // close — on the product, and what you get
+    { at: 2703, words: ["Rebase", "is", "open", "source,", "and", "runs", "on", "your", "laptop,", "your", "own", "servers", "or", "any", "cloud.", "Point", "it", "at", "the", "Postgres", "you", "already", "have,", "and", "you", "get", "the", "whole", "backend:", "a", "typed", "API,", "an", "admin", "panel,", "and", "rules", "the", "database", "itself", "enforces."] },
 ];

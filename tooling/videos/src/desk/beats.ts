@@ -134,7 +134,7 @@ export const BEATS: Beat[] = [
  *  first move. */
 export const OPENING: View = cell(0, 0);
 
-export const DESK_DURATION = tempo(3090);
+export const DESK_DURATION = tempo(3130);
 
 export const beat = (id: string): Beat => {
     const b = BEATS.find((x) => x.id === id);

@@ -6,8 +6,9 @@ is three of them, not as steps to follow.
 
 **Exciting because it is concrete.** No slogans, no taglines. The excitement
 is in what happens: nine critical findings become a clean scan; one file
-becomes an API, an admin panel and a safe place for agents; "point it at your
-database this afternoon" is a thing the viewer can actually do.
+becomes an API, an admin panel and a safe place for agents. The last line is
+about the product — what you get — not about the scan, which is the hook's
+device and not the point.
 
 **Friendly and professional.** One engineer showing another something they
 built. Brisk, warm, present tense. Every line is a sentence.
@@ -20,7 +21,7 @@ each. The one joint that is exact: the green line prints just before you say
 **It opens on you, already talking.** No logo, no pause. You are on screen
 from the first frame and the first word is half a second in.
 
-Total: **3090 frames = 103.0 seconds** at 30fps · 289 words · 168 words a
+Total: **3130 frames = 104.3 seconds** at 30fps · 294 words · 169 words a
 minute over the whole run, silences included.
 
 ## The script
@@ -38,7 +39,7 @@ minute over the whole run, silences included.
 | 09 | Every view | 72.3s | 13 | Boards, tables, cards and forms: every collection gets the views that fit it. | 2.1s — the bento plays |
 | 10 | The schema | 78.3s | 12 | The schema, read live from your database, so it is always current. | 1.9s |
 | 11 | Studio | 83.8s | 18 | And a place to work on the database itself: SQL, schema, policies and logs, in the same app. | 0.9s |
-| 12 | Close | 90.1s | 36 | Rebase is open source, MIT licensed, and runs on your laptop, your own servers or any cloud. Three commands, on the Postgres you already have. Point it at your database this afternoon. Then run the scan. | — |
+| 12 | Close | 90.1s | 41 | Rebase is open source, and runs on your laptop, your own servers or any cloud. Point it at the Postgres you already have, and you get the whole backend: a typed API, an admin panel, and rules the database itself enforces. | — |
 
 ## Timing, beat by beat
 
@@ -54,7 +55,7 @@ minute over the whole run, silences included.
 | Every view | 6.0s | the bento |
 | The schema | 5.5s | the map |
 | Studio | 6.3s | the window and its four labels |
-| Close | 12.8s | the whole desk, then you and the address |
+| Close | 14.1s | the whole desk, then you and the address |
 
 ## The presenter
 
