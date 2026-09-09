@@ -288,14 +288,6 @@ the advice fails with ERR_PACKAGE_PATH_NOT_EXPORTED and there is nothing
 the reader can configure to fix it.`
     },
     {
-        run: "check:config-paths",
-        why: `Three aliases pointed at a \`packages/ui/index.css\` that has never
-existed, and one at \`packages/client-postgres/src\` after that package was
-deleted. Each was dead rather than broken — an earlier entry claimed the
-specifier first — which is why they survived: nothing fails until somebody
-reorders the list, and then the breakage is blamed on whatever moved.`
-    },
-    {
         run: "check:studio-tools",
         why: `The Studio docs table names each tool's slug and drawer group, which are
 facts about one useMemo in RebaseStudio.tsx. cron-jobs.md sent readers to

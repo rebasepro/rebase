@@ -84,6 +84,21 @@ install against a lockfile no scaffold has yet, and belongs in the e2e lane.
 Seconds, no network, no database.`
     },
     {
+        run: "check:config-paths",
+        why: `Three aliases pointed at a \`packages/ui/index.css\` that has never
+existed, and one at \`packages/client-postgres/src\` after that package was
+deleted. Each was dead rather than broken — an earlier entry claimed the
+specifier first — which is why they survived: nothing fails until somebody
+reorders the list, and then the breakage is blamed on whatever moved.
+
+Here rather than in \`ci:static\`, where it was first added: it loads each
+build config for real, and \`app/frontend/vite.config.ts\` imports
+\`@rebasepro/app/dist/vitePlugin.js\`. The static job builds nothing by
+design, so that file does not exist there and the gate reported the whole
+config as pointing at nothing. It passed on a developer's machine only
+because the packages happened to be built already.`
+    },
+    {
         run: "check:api-surface",
         why: `\`@rebasepro/server\` is the one package \`infra/docker/entrypoint.mjs\`
 symlinks over a deployed bundle's own copy, so its exports move underneath
