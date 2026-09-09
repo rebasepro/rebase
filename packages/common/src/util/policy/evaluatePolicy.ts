@@ -133,6 +133,16 @@ function resolveOperand(operand: PolicyOperand, ctx: PolicyEvalContext): Resolve
         case "outerField":
             // Only meaningful inside an `existsIn` subquery (server-authoritative).
             return { known: false };
+        case "authClaim":
+            // Server-authoritative, like `existsIn` and `raw`, and for a reason
+            // worth stating: a claim is TEXT, and Postgres compares it to the
+            // column after casting it to the column's type. Reproducing that
+            // here means reproducing uuid case-folding, numeric widening and
+            // the `NULLIF`, in JavaScript, from a `PolicyEvalContext` that does
+            // not know the column's type. A second implementation of a cast
+            // that is subtly wrong is worse than no answer: it would render a
+            // row the database refuses, or hide one it would have allowed.
+            return { known: false };
     }
 }
 

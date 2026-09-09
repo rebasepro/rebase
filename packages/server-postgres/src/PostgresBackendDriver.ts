@@ -35,7 +35,7 @@ import {
     User
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
-import { applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, resolveCollectionRelations, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
+import { applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, getTenantConfig, resolveCollectionRelations, resolveTenantWrite, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress } from "./services/collection-helpers";
 import { resolveSoftDelete } from "./services/soft-delete";
@@ -729,6 +729,127 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
+    /**
+     * How many membership rows a single write will read to answer "which
+     * tenants is this caller in".
+     *
+     * A cap, not a limit on the feature: past it the API-level check stops
+     * being able to prove a tenant is *not* the caller's, and defers to the
+     * policy's `WITH CHECK`, which decides either way. The alternative — an
+     * uncapped read of a membership table on every insert — makes the cost of a
+     * write depend on how many organizations one user happens to belong to.
+     */
+    private static readonly TENANT_MEMBERSHIP_CAP = 100;
+
+    /**
+     * Stamp, or refuse, the tenant on a write to a `tenant`-scoped collection.
+     *
+     * A no-op for every collection that declares no tenancy, which is the
+     * common case and costs one property read.
+     */
+    private async applyTenantScope<M extends Record<string, unknown>>(
+        collection: CollectionConfig | undefined,
+        path: string,
+        values: Partial<EntityValues<M>>,
+        status: EntityStatus,
+        previousValues: Record<string, unknown> | undefined
+    ): Promise<Partial<EntityValues<M>>> {
+        const tenant = getTenantConfig(collection);
+        if (!tenant) return values;
+
+        // The same set the policy lets past: the trusted server context (no
+        // user at all) and the bypass roles. Deciding it here rather than
+        // inside the pure helper keeps "who is calling" in the one place that
+        // knows.
+        const bypassRoles = tenantBypassRoles(tenant);
+        const callerRoles = (this.user?.roles ?? []).map(r =>
+            typeof r === "string" ? r : String((r as { id?: unknown })?.id ?? r));
+        const bypass = !this.user || callerRoles.some(r => bypassRoles.includes(r));
+
+        const { tenants, complete } = bypass
+            ? { tenants: [] as unknown[], complete: true }
+            : await this.resolveCallerTenants(tenant, collection);
+
+        const decision = resolveTenantWrite({
+            tenant,
+            values: values as Record<string, unknown>,
+            status,
+            callerTenants: tenants,
+            callerTenantsComplete: complete,
+            bypass,
+            previousValues,
+            slug: collection?.slug ?? path
+        });
+
+        if (decision.refusal) {
+            const { code, field, message } = decision.refusal;
+            throw ApiError.badRequest(message, code, {
+                collection: path,
+                violations: [{ field, code, message }]
+            });
+        }
+        return decision.values as Partial<EntityValues<M>>;
+    }
+
+    /**
+     * The tenants this caller may write into.
+     *
+     * Two sources, and they answer at different costs. A `claim` is already on
+     * the request — no query. A `membership` is rows in a table, and reading
+     * them is a real query, so it is capped (see
+     * {@link PostgresBackendDriver.TENANT_MEMBERSHIP_CAP}) and `complete` says
+     * whether the cap was hit.
+     *
+     * The membership read runs in the caller's own context, so the membership
+     * collection's RLS applies to it — exactly as it does inside the generated
+     * policy's subquery. That is deliberate: if the two disagreed, the API
+     * would refuse writes the database would have accepted, or accept writes it
+     * refuses. `validateCollectionConfig` is what makes sure the membership
+     * collection is readable by its own members in the first place.
+     */
+    private async resolveCallerTenants(
+        tenant: NonNullable<ReturnType<typeof getTenantConfig>>,
+        collection: CollectionConfig | undefined
+    ): Promise<{ tenants: unknown[]; complete: boolean }> {
+        if ("claim" in tenant.from) {
+            const value = this.user?.claims?.[tenant.from.claim];
+            const empty = value === undefined || value === null || value === "";
+            return { tenants: empty ? [] : [value], complete: true };
+        }
+
+        const uid = this.user?.uid;
+        if (!uid) return { tenants: [], complete: true };
+
+        const { collection: slug, userField, tenantField } = tenant.from.membership;
+        const cap = PostgresBackendDriver.TENANT_MEMBERSHIP_CAP;
+        try {
+            const rows = await this.dataService.fetchCollection(slug, {
+                filter: { [userField]: ["==", uid] } as never,
+                limit: cap + 1,
+                databaseId: collection?.databaseId
+            });
+            const tenants = Array.from(new Set(
+                rows.slice(0, cap)
+                    .map(row => (row as Record<string, unknown>)[tenantField])
+                    .filter(value => value !== null && value !== undefined)
+                    .map(value => (typeof value === "object"
+                        ? (value as { id?: unknown }).id ?? value
+                        : value))
+            ));
+            return { tenants, complete: rows.length <= cap };
+        } catch (err) {
+            // A membership table this caller cannot read is not a reason to
+            // fail the write here — the policy is about to refuse it anyway,
+            // and refusing with the wrong message would be worse than letting
+            // the database answer. `complete: false` is what says "no evidence
+            // of absence"; see `resolveTenantWrite`.
+            logger.debug(`[save] Could not read '${slug}' to resolve the caller's tenants`, {
+                detail: err instanceof Error ? err.message : String(err)
+            });
+            return { tenants: [], complete: false };
+        }
+    }
+
     async save<M extends Record<string, unknown>>({
                                                             path,
                                                             id,
@@ -866,6 +987,21 @@ export class PostgresBackendDriver implements DataDriver {
                 uid: this.user?.uid
             });
         }
+
+        // Tenancy, last of the three stamps and for the same reason they are
+        // here rather than in a hook: the tenant comes from the *call context*,
+        // never from the body, so a caller (or a `beforeSave`) cannot attribute
+        // a row to another tenant. The database enforces the same rule through
+        // the restrictive tenancy policy — this only reaches the same answer
+        // one layer earlier, with the field named. See `@rebasepro/common`'s
+        // `resolveTenantWrite`.
+        updatedValues = await this.applyTenantScope(
+            resolvedCollection as CollectionConfig | undefined,
+            path,
+            updatedValues,
+            status ?? "new",
+            previousValuesForHistory as Record<string, unknown> | undefined
+        ) as Partial<EntityValues<M>>;
 
         try {
             let savedRow = await this.dataService.save<M>(
@@ -2080,7 +2216,14 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 // POST /auth/anonymous". See `rebase.is_anonymous()`.
                 await applyAuthContext(
                     tx,
-                    { uid, roles: userRoles, isAnonymous: this.user?.isAnonymous === true },
+                    {
+                        uid,
+                        roles: userRoles,
+                        isAnonymous: this.user?.isAnonymous === true,
+                        // The token's custom claims reach the database as
+                        // `rebase.jwt()`, which is what a tenancy policy reads.
+                        claims: this.user?.claims
+                    },
                     this.delegate.rlsUserRole
                 );
 
@@ -2123,7 +2266,12 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     private injectAuthContext(unsubscribe: () => void): () => void {
         const authContext = {
             uid: this.user?.uid || "anonymous",
-            roles: this.user?.roles ?? []
+            roles: this.user?.roles ?? [],
+            // A refetch evaluates the same policies as the fetch that opened
+            // the subscription, and a tenancy policy reads a claim. Spread
+            // rather than set, so a caller carrying none produces exactly the
+            // object this has always produced.
+            ...(this.user?.claims ? { claims: this.user.claims } : {})
         };
         const entries = Array.from(this.delegate.realtimeService.subscriptions.entries());
         const lastEntry = entries[entries.length - 1];

@@ -10,6 +10,7 @@ import { getDataSourceCapabilities } from "./data_source";
 import type { WhereFilterOp, FilterValues, FilterPreset } from "./filter-operators";
 import type { SearchConfig } from "./search";
 import type { CollectionIndex } from "./indexes";
+import type { CollectionTenantConfig } from "./tenancy";
 
 /**
  * Base interface containing all driver-agnostic collection properties.
@@ -406,6 +407,26 @@ export interface PostgresCollectionConfig<M extends Record<string, unknown> = Re
          */
         field?: string;
     };
+
+    /**
+     * Scope every row of this collection to a tenant.
+     *
+     * One declaration replaces the four hand-written pieces a tenant-scoped
+     * table used to need — the `NOT NULL` column, the RLS rule, the value
+     * stamped on insert, and the index — and keeps them in agreement, because
+     * they are all derived from this.
+     *
+     * ```ts
+     * tenant: { field: "orgId", from: { claim: "org_id" } }
+     * ```
+     *
+     * The property must already be declared: this says what a column *means*,
+     * it does not create one. Postgres-only, like {@link SearchConfig} — RLS is
+     * what enforces the boundary.
+     *
+     * @see CollectionTenantConfig
+     */
+    tenant?: CollectionTenantConfig<M>;
 }
 
 /**

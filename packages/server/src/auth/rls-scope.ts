@@ -45,7 +45,7 @@ export const SERVICE_IDENTITY: { uid: string; roles: string[] } = { uid: "servic
  * extend DataDriver with this method.
  */
 interface RLSScopedDriver extends DataDriver {
-    withAuth(user: { uid: string; roles?: string[]; isAnonymous?: boolean }): Promise<DataDriver>;
+    withAuth(user: { uid: string; roles?: string[]; isAnonymous?: boolean; claims?: Record<string, unknown> }): Promise<DataDriver>;
 }
 
 /**
@@ -76,7 +76,7 @@ export async function scopeDataDriver(
      * without this the database sees the same principal either way. See
      * `rebase.is_anonymous()`.
      */
-    user: { uid: string; roles?: string[]; isAnonymous?: boolean }
+    user: { uid: string; roles?: string[]; isAnonymous?: boolean; claims?: Record<string, unknown> }
 ): Promise<DataDriver> {
     if (isRLSScopedDriver(driver)) {
         // Fail closed — do NOT catch and swallow errors here.

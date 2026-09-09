@@ -44,6 +44,8 @@ import {
     getEffectiveSecurityRules,
     getEnumVarName,
     getInjectedSecurityRules,
+    getTenantConfig,
+    TENANT_INDEX_REASON,
     getJunctionCollectionConfig,
     getJunctionSecurityRules,
     getTableName,
@@ -91,7 +93,7 @@ import {
     vectorExtensionDeclared,
     vectorExtensionStatement
 } from "../vector-index";
-import { buildCollectionIndexSpecs } from "../collection-index";
+import { buildCollectionIndexSpecs, deriveIndexName, type CollectionIndexSpec } from "../collection-index";
 import { sharedRelationName } from "../relation-names";
 import { SET_UPDATED_AT_FN, setUpdatedAtFunction } from "./updated-at-trigger";
 import type {
@@ -768,6 +770,12 @@ function planCollectionTable(
             rule.name ?? `#${index}`
         ));
 
+    // ── Tenancy ──────────────────────────────────────────────────────────────
+    // The policy is already above — `getEffectiveSecurityRules` injects it, so
+    // it compiles, names and renders like every other rule. What is left is the
+    // half a rule cannot express: the column is NOT NULL, and it is indexed.
+    const tenantIndexes = applyTenantColumnEffects(collection, columns, schema, table);
+
     return {
         schema,
         table,
@@ -778,7 +786,7 @@ function planCollectionTable(
         slug: collection.slug,
         columns,
         primaryKey: columns.filter(c => c.primaryKey).map(c => c.column),
-        indexes: buildCollectionIndexSpecs(collection, resolveColumnName),
+        indexes: [...buildCollectionIndexSpecs(collection, resolveColumnName), ...tenantIndexes],
         search,
         vector: buildVectorIndexPlan(collection, resolveColumnName),
         vectorColumns: buildVectorColumnSpecs(collection, resolveColumnName),
@@ -866,6 +874,107 @@ function planPropertyColumn(
         });
     }
     return plan;
+}
+
+/**
+ * The two schema effects a `tenant` declaration has that a policy cannot state.
+ *
+ * The policy itself is injected as an ordinary `SecurityRule`
+ * (`buildTenantSecurityRule`) and compiled above with every other rule, so
+ * nothing here touches `policies`. What is left is the column:
+ *
+ * - **`NOT NULL`.** A row whose tenant is NULL belongs to nobody, and the
+ *   restrictive policy compares the column to the caller's tenant — a
+ *   comparison against NULL is never true. Such a row is therefore invisible to
+ *   every caller, forever, including the one who wrote it. The write path
+ *   refuses to create one (`TENANT_REQUIRED`); this is the same statement made
+ *   where a raw `INSERT`, a seed and a migration can also hear it.
+ * - **An index.** The tenancy predicate is ANDed into *every* statement against
+ *   the table, so an unindexed tenant column turns every read into a sequential
+ *   scan filtered by tenant. It is the one index a tenant-scoped table cannot
+ *   be without, and the one people most reliably forget — which is the whole
+ *   argument for deriving it rather than documenting it.
+ *
+ * The index goes through `deriveIndexName` like every other index, so it is a
+ * Rebase-managed name (`_ix_<fingerprint>`), it is in the Atlas diff, and the
+ * doctor recognises it. Because that name is a fingerprint of the index's
+ * semantics, an author who has *already* declared a plain btree index on the
+ * tenant column derives byte-for-byte the same name — so the two are the same
+ * object and this adds nothing rather than colliding.
+ *
+ * Throws when the field names no column. `planSchema` throws rather than
+ * guessing, and the alternative here is a table with a tenancy policy over a
+ * column that does not exist: `CREATE POLICY` fails, RLS stays enabled, and the
+ * collection denies every row.
+ */
+function applyTenantColumnEffects(
+    collection: CollectionConfig,
+    columns: ColumnPlan[],
+    schema: string,
+    table: string
+): CollectionIndexSpec[] {
+    const tenant = getTenantConfig(collection);
+    if (!tenant) return [];
+
+    const column = findTenantColumn(collection, columns, tenant.field);
+    if (!column) {
+        throw new Error(
+            `Collection "${describe(collection)}" declares \`tenant: { field: "${tenant.field}" }\`, and ` +
+            "no property of that name reaches a column. `tenant` says what a column means; it does not " +
+            "create one. Declare the property, or name the one that holds the tenant id."
+        );
+    }
+
+    // A primary key is already NOT NULL and already indexed by `<table>_pkey`.
+    // Saying either again would make `db push` plan a constraint and an index
+    // the database has no reason to hold.
+    if (column.primaryKey) return [];
+
+    column.nullable = false;
+
+    const withoutName = {
+        schema,
+        table,
+        method: "btree" as const,
+        unique: false,
+        keys: [{ column: column.column, direction: "asc" as const, nulls: "last" as const }],
+        include: [],
+        predicate: null,
+        reason: TENANT_INDEX_REASON
+    };
+    return [{ ...withoutName, indexName: deriveIndexName(withoutName) }];
+}
+
+/**
+ * The planned column a `tenant.field` names.
+ *
+ * Not simply `columns.find(c => c.key === field)`: a `belongsTo` relation
+ * property emits its column under the *foreign key's* field name, so
+ * `tenant: { field: "org" }` beside `org: { type: "relation", … }` has to
+ * resolve through the relation to `org_id`. Matching only on `key` found
+ * nothing there and the declaration would have been refused as naming no
+ * column — for the shape the documentation recommends.
+ */
+function findTenantColumn(
+    collection: CollectionConfig,
+    columns: ColumnPlan[],
+    field: string
+): ColumnPlan | undefined {
+    const direct = columns.find(c => c.key === field);
+    if (direct) return direct;
+
+    const prop = collection.properties?.[field] as Property | undefined;
+    if (prop?.type === "relation") {
+        const relations = resolveCollectionRelations(collection);
+        const relation = findRelation(relations, (prop as RelationProperty).relation?.relationName ?? field);
+        if (relation?.kind === "belongsTo" && relation.localKey) {
+            return columns.find(c => c.column === relation.localKey);
+        }
+        return undefined;
+    }
+    if (!prop) return undefined;
+    const columnName = resolveColumnName(field, prop);
+    return columns.find(c => c.column === columnName);
 }
 
 /**

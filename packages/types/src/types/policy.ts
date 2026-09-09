@@ -274,7 +274,8 @@ export type PolicyOperand =
     | OuterFieldPolicyOperand
     | LiteralPolicyOperand
     | AuthUidPolicyOperand
-    | AuthRolesPolicyOperand;
+    | AuthRolesPolicyOperand
+    | AuthClaimPolicyOperand;
 
 /** A column value on the row being evaluated. @group Models */
 export interface FieldPolicyOperand {
@@ -313,6 +314,44 @@ export interface AuthUidPolicyOperand {
  */
 export interface AuthRolesPolicyOperand {
     kind: "authRoles";
+}
+
+/**
+ * A named claim on the caller's session token — compiles to
+ * `NULLIF(rebase.jwt() ->> '<name>', '')`.
+ *
+ * The operand multi-tenancy is built on, and the reason it is an operand rather
+ * than a {@link RawPolicyExpression}: a claim arrives as **text**, and the
+ * column it is compared against usually is not. `org_id = rebase.jwt() ->>
+ * 'org_id'` on a `uuid` column is not a policy that denies — it is
+ * `CREATE POLICY` failing with "operator does not exist: uuid = text", and a
+ * table left with RLS enabled and no policy denies every row. Casting the
+ * *column* to text instead compiles, but takes the index off the one predicate
+ * that is ANDed into every read of the table.
+ *
+ * As an operand the compiler can see both sides: it casts the claim to the
+ * column's type, guarded so a malformed claim denies rather than raising
+ * `invalid input syntax` on every query, and the column keeps its index.
+ *
+ * An absent claim, and a claim set to the empty string, are both NULL — and a
+ * comparison against NULL is never true, so a caller carrying no claim sees no
+ * rows rather than all of them.
+ *
+ * Only *custom* claims are reachable. `uid`, `roles`, `aal` and `isAnonymous`
+ * are identity claims written after the custom ones when a token is minted,
+ * precisely so a claims hook cannot assert them; they have their own operands
+ * ({@link AuthUidPolicyOperand}, {@link AuthRolesPolicyOperand}) and naming one
+ * here is refused.
+ *
+ * Postgres-authoritative: the JavaScript evaluator reports *unknown* rather
+ * than reproducing Postgres's cast semantics (uuid case folding, numeric
+ * widening) a second time and getting them subtly wrong.
+ * @group Models
+ */
+export interface AuthClaimPolicyOperand {
+    kind: "authClaim";
+    /** The claim's name on the token, e.g. `"org_id"`. */
+    name: string;
 }
 
 // ── Constructor helpers ──────────────────────────────────────────────
@@ -354,5 +393,7 @@ name }),
     literal: (value: string | number | boolean | null): LiteralPolicyOperand => ({ kind: "literal",
 value }),
     authUid: (): AuthUidPolicyOperand => ({ kind: "authUid" }),
-    authRoles: (): AuthRolesPolicyOperand => ({ kind: "authRoles" })
+    authRoles: (): AuthRolesPolicyOperand => ({ kind: "authRoles" }),
+    authClaim: (name: string): AuthClaimPolicyOperand => ({ kind: "authClaim",
+name })
 };

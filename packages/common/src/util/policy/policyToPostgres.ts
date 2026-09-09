@@ -1,4 +1,4 @@
-import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression, RLS_IS_ANONYMOUS_SQL, RLS_ROLES_SQL, RLS_UID_SQL, rewriteLegacyRlsFunctions } from "@rebasepro/types";
+import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression, RLS_IS_ANONYMOUS_SQL, RLS_JWT_SQL, RLS_ROLES_SQL, RLS_UID_SQL, rewriteLegacyRlsFunctions } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { getTableName } from "../relations";
 
@@ -77,8 +77,19 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
                 other.kind === "authUid" && (operand.kind === "field" || operand.kind === "outerField")
                     ? `(${sqlText})::text`
                     : sqlText;
-            const leftSql = castForAuthUid(expr.left, operandToSql(expr.left, scope), expr.right);
-            const rightSql = castForAuthUid(expr.right, operandToSql(expr.right, scope), expr.left);
+            // A claim is text too, and the same mismatch applies — but here the
+            // cast goes the OTHER way, onto the claim. Casting the column would
+            // compile and would take the index off it, and this operand exists
+            // to carry a tenancy predicate that is ANDed into every read of the
+            // table. See {@link claimCastType}.
+            const claimSql = (operand: PolicyOperand, other: PolicyOperand): string | undefined =>
+                operand.kind === "authClaim"
+                    ? authClaimSql(operand.name, claimCastType(other, scope))
+                    : undefined;
+            const leftSql = claimSql(expr.left, expr.right)
+                ?? castForAuthUid(expr.left, operandToSql(expr.left, scope), expr.right);
+            const rightSql = claimSql(expr.right, expr.left)
+                ?? castForAuthUid(expr.right, operandToSql(expr.right, scope), expr.left);
             return `${leftSql} ${COMPARE_SQL[expr.op]} ${rightSql}`;
         }
         case "rolesOverlap":
@@ -185,8 +196,171 @@ function operandToSql(operand: PolicyOperand, scope: CompileScope): string {
             return RLS_UID_SQL;
         case "authRoles":
             return `string_to_array(${RLS_ROLES_SQL}, ',')`;
+        case "authClaim":
+            // Uncast — the shape a claim has when nothing says what it is being
+            // compared against (a claim on both sides, or against a literal).
+            // The `compare` arm replaces this whenever the other operand names
+            // a typed column.
+            return authClaimSql(operand.name, "text");
     }
 }
+
+/** Postgres types a text claim is cast to. `"text"` is the no-cast case. */
+type ClaimCastType = "text" | "uuid" | "bigint" | "numeric";
+
+/**
+ * The Postgres type a claim has to be cast to, to be compared with `operand`.
+ *
+ * `"text"` means "no cast": a claim already is text, and a `text` / `varchar`
+ * column compares with it directly and keeps using its index.
+ *
+ * Resolved from the *property*, and through a relation's target when the column
+ * is a foreign key — a `belongsTo` tenant field is the ordinary shape, and its
+ * column's type is the target collection's primary key type rather than
+ * anything visible on the property itself. Unknown resolves to `"text"`, which
+ * is the safe direction: a redundant `text` comparison costs nothing, while a
+ * missing `uuid` cast is a `CREATE POLICY` that fails and leaves a table with
+ * RLS enabled and no policy — which denies every row.
+ */
+function claimCastType(operand: PolicyOperand, scope: CompileScope): ClaimCastType {
+    if (operand.kind !== "field" && operand.kind !== "outerField") return "text";
+    const collection = operand.kind === "field" ? scope.fieldCollection : scope.outerCollection;
+    return propertyClaimCastType(operand.name, collection, scope.resolveCollection);
+}
+
+/**
+ * What `name` on `collection` compares against a text claim as.
+ *
+ * `depth` stops a `reference` cycle — two collections whose keys point at each
+ * other — from recursing forever. Two hops is more than any real declaration
+ * needs.
+ */
+function propertyClaimCastType(
+    name: string,
+    collection: CollectionConfig | undefined,
+    resolveCollection: ((slug: string) => CollectionConfig | undefined) | undefined,
+    depth = 0
+): ClaimCastType {
+    const prop = collection?.properties?.[name] as Property | undefined;
+    if (!prop || depth > 2) return "text";
+
+    switch (prop.type) {
+        case "string": {
+            const sp = prop as { isId?: unknown; columnType?: unknown; enum?: unknown };
+            if (sp.enum) return "text";
+            return sp.isId === "uuid" || sp.columnType === "uuid" ? "uuid" : "text";
+        }
+        case "number": {
+            const np = prop as { columnType?: string; isId?: unknown; validation?: { integer?: boolean } };
+            if (np.columnType === "numeric") return "numeric";
+            if (np.columnType || np.validation?.integer || np.isId) return "bigint";
+            // A `number` with no `columnType` and no `validation.integer` is
+            // NUMERIC — see `numberType` in the schema planner.
+            return "numeric";
+        }
+        case "reference":
+            return primaryKeyClaimCastType(
+                resolveTargetCollection((prop as { path?: string }).path, resolveCollection),
+                resolveCollection,
+                depth
+            );
+        case "relation":
+            return primaryKeyClaimCastType(
+                resolveTargetCollection(
+                    relationTargetSlug((prop as { relation?: { target?: unknown } }).relation),
+                    resolveCollection
+                ),
+                resolveCollection,
+                depth
+            );
+        default:
+            return "text";
+    }
+}
+
+/** The cast a column pointing at `target`'s primary key needs. */
+function primaryKeyClaimCastType(
+    target: CollectionConfig | undefined,
+    resolveCollection: ((slug: string) => CollectionConfig | undefined) | undefined,
+    depth: number
+): ClaimCastType {
+    if (!target) return "text";
+    for (const [key, property] of Object.entries(target.properties ?? {})) {
+        if (!(property as { isId?: unknown })?.isId) continue;
+        return propertyClaimCastType(key, target, resolveCollection, depth + 1);
+    }
+    // No declared key: the implicit `id TEXT PRIMARY KEY`.
+    return "text";
+}
+
+/**
+ * A relation's target slug, whatever form the declaration took.
+ *
+ * `target` is a slug on a plain object and a thunk on a builder — the two
+ * shapes `resolveRelation` normalises — and this runs on the raw property,
+ * before that resolution.
+ */
+function relationTargetSlug(relation: { target?: unknown } | undefined): string | undefined {
+    const target = relation?.target;
+    if (typeof target === "string") return target;
+    if (typeof target !== "function") return undefined;
+    try {
+        const slug = ((target as () => unknown)() as { slug?: unknown })?.slug;
+        return typeof slug === "string" ? slug : undefined;
+    } catch {
+        // A thunk needing a registry this compilation does not have. `text` is
+        // the fallback, and a fallback is not worth failing a compile over.
+        return undefined;
+    }
+}
+
+function resolveTargetCollection(
+    slug: string | undefined,
+    resolveCollection: ((slug: string) => CollectionConfig | undefined) | undefined
+): CollectionConfig | undefined {
+    if (!slug || !resolveCollection) return undefined;
+    // A `reference` path may be nested; the collection is its last segment.
+    return resolveCollection(slug) ?? resolveCollection(slug.split("/").pop() as string);
+}
+
+/**
+ * `NULLIF(rebase.jwt() ->> 'name', '')`, cast to the column's type.
+ *
+ * Two things here are load-bearing beyond the cast:
+ *
+ * - **`NULLIF(…, '')`.** An absent claim already reads as NULL, but one set to
+ *   the empty string does not, and `''::uuid` raises rather than denying. Both
+ *   spellings of "this caller has no tenant" have to reach the comparison as
+ *   NULL, which is never true and therefore never a grant.
+ * - **The guard.** The cast sits inside a `CASE` that first checks the text is
+ *   well-formed, because `'nonsense'::uuid` raises `invalid input syntax` — and
+ *   a policy that raises does not deny a row, it fails the whole statement. A
+ *   caller holding a malformed claim would get a 500 on every read of the table
+ *   instead of an empty list. `CASE` rather than an `AND` guard because only
+ *   `CASE` is guaranteed not to evaluate its arms out of order.
+ *
+ * The whole expression is STABLE (`rebase.jwt()` is), so Postgres evaluates it
+ * once per query and can still use a btree index on the column it is compared
+ * against — which is the entire reason the cast is on this side.
+ */
+function authClaimSql(name: string, cast: ClaimCastType): string {
+    const claim = `NULLIF(${RLS_JWT_SQL} ->> ${quoteLiteral(name)}, '')`;
+    if (cast === "text") return claim;
+    return `CASE WHEN ${claim} ~ '${CLAIM_CAST_GUARDS[cast]}' THEN (${claim})::${cast} END`;
+}
+
+/**
+ * The text a claim must match before it is cast, per target type.
+ *
+ * The `bigint` guard caps the digit run at 18 rather than matching any run of
+ * digits: `'99999999999999999999'::bigint` is a range error, which fails the
+ * statement exactly as the syntax error would have.
+ */
+const CLAIM_CAST_GUARDS: Record<Exclude<ClaimCastType, "text">, string> = {
+    uuid: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+    bigint: "^-?[0-9]{1,18}$",
+    numeric: "^-?[0-9]+(\\.[0-9]+)?$"
+};
 
 /**
  * SQL prefix that qualifies a column of the outer RLS row (`"schema"."table".`),

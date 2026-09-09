@@ -88,6 +88,50 @@ export interface AccessTokenPayload {
     mfa_verified?: boolean;
     /** Authentication Methods Reference — list of methods used (e.g. 'pwd', 'otp') */
     amr?: string[];
+    /**
+     * Every claim on the token that is not one of the above — what a custom
+     * claims hook put there, or what an external IdP sends.
+     *
+     * These used to be dropped. `verifyAccessToken` rebuilds the payload from a
+     * fixed list of fields rather than returning what it decoded, so a claim
+     * minted through {@link generateAccessToken}'s `customClaims` reached the
+     * token, was signed, was verified — and then existed nowhere the request
+     * could see it. Anything built on a claim (multi-tenancy's `claim` form,
+     * a rule reading `rebase.jwt()`) had no value to read.
+     *
+     * Custom only, and that is a security property rather than tidiness: the
+     * identity claims are stripped out here, so nothing downstream can mistake
+     * a hook's `roles` for the verified `roles` — which is the same reason the
+     * mint writes them last. See {@link RESERVED_TOKEN_CLAIMS}.
+     */
+    claims?: Record<string, unknown>;
+}
+
+/**
+ * Claims the token's own identity owns, and which therefore never appear in
+ * {@link AccessTokenPayload.claims}.
+ *
+ * The four Rebase writes after the custom ones (`uid`, `roles`, `aal`,
+ * `isAnonymous`), the two synonyms an external IdP may use for the subject,
+ * and the registered JWT claims that belong to the envelope rather than to the
+ * session.
+ */
+const RESERVED_TOKEN_CLAIMS: ReadonlySet<string> = new Set([
+    "uid", "sub", "roles", "aal", "isAnonymous", "purpose",
+    "iat", "exp", "nbf", "iss", "aud", "jti"
+]);
+
+/** The custom half of a verified token, or nothing when there is none. */
+function customClaimsOf(decoded: Record<string, unknown>): Record<string, unknown> | undefined {
+    const claims: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(decoded)) {
+        if (RESERVED_TOKEN_CLAIMS.has(key)) continue;
+        claims[key] = value;
+    }
+    // Absent rather than `{}`, mirroring `isAnonymous`: the verified payload
+    // keeps exactly the shape it had for everything that compares whole
+    // payloads, and for every token minted without custom claims.
+    return Object.keys(claims).length > 0 ? claims : undefined;
 }
 
 let jwtConfig: JwtConfig = {
@@ -342,7 +386,7 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
         const decoded = (namedKey
             ? await verifyJwt(token, namedKey.publicKey, { algorithms: [namedKey.algorithm] })
             : await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] })
-        ) as { uid?: string; sub?: string; roles?: string[]; aal?: string; isAnonymous?: boolean; purpose?: string; iat?: number };
+        ) as Record<string, unknown> & { uid?: string; sub?: string; roles?: string[]; aal?: string; isAnonymous?: boolean; purpose?: string; iat?: number };
         if (decoded.purpose) {
             logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
             return null;
@@ -366,7 +410,14 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenPaylo
             // the object also means the verified payload has exactly the shape
             // it had, for everything that compares whole payloads.
             ...(decoded.isAnonymous === true ? { isAnonymous: true as const } : {}),
-            iat: decoded.iat
+            iat: decoded.iat,
+            // Everything the mint's `customClaims` put on the token. Absent when
+            // there were none, so a payload that had no custom claims is
+            // byte-for-byte the object it used to be.
+            ...(() => {
+                const claims = customClaimsOf(decoded);
+                return claims ? { claims } : {};
+            })()
         };
     } catch (error) {
         logger.error("[JWT] Verification failed", { error: error, detail: token.substring(0, 15) });

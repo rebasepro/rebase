@@ -421,7 +421,15 @@ code: "INTERNAL_ERROR" } }, 500);
                             const user = {
                                 uid: payload.uid,
                                 roles: payload.roles,
-                                isAnonymous: payload.isAnonymous === true
+                                isAnonymous: payload.isAnonymous === true,
+                                // The token's custom claims, so a policy can
+                                // read one — `rebase.jwt() ->> 'org_id'`, which
+                                // is what multi-tenancy's `claim` form compiles
+                                // to — and so the write path can stamp the
+                                // caller's tenant. Verified claims only: the
+                                // identity ones are stripped in
+                                // `verifyAccessToken`.
+                                claims: payload.claims
                             };
                             c.set("driver", await scopeDataDriver(driver, user));
                         } catch (error) {

@@ -111,6 +111,23 @@ export interface AuthContext {
      * rather than having every one of its users reclassified as guests.
      */
     isAnonymous?: boolean;
+    /**
+     * The **custom** claims on the caller's token, as `rebase.jwt()` reports
+     * them.
+     *
+     * This is how a policy reaches a fact about the session that is neither the
+     * uid nor the roles — which, before this, it could not: `app.jwt` was built
+     * from three fields the driver already had, so `rebase.jwt()`, documented
+     * as "full JWT claims as JSONB", returned a three-key object that never had
+     * a claim in it.
+     *
+     * Multi-tenancy's `claim` form is the first caller — `policy.authClaim(…)`
+     * compiles to `rebase.jwt() ->> '<name>'`. Identity claims are stripped out
+     * before they reach here (`AccessTokenPayload.claims`) and the identity
+     * fields are written *over* them below, so nothing a hook put on a token
+     * can assert a uid, roles or guest status.
+     */
+    claims?: Record<string, unknown>;
 }
 
 const quoteIdent = (name: string): string => `"${name.replace(/"/g, "\"\"")}"`;
@@ -397,6 +414,13 @@ export async function applyAuthContext(tx: SqlTx, auth: AuthContext, userRole?: 
             set_config('app.user_roles', ${normalizedRoles.join(",")}, true),
             set_config('app.is_anonymous', ${isAnonymous}, true),
             set_config('app.jwt', ${JSON.stringify({
+        // The caller's custom claims, FIRST, so the identity keys below
+        // overwrite them rather than the other way round. Same ordering, and
+        // the same reason, as `generateAccessToken`: a claims hook is a place
+        // to add facts about a session, not the place its subject is decided.
+        // `verifyAccessToken` already strips the identity claims out of this
+        // object; the ordering is the second lock on the same door.
+        ...(auth.claims ?? {}),
         sub: uid,
         roles: auth.roles,
         // In the claims too, so a policy reading `rebase.jwt()` — which is
