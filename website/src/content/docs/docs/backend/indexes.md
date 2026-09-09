@@ -154,7 +154,7 @@ it here as well is refused rather than accepted as a synonym.
 Postgres — not Rebase — names `<table>_<column>_key`.
 
 ```typescript
-{ on: ["tenantId", "slug"], unique: true, reason: "one slug per tenant" }
+{ on: ["workspaceId", "slug"], unique: true, reason: "one slug per workspace" }
 ```
 
 ### `include` buys an index-only scan

@@ -706,7 +706,6 @@ export class RestApiGenerator {
             const searchExplain = searchExplainRaw === "true";
 
             const driver = this.getScopedDriver(c);
-            const fetchService = driver.restFetchService;
 
             const page = await this.readPage(
                 driver, resolvedCollection, queryOptions, searchString, searchExplain

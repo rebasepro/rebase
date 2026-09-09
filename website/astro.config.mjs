@@ -230,6 +230,7 @@ export default defineConfig({
                     items: [
                         { label: "Getting Started", slug: "docs/sdk" },
                         { label: "Querying Data", slug: "docs/sdk/querying" },
+                        { label: "Pagination", slug: "docs/sdk/pagination" },
                         { label: "Writing Data", slug: "docs/sdk/writing" },
                         { label: "Aggregates & search", slug: "docs/sdk/aggregates-and-search" },
                         { label: "Relations", slug: "docs/sdk/relations" },

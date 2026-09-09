@@ -666,15 +666,11 @@ target });
 
         for (const { key, node, relation } of levels) {
             const targetCollection = relation.target();
-            let narrow: SQL | undefined;
-            try {
-                narrow = this.includeNarrowing(node, targetCollection);
-            } catch (e) {
-                // A `where` inside an include that names a column the target
-                // does not have is the caller's mistake, and it is already an
-                // ApiError. Anything else is not this loop's to swallow.
-                throw e;
-            }
+            // Deliberately unguarded: a `where` inside an include that names a
+            // column the target does not have is the caller's mistake, and it
+            // is already an ApiError. Anything else is not this loop's to
+            // swallow either, so both travel to the caller untouched.
+            const narrow: SQL | undefined = this.includeNarrowing(node, targetCollection);
 
             // Rows loaded at this level, to recurse into. Collected as the
             // objects actually attached to the parents, so a nested include

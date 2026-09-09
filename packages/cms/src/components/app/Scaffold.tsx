@@ -3,7 +3,7 @@ import { cls, defaultBorderMixin, IconButton, Sheet, Tooltip } from "@rebasepro/
 import { ChevronLeftIcon, ErrorBoundary, MenuIcon } from "@rebasepro/ui";
 import { deepEqual as equal } from "fast-equals"
 
-import { useLargeLayout, useAdminModeController, useTranslation } from "@rebasepro/app";
+import { useLargeLayout, useTranslation } from "@rebasepro/app";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { AppContext } from "./useApp";
 
@@ -218,8 +218,6 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
 
         const computedDrawerOpen: boolean = drawerOpen;
         const computedDrawerHovered = Boolean(largeLayout && onHover);
-
-        const adminModeController = useAdminModeController();
 
         const hasAppBar = Boolean(appBarChildren.length > 0);
         const appContextValue = useMemo(() => ({

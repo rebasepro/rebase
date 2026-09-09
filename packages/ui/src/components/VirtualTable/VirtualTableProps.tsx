@@ -3,8 +3,17 @@
 import React from "react";
 import type { FilterFormFieldProps } from "./VirtualTableHeader";
 
-/** One sort key: the column, and which way it runs. */
-export type VirtualTableSortKey = [string, "asc" | "desc"];
+/**
+ * One sort key: the column, which way it runs, and where nulls go.
+ *
+ * Structurally the data layer's `OrderByTuple`, deliberately restated rather
+ * than imported: this package carries no dependency on `@rebasepro/types`, and
+ * a design-system table should not acquire one to name a two-word union. The
+ * third element is optional, so every existing `[key, direction]` destructure
+ * still reads what it always read — but a caller passing the data layer's own
+ * order through no longer has to strip it.
+ */
+export type VirtualTableSortKey = [string, "asc" | "desc", ("first" | "last")?];
 
 export type OnRowClickParams<T extends Record<string, unknown>> = {
     rowData: T;

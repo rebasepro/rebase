@@ -134,6 +134,9 @@ the ID you got. Read the response header.
 | `BULK_TOO_LARGE` | 400 | The bulk body exceeds the configured item limit. | Split the request. |
 | `BULK_UNSUPPORTED` | 400 | This collection or driver does not support bulk writes. | Write the rows one at a time. |
 | `CALLBACK_REJECTED` | 400 | A collection callback refused the write. A `throw` from `beforeSave`/`beforeDelete`/`after*` is a 400 carrying the author's own message; a `beforeDelete` that returns `false` is a 403. `details.stage` names which callback, `details.path` the collection. | Read the message — it was written by this project, not by Rebase. |
+| `CURSOR_WITH_OFFSET` | 400 | `?after=` was combined with `?offset=` or `?page=`. A cursor already says where the page starts, so an offset on top of it silently skips that many rows past the cursor — a gap the caller cannot see in the response. | Use one or the other. |
+| `DISTINCT_NOT_APPLICABLE` | 400 | `?distinct=true` was combined with a search or vector query. Both attach a per-row score, so no two rows are ever equal and `DISTINCT` would collapse nothing — it would look like it worked and change nothing. | Drop one of the two. |
+| `DISTINCT_ORDER_BY_NOT_SELECTED` | 400 | A `distinct` read is ordered by a column it does not return. A `SELECT DISTINCT` can only be ordered by columns in its select list, or the rows it collapses have no defined order. `details.fields` names them. | Add those fields to `?fields=`, or drop them from `?orderBy=`. |
 | `DB_PERMISSION_DENIED` | 500 | Postgres refused the statement (`42501`): either a row-level-security policy denying this role, or a missing `GRANT`. | See [Troubleshooting](/docs/troubleshooting/). |
 | `FIELD_NOT_READABLE` | 400 | A filter, `orderBy`, `fields`, aggregate `select` or `groupBy` names a field this caller's roles cannot read (`access.read`). A field no response can carry has to be one no query can interrogate, or the value is readable one predicate at a time. `details.violations` names each field. | Drop the field from the query, or acquire the role. See [Field access](/docs/collections/field-access/). |
 | `FIELD_NOT_WRITABLE` | 400 | The body sets a field this caller's roles cannot write (`access.write`). Refused rather than dropped: a write that discards a field would report success for an edit that did not happen. `details.violations` names each field. | Remove the field, or acquire the role. A field nobody may write answers `VALIDATION_EXCLUDED_FIELDS` instead. |
@@ -145,10 +148,14 @@ the ID you got. Read the response header.
 | `INVALID_BATCH_REF` | 400 | A `{ "$ref": "<name>.<field>" }` names no earlier operation, points forward, or asks for a field the referenced row does not have. Only backward references resolve. | Name the operation with `ref` *before* referencing it. |
 | `INVALID_BULK_BODY` | 400 | The bulk body is not the expected shape. | Send the documented `items` array. |
 | `INVALID_CONFLICT_TARGET` | 400 | An upsert's `on_conflict` / `onConflict` names columns carrying no uniqueness guarantee, or names them without `upsert: true`. Postgres would otherwise answer 42P10 from inside a transaction that has already done work. | Declare `validation: { unique: true }` or a `unique` index; the message lists the targets that do exist. |
+| `INVALID_DELETED_PARAM` | 400 | `?deleted=` is neither `include` nor `only`. Refused rather than ignored: a mistyped `?deleted=true` that quietly hid every deleted row would look like it worked and answer the opposite question. | Send `include` (live and deleted) or `only` (deleted alone). Omit it for live rows only. |
+| `INVALID_DISTINCT` | 400 | `?distinct=` is not `true` or `false`. | Send one of those; `1` and `0` are accepted too. |
 | `INVALID_FIELD_OPERATION` | 400 | A `$inc` / `$push` / `$pull` / `$merge` was used on a property type it is not defined on, with an operand of the wrong shape, with two operators on one field, misspelled, or on a create — where there is no stored value to operate on. | See [Writing over REST](/docs/backend/writes/#field-operations); the message names the field. |
 | `INVALID_FILTER_FIELD` | 400 | The filter names a property this collection does not have. | Check the spelling against the collection. |
 | `INVALID_FILTER_OPERATOR` | 400 | The operator is not one this property type supports. | See [Querying data](/docs/sdk/querying/). |
 | `INVALID_FILTER_VALUE` | 400 | A filter value cannot be read as the type of the column it was compared against: `?id=eq.abc` on an integer key, a label that is not in the enum, a timestamp that is not one, a number past the type's range. `details.dbCode` carries the SQLSTATE. | Send a value of the column's type. |
+| `INVALID_HARD_PARAM` | 400 | `?hard=` is not `true` or `false`. Anything else is refused rather than read as "no" — a typo that soft-deletes when the caller asked to purge leaves them believing the data is gone. | Send `true` or `false`. |
+| `INVALID_INCLUDE` | 400 | `?include=` is malformed: not a valid path list, or nested past the maximum depth. Answered at the boundary rather than escaping the driver as a 500. | See the message; it names the offending path. |
 | `INVALID_INPUT` | 400 | The body failed validation. | See the message. |
 | `INVALID_LIMIT` | — | A realtime subscription asked for a limit outside the allowed range. Delivered as a WebSocket `ERROR` frame, not an HTTP response. | Lower the limit. |
 | `INVALID_LOGICAL_GROUP` | 400 | An `?or=` / `?and=` group is malformed or nested past the allowed depth. | See the message; it shows the flattening rule. |
@@ -163,7 +170,7 @@ the ID you got. Read the response header.
 | `MISSING_AGGREGATE_SELECT` | 400 | The aggregate route was called with no `?select=`. | Add one, e.g. `?select=count()`. |
 | `NO_COLLECTIONS` | 404 | The project serves no collections: none declared in code, and no tables to derive them from. | Create tables — a migration, SQL, or a collection file plus `rebase db push` — and restart. |
 | `NOT_FOUND` | 404 | No row with that id in that collection — or one that row-level security hides from this caller. | Check the id, then the collection's `securityRules`. |
-| `UNKNOWN_RELATION` | 404 | A nested path names a relation the parent collection does not declare, e.g. `/api/data/authors/1/posts` where `authors` declares none. | Check the relation's name — the message lists the ones the collection has. A back-reference has to be declared on the parent to be traversable. |
+| `UNKNOWN_RELATION` | 400 | `?include=` names something that is not a relation on the collection. The same code answers **404** when a nested *URL path* names one instead, e.g. `/api/data/authors/1/posts` where `authors` declares none — there the URL names nothing, so it is a not-found rather than a malformed request. | Check the relation's name — the message lists the ones the collection has. A back-reference has to be declared on the parent to be traversable. |
 | `ORDER_BY_FIELD_NOT_SORTABLE` | 400 | The sort names a property that is not sortable. | Sort on a column-backed property. |
 | `PAYLOAD_TOO_LARGE` | 413 | The body exceeds the configured limit. | Send less, or raise the limit. |
 | `READ_ONLY_TRANSACTION` | 409 | An `afterRead` callback tried to write. A request-scoped read runs in a `READ ONLY` transaction, so neither the callback nor anything it calls may write. | Move the write out of the read: a background job, or `rebase.dataAsAdmin` from a cron job or a custom function. |
@@ -173,6 +180,10 @@ the ID you got. Read the response header.
 | `RELATION_SOURCE_KEY_EMPTY` | 400 | A relation write had no source key to hang the link on. | Save the parent row first. |
 | `SCHEMA_DRIFT` | 500 | A table or column the code expects does not exist in the database. | `rebase db push` in development; redeploy on a managed tenant. |
 | `SCORE_CURSOR_UNSUPPORTED` | 400 | `startAfter` was combined with `orderBy: "_score"`. Relevance is computed per query rather than stored, so it cannot key a cursor. | Page relevance with `limit`/`offset`, or order by a column. |
+| `TENANT_IMMUTABLE` | 400 | A write would move a row from one tenant to another. A row cannot change tenant. `details.violations` names the field. | Create the row in the other tenant and delete this one, or write with a role in `tenant.bypassRoles`. |
+| `TENANT_MISMATCH` | 400 | The write names a tenant this caller does not belong to; the database would refuse it as well. | Write into a tenant the caller belongs to, or authenticate as one that belongs to it. |
+| `TENANT_REQUIRED` | 400 | The collection is tenant-scoped and the tenant cannot be inferred: the request carries none, or the caller belongs to several. | Send the tenant field explicitly, or authenticate as a caller belonging to exactly one. |
+| `UNKNOWN_FIELD` | 400 | `?fields=` names a field the collection does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_AGGREGATE_FIELD` | 400 | An aggregate or `groupBy` names a field the collection does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_FILTER_FIELD` | 400 | The filter names a field this collection — or a relation's target — does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_FILTER_OPERATOR` | 400 | The filter names an operator that does not exist. | The message lists every operator. |
@@ -220,6 +231,8 @@ the message names the constraint.
 | `INVALID_STORAGE_BUCKET` | 400 | The bucket name is malformed. | Check the name. |
 | `INVALID_STORAGE_KEY` | 400 | The object key is malformed, or escapes its prefix. | Check the key. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | The image-transform parameters are out of range or contradictory. | See [Storage](/docs/backend/storage/). |
+| `STORAGE_FILE_TOO_LARGE` | 413 | The upload exceeds the `maxSize` the target property declares. Enforced on the server, not only in the browser. `details` carries the property, the limit and the actual size. | Upload a smaller file, or raise `maxSize` on the property. |
+| `STORAGE_FILE_TYPE_REFUSED` | 400 | The upload's type is not in the property's `acceptedFiles`. `details` carries the property, the accepted list and the content type sent. | Upload an accepted type, or widen `acceptedFiles`. |
 | `STORAGE_NOT_CONFIGURED` | 503 | No storage backend is configured on this server. | Configure S3, GCS, or local storage. |
 | `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | The storage source is declared but has no credentials here. | Set that source's environment variables. |
 | `STORAGE_WRITE_FAILED` | 502 | The storage backend refused or dropped the write. | Check its own logs and credentials. |

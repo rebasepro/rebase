@@ -195,6 +195,14 @@ function resolveOperand(operand: PolicyOperand, ctx: PolicyUserContext): Resolve
             return { kind: "field", name: operand.name };
         case "outerField":
             return { kind: "unknown" };
+        case "authClaim":
+            // Server-authoritative, exactly as `evaluatePolicy` treats it. A
+            // claim is TEXT, and the database compares it to the column after
+            // casting it to the column's type; there is no cast to reproduce
+            // here, and a second implementation that is subtly wrong would
+            // match documents the database would have refused. The caller
+            // resolves `unknown` fail-closed.
+            return { kind: "unknown" };
     }
 }
 

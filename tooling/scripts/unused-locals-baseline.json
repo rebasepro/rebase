@@ -98,7 +98,6 @@
   "packages/server-mongo/src/websocket.ts::options": 1,
   "packages/server-postgres/src/auth/services.ts::idColumn": 1,
   "packages/server-postgres/src/PostgresBootstrapper.ts::collectionRegistry": 1,
-  "packages/server-postgres/src/schema/generate-drizzle-schema-logic.ts::otherKey": 1,
   "packages/server-postgres/src/schema/introspect-db-inference.ts::COLOR_HEX_REGEX": 1,
   "packages/server-postgres/src/services/PersistService.ts::primaryKeyFields": 1,
   "packages/server-postgres/src/services/realtimeService.ts::fetchFn": 2,

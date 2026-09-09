@@ -3,7 +3,7 @@ import type { Property, WhereFilterOp } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { Entity, FilterValues } from "@rebasepro/types";
 import { CollectionSize, EntityTableController, SelectedCellProps, AdminCollection } from "@rebasepro/cms-types";
-import { CellRendererParams, VirtualTable, VirtualTableColumn, VirtualTableFilterValues, OnRowClickParams } from "@rebasepro/ui";
+import { CellRendererParams, VirtualTable, VirtualTableColumn, VirtualTableFilterValues, VirtualTableSortKey, OnRowClickParams } from "@rebasepro/ui";
 import { DEFAULT_PAGE_SIZE, DataCollectionTableController, OnCellValueChange, OnColumnResizeParams } from "@rebasepro/app";
 import { FilterFormFieldProps } from "@rebasepro/ui";
 import { useOutsideAlerter } from "@rebasepro/ui";
@@ -284,7 +284,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
                     filter={filterValues as any}
                     onFilterUpdate={setFilterValues ? onFilterUpdate : undefined}
                     sortBy={sortBy}
-                    onSortByUpdate={setSortBy as ((sortBy?: [string, "asc" | "desc"][]) => void)}
+                    onSortByUpdate={setSortBy as ((sortBy?: VirtualTableSortKey[]) => void)}
                     hoverRow={hoverRow}
                     initialScroll={initialScroll}
                     onScroll={onScroll}
