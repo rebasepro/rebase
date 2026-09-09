@@ -18,7 +18,9 @@ import { useTone } from "../../Plane";
 /** Shorter than the slide film's montage — the beat is shorter. */
 const SHOTS: Shot[] = [
     { ...PANEL_SHOTS[0], frames: 50 },
-    { ...PANEL_SHOTS[1], frames: 104 },
+    /* Contiguous with the first shot at THIS cut's length, not the slide
+       film's: the take runs on under the label change, no cut. */
+    { ...PANEL_SHOTS[1], from: PANEL_SHOTS[0].from + 50, frames: 104 },
     { ...PANEL_SHOTS[2], frames: 70 },
 ];
 

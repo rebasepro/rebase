@@ -342,15 +342,99 @@ const CLIPS = {
     panel: async ({ page, hold, scrollBy, clickOn }) => {
         await settleGrid(page, `${BASE}/c/products`, 40);
         await hold(0.6);
-        await scrollBy(1400, 5.0);                          // — shot 1: the grid
-        await hold(0.4);
-        await scrollBy(-1400, 1.8);                         // back to the top
-        await hold(0.6);
-        await clickOn("Italian coffee maker", 2.2, 1.0);    // — shot 2: the record
+        /* ONE continuous take, no scroll back. The film's first two shots are
+           two windows onto this clip, cut to be contiguous — and the earlier
+           flow scrolled the grid 1400px down and then back to the top before
+           the click, so a window opened after the scroll-up showed the grid
+           jumping back, which read as the video restarting. Now the grid
+           scrolls once, and the card that is clicked is one that is on screen
+           where the scroll stopped. */
+        /* Two seconds of scroll, not three: the film's second window opens
+           at source frame 70, and the click has to land early in it so the
+           record is on screen for most of that shot, not its last ten
+           frames. */
+        await scrollBy(760, 2.0);                           // — shot 1: the grid
+        await hold(0.3);
+        const card = await page.evaluate(() => {
+            /* The product name nearest the middle of the viewport, by
+               geometry — whichever product the seed put there. A name is a
+               leaf text node of some length that is not a price, a date or a
+               chip. */
+            const chips = new Set(["Active", "Draft", "Archived", "Electronics", "Home & Garden", "Clothing", "Toys & Games", "Books & Media", "Health & Beauty", "Sports"]);
+            const names = [...document.querySelectorAll("main *, [role=main] *, body *")]
+                .filter((e) => e.children.length === 0)
+                .map((e) => ({ t: (e.textContent || "").trim(), r: e.getBoundingClientRect() }))
+                .filter(({ t, r }) => t.length >= 6 && t.length <= 40 && !/[$€£]|\d{1,2} \w{3}|in stock|ago$/.test(t) && !chips.has(t) && r.width > 40 && r.height < 40 && r.y > 140 && r.y < window.innerHeight - 140);
+            names.sort((a, b) => Math.abs(a.r.y - window.innerHeight / 2) - Math.abs(b.r.y - window.innerHeight / 2));
+            return names[0]?.t ?? null;
+        }) ?? "OTTO fan";
+        await clickOn(card, 2.2, 0.8);                      // — shot 2: the record
         await scrollBy(520, 3.4, 520);
         // Related records for THIS product — the relation, made visible.
         await clickOn(() => page.getByRole("tab", { name: /orders/i }).first(), 2.6, 0.8);
         await hold(0.6);
+    },
+
+    /* Studio's SQL editor: a real query typed and run against the demo, then
+       a result row's related record opened from the row's action. The film's
+       Studio window shows this instead of the schema visualizer — "work on
+       the database itself" is a query and its rows, and the pencil in the
+       results is the panel and the database being one app. */
+    studio: async ({ page, hold, clickOn, clearField, shoot }) => {
+        const QUERY = [
+            /* c.id, not o.id: both tables' primary keys are called id, and
+               the results' row action opens whichever collection is chosen
+               with the row's `id` — so the id in the result set has to be
+               the customer's for "Open Customers" to open the right record. */
+            "select c.id, o.order_number, c.first_name, c.last_name, c.company, o.total, o.order_date",
+            "from orders o",
+            "join customers c on c.id = o.customer_id",
+            "where c.is_vip",
+            "order by o.total desc",
+            "limit 12;",
+        ].join("\n");
+        await page.goto(`${BASE}/sql`, { waitUntil: "networkidle", timeout: 90_000 });
+        await hold(0.8);
+        /* Monaco. Its own textarea is invisible and its view-lines are not
+           a stable click target, so the editor is focused by a click inside
+           its text area (it spans x 388-1271, y 45-418 at this viewport). */
+        await clickOn({ x: 700, y: 120 }, 0.3, 0.8);
+        await clearField(0.3);
+        /* Typed, two frames a character — read as typing, not as a paste.
+           Escape before every newline: with a suggestion popup open, Enter
+           would accept the suggestion instead of breaking the line. */
+        for (const ch of QUERY) {
+            if (ch === "\n") {
+                await page.keyboard.press("Escape");
+                await page.keyboard.press("Enter");
+            } else {
+                await page.keyboard.type(ch);
+            }
+            await shoot();
+            await shoot();
+        }
+        await page.keyboard.press("Escape");
+        await hold(0.4);
+        /* Settles are short from here on: the film shows six seconds of
+           this take, and they have to hold the run, the rows, the menu and
+           the record. */
+        await clickOn(() => page.getByRole("button", { name: /^run$/i }).first(), 1.3, 0.6);
+        /* The first row's action: with two collections matched it is a menu
+           trigger (a 32px button at the table's left edge), and the entry to
+           take is the customer — the related record. Found by role and
+           position, not by icon; a pass that took "the first button under
+           the results header" hit an export tool instead. */
+        const triggers = page.locator("button[aria-haspopup=menu]");
+        const count = await triggers.count();
+        let first = null;
+        for (let i = 0; i < count; i++) {
+            const b = await triggers.nth(i).boundingBox();
+            if (b && b.x > 300 && b.x < 340 && b.y > 440 && (!first || b.y < first.y)) first = { i, y: b.y };
+        }
+        if (!first) throw new Error("no row action in the results");
+        await clickOn(() => triggers.nth(first.i), 0.7, 0.7);
+        await clickOn(() => page.getByRole("menuitem", { name: /open customers/i }).first(), 3.2, 0.4);
+        await hold(0.8);
     },
 
     /* Studio: choose a collection, then SELECT PROPERTIES — the old take only

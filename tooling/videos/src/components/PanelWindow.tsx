@@ -30,13 +30,15 @@ export interface Shot {
    25fps and this film runs at 30, and no rate divides both.
    See scripts/render-demo.mjs. */
 export const PANEL_SHOTS: Shot[] = [
-    /* Shots 1 and 2 are two windows onto ONE take. They have to be: the demo
-       signs its image URLs per request, so a second visit to the grid is forty
-       cache misses at once and its storage endpoint answers that burst with
-       429 — the second take is always a field of grey placeholder tiles. So
-       the grid is loaded once and never left, and the cut here is a cut in the
-       edit rather than a second recording. */
-    { file: "demo/panel.mp4", label: "Cards", from: 24, frames: 58 },
+    /* Shots 1 and 2 are two windows onto ONE take, and CONTIGUOUS: shot 2
+       starts where shot 1 ends, so the label changes while the take runs on
+       and there is no cut in the picture at all. Two windows because the
+       demo signs its image URLs per request, so a second visit to the grid is
+       forty cache misses at once and its storage endpoint answers that burst
+       with 429 — the second take is always a field of grey placeholder tiles.
+       Contiguous because any cut between two moments of the same grid — even
+       a dissolve — showed the grid jumping, which read as a restart. */
+    { file: "demo/panel.mp4", label: "Cards", from: 20, frames: 58 },
     /* The click-through, and the reason the montage stopped reading as static:
        a product picked out of the grid and the record that opens. The window
        starts on held grid so the cursor is seen travelling to the card — the
@@ -45,7 +47,7 @@ export const PANEL_SHOTS: Shot[] = [
        grid down and back UP before the click (frames ~210-258), and a window
        opened during that scroll-up read as the video restarting. 262 is the
        first settled frame at the top of the grid. */
-    { file: "demo/panel.mp4", label: "Open a record", from: 262, frames: 122 },
+    { file: "demo/panel.mp4", label: "Open a record", from: 78, frames: 122 },
     { file: "demo/orders.mp4", label: "Every view", from: 20, frames: 72 },
 ];
 

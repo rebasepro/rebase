@@ -4,9 +4,15 @@ import { ramp, ENTER } from "./motion";
 import { FRAME } from "../theme";
 
 /**
- * Studio's schema editor, as a window: real capture from the live demo, where
- * every property carries its type AND the column it sits on. Building a
+ * Studio's SQL editor, as a window: a real capture from the live demo of a
+ * real query — orders joined to their VIP customers — typed, run, and then a
+ * result row's related customer opened from the row's action menu. "Work on
+ * the database itself" is a query and its rows, and the record opening out
+ * of a result row is the panel and the database being one app. Building a
  * plausible Studio out of the toolkit would be inventing product.
+ *
+ * The window opens on the last line being typed (frame 460 of the take), so
+ * six seconds hold the run, the rows, the menu and the record.
  *
  * Draws its own window chrome, so it gets no frame head.
  */
@@ -18,13 +24,15 @@ export const StudioWindow: React.FC<{
 }> = ({ enterAt = 12, driftUntil = 200, style }) => {
     const frame = useCurrentFrame();
     const enter = ramp(frame, enterAt, 30, ENTER);
-    const push = interpolate(frame, [enterAt, driftUntil], [1, 1.03], {
+    const push = interpolate(frame, [enterAt, driftUntil], [1, 1.02], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
     });
-    /* The capture really moves — the property list scrolls — so the pan on
-       top is a slow reading drift, deliberately small. */
-    const pan = interpolate(frame, [enterAt, driftUntil], [6, -6], {
+    /* The capture really moves — the query runs, the record opens — so the
+       pan on top is a slow reading drift, deliberately small, and the frame
+       is shown nearly whole: the editor, the results and the record all
+       have to be in it. */
+    const pan = interpolate(frame, [enterAt, driftUntil], [2, -2], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
     });
@@ -46,14 +54,14 @@ export const StudioWindow: React.FC<{
         >
             <AbsoluteFill>
                 <OffthreadVideo
-                    src={staticFile("demo/schema.mp4")}
-                    startFrom={90}
+                    src={staticFile("demo/studio.mp4")}
+                    startFrom={460}
                     muted
                     style={{
                         width: "100%",
                         height: "100%",
                         objectFit: "cover",
-                        transform: `scale(1.18) translateY(${pan}%)`,
+                        transform: `scale(1.04) translateY(${pan}%)`,
                     }}
                 />
             </AbsoluteFill>

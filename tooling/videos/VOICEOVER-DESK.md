@@ -54,7 +54,7 @@ minute over the whole run, silences included.
 | The panel | 9.1s | the montage |
 | Every view | 6.0s | the bento |
 | The schema | 5.5s | the map |
-| Studio | 6.3s | the window and its four labels |
+| Studio | 6.3s | the SQL editor: a real query run, the rows, a row's related customer opened |
 | Close | 14.1s | the whole desk, then you and the address |
 
 ## The presenter
@@ -98,6 +98,10 @@ as the green line prints, then back to the lens for "Then run it".
   real file list for these nine tables. Lines are left out, never made up.
 - The collection file is the head of the one introspection generates; the
   policy is the one `db push` writes to `drizzle/policies.sql`.
+- Studio's window is a real query in the demo's SQL editor — orders joined to
+  their VIP customers — typed, run, and a result row's customer opened from
+  the row's action menu. The panel's first two shots are one continuous
+  take with no cut between them.
 - MIT, three commands, nine tables and the container image are checked
   against the repo. No line refers to Rebase Cloud.
 - **Open:** the clean report was captured with FORCE ROW LEVEL SECURITY set
