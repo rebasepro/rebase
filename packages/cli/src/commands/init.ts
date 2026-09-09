@@ -819,7 +819,9 @@ async function createProject(options: InitOptions) {
         git: Boolean(options.git),
         duration: durationBucket(Date.now() - startedAt)
     };
-    if (await promptForConsent("cli.init", initProperties)) {
+    // `reAskDeclined`: scaffolding is the one moment where asking again is an
+    // offer rather than nagging. See PromptOptions.
+    if (await promptForConsent("cli.init", initProperties, { reAskDeclined: true })) {
         await recordEvent("cli.init", initProperties, { projectRoot: options.targetDirectory });
     }
 }

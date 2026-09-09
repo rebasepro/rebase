@@ -30,11 +30,42 @@ import { setConsent, suppressionReason } from "./index";
  * fiction.
  */
 
-/** True when we may ask: no decision recorded, and nothing else forbids it. */
-export function shouldPrompt(env: NodeJS.ProcessEnv = process.env): boolean {
+/** Where the question is being asked from, which decides how often it may be. */
+export interface PromptOptions {
+    /**
+     * Ask again even though this machine already declined.
+     *
+     * Set by `rebase init`, and only there. Scaffolding a project is a
+     * deliberate, occasional act with a natural pause in it — not something
+     * anyone does in a loop — so asking each time is an offer rather than
+     * nagging, and it reaches the person whose first answer was a reflex before
+     * they had seen the tool do anything.
+     *
+     * It does **not** re-ask someone who accepted: they are already sharing, so
+     * the only thing another prompt could do is talk them out of it.
+     *
+     * Nothing else changes. `DO_NOT_TRACK`, `REBASE_TELEMETRY_DISABLED`, `CI`
+     * and a project's `"telemetry": false` are answers, not questions, and they
+     * still suppress the prompt entirely — a re-ask that could override a
+     * committed repository policy would be exactly the consent-by-proxy the
+     * policy exists to prevent.
+     */
+    reAskDeclined?: boolean;
+}
+
+/** True when we may ask: nothing forbids it, and there is a question to ask. */
+export function shouldPrompt(
+    env: NodeJS.ProcessEnv = process.env,
+    { reAskDeclined = false }: PromptOptions = {}
+): boolean {
+    if (!process.stdin.isTTY) return false;
+
+    const reason = suppressionReason(env);
     // `not_asked` is the only reason that is a question rather than an answer.
-    // A user who set DO_NOT_TRACK, or is on CI, has already told us.
-    return suppressionReason(env) === "not_asked" && Boolean(process.stdin.isTTY);
+    // A user who set DO_NOT_TRACK, or is on CI, has already told us — and so
+    // has one who is already sharing (`null`), whom we never re-ask.
+    if (reason === "not_asked") return true;
+    return reAskDeclined && reason === "declined";
 }
 
 export function renderPreview(event: TelemetryEventName, properties: Record<string, unknown>): string {
@@ -54,9 +85,14 @@ export function renderPreview(event: TelemetryEventName, properties: Record<stri
  */
 export async function promptForConsent(
     event: TelemetryEventName,
-    properties: Record<string, unknown>
+    properties: Record<string, unknown>,
+    options: PromptOptions = {}
 ): Promise<boolean> {
-    if (!shouldPrompt()) return false;
+    if (!shouldPrompt(process.env, options)) return false;
+
+    // Only true when this is a second (or later) asking, which the closing line
+    // needs to know: "you will not be asked again" is false at `init`.
+    const askedBefore = suppressionReason(process.env) === "declined";
 
     try {
         console.log("");
@@ -76,6 +112,11 @@ export async function promptForConsent(
         console.log("");
         console.log(chalk.gray("  No project names, paths, schemas, URLs or error messages. Change your"));
         console.log(chalk.gray(`  mind any time with ${chalk.cyan("rebase telemetry disable")}.`));
+        if (askedBefore) {
+            console.log("");
+            console.log(chalk.gray("  You declined before, and that is still the answer unless you change it"));
+            console.log(chalk.gray("  here. Asked once per new project; never during ordinary work."));
+        }
         console.log("");
 
         const { accepted } = await inquirer.prompt([
@@ -92,7 +133,12 @@ export async function promptForConsent(
         console.log(
             accepted
                 ? chalk.green("  Thank you — sharing enabled.")
-                : chalk.gray("  Nothing will be sent. You will not be asked again.")
+                : chalk.gray(
+                    "  Nothing will be sent."
+                    + (options.reAskDeclined
+                        ? " You will be asked again the next time you scaffold a project."
+                        : " You will not be asked again.")
+                )
         );
         console.log("");
         return Boolean(accepted);
