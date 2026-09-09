@@ -33,6 +33,12 @@
  * - `cron` — `${basePath}/cron`, the cron *admin* surface. Whether jobs actually
  *   fire is {@link RuntimeOwnership.cronScheduler}, not this.
  * - `meta` — `${basePath}/meta`, the contract endpoint a generated SDK reads.
+ * - `mcp` — `/mcp` for AI clients, plus the OAuth authorization server that
+ *   issues its tokens (`${basePath}/oauth`) and the two `.well-known` documents
+ *   they are discovered through. One name for all three because they are
+ *   useless apart: the endpoint without the authorization server cannot be
+ *   reached, and the authorization server without the endpoint issues tokens
+ *   for a resource that does not answer.
  * - `realtime` — the websocket server, and with it this process's appetite for
  *   change events: whether it opens a `LISTEN` connection and consumes CDC at
  *   all. Not a Hono route like the others — the websocket server is attached to
@@ -49,7 +55,8 @@ export type RuntimeSurface =
     | "functions"
     | "cron"
     | "meta"
-    | "realtime";
+    | "realtime"
+    | "mcp";
 
 /** Every surface, in a stable order. */
 export const ALL_RUNTIME_SURFACES: readonly RuntimeSurface[] = [
@@ -60,7 +67,8 @@ export const ALL_RUNTIME_SURFACES: readonly RuntimeSurface[] = [
     "functions",
     "cron",
     "meta",
-    "realtime"
+    "realtime",
+    "mcp"
 ] as const;
 
 /** A fully-resolved answer for every surface. */
@@ -107,17 +115,40 @@ export type RuntimeSurfaceOptions = Partial<ResolvedSurfaces>;
 export type RuntimeOwnershipOptions = Partial<ResolvedOwnership>;
 
 /**
- * Resolve a partial surface set against the default, which is everything on.
+ * Surfaces that default to OFF, against the rule below.
  *
- * Defaulting to on rather than off is the whole compatibility story: a caller
- * that says nothing gets the process this server has always booted, and a
- * surface added later is mounted by every existing deployment without anyone
- * editing a list.
+ * `mcp` is the first, and the exception is deliberate. The default-on rule is a
+ * compatibility story — a caller that says nothing gets the process this server
+ * has always booted — and it is the right rule for a surface that exposes
+ * something the deployment already exposes by another name. It is the wrong
+ * rule for this one.
+ *
+ * `mcp` mounts an OAuth authorization server that issues credentials to
+ * third-party software, on a public path, to anyone who completes a consent
+ * screen. Defaulting it on would mean every existing deployment starts doing
+ * that at the next upgrade, because a library was updated — nobody would have
+ * decided it, and most operators would not know it had happened. "A surface
+ * added later is mounted by every existing deployment without anyone editing a
+ * list" is precisely what must NOT happen here.
+ *
+ * So the compatibility story for this surface is inverted: an operator opts in
+ * once, and everything else keeps behaving exactly as it did.
+ */
+const DEFAULT_OFF: readonly RuntimeSurface[] = ["mcp"] as const;
+
+/**
+ * Resolve a partial surface set against the default, which is everything on
+ * except {@link DEFAULT_OFF}.
+ *
+ * Defaulting to on rather than off is the compatibility story: a caller that
+ * says nothing gets the process this server has always booted, and a surface
+ * added later is mounted by every existing deployment without anyone editing a
+ * list. See {@link DEFAULT_OFF} for the one place that rule is wrong and why.
  */
 export function resolveSurfaces(options?: RuntimeSurfaceOptions): ResolvedSurfaces {
     const resolved = {} as ResolvedSurfaces;
     for (const surface of ALL_RUNTIME_SURFACES) {
-        resolved[surface] = options?.[surface] ?? true;
+        resolved[surface] = options?.[surface] ?? !DEFAULT_OFF.includes(surface);
     }
     return resolved;
 }

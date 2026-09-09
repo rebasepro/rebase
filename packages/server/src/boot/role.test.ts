@@ -28,16 +28,34 @@ function owning(over: Partial<RoleEnv> = {}): { cronScheduler: boolean; jobWorke
 }
 
 describe("resolveRole — what each role is", () => {
+    /**
+     * Surfaces no role turns on by itself.
+     *
+     * `mcp` is opt-in whatever the role: it mounts an OAuth authorization
+     * server that issues credentials to third-party software, and a role is a
+     * statement about process shape — "this container answers HTTP" — not a
+     * decision to start doing that. See `DEFAULT_OFF` in `init/surfaces.ts`.
+     */
+    const OPT_IN = ["mcp"];
+    const byDefault = [...ALL_RUNTIME_SURFACES].filter(s => !OPT_IN.includes(s));
+
     it("defaults to `all`, which is exactly today's process", () => {
         expect(resolveRole(env()).role).toBe("all");
-        expect(serving()).toEqual([...ALL_RUNTIME_SURFACES].sort());
+        expect(serving()).toEqual(byDefault.sort());
         expect(owning()).toEqual({ cronScheduler: true, jobWorkers: true, rlsAudit: true });
         expect(resolveRole(env()).provisionSchema).toBe(true);
     });
 
+    it("`all` does not switch on an opt-in surface", () => {
+        // Named separately from the assertion above so that adding a surface to
+        // `OPT_IN` cannot quietly make that assertion weaker: this one fails if
+        // the list stops being honest.
+        expect(serving()).not.toContain("mcp");
+    });
+
     it("`api` serves everything except functions", () => {
         expect(serving({ REBASE_ROLE: "api" })).toEqual(
-            [...ALL_RUNTIME_SURFACES].filter(s => s !== "functions").sort()
+            byDefault.filter(s => s !== "functions").sort()
         );
     });
 

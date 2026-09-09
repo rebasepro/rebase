@@ -196,7 +196,13 @@ afterEach(() => {
  * otherwise this list becomes the place a surface goes to stop being tested.
  */
 const NON_HTTP_SURFACES: Partial<Record<RuntimeSurface, string>> = {
-    realtime: "the websocket server attaches to the HTTP server, not to a path"
+    realtime: "the websocket server attaches to the HTTP server, not to a path",
+    // Not "no path" but "no path ON A STOCK BOOT", which is the property this
+    // file exists to defend rather than an excuse from it: `mcp` is the one
+    // surface that defaults to OFF, so a probe for it would have to 404 in the
+    // test above and answer nowhere else. The mounts themselves are covered by
+    // `test/mcp-oauth-flow.test.ts`, and the default is pinned below.
+    mcp: "defaults to off, so it answers on no stock boot — see `DEFAULT_OFF` in init/surfaces.ts"
 };
 
 describe("runtime surfaces", () => {
@@ -204,6 +210,19 @@ describe("runtime surfaces", () => {
         const app = await boot();
 
         expect((await mounted(app)).sort()).toEqual(PROBES.map(p => p.url).sort());
+    });
+
+    it("does NOT mount the MCP surface on a stock boot", async () => {
+        // The inverse of the test above, and the more important one. `mcp`
+        // mounts an OAuth authorization server that issues credentials to
+        // third-party software. If it ever starts answering because someone
+        // upgraded a library, nobody decided that — so this asserts the silence
+        // directly rather than trusting the default-off list to stay correct.
+        const app = await boot();
+
+        for (const url of ["/mcp", "/.well-known/oauth-protected-resource/mcp", "/api/oauth/register"]) {
+            expect((await app.request(url)).status).toBe(404);
+        }
     });
 
     it("has a probe for every declared surface", async () => {

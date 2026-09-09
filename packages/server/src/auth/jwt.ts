@@ -614,3 +614,164 @@ export async function verifyDownloadToken(token: string): Promise<DownloadTokenP
     }
 }
 
+// ─── Generic purpose-scoped tokens ───────────────────────────────────
+
+/**
+ * Sign a short-lived token that carries state across a redirect.
+ *
+ * The generalisation of the MFA-pending token: a signed blob the server hands
+ * out and expects back, where the point is that the holder cannot edit it. The
+ * OAuth authorize flow needs one to carry the authorization request across the
+ * sign-in hop — without it, the endpoint the consent page posts to would mint a
+ * code for whatever `client_id` and `redirect_uri` its caller typed, skipping
+ * every check the authorize endpoint performs.
+ *
+ * The `purpose` is not decoration. {@link verifyAccessToken} refuses any token
+ * that has one, so nothing minted here can be replayed as a session, and
+ * {@link verifyPurposeToken} refuses a token whose purpose is not the one the
+ * caller named — so a token minted for one hop cannot be spent on another.
+ */
+export async function signPurposeToken(
+    purpose: string,
+    claims: Record<string, unknown>,
+    expiresInSeconds: number
+): Promise<string> {
+    if (!jwtConfig.secret) {
+        throw new Error("JWT secret not configured. Call configureJwt() first.");
+    }
+    // `purpose` last, so a claims object carrying one cannot rename the token.
+    return signJwt({ ...claims, purpose }, jwtConfig.secret, {
+        expiresIn: expiresInSeconds,
+        algorithm: "HS256"
+    });
+}
+
+/** Verify a token minted by {@link signPurposeToken}, for one named purpose. */
+export async function verifyPurposeToken<T>(purpose: string, token: string): Promise<T | null> {
+    if (!jwtConfig.secret) {
+        throw new Error("JWT secret not configured. Call configureJwt() first.");
+    }
+    if (!token) return null;
+    try {
+        const decoded = await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] }) as Record<string, unknown> | undefined;
+        if (!decoded || decoded.purpose !== purpose) return null;
+        return decoded as T;
+    } catch (error) {
+        logger.error("[JWT] Purpose token verification failed", { purpose, error });
+        return null;
+    }
+}
+
+// ─── MCP access tokens ───────────────────────────────────────────────
+
+/** The `purpose` that marks a token as belonging to the MCP resource. */
+export const MCP_ACCESS_PURPOSE = "mcp-access";
+
+export interface McpAccessTokenPayload {
+    purpose: typeof MCP_ACCESS_PURPOSE;
+    /** The person the token acts for. Fed straight to `withAuth()`, so RLS sees them. */
+    uid: string;
+    roles: string[];
+    /** Granted OAuth scope, space-separated. */
+    scope: string;
+    /** Which registered client holds this token — carried for audit and revocation. */
+    clientId: string;
+    /** The resource this token is bound to (RFC 8707). */
+    aud: string;
+    iss: string;
+}
+
+/**
+ * Mint an access token for the MCP endpoint.
+ *
+ * Deliberately **not** an ordinary session token, and the `purpose` claim is
+ * what enforces that: {@link verifyAccessToken} refuses any token carrying one,
+ * so a credential issued to a third-party MCP client — Claude, an IDE, anything
+ * that completed the OAuth flow — cannot be replayed against `/api/data`,
+ * `/api/admin` or the websocket. It buys exactly the one resource it names.
+ *
+ * That asymmetry matters more than it first looks. These tokens are handed to
+ * software the user authorized but the operator never vetted, they live in that
+ * software's storage, and they are the only credential in this system minted
+ * for a third party. Without the purpose separation, "connect Claude to your
+ * data" would silently mean "give Claude a full session".
+ *
+ * The audience is the canonical resource URI, and {@link verifyMcpAccessToken}
+ * requires the caller to say which resource it is checking for. A token minted
+ * for another Rebase project — or another path on this one — fails there.
+ *
+ * HS256 with the shared secret, like the download token: the authorization
+ * server and the resource server are the same process, so nothing outside it
+ * ever needs to verify one, and an asymmetric key here would be a second key
+ * surface bought for nobody.
+ */
+export async function generateMcpAccessToken(
+    payload: Omit<McpAccessTokenPayload, "purpose">,
+    expiresInSeconds: number
+): Promise<string> {
+    if (!jwtConfig.secret) {
+        throw new Error("JWT secret not configured. Call configureJwt() first.");
+    }
+
+    // `uid` and `roles` are written by this function and come from a redeemed
+    // authorization code, never from anything the client sent. There is no
+    // custom-claims hook on this path on purpose — see `generateAccessToken`
+    // for what a hook that can reach the identity claims costs.
+    return signJwt(
+        {
+            purpose: MCP_ACCESS_PURPOSE,
+            uid: payload.uid,
+            roles: payload.roles,
+            scope: payload.scope,
+            clientId: payload.clientId,
+            aud: payload.aud,
+            iss: payload.iss
+        },
+        jwtConfig.secret,
+        { expiresIn: expiresInSeconds, algorithm: "HS256" }
+    );
+}
+
+/**
+ * Verify an MCP access token **for a specific resource**.
+ *
+ * `expectedAudience` has no default. The MCP specification requires a resource
+ * server to validate that a token was issued for it specifically, and a default
+ * would be the thing that quietly turns that check off — the caller has to say
+ * what it is, every time, so a new call site cannot forget by omission.
+ */
+export async function verifyMcpAccessToken(
+    token: string,
+    expectedAudience: string
+): Promise<McpAccessTokenPayload | null> {
+    if (!jwtConfig.secret) {
+        throw new Error("JWT secret not configured. Call configureJwt() first.");
+    }
+
+    try {
+        const decoded = await verifyJwt(token, jwtConfig.secret, { algorithms: ["HS256"] }) as Record<string, unknown> | undefined;
+        if (!decoded || decoded.purpose !== MCP_ACCESS_PURPOSE) return null;
+        if (typeof decoded.uid !== "string" || !decoded.uid) return null;
+        if (typeof decoded.aud !== "string" || decoded.aud !== expectedAudience) {
+            logger.error("[JWT] MCP token rejected: audience mismatch", {
+                expected: expectedAudience,
+                got: decoded.aud
+            });
+            return null;
+        }
+
+        return {
+            purpose: MCP_ACCESS_PURPOSE,
+            uid: decoded.uid,
+            roles: Array.isArray(decoded.roles) ? decoded.roles.map(String) : [],
+            scope: typeof decoded.scope === "string" ? decoded.scope : "",
+            clientId: typeof decoded.clientId === "string" ? decoded.clientId : "",
+            aud: decoded.aud,
+            iss: typeof decoded.iss === "string" ? decoded.iss : ""
+        };
+    } catch (error) {
+        logger.error("[JWT] MCP token verification failed", { error: error });
+        return null;
+    }
+}
+
