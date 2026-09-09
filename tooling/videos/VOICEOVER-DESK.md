@@ -105,5 +105,21 @@ as the green line prints, then back to the lens for "Then run it".
   `rls-enabled-not-forced` on every table. That is a product decision, not
   a film one — see the note in `windows/Hook.tsx`.
 
+## Footage and resolution
+
+- Every product clip is shot frame by frame from demo.rebase.pro at **device
+  scale factor 2** (`scripts/render-demo.mjs`): the viewports stay small so
+  the app lays out densely, and each capture carries four times the pixels
+  a 1× capture did. The bento tiles used to be 680×348 at ~100 kb/s, which
+  is why they looked soft; they are 1360×696 now, the record tiles
+  1200×1256, the full windows 2560×1600.
+- The demo carries the current surface system (frame, sheet, card, hairlines,
+  tinted chips), and the film's own windows follow the same ladder
+  (`SURFACE`, `RADIUS`, `FRAME` in `src/theme.ts`): sheets with an 8%
+  hairline, wells for code and terminals, no shadows.
+- Render the deliverable at 4K: `remotion render src/index.ts RebaseDesk
+  out/rebase-desk-4k.mp4 --scale=2`. A 1080p render throws the reshoot
+  away.
+
 `TEMPO` in `src/desk/beats.ts` stretches the whole sheet — beats, moves and
 the narration's frames alike. It is 1 now. To slow it, change one number.

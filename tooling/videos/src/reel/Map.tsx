@@ -3,7 +3,7 @@ import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 import { pop, ramp, SPRING } from "../components/motion";
 import { STAGE_INSET } from "../components/Scene";
 import { DisplayLine, DISPLAY } from "../components/Type";
-import { CHROMA, FONT, INK, TRACKING } from "../theme";
+import { CHROMA, FONT, INK, RADIUS, SURFACE, TRACKING } from "../theme";
 
 /**
  * CANDIDATE — the schema, drawn.
@@ -141,9 +141,9 @@ export const Map: React.FC<{
                             top: n.y,
                             width: W,
                             height: H,
-                            borderRadius: 14,
-                            border: `1px solid ${INK.rule}`,
-                            background: "#000",
+                            borderRadius: RADIUS.xl,
+                            border: `1px solid ${SURFACE.hairline}`,
+                            background: SURFACE.card,
                             display: "flex",
                             alignItems: "center",
                             gap: 18,
@@ -154,15 +154,16 @@ export const Map: React.FC<{
                     >
                         {/* The hue is the domain, not decoration: e-commerce,
                             people, support, content. The shape of the schema is
-                            legible before a label is read. */}
+                            legible before a label is read. A dot before the
+                            word — the status grammar — not a coloured edge bar,
+                            which the chrome rules retired. */}
                         <span
                             style={{
-                                position: "absolute",
-                                left: 0,
-                                top: 0,
-                                bottom: 0,
-                                width: 4,
+                                width: 6,
+                                height: 6,
+                                borderRadius: 999,
                                 background: n.hue,
+                                flexShrink: 0,
                             }}
                         />
                         <div>

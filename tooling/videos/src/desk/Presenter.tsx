@@ -2,7 +2,7 @@ import React from "react";
 import { AbsoluteFill, Easing, interpolate, OffthreadVideo, staticFile, useCurrentFrame } from "remotion";
 import { beat } from "./beats";
 import { DESK_FRAMES_PER_WORD, DESK_NARRATION } from "./script";
-import { FONT, FRAME, INK } from "../theme";
+import { FONT, FRAME, INK, SURFACE } from "../theme";
 
 /**
  * THE PRESENTER — a person narrating to camera, in screen space, over the
@@ -121,7 +121,7 @@ export const Presenter: React.FC = () => {
                     borderRadius: FRAME.radius,
                     border: FRAME.border,
                     boxShadow: FRAME.boxShadow,
-                    background: "#0B0C0F",
+                    background: SURFACE.frame,
                     overflow: "hidden",
                     opacity: p.opacity,
                 }}

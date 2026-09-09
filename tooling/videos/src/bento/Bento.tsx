@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame } from "remotion";
 import { ENTER, ramp } from "../components/motion";
-import { GROUND, INK } from "../theme";
+import { GROUND, INK, RADIUS, SURFACE } from "../theme";
 
 /**
  * The bento: seven live views of the product in one rectangle.
@@ -98,7 +98,7 @@ export const TILES: Tile[] = [
     { file: "record", from: "up", delay: 0, at: 204, length: 594, atShort: 100 },
     { file: "tickets", from: "up", delay: 8, at: 30, length: 480, atShort: 42 },
     { file: "cards", from: "right", delay: 18, at: 40, length: 495, atShort: 153 },
-    { file: "expand", from: "right", delay: 24, at: 30, length: 455, atShort: 258 },
+    { file: "expand", from: "right", delay: 24, at: 30, length: 422, atShort: 230 },
 ];
 
 const ENTRY = 32;
@@ -128,9 +128,9 @@ const Cell: React.FC<{
                 top: rect.y,
                 width: rect.w,
                 height: rect.h,
-                borderRadius: 16,
-                border: `1px solid ${INK.rule}`,
-                background: "#000",
+                borderRadius: RADIUS.xl,
+                border: `1px solid ${SURFACE.hairline}`,
+                background: SURFACE.frame,
                 overflow: "hidden",
                 opacity: Math.min(1, t * 1.6),
                 // No shadow: seven of them across a grid this tight muddies the

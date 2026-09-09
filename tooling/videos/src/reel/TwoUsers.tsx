@@ -3,7 +3,7 @@ import { AbsoluteFill, useCurrentFrame } from "remotion";
 import { Stage } from "../components/Scene";
 import { Chapter, DisplayLine, DISPLAY } from "../components/Type";
 import { ramp } from "../components/motion";
-import { CHROMA, FONT, INK, TRACKING } from "../theme";
+import { CHROMA, FONT, INK, TRACKING, RADIUS, SURFACE } from "../theme";
 
 /**
  * CANDIDATE — the same query, twice.
@@ -70,9 +70,9 @@ export const Side: React.FC<{
                 top: y,
                 width: w,
                 height: PANEL.h,
-                borderRadius: 16,
-                border: `1px solid ${INK.rule}`,
-                background: "#000",
+                borderRadius: RADIUS.xl,
+                border: `1px solid ${SURFACE.hairline}`,
+                background: SURFACE.sheet,
                 overflow: "hidden",
                 opacity: up,
             }}
@@ -83,11 +83,12 @@ export const Side: React.FC<{
                     alignItems: "center",
                     gap: 14,
                     padding: "22px 26px",
-                    borderBottom: `1px solid ${INK.ruleSoft}`,
+                    /* A list header's rule is one of the lines that stays. */
+                    borderBottom: `1px solid ${SURFACE.hairline}`,
                 }}
             >
                 <span
-                    style={{ width: 10, height: 10, borderRadius: 999, background: accent, display: "block" }}
+                    style={{ width: 6, height: 6, borderRadius: 999, background: accent, display: "block" }}
                 />
                 <span style={{ fontFamily: FONT.body, fontSize: 22, fontWeight: 600, color: INK.high }}>
                     {who}
@@ -116,7 +117,8 @@ export const Side: React.FC<{
                             alignItems: "center",
                             gap: 20,
                             padding: "17px 26px",
-                            borderBottom: `1px solid ${INK.ruleSoft}`,
+                            /* Rows have no fill and no dividers: text on the
+                               sheet. Only a touched row would take a shape. */
                             opacity: t,
                             transform: t < 1 ? `translateY(${(1 - t) * 8}px)` : undefined,
                         }}

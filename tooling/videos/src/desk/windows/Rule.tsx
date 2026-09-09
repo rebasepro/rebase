@@ -3,7 +3,7 @@ import { Sequence, useCurrentFrame } from "remotion";
 import { Frame } from "../../components/Frame";
 import { Code, CodeCaption } from "../../components/Code";
 import { ramp, ENTER } from "../../components/motion";
-import { FONT } from "../../theme";
+import { FONT, SURFACE } from "../../theme";
 import { useTone } from "../../Plane";
 
 /**
@@ -79,7 +79,7 @@ const RuleBody: React.FC = () => {
             <div style={{ display: "flex", alignItems: "flex-start" }}>
                 <div style={{ width: 700, flexShrink: 0 }}>
                     <CodeCaption delay={FILE_AT}>config/collections/orders.ts</CodeCaption>
-                    <Frame delay={FILE_AT + 4} style={{ marginTop: 12 }} bodyStyle={{ padding: "24px 28px 0" }}>
+                    <Frame surface="well" delay={FILE_AT + 4} style={{ marginTop: 12 }} bodyStyle={{ padding: "24px 28px 0" }}>
                         {/* A window onto the file: it continues below the fold,
                             and the fold fades. The generated lines recede only
                             once the rule starts arriving — before that they are
@@ -94,7 +94,7 @@ const RuleBody: React.FC = () => {
                                     right: 0,
                                     bottom: 0,
                                     height: 90,
-                                    background: "linear-gradient(rgba(11,12,15,0), #0B0C0F)",
+                                    background: `linear-gradient(rgba(10,10,10,0), ${SURFACE.well})`,
                                 }}
                             />
                         </div>
@@ -109,7 +109,7 @@ const RuleBody: React.FC = () => {
 
                 <div style={{ flex: 1 }}>
                     <CodeCaption delay={POLICY_AT - 4}>drizzle/policies.sql</CodeCaption>
-                    <Frame delay={POLICY_AT} style={{ marginTop: 12 }} bodyStyle={{ padding: "24px 28px" }}>
+                    <Frame surface="well" delay={POLICY_AT} style={{ marginTop: 12 }} bodyStyle={{ padding: "24px 28px" }}>
                         <Code code={POLICY} sql delay={POLICY_AT + 14} step={3.5} size={16} />
                     </Frame>
                 </div>

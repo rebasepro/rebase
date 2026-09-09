@@ -267,7 +267,7 @@ async function renderClip(page, name, build, opts = {}) {
         // typed — a height of 629 failed the whole encode with "height not
         // divisible by 2" after the frames had already been rendered.
         "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-        "-c:v", "libx264", "-crf", "16", "-preset", "slow",
+        "-c:v", "libx264", "-crf", "14", "-preset", "slow",
         "-pix_fmt", "yuv420p", mp4,
     ]);
     console.log(`  ${name}.mp4 — ${n} frames, ${(n / FPS).toFixed(1)}s`);
@@ -559,28 +559,50 @@ Object.assign(CLIPS, {
         viewport: TALL,
         run: async ({ page, hold, scrollBy, clickOn }) => {
             await settleGrid(page, `${BASE}/c/orders`);
-            await hold(0.4);
-            await scrollBy(280, 2.0);      // past the stat cards, down to the rows
-            await clickOn(() => page.getByText(/^ORD-/).first(), 1.6, 0.9);
-            /* Work the PANEL, do not try to scroll it. Its content fits, so a
-               scroll moved zero pixels and the tile sat frozen for its last
-               nine seconds — measured, not guessed. Its tabs and its close are
-               the things that actually move.
+            await hold(0.6);
+            /* The table since the surface pass: a click on a cell focuses the
+               cell, spreadsheet-style, and the record opens from the pencil
+               that appears at the row's left on hover — the first of three
+               unlabeled buttons in the ID cell, which is the ORD cell's
+               previous sibling. Hover first, or the button is not in the DOM. */
+            const firstOrd = () => page.getByText(/^ORD-/).first();
+            /* Found by geometry, not by DOM: the ID cell's markup is not a
+               stable sibling of the ORD cell, but the pencil is always the
+               nearest button on the row band to the left of it. */
+            const pencilOf = async (ord) => {
+                await ord().hover();
+                await hold(0.3);
+                const b = await ord().boundingBox();
+                const pt = await page.evaluate((cell) => {
+                    const hit = [...document.querySelectorAll("button")]
+                        .map((e) => e.getBoundingClientRect())
+                        /* No left margin guard: at the tile's 600px the rail
+                           collapses and the pencil sits at x 17. */
+                        .filter((r) => r.width > 0 && r.x < cell.x && Math.abs(r.y + r.height / 2 - (cell.y + cell.height / 2)) < 24)
+                        .sort((a, c) => a.x - c.x)[0];
+                    return hit ? { x: Math.round(hit.x + hit.width / 2), y: Math.round(hit.y + hit.height / 2) } : null;
+                }, b);
+                if (!pt) throw new Error("no pencil on the hovered row");
+                return pt;
+            };
+            await clickOn(await pencilOf(firstOrd), 1.8, 0.9);
+            /* The record is a page now, with folder tabs. Its tabs and the
+               breadcrumb back to the list are the things that move.
                Settles are SHORT here on purpose: a three-second dwell after
                each click is fine in a full-frame clip and reads as a frozen
                tile at a sixth of the screen with six others moving. */
             await clickOn(() => page.getByRole("tab", { name: /order items/i }).first(), 1.6, 0.7);
             await clickOn(() => page.getByRole("tab", { name: /^order$/i }).first(), 1.2, 0.5);
-            await page.keyboard.press("Escape");
-            await hold(0.9);
-            await clickOn(() => page.getByText(/^ORD-/).nth(2), 1.4, 0.9);
+            const back = page.getByRole("link", { name: /^orders$/i }).first();
+            if (await back.count()) await clickOn(() => back, 1.2, 0.6);
+            else { await page.goBack(); await hold(1.2); }
+            const thirdOrd = () => page.getByText(/^ORD-/).nth(2);
+            await clickOn(await pencilOf(thirdOrd), 1.4, 0.9);
             /* End on movement. A window whose tail lands on a settle shows a
                frozen tile, and which part of the clip a tile lands on is set
                in Bento.tsx, not here — so the clip should not have a still
                ending to land on. */
-            await page.keyboard.press("Escape");
-            await hold(0.6);
-            await scrollBy(-240, 2.2);
+            await scrollBy(320, 2.4);
         },
     },
 });
@@ -596,7 +618,12 @@ const ctx = await browser.newContext({
     viewport: { width: 1280, height: 800 },
     storageState: stateFile,
     colorScheme: "dark",
-    deviceScaleFactor: 1,
+    /* 2, not 1: the viewports above are small so the app lays out densely,
+       and that is right — but at 1 a 680-wide tile had exactly as many pixels
+       as it showed, and every one of them went through two encodes. At 2 the
+       layout is identical and there are four times the pixels, which is what
+       a 4K render of the film actually shows. */
+    deviceScaleFactor: 2,
 });
 await ctx.addInitScript(CURSOR);
 const page = await ctx.newPage();

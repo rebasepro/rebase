@@ -1,6 +1,6 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
-import { FONT, FRAME, INK } from "../theme";
+import { FONT, FRAME, INK, SURFACE } from "../theme";
 import { useTone } from "../Plane";
 import { pop, SPRING } from "./motion";
 
@@ -25,7 +25,10 @@ export const Frame: React.FC<{
     /** Skip the spring — for a frame that is already on screen when the scene
      *  starts and should not re-enter. */
     still?: boolean;
-}> = ({ children, title, meta, delay = 0, width, style, bodyStyle, still }) => {
+    /** `sheet` for a window with UI in it; `well` for a terminal, a report or
+     *  a file — the inset surface, darker than the sheet on purpose. */
+    surface?: "sheet" | "well";
+}> = ({ children, title, meta, delay = 0, width, style, bodyStyle, still, surface = "sheet" }) => {
     const frame = useCurrentFrame();
     const { fps } = useVideoConfig();
     const p = still ? 1 : pop(frame, fps, delay, SPRING.card);
@@ -36,7 +39,7 @@ export const Frame: React.FC<{
                 width,
                 borderRadius: FRAME.radius,
                 border: FRAME.border,
-                background: FRAME.background,
+                background: surface === "well" ? SURFACE.well : SURFACE.sheet,
                 boxShadow: FRAME.boxShadow,
                 overflow: "hidden",
                 opacity: Math.min(1, p * 1.6),
@@ -51,15 +54,17 @@ export const Frame: React.FC<{
                         alignItems: "center",
                         gap: 8,
                         padding: "12px 18px",
-                        borderBottom: `1px solid ${INK.ruleSoft}`,
+                        borderBottom: `1px solid ${SURFACE.hairline}`,
                         fontFamily: FONT.mono,
                         fontSize: 14,
                         color: INK.muted,
                     }}
                 >
-                    <Dot color="rgba(244,63,94,0.7)" />
-                    <Dot color="rgba(251,191,36,0.7)" />
-                    <Dot color="rgba(52,211,153,0.7)" />
+                    {/* The window's own convention, kept quiet: chrome is
+                        monochrome and a hue is information, so these sit low. */}
+                    <Dot color="rgba(244,63,94,0.5)" />
+                    <Dot color="rgba(251,191,36,0.5)" />
+                    <Dot color="rgba(52,211,153,0.5)" />
                     <span style={{ marginLeft: 10 }}>{title}</span>
                     {meta && <div style={{ marginLeft: "auto" }}>{meta}</div>}
                 </div>

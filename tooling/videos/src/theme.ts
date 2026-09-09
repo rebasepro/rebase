@@ -158,15 +158,33 @@ export const TRACKING = {
     eyebrow: "0.22em",
 } as const;
 
-/** The one treatment every product surface gets. A demo that draws its own
- *  window chrome must not also get a frame head. */
+/** The surface ladder, dark theme, lifted from packages/ui/src/theme.css
+ *  (September 2026). Named by ROLE, never by a number: frame → sheet → card,
+ *  each a step lighter than what it sits on; `well` is the one surface that
+ *  goes down the ladder — an inset code well, a query, a log tail. */
+export const SURFACE = {
+    frame: "#0a0a0a",
+    sheet: "#131313",
+    card: "#181818",
+    raised: "#242424",
+    well: "#0a0a0a",
+    /** A hairline marks an object, not a region: cards on the sheet, fields,
+     *  a table header's rule. Rows, tiles inside a card and buttons get none. */
+    hairline: "rgba(255,255,255,0.08)",
+    hairlineStrong: "rgba(255,255,255,0.14)",
+} as const;
+
+/** Radius is proportional to what it rounds: chips and tiles md, controls
+ *  and list highlights lg, cards, sheets and windows xl. */
+export const RADIUS = { md: 6, lg: 9, xl: 13 } as const;
+
+/** The one treatment every product surface gets: a sheet with a hairline,
+ *  the card radius, and NO shadow — the ladder separates surfaces by a
+ *  lightness step, the way the panel does since the surface pass. A demo
+ *  that draws its own window chrome must not also get a frame head. */
 export const FRAME = {
-    radius: 14,
-    border: `1px solid ${INK.rule}`,
-    background: "#000000",
-    boxShadow: [
-        "inset 0 1px 0 rgba(255,255,255,0.05)",
-        "0 2px 8px rgba(0,0,0,0.5)",
-        "0 32px 72px -16px rgba(0,0,0,0.85)",
-    ].join(", "),
+    radius: RADIUS.xl,
+    border: `1px solid ${SURFACE.hairline}`,
+    background: SURFACE.sheet,
+    boxShadow: "none",
 } as const;

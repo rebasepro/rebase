@@ -54,6 +54,7 @@ await page
     .catch(() => {});
 
 const text = await page.evaluate(() => document.body.innerText);
+await ctx.storageState({ path: out });
 if (/privacy policy|sign in with email/i.test(text) || text.length < 1000) {
     console.error("LOGIN FAILED — still on the login page.");
     console.error(JSON.stringify(text.slice(0, 220)));
@@ -62,7 +63,7 @@ if (/privacy policy|sign in with email/i.test(text) || text.length < 1000) {
     process.exit(1);
 }
 
-await ctx.storageState({ path: out });
+
 console.log(`signed in — session saved to ${out}`);
 console.log(`  (${text.length} chars of panel content on /c/products)`);
 await browser.close();

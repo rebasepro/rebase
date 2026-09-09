@@ -36,7 +36,7 @@ export const Shell: React.FC<{
 }> = ({ x, y, w, at, pushAt, devAt }) => (
     <div style={{ position: "absolute", left: x, top: y, width: w }}>
         <Sequence from={at} layout="none">
-            <Frame title="zsh" delay={0} bodyStyle={{ padding: "22px 34px 24px" }}>
+            <Frame title="zsh" surface="well" delay={0} bodyStyle={{ padding: "22px 34px 24px" }}>
                 <Session
                     delay={12}
                     size={19}

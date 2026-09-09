@@ -187,7 +187,7 @@ const ScanBody: React.FC<{ rerunAt: number }> = ({ rerunAt }) => {
     const report2 = rerunAt + 4 + CMD.length * rate + 8;
 
     return (
-        <Frame title="rls-check · the same database" delay={0} bodyStyle={{ padding: "22px 30px 26px" }}>
+        <Frame title="rls-check · the same database" surface="well" delay={0} bodyStyle={{ padding: "22px 30px 26px" }}>
             {/* Bottom-anchored once it overflows, top-anchored before — the
                 same box as the shell's (Terminal.tsx). */}
             <div style={{ position: "relative", height: HEIGHT, overflow: "hidden" }}>

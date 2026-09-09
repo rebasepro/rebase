@@ -48,7 +48,7 @@ export const AgentConsole: React.FC<{ x: number; y: number; w: number; at: numbe
 const ConsoleBody: React.FC = () => {
     const frame = useCurrentFrame();
     return (
-        <Frame title="mcp · rebase-mcp-server" delay={0} bodyStyle={{ padding: "26px 34px 30px" }}>
+        <Frame title="mcp · rebase-mcp-server" surface="well" delay={0} bodyStyle={{ padding: "26px 34px 30px" }}>
             <div style={{ fontFamily: FONT.mono, fontSize: 20, lineHeight: 1.75 }}>
                 {LINES.map((l) => (
                     <div
