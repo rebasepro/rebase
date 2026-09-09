@@ -28,6 +28,7 @@ import {
     type DateProperty,
     type MapProperty,
     type NumberProperty,
+    type Properties,
     type Property,
     type ReferenceProperty,
     type RelationProperty,
@@ -517,8 +518,21 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
     // once, for every renderer.
     const enums: EnumPlan[] = [];
     const seenEnums = new Set<string>();
-    for (const collection of collections) {
-        for (const [propName, rawProp] of Object.entries(collection.properties ?? {})) {
+    /**
+     * Every enum type one table's properties declare, appended once.
+     *
+     * `declaredSchema` is passed rather than read off the config because a
+     * junction's synthetic collection carries `schema: "public"` as a resolved
+     * fact and not as a declaration — emitting it as one would make the
+     * generated file reach for a `pgSchema("public")` variable that exists for
+     * nobody.
+     */
+    const collectEnumTypes = (
+        collection: CollectionConfig,
+        properties: Properties,
+        declaredSchema: string | undefined
+    ): void => {
+        for (const [propName, rawProp] of Object.entries(properties)) {
             const prop = rawProp as Property;
             if (!("enum" in prop) || !prop.enum) continue;
             if (prop.type !== "string" && prop.type !== "number") continue;
@@ -537,11 +551,18 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
                 schema,
                 name,
                 qualified,
-                declaredSchema: isPostgresCollectionConfig(collection) ? collection.schema : undefined,
+                declaredSchema,
                 varName: getEnumVarName(getTableName(collection), propName),
                 labels
             });
         }
+    };
+    for (const collection of collections) {
+        collectEnumTypes(
+            collection,
+            (collection.properties ?? {}) as Properties,
+            isPostgresCollectionConfig(collection) ? collection.schema : undefined
+        );
     }
 
     // ── The table set ────────────────────────────────────────────────────────
@@ -567,12 +588,26 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
     }
 
     const junctionSpecs = resolveJunctionSpecs(collections);
+
+    // A junction's payload may declare an enum too, and the type it names is
+    // created by nobody else: no collection owns the table, so the loop above
+    // never sees the property. Appended after the collections' — the enum block
+    // is compared byte-for-byte against its committed copy, and a junction
+    // whose type interleaved with the collections' would reorder that file
+    // whenever a `through.properties` block moved.
+    for (const spec of junctionSpecs.values()) {
+        if (Object.keys(spec.properties).length === 0) continue;
+        collectEnumTypes(getJunctionCollectionConfig(spec), spec.properties, undefined);
+    }
+
     const triggerFunctionNeeded = { value: false };
 
     const tables: TablePlan[] = [];
     for (const [tableName, entry] of tableEntries) {
         tables.push(entry.junction
-            ? planJunctionTable(tableName, entry.junction.relation, entry.junction.source, junctionSpecs, resolveCollection)
+            ? planJunctionTable(
+                tableName, entry.junction.relation, entry.junction.source,
+                junctionSpecs, resolveCollection, triggerFunctionNeeded)
             : planCollectionTable(entry.collection, resolveCollection, triggerFunctionNeeded));
     }
 
@@ -642,45 +677,15 @@ function planCollectionTable(
             continue;
         }
 
-        const isId = isIdProperty(propName, prop, collection);
-        const column = resolveColumnName(propName, prop);
-        const type = columnPgType(propName, prop, collection, resolveCollection);
-        const required = prop.validation?.required === true;
-        const defaultValue = columnDefault(propName, prop, collection, type);
-        // On an auth collection, the columns auth itself reads and writes have
-        // exactly one definition wherever the table is created from — see
-        // `auth-users-columns`. Anything else there is an ordinary field.
-        const authDefinition = auth && !isId ? authUsersColumnDefinition(column) : undefined;
-
-        const plan: ColumnPlan = {
-            key: propName,
-            column,
-            type,
-            // A primary key is NOT NULL whether or not anyone writes it.
-            nullable: !(isId || required),
-            primaryKey: isId,
-            // `validation.unique` holds for every type. The Drizzle generator
-            // honoured it on `string` and `number` only, so a unique `date` or
-            // `map` was UNIQUE in the database and not in the file drizzle-kit
-            // plans from. A primary key gets neither UNIQUE nor NOT NULL —
-            // both are implied, and emitting them made drizzle-kit plan an
-            // extra constraint against a database `db push` built without one.
-            unique: !isId && prop.validation?.unique === true,
-            default: defaultValue,
-            sqlDefinition: authDefinition,
-            source: { kind: "property", propName, slug: collection.slug }
-        };
-        if (prop.type === "date" && (prop as DateProperty).autoValue === "on_update") {
-            plan.touchOnUpdate = true;
-            triggerFunctionNeeded.value = true;
-            triggers.push({
-                schema,
-                table,
-                column,
-                name: toPostgresIdentifier(`${table}_${column}_touch`)
-            });
-        }
-        columns.push(plan);
+        columns.push(planPropertyColumn(propName, prop, {
+            collection,
+            resolveCollection,
+            schema,
+            table,
+            auth,
+            triggers,
+            triggerFunctionNeeded
+        }));
     }
 
     // ── Auth columns the collection file never mentions ──────────────────────
@@ -781,6 +786,86 @@ function planCollectionTable(
         triggers,
         auth
     };
+}
+
+/** What {@link planPropertyColumn} needs about the table the column lands on. */
+interface PropertyColumnContext {
+    /** The collection, or the synthetic one standing in for a junction. */
+    collection: CollectionConfig;
+    resolveCollection: ResolveCollection;
+    schema: string;
+    /** Bare table name — the trigger name is derived from it. */
+    table: string;
+    /** Whether `auth-users-columns` owns this table's columns. */
+    auth: boolean;
+    /** Collected `BEFORE UPDATE` triggers, appended to. */
+    triggers: TriggerPlan[];
+    triggerFunctionNeeded: { value: boolean };
+}
+
+/**
+ * One declared, non-linking property, as a column.
+ *
+ * Extracted from {@link planCollectionTable} the moment a second table needed
+ * it: a `manyToMany`'s `through.properties` are columns on the junction, and
+ * "declared exactly like a collection's properties" has to mean the same code
+ * reads them, or it is a promise the next `columnType` or `defaultValue` change
+ * quietly breaks. A junction payload column therefore gets the type, the
+ * nullability, the default, the UNIQUE and the `on_update` trigger a collection
+ * column with the same declaration gets — because it is the same function
+ * answering.
+ *
+ * `relation` and `reference` do not come through here; they own a foreign key
+ * and are planned by {@link planRelationColumn} / {@link planReferenceColumn}.
+ * A junction payload may not declare either (config validation refuses it), so
+ * this is the whole of a payload column.
+ */
+function planPropertyColumn(
+    propName: string,
+    prop: Property,
+    ctx: PropertyColumnContext
+): ColumnPlan {
+    const { collection, resolveCollection, schema, table, auth } = ctx;
+
+    const isId = isIdProperty(propName, prop, collection);
+    const column = resolveColumnName(propName, prop);
+    const type = columnPgType(propName, prop, collection, resolveCollection);
+    const required = prop.validation?.required === true;
+    const defaultValue = columnDefault(propName, prop, collection, type);
+    // On an auth collection, the columns auth itself reads and writes have
+    // exactly one definition wherever the table is created from — see
+    // `auth-users-columns`. Anything else there is an ordinary field.
+    const authDefinition = auth && !isId ? authUsersColumnDefinition(column) : undefined;
+
+    const plan: ColumnPlan = {
+        key: propName,
+        column,
+        type,
+        // A primary key is NOT NULL whether or not anyone writes it.
+        nullable: !(isId || required),
+        primaryKey: isId,
+        // `validation.unique` holds for every type. The Drizzle generator
+        // honoured it on `string` and `number` only, so a unique `date` or
+        // `map` was UNIQUE in the database and not in the file drizzle-kit
+        // plans from. A primary key gets neither UNIQUE nor NOT NULL —
+        // both are implied, and emitting them made drizzle-kit plan an
+        // extra constraint against a database `db push` built without one.
+        unique: !isId && prop.validation?.unique === true,
+        default: defaultValue,
+        sqlDefinition: authDefinition,
+        source: { kind: "property", propName, slug: collection.slug }
+    };
+    if (prop.type === "date" && (prop as DateProperty).autoValue === "on_update") {
+        plan.touchOnUpdate = true;
+        ctx.triggerFunctionNeeded.value = true;
+        ctx.triggers.push({
+            schema,
+            table,
+            column,
+            name: toPostgresIdentifier(`${table}_${column}_touch`)
+        });
+    }
+    return plan;
 }
 
 /**
@@ -930,7 +1015,8 @@ function planJunctionTable(
     relation: ResolvedRelation,
     source: CollectionConfig,
     junctionSpecs: ReturnType<typeof resolveJunctionSpecs>,
-    resolveCollection: ResolveCollection
+    resolveCollection: ResolveCollection,
+    triggerFunctionNeeded: { value: boolean }
 ): TablePlan {
     if (!isManyToMany(relation)) {
         throw new Error(`Internal: junction table "${tableName}" was reached from a ${relation.kind} relation.`);
@@ -982,6 +1068,44 @@ function planJunctionTable(
 
     const columns = [endpoint(source, sourceColumn), endpoint(target, targetColumn)];
 
+    // ── The junction's own columns ───────────────────────────────────────────
+    // `through.properties`: the `role` on a membership, the `position` on a
+    // tag. Planned by the same {@link planPropertyColumn} the collection tables
+    // use, against the synthetic collection {@link getJunctionCollectionConfig}
+    // builds — so a payload property gets exactly the type, nullability,
+    // default, UNIQUE and enum type it would get on a table, and there is no
+    // second `switch (prop.type)` anywhere to disagree with the first.
+    //
+    // Not supported here, and deliberately: `indexes` (declared per collection,
+    // and no collection declares a junction), `search`, `vector`, and any
+    // linking property — a payload cannot be a `relation`, a `reference` or a
+    // `vector`. Config validation refuses those with the relation named; this
+    // would otherwise reach `columnPgType` and produce a column no writer knows
+    // how to fill.
+    const triggers: TriggerPlan[] = [];
+    if (spec && Object.keys(spec.properties).length > 0) {
+        const junctionCollection = getJunctionCollectionConfig(spec);
+        const keyColumns = new Set([sourceColumn, targetColumn]);
+        for (const [propName, rawProp] of Object.entries(spec.properties)) {
+            const prop = rawProp as Property;
+            const plan = planPropertyColumn(propName, prop, {
+                collection: junctionCollection,
+                resolveCollection,
+                schema,
+                table,
+                auth: false,
+                triggers,
+                triggerFunctionNeeded
+            });
+            // A payload column that resolves onto a key column would be a
+            // second definition of it — refused by `checkJunctionPayload` at
+            // boot, and skipped here so a config that got past it still
+            // produces a table rather than a duplicate-column CREATE.
+            if (keyColumns.has(plan.column)) continue;
+            columns.push(plan);
+        }
+    }
+
     // Junction tables are generated tables like any other: locked by default,
     // with derived policies — reads follow the endpoints' visibility, writes
     // follow the declaring side's update rules. Without them they were the one
@@ -1004,7 +1128,7 @@ function planJunctionTable(
         indexes: [],
         vectorColumns: [],
         policies,
-        triggers: [],
+        triggers,
         auth: false
     };
 }

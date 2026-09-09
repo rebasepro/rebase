@@ -26,7 +26,7 @@
 import type { PgTable } from "drizzle-orm/pg-core";
 import type { Relations } from "drizzle-orm";
 import { CollectionConfig } from "@rebasepro/types";
-import { fieldKeyForColumn, getTableName, resolveJunctionSpecs } from "@rebasepro/common";
+import { fieldKeyForColumn, getJunctionCollectionConfig, getTableName, resolveJunctionSpecs } from "@rebasepro/common";
 
 import { buildDrizzleRelationsFromSchema, buildDrizzleTablesFromSchema, type ColumnKeyResolver } from "./dynamic-tables";
 import { bareTableName, buildDrizzleRelationsFromCollections } from "./config-relations";
@@ -54,8 +54,13 @@ export function schemaOfCollection(collection: CollectionConfig, fallback: strin
  *  - the generated search columns keep their raw names, because `search_vector`
  *    is how `searchColumnNames` excludes them from responses and how the
  *    condition builder finds the one to match against;
- *  - a table no collection claims (a junction) is keyed by its columns, which is
- *    also what the generated file does for them.
+ *  - a table no collection claims (a junction) is keyed by its **key** columns'
+ *    names, which is also what the generated file does for them — but a
+ *    junction that declares `through.properties` keys those payload columns by
+ *    their property key, for the same reason a collection does. `joinedAt` with
+ *    `columnName: "joined_at"` has to be one name on both sides or a `_pivot`
+ *    write is silently dropped by drizzle and the read serves a key the caller
+ *    never declared.
  */
 export function columnKeysFromCollections(
     collections: CollectionConfig[]
@@ -68,9 +73,20 @@ export function columnKeysFromCollections(
         byTable.set(table, collection);
         rawColumns.set(table, new Set(searchColumnNames(collection)));
     }
+    // The junctions' payload columns, as the synthetic collection that owns
+    // them — the same one the planner emitted the columns from, so the runtime
+    // table and the generated one cannot key them differently.
+    const junctionByTable = new Map<string, CollectionConfig>();
+    for (const spec of resolveJunctionSpecs(collections).values()) {
+        if (Object.keys(spec.properties).length === 0) continue;
+        junctionByTable.set(bareTableName(spec.table), getJunctionCollectionConfig(spec));
+    }
     return (tableName, columnName) => {
         const collection = byTable.get(tableName);
-        if (!collection) return columnName;
+        if (!collection) {
+            const junction = junctionByTable.get(tableName);
+            return junction ? fieldKeyForColumn(junction, columnName) : columnName;
+        }
         if (rawColumns.get(tableName)?.has(columnName)) return columnName;
         return fieldKeyForColumn(collection, columnName);
     };

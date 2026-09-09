@@ -14,9 +14,14 @@
  * own collection reads. These tests pin the agreement rather than the old
  * omission — they compare what ensure plans against what the generator writes.
  */
+import { PGlite } from "@electric-sql/pglite";
 import { CollectionConfig } from "@rebasepro/types";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
-import { planCollectionSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-collection-tables";
+import {
+    planCollectionSchemaEnsure,
+    readExistingSchema,
+    type ExistingSchema
+} from "../src/schema/ensure-collection-tables";
 
 const authors: CollectionConfig = {
     slug: "authors",
@@ -323,5 +328,156 @@ describe("boot-ensure agrees with db push", () => {
                 expect(columns.get("bio")).toBe("TEXT");
             }
         });
+    });
+
+    // ── A junction that carries its own columns ──────────────────────────────
+    //
+    // Against a real Postgres, because the claims are about what the database
+    // ends up holding: `db push` and boot-ensure both create `org_members` with
+    // a `role` that is NOT NULL with a DEFAULT, and boot-ensure adds that same
+    // column to a junction that already exists — which is the case a plain
+    // `ADD COLUMN <type>` got wrong, dropping the default and then either
+    // omitting the NOT NULL or applying it to rows that have no value.
+    describe("a `through.properties` junction, applied to a live database", () => {
+        const orgs = {
+            slug: "orgs", table: "orgs", name: "Orgs",
+            properties: { id: { type: "string", isId: "uuid" }, name: { type: "string" } }
+        } as unknown as CollectionConfig;
+
+        const withPayload = (properties: Record<string, unknown>): CollectionConfig => ({
+            slug: "people", table: "people", name: "People",
+            properties: {
+                id: { type: "string", isId: "uuid" },
+                handle: { type: "string" },
+                orgs: {
+                    type: "relation",
+                    relation: {
+                        kind: "manyToMany",
+                        target: () => orgs,
+                        relationName: "orgs",
+                        through: {
+                            table: "org_members",
+                            sourceColumn: "person_id",
+                            targetColumn: "org_id",
+                            properties
+                        }
+                    }
+                }
+            }
+        } as unknown as CollectionConfig);
+
+        const rolePayload = {
+            role: {
+                type: "string",
+                enum: ["owner", "member"],
+                defaultValue: "member",
+                validation: { required: true }
+            }
+        };
+
+        /** `<type>[ NOT NULL][ DEFAULT …]` for one column, straight out of the catalogue. */
+        const liveColumns = async (db: PGlite, table: string): Promise<Map<string, string>> => {
+            const { rows } = await db.query<{
+                column_name: string; data_type: string; udt_name: string;
+                is_nullable: string; column_default: string | null;
+            }>(
+                "SELECT column_name, data_type, udt_name, is_nullable, column_default " +
+                "FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1",
+                [table]
+            );
+            return new Map(rows.map(r => [
+                r.column_name,
+                [
+                    r.data_type === "USER-DEFINED" ? r.udt_name : r.data_type,
+                    r.is_nullable === "NO" ? "NOT NULL" : "",
+                    r.column_default ? `DEFAULT ${r.column_default}` : ""
+                ].filter(Boolean).join(" ")
+            ]));
+        };
+
+        /**
+         * The RLS helpers the derived policies call. Created by the auth boot
+         * step in a real database; stubbed here so a `CREATE POLICY` that names
+         * them parses.
+         */
+        const bootstrapRls = async (db: PGlite): Promise<void> => {
+            await db.exec(
+                "CREATE SCHEMA IF NOT EXISTS rebase;" +
+                "CREATE OR REPLACE FUNCTION rebase.uid() RETURNS text LANGUAGE sql STABLE AS $$ SELECT NULL::text $$;" +
+                "CREATE OR REPLACE FUNCTION rebase.roles() RETURNS text LANGUAGE sql STABLE AS $$ SELECT ''::text $$;"
+            );
+        };
+
+        /** Apply a plan's statements in order, as boot-ensure does. */
+        const apply = async (db: PGlite, statements: string[]): Promise<void> => {
+            await bootstrapRls(db);
+            for (const statement of statements) await db.exec(statement);
+        };
+
+        const asQueryable = (db: PGlite) => ({
+            query: <R,>(text: string, values?: unknown[]) =>
+                db.query<R>(text, values as unknown[]) as Promise<{ rows: R[] }>
+        });
+
+        it("ends up with the same columns whichever path created the table", async () => {
+            const collections = [orgs, withPayload(rolePayload)];
+
+            const pushed = new PGlite();
+            const booted = new PGlite();
+            try {
+                await bootstrapRls(pushed);
+                await pushed.exec(await generatePostgresDdl(collections));
+                await apply(booted, planCollectionSchemaEnsure(collections, emptyDb()).statements);
+
+                const fromPush = await liveColumns(pushed, "org_members");
+                const fromBoot = await liveColumns(booted, "org_members");
+
+                expect([...fromBoot.keys()].sort()).toEqual([...fromPush.keys()].sort());
+                expect(fromBoot.get("role")).toEqual(fromPush.get("role"));
+                // Not merely "the same on both paths" — the right thing on both.
+                expect(fromPush.get("role")).toContain("NOT NULL");
+                expect(fromPush.get("role")).toContain("DEFAULT 'member'");
+                expect(fromPush.get("role")).toContain("org_members_role");
+            } finally {
+                await pushed.close();
+                await booted.close();
+            }
+        });
+
+        it("adds a payload column to a junction that already exists, with its default", async () => {
+            const before = [orgs, withPayload({})];
+            const after = [orgs, withPayload(rolePayload)];
+
+            const db = new PGlite();
+            try {
+                // A junction created before the payload was declared, holding a
+                // link — so NOT NULL cannot be applied blind.
+                await apply(db, planCollectionSchemaEnsure(before, emptyDb()).statements);
+                await db.exec(
+                    "INSERT INTO public.orgs (id, name) VALUES ('11111111-1111-1111-1111-111111111111', 'Acme');" +
+                    "INSERT INTO public.people (id, handle) VALUES ('22222222-2222-2222-2222-222222222222', 'ada');" +
+                    "INSERT INTO public.org_members (person_id, org_id) VALUES " +
+                    "('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111');"
+                );
+
+                const existing = await readExistingSchema(asQueryable(db), ["public", "rebase"]);
+                const plan = planCollectionSchemaEnsure(after, existing);
+                await apply(db, plan.statements);
+
+                const columns = await liveColumns(db, "org_members");
+                // The column arrives WITH its default — that is what makes the
+                // NOT NULL safe on a table that already holds a link, and it is
+                // what a bare `ADD COLUMN <type>` dropped.
+                expect(columns.get("role")).toContain("DEFAULT 'member'");
+                expect(columns.get("role")).toContain("NOT NULL");
+
+                // …and the row that predates the column is backfilled by it
+                // rather than left holding NULL.
+                const { rows } = await db.query<{ role: string }>("SELECT role FROM public.org_members");
+                expect(rows).toEqual([{ role: "member" }]);
+            } finally {
+                await db.close();
+            }
+        }, 30_000);
     });
 });

@@ -116,7 +116,11 @@ export function resolveRelation(
                     // table without having to agree in advance.
                     table: relation.through?.table ?? [sourceTable, targetTable].sort().join("_"),
                     sourceColumn: relation.through?.sourceColumn ?? generateForeignKeyName(sourceName),
-                    targetColumn: relation.through?.targetColumn ?? generateForeignKeyName(relationName)
+                    targetColumn: relation.through?.targetColumn ?? generateForeignKeyName(relationName),
+                    // `{}` rather than `undefined`, for the reason every other
+                    // field here is filled in: a consumer reads one shape and
+                    // does not have to decide what an absent payload means.
+                    properties: relation.through?.properties ?? {}
                 }
             };
         }

@@ -261,6 +261,64 @@ export const tags: CollectionConfig = C({
         { kind: "manyToMany", relationName: "posts", target: () => posts, through: { table: "post_tags", sourceColumn: "tag_id", targetColumn: "post_id" } }
     ]
 });
+// ── A junction that carries its own columns ──────────────────────────────────
+// `through.properties` — the payload on the link rather than on either end.
+// The point of the pair is that a payload column is planned by the same code a
+// collection's is, so every option that can differ is exercised: a required
+// enum with a default, a camelCase key whose column is snake_case, a UNIQUE, a
+// nullable number, and a date with `autoValue: "on_update"` (which puts a
+// trigger on a table no collection declares). Declared from BOTH sides, with
+// the payload written once — the shape the docs recommend.
+export const orgs: CollectionConfig = C({
+    slug: "orgs", table: "orgs", name: "Orgs",
+    properties: {
+        id: { type: "string", isId: "uuid" },
+        name: { type: "string" },
+        members: { type: "relation", relationName: "members" }
+    },
+    relations: [
+        {
+            kind: "manyToMany",
+            relationName: "members",
+            target: () => people,
+            through: {
+                table: "org_members",
+                sourceColumn: "org_id",
+                targetColumn: "person_id",
+                properties: {
+                    role: {
+                        type: "string",
+                        enum: ["owner", "admin", "member"],
+                        defaultValue: "member",
+                        validation: { required: true }
+                    },
+                    seat: { type: "number", validation: { integer: true, unique: true } },
+                    joinedAt: { type: "date", columnName: "joined_at" },
+                    touchedAt: { type: "date", columnName: "touched_at", autoValue: "on_update" }
+                }
+            }
+        }
+    ]
+});
+export const people: CollectionConfig = C({
+    slug: "people", table: "people", name: "People",
+    properties: {
+        id: { type: "number", isId: "increment" },
+        handle: { type: "string" },
+        orgs: { type: "relation", relationName: "orgs" }
+    },
+    relations: [
+        // The inverse side names the same junction and declares no payload:
+        // the columns are the junction's, not one side's.
+        {
+            kind: "manyToMany",
+            relationName: "orgs",
+            target: () => orgs,
+            through: { table: "org_members", sourceColumn: "person_id", targetColumn: "org_id" }
+        }
+    ]
+});
+
 // Relation with no explicit localKey (derived) and a relation property carrying columnName
 export const derivedFk: CollectionConfig = C({
     slug: "derived_fk", table: "derived_fk", name: "x",
@@ -345,6 +403,7 @@ export const groups: Record<string, CollectionConfig[]> = {
     misc: [misc],
     refs: [refs, uuidTarget, intTarget, textTarget],
     relations: [authors, profiles, posts, comments, tags, derivedFk],
+    junctionPayload: [orgs, people],
     enumRec: [strEnumRec, numEnumRec],
     uuidOnly: [uuidOnly],
     smallintOnly: [smallintOnly],

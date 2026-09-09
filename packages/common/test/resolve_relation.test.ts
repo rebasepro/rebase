@@ -66,7 +66,7 @@ describe("resolveRelation — defaults", () => {
             kind: "manyToMany", relationName: "tags", target: () => tags,
             through: { table: "j", sourceColumn: "p", targetColumn: "t" }
         }, posts);
-        expect(r.kind === "manyToMany" && r.through).toEqual({ table: "j", sourceColumn: "p", targetColumn: "t" });
+        expect(r.kind === "manyToMany" && r.through).toEqual({ table: "j", sourceColumn: "p", targetColumn: "t", properties: {} });
     });
 
     it("marks `via` unwritable and shared", () => {

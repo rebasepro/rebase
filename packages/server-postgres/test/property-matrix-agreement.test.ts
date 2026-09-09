@@ -306,8 +306,11 @@ describe("the three emitters agree, column by column", () => {
         let compared = 0;
 
         for (const table of planSchema(everything).tables) {
-            if (table.kind !== "collection") continue;
             for (const plannedColumn of table.columns) {
+                // A junction's two key columns have their own case below; its
+                // `through.properties` columns are compared here with the rest,
+                // because "declared exactly like collection properties" is a
+                // claim about these three emitters and not only about the plan.
                 // Only the columns a declared property owns. The implicit id,
                 // the generated search columns and the auth contract's own
                 // columns are compared by the "which columns each table has"
@@ -331,7 +334,7 @@ describe("the three emitters agree, column by column", () => {
                 const rendered = (facts: ColumnFacts): string => JSON.stringify(facts);
                 if (rendered(fromDrizzle) !== rendered(ddlFacts) || rendered(ddlFacts) !== rendered(ensureFacts)) {
                     disagreements.push(
-                        `${table.slug}.${plannedColumn.source.propName} → ${key}\n` +
+                        `${table.slug ?? table.table}.${plannedColumn.source.propName} → ${key}\n` +
                         `        drizzle: ${rendered(fromDrizzle)}\n` +
                         `        db push: ${rendered(ddlFacts)}\n` +
                         `        ensure : ${rendered(ensureFacts)}`
@@ -375,6 +378,48 @@ describe("the three emitters agree, column by column", () => {
         expect(fromEnsure.get("public.post_tags")!.get("tag_id")).toEqual(fromDdl.get("public.post_tags")!.get("tag_id"));
         expect(drizzle).toContain('post_id: integer("post_id").notNull()');
         expect(drizzle).toContain('tag_id: uuid("tag_id").notNull()');
+    });
+
+    it("on a junction's own `through.properties` columns", () => {
+        const fromDdl = ddlColumns(ddl);
+        const fromEnsure = ensureColumns(ensure);
+        const junction = "public.org_members";
+
+        // Every payload column exists on both SQL paths, with the same facts.
+        for (const column of ["role", "seat", "joined_at", "touched_at"]) {
+            expect(fromDdl.get(junction)!.get(column)).toBeDefined();
+            expect(fromEnsure.get(junction)!.get(column)).toEqual(fromDdl.get(junction)!.get(column));
+        }
+
+        // …and they are the facts the property declared, not a junction
+        // column's defaults: an enum type of its own, NOT NULL with a DEFAULT,
+        // a UNIQUE, and a nullable timestamp.
+        expect(fromDdl.get(junction)!.get("role")!.type).toBe('"public"."org_members_role"');
+        expect(fromDdl.get(junction)!.get("role")!.nullable).toBe(false);
+        expect(fromDdl.get(junction)!.get("role")!.default).toBe("'member'");
+        expect(fromDdl.get(junction)!.get("seat")!.unique).toBe(true);
+        expect(fromDdl.get(junction)!.get("joined_at")!.nullable).toBe(true);
+
+        // The enum type is created — no collection owns this table, so nothing
+        // else would have emitted it.
+        expect(ddl).toContain('CREATE TYPE "public"."org_members_role" AS ENUM');
+
+        // The Drizzle file keys them by the property key, not the column: a
+        // `_pivot` write goes through the drizzle object and a key that does
+        // not exist there is dropped from the statement in silence.
+        expect(drizzle).toContain('joinedAt: timestamp("joined_at"');
+        expect(drizzle).toContain('seat: integer("seat").unique()');
+
+        // `autoValue: "on_update"` puts its trigger on the junction too. It
+        // lives in `triggers.sql` rather than `schema.sql` (a trigger is a
+        // function plus a binding, which Atlas does not manage), so the plan is
+        // where the three emitters read it from.
+        const junctionPlan = planSchema(everything).tables.find(t => t.table === "org_members")!;
+        expect(junctionPlan.kind).toBe("junction");
+        expect(junctionPlan.triggers.map(t => t.name)).toEqual(["org_members_touched_at_touch"]);
+        // The two key columns are still the whole primary key: a payload column
+        // is a column on the link, not part of its identity.
+        expect(junctionPlan.primaryKey).toEqual(["org_id", "person_id"]);
     });
 
     it("on which Postgres enum types exist", () => {

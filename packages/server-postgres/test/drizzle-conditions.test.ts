@@ -793,7 +793,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
             expect(rel.kind === "manyToMany" && rel.through).toEqual({
 
-                table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id"
+                table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id", properties: {}
 
             });
 

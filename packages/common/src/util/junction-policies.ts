@@ -1,7 +1,10 @@
 import {
     CollectionConfig,
+    JUNCTION_PIVOT_KEY,
     PolicyExpression,
     PolicyOperand,
+    Properties,
+    Property,
     Relation,
     SecurityRule,
     isPostgresCollectionConfig,
@@ -89,6 +92,15 @@ export interface JunctionSpec {
     endpoints: [JunctionEndpoint, JunctionEndpoint];
     /** Every collection that declares a relation through this table. */
     declaringSides: JunctionDeclaringSide[];
+    /**
+     * The junction's own columns beyond the two keys — `through.properties`,
+     * merged across every declaring side. `{}` when there are none.
+     *
+     * See {@link ManyToManyRelation.through} for what they are; every side that
+     * names a key has to describe the same column, which is checked when the
+     * specs are resolved rather than left for `CREATE TABLE` to discover.
+     */
+    properties: Properties;
 }
 
 // Mirrors auth-default-policies: the server context or an admin.
@@ -139,10 +151,18 @@ export function resolveJunctionSpecs(collections: CollectionConfig[]): Map<strin
                     table,
                     schema,
                     endpoints: [source, target],
-                    declaringSides: [source]
+                    declaringSides: [source],
+                    properties: mergeJunctionPayload({}, relation.through.properties, table, collection)
                 });
-            } else if (!existing.declaringSides.some(s => s.collection === collection)) {
-                existing.declaringSides.push(source);
+            } else {
+                // Merged whether or not this side is new: the same collection
+                // can reach one junction under two relation names, and the
+                // columns each of them asks for all have to exist.
+                existing.properties = mergeJunctionPayload(
+                    existing.properties, relation.through.properties, table, collection);
+                if (!existing.declaringSides.some(s => s.collection === collection)) {
+                    existing.declaringSides.push(source);
+                }
             }
         }
     }
@@ -151,10 +171,53 @@ export function resolveJunctionSpecs(collections: CollectionConfig[]): Map<strin
 }
 
 /**
+ * Fold one side's `through.properties` into the junction's, refusing a
+ * disagreement rather than picking a winner.
+ *
+ * Both ends of a link may declare it — `posts.tags` and `tags.posts` are one
+ * junction — and each end may name the payload. Only one table gets created, so
+ * two descriptions of `role` that are not the same description are a question
+ * with no correct answer: whichever won, one of the two collections would be
+ * writing through a column it does not think it has. Compared structurally, so
+ * two sides that spell the same property twice (the normal case, and the one
+ * the docs recommend) are fine.
+ */
+function mergeJunctionPayload(
+    into: Properties,
+    incoming: Properties | undefined,
+    table: string,
+    collection: CollectionConfig
+): Properties {
+    if (!incoming || Object.keys(incoming).length === 0) return into;
+    const merged: Properties = { ...into };
+    for (const [key, property] of Object.entries(incoming)) {
+        const already = merged[key as keyof Properties] as Property | undefined;
+        if (already && JSON.stringify(already) !== JSON.stringify(property)) {
+            throw new Error(
+                `The junction table "${table}" is declared from more than one side, and they disagree ` +
+                `about the payload column "${key}": "${collection.slug ?? collection.name}" describes it ` +
+                "differently than another declaring collection does. One table is created, so both " +
+                "`through.properties` blocks have to describe the same column — or only one side should " +
+                "declare it."
+            );
+        }
+        (merged as Record<string, Property>)[key] = property as Property;
+    }
+    return merged;
+}
+
+/**
  * A synthetic CollectionConfig standing in for the junction during policy
  * compilation and naming. Its two FK columns carry explicit `columnName`s so
  * `outerField` operands resolve to the exact columns the CREATE TABLE emitted,
  * whatever their casing.
+ *
+ * The payload columns are here too, exactly as authored. That is what lets one
+ * reading of a `Property` serve the junction as well as a collection: the
+ * schema planner plans these columns with the same function it plans a
+ * collection's with, and the write path validates a `_pivot` against them with
+ * the same validator a row's values go through. A second description of a
+ * payload column anywhere is a second description that can disagree.
  */
 export function getJunctionCollectionConfig(spec: JunctionSpec): CollectionConfig {
     const properties: Record<string, unknown> = {};
@@ -163,6 +226,13 @@ export function getJunctionCollectionConfig(spec: JunctionSpec): CollectionConfi
             type: "string",
             columnName: endpoint.junctionColumn
         };
+    }
+    // After the keys, so a payload property that collides with a key column
+    // cannot quietly replace it — `checkJunctionPayload` refuses that config at
+    // boot, and this ordering means the key column survives if one gets past.
+    for (const [key, property] of Object.entries(spec.properties)) {
+        if (key === JUNCTION_PIVOT_KEY || key in properties) continue;
+        properties[key] = property;
     }
     return {
         slug: spec.table,

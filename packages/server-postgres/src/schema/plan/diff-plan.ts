@@ -614,6 +614,19 @@ export function diffPlanAgainstCatalogue(
         if (created.has(table.qualified)) continue;
         for (const column of table.columns) {
             if (renameLegacyColumn(table, column)) continue;
+            // A payload column (`through.properties`) goes through `planColumn`,
+            // the same pass a collection's scalar columns take. The bare
+            // `ADD COLUMN <type>` below is right for the two key columns — they
+            // are NOT NULL by the composite primary key and have no default —
+            // and wrong for everything else: it would drop a `defaultValue`, and
+            // it would either omit a NOT NULL the collection declared or apply
+            // one to a junction that already holds rows without a value to
+            // backfill them. `planColumn` is the one place that decides which of
+            // those is safe, and it reports the constraint it withheld.
+            if (column.source.kind === "property") {
+                planColumn(table, column);
+                continue;
+            }
             addColumn(table, column.column, renderPgType(column.type));
         }
     }
