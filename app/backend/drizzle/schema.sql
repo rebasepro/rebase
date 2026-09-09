@@ -69,7 +69,8 @@ CREATE TABLE "public"."exercises" (
   "is_featured" BOOLEAN,
   "status" "public"."exercises_status" DEFAULT 'draft' NOT NULL,
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now()
+  "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  "order" TEXT
 );
 
 CREATE TABLE "public"."order_items" (
@@ -155,7 +156,8 @@ CREATE TABLE "public"."products" (
   "status" "public"."products_status" DEFAULT 'draft' NOT NULL,
   "is_featured" BOOLEAN,
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now()
+  "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  "order" TEXT
 );
 
 CREATE TABLE "public"."tags" (
