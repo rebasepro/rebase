@@ -11,7 +11,9 @@ about the product — what you get — not about the scan, which is the hook's
 device and not the point.
 
 **Friendly and professional.** One engineer showing another something they
-built. Brisk, warm, present tense. Every line is a sentence.
+built. Brisk, warm, present tense. Every sentence has a subject and a verb:
+no imperative standing in for a sentence ("You push it", not "Push it"),
+no list standing in for one, no participle where a verb should be.
 
 **About 200 words a minute, with room.** Nine frames a word, a breath between
 lines, and a beat after every picture — the montages get five to six seconds
@@ -21,7 +23,7 @@ each. The one joint that is exact: the green line prints just before you say
 **It opens on you, already talking.** No logo, no pause. You are on screen
 from the first frame and the first word is half a second in.
 
-Total: **3510 frames = 117.0 seconds** at 30fps · 333 words · 171 words a
+Total: **3510 frames = 117.0 seconds** at 30fps · 341 words · 175 words a
 minute over the whole run, silences included.
 
 ## The script
@@ -30,17 +32,17 @@ minute over the whole run, silences included.
 |---|------|--------|-------|------|-------|
 | 01 | You, to camera | 0.5s | 15 | It's 2026. Anyone can build a backend in an afternoon. But can you trust it? | 0.6s |
 | 02 | The evidence | 5.6s | 35 | A coding agent built this one. It says it's done: auth, CRUD for nine tables, a REST API, deployed. And a ten-second scan of the same database finds nine critical issues. Every table is open. | 1.5s — the tally sits |
-| 03 | What Rebase does | 17.5s | 28 | Rebase starts from the database you already have. One command reads every table and writes a typed collection file for each one. Your schema, as code, in seconds. | 0.6s |
+| 03 | What Rebase does | 17.5s | 28 | Rebase starts from the database you already have. One command reads every table and writes a typed collection file for each one. Your schema becomes code, in seconds. | 0.6s |
 | 04 | The rule | 26.5s | 40 | Access rules live in that file, right next to the table they protect. This one says customers only see their own orders. Rebase compiles it into a Postgres policy, so the database enforces it on every query, from every client. | 0.7s |
-| 05 | The same scan | 39.2s | 12 | Push it, run the same scan again, and it comes back clean. | 1.2s — the clean report sits |
-| 06 | Run it → two people | 44.0s | 30 | Then run it, and every request is answered by the database itself. Robert sees his own orders. Dana, in support, sees them all. Same query. Postgres decides who sees what. | 1.2s |
-| 07 | The agent | 54.2s | 26 | Give an agent a key, and it gets exactly the permissions on that key, and nothing more. The rules hold no matter what the prompt says. | 1.2s |
+| 05 | The same scan | 39.2s | 14 | You push it, you run the same scan again, and it comes back clean. | 1.2s — the clean report sits |
+| 06 | Run it → two people | 44.0s | 33 | Then you run it, and every request is answered by the database itself. Robert sees his own orders. Dana, in support, sees them all. It is the same query. Postgres decides who sees what. | 1.2s |
+| 07 | The agent | 54.2s | 27 | You give an agent a key, and it gets exactly the permissions on that key, and nothing more. The rules hold no matter what the prompt says. | 1.2s |
 | 08 | The panel | 63.2s | 24 | And your team gets an admin panel on day one, generated from the same files, with the same rules. Nobody had to build it. | 1.9s — the montage plays |
-| 09 | Every view | 72.3s | 13 | Boards, tables, cards and forms: every collection gets the views that fit it. | 2.1s — the bento plays |
-| 10 | The schema | 78.3s | 12 | The schema, read live from your database, so it is always current. | 1.9s |
-| 11 | Studio | 83.8s | 18 | And a place to work on the database itself: SQL, schema, policies and logs, in the same app. | 0.9s |
-| 12 | The wall | 90.1s | 39 | And that's the short version. There's also realtime sync, one SDK with the same shape on the server, in the browser and in an agent, a visual collection editor that writes your TypeScript, storage, functions, jobs, search and cron. | 0.4s |
-| 13 | Close | 102.8s | 41 | Rebase is open source, and runs on your laptop, your own servers or any cloud. Point it at the Postgres you already have, and you get the whole backend: a typed API, an admin panel, and rules the database itself enforces. | — |
+| 09 | Every view | 72.3s | 13 | Every collection gets the views that fit it: boards, tables, cards and forms. | 2.1s — the bento plays |
+| 10 | The schema | 78.3s | 13 | The schema is read live from your database, so it is always current. | 1.9s |
+| 11 | Studio | 83.8s | 17 | And you can work on the database itself in the same app: SQL, schema, policies and logs. | 0.9s |
+| 12 | The wall | 90.1s | 40 | And that's the short version. There's also realtime sync, one isomorphic SDK with the same shape on the server, in the browser and in an agent, a visual collection editor that writes your TypeScript, storage, functions, jobs, search and cron. | 0.4s |
+| 13 | Close | 102.8s | 42 | Rebase is open source, and runs on your laptop, your own servers or any cloud. You point it at the Postgres you already have, and you get the whole backend: a typed API, an admin panel, and rules the database itself enforces. | — |
 
 ## Timing, beat by beat
 
