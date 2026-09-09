@@ -52,6 +52,21 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 - Storage enforces a property's `maxSize` and `acceptedFiles` **on the server**,
   not only in the browser.
 
+- **The MCP server is published to the MCP Registry.** `@rebasepro/mcp` has
+  carried its `mcpName` since it was written, but nothing ever published a
+  `server.json` against it — the name was reserved on npm and claimed nowhere,
+  so the server was absent from the registry every MCP client searches to offer
+  an install.
+
+- **Usage sharing reports deploys and failures.** `cli.deploy` and `cli.error`
+  were declared and never recorded, so a consenting user reported scaffolding
+  and dev servers but never whether they shipped or whether anything broke.
+  `cli.error` carries the command and the error's *type*, never its message —
+  a message is usually a path or a connection string. `rebase init` also asks
+  again on a machine that previously declined; it never re-asks one that
+  accepted, and `DO_NOT_TRACK`, `CI` and a project's `"telemetry": false` still
+  suppress it outright.
+
 ### Changed
 
 - **One interpreter, three renderers.** `Property` → SQL had three independent
@@ -62,6 +77,15 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 - Studio and the panel join the surface ladder: surface roles, chrome
   discipline, and a density pass across the editors.
+
+- **A scaffolded project is built with TypeScript 6.** Every workspace package
+  was already there; the templates pinned `^5.9.2`, two majors behind, so a new
+  project's first install warned about an unmet `typescript` peer. Its vite
+  toolchain moves with it, to the versions the reference app is built and
+  tested against every CI run.
+
+- **`rebase init` asks for the project name** when one is not given, defaulting
+  to `my-app`.
 
 ### Fixed
 
@@ -93,6 +117,63 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 - A selected reference cell in the panel previews and edits in one line.
 
+- **Keyset pagination could not be started.** `?after=` was accepted and
+  `meta.nextCursor` was never sent, so a client had nothing to page with:
+  neither `restFetchService` wrapper forwarded `cursorFor`, and the route can
+  only see what those wrappers expose. The same omission once made
+  `/api/data/:slug/aggregate` answer 501 everywhere, so a guard now reads the
+  members off the interface and fails if either wrapper drops one.
+
+- **`distinct` collapsed nothing.** The projection force-selects the primary
+  key so a row can be addressed, and a surrogate key makes every row unique by
+  construction — the same reasoning that already refuses `distinct` beside a
+  search query. A distinct read no longer selects the key, and reports no
+  `total` rather than a row count that describes a different set.
+
+- **A write could be refused for a field its own `beforeSave` fills in.** The
+  create-time `required` check runs at the request boundary, before the hook, and
+  exempted `defaultValue` and `autoValue` but not "a field a hook supplies" —
+  which is the slug-from-title pattern. It now steps aside for a collection that
+  declares `beforeSave`, leaving `NOT NULL` as the backstop.
+
+- **A list column could name one property and render another.** The leading
+  column took its label from `listProperties[0]` and its content from the title
+  slot, so a users collection listing `["roles", "createdAt"]` printed "Roles"
+  over the name-and-email cell and showed roles nowhere.
+
+- **The collection editor silently dropped three fields.** `autoValue` on a
+  string property and `precision`/`scale` on a number one never reached the
+  serializable mirror the panel round-trips through, so opening such a
+  collection and saving turned a `NUMERIC(10,2)` column back into an unbounded
+  one.
+
+- **A new project booted into a warning its own fix could not clear.** Seven
+  schema-drift differences on `users`, on a database nobody had touched, and
+  `rebase schema generate` — the remedy the warning printed — changed none of
+  them: they are all by design, and the boot differ was the one reader that had
+  not been told.
+
+- **A first `dlx` install was neither quiet nor clean.** `@ariga/atlas` reached
+  it only transitively and is now an optional peer of the driver — nothing in a
+  `dlx` wants it, and the runtime image already turns it off. The admin's
+  spreadsheet reader moved off an unmaintained package, taking six deprecated
+  transitive dependencies with it, and a blank header column no longer shifts
+  every column after it into its neighbour's field.
+
+- Date cells in the collection list carry an accessible name; the focus ring is
+  drawn inside the box, so an ancestor can no longer clip it.
+
+
+### Security
+
+- **The password hash was on the wire.** `enforceAuthSecretExclusion` ran after
+  every driver had already built its own registry, and a registry copies each
+  property it is handed — so the flag reached the config object and none of the
+  copies that serve requests. A redeclared users collection refused writes
+  naming `password_hash` exactly as documented, while returning the scrypt hash
+  and any pending verification token in every row a select policy admitted. It
+  now runs before the bootstrappers, and again afterwards for whatever a driver
+  introspected.
 
 ## [0.19.1] - 2026-09-07
 

@@ -49,7 +49,6 @@ const { loadConfigFromFile } = await import(pathToFileURL(require.resolve("vite"
 
 const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const green = (s) => `\x1b[32m${s}\x1b[0m`;
-const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 
 /**
  * Directories whose contents are not this repository's source.
