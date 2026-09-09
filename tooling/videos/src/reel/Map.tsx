@@ -218,7 +218,7 @@ export const Map: React.FC<{
                 fourteen pixels off the inset every other scene uses. */}
             <div style={{ position: "absolute", left: STAGE_INSET, top: 846, width: 1500 }}>
                 <DisplayLine size={DISPLAY.split} delay={captionAt}>
-                    Your schema, as it actually is.
+                    Your schema, as declared.
                 </DisplayLine>
             </div>
         </AbsoluteFill>
