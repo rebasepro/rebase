@@ -994,20 +994,6 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     ): Promise<Record<string, unknown>[]> {
         if (this.driver) {
             const collection = this.registry.getCollectionByPath(notifyPath);
-            const fetchFn = async () => this.driver!.fetchCollection({
-                path: notifyPath,
-                collection: collection,
-                filter: collectionRequest.filter as FetchCollectionProps["filter"],
-                logical: collectionRequest.logical,
-                orderBy: collectionRequest.orderBy,
-                order: collectionRequest.order,
-                limit: collectionRequest.limit,
-                offset: collectionRequest.offset,
-                startAfter: collectionRequest.startAfter,
-                searchString: collectionRequest.searchString,
-                searchExplain: collectionRequest.searchExplain
-            });
-
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
             // Refetches are reads: apply the same GUCs + reader-role downgrade as the
             // driver's read path, so realtime cannot leak rows the initial fetch hid.
@@ -1033,17 +1019,17 @@ roles: ["anon"] };
                         this.rlsUserRole
                     );
                     const txEntityService = new DataService(tx, this.registry);
-                    // The REST pipeline, not the driver's own fetch.
+                    // The REST pipeline, not the driver's own fetch — one
+                    // query, one include loader, one place search is decided.
                     //
                     // These are the rows a subscriber receives, and a subscriber
-                    // asked the same question a `find()` asks. They used to be
-                    // built by a different method, which nests a relation under a
-                    // `{ __type: "relation" }` envelope and eagerly loaded every
-                    // relation the collection declares — so `find()` and `listen()`
-                    // answered one query with two different row shapes, and the
-                    // generated types described only one of them. Search included:
-                    // it forked to `searchRows` here for no reason other than that
-                    // the branch existed.
+                    // asked the same question a `find()` asks — so they are the
+                    // same rows, in the same shape, for every consumer on this
+                    // wire. The admin panel included: it builds the view model
+                    // it renders (dates as `Date`, relations as refs) in the
+                    // browser, from the collection config it already has — see
+                    // `toViewModelValues` in `buildRebaseData`. There is no
+                    // second wire shape to keep in step with this one.
                     const fetchedEntities = await txEntityService.fetchCollectionForRest(notifyPath, {
                         filter: collectionRequest.filter as FilterValues<string>,
                         // The subscription stored a group; the search branch used to
@@ -1282,12 +1268,6 @@ roles: ["anon"] };
     ): Promise<Record<string, unknown> | undefined> {
         if (this.driver) {
             const collection = this.registry.getCollectionByPath(notifyPath);
-            const fetchFn = async () => this.driver!.fetchOne({
-                path: notifyPath,
-                id,
-                collection
-            });
-
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
             // Same read isolation as collection refetches: GUCs + reader-role downgrade.
             const activeAuth = authContext || { uid: ANONYMOUS_USER_ID,

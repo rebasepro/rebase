@@ -44,7 +44,8 @@ describe("read-shape parity across the entry points", () => {
         table: "authors",
         properties: {
             id: { type: "number", isId: true },
-            name: { type: "string" }
+            name: { type: "string" },
+            joined_at: { type: "date" }
         },
         idField: "id"
     } as unknown as CollectionConfig;
@@ -56,6 +57,7 @@ describe("read-shape parity across the entry points", () => {
         properties: {
             id: { type: "number", isId: true },
             title: { type: "string" },
+            published_at: { type: "date" },
             author: { type: "relation", relationName: "author" }
         },
         relations: [
@@ -69,8 +71,10 @@ describe("read-shape parity across the entry points", () => {
         idField: "id"
     } as unknown as CollectionConfig;
 
-    const POST = { id: 1, title: "Hello", author_id: 7 };
-    const AUTHOR = { id: 7, name: "Ada" };
+    // The timestamp exactly as node-postgres hands it over: a Postgres literal,
+    // with a space and a two-digit offset. Not ISO, and not a `Date`.
+    const POST = { id: 1, title: "Hello", published_at: "2026-08-24 01:37:57.647+02", author_id: 7 };
+    const AUTHOR = { id: 7, name: "Ada", joined_at: "2020-01-02 04:04:05+01" };
 
     beforeEach(() => {
         jest.restoreAllMocks();
@@ -80,8 +84,8 @@ describe("read-shape parity across the entry points", () => {
             return undefined;
         });
         jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "posts") return table("posts", ["id", "title", "author_id"]) as never;
-            if (name === "authors") return table("authors", ["id", "name"]) as never;
+            if (name === "posts") return table("posts", ["id", "title", "published_at", "author_id"]) as never;
+            if (name === "authors") return table("authors", ["id", "name", "joined_at"]) as never;
             return undefined;
         });
     });
@@ -119,10 +123,12 @@ describe("read-shape parity across the entry points", () => {
     };
 
     /**
-     * The three entry points, over one query.
+     * The three DEVELOPER entry points, over one query: `find()`, `findById()`
+     * and the in-process `listen()`. All three take `fetchCollectionForRest`
+     * in its default rendering, and these assert they agree.
      *
-     * The realtime refetch is `fetchCollectionForRest` — that is the change:
-     * it used to be `fetchCollection`, whose rows are the admin's view model.
+     * The panel's wire is the fourth entry point and it does NOT belong in this
+     * set — see the block below.
      */
     const readAllThree = async (include?: string[]) => {
         const list = await service().fetchCollectionForRest("posts", {}, include);
@@ -164,6 +170,52 @@ describe("read-shape parity across the entry points", () => {
         expect(keys(without.one)).toEqual(keys(without.list));
         // And the include is the only thing that changes them.
         expect(keys(withInclude.list)).toEqual([...keys(without.list), "author"].sort());
+    });
+
+    /**
+     * One shape, for every consumer — the property that broke on 2026-09-09 and
+     * that nothing here asserted.
+     *
+     * The realtime refetch was unified onto this rendering so `find()` and
+     * `listen()` would agree. They did. But the admin panel is a subscriber on
+     * that wire and had always been served a *second* shape — relations as
+     * `{ __type: "relation" }` refs, dates as `{ __type: "date" }` envelopes —
+     * so every date cell in the panel began reading "Invalid date value" and
+     * every relation cell "Unexpected value", on the public demo, with all
+     * 2,891 tests green. The tests asserted the arguments the refetch was
+     * called with and the row a developer gets; nothing asserted what any
+     * consumer is actually handed.
+     *
+     * The panel builds its own view model now (`toViewModelValues` in
+     * `@rebasepro/common`), so these assert the only thing the wire owes it: one
+     * rendering, and values a browser can parse.
+     */
+    describe("one rendering, and the types the spec promises", () => {
+        it("serves a relation as the target's own columns, never an envelope", async () => {
+            const [row] = await service().fetchCollectionForRest("posts", {}, ["author"]);
+
+            expect(row.author).toMatchObject({ id: 7, name: "Ada" });
+            expect(row.author).not.toHaveProperty("__type");
+        });
+
+        it("serves a date as RFC 3339, which is what the OpenAPI document says", async () => {
+            const [row] = await service().fetchCollectionForRest("posts", {}, ["author"]);
+
+            // Not `"2026-08-24 01:37:57.647+02"` — the Postgres literal, which
+            // V8 parses by accident and Safari need not parse at all.
+            expect(row.published_at).toBe("2026-08-23T23:37:57.647Z");
+        });
+
+        it("renders an included target exactly as it renders its parent", async () => {
+            const [row] = await service().fetchCollectionForRest("posts", {}, ["author"]);
+            const author = row.author as Record<string, unknown>;
+
+            // The bug this catches: the parent's dates rendered by `toRestRow`
+            // and the child's left in the relation walk's own types, so one
+            // response carried a date column in two encodings.
+            expect(author.joined_at).toBe("2020-01-02T03:04:05.000Z");
+            expect(typeof author.joined_at).toBe(typeof row.published_at);
+        });
     });
 
     it("refuses an unknown relation identically on all three", async () => {

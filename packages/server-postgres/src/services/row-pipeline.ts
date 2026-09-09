@@ -77,8 +77,52 @@ function coerceDeclaredNumber(value: unknown, property: Property | undefined): u
     return isNaN(parsed) ? null : parsed;
 }
 
-/** Apply {@link coerceDeclaredNumber} across a row, leaving every other column alone. */
-function coerceDeclaredNumbers(
+/**
+ * Serve a `date` column as the timestamp this API says it serves.
+ *
+ * The OpenAPI document this server publishes types a `date` property as
+ * `string, format: date-time` — RFC 3339 — and node-postgres hands over the
+ * Postgres literal: `"2026-08-24 01:37:57.647+02"`, with a space where the `T`
+ * belongs and a two-digit offset. V8 parses that by accident; Safari's
+ * `new Date()` does not have to, and the spec never promised it. A column whose
+ * documented type only parses in some browsers is not a contract.
+ *
+ * A date-only column (`mode: "date"`, `format: "date"` in the spec) is already
+ * RFC 3339 as `YYYY-MM-DD` and is left alone — widening it to a timestamp would
+ * invent a time of day and a timezone the column does not have.
+ */
+function toRestDate(value: unknown): unknown {
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value.toISOString();
+    // An upstream walk may already have tagged it for the admin's view model.
+    if (value && typeof value === "object" && (value as { __type?: unknown }).__type === "date") {
+        return (value as { value?: unknown }).value ?? null;
+    }
+    if (typeof value !== "string" && typeof value !== "number") return value;
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const date = new Date(value);
+    // Unparseable is left exactly as it arrived: inventing `null` would erase a
+    // value the database holds, and this is a rendering, not a validator.
+    return isNaN(date.getTime()) ? value : date.toISOString();
+}
+
+/**
+ * One scalar, as REST serves it: declared numbers as numbers, declared dates as
+ * RFC 3339, everything else exactly as the database returned it.
+ */
+function toRestScalar(value: unknown, property: Property | undefined): unknown {
+    if (property?.type === "date") return toRestDate(value);
+    return coerceDeclaredNumber(value, property);
+}
+
+/**
+ * Apply {@link toRestScalar} across a row, leaving undeclared columns alone.
+ *
+ * Exported because the include loader attaches related rows itself, and a
+ * target rendered differently from its parent is the shape bug this whole file
+ * exists to prevent — a date was a string at the top level and a
+ * `{ __type: "date" }` envelope one level down, in the same response.
+ */
+export function toRestValues(
     row: Record<string, unknown>,
     collection: CollectionConfig
 ): Record<string, unknown> {
@@ -87,7 +131,7 @@ function coerceDeclaredNumbers(
 
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(row)) {
-        out[key] = coerceDeclaredNumber(value, properties[key] as Property | undefined);
+        out[key] = toRestScalar(value, properties[key] as Property | undefined);
     }
     return out;
 }
@@ -154,7 +198,7 @@ function renderTarget(
     if (style === "inline") {
         // The target's columns, and only those: its address is the consumer's
         // to derive, and merging one in overwrites a real `id` column.
-        return stripUnreadable(coerceDeclaredNumbers({ ...targetRow }, targetCollection), targetCollection);
+        return stripUnreadable(toRestValues({ ...targetRow }, targetCollection), targetCollection);
     }
 
     const address = relationTargetAddress(targetRow, targetCollection, registry);
@@ -240,9 +284,9 @@ export function toFlatRow(
  *
  * Values are the ones the database returned, except where that contradicts the
  * declared type: a `number` property is served as a number (see
- * {@link coerceDeclaredNumber}). Dates stay as the database returned them —
- * JSON has its own opinions about dates that the admin's view-model does not
- * share.
+ * {@link coerceDeclaredNumber}) and a `date` as RFC 3339, which is what this
+ * server's own OpenAPI document says a date column is (see
+ * {@link toRestDate}).
  *
  * Keyed by the row rather than by the relation list — a REST fetch only loads
  * the relations `include` asked for, so the row is the authority on which are
@@ -270,7 +314,7 @@ export function toRestRow(
         } else if (relation && typeof value === "object" && value !== null) {
             flat[key] = renderTarget(value as Record<string, unknown>, relation.target(), "inline", registry);
         } else {
-            flat[key] = coerceDeclaredNumber(value, collection.properties?.[key] as Property | undefined);
+            flat[key] = toRestScalar(value, collection.properties?.[key] as Property | undefined);
         }
     }
 

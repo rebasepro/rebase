@@ -1,5 +1,5 @@
 import { CollectionAccessor, DataDriver, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateParams, type AggregateRow, type AggregateSelect, type ComputedSortField, type FieldPath, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
-import { toSnakeCase } from "@rebasepro/utils";
+import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
 import { QueryBuilder } from "./query_builder";
@@ -7,6 +7,8 @@ import { collectAllPages, paginateFind, resolveFindWindow } from "./paginate";
 import { normalizeOrderBy } from "./sort-dialect";
 import { deserializeFilter } from "./filter-dialect";
 import { buildCompositeId, resolvePrimaryKeys, PrimaryKeyInfo } from "../util/identity";
+import { resolveCollectionRelations } from "../util/relations";
+import { EntityRelation } from "@rebasepro/types";
 
 /**
  * What a client says when its data source cannot subscribe.
@@ -59,7 +61,7 @@ export interface EntityDataOptions {
      * which sits *above* the admin that owns the collections, so a resolver
      * registered on mount would otherwise arrive too late to be seen.
      */
-    resolveCollection?: (slug: string) => { properties?: Record<string, unknown> } | undefined;
+    resolveCollection?: (slug: string) => { properties?: Record<string, unknown>; relations?: unknown[]; slug?: string } | undefined;
 }
 
 function createPrimaryKeyResolver(options?: EntityDataOptions) {
@@ -102,6 +104,127 @@ function createPrimaryKeyResolver(options?: EntityDataOptions) {
 }
 
 /**
+ * Build the admin's view model out of the row the wire serves.
+ *
+ * The wire has ONE shape, for every consumer: flat columns, typed the way the
+ * database typed them, and a relation rendered as the target's own columns (or
+ * only its foreign key, when nothing asked for it). That is the REST contract,
+ * what `find()` returns, what `listen()` pushes, and what the generated types
+ * describe.
+ *
+ * The admin renders neither of those directly. Its date field requires a real
+ * `Date` and rejects a string outright; its relation cells read `.data.values`
+ * off a relation ref. Those requirements are the *admin's*, so they are met
+ * here — in the browser, from the collection config the panel already has —
+ * rather than by asking the server for a second wire shape.
+ *
+ * That second shape is what this replaces. Until 2026-09-09 the realtime wire
+ * carried the view model and every other read carried flat rows, so `find()`
+ * and `listen()` answered one query two ways; unifying the wire without doing
+ * this conversion is what left every date cell reading "Invalid date value"
+ * and every relation cell "Unexpected value".
+ *
+ * Values already in view-model form pass through untouched: a driver that
+ * still sends `{ __type: "date" }` or a relation ref (the client revives both)
+ * is served by the same walk.
+ */
+function toViewModelValues(
+    values: Record<string, unknown>,
+    properties: Record<string, unknown> | undefined,
+    collection: { properties?: Record<string, unknown>; relations?: unknown[]; slug?: string } | undefined,
+    resolveCollection?: EntityDataOptions["resolveCollection"]
+): Record<string, unknown> {
+    if (!properties) return values;
+
+    const relations = collection
+        ? resolveCollectionRelations(collection as never)
+        : {};
+    let out: Record<string, unknown> | undefined;
+    const write = (key: string, value: unknown) => {
+        out = out ?? { ...values };
+        out[key] = value;
+    };
+
+    for (const [key, rawProperty] of Object.entries(properties)) {
+        const property = rawProperty as { type?: string; of?: { type?: string }; properties?: Record<string, unknown> } | undefined;
+        if (!property) continue;
+
+        // A relation nobody included is still a relation: the row carries only
+        // its foreign key, and an addressable ref with no data attached is what
+        // lets the preview fetch the one record it needs. Without this the
+        // record form showed an empty chip where the customer goes — the panel
+        // reads a form through `listenById`, which takes no `include`.
+        if (!(key in values)) {
+            const fkRelation = relations[key];
+            // `localKey` is the column; the row is keyed the way the wire keys
+            // it, which is that column camelCased (`customer_id` → `customerId`).
+            const column = fkRelation && "localKey" in fkRelation ? fkRelation.localKey : undefined;
+            const fk = column !== undefined
+                ? values[column] ?? values[toWireKey(column)]
+                : undefined;
+            const fkTarget = fkRelation?.targetSlug;
+            if (fkTarget && (typeof fk === "string" || typeof fk === "number")) {
+                write(key, new EntityRelation(fk, fkTarget));
+            }
+            continue;
+        }
+
+        const value = values[key];
+        if (value === null || value === undefined) continue;
+
+        // A relation, under the property key or the relation name.
+        const relation = relations[key];
+        if (relation && (property.type === "relation" || property.of?.type === "relation" || property.type === "array")) {
+            const target = relation.targetSlug;
+            if (!target) continue;
+            const targetProperties = resolveCollection?.(target)?.properties;
+            const targetCollection = resolveCollection?.(target);
+            const toRef = (item: unknown): unknown => {
+                if (item instanceof EntityRelation) return item;
+                if (typeof item === "object" && item !== null && "__type" in item) return item;
+                // The target's own columns: the id it is addressed by, and the
+                // values a relation cell renders without a second fetch.
+                if (typeof item === "object" && item !== null) {
+                    const row = item as Record<string, unknown>;
+                    const keys = targetCollection ? resolvePrimaryKeys(targetCollection as never) : [];
+                    const id = keys.length > 0 ? buildCompositeId(row, keys) : row.id as string | number;
+                    if (id === undefined || id === null || id === "") return item;
+                    return new EntityRelation(id, target, {
+                        id,
+                        path: target,
+                        values: toViewModelValues(row, targetProperties, targetCollection, resolveCollection)
+                    });
+                }
+                // Only the foreign key came back — nothing asked for the
+                // relation. Addressable, with nothing to render but its id.
+                if (typeof item === "string" || typeof item === "number") {
+                    return new EntityRelation(item, target);
+                }
+                return item;
+            };
+            write(key, Array.isArray(value) ? value.map(toRef) : toRef(value));
+            continue;
+        }
+
+        if (property.type === "date" && !(value instanceof Date)) {
+            if (typeof value === "string" || typeof value === "number") {
+                const date = new Date(value);
+                write(key, isNaN(date.getTime()) ? null : date);
+            }
+            continue;
+        }
+
+        // A map's children are declared too, and a date two levels down is
+        // still a date.
+        if (property.type === "map" && property.properties && typeof value === "object" && !Array.isArray(value)) {
+            write(key, toViewModelValues(value as Record<string, unknown>, property.properties, undefined, resolveCollection));
+        }
+    }
+
+    return out ?? values;
+}
+
+/**
  * Give a flat row the Entity view-model the admin renders.
  *
  * The address is *derived here* — it is not a column, and the row it came from
@@ -115,7 +238,14 @@ function createPrimaryKeyResolver(options?: EntityDataOptions) {
 function rowToEntity<M extends Record<string, unknown>>(
     row: Record<string, unknown>,
     slug: string,
-    primaryKeys: PrimaryKeyInfo[] = []
+    primaryKeys: PrimaryKeyInfo[] = [],
+    /**
+     * Turns the wire's row into the view model — see
+     * {@link toViewModelValues}. Absent when the collections cannot be
+     * resolved, which is every consumer that is not the admin: the flat SDK
+     * derives itself from this layer and must keep the wire's own types.
+     */
+    toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>
 ): Entity<M> {
     // Query-computed metadata rides in on the row because that is how the wire
     // carries it, but it is not a column: it belongs beside `values`, not in
@@ -128,7 +258,7 @@ function rowToEntity<M extends Record<string, unknown>>(
             ? buildCompositeId(row, primaryKeys)
             : row.id as string | number,
         path: slug,
-        values: values as EntityValues<M>,
+        values: (toViewModel ? toViewModel(values) : values) as EntityValues<M>,
         ...(_matches ? { searchMatches: _matches } : {})
     };
 }
@@ -156,14 +286,16 @@ function inlineEnvelope(envelope: { data?: { values?: Record<string, unknown> } 
  * Replace every relation envelope on a row with the target's flat columns.
  *
  * The SDK serves one relation shape — the inlined one (see
- * {@link RestFetchService}) — and reads that come back through a *driver*
- * method rather than the REST pipeline still carry envelopes. Realtime is the
- * one such read left: there is no `listenForRest`, so the rows arrive shaped
- * for the admin and are flattened here instead.
+ * {@link RestFetchService}) — and Postgres now serves it on every read, so
+ * against that driver this walk finds nothing to do. It stays for the drivers
+ * whose own `fetchCollection` still answers with refs: a developer reading
+ * through this accessor gets one shape whichever driver is underneath.
  *
  * Only applied where the REST pipeline is the contract (see `find`); a driver
- * without a `restFetchService` keeps whatever it returns, so the admin's own
- * path through {@link buildRebaseData} is untouched.
+ * without a `restFetchService` keeps whatever it returns.
+ *
+ * Note this is NOT how the admin gets its view model — that is built in the
+ * browser by {@link toViewModelValues}, from the same flat row.
  */
 function inlineRelationRefs(row: Record<string, unknown>): Record<string, unknown> {
     let out: Record<string, unknown> | undefined;
@@ -182,7 +314,8 @@ function inlineRelationRefs(row: Record<string, unknown>): Record<string, unknow
 function createDriverAccessor<M extends Record<string, unknown> = Record<string, unknown>>(
     driver: DataDriver,
     slug: string,
-    getPks: () => PrimaryKeyInfo[] = () => []
+    getPks: () => PrimaryKeyInfo[] = () => [],
+    toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>
 ): CollectionAccessor<M> {
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams<M>): Promise<FindResponse<M>> {
@@ -300,7 +433,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 : undefined;
 
             return {
-                data: rows.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug, getPks())),
+                data: rows.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug, getPks(), toViewModel)),
                 meta: { total, limit, offset, hasMore, ...(nextCursor && { nextCursor }) }
             };
         },
@@ -312,7 +445,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             const row = fetchService
                 ? await fetchService.fetchOneForRest(slug, id)
                 : await driver.fetchOne<M>({ path: slug, id: id });
-            return row ? rowToEntity<M>(row, slug, getPks()) : undefined;
+            return row ? rowToEntity<M>(row, slug, getPks(), toViewModel) : undefined;
         },
 
         // Present only when the driver's fetch service implements it — the SDK
@@ -338,7 +471,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 id: id,
                 status: "new"
             });
-            return rowToEntity<M>(row, slug, getPks());
+            return rowToEntity<M>(row, slug, getPks(), toViewModel);
         },
 
         createMany: driver.saveMany
@@ -356,7 +489,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                     // option exists for duplicated every row instead.
                     onConflict: options?.onConflict
                 });
-                return rows.map((row) => rowToEntity<M>(row, slug, getPks()));
+                return rows.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel));
             }
             : undefined,
 
@@ -367,7 +500,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 id: id,
                 status: "existing"
             });
-            return rowToEntity<M>(row, slug, getPks());
+            return rowToEntity<M>(row, slug, getPks(), toViewModel);
         },
 
         async delete(id: string | number): Promise<void> {
@@ -389,7 +522,7 @@ values: {} as Record<string, unknown> }
                     updates: updates.map(u => ({ id: u.id,
 values: u.data })),
                 });
-                return rows.map(row => rowToEntity<M>(row, slug, getPks()));
+                return rows.map(row => rowToEntity<M>(row, slug, getPks(), toViewModel));
             }
             : undefined,
 
@@ -418,9 +551,11 @@ ids });
         listen: driver.listenCollection
             ? (params: FindParams<M> | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) => {
                 const { limit, offset, driverOffset } = resolveFindWindow(params);
-                // Realtime has no REST-pipeline equivalent, so the rows arrive
-                // admin-shaped. Flatten them to the one shape the rest of this
-                // accessor serves.
+                // Belt and braces. Postgres serves one shape on every read now,
+                // realtime included, so this flattens nothing there — but a
+                // driver whose `listen` still answers with refs is normalized
+                // to the shape the rest of this accessor serves rather than
+                // handing a developer two.
                 const normalize = driver.restFetchService ? inlineRelationRefs : (row: Record<string, unknown>) => row;
                 return driver.listenCollection!<M>({
                     path: slug,
@@ -442,7 +577,7 @@ ids });
                     vectorSearch: params?.vectorSearch,
                     onUpdate: (entities) => {
                         onUpdate({
-                            data: entities.map((row: Record<string, unknown>) => rowToEntity<M>(normalize(row), slug, getPks())),
+                            data: entities.map((row: Record<string, unknown>) => rowToEntity<M>(normalize(row), slug, getPks(), toViewModel)),
                             meta: {
                                 // No count is issued on this path, so the total
                                 // is unknown; the lower bound is the rows in
@@ -466,7 +601,7 @@ ids });
                 return driver.listenOne!<M>({
                     path: slug,
                     id: id,
-                    onUpdate: (entity) => onUpdate(entity ? rowToEntity<M>(normalize(entity), slug, getPks()) : undefined),
+                    onUpdate: (entity) => onUpdate(entity ? rowToEntity<M>(normalize(entity), slug, getPks(), toViewModel) : undefined),
                     onError
                 });
             } : undefined,
@@ -518,14 +653,37 @@ ids });
  * await data.products.create({ name: "Camera", price: 299 });
  * const { data: items } = await data.products.find({ where: { status: ["==", "published"] } });
  */
+/**
+ * The view-model converter for one collection, or `undefined` when there is no
+ * collection config to build it from.
+ *
+ * Absent is the honest answer for every consumer that is not the admin: the
+ * flat SDK derives itself from this same layer (`buildSdkData`) and must keep
+ * the wire's own types, and it registers no collection resolver.
+ */
+function createViewModelConverter(options?: EntityDataOptions) {
+    if (!options?.resolveCollection) return () => undefined;
+    return function converterFor(slug: string) {
+        return (values: Record<string, unknown>): Record<string, unknown> => {
+            // Resolved per call rather than memoized: the resolver is
+            // late-bound (see `createPrimaryKeyResolver`) and a collection
+            // edited in the schema editor should not need a reload here.
+            const collection = options.resolveCollection?.(slug);
+            if (!collection) return values;
+            return toViewModelValues(values, collection.properties, collection, options.resolveCollection);
+        };
+    };
+}
+
 export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions): RebaseData {
     const cache = new Map<string, CollectionAccessor>();
     const primaryKeysFor = createPrimaryKeyResolver(options);
+    const viewModelFor = createViewModelConverter(options);
 
     function getAccessor(slug: string): CollectionAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = createDriverAccessor(driver, slug, () => primaryKeysFor(slug));
+            accessor = createDriverAccessor(driver, slug, () => primaryKeysFor(slug), viewModelFor(slug));
             cache.set(slug, accessor);
         }
         return accessor;
@@ -884,19 +1042,20 @@ data: u.data as Partial<EntityValues<M>> }))
 function toEntityAccessor<M extends Record<string, unknown>>(
     sdk: SDKCollectionClient<M>,
     slug: string,
-    getPks: () => PrimaryKeyInfo[] = () => []
+    getPks: () => PrimaryKeyInfo[] = () => [],
+    toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>
 ): CollectionAccessor<M> {
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams<M>): Promise<FindResponse<M>> {
             const res = await sdk.find(params);
-            return { data: res.data.map((row) => rowToEntity<M>(row, slug, getPks())), meta: res.meta };
+            return { data: res.data.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel)), meta: res.meta };
         },
         async findById(id: string | number): Promise<Entity<M> | undefined> {
             const row = await sdk.findById(id);
-            return row ? rowToEntity<M>(row, slug, getPks()) : undefined;
+            return row ? rowToEntity<M>(row, slug, getPks(), toViewModel) : undefined;
         },
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
-            return rowToEntity<M>(await sdk.create(data as Partial<M>, id), slug, getPks());
+            return rowToEntity<M>(await sdk.create(data as Partial<M>, id), slug, getPks(), toViewModel);
         },
         // Declared on `CollectionAccessor` and, until now, never implemented on
         // this side of the boundary — so the admin's own import wrote one HTTP
@@ -908,13 +1067,13 @@ function toEntityAccessor<M extends Record<string, unknown>>(
                 options?: { upsert?: boolean; onConflict?: readonly string[] }
             ): Promise<Entity<M>[]> => {
                 const rows = await sdk.createMany!(data as Partial<M>[], options);
-                return rows.map((row) => rowToEntity<M>(row, slug, getPks()));
+                return rows.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel));
             }
             : undefined,
         async update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>> {
             const row = await sdk.update(id, data as Partial<M>);
             if (!row) throw new Error(`Update returned no data for id ${id}`);
-            return rowToEntity<M>(row, slug, getPks());
+            return rowToEntity<M>(row, slug, getPks(), toViewModel);
         },
         delete(id: string | number): Promise<void> {
             return sdk.delete(id);
@@ -931,11 +1090,11 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         listen: isUnsupported(sdk.listen)
             ? undefined
             : (params: FindParams<M> | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) =>
-                sdk.listen(params, (res) => onUpdate({ data: res.data.map((row) => rowToEntity<M>(row, slug, getPks())), meta: res.meta }), onError),
+                sdk.listen(params, (res) => onUpdate({ data: res.data.map((row) => rowToEntity<M>(row, slug, getPks(), toViewModel)), meta: res.meta }), onError),
         listenById: isUnsupported(sdk.listenById)
             ? undefined
             : (id: string | number, onUpdate: (s: Entity<M> | undefined) => void, onError?: (e: Error) => void) =>
-                sdk.listenById(id, (row) => onUpdate(row ? rowToEntity<M>(row, slug, getPks()) : undefined), onError),
+                sdk.listenById(id, (row) => onUpdate(row ? rowToEntity<M>(row, slug, getPks(), toViewModel) : undefined), onError),
         where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown) {
             const builder = new QueryBuilder<M>(accessor);
             if (typeof columnOrCondition === "object") {
@@ -978,11 +1137,12 @@ function toEntityAccessor<M extends Record<string, unknown>>(
 export function wrapAsEntityData(sdkData: Pick<RebaseSdkData, "collection">, options?: EntityDataOptions): RebaseData {
     const cache = new Map<string, CollectionAccessor>();
     const primaryKeysFor = createPrimaryKeyResolver(options);
+    const viewModelFor = createViewModelConverter(options);
 
     function getAccessor(slug: string): CollectionAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = toEntityAccessor(sdkData.collection(slug), slug, () => primaryKeysFor(slug));
+            accessor = toEntityAccessor(sdkData.collection(slug), slug, () => primaryKeysFor(slug), viewModelFor(slug));
             cache.set(slug, accessor);
         }
         return accessor;

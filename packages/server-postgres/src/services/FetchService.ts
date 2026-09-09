@@ -21,7 +21,7 @@ import { RelationService } from "./RelationService";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { toFlatRow, toRestRow, isJunctionRelation } from "./row-pipeline";
+import { toFlatRow, toRestRow, toRestValues, isJunctionRelation } from "./row-pipeline";
 import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-column";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 // One rule, one place. See `soft-delete.ts` for why every read has to ask.
@@ -701,7 +701,14 @@ target });
                         // nothing is a fact about the row, and leaving the key
                         // off makes it indistinguishable from not having asked.
                         if (!related) { row[key] = null; continue; }
-                        const [shaped] = this.shapeRelatedRows([{ ...related.values }], node, targetCollection);
+                        // Rendered exactly as the parent is: the include loader
+                        // attaches these itself, and a target left in the walk's
+                        // own types is how a date came back as a string at the
+                        // top level and a `{ __type: "date" }` envelope one
+                        // level down, in one response.
+                        const [shaped] = this.shapeRelatedRows(
+                            [toRestValues({ ...related.values }, targetCollection)], node, targetCollection
+                        );
                         row[key] = shaped;
                         loaded.push(shaped);
                     }
@@ -712,7 +719,7 @@ target });
                     for (const row of addressable) {
                         const related = results.get(String(addressOf(row))) ?? [];
                         const shaped = this.shapeRelatedRows(
-                            related.map(e => ({ ...e.values })), node, targetCollection
+                            related.map(e => toRestValues({ ...e.values }, targetCollection)), node, targetCollection
                         );
                         row[key] = shaped;
                         loaded.push(...shaped);
