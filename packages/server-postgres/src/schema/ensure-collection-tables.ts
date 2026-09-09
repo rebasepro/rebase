@@ -1,7 +1,7 @@
 /**
- * Bringing a database up to date with a bundle's collections, additively.
+ * Applying a schema plan to a database that is already running.
  *
- * ## Why this exists
+ * ## What this module is
  *
  * A managed runtime boots someone else's compiled project against a database it
  * has never seen. Auth tables are ensured at boot already, but collection tables
@@ -9,350 +9,82 @@
  * request answered 500 on a missing relation. `rebase db push` cannot help — it
  * is an Atlas-driven CLI command, and the runtime image ships no CLI.
  *
+ * Two halves, and only one of them is here. *What the collections ask for* is
+ * `schema/plan/plan-schema.ts`, shared with `db push` and the generated Drizzle
+ * file; *what the database already has, and which of those statements are safe
+ * to run against it* is `schema/plan/diff-plan.ts`. This module reads the
+ * catalogue, runs the statements, and reports what happened.
+ *
  * ## Why additive-only, forever
  *
  * This runs unattended, against a database with customers' data in it, with no
- * human reading a diff. So it may only ever do things that cannot lose data:
- * create a missing table, add a missing column, create a missing enum type.
- *
- * It will **never** drop a table or a column, narrow a type, or alter a
- * constraint. A removed field leaves its column behind; a renamed field looks
- * like an addition and the old column stays. That is the correct trade for an
- * automated path — the alternative is an unattended process that can silently
- * destroy a column, which is precisely the failure `db push` was hardened
- * against. Destructive changes stay a deliberate, human-reviewed migration.
- *
- * Because of that, this is safe to run on every boot, and re-running it is a
- * no-op.
+ * human reading a diff. So it may only ever do things that cannot lose data.
+ * See `diff-plan.ts` for the whole of that argument.
  */
 import {
     declaredDatabaseExtensions,
-    isPostgresCollectionConfig,
-    type CollectionConfig,
-    type Property
+    REBASE_SCHEMA,
+    type CollectionConfig
 } from "@rebasepro/types";
-import { getTableName, relationalCollections } from "@rebasepro/common";
+import { relationalCollections } from "@rebasepro/common";
 import { logger, isConcurrentDdlRace, isDuplicateObjectRace } from "@rebasepro/server";
+import { SEARCH_STAMP_PREFIX } from "./search-column";
+import { vectorExtensionHint } from "./vector-index";
+import { planJunctionTables, quoteSqlLiteral } from "./generate-postgres-ddl-logic";
+import { planSchema } from "./plan/plan-schema";
 import {
-    assertSearchIsPostgresOnly,
-    buildSearchColumnSpec,
-    searchExtensionStatements,
-    searchHelperFunctions,
-    searchIndexStatements,
-    searchColumnStamps,
-    SEARCH_STAMP_PREFIX,
-    SEARCH_TEXT_FN,
-    SEARCH_UNACCENT_FN,
-    type SearchColumnSpec
-} from "./search-column";
-import {
-    getSqlColumnType,
-    resolveColumnName,
-    isIdProperty,
-    planRelationalColumns,
-    planJunctionTables,
-    quoteSqlLiteral
-} from "./generate-postgres-ddl-logic";
-import {
-    buildVectorColumnSpecs,
-    buildVectorIndexPlan,
-    vectorExtensionDeclared,
-    vectorExtensionHint,
-    vectorExtensionStatement,
-    vectorIndexStatement,
-    type SkippedVectorIndex
-} from "./vector-index";
-import { buildCollectionIndexPlan, collectionIndexStatement } from "./collection-index";
+    assertSafeIdentifier,
+    diffPlanAgainstCatalogue,
+    type ConstraintPolicy,
+    type DiffOptions,
+    type EnsureAction,
+    type EnsurePlan,
+    type ExistingSchema,
+    type LegacyForeignKey,
+    type OrphanedRequiredColumn,
+    type SearchColumnDrift,
+    type WithheldConstraint
+} from "./plan/diff-plan";
 import { extractCauseMessage, extractPgError } from "../utils/pg-error-utils";
-import { columnTypeDriftMessage, typesAgree, type ColumnTypeDrift } from "./column-type-drift";
-import {
-    AUTH_USERS_COLUMNS,
-    authUsersColumnDefinition,
-    authUsersColumnSql,
-    isAuthCollection
-} from "./auth-users-columns";
+import { columnTypeDriftMessage, type ColumnTypeDrift } from "./column-type-drift";
+
+export type {
+    ConstraintPolicy,
+    EnsureAction,
+    EnsurePlan,
+    ExistingSchema,
+    LegacyForeignKey,
+    OrphanedRequiredColumn,
+    SearchColumnDrift,
+    WithheldConstraint
+};
 
 /**
  * The subset of a database handle this needs: run a statement, get rows back.
  *
  * Deliberately parameterless. Everything here is DDL or catalogue reads keyed by
  * schema name, and schema names are identifiers — they cannot be bound as
- * parameters anyway. They are validated against {@link SAFE_IDENTIFIER} before
- * they reach a statement, so a config that somehow carried a quote is refused
- * rather than concatenated.
+ * parameters anyway. They are validated by `assertSafeIdentifier` before they
+ * reach a statement, so a config that somehow carried a quote is refused rather
+ * than concatenated.
  */
 export interface Queryable {
     query<T = unknown>(sql: string): Promise<{ rows: T[] }>;
 }
 
-/** Postgres identifiers this module is willing to interpolate. */
-const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]*$/;
-
-function assertSafeIdentifier(value: string, what: string): string {
-    if (!SAFE_IDENTIFIER.test(value)) {
-        throw new Error(`Refusing to build SQL with an unsafe ${what}: ${JSON.stringify(value)}`);
-    }
-    return value;
-}
-
-/** What the database currently has, as the planner needs it. */
-export interface ExistingSchema {
-    /** `schema.table` → set of column names. */
-    tables: Map<string, Set<string>>;
-    /** `schema.typename` of every enum type that already exists. */
-    enums: Set<string>;
-    /**
-     * `schema.table.constraint` of every constraint that already exists.
-     *
-     * Optional so a caller that only cares about tables can still build one by
-     * hand; absent is read as "none known", which at worst re-attempts a
-     * constraint that then fails harmlessly as a duplicate.
-     */
-    constraints?: Set<string>;
-    /**
-     * `schema.table.column` → that column's comment, for the columns that have
-     * one. This is where a generated search column's fingerprint lives, so it
-     * is the only evidence that a `search` block has changed since the column
-     * was built. Absent is read as "no column is stamped", which plans a stamp
-     * and reports nothing as drifted.
-     */
-    columnComments?: Map<string, string>;
-    /**
-     * `schema.typename` → the values that type currently holds, in order.
-     *
-     * Without this, an enum type that already exists is skipped whole and a
-     * value added to it never reaches the database — the type is there, so
-     * nothing plans anything, and the first row using the new value is rejected
-     * by a constraint nobody changed. Absent is read as "the values are
-     * unknown", which keeps the old skip-by-name behaviour rather than guessing.
-     */
-    enumValues?: Map<string, string[]>;
-    /** `schema.table.column` for every column the database marks NOT NULL. */
-    notNullColumns?: Set<string>;
-    /**
-     * `schema.table.column` → the column's `udt_name` as the database reports
-     * it (`int4`, `jsonb`, `_numeric` for an array of numeric).
-     *
-     * The only evidence that a column's declared type and its real type have
-     * parted company. Absent is read as "unknown", which reports no drift —
-     * see `column-type-drift.ts` for why silence is the right unknown here.
-     */
-    columnTypes?: Map<string, string>;
-    /**
-     * Tables known to hold at least one row.
-     *
-     * The only thing that decides whether a NOT NULL can be added without
-     * reading the data: on an empty table the constraint cannot fail, on a
-     * populated one it is checked against every existing row. Absent is read as
-     * "assume populated", which is the conservative direction — it withholds a
-     * constraint rather than attempting one that aborts the boot.
-     */
-    populatedTables?: Set<string>;
-    /**
-     * `schema.table.column` for every column the database gives a DEFAULT.
-     *
-     * Paired with {@link notNullColumns} to decide whether a column no property
-     * declares can still accept a write: NOT NULL with a default can, NOT NULL
-     * without one cannot. Absent is read as "unknown", which reports nothing.
-     */
-    columnDefaults?: Set<string>;
-}
-
-/**
- * How far the planner may go in making the database's constraints match the
- * configuration.
- *
- * - `additive` — the boot default. Columns, tables, indexes and enum values are
- *   created; no existing column's constraints are touched. Unattended boots run
- *   against customer data with nobody reading a diff, and a database adopted by
- *   introspection legitimately carries NOT NULL on columns the generated
- *   collection leaves optional (`introspect-db-logic` withholds `required` from
- *   a column with a default or a trigger behind it). Converging there would
- *   strip real constraints on first boot.
- * - `converge` — the live schema editor. Every statement is planned, shown to
- *   the person making the change, and applied only once they confirm it. That
- *   is the context in which changing an existing column's constraints is a
- *   reviewed act rather than a surprise.
- */
-export type ConstraintPolicy = "additive" | "converge";
-
-export interface EnsureOptions {
-    /** Defaults to `additive`. See {@link ConstraintPolicy}. */
-    constraints?: ConstraintPolicy;
+export interface EnsureOptions extends DiffOptions {
     /**
      * Server extensions the project's databases gave Rebase leave to install —
      * `declaredDatabaseExtensions()`. Absent means none, which is a refusal and
      * is the right default for a planner given no configuration at all.
      *
-     * Explicit rather than read from the resource registry in here, because
-     * this function is pure and several callers plan against fixtures: reaching
-     * for a process-wide registry would make the plan depend on whatever some
-     * other module happened to import. `ensureCollectionTables` is the boundary
-     * that reads the world.
+     * Explicit rather than read from the resource registry in here, because the
+     * planner is pure and several callers plan against fixtures: reaching for a
+     * process-wide registry would make the plan depend on whatever some other
+     * module happened to import. `ensureCollectionTables` is the boundary that
+     * reads the world.
      */
     databaseExtensions?: readonly string[];
-}
-
-export interface EnsureAction {
-    kind: "create-enum" | "create-table" | "add-column" | "add-constraint" | "rename-column"
-        | "create-extension" | "create-function" | "create-index" | "comment-column"
-        | "add-enum-value" | "set-not-null" | "drop-not-null";
-    /** Qualified target, for logging: `public.posts` or `public.posts.title`. */
-    target: string;
-    sql: string;
-}
-
-export interface EnsurePlan {
-    actions: EnsureAction[];
-    /** Every statement, in dependency order. Empty when the schema is current. */
-    statements: string[];
-    /**
-     * Relation columns this plan is about to create where the table already
-     * carries the same column under its pre-singularization name.
-     *
-     * The reason this is reported rather than silently handled: the ensure is
-     * additive, so it would add `category_id` beside a populated
-     * `categorie_id` and the relation would then read the new, empty one. No
-     * statement fails, no table is missing, and the only symptom is relations
-     * resolving to nothing — which is indistinguishable from having no data.
-     */
-    legacyForeignKeys: LegacyForeignKey[];
-    /**
-     * Generated search columns whose `search` block has changed since they were
-     * built. Reported, never planned into `actions` — see
-     * {@link SearchColumnDrift} for why applying it is not this path's call.
-     */
-    searchDrift: SearchColumnDrift[];
-    /**
-     * Generated search columns that exist but carry no fingerprint — created
-     * before this check existed, or by `search.sql` on an older CLI. The plan
-     * stamps them so the *next* change is detectable; whether they match the
-     * current block cannot be known, which is what the caller reports.
-     */
-    searchAdopted: { table: string; column: string }[];
-    /**
-     * Vector columns this plan is deliberately leaving unindexed, because
-     * pgvector cannot build an ANN index that wide.
-     *
-     * Reported rather than thrown: the column is valid, storable and
-     * searchable, and refusing the boot over it would make a working
-     * configuration unbootable. Reported rather than dropped: an unindexed
-     * vector column and an indexed one differ only in latency, so nothing
-     * about the running system says which one you got.
-     */
-    vectorIndexSkipped: SkippedVectorIndex[];
-    /**
-     * Constraints the configuration asks for that this plan is not applying,
-     * and why.
-     *
-     * This is the half of the feature that matters most. Every one of these was
-     * previously withheld in silence: a required property arrived nullable, and
-     * the only evidence was a database that disagreed with its own
-     * configuration. Reporting them is what lets boot warn, the live editor
-     * refuse, and the doctor explain — three surfaces that until now had nothing
-     * to read.
-     */
-    withheldConstraints: WithheldConstraint[];
-    /**
-     * Columns whose type in the database is in a different family from the one
-     * the collection declares.
-     *
-     * Reported and never acted on — see `column-type-drift.ts`. This is the one
-     * divergence that presents as a *working* deploy: the statement was never
-     * planned, so nothing failed, and the first evidence is a write rejected
-     * hours later by whichever end validates first.
-     */
-    columnTypeDrift: ColumnTypeDrift[];
-    /**
-     * Columns that are NOT NULL, have no default, and that no property declares
-     * any more — so every insert through the API is rejected for a field the
-     * author cannot name, because they already deleted it.
-     *
-     * This is what a **rename** looks like to an additive provisioner. Rename
-     * `title` to `headline` and boot does exactly what it promises: it adds
-     * `headline` (nullable, correctly, and says why) and leaves `title` alone,
-     * because dropping a column is destructive and this runs unattended. The
-     * table is then unwritable:
-     *
-     *     POST /api/data/posts -> 400 PG_23502
-     *     Missing required field: "title" in "posts" cannot be empty.
-     *
-     * naming a field that is no longer in the collection at all. On the default
-     * first-run path there is no way out inside the product either: the managed
-     * database is PGlite, and `db push` — the documented repair — refuses there
-     * because Atlas needs a second database to diff against.
-     *
-     * Reported, never acted on. Dropping the column is the right fix roughly
-     * always and destructive exactly once, which is not a decision to take
-     * unattended.
-     */
-    orphanedRequiredColumns: OrphanedRequiredColumn[];
-}
-
-/**
- * A NOT NULL column with no default that no property declares.
- * @see EnsurePlan.orphanedRequiredColumns
- */
-export interface OrphanedRequiredColumn {
-    /** `schema.table`. */
-    table: string;
-    /** The column left behind. */
-    column: string;
-    /** The collection that no longer declares it. */
-    slug: string;
-}
-
-/** A constraint the configuration asks for that the planner is not applying. */
-export interface WithheldConstraint {
-    /** `schema.table.column`. */
-    target: string;
-    kind: "not-null";
-    /**
-     * Why, in a sentence that names the obstacle rather than the rule. The
-     * reader is looking at a column that is nullable when they asked for
-     * required, and needs to know what to do about it.
-     */
-    reason: string;
-    /** What would make it applicable. */
-    remedy: string;
-}
-
-/**
- * A generated search column built from a `search` block that has since changed.
- *
- * Reported instead of applied because the two ways to apply it are both worse
- * than stopping. `ALTER COLUMN … SET EXPRESSION` exists only on PG17+ and
- * rewrites the table either way; `DROP COLUMN` + `ADD COLUMN` rewrites it under
- * an ACCESS EXCLUSIVE lock and rebuilds the GIN index. This module runs
- * unattended against live customer data with nobody reading a diff — the same
- * reason it withholds `SET NOT NULL` from an adopted table — so a multi-minute
- * outage is not a decision it may take on its own.
- *
- * Not applying it silently is not an option either: that is the bug this
- * detection exists for. A collection that added a field, flipped `unaccent` or
- * raised a weight kept indexing the *old* set forever, and the only symptom was
- * searches returning nothing for content plainly in the row.
- */
-export interface SearchColumnDrift {
-    /** `schema.table`. */
-    table: string;
-    column: string;
-    /** The fingerprint recorded on the column. */
-    found: string;
-    /** The fingerprint the current `search` block computes. */
-    expected: string;
-    /** The statements that would rebuild the column, for the operator to run. */
-    rebuild: string[];
-}
-
-/** A relation column whose old and new spellings both plausibly apply. */
-export interface LegacyForeignKey {
-    /** `schema.table`. */
-    table: string;
-    /** The name the current rule derives, and what this plan would create. */
-    expected: string;
-    /** The name the old rule derived, which the table already has. */
-    legacy: string;
 }
 
 export interface EnsureOutcome extends EnsurePlan {
@@ -369,698 +101,31 @@ export interface EnsureOutcome extends EnsurePlan {
     failures: { kind: EnsureAction["kind"]; target: string; error: string }[];
 }
 
-/**
- * The schema a collection lives in — validated, because it is about to be
- * interpolated into DDL.
- *
- * Validation used to run only on the names read back OUT of the catalogue,
- * which is the direction that cannot hurt anyone: those came from Postgres. The
- * names going IN — the schema and table a collection declares — were quoted and
- * concatenated on trust, and quoting is not escaping. A table named
- * `x" (id int); DROP TABLE users; --` closes the quote and the statement, and
- * the whole thing runs on the owner connection, which is the one connection in
- * the system that is exempt from every RLS policy.
- *
- * That is only a config file on a self-hosted project, where the person writing
- * it could run the SQL directly anyway. It is not only a config file where a
- * collection can be defined over the wire — the live-schema and source editors
- * both do that — and there the caller is an admin on the app, not an operator
- * of the database.
- */
+/** The schema a collection lives in, validated before it reaches any DDL. */
 function schemaOf(collection: CollectionConfig): string {
-    const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
+    const schema = (collection as { schema?: string }).schema || "public";
     return assertSafeIdentifier(schema, "schema name");
 }
 
-/** A collection's table name, validated for the same reason as {@link schemaOf}. */
-function tableOf(collection: CollectionConfig): string {
-    return assertSafeIdentifier(getTableName(collection), "table name");
-}
-
-function qualified(collection: CollectionConfig): string {
-    return `${schemaOf(collection)}.${tableOf(collection)}`;
-}
-
 /**
- * Enum types a collection's properties require, as `schema.typename`.
+ * Decide what to add. Pure — the caller supplies what exists and runs the
+ * result.
  *
- * Named exactly as the DDL generator names them (`<table>_<column>`), because
- * a column added here has to reference the same type the generator would have
- * created — a second, differently-named type for the same field would be a
- * silent schema fork.
- */
-function requiredEnums(collection: CollectionConfig): { name: string; values: string[] }[] {
-    const table = tableOf(collection);
-    const schema = schemaOf(collection);
-    const out: { name: string; values: string[] }[] = [];
-    for (const [propName, prop] of Object.entries(collection.properties ?? {})) {
-        const p = prop as Property;
-        if (!("enum" in p) || !p.enum) continue;
-        if (p.type !== "string" && p.type !== "number") continue;
-        const values = (p.enum as unknown[])
-            .map(entry =>
-                entry && typeof entry === "object" && "id" in (entry as Record<string, unknown>)
-                    ? String((entry as Record<string, unknown>).id)
-                    : String(entry)
-            )
-            .filter(v => v.length > 0);
-        if (values.length === 0) continue;
-        out.push({ name: `${schema}.${table}_${resolveColumnName(propName, p)}`, values });
-    }
-    return out;
-}
-
-/**
- * Decide what to add. Pure — the caller supplies what exists and runs the result.
- *
- * Ordering matters and is deliberate: enum types before the tables and columns
- * that reference them, tables before the columns added to other tables (a new
- * table may be the target of a relation), and nothing is emitted twice.
+ * A plan and a diff: the collections are read once, by `planSchema`, into the
+ * same {@link SchemaPlan} `db push` renders `schema.sql` from, and the diff
+ * subtracts what the database already has. Before that split this function had
+ * its own reading of every `Property`, and the audit found twelve places where
+ * it disagreed with the two generators — a required `author_id` that was
+ * NOT NULL after a push and nullable after a boot among them, on the one path
+ * with no developer in the loop.
  */
 export function planCollectionSchemaEnsure(
     allCollections: CollectionConfig[],
     existing: ExistingSchema,
     options: EnsureOptions = {}
 ): EnsurePlan {
-    const constraintPolicy: ConstraintPolicy = options.constraints ?? "additive";
-    const withheldConstraints: WithheldConstraint[] = [];
-    const columnTypeDrift: ColumnTypeDrift[] = [];
-    // Boot receives every collection the bundle declares, including the ones
-    // served by another engine entirely. Creating a Postgres table for a
-    // Firestore collection is not a harmless extra: the app keeps reading
-    // documents from Firestore while an empty table with the same name accretes
-    // policies and shows up in every drift report.
-    // Before the filter, deliberately: a `search` block on a collection this
-    // engine does not store would otherwise be dropped here without a word.
-    assertSearchIsPostgresOnly(allCollections);
-
-    const collections = relationalCollections(allCollections);
-    const actions: EnsureAction[] = [];
-    const plannedEnums = new Set<string>();
-
-    // 1. Enum types. `CREATE TYPE` has no IF NOT EXISTS, so an existing type is
-    //    skipped by name rather than guarded in SQL.
-    for (const collection of collections) {
-        for (const { name, values } of requiredEnums(collection)) {
-            if (existing.enums.has(name) || plannedEnums.has(name)) {
-                // The type is there, but that says nothing about its *values*.
-                // Skipping the whole type by name is what made an added enum
-                // value vanish: nothing was planned, the boot reported success,
-                // and the first row using the value was rejected by a type that
-                // had never heard of it. `ADD VALUE` is the one alteration
-                // Postgres offers here, it is purely additive, and it is
-                // idempotent with `IF NOT EXISTS`.
-                //
-                // `enumValues` absent means the caller built the schema by hand
-                // and does not know the values; skip by name as before rather
-                // than plan against a guess.
-                const current = existing.enumValues?.get(name);
-                if (!current || plannedEnums.has(name)) continue;
-                const [schema, typeName] = name.split(".");
-                for (const value of values) {
-                    if (current.includes(value)) continue;
-                    actions.push({
-                        kind: "add-enum-value",
-                        target: `${name}.${value}`,
-                        // Not inside a transaction with any use of the value:
-                        // Postgres refuses to read a value added by the
-                        // transaction still adding it. The applier runs these
-                        // one statement at a time, which is what makes it legal.
-                        sql: `ALTER TYPE "${schema}"."${typeName}" ADD VALUE IF NOT EXISTS ${quoteSqlLiteral(value)};`
-                    });
-                }
-                continue;
-            }
-            plannedEnums.add(name);
-            const [schema, typeName] = name.split(".");
-            actions.push({
-                kind: "create-enum",
-                target: name,
-                sql: `CREATE TYPE "${schema}"."${typeName}" AS ENUM (${values.map(quoteSqlLiteral).join(", ")});`
-            });
-        }
-    }
-
-    // 1b. Search support, for collections that declared a `search` block.
-    //
-    //     Before the tables, because a generated column's expression is
-    //     resolved when the column is created: a table whose search column
-    //     calls `rebase_search_text` cannot be added before that function
-    //     exists. Both forms are idempotent, so a boot against a database that
-    //     already has them plans nothing.
-    const searchSpecs = collections
-        .map(c => buildSearchColumnSpec(c))
-        .filter((spec): spec is SearchColumnSpec => spec !== undefined);
-
-    const plannedExtensions = new Set<string>();
-    const planExtension = (statement: string): void => {
-        if (plannedExtensions.has(statement)) return;
-        plannedExtensions.add(statement);
-        actions.push({ kind: "create-extension", target: statement.replace(/^CREATE EXTENSION IF NOT EXISTS |;$/g, ""), sql: statement });
-    };
-    for (const spec of searchSpecs) {
-        for (const statement of searchExtensionStatements(spec)) planExtension(statement);
-    }
-
-    // pgvector, for collections that declared a `vector` property — and only
-    // when a database gave leave to install it. Unlike the search extensions
-    // above, which are contrib modules every Postgres carries, pgvector is a
-    // separate build behind an image, a grant and a provider allow-list, so
-    // whether Rebase may install it is not Rebase's to decide. See
-    // `DatabaseOptions.extensions`.
-    //
-    // Boot has to make the same call `rebase db push` makes, or the two produce
-    // different databases from one commit — which is the rule
-    // `contracts/derived-names.txt` enforces.
-    if (vectorExtensionDeclared(options.databaseExtensions)
-        && collections.some(c => buildVectorColumnSpecs(c, resolveColumnName).length > 0)) {
-        planExtension(vectorExtensionStatement());
-    }
-    const plannedFunctions = new Set<string>();
-    for (const spec of searchSpecs) {
-        for (const statement of searchHelperFunctions(spec)) {
-            if (plannedFunctions.has(statement)) continue;
-            plannedFunctions.add(statement);
-            actions.push({ kind: "create-function", target: statement.includes("unaccent") ? SEARCH_UNACCENT_FN : SEARCH_TEXT_FN, sql: statement });
-        }
-    }
-
-    // 2. Missing tables. Only the identity column is created here; every other
-    //    column is added by step 3, so a new table and an existing table that
-    //    gained a field travel the exact same code path. One way to build a
-    //    column means one way for it to be wrong.
-    const created = new Set<string>();
-    for (const collection of collections) {
-        const key = qualified(collection);
-        if (existing.tables.has(key) || created.has(key)) continue;
-        created.add(key);
-        const schema = schemaOf(collection);
-        const table = tableOf(collection);
-        const idEntry = Object.entries(collection.properties ?? {}).find(([n, p]) =>
-            isIdProperty(n, p as Property, collection)
-        );
-        const idName = idEntry ? resolveColumnName(idEntry[0], idEntry[1] as Property) : "id";
-        const idProp = idEntry?.[1] as Property | undefined;
-        // Derived through the generator's own type mapping, not re-decided here.
-        // This branch used to emit BIGSERIAL for a numeric id while `db push`
-        // emitted INTEGER GENERATED BY DEFAULT AS IDENTITY, so the same project
-        // got an int8 key when the runtime brought the schema up and an int4 key
-        // when a human pushed it. Two consequences, both real: node-postgres
-        // hands back int8 as a *string*, so a collection declaring
-        // `type: "number"` served `"1"` instead of `1` on the managed path only;
-        // and every foreign key and junction column pointing at it stayed
-        // INTEGER on both paths, which is a truncation waiting for the sequence
-        // to pass 2^31. The agreement test now pins this.
-        const idType = idProp
-            ? getSqlColumnType(idEntry![0], idProp, collection, collections)
-            : "TEXT";
-        let idDef = `"${assertSafeIdentifier(idName, "column name")}" ${idType} PRIMARY KEY`;
-        if (idProp?.type === "string" && (idProp as { isId?: unknown }).isId === "uuid") {
-            idDef += " DEFAULT gen_random_uuid()";
-        }
-        actions.push({
-            kind: "create-table",
-            target: key,
-            sql: `CREATE TABLE IF NOT EXISTS "${schema}"."${table}" (${idDef});`
-        });
-    }
-
-    // 2b. Junction tables behind many-to-many relations. No collection declares
-    //     them, so the walk above never sees them — and until they existed, an
-    //     m2m write had nowhere to land and the junction's derived RLS had
-    //     nothing to attach to.
-    const junctions = planJunctionTables(collections);
-    for (const junction of junctions) {
-        const key = `${junction.schema}.${junction.table}`;
-        if (existing.tables.has(key) || created.has(key)) continue;
-        created.add(key);
-        actions.push({ kind: "create-table", target: key, sql: junction.createTable });
-    }
-
-    // 3. Missing columns, on both brand-new and pre-existing tables.
-    const legacyForeignKeys: LegacyForeignKey[] = [];
-
-    /**
-     * Move a relation column that is only missing because it was renamed.
-     *
-     * Returns true when it handled the column, so the caller skips the ordinary
-     * ADD. Adding here would be the wrong move and a quiet one: the data is in
-     * the old column, `ADD COLUMN` creates the new one empty beside it, every
-     * statement succeeds, and the relation reads the empty one. A rename is
-     * metadata-only in Postgres, keeps the values, and carries the column's
-     * indexes and constraints with it.
-     *
-     * Only ever reached when the new name is absent and the old name is
-     * present, so there is nothing to overwrite and nothing to choose between.
-     */
-    const renameLegacyColumn = (
-        key: string,
-        schema: string,
-        table: string,
-        column: string,
-        legacyName: string | undefined
-    ): boolean => {
-        const present = existing.tables.get(key);
-        if (!legacyName || !present) return false;
-        if (present.has(column) || !present.has(legacyName)) return false;
-
-        legacyForeignKeys.push({ table: key, expected: column, legacy: legacyName });
-        actions.push({
-            kind: "rename-column",
-            target: `${key}.${column}`,
-            sql: `ALTER TABLE "${schema}"."${table}" RENAME COLUMN "${legacyName}" TO "${column}";`
-        });
-        return true;
-    };
-
-    const addColumn = (
-        key: string,
-        schema: string,
-        table: string,
-        column: string,
-        definition: string
-    ): void => {
-        const present = existing.tables.get(key);
-        if (present?.has(column)) return;
-        // Same reason as {@link schemaOf}: a column name reaching here came
-        // from a property declaration, which on the editor paths came over the
-        // wire. `definition` is built by the generator from a closed set of
-        // type mappings and is not caller text.
-        assertSafeIdentifier(column, "column name");
-        actions.push({
-            kind: "add-column",
-            target: `${key}.${column}`,
-            sql: `ALTER TABLE "${schema}"."${table}" ADD COLUMN IF NOT EXISTS "${column}" ${definition};`
-        });
-    };
-
-    for (const collection of collections) {
-        const key = qualified(collection);
-        const schema = schemaOf(collection);
-        const table = tableOf(collection);
-        // A table this run is creating has no rows yet, so the constraints
-        // `db push` writes are free to apply. On a table that already exists
-        // they are not: `SET NOT NULL` is checked against live rows and a UNIQUE
-        // would fail on existing duplicates, and this module runs unattended
-        // against customer data with nobody reading a diff. So the constraints
-        // are emitted for the fresh case — which is the whole managed-runtime
-        // path, and the one that diverged from `db push` — and withheld for the
-        // adopted one. `rebase db push` remains how an existing table gets them.
-        const fresh = created.has(key);
-        const auth = isAuthCollection(collection);
-        for (const [propName, prop] of Object.entries(collection.properties ?? {})) {
-            const p = prop as Property;
-            if (isIdProperty(propName, p, collection)) continue;
-            // Relation and reference columns are planned from the shared
-            // relational planner below, which derives the column name, type and
-            // foreign key the same way `db push` does. Deriving them here as
-            // plain columns is what once produced a column with no constraint.
-            if (p.type === "reference" || p.type === "relation") continue;
-
-            const column = resolveColumnName(propName, p);
-            // On an auth collection, the columns auth itself reads and writes
-            // have exactly one definition, wherever the table is created from —
-            // see `auth-users-columns`. Anything else on that collection is an
-            // ordinary user-declared field and is generated like any other.
-            const authDefinition = auth ? authUsersColumnDefinition(column) : undefined;
-            if (authDefinition) {
-                addColumn(key, schema, table, column, authDefinition);
-                continue;
-            }
-
-            // Assembled in the generator's order — type, UNIQUE, DEFAULT,
-            // NOT NULL — so the two produce byte-identical column definitions
-            // and the agreement test can compare them directly instead of
-            // checking that a column merely exists, which is how BIGSERIAL-vs-
-            // INTEGER and every missing constraint went unnoticed.
-            const declaredType = getSqlColumnType(propName, p, collection, collections);
-            let definition = declaredType;
-            if (fresh && p.validation?.unique) definition += " UNIQUE";
-            // Not gated on `fresh`: a default binds future writes only, so it is
-            // safe on a live table, and a column added without it would take the
-            // value the application forgot to send rather than `now()`.
-            const autoValue = (p as { autoValue?: string }).autoValue;
-            const hasDefault = p.type === "date" && (autoValue === "on_create" || autoValue === "on_update");
-            if (hasDefault) definition += " DEFAULT now()";
-
-            const required = p.validation?.required === true;
-            const columnKey = `${key}.${column}`;
-            const columnExists = existing.tables.get(key)?.has(column) === true;
-
-            // The column is there and holds a different kind of value than the
-            // collection says it does. Reported, never altered: an unattended
-            // `ALTER COLUMN … TYPE` over customer data is not a thing to do
-            // quietly, and the *quiet* is what this fixes. A deploy that changed
-            // a `columnType` used to report success while the column stayed as
-            // it was, and the divergence surfaced later as every write failing.
-            const actualType = existing.columnTypes?.get(columnKey);
-            if (columnExists && actualType && !typesAgree(declaredType, actualType)) {
-                columnTypeDrift.push({
-                    table: key,
-                    column,
-                    declared: declaredType,
-                    actual: actualType
-                });
-            }
-
-            // A NOT NULL is safe exactly when it cannot fail against rows that
-            // are already there, and there are three ways to know that:
-            //
-            //  - the table is being created by this plan (no rows yet);
-            //  - the table exists and is empty;
-            //  - the column arrives with a DEFAULT, which Postgres backfills
-            //    into every existing row as part of ADD COLUMN.
-            //
-            // Anything else is checked against live data and can abort the boot,
-            // which is why it used to be withheld — correctly. What was wrong was
-            // withholding it in *silence*: the config said required, the column
-            // came out nullable, and nothing anywhere said so.
-            // `populatedTables` absent means the caller does not know, and not
-            // knowing has to read as "assume rows" — the other direction emits a
-            // NOT NULL that is checked against live data and aborts the boot.
-            // Written as an explicit `!== undefined` because the optional-chain
-            // form (`!existing.populatedTables?.has(key)`) quietly says *empty*
-            // when the fact is missing, which is the wrong way to be wrong.
-            const tableIsEmpty = existing.populatedTables !== undefined
-                && existing.tables.has(key)
-                && !existing.populatedTables.has(key);
-            const notNullIsSafe = fresh || tableIsEmpty || hasDefault;
-
-            if (required && !columnExists) {
-                if (notNullIsSafe) {
-                    definition += " NOT NULL";
-                } else {
-                    withheldConstraints.push({
-                        target: columnKey,
-                        kind: "not-null",
-                        reason:
-                            `"${column}" is required, but "${key}" already holds rows and the column ` +
-                            "has no default to backfill them with, so NOT NULL would be checked " +
-                            "against data that does not have a value yet.",
-                        remedy:
-                            "Backfill the column, then add the constraint — or give the property a " +
-                            "default so every existing row gets one."
-                    });
-                }
-            }
-            addColumn(key, schema, table, column, definition);
-
-            // The column is already there and only its constraint differs. Two
-            // directions, and they are not equally safe — see `ConstraintPolicy`
-            // for why neither runs at an unattended boot.
-            if (columnExists && constraintPolicy === "converge") {
-                const isNotNull = existing.notNullColumns?.has(columnKey) === true;
-                if (required && !isNotNull) {
-                    if (tableIsEmpty) {
-                        actions.push({
-                            kind: "set-not-null",
-                            target: columnKey,
-                            sql: `ALTER TABLE "${schema}"."${table}" ALTER COLUMN "${column}" SET NOT NULL;`
-                        });
-                    } else {
-                        withheldConstraints.push({
-                            target: columnKey,
-                            kind: "not-null",
-                            reason:
-                                `"${column}" became required, but "${key}" holds rows and any of them ` +
-                                "with no value would make SET NOT NULL fail.",
-                            remedy:
-                                "Backfill the column first — `UPDATE … SET \"" + column +
-                                "\" = … WHERE \"" + column + "\" IS NULL` — then apply this again."
-                        });
-                    }
-                }
-                if (!required && isNotNull) {
-                    // Loosening never fails and never loses data. It is here
-                    // rather than at boot because a database adopted by
-                    // introspection carries NOT NULL on columns the generated
-                    // collection deliberately leaves optional, and converging
-                    // those unasked would drop constraints nobody edited.
-                    actions.push({
-                        kind: "drop-not-null",
-                        target: columnKey,
-                        sql: `ALTER TABLE "${schema}"."${table}" ALTER COLUMN "${column}" DROP NOT NULL;`
-                    });
-                }
-            }
-        }
-
-        // The auth columns the collection never mentions. The scaffold's users
-        // collection describes 12 of the 14 auth reads and writes, so planning
-        // only from properties left `is_anonymous` and `tokens_valid_after` to
-        // `ensureAuthTablesExist` — which does create them, but only because
-        // that function happens to run later in the same boot. Planning them
-        // here makes this path self-contained and identical to `db push`, so
-        // neither depends on the other having run.
-        if (auth) {
-            const declared = new Set(
-                Object.entries(collection.properties ?? {})
-                    .map(([name, prop]) => resolveColumnName(name, prop as Property))
-            );
-            for (const spec of AUTH_USERS_COLUMNS) {
-                if (declared.has(spec.column)) continue;
-                addColumn(key, schema, table, spec.column, authUsersColumnSql(spec));
-            }
-        }
-    }
-
-    // 3aa. The generated search columns.
-    //
-    //      Adding a STORED generated column rewrites the table, which on a large
-    //      one is not free — but it is the same additive shape as every other
-    //      column here, and the alternative (leaving it out until someone runs a
-    //      migration) is a declared `search` block that silently does nothing.
-    //
-    //      Changing one is not additive, and `ADD COLUMN IF NOT EXISTS` is a
-    //      no-op against a column that is already there — which is why a `search`
-    //      block that gained a field, flipped `unaccent` or moved a weight used
-    //      to be inert forever, on every path, with nothing logged. Each column
-    //      therefore carries a fingerprint of the expression it was built from
-    //      (in its comment), and a mismatch is reported rather than applied.
-    const searchDrift: SearchColumnDrift[] = [];
-    const searchAdopted: { table: string; column: string }[] = [];
-    for (const spec of searchSpecs) {
-        const key = `${spec.schema}.${spec.table}`;
-        const definitions: Record<string, string> = {
-            [spec.column]: `tsvector GENERATED ALWAYS AS (${spec.expression}) STORED`
-        };
-        if (spec.fuzzy) {
-            definitions[spec.fuzzy.column] = `text GENERATED ALWAYS AS (${spec.fuzzy.expression}) STORED`;
-        }
-
-        for (const stamp of searchColumnStamps(spec)) {
-            const definition = definitions[stamp.column];
-            const exists = existing.tables.get(key)?.has(stamp.column) === true;
-            const recorded = existing.columnComments?.get(`${key}.${stamp.column}`);
-
-            if (exists && recorded?.startsWith(SEARCH_STAMP_PREFIX) && recorded !== stamp.fingerprint) {
-                searchDrift.push({
-                    table: key,
-                    column: stamp.column,
-                    found: recorded,
-                    expected: stamp.fingerprint,
-                    rebuild: [
-                        `ALTER TABLE "${spec.schema}"."${spec.table}" DROP COLUMN "${stamp.column}";`,
-                        `ALTER TABLE "${spec.schema}"."${spec.table}" ADD COLUMN "${stamp.column}" ${definition};`,
-                        stamp.sql
-                    ]
-                });
-                // The old stamp is the only evidence of what the column holds;
-                // overwriting it here would erase the drift instead of fixing it.
-                continue;
-            }
-
-            addColumn(key, spec.schema, spec.table, stamp.column, definition);
-            if (exists && recorded === undefined) {
-                searchAdopted.push({ table: key, column: stamp.column });
-            }
-            if (recorded !== stamp.fingerprint) {
-                actions.push({
-                    kind: "comment-column",
-                    target: `${key}.${stamp.column}`,
-                    sql: stamp.sql
-                });
-            }
-        }
-    }
-
-    // 3b. A junction that already existed, but is short a column. One created
-    //     above already carries both — unlike a collection table, whose CREATE
-    //     declares only the identity column — so re-listing them would log two
-    //     no-op statements and inflate the count of changes applied.
-    for (const junction of junctions) {
-        const key = `${junction.schema}.${junction.table}`;
-        if (created.has(key)) continue;
-        for (const column of junction.columns) {
-            if (renameLegacyColumn(key, junction.schema, junction.table, column.name, column.legacyName)) continue;
-            addColumn(key, junction.schema, junction.table, column.name, column.type);
-        }
-    }
-
-    // 3c. The columns relation and reference properties own.
-    //
-    // Recorded per table as well as planned: these columns are derived here
-    // rather than declared in `properties`, so the orphan check below would
-    // otherwise read every foreign key as a column nobody declared.
-    const plannedRelationColumns = new Map<string, Set<string>>();
-    for (const relational of planRelationalColumns(collections)) {
-        const relKey = `${relational.schema}.${relational.table}`;
-        if (!plannedRelationColumns.has(relKey)) plannedRelationColumns.set(relKey, new Set());
-        plannedRelationColumns.get(relKey)!.add(relational.column);
-        if (relational.legacyColumn) plannedRelationColumns.get(relKey)!.add(relational.legacyColumn);
-        if (renameLegacyColumn(relKey, relational.schema, relational.table, relational.column, relational.legacyColumn)) continue;
-        addColumn(
-            relKey,
-            relational.schema,
-            relational.table,
-            relational.column,
-            relational.type
-        );
-    }
-
-    // 4. Foreign keys, last: the tables and columns on both ends have to exist
-    //    first, and a constraint is the one thing here that can fail on data
-    //    rather than on schema, so nothing else depends on it.
-    const knownConstraints = existing.constraints ?? new Set<string>();
-    const plannedConstraints = new Set<string>();
-    const foreignKeys = [
-        ...planRelationalColumns(collections).map(r => r.foreignKey),
-        ...junctions.flatMap(j => j.foreignKeys)
-    ];
-    for (const fk of foreignKeys) {
-        if (!fk) continue;
-        const name = `${fk.schema}.${fk.table}.${fk.constraintName}`;
-        if (knownConstraints.has(name) || plannedConstraints.has(name)) continue;
-        plannedConstraints.add(name);
-        actions.push({
-            kind: "add-constraint",
-            target: `${fk.schema}.${fk.table}.${fk.constraintName}`,
-            sql: fk.sql
-        });
-    }
-
-    // 5. Search indexes, after everything — the column has to exist, and this is
-    //    the one step that runs against a populated table for real work.
-    //
-    //    CONCURRENTLY: a plain CREATE INDEX takes a lock that blocks writes for
-    //    the duration of the build, which on a live table is an outage. Each
-    //    statement here is issued on its own, outside any transaction, which is
-    //    the condition CONCURRENTLY requires.
-    //
-    //    ...and only on a live table. `concurrentIndexing` withholds it for a
-    //    table this same plan is creating: there are no rows to build from and
-    //    no writer to block, so the lock CONCURRENTLY avoids is a lock nobody
-    //    would have taken. Worth withholding rather than merely harmless,
-    //    because CONCURRENTLY is the one index form Postgres refuses inside a
-    //    transaction block — so on a first boot it buys nothing and adds the
-    //    single failure mode this whole statement family has.
-    const concurrentIndexing = (schema: string, table: string): boolean =>
-        !created.has(`${schema}.${table}`);
-    for (const spec of searchSpecs) {
-        for (const statement of searchIndexStatements(spec)) {
-            actions.push({
-                kind: "create-index",
-                target: `${spec.schema}.${spec.table}`,
-                sql: concurrentIndexing(spec.schema, spec.table)
-                    ? statement.replace("CREATE INDEX IF NOT EXISTS", "CREATE INDEX CONCURRENTLY IF NOT EXISTS")
-                    : statement
-            });
-        }
-    }
-
-    //    ANN indexes for vector columns, on the same terms: the column has to
-    //    exist, the build is real work against real rows, and CONCURRENTLY is
-    //    what keeps that from locking writes for its duration.
-    //
-    //    A column too wide for pgvector to index is reported, not planned —
-    //    silence there would read as "indexed" to anyone watching the boot.
-    const vectorIndexSkipped: SkippedVectorIndex[] = [];
-    for (const collection of collections) {
-        const plan = buildVectorIndexPlan(collection, resolveColumnName);
-        for (const spec of plan.specs) {
-            actions.push({
-                kind: "create-index",
-                target: `${spec.schema}.${spec.table}`,
-                sql: concurrentIndexing(spec.schema, spec.table)
-                    ? vectorIndexStatement(spec).replace("CREATE INDEX IF NOT EXISTS", "CREATE INDEX CONCURRENTLY IF NOT EXISTS")
-                    : vectorIndexStatement(spec)
-            });
-        }
-        vectorIndexSkipped.push(...plan.skipped);
-    }
-
-    //    Declared indexes, on exactly the same terms as the ANN ones above.
-    //
-    //    Boot has to emit these, not just `db push`: the managed runtime
-    //    provisions at boot and never runs a push, so a push-only index would
-    //    simply not exist there — and nothing would say so.
-    //    `contracts/derived-names.txt` states the rule ("Both, or it is a
-    //    bug") and the gate enforces it, which is what caught this.
-    //
-    //    `concurrently` is a parameter here rather than a string replacement
-    //    on the rendered SQL. The `.replace("CREATE INDEX IF NOT EXISTS", …)`
-    //    just above silently does nothing for a UNIQUE index, whose text is
-    //    `CREATE UNIQUE INDEX …` and never matches the pattern.
-    for (const spec of buildCollectionIndexPlan(collections, resolveColumnName)) {
-        actions.push({
-            kind: "create-index",
-            target: `${spec.schema}.${spec.table}`,
-            sql: collectionIndexStatement(spec, {
-                concurrently: concurrentIndexing(spec.schema, spec.table),
-                ifNotExists: true
-            })
-        });
-    }
-
-    // A column the database still requires that no property declares any more.
-    //
-    // Computed last, over the same live snapshot the rest of the plan read, and
-    // only for tables this run did not create — a table created here has exactly
-    // the columns the collection asked for, so there is nothing to orphan.
-    //
-    // Every element of the test matters. NOT NULL, because a nullable leftover
-    // accepts a write and is merely untidy. No DEFAULT, because a leftover with
-    // one is filled in for you. Not declared, because that is what makes it
-    // unreachable — the author has no field to send. The id column is excluded
-    // for the same reason it is skipped everywhere else here: it is generated.
-    const orphanedRequiredColumns: OrphanedRequiredColumn[] = [];
-    if (existing.notNullColumns && existing.columnDefaults) {
-        for (const collection of collections) {
-            const key = qualified(collection);
-            const live = existing.tables.get(key);
-            if (!live || created.has(key)) continue;
-
-            const declared = new Set<string>();
-            for (const [propName, prop] of Object.entries(collection.properties ?? {})) {
-                declared.add(resolveColumnName(propName, prop as Property));
-            }
-            // Relation and reference columns are planned by the relational
-            // planner, not from `properties`, so a foreign key would otherwise
-            // read as undeclared. Anything that planner named for this table is
-            // declared by definition.
-            for (const column of plannedRelationColumns.get(key) ?? []) declared.add(column);
-
-            for (const column of live) {
-                const columnKey = `${key}.${column}`;
-                if (declared.has(column)) continue;
-                if (!existing.notNullColumns.has(columnKey)) continue;
-                if (existing.columnDefaults.has(columnKey)) continue;
-                orphanedRequiredColumns.push({ table: key, column, slug: collection.slug });
-            }
-        }
-    }
-
-    return {
-        actions,
-        statements: actions.map(a => a.sql),
-        legacyForeignKeys,
-        searchDrift,
-        searchAdopted,
-        vectorIndexSkipped,
-        withheldConstraints,
-        columnTypeDrift,
-        orphanedRequiredColumns
-    };
+    const plan = planSchema(allCollections, { databaseExtensions: options.databaseExtensions });
+    return diffPlanAgainstCatalogue(plan, existing, { constraints: options.constraints });
 }
 
 /** Read what the database has, for the schemas the collections live in. */
@@ -1095,8 +160,17 @@ export async function readExistingSchema(
         is_nullable: string;
         udt_name: string | null;
         column_default: string | null;
+        numeric_precision: number | null;
+        numeric_scale: number | null;
     }>(
-        `SELECT table_schema, table_name, column_name, is_nullable, udt_name, column_default
+        // `numeric_precision`/`numeric_scale` because `udt_name` is `numeric`
+        // for both `NUMERIC` and `NUMERIC(10, 2)`, and a property that declares
+        // a precision means it: money stored in an unbounded column keeps the
+        // third decimal the rounding was supposed to remove. Only carried for
+        // `numeric`, where the modifier changes what a value *is*; a `varchar`
+        // width is a limit on the same family and `typesAgree` ignores it.
+        `SELECT table_schema, table_name, column_name, is_nullable, udt_name, column_default,
+                numeric_precision, numeric_scale
          FROM information_schema.columns
          WHERE table_schema IN (${inList})`
     );
@@ -1105,9 +179,27 @@ export async function readExistingSchema(
         if (!tables.has(key)) tables.set(key, new Set());
         tables.get(key)!.add(row.column_name);
         if (row.is_nullable === "NO") notNullColumns.add(`${key}.${row.column_name}`);
-        if (row.udt_name) columnTypes.set(`${key}.${row.column_name}`, row.udt_name);
+        if (row.udt_name) {
+            const modifier = row.udt_name === "numeric" && row.numeric_precision !== null
+                ? `(${row.numeric_precision},${row.numeric_scale ?? 0})`
+                : "";
+            columnTypes.set(`${key}.${row.column_name}`, `${row.udt_name}${modifier}`);
+        }
         if (row.column_default !== null) columnDefaults.add(`${key}.${row.column_name}`);
     }
+
+    // Trigger names, so `autoValue: "on_update"` is installed once rather than
+    // re-issued on every boot. `tgisinternal` excludes the ones Postgres itself
+    // creates to enforce foreign keys.
+    const triggers = new Set<string>();
+    const { rows: triggerRows } = await client.query<{ schema: string; table: string; name: string }>(
+        `SELECT n.nspname AS schema, c.relname AS table, t.tgname AS name
+         FROM pg_trigger t
+         JOIN pg_class c ON t.tgrelid = c.oid
+         JOIN pg_namespace n ON c.relnamespace = n.oid
+         WHERE NOT t.tgisinternal AND n.nspname IN (${inList})`
+    );
+    for (const row of triggerRows) triggers.add(`${row.schema}.${row.table}.${row.name}`);
 
     // Which tables hold rows. This is the only fact that decides whether a
     // NOT NULL can be added without reading the data, so it is worth a query.
@@ -1214,7 +306,7 @@ export async function readExistingSchema(
 
     return {
         tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables, columnTypes,
-        columnDefaults
+        columnDefaults, triggers
     };
 }
 
@@ -1282,30 +374,39 @@ export async function ensureCollectionTables(
     log?: (message: string) => void,
     options: EnsureOptions = {}
 ): Promise<EnsureOutcome> {
-    // Junctions live alongside the collections that declare them, so their
-    // schema has to be read too — otherwise an existing junction reads as
-    // missing and its constraints as unplanned.
-    const schemas = Array.from(new Set([
-        ...collections.map(schemaOf),
-        ...planJunctionTables(collections).map(j => j.schema)
-    ]));
-    for (const schema of schemas) {
-        assertSafeIdentifier(schema, "schema name");
-        if (schema !== "public") {
-            await client.query(`CREATE SCHEMA IF NOT EXISTS "${schema}";`);
-        }
-    }
-
-    const existing = await readExistingSchema(client, schemas);
     // This is the boundary, so this is where the world is read: the planner
     // itself takes the permission as an argument and never reaches for the
     // registry. By the time boot gets here `loadBundleResourceGraph` has
     // evaluated the project's `resources.ts`, so the declarations are there —
     // and a caller that already knows them can still say so.
-    const plan = planCollectionSchemaEnsure(collections, existing, {
-        ...options,
+    const schema = planSchema(collections, {
         databaseExtensions: options.databaseExtensions ?? declaredDatabaseExtensions()
     });
+
+    // Junctions live alongside the collections that declare them, so their
+    // schema has to be read too — otherwise an existing junction reads as
+    // missing and its constraints as unplanned. Taken off the plan, which lists
+    // both kinds of table.
+    const schemas = Array.from(new Set(schema.tables.map(table => table.schema)));
+    for (const name of schemas) {
+        assertSafeIdentifier(name, "schema name");
+        if (name !== "public") {
+            await client.query(`CREATE SCHEMA IF NOT EXISTS "${name}";`);
+        }
+    }
+    // `rebase` is where the `updated_at` trigger's function lives. Every real
+    // boot has the schema by the time this runs (auth ensures it first) and
+    // `db push` creates it in `schema.sql`, but this path is also driven by the
+    // live schema editor and by tests, where "the function's schema happens to
+    // exist already" is not a thing to rely on. Only when something needs it,
+    // so a project with no trigger issues no statement — and not added to the
+    // read set: what is *in* `rebase` is auth's business, not this planner's.
+    if (schema.tables.some(table => table.triggers.length > 0)) {
+        await client.query(`CREATE SCHEMA IF NOT EXISTS "${REBASE_SCHEMA}";`);
+    }
+
+    const existing = await readExistingSchema(client, schemas);
+    const plan = diffPlanAgainstCatalogue(schema, existing, { constraints: options.constraints });
     const failures: EnsureOutcome["failures"] = [];
 
     // Reported, not warned: this is a rename the ensure is about to perform, and

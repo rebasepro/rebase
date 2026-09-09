@@ -78,6 +78,8 @@
     "check:studio-tools": "node tooling/scripts/check-studio-tools-table.mjs",
     "check:ui-string-paths": "node tooling/scripts/check-ui-string-paths.mjs",
     "check:doc-links": "node tooling/scripts/check-doc-links.mjs",
+    "check:doc-examples": "TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx tooling/scripts/check-doc-examples.mjs",
+    "check:schema-sample": "TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx tooling/scripts/check-schema-sample.mjs",
     "check:bug-classes": "node tooling/scripts/check-bug-classes.mjs",
     "check:lint": "eslint . --quiet",
     "ci:static": "node tooling/scripts/ci-static.mjs",

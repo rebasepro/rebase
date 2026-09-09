@@ -149,7 +149,24 @@ export function typesAgree(declared: string, actual: string): boolean {
     const a = typeFamily(declared);
     const b = typeFamily(actual);
     if (a === null || b === null) return true;
-    return a === b;
+    if (a !== b) return false;
+    // Same family, and for `numeric` that is not the end of it: the modifier is
+    // what makes `NUMERIC(10, 2)` a price and a bare `NUMERIC` a number that
+    // keeps whatever the caller sent. A property that declares
+    // `precision`/`scale` is asking the database to round, and a column without
+    // them silently does not — so the two disagree, and the drift report says
+    // so. A declaration with no modifier accepts whatever is there, which is
+    // what it always did.
+    if (a !== "numeric") return true;
+    const declaredModifier = numericModifier(declared);
+    if (declaredModifier === null) return true;
+    return declaredModifier === numericModifier(actual);
+}
+
+/** `numeric(10,2)` / `NUMERIC(10, 2)` → `10,2`; a bare `numeric` → `null`. */
+function numericModifier(raw: string): string | null {
+    const match = raw.match(/\(([^)]*)\)/);
+    return match ? match[1].replace(/\s+/g, "") : null;
 }
 
 /**

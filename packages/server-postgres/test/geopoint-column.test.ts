@@ -1,6 +1,8 @@
 import { CollectionConfig, Property } from "@rebasepro/types";
-import { generateSchema, getDrizzleColumn } from "../src/schema/generate-drizzle-schema-logic";
-import { generatePostgresDdl, getSqlColumnType } from "../src/schema/generate-postgres-ddl-logic";
+import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
+import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
+import { planSchema } from "../src/schema/plan/plan-schema";
+import { planColumnFor, planColumnTypeFor } from "./helpers/plan-column";
 import { serializePropertyToServer, parsePropertyFromServer } from "../src/data-transformer";
 
 /**
@@ -34,10 +36,10 @@ name: "Location" }
         expect(ddl).toMatch(/"location"\s+JSONB/);
     });
 
-    it("agrees between the two generators", () => {
-        const prop = places.properties.location as Property;
-        expect(getDrizzleColumn("location", prop, places, [places])).toContain("jsonb");
-        expect(getSqlColumnType("location", prop, places, [places])).toBe("JSONB");
+    // The two generators cannot disagree any more: there is one column, decided
+    // once, and each of them renders it. This pins the decision itself.
+    it("is one jsonb column in the plan both generators render", () => {
+        expect(planColumnTypeFor([places], "places", "location")).toBe("JSONB");
     });
 
     it("round-trips a { latitude, longitude } value", () => {
@@ -73,10 +75,9 @@ lng: 2.17 }, prop, "location"))
             properties: { thing: { type: "quaternion" } }
         } as unknown as CollectionConfig;
 
-        expect(() => getDrizzleColumn("thing", odd.properties.thing as Property, odd, [odd]))
-            .toThrow(/No Postgres column mapping for property 'thing' of type 'quaternion'/);
-        expect(() => getSqlColumnType("thing", odd.properties.thing as Property, odd, [odd]))
-            .toThrow(/No Postgres column type for property 'thing' of type 'quaternion'/);
+        // Once, in the planner, before any renderer is reached.
+        expect(() => planSchema([odd]))
+            .toThrow(/No Postgres column type for property "thing" of type "quaternion"/);
     });
 
     it("still emits no column for a relation that lives on the other table", () => {
@@ -99,6 +100,6 @@ relationName: "posts" }
             ]
         } as unknown as CollectionConfig;
 
-        expect(getDrizzleColumn("posts", authors.properties.posts as Property, authors, [authors])).toBeNull();
+        expect(planColumnFor([authors], "authors", "posts")).toBeUndefined();
     });
 });

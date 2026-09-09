@@ -24,6 +24,9 @@ import {
     applyVectorDdl,
     getVectorExcludes,
     readVectorDdl,
+    applyTriggersDdl,
+    getTriggerExcludes,
+    readTriggersDdl,
     getTableExcludes,
     getForeignIndexExcludes,
     ExcludeIntrospectionError,
@@ -232,7 +235,8 @@ async function stripCarvedOutFromNewestMigration(collectionsPath: string): Promi
     // plans a drop for every one.
     const patterns = [
         ...await getSearchExcludes(collectionsPath),
-        ...await getVectorExcludes(collectionsPath)
+        ...await getVectorExcludes(collectionsPath),
+        ...await getTriggerExcludes(collectionsPath)
     ];
     if (patterns.length === 0) return true;
 
@@ -433,6 +437,14 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                         out(chalk.gray("  ✓ Appended search DDL to the migration"));
                     }
 
+                    // Last of the three: a trigger needs its table and its
+                    // column, and both arrive above.
+                    const triggersContent = readTriggersDdl();
+                    if (triggersContent) {
+                        migrationContent = `${migrationContent}\n\n${triggersContent}`;
+                        out(chalk.gray("  ✓ Appended `updated_at` triggers to the migration"));
+                    }
+
                     fs.writeFileSync(newestMigrationFile, migrationContent, "utf-8");
 
                     // Append RLS policies, preceded by the RLS bootstrap so the
@@ -464,9 +476,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // wherever this project is deployed.
             out(chalk.gray(
                 "  ℹ No migration written — nothing in this change is visible to Atlas.\n" +
-                "    Search, vector and RLS DDL are applied by `rebase db push`, and at boot by\n" +
-                "    the schema ensure. For a migration-only deployment, add drizzle/search.sql,\n" +
-                "    drizzle/vector.sql and drizzle/policies.sql to a migration by hand."
+                "    Search, vector, trigger and RLS DDL are applied by `rebase db push`, and at\n" +
+                "    boot by the schema ensure. For a migration-only deployment, add\n" +
+                "    drizzle/search.sql, drizzle/vector.sql, drizzle/triggers.sql and\n" +
+                "    drizzle/policies.sql to a migration by hand."
             ));
         }
 
@@ -654,6 +667,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 // may reference the table they are added to.
                 await applyVectorDdl(databaseUrl);
                 await applySearchDdl(databaseUrl);
+                await applyTriggersDdl(databaseUrl);
                 await applyPolicies(databaseUrl);
                 await reconcilePolicies(databaseUrl, collectionsPath);
                 await ensureRlsUserRole(databaseUrl);
@@ -1412,6 +1426,7 @@ async function runAtlas(
         // does not carry them, so an apply left to itself would drop them.
         excludes.push(...await getSearchExcludes(collectionsPath));
         excludes.push(...await getVectorExcludes(collectionsPath));
+        excludes.push(...await getTriggerExcludes(collectionsPath));
 
         // Fail CLOSED: the exclude list is the only thing shielding
         // non-collection tables from the auto-approved apply. If we can't

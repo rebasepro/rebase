@@ -7662,6 +7662,7 @@ For each collection, the following endpoints are generated. Every other route th
 | `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
 | `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
 | `POST` | `/api/data/:slug/bulk/delete` | Delete many entities in one transaction |
+| `POST` | `/api/data/_batch` | Write **across** collections in one transaction |
 
 #### Subcollection Routes
 
@@ -7761,7 +7762,7 @@ use `isnull` for that. The SDK serializes `.where("deleted_at", "==", null)` as
 
 #### Logical Operators
 
-Use `or` and `and` for complex conditions:
+Use `or`, `and` and `not` for complex conditions:
 
 ```bash
 # OR: match products that are either cheap or on sale
@@ -7769,14 +7770,24 @@ GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
 
 # AND: explicit conjunction
 GET /api/data/products?and=(active.eq.true,price.gt.0)
+
+# NOT: everything that is not a discontinued in-stock item
+GET /api/data/products?not=(discontinued.eq.true,stock.gt.0)
 ```
 
-**One group per request, and `or` wins.** If a request carries both `?or=` and
-`?and=`, the `and` is ignored — they are two spellings of the same slot, not two
-filters. Nest instead:
+`not` negates the **conjunction** of its conditions: `not(a)` is `NOT a`, and
+`not(a,b)` is `NOT (a AND b)`. It compiles to a real SQL `NOT (...)` rather than
+to inverted operators — SQL is three-valued, so `NOT (a AND b)` and
+`(NOT a) OR (NOT b)` stop agreeing the moment a NULL is involved. A negation
+therefore **includes rows whose column is NULL**, which is what `NOT` means; AND
+a `notnull` alongside it if that is not what you want.
+
+**One group per request: `or` wins over `and`, and both over `not`.** They are
+three spellings of the same slot, not three filters. Nest instead:
 
 ```bash
 GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
+GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 ```
 
 Groups may nest 32 levels deep; past that the request is refused with
@@ -7859,6 +7870,26 @@ paging over an order that is not total repeats and skips rows.
 A repeated `?orderBy=` parameter is not a multi-key sort — the last one wins, as
 it does for every other query parameter. Use the array.
 
+#### Where NULLs sort
+
+By default NULLs sort **last ascending and first descending**, which is
+Postgres's own convention. A third colon-segment says otherwise:
+
+```bash
+# Newest first, with the undated rows at the end rather than the top
+GET /api/data/posts?orderBy=publishedAt:desc:last
+```
+
+The JSON array form takes a `"nulls"` key for the same thing:
+
+```bash
+GET /api/data/posts?orderBy=[{"field":"publishedAt","direction":"desc","nulls":"last"}]
+```
+
+Anything other than `first` or `last` is a 400, not a silently different order.
+The cursor below honours whatever the sort declared, so paging over a nullable
+key stays correct under either placement.
+
 ### Pagination
 
 Use `limit` and `offset`, or `page`:
@@ -7879,6 +7910,70 @@ itself: `INVALID_LIMIT`, `INVALID_OFFSET` (a whole number of 0 or more) and
 the one asked for cannot be told apart from having reached the end of the
 collection, which is why none of them is clamped or ignored.
 
+#### Cursor pagination
+
+`offset` re-counts rows on every request, so a row inserted or deleted between
+two pages shifts the window and the walk silently skips or repeats rows.
+`?after=` seeks instead: the next page starts strictly after the last row
+served.
+
+Every list response carries `meta.nextCursor` while there is another page. Send
+it back unchanged:
+
+```bash
+GET /api/data/orders?orderBy=createdAt:desc&limit=100
+# → meta.nextCursor = "eyJrIjpbWyJjcmVhdGVkX2F0Iiw…"
+
+GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJjcmVhdGVkX2F0Iiw…
+```
+
+The cursor is **opaque** — it encodes the sort keys *and* the last row's values
+for them — so three rules follow, each a 400 rather than a wrong page:
+
+| Situation | Code |
+|-----------|------|
+| `after` with `offset` or `page` | `CURSOR_WITH_OFFSET` — both say where the page starts |
+| `after` with a different `orderBy` than it was issued under | `CURSOR_ORDER_MISMATCH` |
+| A cursor this API did not issue | `INVALID_CURSOR` |
+
+A request that names no `orderBy` **adopts the cursor's**, so passing
+`meta.nextCursor` back without restating the sort works.
+
+Multi-key sorts and nullable keys both page correctly: the comparison is built
+over every key in order, with the NULL placement the sort declared. The one
+ordering no cursor can describe is relevance (`_score`) — computed per query and
+stored nowhere — and such a listing simply carries no `nextCursor`.
+
+### Selecting columns
+
+`?fields=` narrows a read to the columns you name. It is a projection pushed
+into the query, not a trim of the response:
+
+```bash
+GET /api/data/posts?fields=id,title&limit=50
+```
+
+The primary key always comes back (a row that cannot be addressed cannot be
+updated, deleted, or paged past — and the cursor is derived from it), and
+`excludeFromApi` columns stay hidden whether or not they are named. An unknown
+column is a 400 `UNKNOWN_FIELD` rather than a row quietly missing a field.
+
+`?distinct=true` collapses rows identical over those columns:
+
+```bash
+# The statuses actually in use
+GET /api/data/posts?fields=status&distinct=true
+```
+
+It is refused (400) alongside a ranked `searchString` or a vector search, which
+attach a per-row score that makes every row distinct by construction, and when
+`orderBy` names a column `fields` does not return
+(`DISTINCT_ORDER_BY_NOT_SELECTED`) — Postgres cannot order a DISTINCT read by an
+expression outside its select list.
+
+`?fields=` and `?distinct=` work on the get-by-id route and the nested
+subcollection routes too.
+
 #### Response Format
 
 List responses include pagination metadata:
@@ -7893,10 +7988,15 @@ List responses include pagination metadata:
         "total": 150,
         "limit": 20,
         "offset": 0,
-        "hasMore": true
+        "hasMore": true,
+        "nextCursor": "eyJrIjpbWyJpZCIsImRlc2MiXV0sInYiOnsiaWQiOjJ9LCJpIjoyfQ"
     }
 }
 ```
+
+`nextCursor` is present while `hasMore` is true and the page returned at least
+one row; it is absent on the last page and on an ordering no cursor can
+describe.
 
 Single entity responses return a flat object:
 
@@ -7988,9 +8088,42 @@ Use the `include` parameter to embed related entities:
 # Include specific relations
 GET /api/data/articles?include=author,categories
 
-# Include all relations
+# Include all relations, one hop deep
 GET /api/data/articles?include=*
+
+# A relation of a relation — up to three hops
+GET /api/data/articles?include=comments.author
 ```
+
+A name that is not a relation of the collection is a **400
+`UNKNOWN_RELATION`**, at every level. It used to be ignored, which answers 200
+with the field simply missing — indistinguishable from a row that genuinely has
+no related row, so a typo looked exactly like empty data. A path deeper than
+three hops is `INCLUDE_TOO_DEEP`.
+
+#### Narrowing one relation
+
+The comma-separated form has nowhere to put a per-relation `limit`, so
+`include` also accepts JSON — told apart by a leading brace:
+
+```bash
+GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",true]},"orderBy":"createdAt:desc","fields":["id","body"],"include":{"author":true}}}
+```
+
+| Key | Meaning |
+|-----|---------|
+| `limit` | Rows **per parent row**, not across the page |
+| `where` | The same filter dialect the top-level `where` uses |
+| `logical` | An `or`/`and`/`not` group over the related rows |
+| `orderBy` | The same sort spelling, including the NULL placement |
+| `fields` | Columns of the *related* row; its key always survives |
+| `include` | Relations of the related row, in turn |
+
+`true` means "load it whole", so `{"author":true}` and `author` are the same
+request. Both spellings work on the list route, the get-by-id route and the
+nested subcollection routes.
+
+Each hop is one batched query for the whole page, never one per row.
 
 Included relations are embedded directly in the response:
 
@@ -8007,13 +8140,13 @@ Included relations are embedded directly in the response:
 }
 ```
 
-### Field Selection
+### Writing
 
-Use `fields` to select specific columns:
-
-```bash
-GET /api/data/products?fields=id,name,price
-```
+Idempotency keys, conditional writes (`ETag` / `If-Match`), field operations
+(`$inc`, `$push`, `$pull`, `$merge`), upserting on a natural key,
+`Prefer: return=minimal`, and the cross-collection `POST /api/data/_batch`
+endpoint are all on their own page: **[Writing over
+REST](/docs/backend/writes/)**.
 
 ### Lifecycle Hook Pipeline
 
@@ -8077,6 +8210,229 @@ document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
 - **[Client SDK](/docs/sdk)** — Type-safe client for the REST API
 - **[Collections](/docs/collections)** — Define your data schema
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — Control access per row
+
+## Writing over REST
+
+The verbs are on the [REST API](/docs/backend/api/) page. This one is about the
+five things a write can *ask for* beyond its verb, and the endpoint that writes
+across collections at once. All of them are opt-in per request: a write that
+does not ask for any of this behaves exactly as it always has.
+
+### Writing
+
+Beyond the verbs, the write routes take five things that change how a write
+behaves. All five are opt-in per request, so nothing here changes what a
+request that does not ask for it does.
+
+#### Idempotency
+
+`Idempotency-Key: <uuid>` on any write means "if you have already answered this
+exact request, answer it again rather than doing it twice".
+
+```bash
+curl -X POST /api/data/orders \
+     -H "Idempotency-Key: 1f0f…" \
+     -d '{"total": 40}'
+```
+
+A client that never sees a response cannot know whether the write committed, so
+it retries — and without a key the server cannot tell that retry from a second
+genuine write. On a table with a server-assigned id that is a duplicate row,
+because the id the client invented was never used.
+
+A key names **one request**: it records the method, the path and the body it was
+claimed for. Re-send that exact request and its answer is replayed; send a
+different one under the same key and it is refused with `IDEMPOTENCY_KEY_REUSED`
+(422) rather than answered with the first one's result. A retry that arrives
+while the first is still in flight gets `IDEMPOTENCY_KEY_IN_PROGRESS` (409) —
+send it again once the first has landed.
+
+Honoured on `POST`, `PATCH`, `DELETE`, all three `/bulk` routes and `/_batch`.
+Keys live for 24 hours and are scoped to the signed-in caller; an
+unauthenticated request has no principal to scope one to, so the header is
+ignored there. A backend that cannot store keys ignores the header rather than
+refusing the write.
+
+`DELETE` is the case worth reading twice. Replayed without a key, the second
+attempt finds the row gone and answers `404` — which a retrying client reads as
+a permanent failure for a delete that in fact succeeded. Under a key it replays
+the `204`.
+
+#### Optimistic concurrency: `ETag` and `If-Match`
+
+`GET /api/data/:slug/:id` returns an `ETag`. Send it back as `If-Match` on a
+later `PATCH` or `DELETE` and the write is refused with `412` if the row has
+changed in between.
+
+```bash
+# read
+curl -i /api/data/docs/d1
+# → ETag: "9f2c…"
+
+# write, conditionally
+curl -X PATCH /api/data/docs/d1 \
+     -H 'If-Match: "9f2c…"' \
+     -d '{"title": "Second draft"}'
+# → 412 PRECONDITION_FAILED if somebody else edited it first
+```
+
+Without it, read-modify-write is last-writer-wins over everything the second
+write did not send: two editors a second apart both succeed and the first one's
+change is gone with no error anywhere.
+
+The tag is derived from a `date` property with `autoValue: "on_update"` when the
+collection declares one — that column already *is* a version — and from a stable
+hash of the row otherwise. `If-Match: *` asserts only that the row exists.
+Nothing is written when the precondition fails.
+
+#### Field operations
+
+A property's value in a `PATCH` body may be an operation on the stored value
+rather than a value:
+
+```bash
+curl -X PATCH /api/data/posts/p1 -d '{
+  "views": { "$inc": 1 },
+  "tags":  { "$push": "featured" },
+  "meta":  { "$merge": { "seen": true } }
+}'
+```
+
+| Operator | Property type | Becomes |
+|----------|---------------|---------|
+| `$inc` | `number` | `SET col = COALESCE(col, 0) + n` |
+| `$push` | `array` | `array_append(col, …)`, or a jsonb concatenation |
+| `$pull` | `array` | `array_remove(col, …)`, or a jsonb re-aggregation |
+| `$merge` | `map` | `col || '…'::jsonb` (a **shallow** merge) |
+
+The point is the read the caller no longer makes. Expressing `views + 1` as a
+value means reading it first, and two requests that each read `4`, add one and
+write `5` end at `5` — with nothing in either response saying an increment went
+missing. Compiled into the statement, the arithmetic happens inside the row lock
+and cannot lose.
+
+Exactly one operator per field. An operator on a property type it is not defined
+on, an unknown `$operator`, or an operand of the wrong shape is a `400`
+(`INVALID_FIELD_OPERATION`) naming the field — a misspelling is never written to
+the column as a JSON document. Operations apply to updates only: over a row that
+does not exist yet there is nothing to operate on, so they are refused on
+`POST`, on `/bulk` creates, and on upserts.
+
+#### Upsert on a natural key
+
+`POST /api/data/:slug?on_conflict=email` writes
+`INSERT … ON CONFLICT (email) DO UPDATE` instead of a plain insert. The bulk
+route takes the same target as `onConflict` beside `upsert: true`, and so does
+each `upsert` operation of a batch.
+
+```bash
+curl -X POST '/api/data/users?on_conflict=email' \
+     -d '{"email": "ada@example.com", "name": "Ada"}'
+
+curl -X POST /api/data/users/bulk -d '{
+  "rows": [ … ],
+  "upsert": true,
+  "onConflict": ["tenant_id", "slug"]
+}'
+```
+
+The target must carry a uniqueness guarantee the database can match on: the
+primary key (the default when none is named), a property with
+`validation: { unique: true }`, or the columns of a `unique: true`
+[index](/docs/backend/indexes/). Anything else is a `400`
+(`INVALID_CONFLICT_TARGET`) listing the targets that do exist — Postgres would
+otherwise answer *there is no unique or exclusion constraint matching the ON
+CONFLICT specification* from inside a transaction that has already done work.
+
+Naming a target without `upsert: true` on a bulk write is also a `400`: silently
+ignoring it turns a re-runnable import into a duplicating one.
+
+A row that already existed keeps its `on_create` timestamp. A conflict means the
+row's creation is a fact about the past, and a nightly re-import that reset
+`createdAt` on everything it touched would take every "new this week" query
+with it.
+
+#### `Prefer: return=minimal`
+
+Every write answers with the full row by default, which is what carries the
+things the server decided — a serial id, an `autoValue` stamp, whatever
+`beforeSave` rewrote. Send `Prefer: return=minimal` when you need none of it:
+
+```bash
+curl -X POST /api/data/events \
+     -H "Prefer: return=minimal" \
+     -d '{"kind": "page_view"}'
+# → 204 No Content, Preference-Applied: return=minimal
+```
+
+A single write answers `204`. A `/bulk` or `/_batch` write answers `200`
+carrying the **ids** rather than the rows — on a create the id is the one thing
+the caller cannot compute, so discarding it would mean re-reading the table by
+some natural key to learn what had just been written. A single-column key comes
+back as the scalar; a composite key as an object of its columns.
+
+### Cross-collection batches
+
+`POST /api/data/_batch` writes across collections in one transaction, under the
+caller's own role, with the same validation, callbacks and row-level security
+each operation's single-row route would apply.
+
+```json
+POST /api/data/_batch
+{
+  "operations": [
+    { "op": "create", "collection": "orders",
+      "values": { "total": 40 }, "ref": "order" },
+    { "op": "create", "collection": "order_items",
+      "values": { "order_id": { "$ref": "order.id" }, "sku": "A-1" } },
+    { "op": "update", "collection": "stock",
+      "id": "A-1", "values": { "count": { "$inc": -1 } } },
+    { "op": "delete", "collection": "carts", "id": "c-9" }
+  ]
+}
+```
+
+```json
+{
+  "data": [ { "id": 31, "total": 40 }, { "id": 88, … }, { … }, null ],
+  "meta": { "operations": 4 }
+}
+```
+
+`op` is `create`, `update`, `upsert` or `delete`. `update` and `delete` need an
+`id`; `create`, `update` and `upsert` need `values`; `upsert` may name an
+`onConflict` target on the same terms as above. `data` is aligned to
+`operations` — the written row for a create, update or upsert, and `null` for a
+delete — so an index into one is an index into the other.
+
+#### `$ref`: pointing at a row the same batch created
+
+An operation may name itself with `ref`, and any later operation may stand
+`{ "$ref": "<name>.<field>" }` where a value goes — in `values` at any depth, or
+as an `id`. It resolves to that field of the row the named operation wrote.
+
+This is the reason the endpoint exists rather than being a loop: a child's
+foreign key is not knowable until the parent has been inserted, so without it
+the parent and the children have to be separate requests — precisely the
+sequence that can half-succeed. Only **backward** references resolve; a forward
+one is refused before the transaction opens.
+
+#### What is checked before anything is written
+
+Shape, unknown collections, unknown fields, value constraints, field operations,
+conflict targets and `$ref` reachability are all decided before the transaction
+opens. A batch is all-or-nothing, and finding a typo at operation 40 would
+otherwise cost the rollback of the 39 writes before it.
+
+Capped at the same number of operations as a bulk write (1000 by default), since
+one batch holds its locks for the whole transaction. A driver that cannot make
+the batch atomic answers `BATCH_UNSUPPORTED` rather than falling back to a loop
+of single writes — which would give neither the atomicity nor the single round
+trip a batch is reached for.
+
+An `update` or `delete` naming a row that does not exist fails the whole batch
+with a `404`, for the same reason a partial write is refused everywhere else:
+half-applied is the state with no good recovery.
 
 ## Client SDK — Getting Started
 
@@ -8513,6 +8869,15 @@ role, enforced *inside* the `USING` / `WITH CHECK` clause through
 `rebase.roles()`. `pgRoles` is a database role, and controls which connections
 the policy is attached to at all. Almost every project wants `roles`.
 
+:::tip[Filling the column `ownerField` names]
+`ownerField` compares a column to `rebase.uid()`; it does not put anything in
+it. Declare that column as a string with
+[`autoValue: "user_on_create"`](/docs/collections/properties#audit-columns) and
+the driver stamps the acting user's uid on insert, overwriting whatever the
+request body sent — which is what makes the policy's premise true. A column the
+caller supplies is one the caller can lie about.
+:::
+
 ### Examples
 
 #### Blog Platform
@@ -8627,11 +8992,270 @@ securityRules: [
 Avoid the legacy pattern of checking `string_to_array(rebase.roles(), ',')` for anonymous access. The `access: "public"` shortcut is simpler and generates the correct policy automatically.
 :::
 
+### Rows here, fields next door
+
+Security rules answer one question: **which rows** does this caller reach. They
+are enforced by Postgres itself, on every statement, whatever the route — which
+is why they are the authorization model and everything above them is convenience.
+
+They have nothing to say about the *columns* of a row a caller does reach. A
+policy that lets an employee read their team's rows lets them read every field of
+those rows, salary included. That is what per-property
+[`access`](/docs/collections/field-access/) is for:
+
+```typescript
+salary: {
+    type: "number",
+    // Everyone the rules above let read the row; only HR gets this column.
+    access: { read: ["hr"], write: [] }
+}
+```
+
+The two stack and never contradict: a field rule cannot widen row access, and a
+row you cannot read has no fields to talk about. Roles are the same roles —
+`rebase.roles()` inside a policy, `user.roles` on the request — so
+`rolesOverlap(['hr'])` in a rule and `access: { read: ["hr"] }` on a property
+mean the same `hr`. Field rules are applied by the server rather than by
+Postgres, so they cover the API surface; a query run through `rebase.sql()` sees
+every column, exactly as it bypasses RLS.
+
 ### Next Steps
 
+- **[Field access](/docs/collections/field-access)** — Per-field read/write roles
 - **[Relations](/docs/collections/relations)** — Foreign keys and joins
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
 - **[Custom Functions](/docs/backend/custom-functions)** — Custom API endpoints
+
+## Field access
+
+### Overview
+
+[Security rules](/docs/collections/security-rules/) decide which **rows** a caller
+reaches. `access` decides which **fields of a reached row** they see and may set.
+
+```typescript
+
+const staff = defineCollection({
+    slug: "staff",
+    name: "Staff",
+    table: "staff",
+    properties: {
+        id: { type: "number", isId: "increment" },
+        name: { type: "string" },
+        salary: {
+            type: "number",
+            // Read by HR (and admins). Set by nobody through the API.
+            access: { read: ["hr"], write: [] }
+        }
+    },
+    securityRules: [
+        { operation: "select", access: "public" }
+    ]
+});
+```
+
+The rule above puts no row filter on `select`, so every caller the API lets in
+reads every staff row. Only a caller holding `hr` gets the `salary` column of
+one, and nobody sets it over HTTP.
+
+### The rule
+
+`access` has two optional lists, and an omitted list is not an empty one — the
+difference is the whole feature.
+
+| `read` / `write` | Means |
+|------------------|-------|
+| omitted | Delegate to the row. Everyone the collection's security rules let read (or write) the row gets the field. |
+| `[]` | Nobody, through the API, at any privilege — not `admin`, not the service key, not an in-process read. |
+| `["hr"]` | A caller holding `hr`, **or** `admin`, **or** trusted server code with no request behind it. |
+
+Roles are Rebase application roles — the same ones `rebase.roles()` returns
+inside a policy and `policy.rolesOverlap` compiles against. They come from the
+call context: `user.roles` on the authenticated request.
+
+#### Why `admin` always passes
+
+Every baseline policy Rebase injects carries a `rolesOverlap(['admin'])` arm, and
+`rebase.dataAsAdmin` runs as `{ uid: "service", roles: ["admin"] }`. A field rule
+that could lock an administrator out of a column of their own database would
+also lock the Studio out of rendering it and the CLI out of exporting it. If you
+need a column no administrator reads through the API, that is `read: []`.
+
+#### Why the trusted plane passes
+
+An in-process `rebase.data` call in a hook, a migration, or the auth adapter
+verifying a password has no request and no roles behind it. Those are server
+code, and a role list does not apply to them. `[]` still does: that is a
+statement about the API surface rather than about who is calling.
+
+### `excludeFromApi` is the same mechanism
+
+`excludeFromApi: true` is sugar for `access: { read: [], write: [] }`. There is
+one predicate behind both spellings, so everything on this page applies to the
+flag too. Write whichever reads better — but not both on one property, which is
+refused at boot.
+
+### What a caller sees
+
+#### Reads
+
+A field you cannot read is **absent** from the response. Not `null`, not an empty
+string — the key is not there.
+
+```json
+// GET /api/data/staff/1  as a caller holding `staff`
+{ "id": 1, "name": "Ada" }
+
+// the same row as a caller holding `hr`
+{ "id": 1, "name": "Ada", "salary": 90000 }
+```
+
+That is deliberate. A withheld value served as `null` is indistinguishable from a
+stored `null`, so a client could map the whole column by counting them — and an
+`update` that echoed the row back would overwrite the real value with the null it
+was handed.
+
+It applies at every exit: list, single get, relation targets included with
+`?include=`, `_batch` results, realtime frames from `.listen()`, aggregate
+results and [history](#history) snapshots.
+
+#### Queries
+
+A `where`, `orderBy`, `fields`, aggregate `select` or `groupBy` naming a field you
+cannot read is a **400 `FIELD_NOT_READABLE`**:
+
+```http
+GET /api/data/staff?salary=gt.100000
+```
+
+```json
+{
+  "error": {
+    "code": "FIELD_NOT_READABLE",
+    "message": "'salary' is not readable on 'staff' with your roles, so it cannot be used in a filter.",
+    "details": {
+      "collection": "staff",
+      "fields": ["salary"],
+      "violations": [
+        { "field": "salary", "code": "access", "message": "'salary' is not readable with your roles." }
+      ]
+    }
+  }
+}
+```
+
+Without this the value is readable one predicate at a time: twenty requests is a
+binary search over a salary.
+
+The error **names the field**. That is a decision, not an oversight: the
+published OpenAPI document lists every property of every collection — it is
+served off the app, not off the authenticated data router — so field names are
+already public. Hiding the name here would protect nothing and would answer a
+caller's genuine typo with "unknown field", sending them to look for a spelling
+mistake that is not there. **Field names are public; field values are not.**
+
+#### Writes
+
+A value for a field you cannot write is a **400**, never a silently dropped key —
+a write that discards a field reports success for an edit that did not happen.
+
+| Code | When |
+|------|------|
+| `FIELD_NOT_WRITABLE` | `write` is a role list you do not satisfy. Your colleague may get a 200 for the same body. |
+| `VALIDATION_EXCLUDED_FIELDS` | `write` is `[]` (or `excludeFromApi`). Nobody may write it; the answer is the same for every caller. |
+
+Both carry `details.violations` keyed by the wire name you sent. Enforced on
+create, `PATCH`/`PUT`, `/bulk`, `_batch`, upserts, field operations
+(`{ "salary": { "$inc": 1000 } }` names `salary` like any value does) and the
+WebSocket `SAVE` frame.
+
+### Search
+
+The fallback search — a collection with no `search` block — matches `ILIKE` across
+your string properties, and it skips the ones the caller cannot read. Nothing
+leaks through it.
+
+A collection that **does** declare a [`search` block](/docs/backend/api/) compiles
+to a single generated `tsvector` column shared by every caller. There is no
+per-role variant of it, so a restricted field named in `search.fields` would stay
+*matchable* to callers who can never see its value — recoverable a term at a
+time. Rebase refuses that combination at boot: remove the field from
+`search.fields`, or drop the read restriction.
+
+### History
+
+[Entity history](/docs/backend/api/) stores the whole row, and it is served to
+anyone who can read the row — the gate is "can you fetch this entity", not "are
+you an admin". So the read rule is applied to each stored snapshot too: the entry
+is still listed, with who changed it and when, and the withheld columns are gone
+from its `values`.
+
+Reverting is unaffected. The revert route reads the stored entry server-side, so a
+caller can restore a version whose every field they cannot see — exactly as they
+can already overwrite a row without reading all of it.
+
+### What the admin panel shows
+
+Nothing to configure. The Studio reads through the same API, so a field the
+caller cannot read never arrives and the form does not draw it; a field they
+cannot write is refused if something tries to send it. This is a server-side
+guarantee, unlike `admin.hideFromCollection`, which only stops the panel from
+*rendering* a field and leaves the value in the JSON.
+
+### Generated types and OpenAPI
+
+The SDK's `Row`, `Insert` and `Update` types are one shape for every caller —
+there is no `Row` that is right for both a reader who holds `hr` and one who does
+not — so a **role** rule does not change them. A field closed to everybody
+(`[]`, or `excludeFromApi`) is absent from them, as it always was.
+
+The OpenAPI document states the rule rather than pretending to be per-caller.
+Each restricted property carries `x-rebase-access`:
+
+```json
+"salary": {
+  "type": "number",
+  "description": "Salary — Field access: readable by `hr` (and `admin`); writable by nobody through the API. A caller without the role does not receive the field at all — it is absent, not null.",
+  "x-rebase-access": { "read": ["hr"], "write": [] }
+}
+```
+
+A field nobody can read is absent from the read schema and from the filter
+parameters; a field nobody can write is absent from the input schema. The two
+directions are separate schemas and are judged separately, so a token an admin
+posts and never reads back appears in the request body and not in the row.
+
+### In-process writes
+
+`rebase.data` and `rebase.dataAsAdmin` in a hook, a function or a cron job do not
+pass through the write check. That is the same exemption `excludeFromApi` has
+always had, and it is what makes the rule enforceable at all: something has to be
+able to store the password hash.
+
+Reads through `rebase.dataAsAdmin` hold the `admin` role, so a role rule does not
+hide anything from them. `[]` still does — including from `dataAsAdmin`. Use
+[`rebase.sql()`](/docs/backend/api/) if you need the raw column.
+
+### Validation
+
+These are refused at boot, before the server serves anything:
+
+- `access` and `excludeFromApi` on the same property — they are one mechanism, and
+  the flag wins, so the block beside it would be dead;
+- a bare string where a list belongs (`read: "admin"`), which reads as a non-empty
+  rule no caller satisfies and would hide the field from everybody;
+- a role that is not a non-empty string;
+- a restricted field named in the collection's `search.fields`.
+
+Role *names* are not checked against a set: roles are application data, created
+and deleted while the server runs. A typo in one is a field nobody can read, which
+is the safe direction to fail.
+
+### See also
+
+- [Security Rules (RLS)](/docs/collections/security-rules/) — which rows a caller reaches
+- [Properties](/docs/collections/properties/) — the full option table
+- [Error codes](/docs/backend/errors/) — `FIELD_NOT_READABLE`, `FIELD_NOT_WRITABLE`
 
 ## Collections
 
@@ -8875,6 +9499,7 @@ export const productsCollection = defineCollection({
 | `slug` | `string` | **Required.** URL-safe identifier. Used in the admin UI URL and REST API path (`/api/data/{slug}`). |
 | `name` | `string` | **Required.** Display name (plural). Shown in navigation and page headers. |
 | `singularName` | `string` | Display name for a single entity. Used in "New Product", "Edit Product", etc. |
+| `description` | `string` | A sentence about what this collection holds, shown above the list. Markdown. |
 | `table` | `string` | PostgreSQL table name. Defaults to `toSnakeCase(slug)` — set it only to decouple the URL from the table, e.g. an existing `blog_posts` table served at `/posts`. |
 | `admin.icon` | `string` | A [Lucide](https://lucide.dev/icons) icon name, e.g. `"FileText"`, `"ShoppingCart"`. A rendered element also works, but the name survives serialization, so it is what the schema editor writes back. |
 
@@ -8888,6 +9513,10 @@ export const productsCollection = defineCollection({
 | `indexes` | `CollectionIndex[]` | Postgres indexes this table needs. See [Indexes](/docs/backend/indexes). |
 | `search` | `SearchConfig` | Ranked full-text search over the fields you name, including JSONB and array content. Postgres only. See [Search](/docs/backend/search). |
 | `auth` | `boolean \| AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
+| `schema` | `string` | Postgres schema the table lives in — `"public"`, `"rebase"`, `"auth"`. Defaults to `"public"`. |
+| `disableDefaultPolicies` | `boolean` | Remove the baseline policies the generator injects — an admin/server SELECT, and on an auth collection a self-read plus an admin-only write gate — and take full responsibility for this collection's RLS. `false` by default. See [Security Rules](/docs/collections/security-rules). |
+| `softDelete` | `boolean \| { field?: string }` | Turn `delete` into a timestamp and hide stamped rows from every read. `true` uses `deletedAt`; the object form renames the field. The collection must declare that `date` property itself. Postgres only — see [Soft delete](/docs/collections/soft-delete) |
+| `strictWrites` | `boolean` | Reject a write that names a field this collection does not declare, with a 400. `true` by default. Set it to `false` only where the column genuinely exists and is not declared — filled by a trigger, or introspected rather than written down. |
 
 #### UI Configuration
 
@@ -8928,22 +9557,39 @@ Inside `admin`, except `history`, which is a backend feature and stays at the to
 
 #### Advanced
 
+At the top level, because the backend reads them:
+
 | Property | Type | Description |
 |----------|------|-------------|
 | `callbacks` | `CollectionCallbacks` | Lifecycle hooks (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
-| `entityActions` | `EntityAction[]` | Custom actions on entities (archive, publish, etc.) |
-| `Actions` | `React.ComponentType` | Custom toolbar actions component |
-| `entityViews` | `EntityCustomView[]` | Custom tabs in the entity detail view |
-| `additionalFields` | `AdditionalFieldDelegate[]` | Computed/virtual columns |
-| `childCollections` | `() => CollectionConfig[]` | Nested child collections |
-| `subcollections` | `() => CollectionConfig[]` | Nested collections (e.g., order → line items) |
-| `exportable` | `boolean \| ExportConfig` | Enable data export |
-| `ownerId` | `string` | Owner user ID (used by plugins/custom code) |
-| `overrides` | `EntityOverrides` | Overrides for the entity view |
-| `components` | `CollectionComponentOverrideMap` | Collection-scoped UI component overrides |
+| `childCollections` | `() => CollectionConfig[]` | The collections nested under an entity of this one. Filled in during normalization from whatever the driver expresses them with — a Firestore `subcollections`, a Postgres `hasMany` relation — so a custom driver is the only reason to set it by hand |
 | `dataSource` | `string` | Which registered data source backs this collection (default: the unnamed one) |
 | `engine` | `string` | The engine behind it — `"postgres"`, `"firestore"`, `"mongodb"`. Resolved from `dataSource`; set it only to override |
 | `databaseId` | `string` | Database or schema within the engine |
+| `metadata` | `Record<string, unknown>` | Anything your own code needs to hang off a collection. Rebase does not read it; it survives serialization unchanged |
+| `ownerId` | `string` | **Admin form only — not enforced by the API or the database.** The user id the collection editor stamps on a collection it creates, and shows beside its name. Nothing on the request path consults it |
+
+`subcollections` and `path` are on the **document-database** configs only —
+`FirebaseCollectionConfig` and, for `path`, `MongoDBCollectionConfig`:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `subcollections` | `() => CollectionConfig[]` | **Firestore only.** Collections nested under each document. A Postgres collection says the same thing with a `hasMany` [relation](/docs/collections/relations), which is what fills `childCollections` |
+| `path` | `string` | **Firestore and MongoDB only.** The path or collection name at the engine, when it differs from the slug |
+
+And inside `admin`, because only the panel draws them:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `admin.entityActions` | `EntityAction[]` | Custom actions on entities (archive, publish, etc.) |
+| `admin.Actions` | `React.ComponentType` | Custom toolbar actions component |
+| `admin.entityViews` | `EntityCustomView[]` | Custom tabs in the entity detail view |
+| `admin.additionalFields` | `AdditionalFieldDelegate[]` | Computed/virtual columns |
+| `admin.exportable` | `boolean \| ExportConfig` | Enable data export |
+| `admin.components` | `CollectionComponentOverrideMap` | Collection-scoped UI component overrides |
+
+Writing any of those six at the top level is a boot-time error, with a message
+naming the key and where it moved to.
 
 ### Entity display
 
@@ -9025,8 +9671,10 @@ When `display.title` is not set, the property used as the entity's display title
 #### Relation Previews in Tables
 When `propertiesOrder` is explicitly set, relation properties are **not** automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).
 
-#### resolveTitleToString Utility
-Rebase provides a `resolveTitleToString(title: any): string` helper to turn complex entity title values (including dates, arrays, or relation shapes like `{ __type: "relation", id, data: { values } }`) into clean, human-readable strings. It prioritizes common fields like `name`, `title`, `label`, and `displayName` from nested relation data.
+#### What a title value renders as
+Whatever the title property holds, the panel renders a string. A date is formatted, an array is joined, and a relation — which arrives as `{ id, data: { values } }` rather than as text — is looked through for the first of `name`, `title`, `label` or `displayName` on the related row, falling back to its id. So a title may name a `relation` property and still read as a name rather than a uuid.
+
+This is not an exported helper: it is what every surface that draws a record already does. Nothing to call, and nothing to import.
 
 ### Collection Builder
 
@@ -9048,20 +9696,36 @@ const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) 
 
 ### Filtering and Sorting
 
-You can set default or forced filters:
+You can set default or forced filters. All three are presentation — what the
+panel opens with — so they live in `admin`:
 
 ```typescript
-{
-    // Default filter — users can change it
-    defaultFilter: { active: ["==", true] },
 
-    // Fixed filter — cannot be changed
-    fixedFilter: { tenant_id: ["==", currentTenantId] },
+const invoices = defineCollection({
+    slug: "invoices",
+    name: "Invoices",
+    table: "invoices",
+    properties: {
+        active: { name: "Active", type: "boolean" },
+        tenantId: { name: "Tenant", type: "string" },
+        createdAt: { name: "Created", type: "date" }
+    },
+    admin: {
+        // Default filter — users can change it
+        defaultFilter: { active: ["==", true] },
 
-    // Default sort
-    sort: ["createdAt", "desc"]
-}
+        // Fixed filter — cannot be changed
+        fixedFilter: { tenantId: ["==", currentTenantId] },
+
+        // Default sort
+        sort: ["createdAt", "desc"]
+    }
+});
 ```
+
+A `fixedFilter` narrows what the panel *asks for*; it is not a boundary. What a
+caller is allowed to read is a [security rule](/docs/collections/security-rules),
+which the database enforces for every caller, panel or not.
 
 ### Next Steps
 
@@ -9108,13 +9772,24 @@ All property types share these options:
 | `type` | `string` | **Required.** Data type (see above) |
 | `name` | `string` | Display label. Defaults to the property key, prettified — `publishDate` → "Publish Date". Set it when that derivation is wrong: `"URL"` rather than "Url". |
 | `description` | `string` | Help text shown below the field |
-| `defaultValue` | `any` | Default value for new entities |
+| `defaultValue` | `any` | Default value for new entities. A literal one — a string, number, boolean, date, enum id, or a `map`/`array` document — also becomes the column's `DEFAULT`, so a row inserted by anything that is not the admin panel (the REST API, a seed, `psql`) gets it too |
 | `validation` | `object` | Validation rules |
 | `propertyConfig` | `string` | Registered property config key |
 | `columnName` | `string` | Explicit database column name (bypasses snake_case conversion) |
 | `callbacks` | `PropertyCallbacks` | Hooks for `afterRead` and `beforeSave` transforms |
-| `dynamicProps` | `function` | Dynamic property builder (see Conditional Fields) |
-| `conditions` | `PropertyConditions` | Declarative JSON Logic conditions |
+| `excludeFromApi` | `boolean` | Never mention this column on the API surface, in either direction — for a password hash or a verification token. The value is still written and queryable server-side; it is stripped from every row the API serves, for every caller including admins and service keys, and it is absent from the generated `Row`, `Insert` and `Update` types and from the OpenAPI schema. Sugar for `access: { read: [], write: [] }` — the two are one mechanism, and setting both on one property is refused at boot |
+| `access` | `{ read?: string[]; write?: string[] }` | Who may read and who may write this one field, by role. An omitted list delegates to the row's [security rules](/docs/collections/security-rules/); `[]` is nobody through the API; a role list is those roles plus `admin`. An unreadable field is **absent** from responses rather than `null`, and a write naming an unwritable one is a 400. See [Field access](/docs/collections/field-access/) |
+| `metadata` | `Record<string, unknown>` | Anything your own code needs to hang off a property. Rebase does not read it; it survives serialization unchanged |
+| `dynamicProps` | `function` | Dynamic property builder (see [Conditional fields](/docs/collections/validation-and-conditions/#conditional-fields)). **Admin form only — not enforced by the API or the database.** |
+| `conditions` | `PropertyConditions` | Declarative JSON Logic conditions. **Admin form only — not enforced by the API or the database.** |
+
+:::note[What "admin form only" means]
+Several options below carry that label: they shape the form the panel draws and
+nothing else — the API accepts a write that ignores them, and no constraint
+stands behind them. A rule that must hold for every caller is a
+[validation rule](/docs/collections/validation-and-conditions/) or a
+[security rule](/docs/collections/security-rules/).
+:::
 
 #### UI Configuration (`admin`)
 
@@ -9226,19 +9901,19 @@ website: {
 
 #### File upload
 
-Set `storage` to render a file upload dropzone.
+Set `storage` to render a file upload dropzone. The column stays a string — what
+is written to it is the object's key in the bucket:
 
 ```typescript
 avatar: {
     type: "string",
     name: "Main image",
-    storage: {
-        storagePath: "avatars",
-        acceptedFiles: ["image/*"],
-        maxSize: 2 * 1024 * 1024
-    }
+    storage: { storagePath: "avatars", acceptedFiles: ["image/*"] }
 }
 ```
+
+Every option inside `storage`, and the multi-file form of the same field, are on
+[File uploads](/docs/collections/file-uploads).
 
 #### Select (enum)
 
@@ -9286,14 +9961,57 @@ locales: {
 | `admin.markdown` | `boolean` | Render as markdown editor |
 | `email` | `boolean` | Email format validation |
 | `url` | `boolean` | URL format validation |
-| `storage` | `StorageConfig` | Enable file upload |
+| `storage` | `StorageConfig` | Enable file upload — see [File uploads](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Render as select dropdown |
-| `columnType` | `string` | Database column: `"varchar"`, `"text"` |
-| `isId` | `string` | ID generation: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
-| `userSelect` | `boolean` | Render as a user picker |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | The database column. Defaults to `varchar`, or `uuid` when `isId` says so. `text` for unbounded strings, `char` for fixed width |
+| `isId` | `boolean \| string` | Marks the property as the primary key, and says who fills it: `"manual"` (you do), `"uuid"` (`gen_random_uuid()`), or any other string, used verbatim as the column's SQL default expression — bare (`nanoid()`) or in template form (``"sql`nanoid()`"``). The function has to exist; nothing here creates it. `"increment"` is a **number** strategy and does nothing here, and `"cuid"` is refused at config load |
+| `autoValue` | `"user_on_create" \| "user_on_update"` | Stamp the column with the **uid of the acting user** — on creation only, or on every write. See [Audit columns](#audit-columns) |
+| `userSelect` | `boolean` | Render as a user picker. The value is a plain string column holding the user id — nothing resolves or checks it on the way in. **Admin form only — not enforced by the API or the database.** |
 | `admin.previewAsTag` | `boolean` | Render this string as a tag in previews |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 | `admin.urlPreview` | `PreviewType` | How to render a string that holds a URL: a link, or an inline image, audio or video preview. Presentation only — whether the value *is* a URL is the `url` flag on the property, which is what the OpenAPI contract is generated from |
+
+#### Audit columns
+
+`autoValue` on a string is the `created_by` / `updated_by` twin of the same
+option on a [date](#date-options):
+
+```typescript
+createdBy: {
+    type: "string",
+    name: "Created by",
+    autoValue: "user_on_create",
+    admin: { readOnly: true }
+},
+
+updatedBy: {
+    type: "string",
+    name: "Updated by",
+    autoValue: "user_on_update"
+}
+```
+
+The value comes from the call context, never from the request body — the driver
+overwrites whatever arrived, so a caller cannot claim to be somebody else by
+sending the field. A column whose value the caller supplies is not an audit
+column.
+
+With no acting user — an anonymous request, a service token, a seed script — the
+column is set to `null`. Pair it with `validation: { required: true }` and that
+becomes a 400 instead: a collection that insists on knowing who wrote a row is a
+collection that cannot accept an anonymous write.
+
+There is no foreign key. The uid is a string, the user store may be another
+database entirely, and a deleted user must not take the audit trail with them —
+declare a [relation](/docs/collections/relations) if you want the join.
+
+:::note[One primary key per collection]
+`isId` may be claimed by exactly one property. A second is refused at config
+load rather than silently ignored: composite primary keys are not supported, and
+a config declaring two has to be read as asking for one Rebase cannot build. If
+what you wanted was a uniqueness constraint over several columns, that is a
+unique [index](/docs/backend/indexes).
+:::
 
 ### Number Properties
 
@@ -9317,9 +10035,10 @@ Number fields render as a standard text input with numeric validation.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `enum` | `EnumValues` | Render as select with numeric values |
-| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
-| `isId` | `string` | ID generation strategy |
+| `enum` | `EnumValues` | Render as select with numeric values. Unlike a string enum this creates **no Postgres enum type** — the column stays `NUMERIC` or `INTEGER`, so the panel offers the values and the database does not enforce them |
+| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"`. Defaults to `integer` where `validation.integer` or `isId` says the value is whole, `numeric` otherwise |
+| `precision` / `scale` | `number` | Total significant digits and digits after the point on a `numeric` column — `NUMERIC(10, 2)`. Money without them is an unbounded `NUMERIC` that keeps whatever the caller sent, and cannot be tightened later without rewriting the column |
+| `isId` | `boolean \| string` | Marks the property as the primary key: `"manual"`, `"increment"`, or any other string used verbatim as the column's SQL default expression. `"increment"` is always `INTEGER GENERATED BY DEFAULT AS IDENTITY` — `columnType` beside it is ignored, with a warning, because every foreign key pointing at a numeric key is `INTEGER` and a wider key would be referenced by narrower columns |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 | `admin.format` | `NumberFormatOptions` | Write the number out as currency, a percentage, or with fixed decimals. Omitted, the raw value renders — a number in the database is shown as the number in the database |
 
@@ -9394,124 +10113,54 @@ updatedAt: {
 }
 ```
 
+`on_update` is a database trigger, not only an app-layer stamp. Rebase writes the
+column on every save it makes — so a `beforeSave` hook sees the new value — and
+installs a `BEFORE UPDATE` trigger that writes it for everyone else. Without the
+trigger a seed script, a migration backfill or one row fixed in `psql` left the
+column claiming the row had not changed, and anything reading it to decide what
+to re-index or re-send skipped that row.
+
+The trigger lives in `drizzle/triggers.sql`, applied by `rebase db push` and at
+boot by the schema ensure — Atlas cannot manage it, for the same reason it
+cannot manage the full-text search helpers.
+
 #### Date Options
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`) |
-| `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps |
-| `columnType` | `string` | `"timestamp"`, `"date"` |
-| `timezone` | `string` | Timezone string to evaluate the date in |
+| `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`). Picks the widget; the column is the same either way. **Admin form only — not enforced by the API or the database.** |
+| `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps. `on_create` is a `DEFAULT now()`; `on_update` is a `BEFORE UPDATE` trigger **as well as** an app-layer stamp, so a raw `UPDATE` from a seed or a migration moves the column too |
+| `columnType` | `"timestamp" \| "date" \| "time"` | The database column. Defaults to `timestamp` **with time zone** |
+| `timezone` | `string` | Which timezone the picker reads and writes the value in. **Admin form only — not enforced by the API or the database.** |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
-### Array Properties
+### Array and Map Properties
 
-#### Simple repeat
+The two composite types — a repeatable list and a structured object, both
+stored as JSONB unless a native Postgres array fits. Repeats, block editors,
+groups, key-value editors and every option either one takes are on
+**[Arrays and maps](/docs/collections/arrays-and-maps)**.
 
-Use `of` to define a repeatable list of items.
+### Geopoint Properties
+
+A latitude/longitude pair, stored as `jsonb` — `{ latitude, longitude }`, which
+is what the generated TypeScript type, the OpenAPI schema and the form field all
+describe.
 
 ```typescript
-tags: {
-    type: "array",
-    name: "Tags",
-    of: { type: "string" }
+location: {
+    type: "geopoint",
+    name: "Location"
 }
 ```
 
-#### Multi file upload
+Writes take the same shape, or a `GeoPoint` from `@rebasepro/types`:
+`new GeoPoint(41.4036, 2.1744)`.
 
-Combine `of` with `storage` for a multi-file upload.
-
-```typescript
-images: {
-    type: "array",
-    name: "Images",
-    of: {
-        type: "string",
-        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
-    }
-}
-```
-
-#### Block editor
-
-Use `oneOf` to create a block editor with multiple content types. Each key creates a card type that users can pick from.
-
-```typescript
-content: {
-    type: "array",
-    name: "Content",
-    oneOf: {
-        properties: {
-            text: {
-                type: "map",
-                properties: {
-                    body: { type: "string", name: "Text", admin: { markdown: true } }
-                }
-            },
-            image: {
-                type: "map",
-                properties: {
-                    src: { type: "string", name: "Image", storage: { storagePath: "content" } },
-                    caption: { type: "string", name: "Caption" }
-                }
-            }
-        }
-    }
-}
-```
-
-#### Array Options
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `of` | `Property \| Property[]` | Property schema for array items |
-| `oneOf` | `object` | Array of typed objects with multiple discriminator types |
-| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
-| `admin.minimalistView` | `boolean` | Display child properties directly without extendable panel |
-| `admin.sortable` | `boolean` | Can elements be reordered (default: true) |
-| `admin.canAddElements` | `boolean` | Can new elements be added (default: true) |
-
-### Map Properties
-
-#### Group (structured)
-
-Use `properties` to define a structured object with named fields.
-
-```typescript
-address: {
-    type: "map",
-    name: "Address",
-    properties: {
-        street: { type: "string", name: "Street" },
-        zip: { type: "string", name: "Postal code" }
-    }
-}
-```
-
-#### Key-value (free-form)
-
-Set `keyValue: true` to render an arbitrary key-value pairs editor.
-
-```typescript
-metadata: {
-    type: "map",
-    name: "Key value",
-    keyValue: true
-}
-```
-
-#### Map Options
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `properties` | `Properties` | Record of properties included in the map |
-| `propertiesOrder` | `string[]` | Ordered keys for rendering |
-| `admin.previewProperties` | `string[]` | Which properties to show in the table preview |
-| `admin.spreadChildren` | `boolean` | Render child properties as separate columns in table view |
-| `admin.minimalistView` | `boolean` | Display properties without a wrapping panel |
-| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
-| `keyValue` | `boolean` | Render as arbitrary key-value pairs editor |
+There are no options beyond the ones every property has. The column is not
+spatially indexed and there is no distance operator to filter on: a geopoint is
+a value you store and show, not one you search by. For that, model the two
+numbers as columns of their own.
 
 ### Reference Properties
 
@@ -9598,6 +10247,218 @@ Enum values, validation rules and conditional fields have a page of their own:
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
 - **[Custom Fields](/docs/frontend/custom-fields)** — Build custom field components
 
+## Arrays and maps
+
+
+An `array` is an ordered list and a `map` is a structured object. Both are
+stored as `jsonb`, except an array of a primitive, which becomes a native
+Postgres array (`text[]`, `integer[]`) so the database can index and search
+inside it.
+
+### Array Properties
+
+#### Simple repeat
+
+Use `of` to define a repeatable list of items.
+
+```typescript
+tags: {
+    type: "array",
+    name: "Tags",
+    of: { type: "string" }
+}
+```
+
+#### Multi file upload
+
+An array whose `of` carries the `storage` block is a multi-file upload — see
+[File uploads](/docs/collections/file-uploads).
+
+#### Block editor
+
+Use `oneOf` to create a block editor with multiple content types. Each key creates a card type that users can pick from.
+
+```typescript
+content: {
+    type: "array",
+    name: "Content",
+    oneOf: {
+        properties: {
+            text: {
+                type: "map",
+                properties: {
+                    body: { type: "string", name: "Text", admin: { markdown: true } }
+                }
+            },
+            image: {
+                type: "map",
+                properties: {
+                    src: { type: "string", name: "Image", storage: { storagePath: "content" } },
+                    caption: { type: "string", name: "Caption" }
+                }
+            }
+        }
+    }
+}
+```
+
+#### Array Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `of` | `Property \| Property[]` | Property schema for array items |
+| `oneOf` | `object` | Array of typed objects with multiple discriminator types. Takes `properties`, and optionally `propertiesOrder`, `typeField` (default `"type"`) and `valueField` (default `"value"`) |
+| `columnType` | `"json" \| "jsonb" \| "text[]" \| "integer[]" \| "boolean[]" \| "numeric[]"` | The database column. A primitive `of` defaults to the matching native Postgres array; anything else to `jsonb` |
+| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `admin.minimalistView` | `boolean` | Display child properties directly without extendable panel |
+| `admin.sortable` | `boolean` | Can elements be reordered (default: true) |
+| `admin.canAddElements` | `boolean` | Can new elements be added (default: true) |
+
+### Map Properties
+
+#### Group (structured)
+
+Use `properties` to define a structured object with named fields.
+
+```typescript
+address: {
+    type: "map",
+    name: "Address",
+    properties: {
+        street: { type: "string", name: "Street" },
+        zip: { type: "string", name: "Postal code" }
+    }
+}
+```
+
+#### Key-value (free-form)
+
+Set `keyValue: true` to render an arbitrary key-value pairs editor.
+
+```typescript
+metadata: {
+    type: "map",
+    name: "Key value",
+    keyValue: true
+}
+```
+
+#### Map Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `properties` | `Properties` | Record of properties included in the map |
+| `propertiesOrder` | `string[]` | Ordered keys for rendering |
+| `admin.previewProperties` | `string[]` | Which properties to show in the table preview |
+| `admin.spreadChildren` | `boolean` | Render child properties as separate columns in table view |
+| `admin.minimalistView` | `boolean` | Display properties without a wrapping panel |
+| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `keyValue` | `boolean` | Render as arbitrary key-value pairs editor. Not presentation despite the wording: it says the map has no declared shape, which is what the OpenAPI schema is generated from |
+| `columnType` | `"json" \| "jsonb"` | The database column. Defaults to `jsonb` |
+
+### Next Steps
+
+- **[Properties](/docs/collections/properties)** — every other property type and the options they share
+- **[Validation and conditions](/docs/collections/validation-and-conditions/)** — the rules that apply to elements and to the list itself
+- **[File uploads](/docs/collections/file-uploads)** — an array of `storage` strings is a multi-file field
+
+## File upload fields
+
+
+A file field is an ordinary **string** property with a `storage` block. The
+column holds text — the object's key in the bucket, or its URL if you ask for
+that — and the block says where the bytes go and what the form will accept.
+
+That split matters more than it looks. Most of `storage` is read by the admin
+panel's uploader on its way to the API, so a write that does not come from a
+form does not go through it — those options carry the label below. The two that
+decide what a file may *be*, `maxSize` and `acceptedFiles`, are the exception:
+the server checks them on every upload.
+
+### One file
+
+```typescript
+avatar: {
+    type: "string",
+    name: "Main image",
+    storage: {
+        storagePath: "avatars",
+        acceptedFiles: ["image/*"],
+        maxSize: 2 * 1024 * 1024
+    }
+}
+```
+
+### Several files
+
+An array of the same thing. The `storage` block moves to `of`, because it
+describes each element rather than the list:
+
+```typescript
+images: {
+    type: "array",
+    name: "Images",
+    of: {
+        type: "string",
+        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
+    }
+}
+```
+
+### Storage options
+
+Everything inside `storage`.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `storagePath` | `string \| function` | **Required.** Where in the bucket the file goes. A string with placeholders — `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}` — or a function of the upload's context. **Admin form only — not enforced by the API or the database:** it is the panel's uploader that resolves it, and `client.storage.upload()` names its own key |
+| `fileName` | `string \| function` | The uploaded object's file name, with the same placeholders. **Admin form only — not enforced by the API or the database.** |
+| `storageSource` | `string` | Which registered bucket, when a project has more than one. The `bucket("media")` handle works here too |
+| `public` | `boolean` | Store under the public prefix and serve through a stable, token-less, cacheable URL. `false` by default, which means private objects and short-lived signed URLs |
+| `acceptedFiles` | `FileType[]` | MIME types this property takes. The asterisk form works — `image/*`. **Enforced by the server**, not only by the file picker |
+| `maxSize` | `number` | Largest accepted file, in bytes. **Enforced by the server**, on the plain and the resumable upload paths alike |
+| `metadata` | `Record<string, unknown>` | Object metadata to store alongside the file |
+| `includeBucketUrl` | `boolean` | Write `s3://my-bucket/path/to/file.png` into the column instead of `path/to/file.png`. `false` by default |
+| `storeUrl` | `boolean` | Write the download URL into the column instead of the key. `false` by default, and worth leaving that way: a URL that carries a token stops working when the token does, and the original reference is then gone |
+| `imageResize` | `ImageResize` | Resize and crop before uploading, for `image/jpeg`, `image/png` and `image/webp`. **Admin form only — not enforced by the API or the database.** |
+| `processFile` | `(file: File) => Promise<File>` | Transform the file before it is uploaded. Runs in the browser. **Admin form only — not enforced by the API or the database.** |
+| `postProcess` | `(pathOrUrl: string) => Promise<string>` | Transform the resolved path or URL before it is saved. Runs in the browser. **Admin form only — not enforced by the API or the database.** |
+| `previewUrl` | `(fileName: string) => string` | Build the preview URL, for when the file's real address is not the field's value. **Admin form only — not enforced by the API or the database.** |
+
+#### Resizing
+
+`imageResize` takes `maxWidth` and `maxHeight` in pixels, a `mode` of
+`"contain"` (scale down to fit, the default) or `"cover"` (fill the bounds and
+crop), a `format` of `"original"`, `"jpeg"`, `"png"` or `"webp"`, and a
+`quality` between 0 and 100 for the lossy formats — 80 by default. It happens in
+the browser, before the bytes are sent, so an upload that did not come from the
+panel is stored at its original size.
+
+#### What the server checks
+
+`maxSize` and `acceptedFiles` used to be enforced by exactly one thing: the
+browser. The upload route knew a single global size cap and nothing about the
+property a file was destined for, so `curl -F file=@payload.exe` past the picker
+put a 40 MB executable in the avatar bucket and the config that said otherwise
+was never consulted.
+
+Both are now checked server-side, against the property the upload names. An
+upload that names no property — an older client, a direct call — still falls
+back to the global cap, because a request with no property context has no
+property rule to check, and refusing it would break clients that predate this.
+
+#### Where the file is allowed to go
+
+`storagePath` is a default, not a boundary: nothing on the server confines an
+upload to that prefix. Deciding who may write where is what a storage
+authorization rule is for — see [Storage](/docs/backend/storage).
+
+### Next Steps
+
+- **[Properties](/docs/collections/properties)** — every property type and its options
+- **[Storage](/docs/backend/storage)** — buckets, signed URLs, and what the server does with an upload
+- **[Security Rules (RLS)](/docs/collections/security-rules)** — who may read the rows these files hang off
+
 ## Validation and conditions
 
 ### Enum Values
@@ -9625,29 +10486,89 @@ enum: [
 
 ### Validation
 
+Every rule lives in the property's `validation` block, and which rules a
+property accepts depends on its type — `min` counts characters on a string,
+compares magnitudes on a number, and counts elements on an array.
+
 ```typescript
-validation: {
-    required: true,             // Field is required
-    unique: true,               // Must be unique in the table
-    requiredMessage: "Custom error message",
-
-    // String-specific
-    min: 2,                     // Minimum length
-    max: 200,                   // Maximum length
-    matches: /^[a-z]+$/,       // Regex pattern
-    email: true,                // Email format
-    url: true,                  // URL format
-
-    // Number-specific
-    min: 0,                     // Minimum value
-    max: 1000,                  // Maximum value
-    integer: true,              // Must be integer
-
-    // Array-specific
-    min: 1,                     // Minimum items
-    max: 10,                    // Maximum items
+properties: {
+    title: {
+        type: "string",
+        name: "Title",
+        validation: { required: true, min: 2, max: 200 }
+    },
+    slug: {
+        type: "string",
+        name: "Slug",
+        validation: {
+            unique: true,
+            matches: /^[a-z0-9-]+$/,
+            matchesMessage: "Lowercase letters, digits and hyphens only",
+            trim: true,
+            lowercase: true
+        }
+    },
+    readingMinutes: {
+        type: "number",
+        name: "Reading time",
+        validation: { integer: true, moreThan: 0, max: 120 }
+    }
 }
 ```
+
+#### Every type
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `required` | `boolean` | The value must be present |
+| `requiredMessage` | `string` | What the form says when it is not. **Admin form only — not enforced by the API or the database.** |
+| `unique` | `boolean` | Only one row in the table may hold this value |
+| `uniqueInArray` | `boolean` | Only one entry *per array* may hold it. Applies to a direct child of an `array` property, or a first-level child of a `map` inside one. **Admin form only — not enforced by the API or the database.** |
+
+#### Strings
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `number` | Fewest / most characters, inclusive. A `max` also sizes the column: it turns `TEXT` into `VARCHAR(max)`, so lowering it on a table that already holds longer rows is a migration the database refuses |
+| `length` | `number` | Exactly this many characters — a country code, a fixed-width reference |
+| `matches` | `string \| RegExp` | A pattern the whole value must match. A string is compiled per request, so one that will not compile is rejected at boot rather than quietly becoming no rule |
+| `matchesMessage` | `string` | What the form says when `matches` fails |
+| `trim` | `boolean` | Strip leading and trailing whitespace **before** saving. A transform, not a check — it changes what is written, which is what makes it the fix for "the same tag twice, one with a trailing space". **Admin form only — not enforced by the API or the database.** |
+| `lowercase` / `uppercase` | `boolean` | Case-fold the value before saving, like `trim`. **Admin form only — not enforced by the API or the database.** |
+
+Email and URL formats are **not** validation rules. `email` and `url` are flags
+on the property itself, beside `type` — statements about the data that the
+OpenAPI contract is generated from, rather than form behaviour:
+
+```typescript
+properties: {
+    email: { type: "string", name: "Email", email: true },
+    website: { type: "string", name: "Website", url: true }
+}
+```
+
+See [String properties](/docs/collections/properties/#string-options).
+
+#### Numbers
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `number` | Smallest / largest accepted value, **inclusive** |
+| `moreThan` / `lessThan` | `number` | The exclusive twins of `min` and `max` |
+| `positive` / `negative` | `boolean` | Strictly above / below zero. `0` is rejected by both — use `min: 0` to allow it |
+| `integer` | `boolean` | No fractional part. Does not change the column type; `columnType` does |
+
+#### Dates
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `Date` | Earliest / latest accepted date, inclusive. A fixed instant, not "today" |
+
+#### Arrays
+
+| Rule | Type | Description |
+|------|------|-------------|
+| `min` / `max` | `number` | Fewest / most elements, inclusive. Elements, not characters |
 
 ### Conditional Fields
 
@@ -9671,12 +10592,25 @@ price: {
 ```
 
 The conditions object gives you access to:
-- `disabled`, `hidden`, `readOnly`
-- `required`, `min`, `max`
+- `disabled`, `disabledMessage`, `clearOnDisabled`, `hidden`, `readOnly`
+- `required`, `requiredMessage`, `min`, `max`
 - `defaultValue`
 - `enumConditions`, `allowedEnumValues`, `excludedEnumValues`
 - `referencePath`, `referenceFilter`
 - `canAddElements`, `sortable` (for arrays)
+- `acceptedFiles`, `maxFileSize` (for uploads)
+
+`disabledMessage` is the sentence a reader sees in place of the control. Without
+it a greyed-out field explains nothing, which is the difference between a form
+that is guiding someone and one that is refusing them.
+
+:::caution[Conditions are form behaviour]
+**Admin form only — not enforced by the API or the database.** They run in the
+browser, on the entity being edited, and shape what the panel offers. A rule
+that has to hold for every caller belongs in `validation`, which the server
+checks, or in a [security rule](/docs/collections/security-rules/), which the
+database enforces for anyone — panel, SDK or `curl`.
+:::
 
 #### 2. Property Builders (Programmatic)
 
@@ -9692,6 +10626,10 @@ price: {
     })
 }
 ```
+
+The same caveat applies, and more sharply: the function is bundled into the
+panel and called on every render of the form. **Admin form only — not enforced
+by the API or the database.**
 
 ### Next Steps
 
@@ -9885,7 +10823,9 @@ properties: {
         type: "relation",
         name: "Author",
         relation: { kind: "belongsTo", target: () => usersCollection },
-        widget: "select"           // "select" (dropdown) or "dialog" (full picker)
+        // Which control draws it is presentation, so it goes in the admin block:
+        // "select" (dropdown) or "dialog" (full picker).
+        admin: { widget: "select" }
     }
 }
 ```
@@ -10243,6 +11183,79 @@ normalization.
 
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
 - **[Properties](/docs/collections/properties)** — Property types reference
+
+## Soft delete
+
+### What it changes
+
+With `softDelete` on, a delete **stamps a column instead of removing the row**,
+and every read filters the stamped rows out. Nothing else about the operation
+moves: the same permission is required, `beforeDelete` can still veto it and
+`afterDelete` still fires. From the caller's point of view the row was deleted;
+how the table records that is this flag's business.
+
+```typescript
+
+const invoices = defineCollection({
+    slug: "invoices",
+    name: "Invoices",
+    table: "invoices",
+    softDelete: true,
+    properties: {
+        reference: { name: "Reference", type: "string" },
+        deletedAt: { name: "Deleted at", type: "date", admin: { readOnly: true } }
+    }
+});
+```
+
+`true` uses `deletedAt` (column `deleted_at`). The object form renames it:
+`softDelete: { field: "archivedAt" }`.
+
+:::caution[The column is yours to declare]
+The flag says what a column *means*; it does not conjure one into existence.
+A collection that turns `softDelete` on without declaring that `date` property
+is refused at boot — deliberately early, because the alternative is the failure
+landing on somebody trying to remove a row.
+:::
+
+Postgres only, like [search](/docs/backend/search) and
+[indexes](/docs/backend/indexes).
+
+### What a read sees
+
+Stamped rows are hidden by default from `find`, `findById`, `count`, the
+aggregates, the realtime refetch, and from this collection loaded through a
+relation. That default is the point: code written before the flag existed keeps
+working, and nobody has to remember to filter.
+
+Two query parameters open it up:
+
+| Parameter | Answers |
+|-----------|---------|
+| `?deleted=include` | Live rows **and** stamped ones |
+| `?deleted=only` | Stamped rows alone — the trash view |
+
+Anything else is a 400 rather than a silent fallback. `?deleted=true` quietly
+hiding every deleted row would look like it worked and answer the opposite
+question.
+
+### Restoring, and really deleting
+
+A **restore** is an ordinary update setting the field back to `null`. There is
+no special verb, because there is no special state — the row never went anywhere.
+
+A **real** `DELETE` is `?hard=true` on the delete call. It needs exactly the
+same permission an ordinary delete does: it is the same verb, and gating it
+separately would be a second access-control surface for one operation. What it
+changes is whether the row can come back. Only the literal `true` or `1` means
+yes; a typo is a 400, because a caller who asked to purge and got a soft delete
+believes the data is gone.
+
+### Next Steps
+
+- **[Defining Collections](/docs/collections)** — where `softDelete` is declared
+- **[REST API](/docs/backend/api)** — the delete and query endpoints these parameters belong to
+- **[Security Rules (RLS)](/docs/collections/security-rules)** — who may delete a row at all
 
 ## Entity Callbacks
 
@@ -11037,6 +12050,15 @@ role, enforced *inside* the `USING` / `WITH CHECK` clause through
 `rebase.roles()`. `pgRoles` is a database role, and controls which connections
 the policy is attached to at all. Almost every project wants `roles`.
 
+:::tip[Filling the column `ownerField` names]
+`ownerField` compares a column to `rebase.uid()`; it does not put anything in
+it. Declare that column as a string with
+[`autoValue: "user_on_create"`](/docs/collections/properties#audit-columns) and
+the driver stamps the acting user's uid on insert, overwriting whatever the
+request body sent — which is what makes the policy's premise true. A column the
+caller supplies is one the caller can lie about.
+:::
+
 ### Examples
 
 #### Blog Platform
@@ -11151,11 +12173,270 @@ securityRules: [
 Avoid the legacy pattern of checking `string_to_array(rebase.roles(), ',')` for anonymous access. The `access: "public"` shortcut is simpler and generates the correct policy automatically.
 :::
 
+### Rows here, fields next door
+
+Security rules answer one question: **which rows** does this caller reach. They
+are enforced by Postgres itself, on every statement, whatever the route — which
+is why they are the authorization model and everything above them is convenience.
+
+They have nothing to say about the *columns* of a row a caller does reach. A
+policy that lets an employee read their team's rows lets them read every field of
+those rows, salary included. That is what per-property
+[`access`](/docs/collections/field-access/) is for:
+
+```typescript
+salary: {
+    type: "number",
+    // Everyone the rules above let read the row; only HR gets this column.
+    access: { read: ["hr"], write: [] }
+}
+```
+
+The two stack and never contradict: a field rule cannot widen row access, and a
+row you cannot read has no fields to talk about. Roles are the same roles —
+`rebase.roles()` inside a policy, `user.roles` on the request — so
+`rolesOverlap(['hr'])` in a rule and `access: { read: ["hr"] }` on a property
+mean the same `hr`. Field rules are applied by the server rather than by
+Postgres, so they cover the API surface; a query run through `rebase.sql()` sees
+every column, exactly as it bypasses RLS.
+
 ### Next Steps
 
+- **[Field access](/docs/collections/field-access)** — Per-field read/write roles
 - **[Relations](/docs/collections/relations)** — Foreign keys and joins
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
 - **[Custom Functions](/docs/backend/custom-functions)** — Custom API endpoints
+
+## Field access
+
+### Overview
+
+[Security rules](/docs/collections/security-rules/) decide which **rows** a caller
+reaches. `access` decides which **fields of a reached row** they see and may set.
+
+```typescript
+
+const staff = defineCollection({
+    slug: "staff",
+    name: "Staff",
+    table: "staff",
+    properties: {
+        id: { type: "number", isId: "increment" },
+        name: { type: "string" },
+        salary: {
+            type: "number",
+            // Read by HR (and admins). Set by nobody through the API.
+            access: { read: ["hr"], write: [] }
+        }
+    },
+    securityRules: [
+        { operation: "select", access: "public" }
+    ]
+});
+```
+
+The rule above puts no row filter on `select`, so every caller the API lets in
+reads every staff row. Only a caller holding `hr` gets the `salary` column of
+one, and nobody sets it over HTTP.
+
+### The rule
+
+`access` has two optional lists, and an omitted list is not an empty one — the
+difference is the whole feature.
+
+| `read` / `write` | Means |
+|------------------|-------|
+| omitted | Delegate to the row. Everyone the collection's security rules let read (or write) the row gets the field. |
+| `[]` | Nobody, through the API, at any privilege — not `admin`, not the service key, not an in-process read. |
+| `["hr"]` | A caller holding `hr`, **or** `admin`, **or** trusted server code with no request behind it. |
+
+Roles are Rebase application roles — the same ones `rebase.roles()` returns
+inside a policy and `policy.rolesOverlap` compiles against. They come from the
+call context: `user.roles` on the authenticated request.
+
+#### Why `admin` always passes
+
+Every baseline policy Rebase injects carries a `rolesOverlap(['admin'])` arm, and
+`rebase.dataAsAdmin` runs as `{ uid: "service", roles: ["admin"] }`. A field rule
+that could lock an administrator out of a column of their own database would
+also lock the Studio out of rendering it and the CLI out of exporting it. If you
+need a column no administrator reads through the API, that is `read: []`.
+
+#### Why the trusted plane passes
+
+An in-process `rebase.data` call in a hook, a migration, or the auth adapter
+verifying a password has no request and no roles behind it. Those are server
+code, and a role list does not apply to them. `[]` still does: that is a
+statement about the API surface rather than about who is calling.
+
+### `excludeFromApi` is the same mechanism
+
+`excludeFromApi: true` is sugar for `access: { read: [], write: [] }`. There is
+one predicate behind both spellings, so everything on this page applies to the
+flag too. Write whichever reads better — but not both on one property, which is
+refused at boot.
+
+### What a caller sees
+
+#### Reads
+
+A field you cannot read is **absent** from the response. Not `null`, not an empty
+string — the key is not there.
+
+```json
+// GET /api/data/staff/1  as a caller holding `staff`
+{ "id": 1, "name": "Ada" }
+
+// the same row as a caller holding `hr`
+{ "id": 1, "name": "Ada", "salary": 90000 }
+```
+
+That is deliberate. A withheld value served as `null` is indistinguishable from a
+stored `null`, so a client could map the whole column by counting them — and an
+`update` that echoed the row back would overwrite the real value with the null it
+was handed.
+
+It applies at every exit: list, single get, relation targets included with
+`?include=`, `_batch` results, realtime frames from `.listen()`, aggregate
+results and [history](#history) snapshots.
+
+#### Queries
+
+A `where`, `orderBy`, `fields`, aggregate `select` or `groupBy` naming a field you
+cannot read is a **400 `FIELD_NOT_READABLE`**:
+
+```http
+GET /api/data/staff?salary=gt.100000
+```
+
+```json
+{
+  "error": {
+    "code": "FIELD_NOT_READABLE",
+    "message": "'salary' is not readable on 'staff' with your roles, so it cannot be used in a filter.",
+    "details": {
+      "collection": "staff",
+      "fields": ["salary"],
+      "violations": [
+        { "field": "salary", "code": "access", "message": "'salary' is not readable with your roles." }
+      ]
+    }
+  }
+}
+```
+
+Without this the value is readable one predicate at a time: twenty requests is a
+binary search over a salary.
+
+The error **names the field**. That is a decision, not an oversight: the
+published OpenAPI document lists every property of every collection — it is
+served off the app, not off the authenticated data router — so field names are
+already public. Hiding the name here would protect nothing and would answer a
+caller's genuine typo with "unknown field", sending them to look for a spelling
+mistake that is not there. **Field names are public; field values are not.**
+
+#### Writes
+
+A value for a field you cannot write is a **400**, never a silently dropped key —
+a write that discards a field reports success for an edit that did not happen.
+
+| Code | When |
+|------|------|
+| `FIELD_NOT_WRITABLE` | `write` is a role list you do not satisfy. Your colleague may get a 200 for the same body. |
+| `VALIDATION_EXCLUDED_FIELDS` | `write` is `[]` (or `excludeFromApi`). Nobody may write it; the answer is the same for every caller. |
+
+Both carry `details.violations` keyed by the wire name you sent. Enforced on
+create, `PATCH`/`PUT`, `/bulk`, `_batch`, upserts, field operations
+(`{ "salary": { "$inc": 1000 } }` names `salary` like any value does) and the
+WebSocket `SAVE` frame.
+
+### Search
+
+The fallback search — a collection with no `search` block — matches `ILIKE` across
+your string properties, and it skips the ones the caller cannot read. Nothing
+leaks through it.
+
+A collection that **does** declare a [`search` block](/docs/backend/api/) compiles
+to a single generated `tsvector` column shared by every caller. There is no
+per-role variant of it, so a restricted field named in `search.fields` would stay
+*matchable* to callers who can never see its value — recoverable a term at a
+time. Rebase refuses that combination at boot: remove the field from
+`search.fields`, or drop the read restriction.
+
+### History
+
+[Entity history](/docs/backend/api/) stores the whole row, and it is served to
+anyone who can read the row — the gate is "can you fetch this entity", not "are
+you an admin". So the read rule is applied to each stored snapshot too: the entry
+is still listed, with who changed it and when, and the withheld columns are gone
+from its `values`.
+
+Reverting is unaffected. The revert route reads the stored entry server-side, so a
+caller can restore a version whose every field they cannot see — exactly as they
+can already overwrite a row without reading all of it.
+
+### What the admin panel shows
+
+Nothing to configure. The Studio reads through the same API, so a field the
+caller cannot read never arrives and the form does not draw it; a field they
+cannot write is refused if something tries to send it. This is a server-side
+guarantee, unlike `admin.hideFromCollection`, which only stops the panel from
+*rendering* a field and leaves the value in the JSON.
+
+### Generated types and OpenAPI
+
+The SDK's `Row`, `Insert` and `Update` types are one shape for every caller —
+there is no `Row` that is right for both a reader who holds `hr` and one who does
+not — so a **role** rule does not change them. A field closed to everybody
+(`[]`, or `excludeFromApi`) is absent from them, as it always was.
+
+The OpenAPI document states the rule rather than pretending to be per-caller.
+Each restricted property carries `x-rebase-access`:
+
+```json
+"salary": {
+  "type": "number",
+  "description": "Salary — Field access: readable by `hr` (and `admin`); writable by nobody through the API. A caller without the role does not receive the field at all — it is absent, not null.",
+  "x-rebase-access": { "read": ["hr"], "write": [] }
+}
+```
+
+A field nobody can read is absent from the read schema and from the filter
+parameters; a field nobody can write is absent from the input schema. The two
+directions are separate schemas and are judged separately, so a token an admin
+posts and never reads back appears in the request body and not in the row.
+
+### In-process writes
+
+`rebase.data` and `rebase.dataAsAdmin` in a hook, a function or a cron job do not
+pass through the write check. That is the same exemption `excludeFromApi` has
+always had, and it is what makes the rule enforceable at all: something has to be
+able to store the password hash.
+
+Reads through `rebase.dataAsAdmin` hold the `admin` role, so a role rule does not
+hide anything from them. `[]` still does — including from `dataAsAdmin`. Use
+[`rebase.sql()`](/docs/backend/api/) if you need the raw column.
+
+### Validation
+
+These are refused at boot, before the server serves anything:
+
+- `access` and `excludeFromApi` on the same property — they are one mechanism, and
+  the flag wins, so the block beside it would be dead;
+- a bare string where a list belongs (`read: "admin"`), which reads as a non-empty
+  rule no caller satisfies and would hide the field from everybody;
+- a role that is not a non-empty string;
+- a restricted field named in the collection's `search.fields`.
+
+Role *names* are not checked against a set: roles are application data, created
+and deleted while the server runs. A typo in one is a field nobody can read, which
+is the safe direction to fail.
+
+### See also
+
+- [Security Rules (RLS)](/docs/collections/security-rules/) — which rows a caller reaches
+- [Properties](/docs/collections/properties/) — the full option table
+- [Error codes](/docs/backend/errors/) — `FIELD_NOT_READABLE`, `FIELD_NOT_WRITABLE`
 
 ## Backend Overview
 
@@ -11546,6 +12827,7 @@ For each collection, the following endpoints are generated. Every other route th
 | `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
 | `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
 | `POST` | `/api/data/:slug/bulk/delete` | Delete many entities in one transaction |
+| `POST` | `/api/data/_batch` | Write **across** collections in one transaction |
 
 #### Subcollection Routes
 
@@ -11645,7 +12927,7 @@ use `isnull` for that. The SDK serializes `.where("deleted_at", "==", null)` as
 
 #### Logical Operators
 
-Use `or` and `and` for complex conditions:
+Use `or`, `and` and `not` for complex conditions:
 
 ```bash
 # OR: match products that are either cheap or on sale
@@ -11653,14 +12935,24 @@ GET /api/data/products?or=(price.lt.10,on_sale.eq.true)
 
 # AND: explicit conjunction
 GET /api/data/products?and=(active.eq.true,price.gt.0)
+
+# NOT: everything that is not a discontinued in-stock item
+GET /api/data/products?not=(discontinued.eq.true,stock.gt.0)
 ```
 
-**One group per request, and `or` wins.** If a request carries both `?or=` and
-`?and=`, the `and` is ignored — they are two spellings of the same slot, not two
-filters. Nest instead:
+`not` negates the **conjunction** of its conditions: `not(a)` is `NOT a`, and
+`not(a,b)` is `NOT (a AND b)`. It compiles to a real SQL `NOT (...)` rather than
+to inverted operators — SQL is three-valued, so `NOT (a AND b)` and
+`(NOT a) OR (NOT b)` stop agreeing the moment a NULL is involved. A negation
+therefore **includes rows whose column is NULL**, which is what `NOT` means; AND
+a `notnull` alongside it if that is not what you want.
+
+**One group per request: `or` wins over `and`, and both over `not`.** They are
+three spellings of the same slot, not three filters. Nest instead:
 
 ```bash
 GET /api/data/products?or=(price.lt.10,and(active.eq.true,price.gt.0))
+GET /api/data/products?not=(or(status.eq.draft,status.eq.archived))
 ```
 
 Groups may nest 32 levels deep; past that the request is refused with
@@ -11743,6 +13035,26 @@ paging over an order that is not total repeats and skips rows.
 A repeated `?orderBy=` parameter is not a multi-key sort — the last one wins, as
 it does for every other query parameter. Use the array.
 
+#### Where NULLs sort
+
+By default NULLs sort **last ascending and first descending**, which is
+Postgres's own convention. A third colon-segment says otherwise:
+
+```bash
+# Newest first, with the undated rows at the end rather than the top
+GET /api/data/posts?orderBy=publishedAt:desc:last
+```
+
+The JSON array form takes a `"nulls"` key for the same thing:
+
+```bash
+GET /api/data/posts?orderBy=[{"field":"publishedAt","direction":"desc","nulls":"last"}]
+```
+
+Anything other than `first` or `last` is a 400, not a silently different order.
+The cursor below honours whatever the sort declared, so paging over a nullable
+key stays correct under either placement.
+
 ### Pagination
 
 Use `limit` and `offset`, or `page`:
@@ -11763,6 +13075,70 @@ itself: `INVALID_LIMIT`, `INVALID_OFFSET` (a whole number of 0 or more) and
 the one asked for cannot be told apart from having reached the end of the
 collection, which is why none of them is clamped or ignored.
 
+#### Cursor pagination
+
+`offset` re-counts rows on every request, so a row inserted or deleted between
+two pages shifts the window and the walk silently skips or repeats rows.
+`?after=` seeks instead: the next page starts strictly after the last row
+served.
+
+Every list response carries `meta.nextCursor` while there is another page. Send
+it back unchanged:
+
+```bash
+GET /api/data/orders?orderBy=createdAt:desc&limit=100
+# → meta.nextCursor = "eyJrIjpbWyJjcmVhdGVkX2F0Iiw…"
+
+GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJjcmVhdGVkX2F0Iiw…
+```
+
+The cursor is **opaque** — it encodes the sort keys *and* the last row's values
+for them — so three rules follow, each a 400 rather than a wrong page:
+
+| Situation | Code |
+|-----------|------|
+| `after` with `offset` or `page` | `CURSOR_WITH_OFFSET` — both say where the page starts |
+| `after` with a different `orderBy` than it was issued under | `CURSOR_ORDER_MISMATCH` |
+| A cursor this API did not issue | `INVALID_CURSOR` |
+
+A request that names no `orderBy` **adopts the cursor's**, so passing
+`meta.nextCursor` back without restating the sort works.
+
+Multi-key sorts and nullable keys both page correctly: the comparison is built
+over every key in order, with the NULL placement the sort declared. The one
+ordering no cursor can describe is relevance (`_score`) — computed per query and
+stored nowhere — and such a listing simply carries no `nextCursor`.
+
+### Selecting columns
+
+`?fields=` narrows a read to the columns you name. It is a projection pushed
+into the query, not a trim of the response:
+
+```bash
+GET /api/data/posts?fields=id,title&limit=50
+```
+
+The primary key always comes back (a row that cannot be addressed cannot be
+updated, deleted, or paged past — and the cursor is derived from it), and
+`excludeFromApi` columns stay hidden whether or not they are named. An unknown
+column is a 400 `UNKNOWN_FIELD` rather than a row quietly missing a field.
+
+`?distinct=true` collapses rows identical over those columns:
+
+```bash
+# The statuses actually in use
+GET /api/data/posts?fields=status&distinct=true
+```
+
+It is refused (400) alongside a ranked `searchString` or a vector search, which
+attach a per-row score that makes every row distinct by construction, and when
+`orderBy` names a column `fields` does not return
+(`DISTINCT_ORDER_BY_NOT_SELECTED`) — Postgres cannot order a DISTINCT read by an
+expression outside its select list.
+
+`?fields=` and `?distinct=` work on the get-by-id route and the nested
+subcollection routes too.
+
 #### Response Format
 
 List responses include pagination metadata:
@@ -11777,10 +13153,15 @@ List responses include pagination metadata:
         "total": 150,
         "limit": 20,
         "offset": 0,
-        "hasMore": true
+        "hasMore": true,
+        "nextCursor": "eyJrIjpbWyJpZCIsImRlc2MiXV0sInYiOnsiaWQiOjJ9LCJpIjoyfQ"
     }
 }
 ```
+
+`nextCursor` is present while `hasMore` is true and the page returned at least
+one row; it is absent on the last page and on an ordering no cursor can
+describe.
 
 Single entity responses return a flat object:
 
@@ -11872,9 +13253,42 @@ Use the `include` parameter to embed related entities:
 # Include specific relations
 GET /api/data/articles?include=author,categories
 
-# Include all relations
+# Include all relations, one hop deep
 GET /api/data/articles?include=*
+
+# A relation of a relation — up to three hops
+GET /api/data/articles?include=comments.author
 ```
+
+A name that is not a relation of the collection is a **400
+`UNKNOWN_RELATION`**, at every level. It used to be ignored, which answers 200
+with the field simply missing — indistinguishable from a row that genuinely has
+no related row, so a typo looked exactly like empty data. A path deeper than
+three hops is `INCLUDE_TOO_DEEP`.
+
+#### Narrowing one relation
+
+The comma-separated form has nowhere to put a per-relation `limit`, so
+`include` also accepts JSON — told apart by a leading brace:
+
+```bash
+GET /api/data/posts?include={"comments":{"limit":5,"where":{"published":["==",true]},"orderBy":"createdAt:desc","fields":["id","body"],"include":{"author":true}}}
+```
+
+| Key | Meaning |
+|-----|---------|
+| `limit` | Rows **per parent row**, not across the page |
+| `where` | The same filter dialect the top-level `where` uses |
+| `logical` | An `or`/`and`/`not` group over the related rows |
+| `orderBy` | The same sort spelling, including the NULL placement |
+| `fields` | Columns of the *related* row; its key always survives |
+| `include` | Relations of the related row, in turn |
+
+`true` means "load it whole", so `{"author":true}` and `author` are the same
+request. Both spellings work on the list route, the get-by-id route and the
+nested subcollection routes.
+
+Each hop is one batched query for the whole page, never one per row.
 
 Included relations are embedded directly in the response:
 
@@ -11891,13 +13305,13 @@ Included relations are embedded directly in the response:
 }
 ```
 
-### Field Selection
+### Writing
 
-Use `fields` to select specific columns:
-
-```bash
-GET /api/data/products?fields=id,name,price
-```
+Idempotency keys, conditional writes (`ETag` / `If-Match`), field operations
+(`$inc`, `$push`, `$pull`, `$merge`), upserting on a natural key,
+`Prefer: return=minimal`, and the cross-collection `POST /api/data/_batch`
+endpoint are all on their own page: **[Writing over
+REST](/docs/backend/writes/)**.
 
 ### Lifecycle Hook Pipeline
 
@@ -11961,6 +13375,229 @@ document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
 - **[Client SDK](/docs/sdk)** — Type-safe client for the REST API
 - **[Collections](/docs/collections)** — Define your data schema
 - **[Security Rules (RLS)](/docs/collections/security-rules)** — Control access per row
+
+## Writing over REST
+
+The verbs are on the [REST API](/docs/backend/api/) page. This one is about the
+five things a write can *ask for* beyond its verb, and the endpoint that writes
+across collections at once. All of them are opt-in per request: a write that
+does not ask for any of this behaves exactly as it always has.
+
+### Writing
+
+Beyond the verbs, the write routes take five things that change how a write
+behaves. All five are opt-in per request, so nothing here changes what a
+request that does not ask for it does.
+
+#### Idempotency
+
+`Idempotency-Key: <uuid>` on any write means "if you have already answered this
+exact request, answer it again rather than doing it twice".
+
+```bash
+curl -X POST /api/data/orders \
+     -H "Idempotency-Key: 1f0f…" \
+     -d '{"total": 40}'
+```
+
+A client that never sees a response cannot know whether the write committed, so
+it retries — and without a key the server cannot tell that retry from a second
+genuine write. On a table with a server-assigned id that is a duplicate row,
+because the id the client invented was never used.
+
+A key names **one request**: it records the method, the path and the body it was
+claimed for. Re-send that exact request and its answer is replayed; send a
+different one under the same key and it is refused with `IDEMPOTENCY_KEY_REUSED`
+(422) rather than answered with the first one's result. A retry that arrives
+while the first is still in flight gets `IDEMPOTENCY_KEY_IN_PROGRESS` (409) —
+send it again once the first has landed.
+
+Honoured on `POST`, `PATCH`, `DELETE`, all three `/bulk` routes and `/_batch`.
+Keys live for 24 hours and are scoped to the signed-in caller; an
+unauthenticated request has no principal to scope one to, so the header is
+ignored there. A backend that cannot store keys ignores the header rather than
+refusing the write.
+
+`DELETE` is the case worth reading twice. Replayed without a key, the second
+attempt finds the row gone and answers `404` — which a retrying client reads as
+a permanent failure for a delete that in fact succeeded. Under a key it replays
+the `204`.
+
+#### Optimistic concurrency: `ETag` and `If-Match`
+
+`GET /api/data/:slug/:id` returns an `ETag`. Send it back as `If-Match` on a
+later `PATCH` or `DELETE` and the write is refused with `412` if the row has
+changed in between.
+
+```bash
+# read
+curl -i /api/data/docs/d1
+# → ETag: "9f2c…"
+
+# write, conditionally
+curl -X PATCH /api/data/docs/d1 \
+     -H 'If-Match: "9f2c…"' \
+     -d '{"title": "Second draft"}'
+# → 412 PRECONDITION_FAILED if somebody else edited it first
+```
+
+Without it, read-modify-write is last-writer-wins over everything the second
+write did not send: two editors a second apart both succeed and the first one's
+change is gone with no error anywhere.
+
+The tag is derived from a `date` property with `autoValue: "on_update"` when the
+collection declares one — that column already *is* a version — and from a stable
+hash of the row otherwise. `If-Match: *` asserts only that the row exists.
+Nothing is written when the precondition fails.
+
+#### Field operations
+
+A property's value in a `PATCH` body may be an operation on the stored value
+rather than a value:
+
+```bash
+curl -X PATCH /api/data/posts/p1 -d '{
+  "views": { "$inc": 1 },
+  "tags":  { "$push": "featured" },
+  "meta":  { "$merge": { "seen": true } }
+}'
+```
+
+| Operator | Property type | Becomes |
+|----------|---------------|---------|
+| `$inc` | `number` | `SET col = COALESCE(col, 0) + n` |
+| `$push` | `array` | `array_append(col, …)`, or a jsonb concatenation |
+| `$pull` | `array` | `array_remove(col, …)`, or a jsonb re-aggregation |
+| `$merge` | `map` | `col || '…'::jsonb` (a **shallow** merge) |
+
+The point is the read the caller no longer makes. Expressing `views + 1` as a
+value means reading it first, and two requests that each read `4`, add one and
+write `5` end at `5` — with nothing in either response saying an increment went
+missing. Compiled into the statement, the arithmetic happens inside the row lock
+and cannot lose.
+
+Exactly one operator per field. An operator on a property type it is not defined
+on, an unknown `$operator`, or an operand of the wrong shape is a `400`
+(`INVALID_FIELD_OPERATION`) naming the field — a misspelling is never written to
+the column as a JSON document. Operations apply to updates only: over a row that
+does not exist yet there is nothing to operate on, so they are refused on
+`POST`, on `/bulk` creates, and on upserts.
+
+#### Upsert on a natural key
+
+`POST /api/data/:slug?on_conflict=email` writes
+`INSERT … ON CONFLICT (email) DO UPDATE` instead of a plain insert. The bulk
+route takes the same target as `onConflict` beside `upsert: true`, and so does
+each `upsert` operation of a batch.
+
+```bash
+curl -X POST '/api/data/users?on_conflict=email' \
+     -d '{"email": "ada@example.com", "name": "Ada"}'
+
+curl -X POST /api/data/users/bulk -d '{
+  "rows": [ … ],
+  "upsert": true,
+  "onConflict": ["tenant_id", "slug"]
+}'
+```
+
+The target must carry a uniqueness guarantee the database can match on: the
+primary key (the default when none is named), a property with
+`validation: { unique: true }`, or the columns of a `unique: true`
+[index](/docs/backend/indexes/). Anything else is a `400`
+(`INVALID_CONFLICT_TARGET`) listing the targets that do exist — Postgres would
+otherwise answer *there is no unique or exclusion constraint matching the ON
+CONFLICT specification* from inside a transaction that has already done work.
+
+Naming a target without `upsert: true` on a bulk write is also a `400`: silently
+ignoring it turns a re-runnable import into a duplicating one.
+
+A row that already existed keeps its `on_create` timestamp. A conflict means the
+row's creation is a fact about the past, and a nightly re-import that reset
+`createdAt` on everything it touched would take every "new this week" query
+with it.
+
+#### `Prefer: return=minimal`
+
+Every write answers with the full row by default, which is what carries the
+things the server decided — a serial id, an `autoValue` stamp, whatever
+`beforeSave` rewrote. Send `Prefer: return=minimal` when you need none of it:
+
+```bash
+curl -X POST /api/data/events \
+     -H "Prefer: return=minimal" \
+     -d '{"kind": "page_view"}'
+# → 204 No Content, Preference-Applied: return=minimal
+```
+
+A single write answers `204`. A `/bulk` or `/_batch` write answers `200`
+carrying the **ids** rather than the rows — on a create the id is the one thing
+the caller cannot compute, so discarding it would mean re-reading the table by
+some natural key to learn what had just been written. A single-column key comes
+back as the scalar; a composite key as an object of its columns.
+
+### Cross-collection batches
+
+`POST /api/data/_batch` writes across collections in one transaction, under the
+caller's own role, with the same validation, callbacks and row-level security
+each operation's single-row route would apply.
+
+```json
+POST /api/data/_batch
+{
+  "operations": [
+    { "op": "create", "collection": "orders",
+      "values": { "total": 40 }, "ref": "order" },
+    { "op": "create", "collection": "order_items",
+      "values": { "order_id": { "$ref": "order.id" }, "sku": "A-1" } },
+    { "op": "update", "collection": "stock",
+      "id": "A-1", "values": { "count": { "$inc": -1 } } },
+    { "op": "delete", "collection": "carts", "id": "c-9" }
+  ]
+}
+```
+
+```json
+{
+  "data": [ { "id": 31, "total": 40 }, { "id": 88, … }, { … }, null ],
+  "meta": { "operations": 4 }
+}
+```
+
+`op` is `create`, `update`, `upsert` or `delete`. `update` and `delete` need an
+`id`; `create`, `update` and `upsert` need `values`; `upsert` may name an
+`onConflict` target on the same terms as above. `data` is aligned to
+`operations` — the written row for a create, update or upsert, and `null` for a
+delete — so an index into one is an index into the other.
+
+#### `$ref`: pointing at a row the same batch created
+
+An operation may name itself with `ref`, and any later operation may stand
+`{ "$ref": "<name>.<field>" }` where a value goes — in `values` at any depth, or
+as an `id`. It resolves to that field of the row the named operation wrote.
+
+This is the reason the endpoint exists rather than being a loop: a child's
+foreign key is not knowable until the parent has been inserted, so without it
+the parent and the children have to be separate requests — precisely the
+sequence that can half-succeed. Only **backward** references resolve; a forward
+one is refused before the transaction opens.
+
+#### What is checked before anything is written
+
+Shape, unknown collections, unknown fields, value constraints, field operations,
+conflict targets and `$ref` reachability are all decided before the transaction
+opens. A batch is all-or-nothing, and finding a typo at operation 40 would
+otherwise cost the rollback of the 39 writes before it.
+
+Capped at the same number of operations as a bulk write (1000 by default), since
+one batch holds its locks for the whole transaction. A driver that cannot make
+the batch atomic answers `BATCH_UNSUPPORTED` rather than falling back to a loop
+of single writes — which would give neither the atomicity nor the single round
+trip a batch is reached for.
+
+An `update` or `delete` naming a row that does not exist fails the whole batch
+with a `404`, for the same reason a partial write is refused everywhere else:
+half-applied is the state with no good recovery.
 
 ## API keys
 
@@ -12264,15 +13901,23 @@ the ID you got. Read the response header.
 | --- | --- | --- | --- |
 | `AGGREGATE_NOT_SUPPORTED` | 501 | This driver cannot compute the requested aggregate. | Use a driver that can, or compute it in the client. |
 | `BRANCHING_UNSUPPORTED` | — | A database branch was requested over the Studio websocket on the managed development database (PGlite), where a branch *is* the parent and nothing would be isolated. The refusal is the same one `rebase db branch` prints. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one) and branch there. |
+| `BATCH_TOO_LARGE` | 400 | `POST /api/data/_batch` carries more operations than the per-batch limit (1000 by default). One batch is one transaction and holds its locks for the whole of it. | Send it in chunks; the message names the limit and your count. |
+| `BATCH_UNSUPPORTED` | 400 | This backend's driver cannot write across collections atomically, and a loop of single writes would be neither atomic nor one round trip. | Send the writes as separate requests, or as per-collection `/bulk` calls. |
 | `BULK_TOO_LARGE` | 400 | The bulk body exceeds the configured item limit. | Split the request. |
 | `BULK_UNSUPPORTED` | 400 | This collection or driver does not support bulk writes. | Write the rows one at a time. |
 | `CALLBACK_REJECTED` | 400 | A collection callback refused the write. A `throw` from `beforeSave`/`beforeDelete`/`after*` is a 400 carrying the author's own message; a `beforeDelete` that returns `false` is a 403. `details.stage` names which callback, `details.path` the collection. | Read the message — it was written by this project, not by Rebase. |
 | `DB_PERMISSION_DENIED` | 500 | Postgres refused the statement (`42501`): either a row-level-security policy denying this role, or a missing `GRANT`. | See [Troubleshooting](/docs/troubleshooting/). |
+| `FIELD_NOT_READABLE` | 400 | A filter, `orderBy`, `fields`, aggregate `select` or `groupBy` names a field this caller's roles cannot read (`access.read`). A field no response can carry has to be one no query can interrogate, or the value is readable one predicate at a time. `details.violations` names each field. | Drop the field from the query, or acquire the role. See [Field access](/docs/collections/field-access/). |
+| `FIELD_NOT_WRITABLE` | 400 | The body sets a field this caller's roles cannot write (`access.write`). Refused rather than dropped: a write that discards a field would report success for an edit that did not happen. `details.violations` names each field. | Remove the field, or acquire the role. A field nobody may write answers `VALIDATION_EXCLUDED_FIELDS` instead. |
 | `IDEMPOTENCY_KEY_IN_PROGRESS` | 409 | An earlier request with the same `Idempotency-Key` is still running. | Retry once it finishes. |
 | `IDEMPOTENCY_KEY_REUSED` | 422 | The same `Idempotency-Key` arrived with a different body. | Use a new key, or send the original body. |
 | `INVALID_AGGREGATE_FUNCTION` | 400 | `?select=` named a function that is not `count`, `sum`, `avg`, `min` or `max`. | Use one of those; the message lists them. |
 | `INVALID_AGGREGATE_SELECT` | 400 | An `?select=` entry is not `fn(field)`, or a function other than `count()` was given no field. | Write `sum(total)`, `count()`, `avg(score)`. |
+| `INVALID_BATCH_BODY` | 400 | A `/_batch` operation is missing `op`, `collection`, `values` or `id`, names a collection this backend does not serve, or reuses a `ref` name. | See the message; it names the operation by index. |
+| `INVALID_BATCH_REF` | 400 | A `{ "$ref": "<name>.<field>" }` names no earlier operation, points forward, or asks for a field the referenced row does not have. Only backward references resolve. | Name the operation with `ref` *before* referencing it. |
 | `INVALID_BULK_BODY` | 400 | The bulk body is not the expected shape. | Send the documented `items` array. |
+| `INVALID_CONFLICT_TARGET` | 400 | An upsert's `on_conflict` / `onConflict` names columns carrying no uniqueness guarantee, or names them without `upsert: true`. Postgres would otherwise answer 42P10 from inside a transaction that has already done work. | Declare `validation: { unique: true }` or a `unique` index; the message lists the targets that do exist. |
+| `INVALID_FIELD_OPERATION` | 400 | A `$inc` / `$push` / `$pull` / `$merge` was used on a property type it is not defined on, with an operand of the wrong shape, with two operators on one field, misspelled, or on a create — where there is no stored value to operate on. | See [Writing over REST](/docs/backend/writes/#field-operations); the message names the field. |
 | `INVALID_FILTER_FIELD` | 400 | The filter names a property this collection does not have. | Check the spelling against the collection. |
 | `INVALID_FILTER_OPERATOR` | 400 | The operator is not one this property type supports. | See [Querying data](/docs/sdk/querying/). |
 | `INVALID_FILTER_VALUE` | 400 | A filter value cannot be read as the type of the column it was compared against: `?id=eq.abc` on an integer key, a label that is not in the enum, a timestamp that is not one, a number past the type's range. `details.dbCode` carries the SQLSTATE. | Send a value of the column's type. |
@@ -12304,13 +13949,14 @@ the ID you got. Read the response header.
 | `UNKNOWN_FILTER_FIELD` | 400 | The filter names a field this collection — or a relation's target — does not have. | Check the spelling; the message lists the valid fields. |
 | `UNKNOWN_FILTER_OPERATOR` | 400 | The filter names an operator that does not exist. | The message lists every operator. |
 | `UNKNOWN_ORDER_BY_FIELD` | 400 | The sort names a field this collection does not have. | Check the spelling; the message lists the valid fields. |
+| `PRECONDITION_FAILED` | 412 | An `If-Match` named a version of the row that is no longer current: somebody wrote to it between the read and this write. Nothing was written. | Re-read the row, re-apply the change, and send the new `ETag`. |
 | `UNKNOWN_RESPONSE_FIELD` | 400 | `?fields=` asks for a field the collection does not have. | Check the spelling; the message lists the known fields. |
 | `UNKNOWN_VECTOR_PROPERTY` | 400 | A vector search named a property that is not a `vector` on this collection. | The message lists the collection's vector properties. |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | The `Content-Type` is not one this route accepts. | Send the type the route documents. |
 | `UNSUPPORTED_RELATION_FILTER` | 400 | The filter crosses a `via` relation, whose join path is authored one way only, so there is nothing to correlate a subquery back to. | Filter from the owning side. |
 | `UNSUPPORTED_RELATION_FILTER_OPERATOR` | 400 | The operator is not defined for that field: a relation with no column on this row is filtered by membership, and case-insensitive matching only applies to text. | See the message; it lists what the field accepts. |
 | `VALIDATION_CONSTRAINT` | 400 | A value broke a `validation` rule the property declares — a length, a range, a pattern, a required field. | See the message; it names each violation. |
-| `VALIDATION_EXCLUDED_FIELDS` | 400 | The body writes a column marked `excludeFromApi`. Those are the server's to set — a password hash, a verification token. | Remove the field. |
+| `VALIDATION_EXCLUDED_FIELDS` | 400 | The body writes a column marked `excludeFromApi`, or `access: { write: [] }` — the same rule, two spellings. Those are the server's to set: a password hash, a verification token. Unlike `FIELD_NOT_WRITABLE` this is the same answer for every caller, `admin` included. | Remove the field. See [Field access](/docs/collections/field-access/). |
 | `VALIDATION_INVALID_VALUE` | 400 | A value does not fit its property type. | See the message; it names the property. |
 | `VALIDATION_UNKNOWN_FIELDS` | 400 | The body names a field the collection does not have — including an `id` argument on a collection keyed on something else. | Check the spelling; the message lists the known fields. |
 | `WRITE_DENIED` | 403 | A security rule or row-level-security policy refused the write. | Check the collection's `securityRules`. |
@@ -12460,6 +14106,7 @@ list. `:slug` is a collection's `slug`.
 | `POST` | `/api/data/:slug/bulk` | RLS | Insert many rows, optionally upserting — [REST API](/docs/backend/api/) |
 | `PATCH` | `/api/data/:slug/bulk` | RLS | Update many rows by id — [REST API](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/bulk/delete` | RLS | Delete many rows by id — [REST API](/docs/backend/api/) |
+| `POST` | `/api/data/_batch` | RLS | Write across collections in one transaction — [Writing over REST](/docs/backend/writes/#cross-collection-batches) |
 | `GET` | `/api/data/:slug/:id/history` | RLS | [Entity History](/docs/backend/history/) |
 | `POST` | `/api/data/:slug/:id/history/:historyId/revert` | RLS | [Entity History](/docs/backend/history/) |
 
@@ -15225,6 +16872,48 @@ own policies would have denied it, and the subscription's own `where` filter was
 not applied to it either. The patch has been removed: perceived latency for an
 update is now the debounce window.
 
+#### The refetch is the REST read
+
+The refetch runs the same pipeline `GET /api/data/<collection>` runs, with the
+same `include` handling. That is what makes `find({ q })` and `listen({ q })`
+return rows that are equal field for field.
+
+It used to be a different method — one that nested each relation under a
+`{ "__type": "relation" }` envelope and, because a subscription could carry no
+`include`, eagerly loaded **every** relation the collection declares. So the same
+query answered in one shape over HTTP and another over the socket, and a client
+rendering both saw its rows change shape the moment a write landed.
+
+A subscribe frame therefore takes what a list request takes: `filter`,
+`logical`, `orderBy`, `limit`, `offset`/`page`, `searchString`, `include` and
+`fields`. `vectorSearch` is the exception and is **refused** with
+`VECTOR_SEARCH_NOT_LIVE` — a subscription is re-run on every matching write and
+nothing there computes distances.
+
+#### `collection_update` carries its own metadata
+
+The frame is `{ rows, pks, meta }`:
+
+```json
+{
+    "type": "collection_update",
+    "subscriptionId": "…",
+    "rows": [ { "id": 1, "title": "Widget" } ],
+    "pks": [ { "fieldName": "id", "type": "number" } ],
+    "meta": { "total": 150, "limit": 20, "offset": 0, "hasMore": true, "nextCursor": "eyJ…" }
+}
+```
+
+`meta` is counted inside the same RLS-bound transaction that read the rows, so
+it describes exactly the rows beside it. Without it, a client needing a total
+had to issue a `GET /count` **per push** — one extra round trip per write, per
+subscriber, and a window in which the count and the rows described different
+states of the collection.
+
+When the count itself fails, the frame carries `partial: true` and no `total`;
+that is not a subscription error, and a client should keep the last real total
+rather than substituting the page length.
+
 ### Broadcast Channels
 
 Broadcast channels let clients send arbitrary messages to each other in real time — useful for features like typing indicators, cursor positions, or custom notifications.
@@ -16184,6 +17873,11 @@ Both producers emit them, which matters because not every deployment runs
 - **`rebase db push` / `rebase db generate`** put them in `schema.sql`, on the
   ordinary Atlas path — so they get migrations, drift detection and rollback
   like every other object.
+- **`rebase schema generate`** also writes them into `schema.generated.ts`, so
+  the Drizzle schema describes the same table the database has. A covering
+  index's `INCLUDE` columns are the one exception: Drizzle cannot express them,
+  and the generated line carries a comment saying so and pointing at
+  `schema.sql`, which does.
 - **Boot-time schema ensure** creates them with
   `CREATE INDEX CONCURRENTLY IF NOT EXISTS`, on the same terms as the ANN
   indexes beside it. A managed-runtime tenant provisions at boot and never runs
@@ -26856,6 +28550,610 @@ Row-level security makes "no such row" and "not yours to read" the same answer,
 deliberately: a 404 that distinguished them would confirm the row exists.
 :::
 
+#### Writing
+
+`create`, `upsert`, `update`, `delete` and their batch forms are on
+**[Writing data](/docs/sdk/writing/)**, along with field operations, conditional
+writes and idempotency keys.
+
+#### Count
+
+```typescript
+const total = await client.data.products.count();
+
+// With filters
+const activeCount = await client.data.products.count({
+    where: { active: ["==", true] }
+});
+```
+
+### Fluent Query Builder
+
+Chain methods for more expressive queries:
+
+```typescript
+const { data } = await client.data.products
+    .where("price", ">=", 100)
+    .where("active", "==", true)
+    .orderBy("createdAt", "desc")
+    .limit(10)
+    .find();
+```
+
+#### Available Methods
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `.where(field, op, value)` | Add a filter condition | `.where("age", ">=", 18)` |
+| `.where(path, op, value)` | Filter on a [relation](#querying-through-a-relation) or [JSON](#filtering-inside-json) path | `.where("author.name", "==", "bob")` |
+| `.where(group)` | Add an [OR/AND group](#logical-conditions-or--and) | `.where(or(cond(…), cond(…)))` |
+| `.orderBy(field, dir, nulls?)` | Sort results | `.orderBy("name", "asc")` |
+| `.orderBy(aggregate, dir)` | Sort by an [aggregate over a relation](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
+| `.limit(n)` | Limit result count | `.limit(25)` |
+| `.offset(n)` | Skip first N results | `.offset(50)` |
+| `.after(cursor)` | Continue after a [cursor](#cursor-pagination) | `.after(meta.nextCursor)` |
+| `.fields(...columns)` | Return [only these columns](#returning-fewer-columns) | `.fields("id", "title")` |
+| `.distinct()` | Collapse rows identical over those columns | `.fields("status").distinct()` |
+| `.search(text)` | Text search — see [Search](/docs/backend/search) | `.search("laptop")` |
+| `.vectorSearch(prop, vector, opts?)` | Nearest-neighbour search over a `vector` property | `.vectorSearch("embedding", vec)` |
+| `.include(...relations)` | [Load related rows](/docs/sdk/relations#loading-related-rows) | `.include("author", "tags")` |
+| `.find()` | Execute the query | Returns `FindResult<M>` |
+| `.aggregate(params)` | [Reduce instead of returning rows](#aggregates) | `.aggregate({ select: [{ fn: "count" }] })` |
+| `.iterate(options?)` | [Stream every matching row](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
+| `.findAll(options?)` | [Collect every matching row](#reading-everything-iterate-and-findall) | Returns `M[]` |
+| `.count()` | Count the matching rows | Returns `number` |
+| `.listen(onUpdate, onError?)` | Subscribe to real-time updates | Returns `unsubscribe()` |
+
+#### Filter Operators
+
+| Operator | Alias | Description |
+|----------|-------|-------------|
+| `"=="` | `"eq"` | Equal |
+| `"!="` | `"neq"` | Not equal |
+| `">"` | `"gt"` | Greater than |
+| `">="` | `"gte"` | Greater than or equal |
+| `"<"` | `"lt"` | Less than |
+| `"<="` | `"lte"` | Less than or equal |
+| `"in"` | | Value in array |
+| `"not-in"` | `"nin"` | Value not in array |
+| `"array-contains"` | `"cs"` | Array field contains value |
+| `"array-contains-any"` | `"csa"` | Array field contains any of values |
+| `"like"` | `"like"` | Case-**sensitive** pattern match; `%` and `_` are the wildcards |
+| `"ilike"` | `"ilike"` | Case-insensitive pattern match |
+| `"not-like"` | `"nlike"` | Does not match the pattern |
+| `"not-ilike"` | `"nilike"` | Does not match the pattern, case-insensitively |
+| `"is-null"` | `"isnull"` | Column is `NULL`. Takes no value — whatever you pass is normalized away |
+| `"is-not-null"` | `"notnull"` | Column is not `NULL`. Takes no value |
+
+The alias column is the **wire** spelling, used in REST query strings. It never
+appears in application code: the SDK and the admin panel both speak the
+canonical operator on the left.
+
+#### Where Clause Syntaxes
+
+The `where` parameter in `find()` supports two formats:
+
+```typescript no-verify
+// 1. Tuple syntax — [operator, value] (recommended)
+await client.data.products.find({
+    where: {
+        status: ["==", "active"],
+        featured: ["==", true],
+        price: [">=", 100],
+        category: ["in", ["electronics", "gadgets"]],
+        deleted_at: ["!=", null]
+    }
+});
+
+// 2. Pre-serialized PostgREST string syntax (advanced)
+await client.data.products.find({
+    where: { status: "eq.published", price: "gte.100" }
+});
+```
+
+> **Note:** Pre-serialized PostgREST strings (format 2) are an escape hatch for passing filter values that are already in wire format. Prefer tuple syntax for type safety and readability.
+
+### Logical Conditions (OR / AND / NOT)
+
+Every field in `where` is AND-ed. To OR conditions together, or to negate a
+group, build a **logical condition** with the `or`, `and`, `not` and `cond`
+helpers the SDK exports:
+
+```typescript
+
+const { data } = await client.data.products.find({
+    logical: or(
+        cond("status", "==", "active"),
+        and(
+            cond("status", "==", "draft"),
+            cond("authorId", "==", currentUserId)
+        )
+    )
+});
+```
+
+The fluent builder takes the same tree:
+
+```typescript
+const { data } = await client.data.products
+    .where(or(cond("status", "==", "active"), cond("featured", "==", true)))
+    .orderBy("createdAt", "desc")
+    .find();
+```
+
+`cond` takes the canonical operator — the left column of the
+[Filter Operators](#filter-operators) table. An operator the dialect does not
+have is a `TypeError` when the query is serialized, not a silently different
+query.
+
+#### Negation
+
+`not` negates the **conjunction** of its conditions: `not(a)` is `NOT a`, and
+`not(a, b)` is `NOT (a AND b)`. Groups nest, so De Morgan's other half is
+`not(or(a, b))`.
+
+```typescript
+// Everything that is NOT a draft with fewer than ten views.
+const { data } = await client.data.posts.find({
+    logical: not(
+        cond("status", "==", "draft"),
+        cond("views", "<", 10)
+    )
+});
+```
+
+It compiles to a real SQL `NOT (...)`, not to inverted operators. That
+distinction is not cosmetic: SQL is three-valued, so `NOT (a AND b)` and
+`(NOT a) OR (NOT b)` stop agreeing the moment a `NULL` is involved, and only
+one of them is the query you wrote.
+
+It also means a negation **includes rows whose column is NULL** —
+`not(cond("status", "==", "draft"))` returns rows with no status at all. That
+is what `NOT` means, and usually what you want; if it is not, AND an
+`is-not-null` alongside it.
+
+#### How it composes with the rest of the query
+
+`where`, `logical` and `search` are three independent groups, AND-ed with each
+other:
+
+```
+(where fields, AND-ed)  AND  (logical group)  AND  (search)
+```
+
+There is no way to OR `where` against `logical`. Anything that is not a plain
+AND of the three has to be expressed inside one `logical` tree — move the
+fields you need OR-ed into it.
+
+#### On the wire
+
+A logical group travels as a single `or=`, `and=` or `not=` query parameter, in
+the same dot-syntax the field filters use:
+
+```
+GET /api/data/products?or=(status.eq.active,featured.eq.true)
+GET /api/data/posts?not=(status.eq.draft,views.lt.10)
+```
+
+Only one of the three applies per request — `or` wins over `and`, and both over
+`not`. Nest a group inside another to combine them.
+
+Three encodings are worth knowing, because they are the ones a hand-written
+query string gets wrong:
+
+| Condition | Wire form | Note |
+|-----------|-----------|------|
+| `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` is a search for the four-character string `null` |
+| `cond("id", "in", [])` | `id.in.(\)` | `in.()` is a list holding one empty string, which is a different query |
+| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | a [relation path](#querying-through-a-relation) keeps its dot |
+
+Commas, parentheses and backslashes inside a value are backslash-escaped, so
+`cond("name", "==", "Doe, John")` travels as `name.eq.Doe\, John` and does not
+split the group.
+
+Groups may nest 32 levels deep. Past that the request is rejected with
+`INVALID_LOGICAL_GROUP` — flatten it, since `or(a,or(b,c))` is `or(a,b,c)`.
+
+### Pagination
+
+```typescript
+// Offset-based pagination
+const page1 = await client.data.products.find({ limit: 20, offset: 0 });
+const page2 = await client.data.products.find({ limit: 20, offset: 20 });
+
+// Check if more pages exist
+if (page1.meta.hasMore) {
+    // fetch next page
+}
+
+// Page-number pagination (1-indexed)
+const page = await client.data.products.find({ page: 2, limit: 20 });
+```
+
+`limit` must be a whole number between 1 and 1000. A larger one — or a zero,
+negative, or fractional one — is refused with a 400 `INVALID_LIMIT` rather than
+clamped, because a silently smaller page cannot be told apart from the last one.
+To read past that ceiling, walk the pages with `iterate()` or `findAll()`.
+
+#### Cursor pagination
+
+Every list response carries a `meta.nextCursor` while there is another page.
+Pass it back as `after` and the next page picks up **strictly after the last row
+served**, rather than at a row *count* that concurrent writes have already
+moved:
+
+```typescript
+let after: string | undefined;
+do {
+    const { data, meta } = await client.data.orders.find({
+        orderBy: ["createdAt", "desc"],
+        limit: 100,
+        after
+    });
+    for (const order of data) await handle(order);
+    after = meta.nextCursor;
+} while (after);
+```
+
+The cursor is **opaque**. It encodes the sort keys *and* the last row's values
+for them, so it can only continue the listing it came from: keep `orderBy`
+identical across pages, or the request is refused with
+`CURSOR_ORDER_MISMATCH` rather than seeked in an order nobody asked for. A
+request that names no `orderBy` at all adopts the cursor's, so you can hand it
+straight back without restating the sort.
+
+Do not parse it, and do not build one: the encoding exists to be changed, and
+anything else is `INVALID_CURSOR`.
+
+Three things follow from what a cursor is:
+
+- **`after` cannot be combined with `offset` or `page`** (400
+  `CURSOR_WITH_OFFSET`). Both say where the page starts, and honouring both
+  would skip rows.
+- **Multi-key sorts and nullable keys both work.** The comparison is built over
+  every key in order, with the [NULL placement](#where-nulls-sort) the sort
+  declared — not a single `>` on one column.
+- **Relevance cannot be a cursor.** A `_score` is computed per query and stored
+  nowhere, and two queries with different search strings produce scores that are
+  not on the same scale. Such a listing simply carries no `nextCursor`; page it
+  with `offset`.
+
+Over HTTP it is one parameter:
+
+```
+GET /api/data/orders?orderBy=createdAt:desc&limit=100
+GET /api/data/orders?orderBy=createdAt:desc&limit=100&after=eyJrIjpbWyJ…
+```
+
+#### Which reads are wrapped, and which are not
+
+Two shapes, and one rule: **a window is wrapped, a whole answer is not.**
+
+| Method | Returns | Why |
+|--------|---------|-----|
+| `find()`, `listen()` | `{ data, meta }` | One page. `meta.total` / `meta.hasMore` are the only way to know there is more |
+| `findAll()`, `createMany()`, `updateMany()` | `M[]` | Nothing left over to report — the walk finished, or the batch *is* the rows |
+| `iterate()` | one row at a time | Nothing is materialised at all |
+| `findById()`, `get()`, `create()`, `update()` | one row | Not a list |
+
+`data` is not a wrapper the SDK sometimes adds and sometimes forgets. It is
+where the pagination metadata lives, and it is there exactly when there is some.
+
+#### Reading everything: `iterate()` and `findAll()`
+
+`iterate()` streams every row a query matches, one at a time, fetching a page at
+a time behind the scenes. Nothing accumulates, so it is the one to use for a
+collection you cannot hold in memory:
+
+```typescript
+for await (const order of client.data.orders.iterate({
+    where: { status: ["==", "pending"] }
+})) {
+    await handleOrder(order);
+}
+```
+
+`findAll()` is the same walk collected into an array:
+
+```typescript
+const stale = await client.data.sessions.findAll({
+    where: { expiresAt: ["<", cutoff] }
+});
+```
+
+Both are on the fluent builder too, where `.limit()` becomes the **page size**
+rather than a total:
+
+```typescript
+const rows = await client.data.orders
+    .where("status", "==", "pending")
+    .orderBy("createdAt", "asc")
+    .limit(500)          // rows per request
+    .findAll();
+```
+
+Three options shape the walk:
+
+| Option | Default | What it does |
+|--------|---------|--------------|
+| `pageSize` | 200 | Rows per request. |
+| `cursor` | — | Seek on a column instead of paging by offset. See below. |
+| `maxPages` | 10 000 | Ceiling on requests, so a server that never stops saying `hasMore` cannot spin forever. |
+| `maxRows` | 10 000 | `findAll()` only. Exceeding it **throws** rather than returning a truncated array as if it were the whole answer. Pass `Infinity` to opt out, or use `iterate()`. |
+
+**Prefer `cursor` whenever the collection has a unique, sortable column.**
+Offset paging re-counts rows on every request, so a row inserted or deleted
+*while the walk runs* shifts the window and the walk silently skips or repeats
+rows. Seeking asks for rows strictly after the last one seen, which concurrent
+writes before the cursor cannot move:
+
+```typescript
+for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
+```
+
+`cursor` here means "seek rather than page by offset", and names the column to
+sort by when the query does not already say. The seeking itself is
+[the server's cursor](#cursor-pagination): the walk hands `meta.nextCursor` back
+as `after` and builds no comparison of its own, which is why a multi-key sort
+works —
+
+```typescript
+for await (const job of client.data.jobs.iterate({
+    cursor: "id",
+    orderBy: [["priority", "desc"], ["createdAt", "asc"]]
+})) { /* … */ }
+```
+
+— and why a nullable sort key does too.
+
+The sort still has to be **total**, which in practice means unique: the row id
+breaks the final tie, so any column works as a tie-breaker, but a walk whose
+cursor stops advancing throws `cursor-stalled` rather than looping forever. A
+query no cursor can describe (relevance) throws `cursor-missing`; drop `cursor`
+and page by offset.
+
+### Sorting
+
+```typescript
+// Sort by field (format: ["field", "direction"])
+const { data } = await client.data.products.find({
+    orderBy: ["createdAt", "desc"]
+});
+
+// Fluent style
+const { data } = await client.data.products
+    .orderBy("price", "asc")
+    .find();
+```
+
+A direction you leave out is `"asc"` — the same thing `?orderBy=name` means over
+HTTP, whichever database is underneath.
+
+#### Sorting by more than one column
+
+A sort is a *list* of keys. The second decides between rows the first calls
+equal, the third between rows the first two do — so `orderBy` takes a list of
+`[field, direction]` pairs as readily as a single one:
+
+```typescript
+// By category, and newest first within each category.
+const { data } = await client.data.products.find({
+    orderBy: [["category", "asc"], ["createdAt", "desc"]]
+});
+```
+
+The fluent builder spells the same thing by calling `.orderBy()` again. Each
+call **adds** a key under the ones before it rather than replacing them:
+
+```typescript
+const { data } = await client.data.products
+    .orderBy("category")            // primary
+    .orderBy("createdAt", "desc")  // tie-breaker
+    .find();
+```
+
+Every sort ends on the row id, descending, whether you asked for it or not.
+That is what makes the ordering *total*: without it two rows sharing a value are
+returned in whatever order the database pleased, and paging over an order that
+can differ between two runs of the same query repeats some rows and skips
+others.
+
+A multi-column sort pages fine under a [cursor](#cursor-pagination): the
+comparison is built over every key, in order. The one ordering a cursor cannot
+describe is **`_score`** — see [Search](/docs/backend/search). Relevance is
+computed per query rather than stored, so there is no value on the cursor row to
+compare the next page against, and such a listing carries no `nextCursor`.
+
+#### Where NULLs sort
+
+By default NULLs sort **last ascending and first descending** — Postgres's own
+convention. That default is what puts every row with no date at the very top of
+a "newest first" list, ahead of everything real, and the only way out used to be
+an `is-not-null` filter that dropped those rows entirely.
+
+A third element on the key says where they go instead:
+
+```typescript
+// Newest first, and the ones with no date at the end where they belong.
+const { data } = await client.data.posts.find({
+    orderBy: [["publishedAt", "desc", "last"]]
+});
+```
+
+```typescript
+const { data } = await client.data.posts
+    .orderBy("publishedAt", "desc", "last")
+    .find();
+```
+
+Over HTTP it is a third colon-segment, `?orderBy=publishedAt:desc:last`, or a
+`"nulls"` key in the JSON array form. Anything other than `first`/`last` is a
+400 rather than a silently different order.
+
+The [cursor](#cursor-pagination) honours whatever the sort declared, so paging
+over a nullable key stays correct under either placement.
+
+### Returning fewer columns
+
+`fields` narrows a read to the columns you name. It is a projection at the
+database — those are the columns *read*, not the ones that survive a trim of the
+response — so a query that needs two fields of a wide row does not pay for the
+rest:
+
+```typescript
+const { data } = await client.data.posts.find({
+    fields: ["id", "title"],
+    limit: 50
+});
+```
+
+```typescript
+const { data } = await client.data.posts.fields("id", "title").find();
+```
+
+Two things always hold, whatever you name:
+
+- **The primary key comes back.** A row that cannot be addressed cannot be
+  updated, deleted, or paged past — and `meta.nextCursor` is derived from it, so
+  a projection without it would silently disable seeking.
+- **`excludeFromApi` columns stay hidden.** Naming one does not un-hide it.
+
+An unknown column is a 400 `UNKNOWN_FIELD`. Read as "omit it", a mistyped
+`fields: ["titel"]` would return rows with no titles and no hint why.
+
+A relation named in `include` is loaded whether or not it appears in `fields`;
+to narrow the columns *inside* a relation, see
+[per-relation options](/docs/sdk/relations#narrowing-what-a-relation-loads).
+
+#### `distinct`
+
+`distinct` collapses rows that are identical over the columns being returned.
+It is only meaningful alongside `fields`, since the primary key is always in the
+projection and every row is therefore already distinct:
+
+```typescript
+// The statuses actually in use.
+const { data } = await client.data.posts
+    .fields("status")
+    .distinct()
+    .find();
+```
+
+`meta.total` counts distinct rows too, so `hasMore` describes the set being
+paged. Two combinations are refused rather than answered uselessly:
+
+- **A query that scores every row** — a ranked `search()` or a `vectorSearch()`
+  attaches a `_score`/`_distance` per row, so no two rows are ever equal and
+  `DISTINCT` would have no effect. (A plain substring search attaches nothing
+  and is fine.)
+- **Sorting by a column you did not return.** Postgres cannot order a `DISTINCT`
+  read by an expression outside the select list; the request is a 400
+  `DISTINCT_ORDER_BY_NOT_SELECTED` rather than a 500 quoting SQL you never
+  wrote.
+
+Over HTTP: `?fields=status&distinct=true`.
+
+### Aggregates
+
+`aggregate()` reduces the matching rows instead of returning them — `count`,
+`sum`, `avg`, `min`, `max`, optionally grouped:
+
+```typescript
+const rows = await client.data.orders.aggregate({
+    select: [{ fn: "sum", field: "total" }, { fn: "count" }],
+    groupBy: ["status"],
+    where: { createdAt: [">=", startOfMonth] }
+});
+// [{ status: "paid", sum_total: 41822.5, count: 317 }, …]
+```
+
+The builder's filters carry into it, which is usually the shorter spelling:
+
+```typescript
+const rows = await client.data.orders
+    .where("createdAt", ">=", startOfMonth)
+    .aggregate({ select: [{ fn: "sum", field: "total" }], groupBy: ["status"] });
+```
+
+Result keys are **derived**, not chosen: `sum(total)` comes back as `sum_total`,
+a bare `count()` as `count`. Letting you name them would mean checking the name
+is not also a `groupBy` field — a rule nobody would guess, and a silently
+overwritten value if it went unchecked.
+
+`limit` bounds the number of **groups** (grouping by a high-cardinality column
+is a whole table's worth of rows in one response) and is ignored without a
+`groupBy`, since an ungrouped aggregate is one row. `orderBy`, `include` and the
+page do not apply: an aggregate has no rows to sort, no relations to load and no
+page to continue.
+
+The whole point is not to fetch rows in order to reduce them. "Revenue by
+status" over a million orders is one query and one row per status here, and a
+`findAll()` plus a loop everywhere else — which is wrong under a `limit` and
+unaffordable without one. It runs through the same request-scoped handle as
+every other read, so row-level security applies to the rows being aggregated.
+
+Over HTTP: `GET /api/data/orders/aggregate?select=sum(total),count()&groupBy=status`.
+
+JSON filtering, full-text search and vector search have a page of their own:
+[Aggregates and search](/docs/sdk/aggregates-and-search/).
+
+Reading related entities — `include`, and the accessors that query through a
+relation — has a page of its own: [Querying relations](/docs/sdk/relations/).
+
+### Custom Endpoints
+
+Call custom server endpoints registered via the functions system:
+
+```typescript
+// Using client.functions.invoke()
+const result = await client.functions.invoke<{ summary: string }>(
+    "generate-summary",
+    { articleId: 42 }
+);
+
+// With options
+const result = await client.functions.invoke<{ status: string }>(
+    "process-order",
+    { orderId: 123 },
+    { method: "POST", path: "status/check" }
+);
+
+// Shorthand via client.call()
+const result = await client.call<{ summary: string }>(
+    "functions/generate-summary",
+    { articleId: 42 }
+);
+```
+
+Both return **the function's response body, verbatim**. Neither reaches into it
+for a `data` key, so a function that answers `{ data: [...] }` gives you that
+object and you read `.data` yourself.
+
+`call()` takes a full path and always POSTs; `invoke()` takes a function name
+and can take a method, a sub-path and headers. Use `invoke()` unless you are
+calling something that is not a function.
+
+### Next Steps
+
+- **[Authentication](/docs/sdk/authentication)** — Sign in, sign up, OAuth, sessions
+- **[Realtime Subscriptions](/docs/sdk/realtime)** — Live data with WebSockets
+- **[Storage & Files](/docs/sdk/storage)** — Upload, download, and manage files
+- **[Relations](/docs/collections/relations)** — Define relations between collections
+
+## Writing data
+
+Reads are on [Querying data](/docs/sdk/querying/). This page is the other half:
+everything that changes a row.
+
+Every method here goes through the same pipeline a write from anywhere else
+does — [callbacks](/docs/collections/callbacks/),
+[relations](/docs/collections/relations/) and
+[row-level security](/docs/collections/security-rules/) all still apply. None of
+it is a shortcut past your own rules; what these options buy is a round trip, a
+transaction, or a race you no longer have to lose.
+
+### Single-row writes
+
 #### Create
 
 ```typescript
@@ -26872,6 +29170,33 @@ const newProduct = await client.data.products.create(
 );
 ```
 
+#### Upsert
+
+Insert the row, or replace the one already occupying its key:
+
+```typescript
+await client.data.users.upsert(
+    { email: "ada@example.com", name: "Ada" },
+    { onConflict: ["email"] }
+);
+```
+
+One statement server-side (`INSERT … ON CONFLICT DO UPDATE`), so unlike a
+`findById` followed by `create`-or-`update` it cannot lose the race between the
+two, and unlike `create` it does not fail when the row is already there.
+
+`onConflict` defaults to the primary key, which is the wrong target for most of
+the writes an upsert is reached for: keyed on a serial id that is a plain
+insert, because the caller does not know the id — so a re-runnable import
+duplicates every row on the second run. Name the natural key instead. It must
+carry a uniqueness guarantee the database can match on — `validation: { unique:
+true }` on the property, or the columns of a `unique: true`
+[index](/docs/backend/indexes/) — and anything else is a 400 listing the targets
+that do exist, rather than an error raised from inside a transaction.
+
+The `on_create` timestamp of a row that already existed is left alone: a
+conflict means its creation is a fact about the past.
+
 #### Update
 
 ```typescript
@@ -26881,22 +29206,84 @@ const updated = await client.data.products.update(42, {
 });
 ```
 
+##### Field operations
+
+A value may be an operation on the *stored* value instead:
+
+```typescript
+await client.data.posts.update(postId, {
+    views: { $inc: 1 },
+    tags:  { $push: "featured" },
+    meta:  { $merge: { lastSeen: Date.now() } }
+});
+```
+
+| Operator | Property type | Meaning |
+|----------|---------------|---------|
+| `$inc` | `number` | add (negative to subtract) |
+| `$push` | `array` | append one value, or each of an array of values |
+| `$pull` | `array` | remove every occurrence of a value |
+| `$merge` | `map` | shallow-merge an object in |
+
+The reason to reach for them is the read you no longer make, and the race that
+read opens. `views = current + 1` means fetching `current` first, and two
+requests that each read `4` both write `5` — an increment is lost and neither
+response says so. Compiled into the statement, the arithmetic happens inside the
+row lock.
+
+Exactly one operator per field, and only on an update: over a row that does not
+exist yet there is nothing to operate on, so an operation in a `create`,
+`createMany` or `upsert` is a 400. An operator on the wrong property type, or a
+misspelled `$operator`, is a 400 naming the field — never a JSON document
+written into the column.
+
+While offline they are refused rather than queued: an operation is evaluated
+against a stored value the device has no current copy of, and an optimistic row
+could only show the marker itself until the queue drained.
+
 #### Delete
 
 ```typescript
 await client.data.products.delete(42);
 ```
 
-#### Count
+#### Conditional writes
+
+`update` and `delete` take an `ifMatch`, so a write is refused when the row has
+changed since you read it:
 
 ```typescript
-const total = await client.data.products.count();
 
-// With filters
-const activeCount = await client.data.products.count({
-    where: { active: ["==", true] }
-});
+const post = await client.data.posts.get(1);
+await client.data.posts.update(1, { title: "New" }, { ifMatch: etagOf(post) });
+// → RebaseApiError, status 412, if somebody edited it in between
 ```
+
+Without it, read-modify-write is last-writer-wins over everything you did not
+send: two editors a second apart both succeed, and the first one's change is
+gone with no error anywhere.
+
+`etagOf(row)` reads the version off a row that came from `findById`/`get`. It
+lives on a non-enumerable key, so it never enters the generated `Row` type, a
+`JSON.stringify`, or a spread into the next update body. It is `undefined` for a
+row from `find()`, from the offline cache, or from a server that sends no
+`ETag` — and passing `undefined` sends no precondition, so the call above
+degrades to an ordinary update rather than throwing.
+
+#### Skipping the response
+
+Every write resolves to the row it wrote. Pass `{ returning: false }` when you
+do not need it:
+
+```typescript
+await client.data.events.create({ kind: "page_view" }, undefined, { returning: false });
+```
+
+That sends `Prefer: return=minimal`; the server answers `204` for a single write
+and the ids only for a batch. The method then resolves to `undefined` (or `[]`),
+so you cannot accidentally use a row the server never sent. Worth it on imports
+and fire-and-forget writes — the default is the row because it carries what the
+*server* decided.
 
 ### Batch Writes
 
@@ -26988,351 +29375,57 @@ A data source that cannot write atomically reports `BULK_UNSUPPORTED` rather
 than quietly looping single writes — which would give you neither the atomicity
 nor the single round trip you reached for a batch to get.
 
-### Fluent Query Builder
+### Writing across collections
 
-Chain methods for more expressive queries:
-
-```typescript
-const { data } = await client.data.products
-    .where("price", ">=", 100)
-    .where("active", "==", true)
-    .orderBy("createdAt", "desc")
-    .limit(10)
-    .find();
-```
-
-#### Available Methods
-
-| Method | Description | Example |
-|--------|-------------|---------|
-| `.where(field, op, value)` | Add a filter condition | `.where("age", ">=", 18)` |
-| `.where(path, op, value)` | Filter on a [relation](#querying-through-a-relation) or [JSON](#filtering-inside-json) path | `.where("author.name", "==", "bob")` |
-| `.where(group)` | Add an [OR/AND group](#logical-conditions-or--and) | `.where(or(cond(…), cond(…)))` |
-| `.orderBy(field, dir)` | Sort results | `.orderBy("name", "asc")` |
-| `.orderBy(aggregate, dir)` | Sort by an [aggregate over a relation](#sort-by-an-aggregate-over-a-relation) | `.orderBy({ relation: "orders", agg: "count" }, "desc")` |
-| `.limit(n)` | Limit result count | `.limit(25)` |
-| `.offset(n)` | Skip first N results | `.offset(50)` |
-| `.search(text)` | Text search — see [Search](/docs/backend/search) | `.search("laptop")` |
-| `.vectorSearch(prop, vector, opts?)` | Nearest-neighbour search over a `vector` property | `.vectorSearch("embedding", vec)` |
-| `.include(...relations)` | Include related entities | `.include("author", "tags")` |
-| `.find()` | Execute the query | Returns `FindResult<M>` |
-| `.iterate(options?)` | [Stream every matching row](#reading-everything-iterate-and-findall) | `for await (const r of qb.iterate())` |
-| `.findAll(options?)` | [Collect every matching row](#reading-everything-iterate-and-findall) | Returns `M[]` |
-| `.count()` | Count the matching rows | Returns `number` |
-| `.listen(onUpdate, onError?)` | Subscribe to real-time updates | Returns `unsubscribe()` |
-
-#### Filter Operators
-
-| Operator | Alias | Description |
-|----------|-------|-------------|
-| `"=="` | `"eq"` | Equal |
-| `"!="` | `"neq"` | Not equal |
-| `">"` | `"gt"` | Greater than |
-| `">="` | `"gte"` | Greater than or equal |
-| `"<"` | `"lt"` | Less than |
-| `"<="` | `"lte"` | Less than or equal |
-| `"in"` | | Value in array |
-| `"not-in"` | `"nin"` | Value not in array |
-| `"array-contains"` | `"cs"` | Array field contains value |
-| `"array-contains-any"` | `"csa"` | Array field contains any of values |
-| `"like"` | `"like"` | Case-**sensitive** pattern match; `%` and `_` are the wildcards |
-| `"ilike"` | `"ilike"` | Case-insensitive pattern match |
-| `"not-like"` | `"nlike"` | Does not match the pattern |
-| `"not-ilike"` | `"nilike"` | Does not match the pattern, case-insensitively |
-| `"is-null"` | `"isnull"` | Column is `NULL`. Takes no value — whatever you pass is normalized away |
-| `"is-not-null"` | `"notnull"` | Column is not `NULL`. Takes no value |
-
-The alias column is the **wire** spelling, used in REST query strings. It never
-appears in application code: the SDK and the admin panel both speak the
-canonical operator on the left.
-
-#### Where Clause Syntaxes
-
-The `where` parameter in `find()` supports two formats:
-
-```typescript no-verify
-// 1. Tuple syntax — [operator, value] (recommended)
-await client.data.products.find({
-    where: {
-        status: ["==", "active"],
-        featured: ["==", true],
-        price: [">=", 100],
-        category: ["in", ["electronics", "gadgets"]],
-        deleted_at: ["!=", null]
-    }
-});
-
-// 2. Pre-serialized PostgREST string syntax (advanced)
-await client.data.products.find({
-    where: { status: "eq.published", price: "gte.100" }
-});
-```
-
-> **Note:** Pre-serialized PostgREST strings (format 2) are an escape hatch for passing filter values that are already in wire format. Prefer tuple syntax for type safety and readability.
-
-### Logical Conditions (OR / AND)
-
-Every field in `where` is AND-ed. To OR conditions together, build a **logical
-condition** with the `or`, `and` and `cond` helpers the SDK exports:
+`createMany` and friends are one collection at a time. `client.batch()` is the
+cross-collection form: one request, one transaction, all of it or none.
 
 ```typescript
+const result = await client.batch([
+    { op: "create", collection: "orders",
+      values: { total: 40 }, ref: "order" },
+    { op: "create", collection: "order_items",
+      values: { order_id: { $ref: "order.id" }, sku: "A-1" } },
+    { op: "update", collection: "stock",
+      id: "A-1", values: { count: { $inc: -1 } } },
+    { op: "delete", collection: "carts", id: "c-9" }
+]);
 
-const { data } = await client.data.products.find({
-    logical: or(
-        cond("status", "==", "active"),
-        and(
-            cond("status", "==", "draft"),
-            cond("authorId", "==", currentUserId)
-        )
-    )
-});
+result.data;  // [ order, item, stock, null ] — aligned to the operations
+result.meta;  // { operations: 4 }
 ```
 
-The fluent builder takes the same tree:
+`op` is `create`, `update`, `upsert` or `delete`, and `collection` narrows
+`values` to that collection's generated `Insert` or `Update` shape. Every
+operation runs the pipeline its single-row equivalent runs — the same
+validation, callbacks and row-level security, as the same user.
 
-```typescript
-const { data } = await client.data.products
-    .where(or(cond("status", "==", "active"), cond("featured", "==", true)))
-    .orderBy("createdAt", "desc")
-    .find();
-```
+#### `$ref`
 
-`cond` takes the canonical operator — the left column of the
-[Filter Operators](#filter-operators) table. An operator the dialect does not
-have is a `TypeError` when the query is serialized, not a silently different
-query.
+An operation may name itself with `ref`; a later one may stand
+`{ $ref: "<name>.<field>" }` wherever a value goes, including as an `id` and at
+any depth inside `values`. It resolves to that field of the row the named
+operation wrote.
 
-#### How it composes with the rest of the query
+This is why the method exists rather than a loop over `createMany`: the child's
+foreign key does not exist until the parent is inserted, so the two would have
+to be separate requests — and separate requests can half-succeed. The recovery
+from that (read back, work out which half landed, undo it) is code nobody
+writes.
 
-`where`, `logical` and `search` are three independent groups, AND-ed with each
-other:
+Only backward references resolve. A forward one is refused before the
+transaction opens, along with unknown collections, unknown fields, illegal field
+operations and ineligible conflict targets — because finding a mistake at
+operation 40 would otherwise cost the rollback of the 39 writes before it.
 
-```
-(where fields, AND-ed)  AND  (logical group)  AND  (search)
-```
+#### Limits and failures
 
-There is no way to OR `where` against `logical`. Anything that is not a plain
-AND of the three has to be expressed inside one `logical` tree — move the
-fields you need OR-ed into it.
+The same 1000-operation cap as a bulk write, for the same reason: one batch
+holds its locks for the whole transaction. An `update` or `delete` naming a row
+that does not exist fails the whole batch with a 404. A backend whose driver
+cannot make it atomic answers `BATCH_UNSUPPORTED` rather than looping.
 
-#### On the wire
-
-A logical group travels as a single `or=` or `and=` query parameter, in the
-same dot-syntax the field filters use:
-
-```
-GET /api/data/products?or=(status.eq.active,featured.eq.true)
-```
-
-Three encodings are worth knowing, because they are the ones a hand-written
-query string gets wrong:
-
-| Condition | Wire form | Note |
-|-----------|-----------|------|
-| `cond("deleted_at", "==", null)` | `deleted_at.isnull.null` | `eq.null` is a search for the four-character string `null` |
-| `cond("id", "in", [])` | `id.in.(\)` | `in.()` is a list holding one empty string, which is a different query |
-| `cond("author.name", "==", "bob")` | `author.name.eq.bob` | a [relation path](#querying-through-a-relation) keeps its dot |
-
-Commas, parentheses and backslashes inside a value are backslash-escaped, so
-`cond("name", "==", "Doe, John")` travels as `name.eq.Doe\, John` and does not
-split the group.
-
-Groups may nest 32 levels deep. Past that the request is rejected with
-`INVALID_LOGICAL_GROUP` — flatten it, since `or(a,or(b,c))` is `or(a,b,c)`.
-
-### Pagination
-
-```typescript
-// Offset-based pagination
-const page1 = await client.data.products.find({ limit: 20, offset: 0 });
-const page2 = await client.data.products.find({ limit: 20, offset: 20 });
-
-// Check if more pages exist
-if (page1.meta.hasMore) {
-    // fetch next page
-}
-
-// Page-number pagination (1-indexed)
-const page = await client.data.products.find({ page: 2, limit: 20 });
-```
-
-`limit` must be a whole number between 1 and 1000. A larger one — or a zero,
-negative, or fractional one — is refused with a 400 `INVALID_LIMIT` rather than
-clamped, because a silently smaller page cannot be told apart from the last one.
-To read past that ceiling, walk the pages with `iterate()` or `findAll()`.
-
-#### Which reads are wrapped, and which are not
-
-Two shapes, and one rule: **a window is wrapped, a whole answer is not.**
-
-| Method | Returns | Why |
-|--------|---------|-----|
-| `find()`, `listen()` | `{ data, meta }` | One page. `meta.total` / `meta.hasMore` are the only way to know there is more |
-| `findAll()`, `createMany()`, `updateMany()` | `M[]` | Nothing left over to report — the walk finished, or the batch *is* the rows |
-| `iterate()` | one row at a time | Nothing is materialised at all |
-| `findById()`, `get()`, `create()`, `update()` | one row | Not a list |
-
-`data` is not a wrapper the SDK sometimes adds and sometimes forgets. It is
-where the pagination metadata lives, and it is there exactly when there is some.
-
-#### Reading everything: `iterate()` and `findAll()`
-
-`iterate()` streams every row a query matches, one at a time, fetching a page at
-a time behind the scenes. Nothing accumulates, so it is the one to use for a
-collection you cannot hold in memory:
-
-```typescript
-for await (const order of client.data.orders.iterate({
-    where: { status: ["==", "pending"] }
-})) {
-    await handleOrder(order);
-}
-```
-
-`findAll()` is the same walk collected into an array:
-
-```typescript
-const stale = await client.data.sessions.findAll({
-    where: { expiresAt: ["<", cutoff] }
-});
-```
-
-Both are on the fluent builder too, where `.limit()` becomes the **page size**
-rather than a total:
-
-```typescript
-const rows = await client.data.orders
-    .where("status", "==", "pending")
-    .orderBy("createdAt", "asc")
-    .limit(500)          // rows per request
-    .findAll();
-```
-
-Three options shape the walk:
-
-| Option | Default | What it does |
-|--------|---------|--------------|
-| `pageSize` | 200 | Rows per request. |
-| `cursor` | — | Seek on a column instead of paging by offset. See below. |
-| `maxPages` | 10 000 | Ceiling on requests, so a server that never stops saying `hasMore` cannot spin forever. |
-| `maxRows` | 10 000 | `findAll()` only. Exceeding it **throws** rather than returning a truncated array as if it were the whole answer. Pass `Infinity` to opt out, or use `iterate()`. |
-
-**Prefer `cursor` whenever the collection has a unique, sortable column.**
-Offset paging re-counts rows on every request, so a row inserted or deleted
-*while the walk runs* shifts the window and the walk silently skips or repeats
-rows. Seeking asks for rows strictly after the last one seen, which concurrent
-writes before the cursor cannot move:
-
-```typescript
-for await (const job of client.data.jobs.iterate({ cursor: "id" })) { /* … */ }
-```
-
-The column must be unique — a repeated value at a page boundary either skips
-rows or stalls, and the iterator throws rather than looping — and the query is
-ordered by it, so a `cursor` alongside a conflicting `orderBy` is an error
-rather than a silent override.
-
-### Sorting
-
-```typescript
-// Sort by field (format: ["field", "direction"])
-const { data } = await client.data.products.find({
-    orderBy: ["createdAt", "desc"]
-});
-
-// Fluent style
-const { data } = await client.data.products
-    .orderBy("price", "asc")
-    .find();
-```
-
-A direction you leave out is `"asc"` — the same thing `?orderBy=name` means over
-HTTP, whichever database is underneath.
-
-#### Sorting by more than one column
-
-A sort is a *list* of keys. The second decides between rows the first calls
-equal, the third between rows the first two do — so `orderBy` takes a list of
-`[field, direction]` pairs as readily as a single one:
-
-```typescript
-// By category, and newest first within each category.
-const { data } = await client.data.products.find({
-    orderBy: [["category", "asc"], ["createdAt", "desc"]]
-});
-```
-
-The fluent builder spells the same thing by calling `.orderBy()` again. Each
-call **adds** a key under the ones before it rather than replacing them:
-
-```typescript
-const { data } = await client.data.products
-    .orderBy("category")            // primary
-    .orderBy("createdAt", "desc")  // tie-breaker
-    .find();
-```
-
-Every sort ends on the row id, descending, whether you asked for it or not.
-That is what makes the ordering *total*: without it two rows sharing a value are
-returned in whatever order the database pleased, and paging over an order that
-can differ between two runs of the same query repeats some rows and skips
-others.
-
-Two things a multi-column sort cannot be combined with, both refused with a 400
-rather than answered wrongly:
-
-- **`cursor` on `iterate()`/`findAll()`.** Keyset pagination advances with one
-  comparison along one column. Order by the cursor column alone, or page by
-  `offset`.
-- **`_score`** — see [Search](/docs/backend/search). Relevance is computed per
-  query rather than stored, so there is no value on the cursor row to compare
-  the next page against.
-
-Aggregation, JSON filtering, full-text search and vector search have a page
-of their own: [Aggregates and search](/docs/sdk/aggregates-and-search/).
-
-Reading related entities — `include`, and the accessors that query through a
-relation — has a page of its own: [Querying relations](/docs/sdk/relations/).
-
-### Custom Endpoints
-
-Call custom server endpoints registered via the functions system:
-
-```typescript
-// Using client.functions.invoke()
-const result = await client.functions.invoke<{ summary: string }>(
-    "generate-summary",
-    { articleId: 42 }
-);
-
-// With options
-const result = await client.functions.invoke<{ status: string }>(
-    "process-order",
-    { orderId: 123 },
-    { method: "POST", path: "status/check" }
-);
-
-// Shorthand via client.call()
-const result = await client.call<{ summary: string }>(
-    "functions/generate-summary",
-    { articleId: 42 }
-);
-```
-
-Both return **the function's response body, verbatim**. Neither reaches into it
-for a `data` key, so a function that answers `{ data: [...] }` gives you that
-object and you read `.data` yourself.
-
-`call()` takes a full path and always POSTs; `invoke()` takes a function name
-and can take a method, a sub-path and headers. Use `invoke()` unless you are
-calling something that is not a function.
-
-### Next Steps
-
-- **[Authentication](/docs/sdk/authentication)** — Sign in, sign up, OAuth, sessions
-- **[Realtime Subscriptions](/docs/sdk/realtime)** — Live data with WebSockets
-- **[Storage & Files](/docs/sdk/storage)** — Upload, download, and manage files
-- **[Relations](/docs/collections/relations)** — Define relations between collections
+`idempotencyKey` and `returning` work as they do on every other write.
 
 ## Aggregates and search
 
@@ -27544,7 +29637,7 @@ write.
 
 ## Querying relations
 
-### Fetching Relations
+### Loading related rows
 
 Relations can be included so that related entities are returned alongside the primary data, instead of just their foreign key IDs.
 
@@ -27556,11 +29649,14 @@ const { data } = await client.data.posts
     .include("author", "categories")
     .find();
 
-// Include all defined relations
+// Include all defined relations, one hop deep
 const { data } = await client.data.posts
     .include("*")
     .find();
 ```
+
+Repeated calls **add** to each other rather than replacing, so
+`.include("author").include("categories")` asks for both.
 
 #### Using `find({ include })` (Params)
 
@@ -27569,6 +29665,85 @@ const { data } = await client.data.posts.find({
     include: ["author", "categories"]
 });
 ```
+
+#### Nesting: relations of relations
+
+A dotted path loads a relation of a relation, up to **three hops**:
+
+```typescript
+// Each post's comments, and each comment's author.
+const { data } = await client.data
+    .collection<{ id: string; comments?: { author?: { name: string } }[] }>("posts")
+    .include("comments.author")
+    .find();
+
+console.log(data[0].comments?.[0].author?.name);
+```
+
+Naming the intermediate hop is optional — `comments.author` already implies
+`comments` — and sending both is the same request twice.
+
+Each hop is one batched query for the whole page, not one per row: a page of 50
+posts with `comments.author` is three queries, whatever the number of comments.
+The depth bound is what stops a self-referencing relation from walking forever;
+past it the request is a 400 `INCLUDE_TOO_DEEP`.
+
+#### Narrowing what a relation loads
+
+The list form has nowhere to put a per-relation `limit`, so a relation that
+needs narrowing takes an options object instead:
+
+```typescript
+const { data } = await client.data.posts.include({
+    comments: {
+        limit: 5,
+        where: { published: ["==", true] },
+        orderBy: ["createdAt", "desc"],
+        fields: ["id", "body"],
+        include: { author: true }
+    }
+}).find();
+```
+
+| Option | What it does |
+|--------|--------------|
+| `limit` | Rows **per parent**, not across the page — five comments on each post, not five in total. |
+| `where` | The same filter dialect the top-level `where` uses. Pushed into the query, so the `limit` applies to rows that match. |
+| `logical` | An `or`/`and`/`not` group over the related rows. |
+| `orderBy` | The same sort spelling, including the [NULL placement](/docs/sdk/querying#where-nulls-sort). |
+| `fields` | Columns of the *related* row. Its key always survives, so the row stays addressable. |
+| `include` | Relations of the related row, in turn — this is how the tree nests. |
+
+`true` is the shorthand for "load it whole": `{ author: true }` and
+`["author"]` are the same request.
+
+#### Unknown relation names are refused
+
+A name that is not a relation of the collection is a **400
+`UNKNOWN_RELATION`**, at every level of the tree — including inside a nested
+`include`. It used to be ignored, which answers 200 with the field simply
+missing, and a missing relation field is indistinguishable from a row that
+genuinely has no related row. A typo therefore looked exactly like empty data.
+
+With a generated `Database` type, it does not get that far: `include` keys are
+checked against the collection's real relations at compile time, recursively.
+See [Typed includes](#typed-includes).
+
+#### On the wire
+
+`include` is one query parameter with two spellings, told apart by a leading
+brace:
+
+```
+GET /api/data/posts?include=author,comments.author
+GET /api/data/posts?include={"comments":{"limit":5,"include":{"author":true}}}
+```
+
+The flat form is what a human types and what most requests need; the JSON form
+exists because the flat one cannot carry per-relation options, and inventing a
+punctuation for them (`comments(limit:5)`) would be a third grammar to learn
+beside the two this API already has. Both are accepted on every list and
+get-by-id route, and the SDK picks whichever the query needs.
 
 #### Combining with Filters
 
@@ -27601,6 +29776,67 @@ for (const post of data) {
 ```
 
 > **Note:** Without `.include("author")`, only the scalar `authorId` field is returned. The hydrated `author` object will be `undefined`.
+
+#### A `belongsTo` has three shapes
+
+One relation, three places it appears — and the wire is deliberately not
+symmetric about it, so it is worth knowing all three:
+
+| Where | Shape | Why |
+|-------|-------|-----|
+| **Write** | `{ author: id }` **or** `{ authorId: id }` | Both are accepted. The write transformer maps the relation property onto the foreign-key column, so the two are the same write. |
+| **Read** | `authorId` | It is a column. Every read returns it. |
+| **Read with `include`** | `author`, the target's own row | Loaded only when the query names it, so it is absent from every other read. |
+
+```typescript
+type Post = { id: string; title: string; authorId: string; author?: { name: string } };
+const posts = client.data.collection<Post>("posts");
+
+// Write: either spelling.
+await posts.create({ title: "Hello", author: authorId } as Partial<Post>);
+await posts.create({ title: "Hello", authorId });
+
+// Read: the key.
+const post = await posts.get(id);
+post.authorId;          // "uuid-1234"
+post.author;            // undefined — nothing asked for it
+
+// Read with include: the row.
+const { data } = await posts.include("author").find();
+data[0].authorId;       // "uuid-1234" — still there
+data[0].author?.name;   // "Jane Doe"
+```
+
+A generated `Database` types all three precisely: `Insert` and `Update` accept
+either write spelling, `Row` has `authorId` unconditionally, and `author` is
+optional on `Row` and **required** on the row a read with `include` returns —
+see [Typed includes](#typed-includes).
+
+The one case where the three collapse is a relation named identically to its own
+foreign key. There the included row is served *over* the column, and the
+generated type says so by typing that key as both.
+
+#### Typed includes
+
+`rebase generate-sdk` writes the relation graph into your `Database` type, and
+two helpers built on it:
+
+```typescript no-verify
+
+const ok: IncludeFor<"posts"> = { comments: { limit: 5, include: { author: true } } };
+
+// @ts-expect-error — 'authr' is not a relation of 'comments'
+const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
+```
+
+`IncludeFor<A>` constrains an include's keys to relations that exist, at every
+level. `RowWith<A, I>` is the row that read returns, with every included
+relation made **required** — so after asking for the author, `row.author.name`
+needs no `?.`.
+
+Without a generated `Database`, `include` stays a plain `string[]` or tree: a
+hand-written row type has no relations in it to check against, and the server's
+400 is the backstop.
 
 #### Relation Names
 
@@ -28309,24 +30545,55 @@ listen(
 ```
 
 `FindResult<M>` is the same shape `find()` returns: flat rows in `data`, and
-`{ total, limit, offset, hasMore }` in `meta`.
+`{ total, limit, offset, hasMore, nextCursor }` in `meta`.
+
+#### `listen()` takes what `find()` takes
+
+`params` is a full `FindParams`. A subscription is the same query as the
+`find()` beside it, so it accepts the same narrowing — `where`, `logical`,
+`orderBy`, `limit`, `offset`/`page`, `searchString`, **`include`** and
+**`fields`**:
+
+```typescript
+client.data.posts.listen(
+    { where: { status: ["==", "published"] }, include: ["author"], limit: 20 },
+    (result) => render(result.data)   // each row carries its author
+);
+```
+
+That matters more than it sounds. `include` and `fields` used to be silently
+dropped here, so the same query answered in one shape through `find()` and
+another through `listen()` — and a component rendering both saw its rows change
+shape the moment a write landed. They now go through the identical read
+pipeline, so `find({ q })` and `listen({ q })` return rows that are equal field
+for field.
+
+The exception is `vectorSearch`, which is **refused** rather than dropped: a
+subscription is re-run on every matching write and nothing there computes
+distances. Use `.vectorSearch(…).find()` for the query and subscribe without it.
 
 #### One emission per change
 
 Each server push calls your callback **once**, with metadata that describes the
-rows beside it. There is no separate first-paint emission and no flag to check:
+rows beside it. There is no separate first-paint emission and no flag to check.
 
-- A `count()` runs for the query before the emission, so `meta.total` and
-  `meta.hasMore` are authoritative.
-- If a push arrives while that count is still in flight, the older emission is
-  dropped — you are never called back with a total belonging to a previous page.
-- If the count **fails**, the last total a count actually returned is reused. A
-  failed count says nothing about how big the collection is, so it must not be
-  allowed to overwrite a real answer. This is not a subscription error, and
-  `onError` is not called.
-- If no count has ever succeeded for this subscription, `meta.total` is a
-  **lower bound** — the rows on this page plus the ones paged past to reach
-  them — and `meta.hasMore` is `true` when the page came back full.
+The metadata arrives **in the same frame as the rows**: the server counts the
+query inside the same row-level-security-bound transaction that read them, so
+`meta.total`, `meta.hasMore` and `meta.nextCursor` describe exactly the rows
+next to them. (Every push used to be followed by a `GET /count` from the client
+— one extra round trip per write, per subscriber, and a window in which the
+count and the rows described different states of the collection.)
+
+Two fallbacks, neither of them a subscription error and neither calling
+`onError`:
+
+- If the server's **count failed**, the frame carries no total and the last one
+  that did arrive is reused. A failed count says nothing about how big the
+  collection is, so it must not overwrite a real answer.
+- If no total has ever arrived for this subscription — an older server that
+  sends no metadata at all — the client asks once, on the first push. If that
+  also fails, `meta.total` is a **lower bound**: the rows on this page plus the
+  ones paged past to reach them.
 
 ```typescript
 client.data.products.listen(
@@ -30557,6 +32824,21 @@ rebase db push
 - Applies your collections' RLS policies, and **removes policies an earlier push superseded**
 - Does **not** create migration files
 
+**The files it generates on the way**, all under `drizzle/`:
+
+| File | Holds |
+|------|-------|
+| `schema.sql` | Tables, columns, constraints and indexes — Atlas's desired state, and the only one it diffs |
+| `policies.sql` | The RLS policies your `securityRules` compile to |
+| `search.sql` | The full-text search functions and generated columns, for collections with a `search` block |
+| `vector.sql` | pgvector extensions and ANN indexes |
+| `triggers.sql` | `rebase.set_updated_at()` and the `BEFORE UPDATE` triggers behind `autoValue: "on_update"` |
+
+Atlas manages the first and nothing else, so `db push` and the boot-time schema
+ensure apply the other four themselves. A **migration-only** deployment — one
+that runs `db migrate` and never `db push` — has to fold those four into a
+migration by hand; `db generate` says so when a change is invisible to Atlas.
+
 :::note[Editing a security rule renames its policy]
 A rule without an explicit `name` compiles to `<table>_<op>_<hash>`, where the hash covers the rule's semantics — so *editing* a rule (rather than adding one) produces a policy under a new name and leaves the old one behind.
 
@@ -31389,32 +33671,49 @@ This "UI as Code Generator" approach means visual edits produce the same clean T
 
 ### Schema Generation Pipeline
 
+Your collections are read once and emitted twice — as a Drizzle schema the
+running server queries through, and as SQL that describes the database you meant
+to have. It is the SQL that the database is brought into line with, by
+[Atlas](https://atlasgo.io), which diffs your desired schema against the live one
+and plans the change:
+
 ```
-TypeScript Collections
-        │
-        ▼
-  rebase schema generate
-        │
-        ▼
-  Drizzle Schema (schema.generated.ts)
-        │
-        ▼
-  rebase db generate
-        │
-        ▼
-  SQL Migration Files
-        │
-        ▼
-  rebase db migrate
-        │
-        ▼
-  PostgreSQL Tables
+                        Collections (TypeScript)
+                                  │
+            ┌─────────────────────┴─────────────────────┐
+            ▼                                           ▼
+   rebase schema generate                       (the same command also
+            │                                    writes the SQL below)
+            ▼                                           │
+  backend/src/schema.generated.ts                        ▼
+  the Drizzle schema the runtime            drizzle/schema.sql      ← Atlas's desired state
+  reads and writes rows through             policies.sql            ← RLS, applied separately
+                                            search.sql, vector.sql  ← Atlas cannot manage these
+                                                        │
+                                          ┌─────────────┴─────────────┐
+                                          ▼                           ▼
+                                   rebase db push              rebase db generate
+                                   Atlas plans the diff        Atlas writes the diff
+                                   and applies it now          to drizzle/migrations/
+                                          │                           │
+                                          │                           ▼
+                                          │                    rebase db migrate
+                                          │                    applies them in order
+                                          └─────────────┬─────────────┘
+                                                        ▼
+                                                  PostgreSQL
 ```
+
+`db push` is the development loop; `db generate` + `db migrate` is the
+reviewable one, and the one to use in production. Both go through the same
+generated SQL, so they cannot disagree about what your collections mean. See
+[Schema Generation](/docs/cli/schema) for every flag.
 
 #### Example
 
 Given this collection:
 
+<!-- schema-sample: collection -->
 ```typescript
 
 const productsCollection = defineCollection({
@@ -31430,31 +33729,63 @@ const productsCollection = defineCollection({
 });
 ```
 
-Rebase generates this Drizzle schema:
+Rebase generates this Drizzle schema — the whole file, `id` column, default
+policies and all:
 
+<!-- schema-sample: drizzle -->
 ```typescript
 // schema.generated.ts
+// This file is auto-generated by the Rebase Drizzle generator. Do not edit manually.
 
 export const products = pgTable("products", {
-    id: serial("id").primaryKey(),
-    name: varchar("name").notNull(),
+    name: text("name").notNull(),
     price: numeric("price"),
-    active: boolean("active").default(true),
-    created_at: timestamp("created_at").defaultNow()
-});
+    active: boolean("active").default(sql`TRUE`),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
+    id: text("id").primaryKey()
+}, (table) => ([
+    pgPolicy("products_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("products_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("products_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("products_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])` }),
+])).enableRLS();
+
+export const tables = { products };
+export const enums = {  };
+export const relations = {  };
 ```
 
-Which produces this SQL:
+Three things in there are worth reading twice. The `id` column you did not
+declare: every collection gets a `text` primary key unless a property claims
+`isId`. The `pgPolicy` block: row level security is enabled on every table, and
+those baseline policies are what keep the trusted server context and the `admin`
+role able to read it at all — see
+[Security Rules](/docs/collections/security-rules). And `active`, which carries
+the `defaultValue` you wrote as a **column** default: a literal `defaultValue`
+compiles to a real `DEFAULT`, so a row inserted by the REST API, a seed script
+or `psql` gets it too, not only one typed into the admin panel. A `reference` or
+`vector` default is not a column literal and stays an application-layer value.
 
+And this SQL, which is what Atlas is handed as the desired state:
+
+<!-- schema-sample: sql -->
 ```sql
-CREATE TABLE products (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR NOT NULL,
-    price NUMERIC,
-    active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT NOW()
+-- This file is auto-generated by the Rebase DDL generator. Do not edit manually.
+
+CREATE SCHEMA IF NOT EXISTS "rebase";
+
+CREATE TABLE "public"."products" (
+  "id" TEXT PRIMARY KEY,
+  "name" TEXT NOT NULL,
+  "price" NUMERIC,
+  "active" BOOLEAN DEFAULT TRUE,
+  "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 ```
+
+Policies, search columns, vector indexes and `updated_at` triggers are written to
+files of their own and applied by the CLI in their own right — Atlas manages
+none of the four.
 
 ### Safety & Unmapped Database Objects
 

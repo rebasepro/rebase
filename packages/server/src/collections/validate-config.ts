@@ -1,7 +1,7 @@
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
 import type { CollectionConfig, PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property } from "@rebasepro/types";
 
-import { getTableName } from "@rebasepro/common";
+import { getTableName, isRelationalCollection } from "@rebasepro/common";
 import { suggestNearMiss } from "@rebasepro/utils";
 
 import { logger } from "../utils/logger";
@@ -163,6 +163,7 @@ const COLLECTION_KEY_LIST = [
     "schema",
     "search",
     "indexes",
+    "softDelete",
     // FirebaseCollectionConfig / MongoDBCollectionConfig
     "path",
     "subcollections",
@@ -207,6 +208,7 @@ const BASE_PROPERTY_KEYS = [
     "defaultValue",
     "validation",
     "excludeFromApi",
+    "access",
     "dynamicProps",
     "conditions",
     "callbacks",
@@ -238,8 +240,8 @@ const BASE_PROPERTY_KEYS = [
  * every type, so a key added to the admin block later cannot be added here too.
  */
 const PROPERTY_KEYS_BY_TYPE = {
-    string: ["columnType", "isId", "enum", "storage", "userSelect", "email", "url"],
-    number: ["columnType", "isId", "enum"],
+    string: ["columnType", "isId", "enum", "storage", "userSelect", "email", "url", "autoValue"],
+    number: ["columnType", "isId", "enum", "precision", "scale"],
     boolean: [],
     date: ["columnType", "mode", "timezone", "autoValue"],
     geopoint: [],
@@ -573,6 +575,85 @@ function checkValidationPattern(
 }
 
 /**
+ * The per-field `access` block: shape, and its one incompatibility.
+ *
+ * Three failures, all of which boot cleanly and all of which are silent:
+ *
+ * - **`access` beside `excludeFromApi`.** They are one mechanism — the flag is
+ *   sugar for `access: { read: [], write: [] }` and `effectiveAccess` expands it
+ *   *before* looking at `access`, so the flag wins and the block is dead. An
+ *   author who wrote `excludeFromApi: true, access: { read: ["admin"] }` meant
+ *   the second line to do something, and it does nothing. Refused rather than
+ *   merged, because there is no reading of the pair that is obviously right.
+ * - **A non-array `read` or `write`.** `access: { read: "admin" }` is the shape
+ *   an author reaches for first, and it is not an empty list — it is a *string*,
+ *   whose `.length` is 5, so it reads as "some roles are allowed" and then
+ *   matches none of them. Every caller loses the field, including the admin.
+ * - **A role that is not a non-empty string.** `[""]`, `[null]`, `[0]` — a list
+ *   entry nothing can hold, which is `[]` written the long way round.
+ *
+ * Nothing checks role *names* against a set: roles are application data, live in
+ * the users table, and are created and deleted while the server runs. A typo in
+ * one is a field nobody can read, which is the safe direction to fail.
+ */
+function checkFieldAccess(
+    property: Record<string, unknown>,
+    path: string,
+    collect: ProblemCollector
+): void {
+    const access = property.access;
+    if (access === undefined) return;
+
+    if (property.excludeFromApi) {
+        collect.error(
+            `${path}.access`,
+            "`access` and `excludeFromApi` cannot both be set. `excludeFromApi: true` IS " +
+            "`access: { read: [], write: [] }` — one mechanism, two spellings — so the block " +
+            "beside it is never read. Keep whichever says what you mean and delete the other."
+        );
+        return;
+    }
+
+    if (!isPlainObject(access)) {
+        collect.error(
+            `${path}.access`,
+            "`access` must be an object with optional `read` and `write` role lists, " +
+            "e.g. `access: { read: [\"hr\"], write: [] }`."
+        );
+        return;
+    }
+
+    for (const direction of ["read", "write"] as const) {
+        const roles = access[direction];
+        if (roles === undefined) continue;
+        if (!Array.isArray(roles)) {
+            collect.error(
+                `${path}.access.${direction}`,
+                `\`access.${direction}\` must be an array of role ids. ` +
+                `\`${JSON.stringify(roles)}\` is not one — a bare string is read as a non-empty ` +
+                "rule that no caller can satisfy, so the field would disappear for everybody. " +
+                `Write \`[${JSON.stringify(roles)}]\`, or \`[]\` if you mean nobody.`
+            );
+            continue;
+        }
+        const bad = roles.filter(role => typeof role !== "string" || role.trim() === "");
+        if (bad.length > 0) {
+            collect.error(
+                `${path}.access.${direction}`,
+                `\`access.${direction}\` contains ${bad.map(r => JSON.stringify(r)).join(", ")}, ` +
+                "which no caller's roles can hold. A role id is a non-empty string; an empty " +
+                "list is how you say nobody."
+            );
+        }
+    }
+
+    const unknownKeys = Object.keys(access).filter(key => key !== "read" && key !== "write");
+    if (unknownKeys.length > 0) {
+        collect.unknown(`${path}.access.${unknownKeys[0]}`, unknownKeys[0], "`access` block", ["read", "write"]);
+    }
+}
+
+/**
  * An enum's ids and labels, which become a Postgres type and a dropdown.
  *
  * The ids are the enum's SQL labels — `CREATE TYPE "posts_status" AS ENUM
@@ -634,6 +715,27 @@ function checkEnumValues(
             }
         }
     };
+
+    // An `enum` with nothing in it is not an under-specified dropdown; it is a
+    // column with a Postgres type nobody creates. `CREATE TYPE … AS ENUM ()` is
+    // not valid SQL, so all three emitters "handled" it by skipping the type and
+    // typing the column with it anyway: the generated Drizzle file referenced an
+    // enum variable it never declared (so the file does not compile), the DDL
+    // named a type nothing creates, and boot-ensure's `ADD COLUMN` failed —
+    // which is not a survivable action, so the boot died. Said here, where the
+    // property has a name, rather than in a Postgres error later.
+    const empty = Array.isArray(values)
+        ? values.length === 0
+        : isPlainObject(values) && Object.keys(values).length === 0;
+    if (empty) {
+        collect.error(
+            path,
+            "`enum` is empty. The values become the labels of one Postgres enum type, and a type with " +
+            "no labels cannot be created — so the column would reference a type nothing creates and the " +
+            "schema fails to build. List the values, or drop the `enum` for a plain column."
+        );
+        return;
+    }
 
     if (Array.isArray(values)) {
         values.forEach((entry, index) => {
@@ -762,7 +864,13 @@ function checkProperty(
         checkEnumValues(property.enum, `${path}.enum`, collect);
     }
 
+    if (type === "number") {
+        checkNumericPrecision(property, path, collect);
+    }
+
     checkValidationPattern(property.validation, `${path}.validation`, collect);
+
+    checkFieldAccess(property, path, collect);
 
     // Recurse into the two composites. `of` may be one property or an array of
     // them; `oneOf.properties` is a record like a map's.
@@ -931,6 +1039,233 @@ function checkRelationPropertiesResolve(
     }
 }
 
+/** The field `softDelete: true` means, when the object form names none. */
+const DEFAULT_SOFT_DELETE_FIELD = "deletedAt";
+
+/**
+ * `softDelete` says what a column *means*. It does not create the column.
+ *
+ * So the collection has to declare it, as a `date`, and a config that turns the
+ * flag on without one has to be refused here rather than at the first delete —
+ * where the failure would be a 500 landing on whoever pressed the button, on a
+ * row that then either vanished or did not depending on which half of the
+ * feature was reached. Both halves need the column: the delete writes it and
+ * every read filters on it.
+ *
+ * A wrong *type* is refused for the same reason. `deletedAt: { type: "boolean" }`
+ * would let the delete write `now()` into a boolean column and fail at the
+ * database, which is the same failure one layer further from the cause.
+ */
+function checkSoftDelete(
+    collection: Record<string, unknown>,
+    at: string,
+    collect: ProblemCollector
+): void {
+    const declared = collection.softDelete;
+    if (declared === undefined || declared === false) return;
+
+    if (declared !== true && !isPlainObject(declared)) {
+        collect.error(`${at}.softDelete`, "`softDelete` must be `true` or `{ field }`.");
+        return;
+    }
+
+    const field = isPlainObject(declared) && typeof declared.field === "string" && declared.field
+        ? declared.field
+        : DEFAULT_SOFT_DELETE_FIELD;
+
+    const properties = isPlainObject(collection.properties) ? collection.properties : undefined;
+    const property = properties?.[field];
+
+    if (!property) {
+        collect.error(
+            `${at}.softDelete`,
+            `\`softDelete\` records the deletion in '${field}', and '${at}' has no such property. ` +
+            `Declare it — \`${field}: { type: "date" }\` — or name an existing date property with ` +
+            "`softDelete: { field: \"…\" }`. The flag says what a column means; it does not add one."
+        );
+        return;
+    }
+
+    const type = isPlainObject(property) ? property.type : undefined;
+    if (type !== "date") {
+        collect.error(
+            `${at}.softDelete`,
+            `\`softDelete\` stamps '${field}' with a timestamp, and that property is a ` +
+            `\`${String(type)}\`. It has to be a \`date\`.`
+        );
+    }
+}
+
+/**
+ * The primary key, against what a SQL store can actually be given.
+ *
+ * Three claims a collection can make that no generator can honour, each of
+ * which used to be discovered somewhere worse:
+ *
+ * - **Two `isId` properties.** Rebase does not model a composite primary key,
+ *   and the three emitters each invented a different wrong answer: two
+ *   `.primaryKey()` columns in the generated Drizzle file, two inline
+ *   `PRIMARY KEY` clauses in one `CREATE TABLE` (which Postgres refuses), and a
+ *   boot-time ensure that created the table with the *first* id and silently
+ *   never added the second column at all.
+ * - **`isId: "cuid"`.** It has always emitted `DEFAULT cuid()` against a
+ *   function Rebase has never created — not by a generator, not at boot, not in
+ *   a migration — so the column has never had a working default on Postgres and
+ *   the first insert relying on it failed with `function cuid() does not exist`.
+ * - **`columnType` beside `isId: "increment"`.** An identity key is INTEGER,
+ *   because every column that points at a numeric primary key is INTEGER; a
+ *   BIGINT one would be referenced by int4 foreign keys. The width is ignored
+ *   rather than honoured, so this warns instead of failing a boot that has been
+ *   working — but it says so, which is the part that was missing.
+ *
+ * Only for collections a SQL toolchain owns: a Firestore or MongoDB collection
+ * has no `CREATE TABLE` for any of this to be wrong in.
+ */
+function checkPrimaryKeyStrategy(
+    collection: Record<string, unknown>,
+    at: string,
+    collect: ProblemCollector
+): void {
+    if (!isPlainObject(collection.properties)) return;
+    if (!isRelationalCollection(collection as unknown as CollectionConfig)) return;
+
+    const ids = Object.entries(collection.properties)
+        .filter(([, property]) => isPlainObject(property) && Boolean(property.isId))
+        .map(([key, property]) => [key, property as Record<string, unknown>] as const);
+
+    if (ids.length > 1) {
+        collect.error(
+            `${at}.properties`,
+            `${ids.length} properties are marked \`isId\` (${ids.map(([key]) => `\`${key}\``).join(", ")}), ` +
+            "and composite primary keys are not supported: the generated table would carry two PRIMARY KEY " +
+            "clauses, which Postgres refuses, and the boot-time schema ensure would create the table without " +
+            "the second column. Give exactly one property `isId`, and express the second key with " +
+            "`indexes: [{ on: [...], unique: true, reason: \"…\" }]`."
+        );
+    }
+
+    for (const [key, property] of ids) {
+        if (property.isId === "cuid") {
+            collect.error(
+                `${at}.properties.${key}.isId`,
+                "`isId: \"cuid\"` cannot be honoured on Postgres: the generated column gets " +
+                "`DEFAULT cuid()`, and no `cuid()` function is ever created, so every insert that relies " +
+                "on it fails. Use `isId: \"uuid\"`, or give the strategy as SQL — " +
+                "``isId: \"sql`my_id()`\"`` — and create that function in a migration."
+            );
+        }
+        if (property.isId === "increment" && property.columnType !== undefined) {
+            collect.warn(
+                `${at}.properties.${key}.columnType`,
+                `\`columnType: "${String(property.columnType)}"\` is not read beside \`isId: "increment"\`. ` +
+                "An increment key is `INTEGER GENERATED BY DEFAULT AS IDENTITY` on every path, because every " +
+                "foreign key and junction column that points at a numeric primary key is INTEGER — a wider " +
+                "key would be referenced by narrower columns. Remove the `columnType`."
+            );
+        }
+    }
+}
+
+/**
+ * A field the API withholds must not be in the collection's search index.
+ *
+ * `search` compiles to ONE generated `tsvector` column, built by the database
+ * from the named fields and shared by every caller — there is no per-role
+ * variant of it and there cannot be. So a field with a read rule that is also a
+ * search field is still *matched*: the value never appears in a response, and a
+ * caller can still recover it a term at a time by watching which searches return
+ * the row. That is the whole of the disclosure the read rule exists to prevent,
+ * reached by a different door.
+ *
+ * Refused at boot rather than warned about, because the two declarations
+ * contradict each other and the author has to say which one they meant. The
+ * fallback ILIKE search (no `search` block) has no such problem — it is built
+ * per query and skips the fields the caller cannot read.
+ */
+function checkSearchFieldsAreReadable(
+    collection: Record<string, unknown>,
+    at: string,
+    collect: ProblemCollector
+): void {
+    const search = collection.search;
+    if (!isPlainObject(search) || !Array.isArray(search.fields)) return;
+    const properties = collection.properties;
+    if (!isPlainObject(properties)) return;
+
+    for (const entry of search.fields) {
+        const path = typeof entry === "string"
+            ? entry
+            : isPlainObject(entry) && typeof entry.path === "string" ? entry.path : undefined;
+        if (!path) continue;
+
+        // A path into a map addresses the map property; a rule on that property
+        // covers everything underneath it, which is what the row strip does too.
+        const property = properties[path.split(".")[0]];
+        if (!isPlainObject(property)) continue;
+
+        const access = isPlainObject(property.access) ? property.access : undefined;
+        const restricted = property.excludeFromApi === true || Array.isArray(access?.read);
+        if (!restricted) continue;
+
+        collect.error(
+            `${at}.search.fields`,
+            `\`${path}\` is named in \`search.fields\` and also restricted by ` +
+            `\`${property.excludeFromApi === true ? "excludeFromApi" : "access.read"}\`. ` +
+            "The search index is one generated column shared by every caller, so the field would " +
+            "stay matchable to callers who can never see its value — recoverable a term at a time. " +
+            "Remove it from `search.fields`, or drop the read restriction."
+        );
+    }
+}
+
+/**
+ * `precision` and `scale` only mean something on a `numeric` column.
+ *
+ * They are the difference between a price the database rounds and a price that
+ * keeps whatever the caller sent — which is exactly the kind of rule that is
+ * silently ignored rather than enforced, so the two ways of writing it wrong are
+ * caught here where the property has a path.
+ *
+ * `scale` alone is refused: `NUMERIC(precision, scale)` has no form that states
+ * the second without the first, so the declaration cannot reach the column at
+ * all. `precision` on a type that has no modifier — an integer, a float, a
+ * serial — is a warning rather than an error: the column is valid, it just does
+ * not do what the line says.
+ */
+const NUMERIC_TYPES_WITHOUT_A_MODIFIER = new Set([
+    "integer", "real", "double precision", "bigint", "serial", "bigserial"
+]);
+
+function checkNumericPrecision(
+    property: Record<string, unknown>,
+    path: string,
+    collect: ProblemCollector
+): void {
+    const { precision, scale, columnType } = property as {
+        precision?: unknown;
+        scale?: unknown;
+        columnType?: unknown;
+    };
+    if (precision === undefined && scale === undefined) return;
+
+    if (scale !== undefined && precision === undefined) {
+        collect.error(
+            `${path}.scale`,
+            "`scale` needs a `precision` beside it: a Postgres column is `NUMERIC(precision, scale)` and " +
+            "there is no form that states the second without the first, so this one reaches the column as " +
+            "an unbounded `NUMERIC`."
+        );
+    }
+    if (typeof columnType === "string" && NUMERIC_TYPES_WITHOUT_A_MODIFIER.has(columnType)) {
+        collect.warn(
+            `${path}.precision`,
+            `\`precision\`/\`scale\` are not read beside \`columnType: "${columnType}"\` — only a \`numeric\` ` +
+            "column takes them. Drop the `columnType` to get `NUMERIC(precision, scale)`, or drop the " +
+            "precision."
+        );
+    }
+}
+
 function checkCollection(
     collection: unknown,
     index: number,
@@ -974,11 +1309,14 @@ function checkCollection(
     if (isPlainObject(collection.properties)) {
         checkProperties(collection.properties, `${at}.properties`, collect);
         checkRelationPropertiesResolve(collection, at, collect);
+        checkPrimaryKeyStrategy(collection, at, collect);
     } else if (collection.properties !== undefined) {
         collect.error(`${at}.properties`, "`properties` must be an object keyed by property name.");
     }
 
     checkBoardConfig(collection, at, collect);
+    checkSoftDelete(collection, at, collect);
+    checkSearchFieldsAreReadable(collection, at, collect);
 
     if (Array.isArray(collection.relations)) {
         collection.relations.forEach((relation, i) => {

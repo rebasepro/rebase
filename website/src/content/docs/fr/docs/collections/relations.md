@@ -1,5 +1,5 @@
 ---
-sourceHash: 8cb714b94b58f0a9
+sourceHash: b0070dc1781e9f2d
 title: Relations
 sidebar_label: Relations
 description: Définir les relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre les collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.
@@ -193,7 +193,9 @@ properties: {
         type: "relation",
         name: "Author",
         relation: { kind: "belongsTo", target: () => usersCollection },
-        widget: "select"           // "select" (dropdown) or "dialog" (full picker)
+        // Which control draws it is presentation, so it goes in the admin block:
+        // "select" (dropdown) or "dialog" (full picker).
+        admin: { widget: "select" }
     }
 }
 ```

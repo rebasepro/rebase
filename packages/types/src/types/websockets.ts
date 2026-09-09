@@ -35,6 +35,42 @@ export interface WebSocketMessage {
  */
 export type WirePrimaryKeys = { fieldName: string; type: "string" | "number"; isUUID?: boolean }[];
 
+/**
+ * What a `collection_update` frame says about the page it carries.
+ *
+ * The same shape a REST list's `meta` has, and for the same reason: a
+ * subscriber renders the list it was handed, and rendering it needs to know how
+ * many rows there are in total and whether there is another page.
+ *
+ * It used not to be sent. The frame carried rows and primary keys and nothing
+ * else, so the SDK issued a `GET /<collection>/count` **on every push** to
+ * recover it — one extra round trip per write, per subscriber, and a window in
+ * which the count and the rows described different states of the collection.
+ * The refetch already knows the query, so it counts once, beside the rows,
+ * inside the same RLS-bound transaction that read them.
+ */
+export interface CollectionUpdateMeta {
+    /** Rows matching the subscription's query. Absent when the count failed. */
+    total?: number;
+    /** Page size the rows were read with. */
+    limit: number;
+    /** Rows skipped to reach them. */
+    offset: number;
+    /** Whether rows exist beyond this page. */
+    hasMore: boolean;
+    /** The opaque cursor continuing this listing — see `PaginationMeta.nextCursor`. */
+    nextCursor?: string;
+    /**
+     * The count could not be taken, so `total` is missing and `hasMore` is a
+     * floor rather than an answer.
+     *
+     * Flagged rather than guessed: a subscriber that knows the total is unknown
+     * can keep the last one it had, which is what the SDK does. Substituting
+     * `rows.length` would claim a page read at offset 10 held two rows.
+     */
+    partial?: boolean;
+}
+
 export interface CollectionUpdateMessage extends WebSocketMessage {
     type: "collection_update";
     subscriptionId: string;
@@ -46,6 +82,8 @@ export interface CollectionUpdateMessage extends WebSocketMessage {
      * unchanged rows' references needs an address to match them by.
      */
     pks?: WirePrimaryKeys;
+    /** See {@link CollectionUpdateMeta}. */
+    meta?: CollectionUpdateMeta;
 }
 
 export interface SingleUpdateMessage extends WebSocketMessage {

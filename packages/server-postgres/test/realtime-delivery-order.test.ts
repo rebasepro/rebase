@@ -81,9 +81,16 @@ isId: true },
     const singleUpdates = () => messagesOfType("single_update");
     const lastSingleRow = () => singleUpdates()[singleUpdates().length - 1]?.row;
 
-    /** Let the awaits inside an in-flight fetch run to completion. */
+    /**
+     * Let the awaits inside an in-flight delivery run to completion.
+     *
+     * The number is a drain, not a measurement: a delivery is a fetch, then a
+     * count for the frame's `meta`, then the hooks around both, and each adds
+     * microtask hops. Too few here does not fail loudly — it silently observes
+     * the state *before* the delivery and asserts against it.
+     */
     const settle = async () => {
-        for (let i = 0; i < 5; i++) await Promise.resolve();
+        for (let i = 0; i < 30; i++) await Promise.resolve();
     };
 
     /** Fire the debounce so a scheduled refetch actually starts its fetch. */

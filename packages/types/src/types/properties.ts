@@ -300,6 +300,29 @@ export type InferEntityType<P extends Properties> = {
     -readonly [K in OptionalPropertyKeys<P>]?: InferPropertyType<P[K]>;
 };
 
+/**
+ * Per-field read and write permission, by application role.
+ *
+ * An omitted list is not an empty one, and the difference is the whole type:
+ * *omitted* delegates to the row — everyone the collection's security rules let
+ * read (or write) the row gets the field; *`[]`* is nobody, through the API, at
+ * any privilege. `["editor"]` is everyone holding `editor`, plus `admin`.
+ *
+ * @see BaseProperty.access
+ */
+export interface FieldAccess {
+    /**
+     * Roles that may read the field. Omitted = everyone the collection's RLS
+     * lets read the row. `[]` = nobody through the API.
+     */
+    read?: readonly string[];
+    /**
+     * Roles that may write the field. Omitted = everyone the collection's RLS
+     * lets write the row. `[]` = nobody through the API.
+     */
+    write?: readonly string[];
+}
+
 export interface BaseProperty<CustomProps = unknown> {
     /**
      * The label the admin panel shows for this field — a column header, a form
@@ -366,8 +389,46 @@ export interface BaseProperty<CustomProps = unknown> {
      * This is a server-side guarantee, unlike `admin.hideFromCollection`, which
      * only stops the admin panel from *rendering* a field and leaves it in the
      * JSON payload.
+     *
+     * Sugar for `access: { read: [], write: [] }` — the two are one mechanism,
+     * not two, and declaring both on the same property is refused at boot. Write
+     * whichever reads better: the flag says "this is the server's column", the
+     * empty lists say the same thing in the vocabulary of {@link FieldAccess}.
      */
     excludeFromApi?: boolean;
+
+    /**
+     * Who may read and who may write this one field.
+     *
+     * Row access is the collection's `securityRules`; this is the field inside
+     * the row. A caller the row's policies let through still does not receive a
+     * field their roles cannot read — it is *absent* from the response rather
+     * than `null`, so a client cannot tell a withheld value from a stored one by
+     * its shape — and a write naming a field their roles cannot write is a 400
+     * (`FIELD_NOT_WRITABLE`), never a silently dropped key.
+     *
+     * Roles are Rebase application roles, the same ones `policy.rolesOverlap`
+     * compiles against and the same list `rebase.roles()` reads inside a policy:
+     * whatever the call context carries as `user.roles`. `admin` satisfies any
+     * non-empty list, mirroring the `rolesOverlap(['admin'])` arm every baseline
+     * policy carries — a field-level rule must not lock an administrator out of
+     * their own data, and `rebase.dataAsAdmin` holds that role.
+     *
+     * The enforcement point is the API boundary. In-process writes through
+     * `rebase.data` / `rebase.dataAsAdmin` and the framework's own auth paths do
+     * not pass through it — the same exemption `excludeFromApi` has always had,
+     * and the reason it is possible to store a password hash at all.
+     *
+     * @example
+     * ```ts
+     * salary: {
+     *     type: "number",
+     *     // Readable by HR and by admins; writable by nobody through the API.
+     *     access: { read: ["hr"], write: [] }
+     * }
+     * ```
+     */
+    access?: FieldAccess;
 
     // NOTE: `defaultValue` is intentionally NOT on BaseProperty.
     // Each concrete property type (StringProperty, NumberProperty, etc.)
@@ -378,6 +439,12 @@ export interface BaseProperty<CustomProps = unknown> {
      * or on the entity's values. For example, you can make a field read-only if
      * another field has a certain value.
      * This function receives the same props as a `PropertyBuilder` and should return a partial `Property` object.
+     *
+     * **Admin form only — not enforced by the API or the database.** The
+     * function is bundled into the panel and called while a form renders. A
+     * write that never goes through a form never goes through it, so a rule
+     * that must hold for every caller belongs in {@link validation}, which the
+     * server checks, or in a security rule, which the database enforces.
      */
     dynamicProps?: (props: PropertyBuilderProps) => Partial<Property>;
 
@@ -388,6 +455,11 @@ export interface BaseProperty<CustomProps = unknown> {
      * - Stored in the database as JSON
      * - Edited via the collection editor UI
      * - Evaluated at runtime like property builders
+     *
+     * **Admin form only — not enforced by the API or the database.** Like
+     * {@link dynamicProps}, these are evaluated while a form renders and shape
+     * what the panel offers. `conditions.required` does not make a column
+     * `NOT NULL` and does not make a write fail.
      *
      * @see PropertyConditions for available condition options
      * @see https://jsonlogic.com/ for JSON Logic syntax
@@ -432,12 +504,21 @@ export interface StringProperty extends BaseProperty {
      *
      * You can set this to `"manual"` for a user-defined ID, or specify a generation strategy:
      * 'uuid' -> Drizzle `.defaultRandom()` (Postgres gen_random_uuid())
-     * 'cuid' -> Drizzle `.default(sql\`cuid()\`)`
-     * Or any other random string to act as a raw SQL default expression: e.g. `nanoid()`
+     * Or any other string to act as a raw SQL default expression, written either
+     * bare (`gen_random_uuid()::text`) or in template form
+     * (``isId: "sql`my_id()`"``) — the wrapper is markup and is stripped before
+     * the SQL is written. The function has to exist: nothing here creates it.
+     *
+     * `"cuid"` is **refused on Postgres**, at config load. It emitted
+     * `DEFAULT cuid()` against a function Rebase has never created — not by a
+     * generator, not at boot, not in a migration — so the column has never had a
+     * working default and the first insert relying on it failed with
+     * `function cuid() does not exist`. Use `"uuid"`, or supply your own SQL
+     * expression above and create the function in a migration.
      *
      * On the UI side, the field automatically gets disabled on new entities if a string strategy is provided.
      */
-    isId?: boolean | "manual" | "uuid" | "cuid" | string;
+    isId?: boolean | "manual" | "uuid" | string;
     /**
      * You can use the enum values providing a map of possible
      * exclusive values the property can take, mapped to the label that it is
@@ -447,6 +528,10 @@ export interface StringProperty extends BaseProperty {
      * colors). If you need to ensure the order of the elements, you can pass
      * a `Map` instead of a plain object.
      *
+     * On a SQL store this compiles to a Postgres enum type named
+     * `<table>_<column>`, so the ids are the type's labels. An empty list is
+     * refused at config load: `CREATE TYPE … AS ENUM ()` is not valid SQL, and
+     * the column would reference a type nothing creates.
      */
     enum?: EnumValues;
     /**
@@ -462,6 +547,11 @@ export interface StringProperty extends BaseProperty {
      * provider (e.g. the ID in your `users` table).
      * You can also use a property builder to specify the user path dynamically
      * based on other values of the entity.
+     *
+     * **Admin form only — not enforced by the API or the database.** The column
+     * is an ordinary string; there is no foreign key to the users table and
+     * nothing resolves or checks the id on the way in. To make the link real,
+     * declare a `relation` to the auth collection instead.
      */
     userSelect?: boolean;
 
@@ -479,6 +569,30 @@ export interface StringProperty extends BaseProperty {
      * renders it — as a link, an image, a video — is `admin.urlPreview`.
      */
     url?: boolean;
+
+    /**
+     * Stamp this column with the **uid of the acting user**, on creation only
+     * (`user_on_create`) or on every write including creation
+     * (`user_on_update`). The `created_by` / `updated_by` twin of
+     * {@link DateProperty.autoValue}, which has always done the same for
+     * timestamps.
+     *
+     * The value is taken from the call context, not from the request body: a
+     * caller cannot claim to be somebody else by sending the field, because the
+     * driver overwrites whatever arrived. That is the whole point — a column
+     * whose value the caller supplies is not an audit column.
+     *
+     * With no acting user (an anonymous request, a service token, a seed
+     * script) the column is set to `null`. If it is also
+     * `validation: { required: true }`, that is a 400 rather than a null: a
+     * collection that demands to know who wrote a row is a collection that
+     * cannot accept an anonymous write.
+     *
+     * There is no foreign key here. The uid is a string, the user store may be
+     * another database entirely, and a deleted user must not take their audit
+     * trail with them — declare a `relation` if you want the join.
+     */
+    autoValue?: "user_on_create" | "user_on_update";
 }
 
 export interface NumberProperty extends BaseProperty {
@@ -493,6 +607,27 @@ export interface NumberProperty extends BaseProperty {
      */
     columnType?: "integer" | "real" | "double precision" | "numeric" | "bigint" | "serial" | "bigserial";
     /**
+     * Total significant digits for a `numeric` column — `NUMERIC(precision, scale)`.
+     *
+     * Money is the case this exists for. Without it a price lands as an
+     * *unbounded* `NUMERIC`, which stores `19.999999999999998` as faithfully as
+     * `19.99` and cannot be tightened afterwards without rewriting the column,
+     * so the rounding rule ends up living in whichever caller last touched the
+     * value. `precision: 10, scale: 2` makes the database the one that decides.
+     *
+     * Read only when the column is `numeric` — either declared
+     * ({@link NumberProperty.columnType}) or arrived at by default, which is
+     * what a non-integer `number` gets. Ignored on `integer`, `real`,
+     * `double precision` and the serial types, which have no modifier.
+     *
+     * Changing it on a live column is an `ALTER COLUMN … TYPE`, so `db push`
+     * plans it and the boot-time ensure reports it rather than applying it —
+     * the same treatment every other type change gets.
+     */
+    precision?: number;
+    /** Digits after the decimal point. Requires {@link NumberProperty.precision}. */
+    scale?: number;
+    /**
      * Rules for validating this property
      */
     validation?: NumberPropertyValidationSchema;
@@ -503,14 +638,27 @@ export interface NumberProperty extends BaseProperty {
      * UI behavior: Field value cannot be changed after creation.
      *
      * You can set this to `"manual"` for a user-defined ID, or specify a generation strategy:
-     * 'increment' -> PostgreSQL `GENERATED BY DEFAULT AS IDENTITY` or auto-incrementing integer.
-     * Or any other random string to act as a raw SQL default expression.
+     * 'increment' -> PostgreSQL `INTEGER GENERATED BY DEFAULT AS IDENTITY`.
+     * Or any other string to act as a raw SQL default expression, bare or in
+     * template form (``isId: "sql`nextval('s')`"``).
+     *
+     * {@link NumberProperty.columnType} is **not read** beside
+     * `isId: "increment"`: an increment key is always INTEGER, because every
+     * foreign key and junction column that points at a numeric primary key is
+     * INTEGER, and a wider key would be referenced by narrower columns. Config
+     * validation warns when the two are written together.
      */
     isId?: boolean | "manual" | "increment" | string;
     /**
      * You can use the enum values providing a map of possible
      * exclusive values the property can take, mapped to the label that it is
      * displayed in the dropdown.
+     *
+     * Unlike a string enum, this creates **no Postgres enum type**: the column
+     * stays NUMERIC or INTEGER, so the values are offered by the panel and are
+     * not enforced by the database. (One used to be created, referenced by
+     * nothing, and every `db push` planned a DROP for it.) An empty list is
+     * refused at config load.
      */
     enum?: EnumValues;
 
@@ -643,10 +791,18 @@ export interface DateProperty extends BaseProperty {
      * Set the granularity of the field to a date or date + time.
      * Defaults to `date_time`.
      *
+     * **Admin form only — not enforced by the API or the database.** It picks
+     * the picker. The column is whatever {@link columnType} says, and the API
+     * accepts a full timestamp either way — narrowing the widget does not
+     * narrow the value.
      */
     mode?: "date" | "date_time";
     /**
      * Timezone string to evaluate the date in.
+     *
+     * **Admin form only — not enforced by the API or the database.** It is the
+     * zone the panel reads and writes the value in; what is stored is a
+     * `timestamptz`, which has no zone of its own.
      */
     timezone?: string;
     /**
@@ -963,7 +1119,11 @@ export interface PropertyValidationSchema {
     required?: boolean;
 
     /**
-     * Customize the required message when the property is not set
+     * Customize the required message when the property is not set.
+     *
+     * **Admin form only — not enforced by the API or the database.** It is the
+     * sentence the panel shows under the field; an API rejection carries its
+     * own error code and message.
      */
     requiredMessage?: string;
 
@@ -978,6 +1138,11 @@ export interface PropertyValidationSchema {
      * once per entry in the parent `ArrayProperty`. It has no effect if this
      * property is not a child of an `ArrayProperty`. It works on direct
      * children of an `ArrayProperty` or first level children of `MapProperty`
+     *
+     * **Admin form only — not enforced by the API or the database.** Unlike
+     * {@link unique}, which compiles to a constraint, this one is checked as
+     * the form is filled in: the column holds a JSON array, and nothing in
+     * Postgres is looking inside it.
      */
     uniqueInArray?: boolean;
 }
@@ -1039,11 +1204,24 @@ export interface StringPropertyValidationSchema extends PropertyValidationSchema
      *
      * A transform, not a check: it changes the value that is written, which is
      * what makes it the fix for "the same tag twice, one with a trailing space".
+     *
+     * **Admin form only — not enforced by the API or the database.** The panel
+     * applies it on its way to the API; a value written any other way arrives
+     * as it was sent. A transform that must always happen is a `beforeSave`
+     * callback, which runs on the server for every write.
      */
     trim?: boolean;
-    /** Lowercase the value before saving. A transform, like {@link trim}. */
+    /**
+     * Lowercase the value before saving. A transform, like {@link trim}.
+     *
+     * **Admin form only — not enforced by the API or the database.**
+     */
     lowercase?: boolean;
-    /** Uppercase the value before saving. A transform, like {@link trim}. */
+    /**
+     * Uppercase the value before saving. A transform, like {@link trim}.
+     *
+     * **Admin form only — not enforced by the API or the database.**
+     */
     uppercase?: boolean;
 }
 
@@ -1106,6 +1284,10 @@ export type StorageConfig = {
      * Advanced image resizing and cropping configuration.
      * Applied before upload to optimize storage and bandwidth.
      * Only applies to image MIME types: image/jpeg, image/png, image/webp
+     *
+     * **Admin form only — not enforced by the API or the database.** The
+     * resizing happens in the browser, before the bytes are sent. An upload
+     * that does not go through the panel is stored at its original size.
      */
     imageResize?: ImageResize;
 
@@ -1128,6 +1310,9 @@ export type StorageConfig = {
      * - `{propertyKey}` - ID of this property
      * - `{path}` - Path of this entity
      *
+     * **Admin form only — not enforced by the API or the database.** The panel's
+     * uploader resolves it; `client.storage.upload()` names its own `key`.
+     *
      * @param context
      */
     fileName?: string | ((context: UploadedFileContext) => string | Promise<string>);
@@ -1144,6 +1329,12 @@ export type StorageConfig = {
      * - `{entityId}` - ID of the entity
      * - `{propertyKey}` - ID of this property
      * - `{path}` - Path of this entity
+     *
+     * **Admin form only — not enforced by the API or the database.** Required
+     * on the type because a file field in the panel has to put the object
+     * somewhere, but it is the panel's uploader that resolves it. Nothing on
+     * the server confines an upload to this prefix — that is what a storage
+     * authorization rule is for.
      */
     storagePath: string | ((context: UploadedFileContext) => string);
 
@@ -1177,6 +1368,10 @@ export type StorageConfig = {
     /**
      * Use this callback to process the file before uploading it to the storage.
      * If nothing is returned, the file is uploaded as it is.
+     *
+     * **Admin form only — not enforced by the API or the database.** It runs in
+     * the browser, on the file the reader picked.
+     *
      * @param file
      */
     processFile?: (file: File) => Promise<File> | undefined;
@@ -1184,12 +1379,17 @@ export type StorageConfig = {
     /**
      * Postprocess the saved value (storage path or URL)
      * after it has been resolved.
+     *
+     * **Admin form only — not enforced by the API or the database.**
      */
     postProcess?: (pathOrUrl: string) => Promise<string>;
 
     /**
      * You can use this prop in order to provide a custom preview URL.
      * Useful when the file's path is different from the original field value
+     *
+     * **Admin form only — not enforced by the API or the database.** It changes
+     * what the panel renders, never what is stored.
      */
     previewUrl?: (fileName: string) => string;
 }

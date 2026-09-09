@@ -40,13 +40,24 @@ All property types share these options:
 | `type` | `string` | **Required.** Data type (see above) |
 | `name` | `string` | Display label. Defaults to the property key, prettified — `publishDate` → "Publish Date". Set it when that derivation is wrong: `"URL"` rather than "Url". |
 | `description` | `string` | Help text shown below the field |
-| `defaultValue` | `any` | Default value for new entities |
+| `defaultValue` | `any` | Default value for new entities. A literal one — a string, number, boolean, date, enum id, or a `map`/`array` document — also becomes the column's `DEFAULT`, so a row inserted by anything that is not the admin panel (the REST API, a seed, `psql`) gets it too |
 | `validation` | `object` | Validation rules |
 | `propertyConfig` | `string` | Registered property config key |
 | `columnName` | `string` | Explicit database column name (bypasses snake_case conversion) |
 | `callbacks` | `PropertyCallbacks` | Hooks for `afterRead` and `beforeSave` transforms |
-| `dynamicProps` | `function` | Dynamic property builder (see Conditional Fields) |
-| `conditions` | `PropertyConditions` | Declarative JSON Logic conditions |
+| `excludeFromApi` | `boolean` | Never mention this column on the API surface, in either direction — for a password hash or a verification token. The value is still written and queryable server-side; it is stripped from every row the API serves, for every caller including admins and service keys, and it is absent from the generated `Row`, `Insert` and `Update` types and from the OpenAPI schema. Sugar for `access: { read: [], write: [] }` — the two are one mechanism, and setting both on one property is refused at boot |
+| `access` | `{ read?: string[]; write?: string[] }` | Who may read and who may write this one field, by role. An omitted list delegates to the row's [security rules](/docs/collections/security-rules/); `[]` is nobody through the API; a role list is those roles plus `admin`. An unreadable field is **absent** from responses rather than `null`, and a write naming an unwritable one is a 400. See [Field access](/docs/collections/field-access/) |
+| `metadata` | `Record<string, unknown>` | Anything your own code needs to hang off a property. Rebase does not read it; it survives serialization unchanged |
+| `dynamicProps` | `function` | Dynamic property builder (see [Conditional fields](/docs/collections/validation-and-conditions/#conditional-fields)). **Admin form only — not enforced by the API or the database.** |
+| `conditions` | `PropertyConditions` | Declarative JSON Logic conditions. **Admin form only — not enforced by the API or the database.** |
+
+:::note[What "admin form only" means]
+Several options below carry that label: they shape the form the panel draws and
+nothing else — the API accepts a write that ignores them, and no constraint
+stands behind them. A rule that must hold for every caller is a
+[validation rule](/docs/collections/validation-and-conditions/) or a
+[security rule](/docs/collections/security-rules/).
+:::
 
 ### UI Configuration (`admin`)
 
@@ -168,21 +179,21 @@ website: {
 
 ### File upload
 
-Set `storage` to render a file upload dropzone.
+Set `storage` to render a file upload dropzone. The column stays a string — what
+is written to it is the object's key in the bucket:
 
 ```typescript
 avatar: {
     type: "string",
     name: "Main image",
-    storage: {
-        storagePath: "avatars",
-        acceptedFiles: ["image/*"],
-        maxSize: 2 * 1024 * 1024
-    }
+    storage: { storagePath: "avatars", acceptedFiles: ["image/*"] }
 }
 ```
 
 <FieldWidgetPreview client:only="react" variant="file_upload" />
+
+Every option inside `storage`, and the multi-file form of the same field, are on
+[File uploads](/docs/collections/file-uploads).
 
 ### Select (enum)
 
@@ -234,14 +245,57 @@ locales: {
 | `admin.markdown` | `boolean` | Render as markdown editor |
 | `email` | `boolean` | Email format validation |
 | `url` | `boolean` | URL format validation |
-| `storage` | `StorageConfig` | Enable file upload |
+| `storage` | `StorageConfig` | Enable file upload — see [File uploads](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Render as select dropdown |
-| `columnType` | `string` | Database column: `"varchar"`, `"text"` |
-| `isId` | `string` | ID generation: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
-| `userSelect` | `boolean` | Render as a user picker |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | The database column. Defaults to `varchar`, or `uuid` when `isId` says so. `text` for unbounded strings, `char` for fixed width |
+| `isId` | `boolean \| string` | Marks the property as the primary key, and says who fills it: `"manual"` (you do), `"uuid"` (`gen_random_uuid()`), or any other string, used verbatim as the column's SQL default expression — bare (`nanoid()`) or in template form (``"sql`nanoid()`"``). The function has to exist; nothing here creates it. `"increment"` is a **number** strategy and does nothing here, and `"cuid"` is refused at config load |
+| `autoValue` | `"user_on_create" \| "user_on_update"` | Stamp the column with the **uid of the acting user** — on creation only, or on every write. See [Audit columns](#audit-columns) |
+| `userSelect` | `boolean` | Render as a user picker. The value is a plain string column holding the user id — nothing resolves or checks it on the way in. **Admin form only — not enforced by the API or the database.** |
 | `admin.previewAsTag` | `boolean` | Render this string as a tag in previews |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 | `admin.urlPreview` | `PreviewType` | How to render a string that holds a URL: a link, or an inline image, audio or video preview. Presentation only — whether the value *is* a URL is the `url` flag on the property, which is what the OpenAPI contract is generated from |
+
+### Audit columns
+
+`autoValue` on a string is the `created_by` / `updated_by` twin of the same
+option on a [date](#date-options):
+
+```typescript
+createdBy: {
+    type: "string",
+    name: "Created by",
+    autoValue: "user_on_create",
+    admin: { readOnly: true }
+},
+
+updatedBy: {
+    type: "string",
+    name: "Updated by",
+    autoValue: "user_on_update"
+}
+```
+
+The value comes from the call context, never from the request body — the driver
+overwrites whatever arrived, so a caller cannot claim to be somebody else by
+sending the field. A column whose value the caller supplies is not an audit
+column.
+
+With no acting user — an anonymous request, a service token, a seed script — the
+column is set to `null`. Pair it with `validation: { required: true }` and that
+becomes a 400 instead: a collection that insists on knowing who wrote a row is a
+collection that cannot accept an anonymous write.
+
+There is no foreign key. The uid is a string, the user store may be another
+database entirely, and a deleted user must not take the audit trail with them —
+declare a [relation](/docs/collections/relations) if you want the join.
+
+:::note[One primary key per collection]
+`isId` may be claimed by exactly one property. A second is refused at config
+load rather than silently ignored: composite primary keys are not supported, and
+a config declaring two has to be read as asking for one Rebase cannot build. If
+what you wanted was a uniqueness constraint over several columns, that is a
+unique [index](/docs/backend/indexes).
+:::
 
 ## Number Properties
 
@@ -267,9 +321,10 @@ Number fields render as a standard text input with numeric validation.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `enum` | `EnumValues` | Render as select with numeric values |
-| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"` |
-| `isId` | `string` | ID generation strategy |
+| `enum` | `EnumValues` | Render as select with numeric values. Unlike a string enum this creates **no Postgres enum type** — the column stays `NUMERIC` or `INTEGER`, so the panel offers the values and the database does not enforce them |
+| `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"`. Defaults to `integer` where `validation.integer` or `isId` says the value is whole, `numeric` otherwise |
+| `precision` / `scale` | `number` | Total significant digits and digits after the point on a `numeric` column — `NUMERIC(10, 2)`. Money without them is an unbounded `NUMERIC` that keeps whatever the caller sent, and cannot be tightened later without rewriting the column |
+| `isId` | `boolean \| string` | Marks the property as the primary key: `"manual"`, `"increment"`, or any other string used verbatim as the column's SQL default expression. `"increment"` is always `INTEGER GENERATED BY DEFAULT AS IDENTITY` — `columnType` beside it is ignored, with a warning, because every foreign key pointing at a numeric key is `INTEGER` and a wider key would be referenced by narrower columns |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 | `admin.format` | `NumberFormatOptions` | Write the number out as currency, a percentage, or with fixed decimals. Omitted, the raw value renders — a number in the database is shown as the number in the database |
 
@@ -350,134 +405,54 @@ updatedAt: {
 }
 ```
 
+`on_update` is a database trigger, not only an app-layer stamp. Rebase writes the
+column on every save it makes — so a `beforeSave` hook sees the new value — and
+installs a `BEFORE UPDATE` trigger that writes it for everyone else. Without the
+trigger a seed script, a migration backfill or one row fixed in `psql` left the
+column claiming the row had not changed, and anything reading it to decide what
+to re-index or re-send skipped that row.
+
+The trigger lives in `drizzle/triggers.sql`, applied by `rebase db push` and at
+boot by the schema ensure — Atlas cannot manage it, for the same reason it
+cannot manage the full-text search helpers.
+
 ### Date Options
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`) |
-| `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps |
-| `columnType` | `string` | `"timestamp"`, `"date"` |
-| `timezone` | `string` | Timezone string to evaluate the date in |
+| `mode` | `"date" \| "date_time"` | Date only or date + time (default: `"date_time"`). Picks the widget; the column is the same either way. **Admin form only — not enforced by the API or the database.** |
+| `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps. `on_create` is a `DEFAULT now()`; `on_update` is a `BEFORE UPDATE` trigger **as well as** an app-layer stamp, so a raw `UPDATE` from a seed or a migration moves the column too |
+| `columnType` | `"timestamp" \| "date" \| "time"` | The database column. Defaults to `timestamp` **with time zone** |
+| `timezone` | `string` | Which timezone the picker reads and writes the value in. **Admin form only — not enforced by the API or the database.** |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
-## Array Properties
+## Array and Map Properties
 
-### Simple repeat
+The two composite types — a repeatable list and a structured object, both
+stored as JSONB unless a native Postgres array fits. Repeats, block editors,
+groups, key-value editors and every option either one takes are on
+**[Arrays and maps](/docs/collections/arrays-and-maps)**.
 
-Use `of` to define a repeatable list of items.
+## Geopoint Properties
+
+A latitude/longitude pair, stored as `jsonb` — `{ latitude, longitude }`, which
+is what the generated TypeScript type, the OpenAPI schema and the form field all
+describe.
 
 ```typescript
-tags: {
-    type: "array",
-    name: "Tags",
-    of: { type: "string" }
+location: {
+    type: "geopoint",
+    name: "Location"
 }
 ```
 
-<FieldWidgetPreview client:only="react" variant="repeat" />
+Writes take the same shape, or a `GeoPoint` from `@rebasepro/types`:
+`new GeoPoint(41.4036, 2.1744)`.
 
-### Multi file upload
-
-Combine `of` with `storage` for a multi-file upload.
-
-```typescript
-images: {
-    type: "array",
-    name: "Images",
-    of: {
-        type: "string",
-        storage: { storagePath: "images", acceptedFiles: ["image/*"] }
-    }
-}
-```
-
-<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
-
-### Block editor
-
-Use `oneOf` to create a block editor with multiple content types. Each key creates a card type that users can pick from.
-
-```typescript
-content: {
-    type: "array",
-    name: "Content",
-    oneOf: {
-        properties: {
-            text: {
-                type: "map",
-                properties: {
-                    body: { type: "string", name: "Text", admin: { markdown: true } }
-                }
-            },
-            image: {
-                type: "map",
-                properties: {
-                    src: { type: "string", name: "Image", storage: { storagePath: "content" } },
-                    caption: { type: "string", name: "Caption" }
-                }
-            }
-        }
-    }
-}
-```
-
-<FieldWidgetPreview client:only="react" variant="block" />
-
-### Array Options
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `of` | `Property \| Property[]` | Property schema for array items |
-| `oneOf` | `object` | Array of typed objects with multiple discriminator types |
-| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
-| `admin.minimalistView` | `boolean` | Display child properties directly without extendable panel |
-| `admin.sortable` | `boolean` | Can elements be reordered (default: true) |
-| `admin.canAddElements` | `boolean` | Can new elements be added (default: true) |
-
-## Map Properties
-
-### Group (structured)
-
-Use `properties` to define a structured object with named fields.
-
-```typescript
-address: {
-    type: "map",
-    name: "Address",
-    properties: {
-        street: { type: "string", name: "Street" },
-        zip: { type: "string", name: "Postal code" }
-    }
-}
-```
-
-<FieldWidgetPreview client:only="react" variant="group" />
-
-### Key-value (free-form)
-
-Set `keyValue: true` to render an arbitrary key-value pairs editor.
-
-```typescript
-metadata: {
-    type: "map",
-    name: "Key value",
-    keyValue: true
-}
-```
-
-<FieldWidgetPreview client:only="react" variant="key_value" />
-
-### Map Options
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `properties` | `Properties` | Record of properties included in the map |
-| `propertiesOrder` | `string[]` | Ordered keys for rendering |
-| `admin.previewProperties` | `string[]` | Which properties to show in the table preview |
-| `admin.spreadChildren` | `boolean` | Render child properties as separate columns in table view |
-| `admin.minimalistView` | `boolean` | Display properties without a wrapping panel |
-| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
-| `keyValue` | `boolean` | Render as arbitrary key-value pairs editor |
+There are no options beyond the ones every property has. The column is not
+spatially indexed and there is no distance operator to filter on: a geopoint is
+a value you store and show, not one you search by. For that, model the two
+numbers as columns of their own.
 
 ## Reference Properties
 

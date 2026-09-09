@@ -93,34 +93,48 @@ describe("orderBy on an owning relation resolves through localKey", () => {
      * column* is sorted on; nothing pinned which way.
      */
     describe("sort direction", () => {
-        // `buildDrizzleQueryOptions` resolves the collection from the registry,
-        // so this one needs a registry that knows `posts` — unlike the direct
+        // `resolveOrderKeys` resolves the collection's relations, so this one
+        // needs a registry that knows `posts` — unlike the direct
         // `resolveOrderByField` calls above, which are handed the collection.
         const registry = new PostgresCollectionRegistry();
         registry.registerMultiple([postsCollection]);
         const sortService = new FetchService({} as never, registry);
 
-        const buildOrder = (order: "asc" | "desc") => {
-            const opts = (sortService as unknown as {
-                buildDrizzleQueryOptions(
+        /**
+         * The rendered `ORDER BY` for one key.
+         *
+         * Through `resolveOrderKeys` + `buildOrderExpressions`, which is what
+         * every read now calls. It used to go through
+         * `buildDrizzleQueryOptions`, which built options for Drizzle's
+         * relational query API — a path no read takes any more, so a test
+         * against it proved nothing about the SQL anyone runs.
+         */
+        const buildOrder = (order: "asc" | "desc", nulls?: "first" | "last") => {
+            const service = sortService as unknown as {
+                resolveOrderKeys(
                     table: typeof postsTable,
-                    idField: AnyPgColumn,
-                    idInfo: { fieldName: string; type: "string" | "number" },
-                    options: Record<string, unknown>,
-                    collectionPath: string
-                ): { orderBy?: unknown[] }
-            }).buildDrizzleQueryOptions(
+                    keys: [string, "asc" | "desc", ("first" | "last")?][],
+                    collection?: unknown,
+                    searchString?: string,
+                    collectionPath?: string
+                ): unknown[];
+                buildOrderExpressions(keys: unknown[], idField: AnyPgColumn): unknown[];
+            };
+            const keys = service.resolveOrderKeys(
                 postsTable,
-                postsTable.id as unknown as AnyPgColumn,
-                { fieldName: "id", type: "number" },
-                { orderBy: "title", order },
+                [nulls ? ["title", order, nulls] : ["title", order]],
+                registry.getCollectionByPath("posts"),
+                undefined,
                 "posts"
+            );
+            const expressions = service.buildOrderExpressions(
+                keys, postsTable.id as unknown as AnyPgColumn
             );
             // Drizzle renders the direction as a string chunk on the SQL
             // object; the id tiebreaker is appended after, so the first
             // expression is ours. Reading the chunks rather than serialising
             // the object, which is circular (a column refers to its table).
-            const first = opts.orderBy?.[0] as { queryChunks?: { value?: string[] }[] } | undefined;
+            const first = expressions[0] as { queryChunks?: { value?: string[] }[] } | undefined;
             return (first?.queryChunks ?? [])
                 .flatMap(chunk => chunk?.value ?? [])
                 .join(" ")
@@ -140,6 +154,20 @@ describe("orderBy on an owning relation resolves through localKey", () => {
             // The assertion that survives a change of Drizzle's internals: the
             // only thing that must hold is that the directions differ.
             expect(buildOrder("asc")).not.toEqual(buildOrder("desc"));
+        });
+
+        // Where the NULLs go used to be a fixed convention — LAST ascending,
+        // FIRST descending — with no way to say otherwise. A "newest first"
+        // list therefore put every row with no date at the very top, and the
+        // only escape was an `is-not-null` filter that dropped those rows.
+        it("defaults NULLs to the direction's own convention", () => {
+            expect(buildOrder("asc")).toMatch(/nulls last/i);
+            expect(buildOrder("desc")).toMatch(/nulls first/i);
+        });
+
+        it("honours an explicit placement against the direction's default", () => {
+            expect(buildOrder("desc", "last")).toMatch(/nulls last/i);
+            expect(buildOrder("asc", "first")).toMatch(/nulls first/i);
         });
     });
 

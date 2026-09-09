@@ -264,7 +264,7 @@ interface JobRecord { attempts, createdAt, id, lastError, maxAttempts, payload, 
 interface JobStore { claim, complete, ensureTable, fail, fetch, insert, reapExpired }
 interface JwtSigningKeyConfig { algorithm, kid, privateKey }
 interface ListUsersOptions { limit, offset, orderBy, orderDir, roleId, search }
-interface ListenCollectionRequest { collection, filter, limit, logical, offset, onError, onUpdate, order, orderBy, path, searchExplain, searchString, startAfter, subscriptionId, vectorSearch }
+interface ListenCollectionRequest { collection, distinct, fields, filter, include, limit, logical, offset, onError, onUpdate, order, orderBy, path, searchExplain, searchString, startAfter, subscriptionId, vectorSearch }
 interface ListenEntityRequest { collection, databaseId, id, onError, onUpdate, path, subscriptionId }
 interface LoadedBundle { collectionsDir, cronsDir, dir, functionsDir, isSource, manifest, staticApps }
 interface LoadedCronJob { definition, id }
@@ -284,7 +284,7 @@ interface PaginatedUsersResult { limit, offset, total, users }
 interface PasswordResetTokenInfo { expiresAt, uid }
 interface PasswordValidationResult { errors, valid }
 interface QueryFilter { field, operator, value }
-interface QueryOptions { fields, include, limit, logical, offset, orderBy, vectorSearch, where }
+interface QueryOptions { cursor, distinct, fields, include, limit, logical, offset, orderBy, vectorSearch, where }
 interface RealtimeProvider { destroy, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RebaseApiError { code, details, statusCode }
 interface RebaseAuthConfig { accessExpiresIn, activeKid, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, captcha, collection, cookieAuth, defaultRole, disableSelfRegistration, discord, email, emailOtp, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, microsoft, providers, refreshExpiresIn, requireAuth, serviceKey, signingKeys, slack, spotify, twitter }
@@ -380,7 +380,7 @@ const ANONYMOUS_USER_IDS
 const BUNDLE_FORMAT_VERSION
 const CANONICAL_TO_REST
 const DEFAULT_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
-const DEFAULT_COMMIT_PATHS { ddlFile, policiesFile, schemaFile, searchFile, vectorFile }
+const DEFAULT_COMMIT_PATHS { ddlFile, policiesFile, schemaFile, searchFile, triggersFile, vectorFile }
 const DEFAULT_DATA_SOURCE_KEY
 const DEFAULT_FILTERABLE_RELATION_KINDS
 const DEFAULT_FUZZY_THRESHOLD
@@ -396,6 +396,8 @@ const LEGACY_RLS_JWT_SQL
 const LEGACY_RLS_ROLES_SQL
 const LEGACY_RLS_SCHEMA
 const LEGACY_RLS_UID_SQL
+const LIST_OPS
+const MAX_INCLUDE_DEPTH
 const MAX_LIST_LIMIT
 const MONGODB_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 const NULL_OPS
@@ -492,6 +494,7 @@ interface AdminUser { createdAt, displayName, email, metadata, photoURL, provide
 interface AfterDeleteProps { collection, context, id, path, row }
 interface AfterReadProps { collection, context, path, row }
 interface AfterSaveProps { collection, context, id, path, previousValues, status, values }
+interface AggregateParams { groupBy, limit, logical, searchString, select, where }
 interface AndPolicyExpression { kind, operands }
 interface ApiKeyMasked { admin, created_at, created_by, expires_at, id, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiKeyPermission { collection, operations }
@@ -541,11 +544,12 @@ interface ChannelHistoryEntry { at, event, payload, senderId, seq }
 interface ChannelHistoryMessage { channel, error, latestSeq, messages, payload, requestId, retained, row, rows, subscriptionId, type }
 interface ChannelRetentionRule { limit, match, ttl }
 interface ClassifiedSchemaChanges { applicable, changes, verdict }
-interface CollectionAccessor { count, create, createMany, delete, deleteMany, find, findById, include, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
+interface CollectionAccessor { aggregate, count, create, createMany, delete, deleteMany, find, findById, include, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where }
 interface CollectionPatchMessage { channel, error, id, payload, pks, requestId, row, rows, subscriptionId, type }
 interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register }
 interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter }
-interface CollectionUpdateMessage { channel, error, payload, pks, requestId, row, rows, subscriptionId, type }
+interface CollectionUpdateMessage { channel, error, meta, payload, pks, requestId, row, rows, subscriptionId, type }
+interface CollectionUpdateMeta { hasMore, limit, nextCursor, offset, partial, total }
 interface ComparePolicyExpression { kind, left, op, right }
 interface ConditionBuilder { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
 interface ConditionContext { entityId, index, isNew, now, path, previousValues, propertyValue, user, values }
@@ -588,13 +592,13 @@ interface EnumValueConditions { disabled, disabledMessage, hidden }
 interface ExistsInPolicyExpression { collection, kind, where }
 interface FalsePolicyExpression { kind }
 interface FetchCollectionOptions { collection, databaseId, filter, limit, offset, order, orderBy, searchString, startAfter }
-interface FetchCollectionProps { collection, filter, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter, vectorSearch }
+interface FetchCollectionProps { collection, distinct, fields, filter, include, limit, logical, offset, order, orderBy, path, searchExplain, searchString, startAfter, vectorSearch }
 interface FetchHistoryOptions { limit, offset }
 interface FetchOneProps { collection, databaseId, id, path }
 interface FieldPolicyOperand { kind, name }
 interface FilterCondition { column, operator, value }
 interface FilterPreset { filterValues, label, sort }
-interface FindParams { include, limit, logical, offset, orderBy, page, searchExplain, searchString, vectorSearch, where }
+interface FindParams { after, distinct, fields, include, limit, logical, offset, orderBy, page, searchExplain, searchString, vectorSearch, where }
 interface FindResponse { data, meta }
 interface FindResult { data, meta }
 interface FirebaseCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, path, properties, securityRules, singularName, slug, strictWrites, subcollections }
@@ -608,6 +612,7 @@ interface HasOneRelation { foreignKeyOnTarget, kind, onDelete, onUpdate, overrid
 interface HealthCheckResult { details, healthy, latencyMs }
 interface HistoryRetentionConfig { maxEntries, ttlDays }
 interface ImageResize { format, maxHeight, maxWidth, mode, quality }
+interface IncludeOptions { fields, include, limit, logical, orderBy, where }
 interface IndexKey { direction, nulls, prop }
 interface InitializedDriver { collectionRegistry, collections, connection, driver, internals, realtimeProvider }
 interface JoinStep { on, table }
@@ -622,13 +627,13 @@ interface MongoDBCollectionConfig { auth, callbacks, childCollections, dataSourc
 interface MountableRouter { fetch, routes }
 interface NativeDependency { name, reason }
 interface NotPolicyExpression { kind, operand }
-interface NumberProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, enum, excludeFromApi, isId, metadata, name, propertyConfig, type, validation }
+interface NumberProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, enum, excludeFromApi, isId, metadata, name, precision, propertyConfig, scale, type, validation }
 interface NumberPropertyValidationSchema { integer, lessThan, max, min, moreThan, negative, positive, required, requiredMessage, unique, uniqueInArray }
 interface OrPolicyExpression { kind, operands }
 interface OuterFieldPolicyOperand { kind, name }
 interface OwnerSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface PageWalkOptions { cursor, maxPages, pageSize }
-interface PaginationMeta { hasMore, limit, offset, total }
+interface PaginationMeta { hasMore, limit, nextCursor, offset, total }
 interface PostgresCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, strictWrites, table }
 interface PostgresPolicy { cmd, permissive, policyname, qual, roles, status, tablename, with_check }
 interface PropertyConditions { acceptedFiles, allowedEnumValues, canAddElements, clearOnDisabled, defaultValue, disabled, disabledMessage, enumConditions, excludedEnumValues, hidden, max, maxFileSize, min, readOnly, referenceFilter, referencePath, required, requiredMessage, sortable }
@@ -678,12 +683,12 @@ interface ResourceDeclaration { engine, key, kind, label, options, transport, us
 interface ResourceGraph { resources, version }
 interface ResourceHandle { engine, key, kind, label, options, toString, transport, usedBy }
 interface ResourceKindSpec { defaultEngine, engines, envBases, envBasesByEngine, implicitDefault, kind, optionKeys, revision }
-interface RestFetchService { aggregate, fetchCollectionForRest, fetchOneForRest }
+interface RestFetchService { aggregate, cursorFor, fetchCollectionForRest, fetchOneForRest }
 interface RolesContainPolicyExpression { kind, roles }
 interface RolesOnlySecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface RolesOverlapPolicyExpression { kind, roles }
-interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where, where }
-interface SDKQueryBuilderInterface { count, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
+interface SDKCollectionClient { after, aggregate, count, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where, where }
+interface SDKQueryBuilderInterface { after, aggregate, count, distinct, fields, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
 interface SQLAdmin { executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase }
 interface SaveManyProps { collection, path, rows, upsert }
 interface SaveProps { collection, id, path, previousValues, status, upsert, values }
@@ -691,7 +696,7 @@ interface SchemaAdmin { fetchTableMetadata, fetchUnmappedTables }
 interface SchemaChange { collection, detail, kind, property, remedy, verdict }
 interface SchemaChangeFile { contents, path }
 interface SchemaChangePlan { classified, files, message, statements, withheldConstraints }
-interface SchemaCommitPaths { ddlFile, policiesFile, schemaFile, searchFile, vectorFile }
+interface SchemaCommitPaths { ddlFile, policiesFile, schemaFile, searchFile, triggersFile, vectorFile }
 interface SchemaEditingAdmin { planSchemaChange }
 interface SearchConfig { column, fields, fuzzy, fuzzyThreshold, language, unaccent }
 interface SearchField { path, weight }
@@ -745,6 +750,8 @@ interface WriteOptions { idempotencyKey }
 type AdminCollectionKey
 type AdminPropertyKey
 type AfterSaveErrorProps
+type AggregateRow
+type AggregateSelect
 type AnyCollectionConfig
 type AuthChangeEvent
 type BackendFactory
@@ -792,6 +799,7 @@ type FirebaseProperties
 type FirebaseProperty
 type HistoryConfig
 type IdOf
+type IncludeSpec
 type IndexPredicate
 type InferCollectionConfigType
 type InferEntityType
@@ -805,6 +813,7 @@ type MongoProperties
 type MongoProperty
 type NoSuchKey { didYouMean, noSuchKey }
 type NonColumnFieldPath
+type NullsPlacement
 type OnAction
 type OrderBySortTuple
 type OrderBySpec
@@ -885,7 +894,7 @@ interface ChannelHistoryEntry { at, event, payload, senderId, seq }
 interface ChannelHistoryResult { latestSeq, messages, retained }
 interface ChannelOptions { history }
 interface ChannelTransport { onChannelMessage, onReconnect, sendMessage }
-interface CollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, observe, observeById, offset, orderBy, search, update, updateMany, vectorSearch, where }
+interface CollectionClient { after, aggregate, count, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, observe, observeById, offset, orderBy, search, update, updateMany, vectorSearch, where }
 interface CookieStorageOptions { domain, maxAge, path, sameSite, secure }
 interface CreateAdminOptions { adminPath }
 interface CreateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
@@ -908,14 +917,14 @@ interface OfflineConfig { crossTab, maxCachedQueriesPerCollection, maxCachedRows
 interface OfflineStatus { lastError, lastSyncedAt, online, pending, syncing }
 interface OfflineStore { clear, deleteCache, dequeue, enqueue, getCache, listCache, listCacheEntries, listQueue, setCache, setCacheMany }
 interface PageWalkOptions { cursor, maxPages, pageSize }
-interface PaginationMeta { hasMore, limit, offset, total }
+interface PaginationMeta { hasMore, limit, nextCursor, offset, total }
 interface PendingMutation { attempts, collection, data, generatedId, id, ids, lastError, mutationId, queuedAt, rollback, type, updates, upsert }
 interface PresenceDiff { joins, leaves }
 interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, headers, onUnauthorized, realtime, schemaVersion, storageUrlOrigin, token, websocketUrl }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
 interface RowSnapshotMeta { fromCache, hasPendingWrites }
-interface SDKCollectionClient { count, create, createMany, delete, deleteMany, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where, where }
-interface SDKQueryBuilderInterface { count, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
+interface SDKCollectionClient { after, aggregate, count, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, offset, orderBy, search, update, updateMany, vectorSearch, where, where, where }
+interface SDKQueryBuilderInterface { after, aggregate, count, distinct, fields, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
 interface UpdateApiKeyRequest { admin, expires_at, name, permissions, rate_limit }
 type AuthChangeEvent
 type AuthConfig
@@ -932,6 +941,9 @@ type User { createdAt, displayName, email, emailVerified, getIdToken, isAnonymou
 
 ## @rebasepro/common
 class CollectionRegistry { get, getCollectionByPath, getCollections, getGlobalCallbacks, getRaw, getRawCollections, normalizeCollection, register, registerMultiple, reset, resolvePathToCollections, setDataSources, setGlobalCallbacks }
+class CursorError { code }
+class CursorMismatchError { code }
+class IncludeSpecError { code }
 class OrderBySpecError { code }
 class QueryBuilder { find, include, limit, listen, offset, orderBy, search, vectorSearch, where }
 class RebasePaginationError { code }
@@ -953,6 +965,7 @@ const REBASE_INTERNAL_TABLES
 const REBASE_USER_ROLE
 const buildPropertyCallbacks
 const defaultUsersCollection { auth, callbacks, childCollections, dataSource, databaseId, description, disableDefaultPolicies, engine, history, indexes, metadata, name, ownerId, properties, relations, schema, search, securityRules, singularName, slug, strictWrites, table }
+function aggregateAlias
 function and
 function buildCollectionFromTableMetadata
 function buildCompositeId
@@ -973,13 +986,18 @@ function createDataSourceRegistry
 function createPaginationHelpers { findAll, iterate }
 function createRelationRef
 function createRelationRefWithData
+function cursorToStartAfter
+function decodeCursor
 function defineCollection
+function denormalizeInclude
 function deserializeFilter
+function deserializeInclude
 function deserializeLogicalCondition
 function deserializeOrderBy
 function deserializeOrderByList
 function detectJunctionTables
 function embedParentExpression
+function encodeCursor
 function enumToObjectEntries
 function evaluateCondition
 function evaluatePolicy
@@ -1010,14 +1028,17 @@ function getRelationTargetPath
 function getSubcollections
 function getTableName
 function getTableVarName
+function includePaths
 function isAddressableId
 function isJunctionBackedRelation
 function isPropertyBuilder
 function isRebaseInternalTable
 function isRelationRequired
 function isRelationalCollection
+function mergeIncludeSpecs
 function normalizeDriverOrderBy
 function normalizeEmail
+function normalizeInclude
 function normalizeOrderBy
 function normalizeToEntityRelation
 function or
@@ -1026,6 +1047,7 @@ function parseIdValues
 function parseOrderBySpecStrict
 function policyToPostgres
 function primaryOrderBy
+function reconcileCursorOrder
 function registerConditionOperations
 function relationDeclaringProperty
 function relationalCollections
@@ -1051,6 +1073,7 @@ function sanitizeData
 function securityRuleToConditions
 function segmentsToStrippedPath
 function serializeFilter
+function serializeInclude
 function serializeLogicalCondition
 function serializeOrderBy
 function sortCollectionsBySlug
@@ -1059,6 +1082,7 @@ function sqlToPolicy
 function stripCollectionPath
 function toCallbackError
 function toFilterTuples
+function topLevelIncludeNames
 function traverseValueProperty
 function traverseValuesProperties
 function updateDateAutoValues
@@ -1067,11 +1091,14 @@ function wrapAsSdkData
 interface AnonymousGrantRisk { detail, explanation, pattern }
 interface CheckOperationOptions { clauses, onUnknown }
 interface DataSourceResolvable { dataSource, databaseId, engine }
+interface DecodedCursor { id, orderBy, values }
 interface EntityDataOptions { resolveCollection }
+interface IncludeNode { children, fields, limit, logical, orderBy, where }
 interface IntrospectedCollection { name, properties, propertiesOrder, relations, securityRules, slug, table }
 interface JunctionDeclaringSide { collection, junctionColumn, relation }
 interface JunctionEndpoint { collection, junctionColumn }
 interface JunctionSpec { declaringSides, endpoints, schema, table }
+interface NormalizedInclude { tree, wildcard }
 interface PolicyCompileOptions { resolveCollection }
 interface PolicyEvalContext { entity, isAnonymous, roles, uid }
 interface PrimaryKeyInfo { fieldName, isUUID, type }

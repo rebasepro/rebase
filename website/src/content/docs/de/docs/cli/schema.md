@@ -1,5 +1,5 @@
 ---
-sourceHash: 4e456b0d449b82c5
+sourceHash: fe1edb8bd07dfdd0
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus Collection-Definitionen, erstellen Sie SQL-Migrationen und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.

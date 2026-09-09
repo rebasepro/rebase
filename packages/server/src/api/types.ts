@@ -4,7 +4,8 @@
 // for a runtime with no Node built-ins. A value import of `@rebasepro/types`
 // would drag that package's whole runtime graph into an edge bundle for the
 // sake of two interfaces. See `functions/portability.test.ts`.
-import type { VectorSearchParams, LogicalCondition, FilterValues, DataDriver } from "@rebasepro/types";
+import type { VectorSearchParams, IncludeSpec, LogicalCondition, FilterValues, NullsPlacement, DataDriver } from "@rebasepro/types";
+import type { DecodedCursor } from "@rebasepro/common";
 import type { AuthResult } from "../auth/middleware";
 import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
 
@@ -107,10 +108,33 @@ export interface QueryOptions {
     offset?: number;
     where?: FilterValues<string>;
     logical?: LogicalCondition;
-    orderBy?: Array<{ field: string; direction: "asc" | "desc" }>;
-    include?: string[];
-    /** Columns to return in the response (field-level selection) */
+    orderBy?: Array<{ field: string; direction: "asc" | "desc"; nulls?: NullsPlacement }>;
+    /**
+     * Relations to load — names, dotted paths, or the parametrised tree.
+     * See {@link IncludeSpec}.
+     */
+    include?: IncludeSpec;
+    /**
+     * Columns to return. A projection pushed into the SELECT, not a trim of
+     * the response — see `FindParams.fields`.
+     */
     fields?: string[];
+    /** `SELECT DISTINCT` over the projection. */
+    distinct?: boolean;
+    /**
+     * The decoded `?after=` cursor, and the sort it was produced under.
+     *
+     * Decoded at the parser rather than at the route so a malformed cursor is
+     * one 400 in one place, and so the `orderBy` a cursor implies is settled
+     * before any route reads it.
+     */
+    cursor?: DecodedCursor;
     /** Vector similarity search configuration */
     vectorSearch?: VectorSearchParams;
+    /**
+     * From `?deleted=include|only`. See `FetchCollectionProps.withDeleted` —
+     * unset hides the rows a soft delete has stamped, which is the default and
+     * the point of the feature.
+     */
+    withDeleted?: boolean | "only";
 }

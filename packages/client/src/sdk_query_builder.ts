@@ -12,11 +12,15 @@ import {
     WhereFilterOp,
     WhereValueFor,
     sortKeyToString,
+    type AggregateParams,
+    type AggregateRow,
     type ComputedSortField,
     type FieldPath,
-    type NonColumnFieldPath
+    type IncludeSpec,
+    type NonColumnFieldPath,
+    type NullsPlacement
 } from "@rebasepro/types";
-import { normalizeOrderBy } from "@rebasepro/common";
+import { mergeIncludeSpecs, normalizeOrderBy } from "@rebasepro/common";
 
 /**
  * SDK Query Builder — returns flat rows (`FindResult<M>`) instead of
@@ -98,11 +102,24 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * `.orderBy("roles").orderBy("created_at", "desc")` sorts by role and
      * shows the newest first within each one.
      */
-    orderBy(column: FieldPath<M> | ComputedSortField | RelationAggregateSort, direction: "asc" | "desc" = "asc"): this {
+    orderBy(
+        column: FieldPath<M> | ComputedSortField | RelationAggregateSort,
+        direction: "asc" | "desc" = "asc",
+        /**
+         * Where this key's NULLs go. Omitted means the direction's own
+         * convention — last ascending, first descending — which is what put
+         * every undated row at the top of a `.orderBy("published_at", "desc")`
+         * list, ahead of everything real.
+         */
+        nulls?: NullsPlacement
+    ): this {
         const existing = normalizeOrderBy(this.params.orderBy) ?? [];
         // `sortKeyToString` encodes a relation aggregate — `count(applications)`
         // — which is the single-string form every layer below here speaks.
-        this.params.orderBy = [...existing, [sortKeyToString(column), direction] as OrderByTuple];
+        const key = sortKeyToString(column);
+        this.params.orderBy = [...existing, (nulls
+            ? [key, direction, nulls]
+            : [key, direction]) as OrderByTuple];
         return this;
     }
 
@@ -182,15 +199,77 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
     }
 
     /**
-     * Include related entities in the response.
-     * Relations will be populated with full data instead of just IDs.
+     * Load related rows into the response, in place of their foreign keys.
      *
-     * @param relations - Relation names to include, or "*" for all.
-     * @example
-     * client.data.posts.include("tags", "author").find()
+     * Three spellings, all the same request:
+     *
+     * ```ts
+     * client.data.posts.include("tags", "author")            // names
+     * client.data.posts.include("comments.author")           // a dotted path
+     * client.data.posts.include({                            // parametrised
+     *     comments: {
+     *         limit: 5,
+     *         where: { published: ["==", true] },
+     *         orderBy: ["created_at", "desc"],
+     *         include: { author: true }
+     *     }
+     * })
+     * ```
+     *
+     * Up to three hops deep, and `"*"` still loads every relation one hop
+     * deep. A name that is not a relation of the collection is a 400
+     * `UNKNOWN_RELATION` — it used to be ignored, which answers 200 with the
+     * field missing and reads exactly like a row that has no related row.
+     *
+     * Repeated calls **merge**: `.include("author").include("tags")` asks for
+     * both. Assigning here — which is what it used to do — meant the second
+     * call silently discarded the first.
      */
-    include(...relations: string[]): this {
-        this.params.include = relations;
+    include(...relations: (string | IncludeSpec)[]): this {
+        this.params.include = mergeIncludeSpecs(this.params.include, relations);
+        return this;
+    }
+
+    /**
+     * Return only these columns.
+     *
+     * A projection at the database, not a trim of the response: a query that
+     * needs two fields of a wide row reads two columns. The primary key always
+     * comes back regardless — a row that cannot be addressed cannot be
+     * updated, deleted or paged past — and `excludeFromApi` columns stay
+     * hidden whether or not they are named.
+     */
+    fields(...columns: (FieldPath<M> | string)[]): this {
+        this.params.fields = [...(this.params.fields ?? []), ...columns as string[]];
+        return this;
+    }
+
+    /**
+     * Collapse rows that are identical over the columns being returned.
+     *
+     * Only meaningful alongside {@link fields}: the primary key is always in
+     * the projection, so without narrowing it every row is already distinct.
+     *
+     * ```ts
+     * client.data.posts.fields("status").distinct().find()   // the statuses in use
+     * ```
+     */
+    distinct(enabled = true): this {
+        this.params.distinct = enabled;
+        return this;
+    }
+
+    /**
+     * Continue after a previous page's `meta.nextCursor` — keyset paging.
+     *
+     * Unlike `offset`, a row inserted or deleted before the cursor cannot
+     * shift the window, so a walk neither repeats nor skips rows. Keep
+     * `orderBy` identical across pages: a cursor only continues the listing it
+     * came from, and one used against a different sort is refused rather than
+     * seeked in an order nobody asked for.
+     */
+    after(cursor: string): this {
+        this.params.after = cursor;
         return this;
     }
 
@@ -199,6 +278,32 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      */
     async find(): Promise<FindResult<M>> {
         return this.collection.find(this.params as FindParams<M>);
+    }
+
+    /**
+     * Aggregate the rows this query matches instead of returning them.
+     *
+     * The builder's `where`/`logical`/`search` narrow which rows are
+     * aggregated; its `orderBy`, `include` and window do not apply — an
+     * aggregate has no rows to sort, no relations to load and no page to
+     * continue.
+     *
+     * ```ts
+     * await client.data.orders
+     *     .where("created_at", ">=", startOfMonth)
+     *     .aggregate({ select: [{ fn: "sum", field: "total" }], groupBy: ["status"] });
+     * // [{ status: "paid", sum_total: 41822.5 }, …]
+     * ```
+     */
+    async aggregate(
+        params: Omit<AggregateParams<M>, "where" | "logical" | "searchString">
+    ): Promise<AggregateRow[]> {
+        return this.collection.aggregate({
+            ...params,
+            where: this.params.where as AggregateParams<M>["where"],
+            logical: this.params.logical,
+            searchString: this.params.searchString
+        });
     }
 
     /**

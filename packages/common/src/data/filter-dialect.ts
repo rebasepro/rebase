@@ -27,6 +27,7 @@ import {
     toCanonicalOp,
     LogicalCondition,
     FilterCondition,
+    LIST_OPS,
     NULL_OPS
 } from "@rebasepro/types";
 import { normalizeToEntityRelation } from "../util/entities";
@@ -540,15 +541,62 @@ export function serializeFilter(
 // ---------------------------------------------------------------------------
 
 /**
+ * The spellings a null-testing operator's operand may take.
+ *
+ * The serializer writes `isnull.null`; a hand-written `isnull.true` means the
+ * same thing and has always been accepted. Anything else after the operator is
+ * not an operand it has — `notnull.reason` is a *value* — see
+ * {@link deserializeSingle}.
+ */
+const NULL_OPERANDS: ReadonlySet<string> = new Set(["null", "true", "false", ""]);
+
+/**
  * Parse a single PostgREST dot-string into a `[WhereFilterOp, unknown]` tuple.
  *
  * All values are returned as strings — the wire format carries no type
  * metadata, so coercion is the data driver's responsibility.
  *
- * If the string doesn't match a known operator prefix, it falls back to
- * `["==", originalString]` (treating the whole string as an equality value).
- * This intentional defense handles values like `"user@host.com"` or
- * `"1.2.3"` that happen to contain dots.
+ * ## When a leading segment is an operator, and when it is part of the value
+ *
+ * `?status=in.progress` and `?status=in.(a,b)` differ by one character and mean
+ * entirely different things, and the reading here decides which. The rule, in
+ * full:
+ *
+ * > A dot-string is read as `operator.operand` **only** when its first segment
+ * > names a known REST operator **and** what follows is a well-formed operand
+ * > *for that operator's arity*. Otherwise the whole string is the value.
+ *
+ * Arity, per operator family:
+ *
+ * - **List** operators (`in`, `nin`, `csa` — `LIST_OPS`) take a parenthesised
+ *   list and nothing else. `in.(draft,review)` is the operator; `in.progress`
+ *   is the *value* `"in.progress"`, because there is no list there and so no
+ *   `in` filter that could have been written. That case used to compile to
+ *   `status IN ('progress')` — a filter the caller never wrote, quietly
+ *   matching the wrong rows and, on a status field, hiding every row they were
+ *   looking for.
+ * - **Null** operators (`isnull`, `notnull` — {@link NULL_OPS}) take no
+ *   operand: only {@link NULL_OPERANDS}. `notnull.reason` is the value
+ *   `"notnull.reason"`, not "reason is not null".
+ * - **Everything else** takes one scalar, and any remainder is one — including
+ *   the empty string, so `eq.` really is "equals the empty string".
+ *
+ * ### The one ambiguity that remains, and how to write past it
+ *
+ * A scalar operator's operand is unconstrained, so `?status=like.that` is a
+ * `LIKE 'that'` and no rule at this layer can tell it from the literal value
+ * `"like.that"` — both are well-formed encodings, and picking either by guess
+ * would break the other. Two spellings say "value" unambiguously, and both
+ * round-trip:
+ *
+ * - `?status=eq.like.that` — name the operator. The *first* segment is consumed
+ *   as the operator and everything after it is the value, dots and all. This is
+ *   what `serializeFilter` emits, which is why the SDK never meets the
+ *   ambiguity at all.
+ * - `?where={"status":["==","like.that"]}` — the JSON dialect's tuple form.
+ *
+ * Values that merely *contain* dots (`user@host.com`, `1.2.3`) were never
+ * ambiguous: their first segment names no operator to begin with.
  */
 function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
     const dotIndex = raw.indexOf(".");
@@ -573,6 +621,9 @@ function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
     // Null-testing operators ignore their serialized value — normalize to null
     // so the tuple round-trips stably (`isnull.null` → ["is-null", null]).
     if (NULL_OPS.has(canonicalOp)) {
+        // ...but only when what follows is an operand this operator has. See
+        // the docblock: `notnull.reason` names no null test, so it is a value.
+        if (!NULL_OPERANDS.has(rest)) return ["==", raw];
         return [canonicalOp, null];
     }
 
@@ -584,6 +635,11 @@ function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
         const items = inner === EMPTY_LIST_TOKEN ? [] : splitListItems(inner);
         return [canonicalOp, items];
     }
+
+    // A list operator with no list is not that operator — see the docblock.
+    // `?status=in.progress` is the value "in.progress"; the `in` filter it used
+    // to compile to was never written by anyone.
+    if (LIST_OPS.has(canonicalOp)) return ["==", raw];
 
     return [canonicalOp, rest];
 }
@@ -803,10 +859,10 @@ export function deserializeLogicalCondition(
             "Flatten the condition — `or(a,or(b,c))` is `or(a,b,c)`."
         );
     }
-    // Check for logical group: "and(...)" or "or(...)"
-    const logicalMatch = str.match(/^(and|or)\((.+)\)$/);
+    // Check for logical group: "and(...)", "or(...)" or "not(...)"
+    const logicalMatch = str.match(/^(and|or|not)\((.+)\)$/);
     if (logicalMatch) {
-        const type = logicalMatch[1] as "and" | "or";
+        const type = logicalMatch[1] as "and" | "or" | "not";
         const innerStr = logicalMatch[2];
 
         const conditions = splitGroupItems(innerStr)

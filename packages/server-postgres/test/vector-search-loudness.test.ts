@@ -34,6 +34,12 @@ jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
         fetchCollection: jest.fn().mockResolvedValue([]),
         fetchOne: jest.fn().mockResolvedValue(null),
+        // The refetch reads through the REST pipeline and counts beside the
+        // rows, so a stub of `DataService` needs both.
+        fetchCollectionForRest: jest.fn().mockResolvedValue([]),
+        fetchOneForRest: jest.fn().mockResolvedValue(null),
+        count: jest.fn().mockResolvedValue(0),
+        cursorFor: jest.fn().mockReturnValue(undefined),
         searchRows: jest.fn().mockResolvedValue([])
     }))
 }));

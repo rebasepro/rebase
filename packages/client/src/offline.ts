@@ -1,9 +1,10 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
-import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, isUnsupported } from "@rebasepro/types";
+import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
 import { collectAllPages, paginateFind } from "@rebasepro/common";
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
 import { dehydrateRow, hydrateRow } from "./offline-codec";
+import { RebaseClientError } from "./errors";
 import {
     ConnectivityMonitor,
     isDuplicateKeyError,
@@ -575,7 +576,10 @@ export class OfflineManager {
                 return row;
             },
 
-            createMany: async (data: Partial<M>[], options?: { upsert?: boolean }) => {
+            createMany: async (
+                data: Partial<M>[],
+                options?: { upsert?: boolean; onConflict?: readonly string[] } & WriteOptions
+            ) => {
                 await this.ensureCollection(slug);
                 if (!Array.isArray(data)) {
                     throw new TypeError("createMany expects an array of records.");
@@ -615,7 +619,58 @@ export class OfflineManager {
                 return rows;
             },
 
-            updateMany: async (updates: { id: string | number; data: Partial<M> }[], options?: WriteOptions) => {
+            /**
+             * Upsert, with the one case that cannot be resolved without the
+             * server refused rather than guessed.
+             *
+             * On the primary key an upsert is create-or-replace, which the
+             * local store can do and the queue already carries (`createMany`
+             * with `upsert`). On a natural key it is not: deciding whether a
+             * row with that email exists means an index this store does not
+             * keep, and inventing an id would insert a duplicate the moment the
+             * queue drains — the exact outcome upsert exists to prevent.
+             */
+            upsert: async (data: Partial<M>, options?: UpsertOptions) => {
+                await this.ensureCollection(slug);
+                if (this.connectivity.shouldAttempt()) {
+                    try {
+                        const row = await inner.upsert(data, options);
+                        this.connectivity.markSuccess();
+                        await this.ingest(slug, [row]);
+                        this.notifyCollection(slug);
+                        this.scheduleRefresh(slug);
+                        return row;
+                    } catch (error) {
+                        if (!isNetworkError(error)) throw error;
+                        this.connectivity.markFailure();
+                    }
+                }
+                const rowId = (data as AnyRow).id as string | number | undefined;
+                if (options?.onConflict?.length || rowId === undefined) {
+                    throw new RebaseClientError(
+                        `Cannot upsert into "${slug}" while offline: the row it would replace can only be ` +
+                        "found by the server. Upserting on the primary key, with the key in the row, is " +
+                        "queued; upserting on a natural key is not.",
+                        { code: "OFFLINE_UPSERT_UNSUPPORTED" }
+                    );
+                }
+                const row = { ...(data as AnyRow), id: rowId } as unknown as M;
+                await this.enqueue({
+                    collection: slug,
+                    type: "createMany",
+                    data: [row],
+                    upsert: true,
+                    rollback: { rows: { [String(rowId)]: this.rawLocalRow(slug, rowId) ?? null } }
+                });
+                this.setLocalRow(slug, rowId, row);
+                this.notifyCollection(slug);
+                return row;
+            },
+
+            updateMany: async (
+                updates: { id: string | number; data: Partial<M> | UpdateValues<Partial<M>> }[],
+                options?: WriteOptions
+            ) => {
                 await this.ensureCollection(slug);
                 if (!Array.isArray(updates)) {
                     throw new TypeError("updateMany expects an array of { id, data } entries.");
@@ -692,7 +747,11 @@ data: u.data as AnyRow })),
                 this.notifyCollection(slug);
             },
 
-            update: async (id: string | number, data: Partial<M>) => {
+            update: async (
+                id: string | number,
+                data: Partial<M> | UpdateValues<Partial<M>>,
+                options?: WriteOptions
+            ) => {
                 await this.ensureCollection(slug);
                 // Never overtake a write already queued for this row. The
                 // reads already respect the queue; the writes did not, so an
@@ -702,7 +761,7 @@ data: u.data as AnyRow })),
                 // Queuing keeps the order the app issued the writes in.
                 if (this.connectivity.shouldAttempt() && !this.hasPending(slug, id)) {
                     try {
-                        const row = await inner.update(id, data);
+                        const row = await inner.update(id, data, options);
                         this.connectivity.markSuccess();
                         await this.ingest(slug, [row]);
                         this.notifyCollection(slug);
@@ -711,6 +770,20 @@ data: u.data as AnyRow })),
                         if (!isNetworkError(error)) throw error;
                         this.connectivity.markFailure();
                     }
+                }
+                // A field operation is an expression over the *stored* value,
+                // and the point of it is that the server evaluates it under the
+                // row lock. Queuing it would be correct on arrival and wrong on
+                // screen in the meantime: the optimistic row below can only
+                // spread the marker object into the column, so a UI showing
+                // `views` would render `{ $inc: 1 }` until the queue drained.
+                if (hasFieldOperation(data as Record<string, unknown>)) {
+                    throw new RebaseClientError(
+                        `Cannot apply a field operation to "${slug}" while offline: it is evaluated ` +
+                        "against the stored value, which this device does not have a current copy of. " +
+                        "Send the value itself, or retry when the connection is back.",
+                        { code: "OFFLINE_FIELD_OP_UNSUPPORTED" }
+                    );
                 }
                 const base = this.rawLocalRow(slug, id);
                 await this.enqueue({
@@ -726,14 +799,14 @@ data: u.data as AnyRow })),
                 return optimistic;
             },
 
-            delete: async (id: string | number) => {
+            delete: async (id: string | number, options?: WriteOptions) => {
                 await this.ensureCollection(slug);
                 // As in `update`: a delete must not overtake this row's own
                 // queued create, or it 404s and the create then lands behind
                 // it, leaving the row the caller just deleted.
                 if (this.connectivity.shouldAttempt() && !this.hasPending(slug, id)) {
                     try {
-                        await inner.delete(id);
+                        await inner.delete(id, options);
                         this.connectivity.markSuccess();
                         this.removeLocalRow(slug, id, true);
                         this.notifyCollection(slug);
@@ -801,12 +874,21 @@ data: u.data as AnyRow })),
                     value as WhereValueFor<WhereFilterOp, M[keyof M & string]>
                 );
             },
-            orderBy: (column, direction) => new SDKQueryBuilder<M>(wrapped).orderBy(column, direction),
+            orderBy: (column, direction, nulls) => new SDKQueryBuilder<M>(wrapped).orderBy(column, direction, nulls),
             limit: (count) => new SDKQueryBuilder<M>(wrapped).limit(count),
             offset: (count) => new SDKQueryBuilder<M>(wrapped).offset(count),
             search: (searchString, options) => new SDKQueryBuilder<M>(wrapped).search(searchString, options),
             vectorSearch: (property, vector, options) => new SDKQueryBuilder<M>(wrapped).vectorSearch(property, vector, options),
             include: (...relations) => new SDKQueryBuilder<M>(wrapped).include(...relations),
+            fields: (...columns) => new SDKQueryBuilder<M>(wrapped).fields(...columns),
+            distinct: (enabled) => new SDKQueryBuilder<M>(wrapped).distinct(enabled),
+            after: (cursor) => new SDKQueryBuilder<M>(wrapped).after(cursor),
+
+            // Straight through to the server. An aggregate is a reduction over
+            // rows the cache does not necessarily hold, and answering one from
+            // a subset is a number that looks exactly like the right number —
+            // the same reason a vector search is not answered locally.
+            aggregate: inner.aggregate,
 
             // Carried over as-is when the inner client cannot listen, so the
             // wrapper does not turn "realtime is off on this client" into

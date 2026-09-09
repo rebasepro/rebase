@@ -3,18 +3,24 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { CollectionConfig, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
 
+// The realtime refetch reads through the REST pipeline — the same method the
+// HTTP list route calls — so a subscription and a `find()` answer one query
+// with one row shape. It used to call `fetchCollection`, which renders the
+// admin's view model and eagerly loads every relation regardless of `include`.
 const mockFetchCollection = jest.fn().mockResolvedValue([{ id: 1,
-path: "posts",
-values: { title: "Refetched Title" } }]);
+title: "Refetched Title" }]);
 const mockFetchEntity = jest.fn().mockResolvedValue({ id: 1,
-path: "posts",
-values: { title: "Refetched Entity Title" } });
+title: "Refetched Entity Title" });
+const mockCount = jest.fn().mockResolvedValue(1);
 
 jest.mock("../src/services/dataService", () => ({
     DataService: jest.fn().mockImplementation(() => ({
-        fetchCollection: mockFetchCollection,
-        fetchOne: mockFetchEntity,
-        searchRows: jest.fn().mockResolvedValue([])
+        fetchCollectionForRest: mockFetchCollection,
+        fetchOneForRest: mockFetchEntity,
+        // The frame carries `meta` now, so the refetch counts beside the rows
+        // instead of leaving the client to issue a `/count` per push.
+        count: mockCount,
+        cursorFor: jest.fn().mockReturnValue(undefined)
     }))
 }));
 
@@ -148,7 +154,8 @@ subscriptionId: "sub-1" }
 
             expect(mockFetchCollection).toHaveBeenCalledWith(
                 "posts",
-                expect.objectContaining({ limit: DEFAULT_LIST_LIMIT })
+                expect.objectContaining({ limit: DEFAULT_LIST_LIMIT }),
+                undefined
             );
             const stored = realtimeService.subscriptions.get("sub-1");
             expect(stored.collectionRequest.limit).toBe(DEFAULT_LIST_LIMIT);
@@ -173,7 +180,8 @@ subscriptionId: "sub-1" }
             // Without this a live list on page three served page one.
             expect(mockFetchCollection).toHaveBeenCalledWith(
                 "posts",
-                expect.objectContaining({ offset: 20 })
+                expect.objectContaining({ offset: 20 }),
+                undefined
             );
             const stored = realtimeService.subscriptions.get("sub-1");
             expect(stored.collectionRequest.offset).toBe(20);
@@ -201,7 +209,8 @@ subscriptionId: "sub-1" }
             // for.
             expect(mockFetchCollection).toHaveBeenCalledWith(
                 "posts",
-                expect.objectContaining({ logical })
+                expect.objectContaining({ logical }),
+                undefined
             );
             const stored = realtimeService.subscriptions.get("sub-1");
             expect(stored.collectionRequest.logical).toEqual(logical);
@@ -243,7 +252,10 @@ subscriptionId: "sub-1" }
 
             expect(parsed.type).toBe("collection_update");
             expect(parsed.subscriptionId).toBe("sub-1");
-            expect(parsed.rows[0].values.title).toBe("Refetched Title");
+            // A flat row, not a `{ id, path, values }` view model: the refetch reads
+            // through the REST pipeline, so a subscriber and a `find()` see the
+            // same shape.
+            expect(parsed.rows[0].title).toBe("Refetched Title");
         });
 
         /**
@@ -317,7 +329,7 @@ subscriptionId: "sub-2" }
             await Promise.resolve();
 
             // It should fetch the single row
-            expect(mockFetchEntity).toHaveBeenCalledWith("posts", "1", undefined);
+            expect(mockFetchEntity).toHaveBeenCalledWith("posts", "1", undefined, undefined);
 
             // It should send row update
             expect(ws.send).toHaveBeenCalled();
@@ -326,7 +338,9 @@ subscriptionId: "sub-2" }
 
             expect(parsed.type).toBe("single_update");
             expect(parsed.subscriptionId).toBe("sub-2");
-            expect(parsed.row.values.title).toBe("Refetched Entity Title");
+            // Flat, for the same reason the collection frame is: `listenById()`
+            // and `findById()` are the same read.
+            expect(parsed.row.title).toBe("Refetched Entity Title");
         });
 
         /**

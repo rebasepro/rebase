@@ -56,24 +56,55 @@ listen(
 ```
 
 `FindResult<M>` is the same shape `find()` returns: flat rows in `data`, and
-`{ total, limit, offset, hasMore }` in `meta`.
+`{ total, limit, offset, hasMore, nextCursor }` in `meta`.
+
+### `listen()` takes what `find()` takes
+
+`params` is a full `FindParams`. A subscription is the same query as the
+`find()` beside it, so it accepts the same narrowing — `where`, `logical`,
+`orderBy`, `limit`, `offset`/`page`, `searchString`, **`include`** and
+**`fields`**:
+
+```typescript
+client.data.posts.listen(
+    { where: { status: ["==", "published"] }, include: ["author"], limit: 20 },
+    (result) => render(result.data)   // each row carries its author
+);
+```
+
+That matters more than it sounds. `include` and `fields` used to be silently
+dropped here, so the same query answered in one shape through `find()` and
+another through `listen()` — and a component rendering both saw its rows change
+shape the moment a write landed. They now go through the identical read
+pipeline, so `find({ q })` and `listen({ q })` return rows that are equal field
+for field.
+
+The exception is `vectorSearch`, which is **refused** rather than dropped: a
+subscription is re-run on every matching write and nothing there computes
+distances. Use `.vectorSearch(…).find()` for the query and subscribe without it.
 
 ### One emission per change
 
 Each server push calls your callback **once**, with metadata that describes the
-rows beside it. There is no separate first-paint emission and no flag to check:
+rows beside it. There is no separate first-paint emission and no flag to check.
 
-- A `count()` runs for the query before the emission, so `meta.total` and
-  `meta.hasMore` are authoritative.
-- If a push arrives while that count is still in flight, the older emission is
-  dropped — you are never called back with a total belonging to a previous page.
-- If the count **fails**, the last total a count actually returned is reused. A
-  failed count says nothing about how big the collection is, so it must not be
-  allowed to overwrite a real answer. This is not a subscription error, and
-  `onError` is not called.
-- If no count has ever succeeded for this subscription, `meta.total` is a
-  **lower bound** — the rows on this page plus the ones paged past to reach
-  them — and `meta.hasMore` is `true` when the page came back full.
+The metadata arrives **in the same frame as the rows**: the server counts the
+query inside the same row-level-security-bound transaction that read them, so
+`meta.total`, `meta.hasMore` and `meta.nextCursor` describe exactly the rows
+next to them. (Every push used to be followed by a `GET /count` from the client
+— one extra round trip per write, per subscriber, and a window in which the
+count and the rows described different states of the collection.)
+
+Two fallbacks, neither of them a subscription error and neither calling
+`onError`:
+
+- If the server's **count failed**, the frame carries no total and the last one
+  that did arrive is reused. A failed count says nothing about how big the
+  collection is, so it must not overwrite a real answer.
+- If no total has ever arrived for this subscription — an older server that
+  sends no metadata at all — the client asks once, on the first push. If that
+  also fails, `meta.total` is a **lower bound**: the rows on this page plus the
+  ones paged past to reach them.
 
 ```typescript
 client.data.products.listen(

@@ -17,12 +17,16 @@ import {
     RebaseData,
     RebaseSdkData,
     RestFetchService,
+    BatchWriteProps,
     SaveManyProps,
     SaveProps,
     StorageSource,
     UpdateManyProps,
     DeleteManyProps,
     EntityValues,
+    EntityStatus,
+    Properties,
+    Property,
     TableColumnInfo,
     TableForeignKeyInfo,
     TableJunctionInfo,
@@ -31,14 +35,16 @@ import {
     User
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
-import { buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, resolveCollectionRelations, toCallbackError, updateDateAutoValues } from "@rebasepro/common";
+import { applyDefaultValuesOnCreate, buildPropertyCallbacks, buildSdkData, callbackRefusal, classifyTable, detectJunctionTables, resolveCollectionRelations, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress } from "./services/collection-helpers";
+import { resolveSoftDelete } from "./services/soft-delete";
 import { HistoryService } from "./history/HistoryService";
 import { mergeDeep } from "@rebasepro/utils";
-import { logger } from "@rebasepro/server";
+import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { isRoleSwitchingPermissionError } from "./utils/pg-error-utils";
 import { applyAuthContext } from "./security/rls-enforcement";
+import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
 
@@ -100,6 +106,46 @@ export class RoleSwitchUnavailableError extends Error {
         this.name = "RoleSwitchUnavailableError";
         this.role = role;
         this.pgError = pgError;
+    }
+}
+
+/**
+ * Refuse a write that would leave a *required* `created_by` / `updated_by`
+ * column null because nobody is acting.
+ *
+ * A `user_on_create` column takes the uid from the call context, and an
+ * anonymous request, a service token and an in-process write all have none.
+ * Storing `null` is the right answer where the column allows it — plenty of
+ * rows are legitimately written by the server. Where the collection has said
+ * `required`, it is not: that declaration means "a row must record who made
+ * it", and a write that cannot answer the question is a write this collection
+ * does not accept. Better a 400 naming the field than a 23502 naming the
+ * column, three layers down, after the hooks have run.
+ */
+function assertActingUserForAutoValues(
+    properties: Properties,
+    status: EntityStatus,
+    uid: string | undefined,
+    path: string
+): void {
+    if (uid) return;
+    for (const [key, property] of Object.entries(properties)) {
+        const prop = property as (Property & { autoValue?: string }) | undefined;
+        if (!prop || prop.type !== "string") continue;
+        if (prop.autoValue !== "user_on_create" && prop.autoValue !== "user_on_update") continue;
+        if (!prop.validation?.required) continue;
+        // `user_on_create` says nothing about an update — the column already
+        // holds the creator's uid, and this write is not rewriting it.
+        if (status === "existing" && prop.autoValue === "user_on_create") continue;
+        throw ApiError.badRequest(
+            `'${key}' on '${path}' records the acting user and is required, and this request has none. ` +
+            "Sign in, or drop `required` from the property to let the server write rows anonymously.",
+            "VALIDATION_CONSTRAINT",
+            {
+                collection: path,
+                violations: [{ field: key, code: "required", message: `'${key}' records the acting user, and there is none.` }]
+            }
+        );
     }
 }
 
@@ -249,8 +295,8 @@ export class PostgresBackendDriver implements DataDriver {
                 const rows = await raw.fetchCollectionForRest(collectionPath, options, include);
                 return this.applyAfterReadForRest(rows, collectionPath);
             },
-            fetchOneForRest: async (collectionPath, id, include, databaseId) => {
-                const row = await raw.fetchOneForRest(collectionPath, id, include, databaseId);
+            fetchOneForRest: async (collectionPath, id, include, databaseId, options) => {
+                const row = await raw.fetchOneForRest(collectionPath, id, include, databaseId, options);
                 if (!row) return row;
                 const [masked] = await this.applyAfterReadForRest([row], collectionPath);
                 return masked;
@@ -586,12 +632,14 @@ export class PostgresBackendDriver implements DataDriver {
                                                              path,
                                                              id,
                                                              databaseId,
-                                                             collection
+                                                             collection,
+                                                             withDeleted
                                                          }: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
         let row = await this.dataService.fetchOne<M>(
             path,
             id,
-            databaseId || collection?.databaseId
+            databaseId || collection?.databaseId,
+            withDeleted
         );
 
         const {
@@ -687,7 +735,8 @@ export class PostgresBackendDriver implements DataDriver {
                                                             values,
                                                             collection,
                                                             status,
-                                                            upsert
+                                                            upsert,
+                                                            onConflict
                                                         }: SaveProps<M>): Promise<Record<string, unknown>> {
 
         const {
@@ -699,6 +748,22 @@ export class PostgresBackendDriver implements DataDriver {
 
         let updatedValues = values;
         const contextForCallback = this.buildCallContext();
+
+        // Declared defaults are filled in BEFORE the hooks, not after, so a
+        // `beforeSave` sees the row as it will be stored rather than a version
+        // of it missing every key the caller happened to omit. A hook that
+        // reads `values.currency` to pick a tax rate was reading `undefined`
+        // on exactly the writes the default exists to cover.
+        //
+        // Before validation too: `required` on create is satisfied by a
+        // default, which is why `assertWriteValuesValid` skips a property that
+        // declares one.
+        if ((status === "new" || status === "copy") && resolvedCollection?.properties) {
+            updatedValues = applyDefaultValuesOnCreate<M>(
+                updatedValues,
+                resolvedCollection.properties
+            ) as Partial<EntityValues<M>>;
+        }
 
         // Fetch previous values for callbacks AND history recording. Same walk
         // as the saved row the callbacks receive (`fetchOneForRest`), so
@@ -784,6 +849,22 @@ export class PostgresBackendDriver implements DataDriver {
                 status: status ?? "new",
                 timestampNowValue: new Date()
             });
+            // The identity half of the same idea: `created_by` / `updated_by`
+            // taken from the call context, never from the body. Stamped after
+            // the hooks for the same reason the timestamps are — a hook must
+            // not be able to attribute a write to another user either.
+            assertActingUserForAutoValues(
+                resolvedCollection.properties,
+                status ?? "new",
+                this.user?.uid,
+                path
+            );
+            updatedValues = updateUserAutoValues({
+                inputValues: updatedValues,
+                properties: resolvedCollection.properties,
+                status: status ?? "new",
+                uid: this.user?.uid
+            });
         }
 
         try {
@@ -792,7 +873,7 @@ export class PostgresBackendDriver implements DataDriver {
                 updatedValues,
                 id,
                 resolvedCollection?.databaseId,
-                { upsert }
+                { upsert, onConflict }
             );
 
             if (savedRow && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
@@ -893,9 +974,13 @@ export class PostgresBackendDriver implements DataDriver {
                 throw toCallbackError(callbackError, "afterSave", path);
             }
 
-            // Record row history (fire-and-forget, never blocks the save)
+            // Awaited, inside the write's transaction, so the entry commits with
+            // its row. It used to be dispatched and dropped — the promise was
+            // not held, the service swallowed its own errors — which meant the
+            // audit trail of a collection that opted into one had silent,
+            // unbounded gaps. See `HistoryService.recordHistory` for the trade.
             if (this.historyService && resolvedCollection?.history) {
-                this.historyService.recordHistory({
+                await this.historyService.recordHistory({
                     tableName: path,
                     id: savedId,
                     action: status === "new" ? "create" : "update",
@@ -979,24 +1064,30 @@ export class PostgresBackendDriver implements DataDriver {
      * Rows are applied in order, so a batch that touches the same key twice ends
      * with the last write winning, exactly as separate calls would.
      */
+    private bindToTransaction(tx: DrizzleClient): PostgresBackendDriver {
+        // Bind the whole batch to the transaction handle. Without this the rows
+        // would be written through `this.db` and survive a rollback.
+        const txDriver = new PostgresBackendDriver(
+            tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
+        );
+        txDriver.dataService = new DataService(tx, this.registry);
+        txDriver.client = this.client;
+        // Carry the caller's notification batching through, so a bulk write
+        // nested in an outer transaction still holds its events until commit.
+        txDriver._deferNotifications = this._deferNotifications;
+        txDriver._pendingNotifications = this._pendingNotifications;
+        return txDriver;
+    }
+
     async saveMany<M extends Record<string, unknown>>({
                                                           path,
                                                           rows,
                                                           collection,
-                                                          upsert
+                                                          upsert,
+                                                          onConflict
                                                       }: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
         return this.db.transaction(async (tx) => {
-            // Bind the whole batch to the transaction handle. Without this the
-            // rows would be written through `this.db` and survive a rollback.
-            const txDriver = new PostgresBackendDriver(
-                tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
-            );
-            txDriver.dataService = new DataService(tx, this.registry);
-            txDriver.client = this.client;
-            // Carry the caller's notification batching through, so a bulk write
-            // nested in an outer transaction still holds its events until commit.
-            txDriver._deferNotifications = this._deferNotifications;
-            txDriver._pendingNotifications = this._pendingNotifications;
+            const txDriver = this.bindToTransaction(tx);
 
             const saved: Record<string, unknown>[] = [];
 
@@ -1015,7 +1106,8 @@ export class PostgresBackendDriver implements DataDriver {
                         // Callers who want existing rows overwritten pass `upsert`.
                         collection,
                         status: "new",
-                        upsert
+                        upsert,
+                        onConflict
                     }));
                 } catch (error) {
                     // One bad row in ten thousand is impossible to find from a
@@ -1058,13 +1150,7 @@ export class PostgresBackendDriver implements DataDriver {
         collection
     }: UpdateManyProps<M>): Promise<Record<string, unknown>[]> {
         return this.db.transaction(async (tx) => {
-            const txDriver = new PostgresBackendDriver(
-                tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
-            );
-            txDriver.dataService = new DataService(tx, this.registry);
-            txDriver.client = this.client;
-            txDriver._deferNotifications = this._deferNotifications;
-            txDriver._pendingNotifications = this._pendingNotifications;
+            const txDriver = this.bindToTransaction(tx);
 
             const saved: Record<string, unknown>[] = [];
 
@@ -1125,16 +1211,11 @@ export class PostgresBackendDriver implements DataDriver {
     async deleteMany<M extends Record<string, unknown>>({
         path,
         ids,
-        collection
+        collection,
+        hard
     }: DeleteManyProps<M>): Promise<void> {
         await this.db.transaction(async (tx) => {
-            const txDriver = new PostgresBackendDriver(
-                tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
-            );
-            txDriver.dataService = new DataService(tx, this.registry);
-            txDriver.client = this.client;
-            txDriver._deferNotifications = this._deferNotifications;
-            txDriver._pendingNotifications = this._pendingNotifications;
+            const txDriver = this.bindToTransaction(tx);
 
             for (let i = 0; i < ids.length; i++) {
                 const id = ids[i];
@@ -1160,7 +1241,8 @@ export class PostgresBackendDriver implements DataDriver {
                             path,
                             values: existing as Partial<EntityValues<M>>
                         },
-                        collection
+                        collection,
+                        hard
                     });
                 } catch (error) {
                     throw Object.assign(
@@ -1176,9 +1258,142 @@ export class PostgresBackendDriver implements DataDriver {
         });
     }
 
+    /**
+     * A mixed list of writes across collections, as one unit of work.
+     *
+     * Same transaction, same tx-bound sub-driver and same per-entry error
+     * labelling as {@link saveMany} — deliberately the same plumbing rather
+     * than a second copy of it, because the three ways this could drift
+     * (notifications not deferred, the sub-driver not bound, an error losing
+     * its status) are all silent.
+     *
+     * The one thing this adds is `$ref`. An operation may name itself, and a
+     * later one may stand a `{ "$ref": "order.id" }` where a value goes; the
+     * substitution happens here because inside the transaction is the only
+     * place the row the reference points at exists. Backward references only —
+     * the REST layer refuses a forward one before the transaction opens, so a
+     * body that cannot work never costs a rollback.
+     */
+    async batchWrite<M extends Record<string, unknown>>({
+        operations
+    }: BatchWriteProps<M>): Promise<(Record<string, unknown> | null)[]> {
+        return this.db.transaction(async (tx) => {
+            const txDriver = this.bindToTransaction(tx);
+
+            const results: (Record<string, unknown> | null)[] = [];
+            /** What each named operation wrote, for the `$ref`s after it. */
+            const named = new Map<string, Record<string, unknown>>();
+
+            for (let i = 0; i < operations.length; i++) {
+                const operation = operations[i];
+                try {
+                    const values = operation.values
+                        ? resolveBatchRefs(operation.values, named) as Partial<EntityValues<M>>
+                        : undefined;
+                    const rawId = operation.id !== undefined
+                        ? resolveBatchRefs(operation.id, named)
+                        : undefined;
+                    const id = rawId === undefined || rawId === null ? undefined : String(rawId);
+
+                    let row: Record<string, unknown> | null = null;
+                    switch (operation.op) {
+                        case "create":
+                            row = await txDriver.save<M>({
+                                path: operation.path,
+                                values: values ?? ({} as Partial<EntityValues<M>>),
+                                collection: operation.collection,
+                                status: "new"
+                            });
+                            break;
+                        case "upsert":
+                            row = await txDriver.save<M>({
+                                path: operation.path,
+                                values: values ?? ({} as Partial<EntityValues<M>>),
+                                collection: operation.collection,
+                                status: "new",
+                                upsert: true,
+                                onConflict: operation.onConflict
+                            });
+                            break;
+                        case "update": {
+                            // Read first, so an id matching no row is a 404
+                            // rather than an UPDATE that matches nothing and
+                            // reports success — the same rule `updateMany` and
+                            // the single-row route both apply.
+                            const existing = await txDriver.fetchOne({
+                                path: operation.path,
+                                id: id!,
+                                collection: operation.collection as CollectionConfig
+                            });
+                            if (!existing) {
+                                throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
+                                    statusCode: 404,
+                                    code: "NOT_FOUND"
+                                });
+                            }
+                            row = await txDriver.save<M>({
+                                path: operation.path,
+                                id: id!,
+                                values: values ?? ({} as Partial<EntityValues<M>>),
+                                collection: operation.collection,
+                                status: "existing"
+                            });
+                            break;
+                        }
+                        case "delete": {
+                            const existing = await txDriver.fetchOne({
+                                path: operation.path,
+                                id: id!,
+                                collection: operation.collection as CollectionConfig
+                            });
+                            if (!existing) {
+                                throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
+                                    statusCode: 404,
+                                    code: "NOT_FOUND"
+                                });
+                            }
+                            await txDriver.delete<M>({
+                                row: {
+                                    id: id!,
+                                    path: operation.path,
+                                    values: existing as Partial<EntityValues<M>>
+                                },
+                                collection: operation.collection
+                            });
+                            row = null;
+                            break;
+                        }
+                    }
+
+                    if (operation.ref && row) named.set(operation.ref, row);
+                    results.push(row);
+                } catch (error) {
+                    // Which operation, as the bulk methods say which row: a
+                    // batch mixes collections, so "the batch failed" does not
+                    // even say which table to go and look at.
+                    throw Object.assign(
+                        new Error(
+                            `Operation ${i} of ${operations.length} (${operation.op} on "${operation.path}") failed: `
+                            + `${(error as Error)?.message ?? error}`,
+                            { cause: error }
+                        ),
+                        {
+                            statusCode: (error as { statusCode?: number })?.statusCode,
+                            code: (error as { code?: string })?.code,
+                            name: (error as Error)?.name
+                        }
+                    );
+                }
+            }
+
+            return results;
+        });
+    }
+
     async delete<M extends Record<string, unknown>>({
                                                               row,
-                                                              collection
+                                                              collection,
+                                                              hard
                                                           }: DeleteProps<M>): Promise<void> {
 
         const targetPath = row.path;
@@ -1255,11 +1470,27 @@ export class PostgresBackendDriver implements DataDriver {
             throw toCallbackError(callbackError, "beforeDelete", targetPath);
         }
 
-        await this.dataService.delete(
-            targetPath,
-            row.id,
-            resolvedCollection?.databaseId
-        );
+        // A soft delete is a delete as far as everything above this line is
+        // concerned — `beforeDelete` can still veto it, `afterDelete` still
+        // fires, the realtime event below still says the row is gone. What
+        // changes is only how the table records it: a timestamp in the declared
+        // field instead of a `DELETE`. `hard` opts back into the real thing and
+        // needs no extra permission, because it is the same verb.
+        const softDelete = hard ? undefined : resolveSoftDelete(resolvedCollection as CollectionConfig | undefined);
+        if (softDelete) {
+            await this.dataService.save(
+                targetPath,
+                { [softDelete.field]: new Date() } as Partial<EntityValues<M>>,
+                row.id,
+                resolvedCollection?.databaseId
+            );
+        } else {
+            await this.dataService.delete(
+                targetPath,
+                row.id,
+                resolvedCollection?.databaseId
+            );
+        }
 
         // Same contract as `afterSave`: inside the transaction, awaited, and a
         // throw undoes the delete rather than leaving the row gone and the
@@ -1301,9 +1532,11 @@ export class PostgresBackendDriver implements DataDriver {
             throw toCallbackError(callbackError, "afterDelete", targetPath);
         }
 
-        // Record delete history (fire-and-forget)
+        // Awaited, for the same reason the save's entry is: a delete is the one
+        // change whose history nothing else can reconstruct, because the row it
+        // describes is gone.
         if (this.historyService && resolvedCollection?.history) {
-            this.historyService.recordHistory({
+            await this.historyService.recordHistory({
                 tableName: targetPath,
                 id: row.id.toString(),
                 action: "delete",
@@ -1359,7 +1592,8 @@ export class PostgresBackendDriver implements DataDriver {
                                                                filter,
                                                                logical,
                                                                searchString,
-                                                               vectorSearch
+                                                               vectorSearch,
+                                                               withDeleted
                                                            }: FetchCollectionProps<M>): Promise<number> {
         return this.dataService.count(
             path,
@@ -1368,10 +1602,13 @@ export class PostgresBackendDriver implements DataDriver {
                 // Counted as well as filtered, or `meta.total` describes a
                 // different set of rows from the `data` beside it. The same
                 // held for a `vectorSearch` carrying a `threshold`: it narrows
-                // the fetch, so it has to narrow the count.
+                // the fetch, so it has to narrow the count. And the same for
+                // soft delete: a listing that hides four rows and a total that
+                // counts them is a page saying "1 of 5".
                 logical,
                 searchString,
-                vectorSearch
+                vectorSearch,
+                withDeleted
             }
         );
     }
@@ -1772,9 +2009,9 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                     return delegate.restFetchService.fetchCollectionForRest(collectionPath, options, include);
                 }, { accessMode: "read only" });
             },
-            fetchOneForRest: async (collectionPath, id, include, databaseId) => {
+            fetchOneForRest: async (collectionPath, id, include, databaseId, options) => {
                 return this.withTransaction(async (delegate) => {
-                    return delegate.restFetchService.fetchOneForRest(collectionPath, id, include, databaseId);
+                    return delegate.restFetchService.fetchOneForRest(collectionPath, id, include, databaseId, options);
                 }, { accessMode: "read only" });
             },
             // In the same read-only transaction as the two above, which is what
@@ -1800,54 +2037,64 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
     ): Promise<T> {
         const pendingNotifications: PostgresBackendDriver["_pendingNotifications"] = [];
 
-        const result = await this.delegate.db.transaction(async (tx) => {
-            let uid = this.user?.uid;
-            if (!uid) {
-                logger.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object", { detail: this.user });
-                uid = "anonymous";
-            }
+        // The same identity the transaction is about to hand Postgres, made
+        // available to the row walk so per-field `access.read` is applied to
+        // whatever this read serves. Established here rather than threaded
+        // through `DataService` → `FetchService` → the pipeline for the reason
+        // set out in `field-viewer.ts`: those layers carry no user, and every
+        // exit from the pipeline needs it. `run` and not `enterWith`, so a
+        // `dataAsAdmin` read nested inside a user request restores the user's
+        // viewer when it returns.
+        const result = await withFieldViewer({ roles: this.user?.roles ?? [] }, async () =>
+            await this.delegate.db.transaction(async (tx) => {
+                let uid = this.user?.uid;
+                if (!uid) {
+                    logger.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object", { detail: this.user });
+                    uid = "anonymous";
+                }
 
-            const userRoles = this.user?.roles ?? [];
-            if (!this.user?.roles) {
-                logger.warn("[DataDriver] User roles are missing for authenticated delegate. Using empty array. User object", { detail: this.user });
-            }
+                const userRoles = this.user?.roles ?? [];
+                if (!this.user?.roles) {
+                    logger.warn("[DataDriver] User roles are missing for authenticated delegate. Using empty array. User object", { detail: this.user });
+                }
 
-            // Set the RLS GUCs and downgrade to the restricted user role so RLS
-            // binds every statement in this transaction — reads AND writes.
-            // This is user context: the collection's securityRules are the
-            // authorization model. The BASE driver never reaches here, so it
-            // stays on the owner connection and bypasses RLS — but note that
-            // `rebase.dataAsAdmin` is NOT the base driver: `init.ts` scopes it
-            // with `withAuth(SERVICE_IDENTITY)`, so it arrives here like any
-            // other user, with uid 'service' and the admin role, and its
-            // statements are RLS-evaluated. The comment used to list it as a
-            // bypass and five docblocks followed. The GUCs are transaction-local and
-            // remain readable after the role switch, so `rebase.uid()` /
-            // `rebase.roles()` in policies still resolve.
-            //
-            // Fails closed: if the switch cannot be performed, the transaction
-            // aborts rather than falling back to an RLS-bypassing connection.
-            // `isAnonymous` rides along so a policy can tell a GUEST from an
-            // account. Anonymous sign-in mints a real user row and a real uid,
-            // so without it the two are the same principal inside the database
-            // and every rule meaning "signed in" also means "anybody who called
-            // POST /auth/anonymous". See `rebase.is_anonymous()`.
-            await applyAuthContext(
-                tx,
-                { uid, roles: userRoles, isAnonymous: this.user?.isAnonymous === true },
-                this.delegate.rlsUserRole
-            );
+                // Set the RLS GUCs and downgrade to the restricted user role so RLS
+                // binds every statement in this transaction — reads AND writes.
+                // This is user context: the collection's securityRules are the
+                // authorization model. The BASE driver never reaches here, so it
+                // stays on the owner connection and bypasses RLS — but note that
+                // `rebase.dataAsAdmin` is NOT the base driver: `init.ts` scopes it
+                // with `withAuth(SERVICE_IDENTITY)`, so it arrives here like any
+                // other user, with uid 'service' and the admin role, and its
+                // statements are RLS-evaluated. The comment used to list it as a
+                // bypass and five docblocks followed. The GUCs are transaction-local and
+                // remain readable after the role switch, so `rebase.uid()` /
+                // `rebase.roles()` in policies still resolve.
+                //
+                // Fails closed: if the switch cannot be performed, the transaction
+                // aborts rather than falling back to an RLS-bypassing connection.
+                // `isAnonymous` rides along so a policy can tell a GUEST from an
+                // account. Anonymous sign-in mints a real user row and a real uid,
+                // so without it the two are the same principal inside the database
+                // and every rule meaning "signed in" also means "anybody who called
+                // POST /auth/anonymous". See `rebase.is_anonymous()`.
+                await applyAuthContext(
+                    tx,
+                    { uid, roles: userRoles, isAnonymous: this.user?.isAnonymous === true },
+                    this.delegate.rlsUserRole
+                );
 
-            const txEntityService = new DataService(tx, this.delegate.registry);
-            const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
+                const txEntityService = new DataService(tx, this.delegate.registry);
+                const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
 
-            txDelegate.dataService = txEntityService;
-            txDelegate._deferNotifications = true;
-            txDelegate._pendingNotifications = pendingNotifications;
-            txDelegate.client = this.delegate.client;
+                txDelegate.dataService = txEntityService;
+                txDelegate._deferNotifications = true;
+                txDelegate._pendingNotifications = pendingNotifications;
+                txDelegate.client = this.delegate.client;
 
-            return await operation(txDelegate);
-        }, options);
+                return await operation(txDelegate);
+            }, options)
+        );
 
         for (const notification of pendingNotifications) {
             try {
@@ -1914,6 +2161,38 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
      */
     async saveMany<M extends Record<string, unknown>>(props: SaveManyProps<M>): Promise<Record<string, unknown>[]> {
         return this.withTransaction((delegate) => delegate.saveMany(props));
+    }
+
+    /**
+     * Present for the same reason `saveMany` is, and absent until now.
+     *
+     * Every request that reaches the REST layer is served by *this* class — the
+     * base driver never sees one — and the routes ask `if (!driver.updateMany)`
+     * before doing anything. So `PATCH /api/data/<c>/bulk` and
+     * `POST /api/data/<c>/bulk/delete` answered `BULK_UNSUPPORTED` on Postgres,
+     * the one backend that implements them, for every authenticated caller.
+     * The methods existed one class down and nothing forwarded to them.
+     */
+    async updateMany<M extends Record<string, unknown>>(props: UpdateManyProps<M>): Promise<Record<string, unknown>[]> {
+        return this.withTransaction((delegate) => delegate.updateMany(props));
+    }
+
+    async deleteMany<M extends Record<string, unknown>>(props: DeleteManyProps<M>): Promise<void> {
+        return this.withTransaction((delegate) => delegate.deleteMany(props));
+    }
+
+    /**
+     * One transaction, one RLS context, every collection the batch touches.
+     *
+     * The whole point is that it runs as the caller: a batch that dropped to
+     * the base driver would write across collections with row-level security
+     * switched off, which is the opposite of what a cross-collection write
+     * needs.
+     */
+    async batchWrite<M extends Record<string, unknown>>(
+        props: BatchWriteProps<M>
+    ): Promise<(Record<string, unknown> | null)[]> {
+        return this.withTransaction((delegate) => delegate.batchWrite(props));
     }
 
     async delete<M extends Record<string, unknown>>(props: DeleteProps<M>): Promise<void> {

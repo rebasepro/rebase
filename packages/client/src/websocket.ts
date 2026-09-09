@@ -2,11 +2,13 @@ import {
     DeleteProps,
     CollectionConfig,
     FetchCollectionProps,
+    ListenCollectionProps,
     FetchOneProps,
     SaveProps,
     WebSocketMessage,
     WebSocketErrorPayload,
     CollectionUpdateMessage,
+    CollectionUpdateMeta,
     SingleUpdateMessage,
     TableMetadata,
     BranchInfo,
@@ -154,11 +156,19 @@ export class RebaseWebSocketClient {
     private collectionSubscriptions = new Map<string, {
         backendSubscriptionId: string;
         callbacks: Map<string, {
-            onUpdate: (rows: Record<string, unknown>[]) => void;
+            onUpdate: (rows: Record<string, unknown>[], meta?: CollectionUpdateMeta) => void;
             onError?: (error: Error) => void;
         }>;
-        props: FetchCollectionProps;
+        props: Omit<ListenCollectionProps, "onUpdate" | "onError">;
         latestData?: Record<string, unknown>[]; // Cache the latest flat rows
+        /**
+         * The `meta` of the last frame — total, hasMore, nextCursor.
+         *
+         * Cached beside the rows so a listener attaching to an existing
+         * subscription is replayed both, rather than the rows alone and a
+         * `meta` it has to go and fetch.
+         */
+        latestMeta?: CollectionUpdateMeta;
         lastUpdated?: number; // Timestamp for cache invalidation
         isInitialDataReceived?: boolean; // Track if we got initial data
         /**
@@ -688,6 +698,17 @@ export class RebaseWebSocketClient {
                     const updatePks = (message as unknown as { pks?: PrimaryKeyInfo[] }).pks;
                     if (updatePks) collectionSub.pks = updatePks;
 
+                    // The page metadata, beside the rows it describes.
+                    //
+                    // The frame used to carry rows and keys and nothing else, so
+                    // every subscriber issued a `GET /<collection>/count` per
+                    // push to recover a total it needed to render the list it
+                    // had just been handed — one extra round trip per write, per
+                    // subscriber, and a window in which the count and the rows
+                    // described different states of the collection.
+                    const updateMeta = (message as unknown as { meta?: CollectionUpdateMeta }).meta;
+                    if (updateMeta) collectionSub.latestMeta = updateMeta;
+
                     // Structural merge: preserve cached row references for rows
                     // whose values haven't changed. This prevents downstream React components
                     // from re-rendering (VirtualTableCell uses deepEqual on rowData —
@@ -706,7 +727,7 @@ export class RebaseWebSocketClient {
                     // Notify all callbacks for this subscription
                     collectionSub.callbacks.forEach(callback => {
                         try {
-                            callback.onUpdate(rows);
+                            callback.onUpdate(rows, collectionSub.latestMeta);
                         } catch (error) {
                             console.error("Error in collection subscription callback:", error);
                             if (callback.onError) {
@@ -1325,8 +1346,13 @@ incoming: normIncoming[key] };
 
     // Subscription methods
     listenCollection<M extends Record<string, unknown>>(
-        props: FetchCollectionProps<M>,
-        onUpdate: (rows: Record<string, unknown>[]) => void,
+        // The subscribe frame, minus the callbacks — so `page`, which only a
+        // subscription takes (a fetch resolves it to an offset before it gets
+        // here), is expressible. The subscription key is derived from these
+        // props rather than a hand-listed subset, so a new field narrows the
+        // key by construction and two different queries cannot collide on it.
+        props: Omit<ListenCollectionProps<M>, "onUpdate" | "onError">,
+        onUpdate: (rows: Record<string, unknown>[], meta?: CollectionUpdateMeta) => void,
         onError?: (error: Error) => void
     ): () => void {
         // A subscription is the app asking for live data, so this is where the
@@ -1343,7 +1369,7 @@ incoming: normIncoming[key] };
         if (existingSubscription) {
             // Reuse existing subscription - just add the new callback
             const callbackMap = existingSubscription.callbacks as Map<string, {
-                onUpdate: (rows: Record<string, unknown>[]) => void;
+                onUpdate: (rows: Record<string, unknown>[], meta?: CollectionUpdateMeta) => void;
                 onError?: (error: Error) => void;
             }>;
             callbackMap.set(callbackId, { onUpdate,
@@ -1352,7 +1378,7 @@ onError });
             // Immediately fire the callback with cached data if available
             if (existingSubscription.latestData !== undefined && existingSubscription.isInitialDataReceived) {
                 try {
-                    onUpdate(existingSubscription.latestData);
+                    onUpdate(existingSubscription.latestData, existingSubscription.latestMeta);
                 } catch (error) {
                     console.error("Error in collection subscription callback:", error);
                     if (onError) {
@@ -1389,7 +1415,7 @@ onError });
         // Create new subscription
         const backendSubscriptionId = `collection_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         const callbackMap = new Map<string, {
-            onUpdate: (rows: Record<string, unknown>[]) => void;
+            onUpdate: (rows: Record<string, unknown>[], meta?: CollectionUpdateMeta) => void;
             onError?: (error: Error) => void;
         }>();
         callbackMap.set(callbackId, { onUpdate,
@@ -1757,7 +1783,7 @@ onError });
         }
     }
 
-    private createCollectionSubscriptionKey(props: FetchCollectionProps): string {
+    private createCollectionSubscriptionKey(props: Omit<ListenCollectionProps, "onUpdate" | "onError">): string {
         // Derived from the props, not a hand-listed subset of them.
         //
         // Two subscriptions share one server subscription when their keys

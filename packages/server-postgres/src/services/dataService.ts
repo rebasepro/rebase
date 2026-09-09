@@ -1,7 +1,8 @@
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { FilterValues, LogicalCondition, OrderByTuple } from "@rebasepro/types";
+import { FilterValues, IncludeSpec, LogicalCondition, OrderByTuple } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
 import { FetchService } from "./FetchService";
+import type { WithDeleted } from "./soft-delete";
 import { PersistService } from "./PersistService";
 import { RelationService } from "./RelationService";
 import { DataRepository, FetchCollectionOptions, SearchOptions, CountOptions, DrizzleClient } from "../interfaces";
@@ -49,9 +50,11 @@ export class DataService implements DataRepository {
     async fetchOne<M extends Record<string, unknown>>(
         collectionPath: string,
         id: string | number,
-        databaseId?: string
+        databaseId?: string,
+        /** See `FetchCollectionProps.withDeleted`. */
+        withDeleted?: WithDeleted
     ): Promise<Record<string, unknown> | undefined> {
-        return this.fetchService.fetchOne<M>(collectionPath, id, databaseId);
+        return this.fetchService.fetchOne<M>(collectionPath, id, databaseId, withDeleted);
     }
 
     /**
@@ -71,9 +74,53 @@ export class DataService implements DataRepository {
             searchString?: string;
             databaseId?: string;
             vectorSearch?: VectorSearchParams;
+            /** See `FetchCollectionProps.withDeleted`. */
+            withDeleted?: WithDeleted;
         } = {}
     ): Promise<Record<string, unknown>[]> {
         return this.fetchService.fetchCollection<M>(collectionPath, options);
+    }
+
+    /**
+     * The REST read pipeline: flat rows, with exactly the relations `include`
+     * names — see {@link FetchService.fetchCollectionForRest}.
+     *
+     * Exposed on the facade because it is what *every* consumer should be
+     * reading through. The realtime refetch used to go via `fetchCollection`
+     * above, which nests a relation under a `{ __type: "relation" }` envelope
+     * and loaded every relation regardless, so a subscription and a REST list
+     * answered the same query with two different row shapes.
+     */
+    async fetchCollectionForRest<M extends Record<string, unknown>>(
+        collectionPath: string,
+        options: Parameters<FetchService["fetchCollectionForRest"]>[1] = {},
+        include?: IncludeSpec
+    ): Promise<Record<string, unknown>[]> {
+        return this.fetchService.fetchCollectionForRest<M>(collectionPath, options, include);
+    }
+
+    /** One row, through the same pipeline. See {@link FetchService.fetchOneForRest}. */
+    async fetchOneForRest<M extends Record<string, unknown>>(
+        collectionPath: string,
+        id: string | number,
+        include?: IncludeSpec,
+        databaseId?: string,
+        options?: {
+            fields?: string[];
+            /** See `FetchCollectionProps.withDeleted`. */
+            withDeleted?: WithDeleted;
+        }
+    ): Promise<Record<string, unknown> | null> {
+        return this.fetchService.fetchOneForRest<M>(collectionPath, id, include, databaseId, options);
+    }
+
+    /** See {@link FetchService.cursorFor}. */
+    cursorFor(
+        collectionPath: string,
+        row: Record<string, unknown>,
+        orderBy?: OrderByTuple[]
+    ): string | undefined {
+        return this.fetchService.cursorFor(collectionPath, row, orderBy);
     }
 
     /**
@@ -109,6 +156,8 @@ export class DataService implements DataRepository {
             databaseId?: string;
             /** Only the `threshold` narrows the count — see `FetchService.count`. */
             vectorSearch?: VectorSearchParams;
+            /** See `FetchCollectionProps.withDeleted`. */
+            withDeleted?: WithDeleted;
         } = {}
     ): Promise<number> {
         return this.fetchService.count<M>(collectionPath, options);
@@ -165,7 +214,7 @@ export class DataService implements DataRepository {
         values: Partial<M>,
         id?: string | number,
         databaseId?: string,
-        options?: { upsert?: boolean }
+        options?: { upsert?: boolean; onConflict?: readonly string[] }
     ): Promise<Record<string, unknown>> {
         return this.persistService.save<M>(collectionPath, values, id, databaseId, options);
     }

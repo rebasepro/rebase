@@ -111,6 +111,7 @@ import type { JobQueueOptions } from "./jobs/types";
 import {
     BackendStorageConfig,
     createStorageRoutes,
+    createUploadConstraintResolver,
     DEFAULT_STORAGE_ID,
     StorageController,
     StorageRegistry
@@ -2292,7 +2293,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             // The same number the body limit above is derived from. The
             // resumable route has no body limit in front of it — a chunked
             // upload is many small bodies — so it has to be told.
-            maxFileSize: storageMaxSize
+            maxFileSize: storageMaxSize,
+            // Per-property `maxSize` / `acceptedFiles`, resolved from the
+            // registry rather than from the request: the limits have to be the
+            // server's, or a caller could send their own alongside the file.
+            // Read lazily so a collection registered after this point (the
+            // introspected ones) is still covered.
+            uploadConstraints: (slug, property) =>
+                createUploadConstraintResolver(collectionRegistry.getRawCollections())(slug, property)
         });
 
         // Wrapper router: middleware must be registered BEFORE the routes it

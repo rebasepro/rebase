@@ -139,7 +139,7 @@ describe("Subscription resilience", () => {
             expect(frames).toHaveLength(1); // it actually re-subscribed
 
             deliverRows(ws, frames[0].payload.subscriptionId, [{ id: "p1" }]);
-            expect(onUpdate2).toHaveBeenCalledWith([{ id: "p1" }]);
+            expect(onUpdate2).toHaveBeenCalledWith([{ id: "p1" }], undefined);
         });
 
         it("reports the failure to every listener, not just the one that created it", async () => {
@@ -179,7 +179,7 @@ describe("Subscription resilience", () => {
             const frames = subscribeFrames(ws);
             expect(frames).toHaveLength(1);
             deliverRows(ws, frames[0].payload.subscriptionId, [{ id: "p1" }]);
-            expect(onUpdate2).toHaveBeenCalledWith([{ id: "p1" }]);
+            expect(onUpdate2).toHaveBeenCalledWith([{ id: "p1" }], undefined);
         });
     });
 
@@ -238,7 +238,7 @@ describe("Subscription resilience", () => {
             const frames = subscribeFrames(ws);
             expect(frames).toHaveLength(2); // fresh attempt, not a dead attach
             deliverRows(ws, frames[1].payload.subscriptionId, [{ id: "p1" }]);
-            expect(onUpdate2).toHaveBeenCalledWith([{ id: "p1" }]);
+            expect(onUpdate2).toHaveBeenCalledWith([{ id: "p1" }], undefined);
         });
 
         it("does not time out a subscribe that was queued before the socket opened", () => {
@@ -312,7 +312,7 @@ describe("Subscription resilience", () => {
             const after = subscribeFrames(ws);
             expect(after).toHaveLength(2);
             deliverRows(ws, after[1].payload.subscriptionId, [{ id: "p1" }]);
-            expect(onUpdate2).toHaveBeenCalledWith([{ id: "p1" }]);
+            expect(onUpdate2).toHaveBeenCalledWith([{ id: "p1" }], undefined);
         });
 
         it("does not swallow a subscription error carrying a non-string payload", () => {
@@ -358,8 +358,8 @@ describe("Subscription resilience", () => {
             const frames = subscribeFrames(ws);
             deliverRows(ws, frames[0].payload.subscriptionId, [{ id: "u1" }]);
 
-            expect(onUpdate1).toHaveBeenCalledWith([{ id: "u1" }]);
-            expect(onUpdate2).toHaveBeenCalledWith([{ id: "u1" }]);
+            expect(onUpdate1).toHaveBeenCalledWith([{ id: "u1" }], undefined);
+            expect(onUpdate2).toHaveBeenCalledWith([{ id: "u1" }], undefined);
         });
 
         it("still serves cached rows to a late joiner without re-subscribing", () => {
@@ -374,7 +374,7 @@ describe("Subscription resilience", () => {
             const late = jest.fn();
             client.listenCollection({ path: "users" }, late as any);
 
-            expect(late).toHaveBeenCalledWith([{ id: "u1" }]);
+            expect(late).toHaveBeenCalledWith([{ id: "u1" }], undefined);
             expect(subscribeFrames(ws)).toHaveLength(1); // no extra frame
         });
 
@@ -416,7 +416,7 @@ describe("Subscription resilience", () => {
 
             const frames = subscribeFrames(ws);
             deliverRows(ws, frames[frames.length - 1].payload.subscriptionId, [{ id: "p1" }]);
-            expect(onUpdate2).toHaveBeenCalledWith([{ id: "p1" }]); // #2 survived
+            expect(onUpdate2).toHaveBeenCalledWith([{ id: "p1" }], undefined); // #2 survived
         });
     });
 

@@ -1,8 +1,24 @@
-import type { FilterValues, ListLimitBounds, LogicalCondition, OrderByTuple, VectorSearchParams } from "@rebasepro/types";
+import type { CollectionConfig, FilterValues, ListLimitBounds, LogicalCondition, NullsPlacement, OrderByTuple, VectorSearchParams } from "@rebasepro/types";
 import { toCanonicalOp, resolveClientListLimit, ListLimitError, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { deserializeFilter, deserializeLogicalCondition, UnknownFilterOperatorError } from "@rebasepro/common";
+import type { DecodedCursor } from "@rebasepro/common";
+import {
+    CursorError,
+    CursorMismatchError,
+    type FieldViewer,
+    IncludeSpecError,
+    OrderBySpecError,
+    decodeCursor,
+    deserializeFilter,
+    deserializeInclude,
+    deserializeLogicalCondition,
+    normalizeInclude,
+    reconcileCursorOrder,
+    UnknownFilterOperatorError
+} from "@rebasepro/common";
 import { QueryOptions } from "../types";
 import { ApiError } from "../errors";
+import { DELETED_QUERY_PARAM, HARD_DELETE_QUERY_PARAM, parseWithDeleted } from "./soft-delete-params";
+import { assertQueryFieldsReadable } from "./field-access-query";
 
 export const mapOperator = (op: string) => toCanonicalOp(op) ?? null;
 
@@ -70,7 +86,7 @@ function getLastValue(val: unknown): unknown {
  * this path stays byte-for-byte consistent with the SDK/admin path (which
  * also parses via the shared dialect).
  */
-function parseLogicalGroup(type: "or" | "and", raw: unknown): LogicalCondition | undefined {
+function parseLogicalGroup(type: "or" | "and" | "not", raw: unknown): LogicalCondition | undefined {
     let inner = String(raw).trim();
     if (inner.startsWith("(") && inner.endsWith(")")) {
         inner = inner.slice(1, -1);
@@ -132,7 +148,7 @@ function parseWhereParam(raw: unknown): FilterValues<string> | undefined {
     return Object.keys(filter).length > 0 ? filter : undefined;
 }
 
-type OrderByEntry = { field: string; direction: "asc" | "desc" };
+type OrderByEntry = { field: string; direction: "asc" | "desc"; nulls?: NullsPlacement };
 
 /**
  * The parsed entries as the driver contract spells them: `[field, direction]`
@@ -145,15 +161,34 @@ type OrderByEntry = { field: string; direction: "asc" | "desc" };
  */
 export function orderByEntriesToTuples(entries?: OrderByEntry[]): OrderByTuple[] | undefined {
     if (!entries || entries.length === 0) return undefined;
-    return entries.map(({ field, direction }) => [field, direction] as OrderByTuple);
+    return entries.map(({ field, direction, nulls }) => (nulls
+        ? [field, direction, nulls]
+        : [field, direction]) as OrderByTuple);
 }
 
 function invalidOrderBy(detail: string): never {
     throw invalidParam(
         `Invalid \`orderBy\` parameter: ${detail}. Expected \`field\`, \`field:desc\`, `
-        + "or a JSON array like [{\"field\":\"created_at\",\"direction\":\"desc\"}]",
+        + "`field:desc:last`, or a JSON array like "
+        + "[{\"field\":\"created_at\",\"direction\":\"desc\",\"nulls\":\"last\"}]",
         "INVALID_ORDER_BY"
     );
+}
+
+/**
+ * The `nulls` slot: `first`/`last`, or a refusal naming the entry.
+ *
+ * Refused rather than defaulted, for the reason every other parameter here is:
+ * a sort quietly ordered by a convention the caller did not ask for reads as
+ * though it obeyed them. See {@link NullsPlacement} for what the default is
+ * when the slot is simply absent.
+ */
+function toNulls(raw: unknown, context: string): NullsPlacement | undefined {
+    if (raw === undefined || raw === null || raw === "") return undefined;
+    if (raw !== "first" && raw !== "last") {
+        invalidOrderBy(`${context} has nulls '${String(raw)}'`);
+    }
+    return raw;
 }
 
 /** The aggregate functions `?select=` accepts. */
@@ -254,7 +289,14 @@ function toOrderByEntry(raw: unknown, index: number): OrderByEntry {
         const idx = raw.indexOf(":");
         const field = (idx === -1 ? raw : raw.slice(0, idx)).trim();
         if (!field) invalidOrderBy(`${context} is an empty field name`);
-        return { field, direction: idx === -1 ? "asc" : toDirection(raw.slice(idx + 1), context) };
+        if (idx === -1) return { field, direction: "asc" };
+        // `field:direction:nulls`. The third segment is optional, so every
+        // `field:desc` written before it existed parses exactly as it did.
+        const rest = raw.slice(idx + 1);
+        const nullsIdx = rest.indexOf(":");
+        const direction = toDirection(nullsIdx === -1 ? rest : rest.slice(0, nullsIdx), context);
+        const nulls = nullsIdx === -1 ? undefined : toNulls(rest.slice(nullsIdx + 1), context);
+        return nulls ? { field, direction, nulls } : { field, direction };
     }
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
         invalidOrderBy(`${context} is not a field name or a {field, direction} object`);
@@ -263,7 +305,9 @@ function toOrderByEntry(raw: unknown, index: number): OrderByEntry {
     if (typeof entry.field !== "string" || entry.field.trim() === "") {
         invalidOrderBy(`${context} has no \`field\``);
     }
-    return { field: entry.field, direction: toDirection(entry.direction, context) };
+    const nulls = toNulls(entry.nulls, context);
+    const direction = toDirection(entry.direction, context);
+    return nulls ? { field: entry.field, direction, nulls } : { field: entry.field, direction };
 }
 
 /**
@@ -401,10 +445,23 @@ function parseWindowParam(raw: unknown, name: string, minimum: number, code: str
  */
 export function parseQueryOptions(
     query: Record<string, unknown>,
-    limits: ListLimitOptions = {}
+    limits: ListLimitOptions = {},
+    /**
+     * The collection being read and who is reading it. Optional so the parser
+     * stays a pure parser for the callers that have neither (tests, the WS
+     * ingress, anything parsing a query it is not about to run); when present,
+     * a `where`, `orderBy` or `fields` naming a field the caller cannot read is
+     * a 400 rather than a query the driver would happily answer. See
+     * {@link assertQueryFieldsReadable}.
+     */
+    access?: { collection: CollectionConfig; viewer?: FieldViewer }
 ): QueryOptions {
     const options: QueryOptions = {};
     const rawLimit = getLastValue(query.limit) as number | string | null | undefined;
+
+    // `?deleted=include|only` — soft delete. See `soft-delete-params.ts`.
+    const withDeleted = parseWithDeleted(getLastValue(query[DELETED_QUERY_PARAM]));
+    if (withDeleted !== undefined) options.withDeleted = withDeleted;
 
     const offsetVal = getLastValue(query.offset);
     if (offsetVal) options.offset = parseWindowParam(offsetVal, "offset", 0, "INVALID_OFFSET");
@@ -422,14 +479,29 @@ export function parseQueryOptions(
         options.offset = (page - 1) * limit;
     }
 
-    // ── Logical conditions (or / and) ──────────────────────────────────
+    // ── Logical conditions (or / and / not) ────────────────────────────
+    //
+    // `?not=(status.eq.draft,views.gte.10)` negates the **conjunction** of its
+    // conditions: `not(a)` is `NOT a`, `not(a,b)` is `NOT (a AND b)`. The rule
+    // lives on `LogicalCondition` and is applied identically by this parser,
+    // the shared wire codec and every driver compiler — one negation, one
+    // meaning. A group nests, so `?not=(or(a,b))` is the De Morgan case.
+    //
+    // Three parameters and one slot, so exactly one applies. `or` wins over
+    // `and`, and both over `not` — the precedence `or`/`and` already had, with
+    // the third added at the end rather than in the middle, where it would have
+    // silently changed which of two existing parameters was honoured.
     const orVal = getLastValue(query.or);
     const andVal = getLastValue(query.and);
+    const notVal = getLastValue(query.not);
     if (orVal) {
         const logical = parseLogicalGroup("or", orVal);
         if (logical) options.logical = logical;
     } else if (andVal) {
         const logical = parseLogicalGroup("and", andVal);
+        if (logical) options.logical = logical;
+    } else if (notVal) {
+        const logical = parseLogicalGroup("not", notVal);
         if (logical) options.logical = logical;
     }
 
@@ -450,7 +522,12 @@ export function parseQueryOptions(
     // `/aggregate` they are the request, and left out of this list
     // `?select=sum(total)` compiles into the filter as a comparison on a
     // column named "select" — a 400 on the one endpoint that requires it.
-    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString", "searchExplain", "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and", "where", "select", "groupBy"];
+    // `not`, `after` and `distinct` join the list for the reason the comment
+    // above gives: a reserved key left out of it compiles as a filter on a
+    // column of that name, which is a 400 `UNKNOWN_FILTER_FIELD` on the one
+    // request that needs the parameter. So do `?deleted=` and `?hard=`, which
+    // ask about the soft-delete stamp rather than name a column.
+    const reservedQueryKeys = ["limit", "offset", "page", "after", "orderBy", "include", "fields", "distinct", "searchString", "searchExplain", "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and", "not", "where", "select", "groupBy", DELETED_QUERY_PARAM, HARD_DELETE_QUERY_PARAM];
     const filterDict: Record<string, unknown> = {};
     for (const [key, rawValue] of Object.entries(query)) {
         if (reservedQueryKeys.includes(key)) continue;
@@ -473,22 +550,101 @@ export function parseQueryOptions(
         options.orderBy = parseOrderByParam(orderByVal);
     }
 
-    // Relation includes
+    // ── Relation includes ──────────────────────────────────────────────
+    //
+    // Two spellings on one parameter, told apart by a leading `{`:
+    //
+    //   ?include=author,comments.author        — names and dotted paths
+    //   ?include={"comments":{"limit":5,"include":{"author":true}}}
+    //
+    // The flat form is what a human types and what every existing client
+    // sends; the JSON form exists because the flat one has nowhere to put a
+    // per-relation `limit`/`where`/`orderBy`/`fields`, and inventing a
+    // punctuation for those (`comments(limit:5)`) would be a third grammar to
+    // learn beside the two this API already has. Both compile to the same
+    // request — `deserializeInclude` in `@rebasepro/common` is the codec, and
+    // the SDK serialises through its inverse.
     const includeVal = getLastValue(query.include);
-    if (includeVal) {
-        const includeStr = String(includeVal).trim();
-        if (includeStr === "*") {
-            options.include = ["*"];
-        } else {
-            options.include = includeStr.split(",").map(s => s.trim()).filter(Boolean);
+    if (includeVal !== undefined && includeVal !== null) {
+        try {
+            const include = deserializeInclude(String(includeVal));
+            // Normalized for its *checks* — the depth bound and the shape of a
+            // per-relation options object — and then discarded: what travels on
+            // is the caller's own spelling, which the driver normalizes again
+            // (idempotently) when it reads it. Validating here is what makes a
+            // malformed include a 400 at the boundary rather than an
+            // `IncludeSpecError` escaping from the driver as a 500, which is
+            // what `?include=a.b.c.d` used to answer.
+            normalizeInclude(include);
+            options.include = include;
+        } catch (e) {
+            if (e instanceof IncludeSpecError) throw invalidParam(e.message, e.code);
+            if (e instanceof OrderBySpecError) {
+                throw invalidParam(`Invalid \`include\`: ${e.message}`, "INVALID_INCLUDE");
+            }
+            throw e;
         }
     }
 
-    // Field selection
+    // Field selection. A projection at the driver, not a trim of the response:
+    // the columns named here are the columns read.
     const fieldsVal = getLastValue(query.fields);
     if (fieldsVal) {
         const fieldsStr = String(fieldsVal).trim();
         options.fields = fieldsStr.split(",").map(s => s.trim()).filter(Boolean);
+    }
+
+    // `?distinct=true` — `SELECT DISTINCT` over the projection. Only `true`
+    // and `1` mean yes; anything else is refused rather than read as "no",
+    // because a `?distinct=1&` typo'd into `?distinct=ture` would otherwise
+    // return duplicate rows while looking exactly like it had worked.
+    const distinctVal = getLastValue(query.distinct);
+    if (distinctVal !== undefined && distinctVal !== null && String(distinctVal) !== "") {
+        const text = String(distinctVal).trim().toLowerCase();
+        if (text !== "true" && text !== "1" && text !== "false" && text !== "0") {
+            throw invalidParam(
+                `Invalid \`distinct\` parameter: expected \`true\` or \`false\`, got ${JSON.stringify(String(distinctVal))}.`,
+                "INVALID_DISTINCT"
+            );
+        }
+        options.distinct = text === "true" || text === "1";
+    }
+
+    // ── Keyset cursor ──────────────────────────────────────────────────
+    //
+    // `?after=<meta.nextCursor>`. Decoded here so a malformed cursor is one
+    // 400 in one place, and so the sort a cursor implies is settled before any
+    // route reads `orderBy`: a request that names no sort adopts the cursor's,
+    // and one that names a different sort is refused rather than seeked in an
+    // order nobody asked for.
+    const afterVal = getLastValue(query.after);
+    if (afterVal !== undefined && afterVal !== null && String(afterVal).trim() !== "") {
+        let cursor: DecodedCursor;
+        try {
+            cursor = decodeCursor(String(afterVal));
+        } catch (e) {
+            if (e instanceof CursorError) throw invalidParam(e.message, e.code);
+            throw e;
+        }
+        try {
+            const reconciled = reconcileCursorOrder(cursor, orderByEntriesToTuples(options.orderBy));
+            options.orderBy = reconciled.map(([field, direction, nulls]) =>
+                (nulls ? { field, direction, nulls } : { field, direction }));
+        } catch (e) {
+            if (e instanceof CursorMismatchError) throw invalidParam(e.message, e.code);
+            throw e;
+        }
+        options.cursor = cursor;
+        // A cursor and an offset describe the same window two incompatible
+        // ways, and honouring both would start the page `offset` rows past
+        // where the cursor pointed — a gap the caller cannot see.
+        if (options.offset !== undefined) {
+            throw invalidParam(
+                "`after` and `offset`/`page` cannot be combined: a cursor already says where the page "
+                + "starts, and an offset on top of it skips rows. Use one or the other.",
+                "CURSOR_WITH_OFFSET"
+            );
+        }
     }
 
     // ── Vector similarity search ───────────────────────────────────────
@@ -560,6 +716,11 @@ export function parseQueryOptions(
         defaultLimit: limits.defaultLimit,
         maxLimit: limits.maxLimit
     });
+
+    // Every field the request named, against what this caller may read. Last,
+    // so a malformed parameter is still answered as malformed rather than as a
+    // permission problem.
+    if (access) assertQueryFieldsReadable(options, access.collection, access.viewer);
 
     return options;
 }

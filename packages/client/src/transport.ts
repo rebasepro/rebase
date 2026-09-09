@@ -1,5 +1,5 @@
-import { FindParams as TypesFindParams, FindResponse as TypesFindResponse, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
-import { serializeFilter, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
+import { AggregateParams, FindParams as TypesFindParams, FindResponse as TypesFindResponse, RebaseApiError, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
+import { serializeFilter, serializeInclude, serializeLogicalCondition, serializeOrderBy } from "@rebasepro/common";
 import { rebaseReviver } from "./reviver";
 
 // The canonical client error now lives in `@rebasepro/types` so every package
@@ -208,6 +208,10 @@ export function buildQueryString(params?: FindParams): string {
     if (params.limit != null) parts.push(`limit=${params.limit}`);
     if (params.offset != null) parts.push(`offset=${params.offset}`);
     if (params.page != null) parts.push(`page=${params.page}`);
+    // The opaque keyset cursor, passed straight back. Nothing on this side
+    // reads it: the encoding is the server's, and a client that parsed it would
+    // be depending on something that exists to be changed.
+    if (params.after) parts.push(`after=${encodeURIComponent(params.after)}`);
 
     if (params.orderBy) {
         const wire = serializeOrderBy(params.orderBy);
@@ -230,9 +234,20 @@ export function buildQueryString(params?: FindParams): string {
         if (vs.threshold !== undefined) parts.push(`vector_threshold=${encodeURIComponent(String(vs.threshold))}`);
     }
 
-    if (params.include && params.include.length > 0) {
-        parts.push(`include=${encodeURIComponent(params.include.join(","))}`);
+    // Through the shared codec, which picks the wire spelling: comma-separated
+    // dotted paths when no relation carries options, JSON when one does. The
+    // server accepts both and tells them apart the same way. Joining an array
+    // here — which is what this did — could not express the tree at all.
+    const include = serializeInclude(params.include);
+    if (include) parts.push(`include=${encodeURIComponent(include)}`);
+
+    if (params.fields && params.fields.length > 0) {
+        parts.push(`fields=${encodeURIComponent(params.fields.join(","))}`);
     }
+
+    // Only when true. `?distinct=false` is the default and sending it says
+    // nothing, while the server refuses anything that is neither.
+    if (params.distinct) parts.push("distinct=true");
 
     if (params.logical) {
         const root = params.logical;
@@ -257,8 +272,80 @@ export function buildQueryString(params?: FindParams): string {
     return parts.length > 0 ? "?" + parts.join("&") : "";
 }
 
+/**
+ * The query string for `GET /<collection>/aggregate`.
+ *
+ * `?select=sum(total),count()` is SQL's spelling, because whoever writes an
+ * aggregate is thinking in SQL and any other spelling has to be learned first —
+ * and because it is what the route already parses. The filters are serialised
+ * by exactly the same code a `find()` uses, so "revenue by status, this month"
+ * narrows the same rows whichever call is asking.
+ *
+ * `orderBy`, `include` and the page are deliberately not here: an aggregate has
+ * no rows to sort, no relations to load and no page to continue. `limit` is,
+ * and bounds the number of *groups*.
+ */
+export function buildAggregateQueryString(params: AggregateParams): string {
+    const parts: string[] = [];
+
+    const select = params.select
+        .map(entry => `${entry.fn}(${(entry as { field?: string }).field ?? ""})`)
+        .join(",");
+    parts.push(`select=${encodeURIComponent(select)}`);
+
+    if (params.groupBy && params.groupBy.length > 0) {
+        parts.push(`groupBy=${encodeURIComponent(params.groupBy.join(","))}`);
+    }
+    if (params.limit != null) parts.push(`limit=${params.limit}`);
+    if (params.searchString) {
+        parts.push(`searchString=${encodeURIComponent(params.searchString)}`);
+    }
+    if (params.logical) {
+        const root = params.logical;
+        const serialized = (root.conditions ?? []).map(serializeLogicalCondition).join(",");
+        parts.push(`${root.type}=${encodeURIComponent(`(${serialized})`)}`);
+    }
+    if (params.where) {
+        assertNoUndefinedFilterValues(params.where);
+        const serialized = serializeFilter(params.where);
+        for (const [field, value] of Object.entries(serialized)) {
+            if (Array.isArray(value)) {
+                for (const v of value) {
+                    parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(v)}`);
+                }
+            } else {
+                parts.push(`${encodeURIComponent(field)}=${encodeURIComponent(value)}`);
+            }
+        }
+    }
+
+    return "?" + parts.join("&");
+}
+
+/**
+ * Response metadata a caller can ask for, filled in by `request`.
+ *
+ * An out-parameter rather than a second return value, because every one of the
+ * fifty-odd call sites wants the body and nothing else, and changing the return
+ * shape would mean rewriting all of them to reach past a wrapper. It is also
+ * why this is a third *optional* parameter: a `Transport` stub in a test that
+ * ignores it is still a valid `Transport`.
+ *
+ * Only `ETag` for now, and only because a row's version is not part of the row.
+ * It cannot be: adding it as a column would put it in the generated `Row` type,
+ * in every `find()` result, in the offline cache and in what a caller sends
+ * back on the next write — a field the server would then have to strip. The
+ * header is where HTTP puts it, so the header is where this reads it.
+ */
+export interface ResponseMeta {
+    /** The `ETag` header, when the response carried one. */
+    etag?: string;
+    /** The HTTP status, for a caller that has to tell 200 from 204. */
+    status?: number;
+}
+
 export interface Transport {
-    request: <T = unknown>(path: string, init?: RequestInit) => Promise<T>;
+    request: <T = unknown>(path: string, init?: RequestInit, meta?: ResponseMeta) => Promise<T>;
     setToken: (newToken: string | null) => void;
     setAuthTokenGetter: (getter: () => Promise<string | null>) => void;
     setOnUnauthorized: (handler: () => Promise<boolean>) => void;
@@ -477,7 +564,7 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
         );
     }
 
-    async function request<T = unknown>(path: string, init?: RequestInit): Promise<T> {
+    async function request<T = unknown>(path: string, init?: RequestInit, meta?: ResponseMeta): Promise<T> {
         const url = resolveBaseUrl(config.baseUrl) + apiPath + path;
 
         let activeToken = token;
@@ -503,6 +590,11 @@ export function createTransport(config: RebaseClientConfig, environment?: Transp
 
         const res = await fetchFn(url, { ...init,
 headers });
+
+        if (meta) {
+            meta.status = res.status;
+            meta.etag = res.headers?.get?.("ETag") ?? undefined;
+        }
 
         if (res.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
 
@@ -547,6 +639,13 @@ headers });
                 const retryHeaders = getHeaders(retryToken, init) as Record<string, string>;
                 const retryRes = await fetchFn(url, { ...init,
 headers: retryHeaders });
+                // The retry is the response the caller gets, so it is the one
+                // whose metadata describes what they are holding — recording
+                // the 401's would hand back the ETag of an error page.
+                if (meta) {
+                    meta.status = retryRes.status;
+                    meta.etag = retryRes.headers?.get?.("ETag") ?? undefined;
+                }
                 if (retryRes.status === 204) return undefined as T; // SAFETY: HTTP 204 No Content has no body
                 const retryText = await retryRes.text().catch(() => "");
                 let retryBody: Record<string, unknown> = {};

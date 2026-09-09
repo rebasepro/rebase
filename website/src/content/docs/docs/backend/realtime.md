@@ -167,6 +167,48 @@ own policies would have denied it, and the subscription's own `where` filter was
 not applied to it either. The patch has been removed: perceived latency for an
 update is now the debounce window.
 
+### The refetch is the REST read
+
+The refetch runs the same pipeline `GET /api/data/<collection>` runs, with the
+same `include` handling. That is what makes `find({ q })` and `listen({ q })`
+return rows that are equal field for field.
+
+It used to be a different method — one that nested each relation under a
+`{ "__type": "relation" }` envelope and, because a subscription could carry no
+`include`, eagerly loaded **every** relation the collection declares. So the same
+query answered in one shape over HTTP and another over the socket, and a client
+rendering both saw its rows change shape the moment a write landed.
+
+A subscribe frame therefore takes what a list request takes: `filter`,
+`logical`, `orderBy`, `limit`, `offset`/`page`, `searchString`, `include` and
+`fields`. `vectorSearch` is the exception and is **refused** with
+`VECTOR_SEARCH_NOT_LIVE` — a subscription is re-run on every matching write and
+nothing there computes distances.
+
+### `collection_update` carries its own metadata
+
+The frame is `{ rows, pks, meta }`:
+
+```json
+{
+    "type": "collection_update",
+    "subscriptionId": "…",
+    "rows": [ { "id": 1, "title": "Widget" } ],
+    "pks": [ { "fieldName": "id", "type": "number" } ],
+    "meta": { "total": 150, "limit": 20, "offset": 0, "hasMore": true, "nextCursor": "eyJ…" }
+}
+```
+
+`meta` is counted inside the same RLS-bound transaction that read the rows, so
+it describes exactly the rows beside it. Without it, a client needing a total
+had to issue a `GET /count` **per push** — one extra round trip per write, per
+subscriber, and a window in which the count and the rows described different
+states of the collection.
+
+When the count itself fails, the frame carries `partial: true` and no `total`;
+that is not a subscription error, and a client should keep the last real total
+rather than substituting the page length.
+
 ## Broadcast Channels
 
 Broadcast channels let clients send arbitrary messages to each other in real time — useful for features like typing indicators, cursor positions, or custom notifications.

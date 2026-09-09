@@ -4,6 +4,8 @@ CREATE SCHEMA IF NOT EXISTS "rebase";
 
 -- Full-text search support lives in `search.sql`, applied separately.
 
+-- `autoValue: "on_update"` triggers live in `triggers.sql`, applied separately.
+
 CREATE TYPE "public"."exercises_difficulty" AS ENUM ('beginner', 'intermediate', 'advanced');
 CREATE TYPE "public"."exercises_category" AS ENUM ('strength', 'cardio', 'flexibility', 'balance', 'plyometrics', 'calisthenics');
 CREATE TYPE "public"."exercises_status" AS ENUM ('draft', 'published', 'archived');
@@ -54,7 +56,7 @@ CREATE TABLE "public"."exercises" (
   "description" TEXT,
   "images" TEXT[],
   "video_url" TEXT,
-  "difficulty" "public"."exercises_difficulty" NOT NULL,
+  "difficulty" "public"."exercises_difficulty" DEFAULT 'intermediate' NOT NULL,
   "category" "public"."exercises_category" NOT NULL,
   "equipment" TEXT[],
   "body_parts" TEXT[],
@@ -65,7 +67,7 @@ CREATE TABLE "public"."exercises" (
   "calories_per_minute" NUMERIC,
   "is_compound" BOOLEAN,
   "is_featured" BOOLEAN,
-  "status" "public"."exercises_status" NOT NULL,
+  "status" "public"."exercises_status" DEFAULT 'draft' NOT NULL,
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
   "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
@@ -85,14 +87,14 @@ CREATE TABLE "public"."orders" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "order_number" TEXT UNIQUE NOT NULL,
   "customer_id" UUID NOT NULL,
-  "status" "public"."orders_status" NOT NULL,
-  "payment_status" "public"."orders_payment_status" NOT NULL,
+  "status" "public"."orders_status" DEFAULT 'pending' NOT NULL,
+  "payment_status" "public"."orders_payment_status" DEFAULT 'unpaid' NOT NULL,
   "subtotal" NUMERIC,
-  "tax_amount" NUMERIC,
-  "shipping_cost" NUMERIC,
-  "discount_amount" NUMERIC,
+  "tax_amount" NUMERIC DEFAULT 0,
+  "shipping_cost" NUMERIC DEFAULT 0,
+  "discount_amount" NUMERIC DEFAULT 0,
   "total" NUMERIC,
-  "currency" "public"."orders_currency",
+  "currency" "public"."orders_currency" DEFAULT 'USD',
   "shipping_address" TEXT,
   "tracking_number" TEXT,
   "notes" TEXT,
@@ -111,7 +113,7 @@ CREATE TABLE "public"."posts" (
   "hero_image" TEXT,
   "excerpt" TEXT,
   "content" JSONB,
-  "status" "public"."posts_status" NOT NULL,
+  "status" "public"."posts_status" DEFAULT 'draft' NOT NULL,
   "publish_date" TIMESTAMP WITH TIME ZONE,
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
   "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
@@ -146,11 +148,11 @@ CREATE TABLE "public"."products" (
   "compare_at_price" NUMERIC,
   "cost" NUMERIC,
   "stock_quantity" NUMERIC NOT NULL,
-  "low_stock_threshold" NUMERIC,
+  "low_stock_threshold" NUMERIC DEFAULT 10,
   "weight_grams" NUMERIC,
   "rating" NUMERIC,
   "review_count" NUMERIC,
-  "status" "public"."products_status" NOT NULL,
+  "status" "public"."products_status" DEFAULT 'draft' NOT NULL,
   "is_featured" BOOLEAN,
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
   "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now()
@@ -167,8 +169,8 @@ CREATE TABLE "public"."tickets" (
   "subject" TEXT NOT NULL,
   "description" TEXT,
   "resolution_notes" TEXT,
-  "status" "public"."tickets_status" NOT NULL,
-  "priority" "public"."tickets_priority" NOT NULL,
+  "status" "public"."tickets_status" DEFAULT 'open' NOT NULL,
+  "priority" "public"."tickets_priority" DEFAULT 'medium' NOT NULL,
   "category" "public"."tickets_category",
   "customer_id" UUID,
   "assigned_to" TEXT,

@@ -199,6 +199,12 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
     /**
      * User id of the owner of this collection. This is used only by plugins, or if you
      * are writing custom code
+     *
+     * **Admin form only — not enforced by the API or the database.** The
+     * collection editor stamps it on a collection it creates and shows it
+     * beside the name; nothing on the request path consults it. It is not an
+     * ownership check, and a collection with somebody else's id here is served
+     * to exactly the same callers as one with none.
      */
     ownerId?: string;
 
@@ -366,6 +372,40 @@ export interface PostgresCollectionConfig<M extends Record<string, unknown> = Re
      * rather than silently ignored.
      */
     indexes?: readonly CollectionIndex<Extract<keyof M, string>>[];
+
+    /**
+     * Turn `delete` into "stamp a timestamp", and hide stamped rows from reads.
+     *
+     * With this on, a delete — single, bulk or through a nested path — sets the
+     * field to `now()` instead of issuing a `DELETE`, and every read filters
+     * `<field> IS NULL` by default: `find`, `findById`, `count`, aggregates, the
+     * realtime refetch, and the loading of this collection through a relation.
+     * A restore is an ordinary update setting the field back to `null`. A real
+     * `DELETE` is still available as `delete(…, { hard: true })` / `?hard=true`,
+     * and needs exactly the same permission an ordinary delete does — it is the
+     * same operation, and gating it separately would be a second access-control
+     * surface for one verb.
+     *
+     * `true` uses `deletedAt` (column `deleted_at`). The object form renames the
+     * field. **Either way the collection must declare that property itself**, as
+     * a `date` — this flag says what a column *means*, it does not conjure the
+     * column into existence. A config that turns it on without the property is
+     * refused at boot rather than at the first delete, because the failure would
+     * otherwise land on a caller trying to remove a row.
+     *
+     * The hooks do not change: `beforeDelete` can still veto and `afterDelete`
+     * still fires. From the application's point of view the row was deleted;
+     * how the table records that is this flag's business.
+     *
+     * Postgres-only, like {@link SearchConfig}.
+     */
+    softDelete?: boolean | {
+        /**
+         * The `date` property that records the deletion. Defaults to
+         * `deletedAt`.
+         */
+        field?: string;
+    };
 }
 
 /**

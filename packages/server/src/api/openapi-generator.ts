@@ -1,5 +1,5 @@
 import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, isToMany, ResolvedRelation, VectorProperty, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations } from "@rebasepro/common";
+import { effectiveAccess, fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations } from "@rebasepro/common";
 
 /**
  * OpenAPI 3.0.3 specification generator.
@@ -54,11 +54,29 @@ export function generateOpenApiSpec(
         { name: "page", in: "query", schema: { type: "integer", minimum: 1 },
             description: "Page number (alternative to offset). Calculates offset as (page-1)*limit" },
         {
+            name: "after",
+            in: "query",
+            schema: { type: "string" },
+            description:
+                "Keyset cursor: continue after the row the previous page ended on. Pass back "
+                + "`meta.nextCursor` from that response, unchanged — it is opaque, and encodes both the "
+                + "sort keys and the last row's values for them. Unlike `offset`, a row inserted or "
+                + "deleted before the cursor cannot shift the window, so a walk neither repeats nor "
+                + "skips rows. Cannot be combined with `offset`/`page` (400 CURSOR_WITH_OFFSET), and an "
+                + "`orderBy` different from the one the cursor was issued under is refused "
+                + "(400 CURSOR_ORDER_MISMATCH) rather than seeked in an order nobody asked for."
+        },
+        {
             name: "orderBy",
             in: "query",
             schema: { type: "string" },
-            description: "Sort field and direction. Accepts `field:asc` or `field:desc`, or a JSON array `[{\"field\":\"name\",\"direction\":\"asc\"}]` — several entries sort by each in turn, the second breaking ties on the first.",
-            example: "created_at:desc"
+            description:
+                "Sort field and direction. Accepts `field:asc`, `field:desc`, or `field:desc:last` — "
+                + "the third segment places NULLs (`first`/`last`), defaulting to Postgres's own "
+                + "convention (last ascending, first descending). Also accepts a JSON array "
+                + "`[{\"field\":\"name\",\"direction\":\"asc\",\"nulls\":\"last\"}]` — several entries sort by "
+                + "each in turn, the second breaking ties on the first.",
+            example: "created_at:desc:last"
         },
         {
             name: "where",
@@ -83,18 +101,55 @@ export function generateOpenApiSpec(
             example: "(views.gte.10,status.eq.draft)"
         },
         {
+            name: "not",
+            in: "query",
+            schema: { type: "string" },
+            description:
+                "Negation, AND-ed with `where` and `searchString`. Negates the **conjunction** of its "
+                + "conditions: `not(a)` is `NOT a`, `not(a,b)` is `NOT (a AND b)`. Groups nest, so "
+                + "`not(or(a,b))` is the De Morgan case. Compiles to a real SQL `NOT (...)`, which — "
+                + "three-valued logic — also excludes rows whose column is NULL. Ignored when `or` or "
+                + "`and` is also present.",
+            example: "(status.eq.draft,views.gte.10)"
+        },
+        {
             name: "include",
             in: "query",
             schema: { type: "string" },
-            description: "Comma-separated list of relations to include (eager-load). Use `*` for all relations.",
-            example: "author,tags"
+            description:
+                "Relations to load, in either of two spellings. **Comma-separated names or dotted "
+                + "paths** — `author,comments.author`, up to 3 hops deep; `*` loads every relation one "
+                + "hop deep. **JSON**, when a relation needs narrowing — "
+                + "`{\"comments\":{\"limit\":5,\"where\":{\"published\":[\"==\",true]},"
+                + "\"orderBy\":\"created_at:desc\",\"fields\":\"id,body\",\"include\":{\"author\":true}}}`. "
+                + "A value starting with `{` is read as the JSON form. A name that is not a relation of "
+                + "the collection is a 400 UNKNOWN_RELATION, not a silently missing field.",
+            example: "author,comments.author"
         },
         {
             name: "fields",
             in: "query",
             schema: { type: "string" },
-            description: "Comma-separated list of fields to return (field selection)",
+            description:
+                "Comma-separated columns to return. A projection pushed into the SELECT, so a query "
+                + "that needs two fields of a wide row reads two columns. The primary key is always "
+                + "returned (a row that cannot be addressed cannot be updated, deleted, or paged past), "
+                + "and `excludeFromApi` columns stay hidden whether or not they are named here. An "
+                + "unknown column is a 400 UNKNOWN_FIELD.",
             example: "id,name,created_at"
+        },
+        {
+            name: "distinct",
+            in: "query",
+            schema: { type: "boolean" },
+            description:
+                "`SELECT DISTINCT` over the returned columns. Only meaningful alongside `fields`: the "
+                + "primary key is always in the projection, so without narrowing it every row is "
+                + "already distinct. `meta.total` counts distinct rows too. Refused (400) alongside "
+                + "`searchString` or a vector search, which attach a per-row score that makes every row "
+                + "distinct by construction, and (400 DISTINCT_ORDER_BY_NOT_SELECTED) when `orderBy` "
+                + "names a column `fields` does not return.",
+            example: "true"
         },
         {
             name: "searchString",
@@ -179,7 +234,16 @@ description: "Page size used for this query" },
                         offset: { type: "integer",
 description: "Number of records skipped" },
                         hasMore: { type: "boolean",
-description: "Whether more records exist beyond this page" }
+description: "Whether more records exist beyond this page" },
+                        nextCursor: {
+                            type: "string",
+                            description:
+                                "Opaque keyset cursor continuing this listing — pass it back as `?after=`. "
+                                + "Present when `hasMore` is true and the page returned at least one row; "
+                                + "absent on the last page and on an ordering no cursor can describe "
+                                + "(relevance, whose scores are computed per query and not stored). Do not "
+                                + "parse it: the encoding exists to be changed."
+                        }
                     }
                 }
             } as Record<string, unknown>,
@@ -235,6 +299,197 @@ description: "Whether more records exist beyond this page" }
     // at a component that does not exist is a document Swagger UI renders empty
     // and a strict generator refuses.
     const registeredSchemas = new Set((collections || []).map(schemaNameFor));
+
+    /**
+     * `Prefer: return=minimal`, on every route that would otherwise send a row
+     * back. Documented rather than left implicit because a client generated
+     * from this spec cannot send a header the spec does not mention.
+     */
+    const preferHeader = {
+        name: "Prefer",
+        in: "header",
+        required: false,
+        schema: { type: "string", enum: ["return=minimal"] },
+        description:
+            "`return=minimal` asks the server not to send the written row back. Single writes then " +
+            "answer `204 No Content`; bulk and batch writes answer `200` carrying the ids only. " +
+            "The response repeats it in `Preference-Applied` when it was honoured."
+    };
+
+    const ifMatchHeader = {
+        name: "If-Match",
+        in: "header",
+        required: false,
+        schema: { type: "string" },
+        description:
+            "The `ETag` this edit was made against, from the `GET` that read the row. The write is " +
+            "refused with `412` if the row has changed since — which is the difference between " +
+            "\"update the row I read\" and \"overwrite whatever is there now\". `*` means only that " +
+            "the row must exist."
+    };
+
+    const preconditionFailed = {
+        412: {
+            description:
+                "The row changed since the ETag in `If-Match` was issued. Nothing was written: " +
+                "re-read the row, re-apply the change, and send the new ETag",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+        }
+    };
+
+    const minimalResponse = {
+        204: {
+            description: "Written. `Prefer: return=minimal` was honoured, so there is no body",
+            headers: {
+                "Preference-Applied": { schema: { type: "string" }, description: "`return=minimal`" }
+            }
+        }
+    };
+
+    // ── POST /data/_batch — writes across collections, one transaction ────
+    //
+    // Registered before the per-collection paths for the same reason the route
+    // is: `_batch` is not a collection, and reading it as one would document a
+    // table that does not exist.
+    if ((collections || []).length > 0) {
+        paths["/data/_batch"] = {
+            post: {
+                tags: ["Data"],
+                summary: "Write across collections in one transaction",
+                description:
+                    "All-or-nothing across collections — an order and its line items, a user and " +
+                    "their membership row. `/bulk` is one collection at a time, and sending the two " +
+                    "halves as separate requests is exactly the sequence that can half-succeed.\n\n" +
+                    "Operations run in order, each through the same pipeline its single-row route " +
+                    "uses: the same validation, callbacks and row-level security, as the same role. " +
+                    "An operation may name itself with `ref`, and a later one may stand " +
+                    "`{ \"$ref\": \"order.id\" }` wherever a value goes — in `values`, at any depth, " +
+                    "or as an `id`. Only backward references resolve.\n\n" +
+                    "Capped at the same number of entries as a bulk write, because one batch is one " +
+                    "transaction and holds its locks for the whole of it.",
+                operationId: "batchWrite",
+                parameters: [
+                    {
+                        name: "Idempotency-Key",
+                        in: "header",
+                        required: false,
+                        schema: { type: "string" },
+                        description:
+                            "Names this batch so a retry is recognised instead of repeated. Without it a " +
+                            "client that lost the response cannot tell a replay from a second batch, and " +
+                            "the whole batch is written twice."
+                    },
+                    preferHeader
+                ],
+                requestBody: {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: {
+                                type: "object",
+                                required: ["operations"],
+                                properties: {
+                                    operations: {
+                                        type: "array",
+                                        items: { $ref: "#/components/schemas/BatchOperation" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    200: {
+                        description:
+                            "One entry per operation, in order: the written row for a create, update or " +
+                            "upsert, and `null` for a delete",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    properties: {
+                                        data: { type: "array", items: { type: "object", nullable: true } },
+                                        meta: { type: "object", properties: { operations: { type: "integer" } } }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    400: {
+                        description:
+                            "Malformed body, an unknown collection or field, an illegal field operation " +
+                            "or conflict target, a forward `$ref`, or more operations than the limit. " +
+                            "Nothing was written",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    404: {
+                        description: "An `update` or `delete` names a row that does not exist; nothing was written",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    409: {
+                        description: "A request with the same Idempotency-Key is still in flight",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    422: {
+                        description: "The Idempotency-Key was already used for a different request",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    ...errorResponses(requireAuth)
+                }
+            }
+        };
+
+        schemas.FieldOperation = {
+            type: "object",
+            description:
+                "A change to the column's current value rather than the value to store. Exactly one " +
+                "operator per field. Only on an update: an operation over a value that does not exist " +
+                "yet is refused with a 400.",
+            properties: {
+                $inc: { type: "number", description: "Add to a `number` column; negative to subtract." },
+                $push: { description: "Append a value, or each of an array of values, to an `array` column." },
+                $pull: { description: "Remove every occurrence of a value from an `array` column." },
+                $merge: { type: "object", description: "Shallow-merge an object into a `map` column." }
+            }
+        };
+
+        schemas.BatchOperation = {
+            type: "object",
+            required: ["op", "collection"],
+            properties: {
+                op: { type: "string", enum: ["create", "update", "upsert", "delete"] },
+                collection: { type: "string", description: "The collection slug this operation writes to." },
+                id: {
+                    description:
+                        "Required for `update` and `delete`. May instead be a reference marker — an " +
+                        "object whose single key is `$ref` and whose value is `<ref name>.<field>`, " +
+                        "e.g. `{ \"$ref\": \"order.id\" }` — naming a column of the row an earlier " +
+                        "operation wrote. (Described rather than declared as a schema: `$ref` is a " +
+                        "reserved word to every OpenAPI reader, and a property named `$ref` is read " +
+                        "as a reference and mangled.)",
+                    oneOf: [{ type: "string" }, { type: "integer" }, { type: "object" }]
+                },
+                values: {
+                    type: "object",
+                    description:
+                        "The row's fields. Values may be `$ref` markers; an `update` may also carry " +
+                        "field operations.",
+                    additionalProperties: true
+                },
+                onConflict: {
+                    type: "array",
+                    items: { type: "string" },
+                    description:
+                        "`upsert` only: the columns the conflict is matched on. Must carry a declared " +
+                        "uniqueness guarantee. Defaults to the primary key."
+                },
+                ref: {
+                    type: "string",
+                    description: "Names this operation's result, so a later one can `$ref` its columns."
+                }
+            }
+        };
+    }
 
     // ── Collection routes ────────────────────────────────────────────────
     for (const collection of (collections || [])) {
@@ -395,6 +650,22 @@ description: "Whether more records exist beyond this page" }
                 tags: [collection.name],
                 summary: `Create ${collection.singularName || collection.name}`,
                 operationId: `create${schemaName}`,
+                parameters: [
+                    {
+                        name: "on_conflict",
+                        in: "query",
+                        required: false,
+                        schema: { type: "string" },
+                        description:
+                            "Comma-separated columns to upsert on, turning the create into " +
+                            "INSERT ... ON CONFLICT DO UPDATE. They must carry a declared uniqueness " +
+                            "guarantee — `validation.unique`, a `unique` index, or the primary key — " +
+                            "or the request is refused with a 400 naming the targets that do exist. " +
+                            "Left off, this is a plain insert and a duplicate key still raises.",
+                        example: "email"
+                    },
+                    preferHeader
+                ],
                 requestBody: {
                     required: true,
                     content: {
@@ -412,6 +683,7 @@ description: "Whether more records exist beyond this page" }
                             }
                         }
                     },
+                    ...minimalResponse,
                     ...errorResponses(requireAuth)
                 }
             }
@@ -463,7 +735,7 @@ description: "Whether more records exist beyond this page" }
                     "security. Capped server-side because one batch holds its locks for its whole " +
                     "duration.",
                 operationId: `createMany${schemaName}`,
-                parameters: [idempotencyHeader],
+                parameters: [idempotencyHeader, preferHeader],
                 requestBody: {
                     required: true,
                     content: {
@@ -475,7 +747,15 @@ description: "Whether more records exist beyond this page" }
                                     rows: { type: "array", items: { $ref: `#/components/schemas/${schemaName}Input` } },
                                     upsert: {
                                         type: "boolean",
-                                        description: "Write each row as INSERT ... ON CONFLICT DO UPDATE on the primary key."
+                                        description: "Write each row as INSERT ... ON CONFLICT DO UPDATE."
+                                    },
+                                    onConflict: {
+                                        type: "array",
+                                        items: { type: "string" },
+                                        description:
+                                            "The columns the conflict is matched on, instead of the primary key. " +
+                                            "They must carry a declared uniqueness guarantee. Naming them without " +
+                                            "`upsert: true` is a 400 rather than a silently ignored field."
                                     }
                                 }
                             }
@@ -509,7 +789,7 @@ description: "Whether more records exist beyond this page" }
                     "than `id` a flat row cannot say whether a column is the address or a value to " +
                     "write. An id matching no row fails the batch.",
                 operationId: `updateMany${schemaName}`,
-                parameters: [idempotencyHeader],
+                parameters: [idempotencyHeader, preferHeader],
                 requestBody: {
                     required: true,
                     content: {
@@ -624,17 +904,42 @@ in: "path",
 required: true,
 schema: { type: "string" },
 description: "Entity ID" },
+                    // The same two parameters the list route documents, and the
+                    // same code serves them — one row and a page of them go
+                    // through one pipeline, so anything true of `include` or
+                    // `fields` there is true here.
                     {
                         name: "include",
                         in: "query",
                         schema: { type: "string" },
-                        description: "Comma-separated list of relations to include",
-                        example: "author,tags"
+                        description:
+                            "Relations to load: comma-separated names or dotted paths "
+                            + "(`author,comments.author`, up to 3 hops), `*` for all one hop deep, or the "
+                            + "JSON form for per-relation `limit`/`where`/`orderBy`/`fields`. An unknown "
+                            + "name is a 400 UNKNOWN_RELATION.",
+                        example: "author,comments.author"
+                    },
+                    {
+                        name: "fields",
+                        in: "query",
+                        schema: { type: "string" },
+                        description:
+                            "Comma-separated columns to return, as a SELECT projection. The primary key "
+                            + "always survives and `excludeFromApi` columns stay hidden.",
+                        example: "id,title"
                     }
                 ],
                 responses: {
                     200: {
                         description: "Entity found",
+                        headers: {
+                            ETag: {
+                                schema: { type: "string" },
+                                description:
+                                    "This row's version. Send it back as `If-Match` on a later PATCH or " +
+                                    "DELETE to have the write refused if the row has changed in between."
+                            }
+                        },
                         content: {
                             "application/json": {
                                 schema: { $ref: `#/components/schemas/${schemaName}` }
@@ -646,7 +951,12 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
                     ...errorResponses(requireAuth)
                 }
             },
-            patch: updateOperation(collection, schemaName, requireAuth),
+            patch: updateOperation(collection, schemaName, requireAuth, {
+                ifMatchHeader,
+                preferHeader,
+                preconditionFailed,
+                minimalResponse
+            }),
             delete: {
                 tags: [collection.name],
                 summary: `Delete ${collection.singularName || collection.name}`,
@@ -656,12 +966,32 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
 in: "path",
 required: true,
 schema: { type: "string" },
-description: "Entity ID" }
+description: "Entity ID" },
+                    ifMatchHeader,
+                    {
+                        name: "Idempotency-Key",
+                        in: "header",
+                        required: false,
+                        schema: { type: "string" },
+                        description:
+                            "Names this delete so a retry replays its answer. A delete replayed after " +
+                            "the first attempt committed would otherwise answer 404 — which an offline " +
+                            "queue reads as a permanent failure for a delete that in fact succeeded."
+                    }
                 ],
                 responses: {
                     204: { description: "Deleted successfully" },
                     404: { description: "Entity not found",
 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
+                    409: {
+                        description: "A request with the same Idempotency-Key is still in flight",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    422: {
+                        description: "The Idempotency-Key was already used for a different request",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    ...preconditionFailed,
                     ...errorResponses(requireAuth)
                 }
             }
@@ -776,8 +1106,42 @@ description: `${collection.singularName || collection.name} ID` },
  * being fixed in one loop at a time: this is the same rule the SDK generator
  * applies to its `Row` type (`packages/codegen/src/generate-types.ts`).
  */
-function isDocumentedProperty(property: Property): boolean {
-    return !property.excludeFromApi;
+function isDocumentedProperty(property: Property, direction: "read" | "write" = "read"): boolean {
+    const access = effectiveAccess(property);
+    return access?.[direction]?.length !== 0;
+}
+
+/**
+ * The `x-rebase-access` annotation, or nothing for a field with no rule.
+ *
+ * A vendor extension rather than a schema keyword because OpenAPI has no way to
+ * say "this property is present for some callers" — `readOnly` is about the
+ * direction of a field, not about who. Generators ignore what they do not know,
+ * so a client built from this spec still compiles; a *human* reading `/docs`, or
+ * a gateway that wants to enforce the same rule at the edge, gets the role lists
+ * verbatim. Emitted for the role case only: a field closed to everybody is
+ * absent from the document entirely, which is a stronger statement.
+ */
+function accessAnnotation(property: Property): Record<string, unknown> | undefined {
+    const access = effectiveAccess(property);
+    if (!access) return undefined;
+    const annotation: Record<string, unknown> = {};
+    if (access.read !== undefined) annotation.read = [...access.read];
+    if (access.write !== undefined) annotation.write = [...access.write];
+    return Object.keys(annotation).length > 0 ? annotation : undefined;
+}
+
+/** The sentence `x-rebase-access` deserves in prose, for a reader of `/docs`. */
+function accessDescription(property: Property): string | undefined {
+    const access = effectiveAccess(property);
+    if (!access) return undefined;
+    const parts: string[] = [];
+    const phrase = (roles: readonly string[]) =>
+        roles.length === 0 ? "nobody through the API" : roles.map(r => `\`${r}\``).join(", ") + " (and `admin`)";
+    if (access.read !== undefined) parts.push(`readable by ${phrase(access.read)}`);
+    if (access.write !== undefined) parts.push(`writable by ${phrase(access.write)}`);
+    if (parts.length === 0) return undefined;
+    return `Field access: ${parts.join("; ")}. A caller without the role does not receive the field at all — it is absent, not null.`;
 }
 
 /**
@@ -788,10 +1152,10 @@ function isDocumentedProperty(property: Property): boolean {
  * other name. Same pair, same reason, as `excludedApiKeys` in the SDK
  * generator.
  */
-function excludedApiKeys(collection: CollectionConfig): Set<string> {
+function excludedApiKeys(collection: CollectionConfig, direction: "read" | "write" = "read"): Set<string> {
     const excluded = new Set<string>();
     for (const [key, property] of Object.entries(collection.properties ?? {})) {
-        if (!(property as Property)?.excludeFromApi) continue;
+        if (isDocumentedProperty(property as Property, direction)) continue;
         excluded.add(key);
         const columnName = (property as { columnName?: unknown }).columnName;
         if (typeof columnName === "string") excluded.add(columnName);
@@ -989,15 +1353,42 @@ function buildCollectionSchema(
 function updateOperation(
     collection: CollectionConfig,
     schemaName: string,
-    requireAuth: boolean
+    requireAuth: boolean,
+    shared: {
+        ifMatchHeader: Record<string, unknown>;
+        preferHeader: Record<string, unknown>;
+        preconditionFailed: Record<string, unknown>;
+        minimalResponse: Record<string, unknown>;
+    }
 ): Record<string, unknown> {
     return {
         tags: [collection.name],
         summary: `Update ${collection.singularName || collection.name}`,
-        description: "Partial update: only the properties present in the body are written; the rest are left unchanged.",
+        description:
+            "Partial update: only the properties present in the body are written; the rest are left " +
+            "unchanged.\n\n" +
+            "A property's value may instead be a field operation — `{ \"views\": { \"$inc\": 1 } }`, " +
+            "`{ \"tags\": { \"$push\": \"new\" } }`, `{ \"tags\": { \"$pull\": \"old\" } }`, " +
+            "`{ \"meta\": { \"$merge\": { \"seen\": true } } }` — which is applied inside the " +
+            "statement holding the row lock. That is the difference between a counter that is correct " +
+            "under concurrency and one that silently loses increments, because expressing the same " +
+            "change as a value means reading it first. `$inc` needs a `number` property, `$push`/`$pull` " +
+            "an `array`, `$merge` a `map`; anything else is a 400. See the `FieldOperation` schema.",
         operationId: `update${schemaName}`,
         parameters: [
-            { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" }
+            { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" },
+            shared.ifMatchHeader,
+            shared.preferHeader,
+            {
+                name: "Idempotency-Key",
+                in: "header",
+                required: false,
+                schema: { type: "string" },
+                description:
+                    "Names this update so a retry replays its answer instead of applying the edit " +
+                    "again. A PATCH is not naturally idempotent — a field operation emphatically is " +
+                    "not — so a retry after a lost response applies it twice."
+            }
         ],
         requestBody: {
             required: true,
@@ -1020,6 +1411,16 @@ function updateOperation(
                 description: "Entity not found",
                 content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
             },
+            409: {
+                description: "A request with the same Idempotency-Key is still in flight",
+                content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+            },
+            422: {
+                description: "The Idempotency-Key was already used for a different request",
+                content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+            },
+            ...shared.preconditionFailed,
+            ...shared.minimalResponse,
             ...errorResponses(requireAuth)
         }
     };
@@ -1049,13 +1450,16 @@ function buildCollectionUpdateSchema(collection: CollectionConfig): Record<strin
 function buildCollectionInputSchema(collection: CollectionConfig): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
-    const excluded = excludedApiKeys(collection);
+    // The write half, not the read half: a field readable by nobody but
+    // writable by an `admin` belongs in the input body and not in the row, and
+    // the two schemas used to share one exclusion set and so got both wrong.
+    const excluded = excludedApiKeys(collection, "write");
     const emitted = new Set<string>(excluded);
     const idKey = idPropertyEntry(collection)?.[0] ?? "id";
 
     for (const [key, property] of Object.entries(collection.properties)) {
         if (property.type === "relation") continue;
-        if (!isDocumentedProperty(property)) continue;
+        if (!isDocumentedProperty(property, "write")) continue;
 
         // Skip auto-value date fields from the input schema
         if (property.type === "date" && property.autoValue) continue;
@@ -1146,6 +1550,22 @@ function emitWritableRelations(
  * Convert a Rebase Property to an OpenAPI 3.0 schema object.
  */
 function convertPropertyToSchema(property: Property): Record<string, unknown> {
+    const schema = convertPropertyTypeToSchema(property);
+    const annotation = accessAnnotation(property);
+    if (!annotation) return schema;
+
+    const sentence = accessDescription(property);
+    return {
+        ...schema,
+        ...(sentence
+            ? { description: schema.description ? `${schema.description} — ${sentence}` : sentence }
+            : {}),
+        "x-rebase-access": annotation
+    };
+}
+
+/** The JSON Schema a property's *type* compiles to, before any access annotation. */
+function convertPropertyTypeToSchema(property: Property): Record<string, unknown> {
     const base: Record<string, unknown> = {};
 
     if (property.name) {

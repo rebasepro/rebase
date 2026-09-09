@@ -4,7 +4,8 @@ import type { EntityStatus, EntityValues } from "../types/entities";
 import type { CollectionConfig, FilterValues } from "../types/collections";
 import type { OrderByTuple } from "../types/filter-operators";
 import type { RebaseCallContext } from "../call_context";
-import type { LogicalCondition } from "./data";
+import type { IncludeSpec, LogicalCondition } from "./data";
+import type { CollectionUpdateMeta } from "../types/websockets";
 
 
 /**
@@ -15,6 +16,13 @@ export interface FetchOneProps<M extends Record<string, unknown> = Record<string
     id: string | number;
     databaseId?: string;
     collection?: CollectionConfig<M>
+    /**
+     * See {@link FetchCollectionProps.withDeleted}. A soft-deleted row is a 404
+     * here by default, so `findById` and `find` agree about which rows exist —
+     * a row you cannot find in a listing and can still open by id is the kind
+     * of inconsistency that makes a feature untrustworthy.
+     */
+    withDeleted?: boolean | "only";
 }
 
 /**
@@ -190,6 +198,36 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
     order?: "desc" | "asc";
     /** Vector similarity search configuration */
     vectorSearch?: VectorSearchParams;
+    /**
+     * What to do about rows a soft delete has stamped.
+     *
+     * Unset (the default) hides them, which is the whole point of the feature:
+     * a deleted row is deleted as far as the application is concerned. `true`
+     * includes them alongside the live ones — a trash view, an admin audit.
+     * `"only"` returns nothing but them, which is the trash view proper and is
+     * not expressible as a filter, because the field is not part of the
+     * caller's vocabulary.
+     *
+     * Ignored by collections that do not declare {@link
+     * PostgresCollectionConfig.softDelete}: there is no stamp to look at, and
+     * silently returning nothing for `"only"` on such a collection would be a
+     * worse answer than ignoring it.
+     */
+    withDeleted?: boolean | "only";
+    /**
+     * Relations to load — see {@link IncludeSpec}.
+     *
+     * Absent means *no* relations, the same as it does over REST. It used to be
+     * absent from this contract entirely, and the driver's own fetch then loaded
+     * every relation of every row unconditionally: `find()` returned a row with
+     * a foreign key and `listen()` returned the same row with a nested object
+     * where that key was, for the same query.
+     */
+    include?: IncludeSpec;
+    /** Columns to read, as a projection. See `FindParams.fields`. */
+    fields?: string[];
+    /** `SELECT DISTINCT` over the projection. See `FindParams.distinct`. */
+    distinct?: boolean;
 }
 
 /**
@@ -198,7 +236,15 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
 export type ListenCollectionProps<M extends Record<string, unknown> = Record<string, unknown>> =
     FetchCollectionProps<M> &
     {
-        onUpdate: (rows: Record<string, unknown>[]) => void;
+        /**
+         * Page number (1-indexed), as `FindParams.page`.
+         *
+         * A subscription could name a `limit` and an `offset` but not a `page`,
+         * so a live list on page three had to compute the offset itself — and
+         * the two spellings then disagreed about what a page was.
+         */
+        page?: number;
+        onUpdate: (rows: Record<string, unknown>[], meta?: CollectionUpdateMeta) => void;
         onError?: (error: Error) => void;
     };
 
@@ -222,6 +268,23 @@ export interface SaveProps<M extends Record<string, unknown> = Record<string, un
      * them there is no conflict target and the row is inserted normally.
      */
     upsert?: boolean;
+
+    /**
+     * The columns the upsert matches a conflict on, instead of the primary key.
+     *
+     * The key is the only target that always exists, and it is the wrong one
+     * for the write an upsert is usually reached for: "this user, identified by
+     * their email, exists with these values". Keyed on the primary key that is
+     * an insert, because the caller does not know the serial id — so the row is
+     * duplicated on every run.
+     *
+     * Only column sets carrying a uniqueness guarantee are legal here; Postgres
+     * refuses anything else with 42P10, from inside a transaction. The REST
+     * layer checks the target against the collection's declarations first (see
+     * `resolveConflictTarget`), so the answer is a 400 naming the available
+     * targets rather than a 500 naming a constraint the caller never wrote.
+     */
+    onConflict?: readonly string[];
 }
 
 /**
@@ -237,6 +300,8 @@ export interface SaveManyProps<M extends Record<string, unknown> = Record<string
     collection?: CollectionConfig<M>;
     /** Apply every row as INSERT ... ON CONFLICT DO UPDATE. See {@link SaveProps.upsert}. */
     upsert?: boolean;
+    /** The conflict target for those upserts. See {@link SaveProps.onConflict}. */
+    onConflict?: readonly string[];
 }
 
 /**
@@ -262,6 +327,17 @@ export interface UpdateManyProps<M extends Record<string, unknown> = Record<stri
 export interface DeleteProps<M extends Record<string, unknown> = Record<string, unknown>> {
     row: { id: string | number; path: string; values?: Partial<EntityValues<M>> };
     collection?: CollectionConfig<M>;
+    /**
+     * Issue a real `DELETE` on a collection that declares
+     * {@link PostgresCollectionConfig.softDelete}.
+     *
+     * The row and every cascade behind it go. It needs the same permission an
+     * ordinary delete does and nothing more: it is the same verb, and a second
+     * access-control surface for one operation is a second thing to get wrong.
+     * No effect on a collection without soft delete, where every delete is
+     * already this one.
+     */
+    hard?: boolean;
 }
 
 /**
@@ -271,6 +347,36 @@ export interface DeleteManyProps<M extends Record<string, unknown> = Record<stri
     path: string;
     ids: (string | number)[];
     collection?: CollectionConfig<M>;
+    /** See {@link DeleteProps.hard}. */
+    hard?: boolean;
+}
+
+/**
+ * One operation of a {@link DataDriver.batchWrite}.
+ *
+ * `path` rather than a slug, because a batch entry addresses rows exactly as
+ * the single-row props do and a nested path is a legal address there.
+ *
+ * @internal
+ */
+export interface BatchWriteOperation<M extends Record<string, unknown> = Record<string, unknown>> {
+    op: "create" | "update" | "upsert" | "delete";
+    path: string;
+    /** Required for `update` and `delete`. May be a `$ref` marker; see `batchWrite`. */
+    id?: unknown;
+    values?: Partial<EntityValues<M>>;
+    collection?: CollectionConfig<M>;
+    /** See {@link SaveProps.onConflict}. `upsert` only. */
+    onConflict?: readonly string[];
+    /** Names this operation's result, for a later `$ref`. */
+    ref?: string;
+}
+
+/**
+ * @internal
+ */
+export interface BatchWriteProps<M extends Record<string, unknown> = Record<string, unknown>> {
+    operations: BatchWriteOperation<M>[];
 }
 
 export type FilterCombinationValidProps = {
@@ -419,6 +525,34 @@ export interface DataDriver {
     deleteMany?<M extends Record<string, unknown> = Record<string, unknown>>(props: DeleteManyProps<M>): Promise<void>;
 
     /**
+     * Apply a mixed list of writes across collections as one unit of work.
+     *
+     * The capability `saveMany` and `deleteMany` cannot express between them: a
+     * batch that touches two tables. Sent as two requests those can
+     * half-succeed, and the recovery — read back, work out which half landed,
+     * undo it — is code nobody writes.
+     *
+     * Every operation runs the pipeline its single-row equivalent runs, in
+     * order, in one transaction, under the caller's own role. Operations may
+     * carry `{ "$ref": "<name>.<field>" }` markers in `values` or `id`, which
+     * the driver resolves against the rows earlier operations wrote — the
+     * driver, because inside the transaction is the only place those rows
+     * exist. `@rebasepro/server` exports `resolveBatchRefs` so the resolution
+     * is one implementation rather than one per driver.
+     *
+     * Resolves to one entry per operation, aligned to the input: the written
+     * row for a create, update or upsert, and `null` for a delete.
+     *
+     * Optional for the same reason `saveMany` is: a driver that cannot make it
+     * atomic must not pretend to. The REST layer answers `BATCH_UNSUPPORTED`
+     * rather than falling back to a loop, which would be the non-atomic
+     * sequence the caller reached for this to avoid.
+     */
+    batchWrite?<M extends Record<string, unknown> = Record<string, unknown>>(
+        props: BatchWriteProps<M>
+    ): Promise<(Record<string, unknown> | null)[]>;
+
+    /**
      * Check if the given property is unique in the given collection
      * @param path Collection path
      * @param name of the property
@@ -535,9 +669,41 @@ export interface RestFetchService {
             searchExplain?: boolean;
             databaseId?: string;
             vectorSearch?: VectorSearchParams;
+            /** See {@link FetchCollectionProps.withDeleted}. */
+            withDeleted?: boolean | "only";
+            /**
+             * Columns to read. A projection pushed into the SELECT, not a trim
+             * of the response — `excludeFromApi` still applies on top, and the
+             * primary key is always read whether or not it is named.
+             */
+            fields?: string[];
+            /** `SELECT DISTINCT` over the projection. See `FindParams.distinct`. */
+            distinct?: boolean;
         },
-        include?: string[]
+        include?: IncludeSpec
     ): Promise<Record<string, unknown>[]>;
+
+    /**
+     * The opaque cursor that continues a listing after `row`.
+     *
+     * On the driver rather than the route because deriving it needs the
+     * collection's primary key — which may be named anything and span several
+     * columns — and that is the driver's knowledge. The route holds the last
+     * row and the sort keys and asks for the string.
+     *
+     * `undefined` where no cursor can describe the page: an ordering with no
+     * stored value to compare against (relevance), or a row missing a value for
+     * one of the sort keys. The listing then reports no `nextCursor` and the
+     * caller pages by offset, which is what it did before cursors existed.
+     *
+     * Optional: a driver that cannot seek simply never issues one, and
+     * `meta.nextCursor` is absent for every read it serves.
+     */
+    cursorFor?(
+        collectionPath: string,
+        row: Record<string, unknown>,
+        orderBy?: OrderByTuple[]
+    ): string | undefined;
 
     /**
      * `count`/`sum`/`avg`/`min`/`max` over the rows a filter selects,
@@ -561,6 +727,8 @@ export interface RestFetchService {
             logical?: LogicalCondition;
             searchString?: string;
             limit?: number;
+            /** See {@link FetchCollectionProps.withDeleted}. */
+            withDeleted?: boolean | "only";
         }
     ): Promise<Record<string, unknown>[]>;
 
@@ -570,7 +738,13 @@ export interface RestFetchService {
     fetchOneForRest(
         collectionPath: string,
         id: string | number,
-        include?: string[],
-        databaseId?: string
+        include?: IncludeSpec,
+        databaseId?: string,
+        options?: {
+            /** See `FetchCollectionProps.fields`. */
+            fields?: string[];
+            /** See {@link FetchOneProps.withDeleted}. */
+            withDeleted?: boolean | "only";
+        }
     ): Promise<Record<string, unknown> | null>;
 }

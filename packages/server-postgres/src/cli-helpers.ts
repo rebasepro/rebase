@@ -680,6 +680,57 @@ export async function getVectorExcludes(collectionsPath: string): Promise<string
 }
 
 /**
+ * The generated SQL for the project's `autoValue: "on_update"` properties, if
+ * it has any.
+ *
+ * @param drizzleDir directory holding the generated SQL. Defaults to `drizzle`
+ *        under the working directory.
+ */
+export function readTriggersDdl(drizzleDir: string = path.resolve(process.cwd(), "drizzle")): string {
+    const triggersFile = path.join(drizzleDir, "triggers.sql");
+    if (!fs.existsSync(triggersFile)) return "";
+    return fs.readFileSync(triggersFile, "utf-8").trim();
+}
+
+/**
+ * Install the `updated_at` trigger function and bind it to every column that
+ * asked for one.
+ *
+ * Runs *after* Atlas, like {@link applySearchDdl} and {@link applyVectorDdl}:
+ * a trigger needs its table and its column to exist. Atlas is told to ignore
+ * the triggers ({@link getTriggerExcludes}) because it cannot manage a function
+ * at all — its free tier refuses to parse a desired state containing one.
+ *
+ * A no-op when no property declares `autoValue: "on_update"`. A failure is
+ * *not* swallowed: a push that reported success while the trigger never
+ * appeared is how `updated_at` ends up silently stale for every writer that is
+ * not the driver, which is the whole reason the trigger exists.
+ */
+export async function applyTriggersDdl(
+    databaseUrl: string,
+    drizzleDir: string = path.resolve(process.cwd(), "drizzle")
+): Promise<void> {
+    const sql = readTriggersDdl(drizzleDir);
+    if (!sql) return;
+
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: databaseUrl });
+    await client.connect();
+    try {
+        await client.query(sql);
+    } finally {
+        await client.end();
+    }
+    out(chalk.gray("  ✓ Applied `updated_at` triggers"));
+}
+
+/** @see getSearchExcludes */
+export async function getTriggerExcludes(collectionsPath: string): Promise<string[]> {
+    const { triggerExcludePatterns } = await import("./schema/generate-postgres-ddl-logic");
+    return triggerExcludePatterns(await loadCollectionsForCli(collectionsPath));
+}
+
+/**
  * Query the live database for every user table/view outside the system
  * catalogs. Separated from {@link getTableExcludes} so its failure mode can
  * be handled explicitly (fail closed) and so tests can inject a stub.
@@ -782,8 +833,9 @@ export async function getForeignIndexExcludes(
  */
 async function managedIndexNames(collectionsPath: string): Promise<Set<string>> {
     const collections = await loadCollectionsForCli(collectionsPath);
-    const { resolveColumnName, searchExcludePatterns, vectorExcludePatterns } =
+    const { searchExcludePatterns, vectorExcludePatterns } =
         await import("./schema/generate-postgres-ddl-logic");
+    const { resolveColumnName } = await import("./schema/column-plan-helpers");
     const { buildCollectionIndexPlan } = await import("./schema/collection-index");
 
     const names = new Set<string>(

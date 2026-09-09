@@ -152,7 +152,20 @@ describe("client → server query contract", () => {
         fc.assert(fc.property(findParams, params => {
             const options = roundTrip(params as never);
             if (params.offset) expect(options.offset).toBe(params.offset);
-            if (params.include?.length) expect(options.include).toEqual(params.include);
+            if (params.include?.length) {
+                // The *set*, not the array. `include` is a graph now, so the
+                // codec de-duplicates: asking for one relation twice is the
+                // same request, and loading it twice would be two identical
+                // queries. Order is not meaningful either — the relations of
+                // one row are loaded independently of each other.
+                const asked = new Set(params.include);
+                const got = new Set(
+                    Array.isArray(options.include)
+                        ? options.include
+                        : Object.keys(options.include ?? {})
+                );
+                expect([...got].sort()).toEqual([...asked].sort());
+            }
         }), { numRuns: RUNS });
     });
 

@@ -8,6 +8,8 @@
  */
 
 import { logger } from "@rebasepro/server";
+import type { CollectionConfig } from "@rebasepro/types";
+import { fieldKeyForColumn, getTableName } from "@rebasepro/common";
 
 /**
  * Shape of a deliberate client-facing error — `ApiError` from
@@ -211,6 +213,124 @@ export function isRowLevelSecurityDenial(error: unknown): boolean {
 }
 
 /**
+ * One constraint the database refused, named in the caller's vocabulary.
+ *
+ * `field` is the **wire** name, derived from the physical column: `author_id`
+ * on the table is `authorId` on the row and in the request body, and telling a
+ * caller their `author_id` is missing sends them looking for a key their client
+ * has never seen. `code` is the SQLSTATE, which is stable, documented by
+ * Postgres and the same in every environment — unlike the message, which is
+ * deliberately thinner in production.
+ *
+ * Deliberately no `value`. The column name is safe to publish: it is already in
+ * the OpenAPI, the generated SDK and the caller's own request. The *value* is
+ * not — `23505`'s detail reads `Key (email)=(a@b.c) already exists.`, which
+ * answers "is this person registered?" for any address on a table whose rows
+ * RLS is otherwise hiding completely.
+ */
+export interface PgFieldViolation {
+    field: string;
+    code: string;
+}
+
+/**
+ * The physical column names a Postgres error is about.
+ *
+ * Postgres puts one in `column` for `23502` and nowhere else, so the rest are
+ * read out of the two places that do carry them:
+ *
+ * - `detail` — `Key (author_id)=(9) is not present in table "authors".` and
+ *   `Key (email, tenant_id)=(…) already exists.` Only the parenthesised column
+ *   list is read; the values after `=` are never touched.
+ * - `constraint` — `users_email_key`, `posts_author_id_fkey`. The table prefix
+ *   and the constraint suffix are stripped, leaving the columns joined by `_`,
+ *   which is ambiguous for multi-column constraints and is therefore only used
+ *   when `detail` gave nothing.
+ *
+ * `22P02` carries neither, because an invalid literal fails during parse rather
+ * than against a constraint. Its message names the *type*, and an enum type is
+ * generated as `<table>_<column>` — which is the one case worth decoding,
+ * because a value outside an enum's labels is the most common 22P02 anyone
+ * hits and the least legible one.
+ */
+function offendingColumns(pgError: PostgresError, collection?: CollectionConfig): string[] {
+    if (pgError.column) return [pgError.column];
+
+    const detail = pgError.detail;
+    if (detail) {
+        const keyed = /Key \(([^)]+)\)=/.exec(detail);
+        if (keyed) {
+            return keyed[1].split(",").map(part => part.trim().replace(/^"|"$/g, "")).filter(Boolean);
+        }
+    }
+
+    if (pgError.code === "22P02") {
+        // `invalid input value for enum posts_status: "archived"`
+        const enumType = /invalid input value for enum ([^:\s]+)/i.exec(pgError.message ?? "");
+        if (enumType && collection) {
+            const typeName = enumType[1].replace(/^.*\./, "").replace(/"/g, "");
+            const table = getTableName(collection);
+            if (typeName.startsWith(`${table}_`)) return [typeName.slice(table.length + 1)];
+        }
+        return [];
+    }
+
+    const constraint = pgError.constraint;
+    if (constraint && collection) {
+        const table = getTableName(collection);
+        const stripped = constraint
+            .replace(new RegExp(`^${table}_`), "")
+            .replace(/_(pkey|key|fkey|unique|check|excl|idx)$/, "");
+        // Only when it names something the collection actually has: a
+        // hand-written constraint name is not a column list, and guessing at one
+        // would put a field in the response that does not exist.
+        if (stripped && stripped !== constraint) {
+            const columns = new Set<string>();
+            for (const [key, prop] of Object.entries(collection.properties ?? {})) {
+                columns.add((prop as { columnName?: string })?.columnName ?? key);
+            }
+            if (columns.has(stripped)) return [stripped];
+            const wire = fieldKeyForColumn(collection, stripped);
+            if (collection.properties && wire in collection.properties) return [stripped];
+        }
+    }
+
+    return [];
+}
+
+/**
+ * The fields a Postgres error is about, for `details.violations`.
+ *
+ * Only the four SQLSTATEs that describe *the caller's data*: a missing value, a
+ * duplicate, a bad literal, a foreign key pointing at nothing. Everything else
+ * — a dropped connection, a missing table, a privilege problem — is the
+ * deployment's, and naming a field for it would send the reader to the wrong
+ * place.
+ *
+ * Empty when the collection is unknown or the column cannot be recovered. An
+ * empty list is the honest answer; inventing a field is worse than saying
+ * nothing, because a form will mark the wrong input red.
+ */
+export function pgFieldViolations(
+    pgError: PostgresError,
+    collection?: CollectionConfig
+): PgFieldViolation[] {
+    const code = pgError.code;
+    if (code !== "23502" && code !== "23505" && code !== "22P02" && code !== "23503") return [];
+    // Without the collection there is no mapping, only a guess. `toWireKey`
+    // would get the default case right and silently invent a field for any
+    // property carrying an explicit `columnName` — and a form pointed at an
+    // input that does not exist is worse off than one shown the raw column.
+    if (!collection) return [];
+    const columns = offendingColumns(pgError, collection);
+    if (columns.length === 0) return [];
+    return columns.map(column => ({
+        field: fieldKeyForColumn(collection, column),
+        code
+    }));
+}
+
+/**
  * Translate a raw PostgreSQL error into a user-friendly message.
  *
  * @param pgError  - The extracted PostgreSQL error (from {@link extractPgError})
@@ -220,8 +340,8 @@ export function isRowLevelSecurityDenial(error: unknown): boolean {
 export function pgErrorToFriendlyMessage(
     pgError: PostgresError,
     context: string,
-    options: { verbose?: boolean } = {}
-): { message: string; code: string } {
+    options: { verbose?: boolean; collection?: CollectionConfig } = {}
+): { message: string; code: string; violations: PgFieldViolation[] } {
     // Postgres's own `DETAIL` and `HINT`, and the raw driver message, are what
     // make these errors useful while you are building — and what makes them an
     // oracle once the server is answering strangers.
@@ -247,6 +367,12 @@ export function pgErrorToFriendlyMessage(
     const pgMessage = verbose ? rawMessage : "";
     const code = pgError.code || "UNKNOWN";
 
+    // Which *field* the caller has to fix, derived from the column. Safe in
+    // production — a column name is already published in the OpenAPI and the
+    // generated SDK — where the value that broke the rule is not, and is never
+    // included. See `pgFieldViolations`.
+    const violations = pgFieldViolations(pgError, options.collection);
+
     const suffix = hint ? ` Hint: ${hint}` : "";
     const tableRef = table ?? context;
 
@@ -259,49 +385,64 @@ export function pgErrorToFriendlyMessage(
                 message: detail
                     ? `Foreign key constraint violated: ${detail}${suffix}`
                     : `Cannot complete operation: a foreign key constraint${constraint ? ` (${constraint})` : ""} was violated in "${context}".${suffix}`,
-                code
+                code,
+                violations
             };
         case "23505": // unique_violation
             return {
                 message: detail
                     ? `Duplicate value: ${detail}${suffix}`
                     : `Cannot complete operation: a unique constraint${constraint ? ` (${constraint})` : ""} was violated in "${context}".${suffix}`,
-                code
+                code,
+                violations
             };
-        case "23502": // not_null_violation
+        case "23502": {
+            // not_null_violation. The message names the *field* when the
+            // collection is known, because that is the key the caller sent and
+            // the only one they can act on: told `author_id` is missing, they go
+            // looking for a key their generated client has never mentioned.
+            const named = violations[0]?.field ?? column ?? "unknown";
             return {
-                message: `Missing required field: "${column ?? "unknown"}" in "${tableRef}" cannot be empty.${suffix}`,
-                code
+                message: `Missing required field: "${named}" in "${tableRef}" cannot be empty.${suffix}`,
+                code,
+                violations
             };
+        }
         case "23514": // check_violation
             return {
                 message: `Validation failed: a check constraint${constraint ? ` (${constraint})` : ""} was violated in "${context}".${suffix}`,
-                code
+                code,
+                violations
             };
         case "22P02": // invalid_text_representation (e.g. invalid UUID, wrong enum value)
             return {
                 message: `Invalid data format in "${context}"${said}.${suffix}`,
-                code
+                code,
+                violations
             };
         case "22001": // string_data_right_truncation (value too long)
             return {
                 message: `Value too long for column "${column ?? "unknown"}" in "${tableRef}"${said}.${suffix}`,
-                code
+                code,
+                violations
             };
         case "22003": // numeric_value_out_of_range
             return {
                 message: `Numeric value out of range for column "${column ?? "unknown"}" in "${tableRef}"${said}.${suffix}`,
-                code
+                code,
+                violations
             };
         case "42703": // undefined_column
             return {
                 message: `Unknown column in "${tableRef}"${said}. Check if your schema is up to date (run migrations).${suffix}`,
-                code
+                code,
+                violations
             };
         case "42P01": // undefined_table
             return {
                 message: `Table not found for "${context}"${said}. Check if your schema is up to date (run migrations).${suffix}`,
-                code
+                code,
+                violations
             };
         case "42501": // insufficient_privilege
             // Two unrelated failures share this SQLSTATE, and the old message
@@ -313,18 +454,21 @@ export function pgErrorToFriendlyMessage(
                     // The caller. Their policies do not permit this row; the
                     // deployment is working exactly as configured.
                     message: `Not permitted to write this row in "${tableRef}": it does not satisfy the row-level security policy.${suffix}`,
-                    code
+                    code,
+                    violations
                 }
                 : {
                     // The deployment. No policy is involved — the connecting
                     // role cannot touch the table at all.
                     message: `Permission denied on "${tableRef}": the database role this server connects as lacks privileges on it.${suffix}`,
-                    code
+                    code,
+                    violations
                 };
         case "28000": // invalid_authorization_specification
             return {
                 message: `Authorization failed for "${context}". Check your database credentials.${suffix}`,
-                code
+                code,
+                violations
             };
         default: {
             // Unhandled PG code — still surface the actual database message
@@ -334,7 +478,7 @@ export function pgErrorToFriendlyMessage(
             if (dataType) parts.push(`Data type: ${dataType}`);
             if (constraint) parts.push(`Constraint: ${constraint}`);
             if (hint) parts.push(`Hint: ${hint}`);
-            return { message: parts.join(". "), code };
+            return { message: parts.join(". "), code, violations };
         }
     }
 }
@@ -352,7 +496,11 @@ export function pgErrorToFriendlyMessage(
  * @returns An object with `message` (user-friendly) and optional `code`
  *          (the `ApiError` code, or the PG SQLSTATE).
  */
-export function sanitizeErrorForClient(error: unknown, context: string): { message: string; code?: string } {
+export function sanitizeErrorForClient(
+    error: unknown,
+    context: string,
+    options: { collection?: CollectionConfig } = {}
+): { message: string; code?: string; violations?: PgFieldViolation[] } {
     // ── A deliberate 4xx is not a database failure ──────────────────
     // Its message and code are written for the client; replacing them with
     // "Check server logs" would discard the only diagnosis the caller gets
@@ -391,7 +539,8 @@ export function sanitizeErrorForClient(error: unknown, context: string): { messa
             // value; the wrapper added only the leak. `logger` strips the
             // wrapper as well, but the field itself carried nothing else.
         });
-        return pgErrorToFriendlyMessage(pgError, context);
+        const { message, code, violations } = pgErrorToFriendlyMessage(pgError, context, { collection: options.collection });
+        return { message, code, ...(violations.length > 0 && { violations }) };
     }
 
     // No PG error found — log the raw error as-is

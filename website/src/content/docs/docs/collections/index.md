@@ -249,6 +249,7 @@ export const productsCollection = defineCollection({
 | `slug` | `string` | **Required.** URL-safe identifier. Used in the admin UI URL and REST API path (`/api/data/{slug}`). |
 | `name` | `string` | **Required.** Display name (plural). Shown in navigation and page headers. |
 | `singularName` | `string` | Display name for a single entity. Used in "New Product", "Edit Product", etc. |
+| `description` | `string` | A sentence about what this collection holds, shown above the list. Markdown. |
 | `table` | `string` | PostgreSQL table name. Defaults to `toSnakeCase(slug)` — set it only to decouple the URL from the table, e.g. an existing `blog_posts` table served at `/posts`. |
 | `admin.icon` | `string` | A [Lucide](https://lucide.dev/icons) icon name, e.g. `"FileText"`, `"ShoppingCart"`. A rendered element also works, but the name survives serialization, so it is what the schema editor writes back. |
 
@@ -262,6 +263,10 @@ export const productsCollection = defineCollection({
 | `indexes` | `CollectionIndex[]` | Postgres indexes this table needs. See [Indexes](/docs/backend/indexes). |
 | `search` | `SearchConfig` | Ranked full-text search over the fields you name, including JSONB and array content. Postgres only. See [Search](/docs/backend/search). |
 | `auth` | `boolean \| AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
+| `schema` | `string` | Postgres schema the table lives in — `"public"`, `"rebase"`, `"auth"`. Defaults to `"public"`. |
+| `disableDefaultPolicies` | `boolean` | Remove the baseline policies the generator injects — an admin/server SELECT, and on an auth collection a self-read plus an admin-only write gate — and take full responsibility for this collection's RLS. `false` by default. See [Security Rules](/docs/collections/security-rules). |
+| `softDelete` | `boolean \| { field?: string }` | Turn `delete` into a timestamp and hide stamped rows from every read. `true` uses `deletedAt`; the object form renames the field. The collection must declare that `date` property itself. Postgres only — see [Soft delete](/docs/collections/soft-delete) |
+| `strictWrites` | `boolean` | Reject a write that names a field this collection does not declare, with a 400. `true` by default. Set it to `false` only where the column genuinely exists and is not declared — filled by a trigger, or introspected rather than written down. |
 
 ### UI Configuration
 
@@ -302,22 +307,39 @@ Inside `admin`, except `history`, which is a backend feature and stays at the to
 
 ### Advanced
 
+At the top level, because the backend reads them:
+
 | Property | Type | Description |
 |----------|------|-------------|
 | `callbacks` | `CollectionCallbacks` | Lifecycle hooks (`beforeSave`, `afterSave`, `beforeDelete`, etc.) |
-| `entityActions` | `EntityAction[]` | Custom actions on entities (archive, publish, etc.) |
-| `Actions` | `React.ComponentType` | Custom toolbar actions component |
-| `entityViews` | `EntityCustomView[]` | Custom tabs in the entity detail view |
-| `additionalFields` | `AdditionalFieldDelegate[]` | Computed/virtual columns |
-| `childCollections` | `() => CollectionConfig[]` | Nested child collections |
-| `subcollections` | `() => CollectionConfig[]` | Nested collections (e.g., order → line items) |
-| `exportable` | `boolean \| ExportConfig` | Enable data export |
-| `ownerId` | `string` | Owner user ID (used by plugins/custom code) |
-| `overrides` | `EntityOverrides` | Overrides for the entity view |
-| `components` | `CollectionComponentOverrideMap` | Collection-scoped UI component overrides |
+| `childCollections` | `() => CollectionConfig[]` | The collections nested under an entity of this one. Filled in during normalization from whatever the driver expresses them with — a Firestore `subcollections`, a Postgres `hasMany` relation — so a custom driver is the only reason to set it by hand |
 | `dataSource` | `string` | Which registered data source backs this collection (default: the unnamed one) |
 | `engine` | `string` | The engine behind it — `"postgres"`, `"firestore"`, `"mongodb"`. Resolved from `dataSource`; set it only to override |
 | `databaseId` | `string` | Database or schema within the engine |
+| `metadata` | `Record<string, unknown>` | Anything your own code needs to hang off a collection. Rebase does not read it; it survives serialization unchanged |
+| `ownerId` | `string` | **Admin form only — not enforced by the API or the database.** The user id the collection editor stamps on a collection it creates, and shows beside its name. Nothing on the request path consults it |
+
+`subcollections` and `path` are on the **document-database** configs only —
+`FirebaseCollectionConfig` and, for `path`, `MongoDBCollectionConfig`:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `subcollections` | `() => CollectionConfig[]` | **Firestore only.** Collections nested under each document. A Postgres collection says the same thing with a `hasMany` [relation](/docs/collections/relations), which is what fills `childCollections` |
+| `path` | `string` | **Firestore and MongoDB only.** The path or collection name at the engine, when it differs from the slug |
+
+And inside `admin`, because only the panel draws them:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `admin.entityActions` | `EntityAction[]` | Custom actions on entities (archive, publish, etc.) |
+| `admin.Actions` | `React.ComponentType` | Custom toolbar actions component |
+| `admin.entityViews` | `EntityCustomView[]` | Custom tabs in the entity detail view |
+| `admin.additionalFields` | `AdditionalFieldDelegate[]` | Computed/virtual columns |
+| `admin.exportable` | `boolean \| ExportConfig` | Enable data export |
+| `admin.components` | `CollectionComponentOverrideMap` | Collection-scoped UI component overrides |
+
+Writing any of those six at the top level is a boot-time error, with a message
+naming the key and where it moved to.
 
 ## Entity display
 
@@ -399,8 +421,10 @@ When `display.title` is not set, the property used as the entity's display title
 ### Relation Previews in Tables
 When `propertiesOrder` is explicitly set, relation properties are **not** automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).
 
-### resolveTitleToString Utility
-Rebase provides a `resolveTitleToString(title: any): string` helper to turn complex entity title values (including dates, arrays, or relation shapes like `{ __type: "relation", id, data: { values } }`) into clean, human-readable strings. It prioritizes common fields like `name`, `title`, `label`, and `displayName` from nested relation data.
+### What a title value renders as
+Whatever the title property holds, the panel renders a string. A date is formatted, an array is joined, and a relation — which arrives as `{ id, data: { values } }` rather than as text — is looked through for the first of `name`, `title`, `label` or `displayName` on the related row, falling back to its id. So a title may name a `relation` property and still read as a name rather than a uuid.
+
+This is not an exported helper: it is what every surface that draws a record already does. Nothing to call, and nothing to import.
 
 ## Collection Builder
 
@@ -422,20 +446,37 @@ const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) 
 
 ## Filtering and Sorting
 
-You can set default or forced filters:
+You can set default or forced filters. All three are presentation — what the
+panel opens with — so they live in `admin`:
 
 ```typescript
-{
-    // Default filter — users can change it
-    defaultFilter: { active: ["==", true] },
+import { defineCollection } from "@rebasepro/cms-types";
 
-    // Fixed filter — cannot be changed
-    fixedFilter: { tenant_id: ["==", currentTenantId] },
+const invoices = defineCollection({
+    slug: "invoices",
+    name: "Invoices",
+    table: "invoices",
+    properties: {
+        active: { name: "Active", type: "boolean" },
+        tenantId: { name: "Tenant", type: "string" },
+        createdAt: { name: "Created", type: "date" }
+    },
+    admin: {
+        // Default filter — users can change it
+        defaultFilter: { active: ["==", true] },
 
-    // Default sort
-    sort: ["createdAt", "desc"]
-}
+        // Fixed filter — cannot be changed
+        fixedFilter: { tenantId: ["==", currentTenantId] },
+
+        // Default sort
+        sort: ["createdAt", "desc"]
+    }
+});
 ```
+
+A `fixedFilter` narrows what the panel *asks for*; it is not a boundary. What a
+caller is allowed to read is a [security rule](/docs/collections/security-rules),
+which the database enforces for every caller, panel or not.
 
 ## Next Steps
 

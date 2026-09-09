@@ -1,5 +1,5 @@
 ---
-sourceHash: 5b3faf351da73329
+sourceHash: 8bafcfc6e9367a8b
 title: Indexes
 sidebar_label: Indexes
 description: Declare ordinary Postgres indexes on a collection — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.
@@ -250,6 +250,11 @@ Both producers emit them, which matters because not every deployment runs
 - **`rebase db push` / `rebase db generate`** put them in `schema.sql`, on the
   ordinary Atlas path — so they get migrations, drift detection and rollback
   like every other object.
+- **`rebase schema generate`** also writes them into `schema.generated.ts`, so
+  the Drizzle schema describes the same table the database has. A covering
+  index's `INCLUDE` columns are the one exception: Drizzle cannot express them,
+  and the generated line carries a comment saying so and pointing at
+  `schema.sql`, which does.
 - **Boot-time schema ensure** creates them with
   `CREATE INDEX CONCURRENTLY IF NOT EXISTS`, on the same terms as the ANN
   indexes beside it. A managed-runtime tenant provisions at boot and never runs

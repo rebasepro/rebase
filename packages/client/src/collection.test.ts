@@ -159,7 +159,9 @@ hasMore: false }
 
             expect(transport.request).toHaveBeenCalledWith(
                 "/data/posts/42",
-                { method: "GET" }
+                { method: "GET" },
+                // The out-parameter `findById` reads the row's ETag from.
+                expect.any(Object)
             );
             expect(result).toBeDefined();
             expect(result!.id).toBe("42");

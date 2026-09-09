@@ -6,6 +6,44 @@ import { resolveListLimitParam } from "../api/rest/query-parser";
 import { CollectionConfig, DataDriver } from "@rebasepro/types";
 import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
 import { httpMethodToOperation, isOperationAllowed } from "../auth/api-keys/api-key-permission-guard";
+import { restrictedFieldNames } from "@rebasepro/common";
+import { requestViewer } from "../api/rest/field-access-query";
+
+/**
+ * A history entry, with the fields this caller cannot read taken out of its
+ * stored snapshot.
+ *
+ * History stores the **whole row** — that is what makes it a revert target — and
+ * it is served to anyone who can read the row, not only to admins: the route's
+ * gate is "can you fetch this entity", nothing more. So a field the data API
+ * withholds was in every history entry of every row the caller could open, which
+ * is the read rule with an audit log around it.
+ *
+ * The snapshot is rewritten rather than the entry dropped: the caller is
+ * entitled to know that a version exists, who made it and when. Only the
+ * withheld columns leave. Reverting is unaffected — the revert route reads the
+ * stored entry through the history service, not through this projection — so a
+ * caller can still restore a version whose every field they cannot see, exactly
+ * as they can already overwrite one.
+ */
+function stripHistoryValues(
+    entries: Record<string, unknown>[],
+    collection: CollectionConfig,
+    viewer: { roles?: readonly string[] } | undefined
+): Record<string, unknown>[] {
+    const { refused } = restrictedFieldNames(collection, viewer, "read");
+    if (refused.size === 0) return entries;
+
+    return entries.map(entry => {
+        const values = entry.values;
+        if (typeof values !== "object" || values === null || Array.isArray(values)) return entry;
+        const kept: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(values as Record<string, unknown>)) {
+            if (!refused.has(key)) kept[key] = value;
+        }
+        return { ...entry, values: kept };
+    });
+}
 /**
  * Create Hono routes for entity history.
  * Mounted at `{basePath}/data/:slug/:id/history`.
@@ -139,7 +177,7 @@ export function createHistoryRoutes(params: {
         });
 
         return c.json({
-            data: result.data,
+            data: stripHistoryValues(result.data, collection, requestViewer(c)),
             meta: {
                 total: result.total,
                 limit: appliedLimit,

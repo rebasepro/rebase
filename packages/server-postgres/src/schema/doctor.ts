@@ -14,6 +14,9 @@ import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { computeSchemaVersion, CollectionConfig, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
+import { compareGeneratedDeclarations, describeDeclarationDifferences } from "./generated-schema-staleness";
+import { columnPgType } from "./plan/plan-schema";
+import type { PgType } from "./plan/types";
 import { generateTypedefs } from "@rebasepro/codegen";
 import { getTableName, resolveCollectionRelations, findRelation, relationalCollections } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
@@ -100,82 +103,83 @@ export interface DoctorReport {
     summary: { passed: number; skipped: number; notApplicable: number; warnings: number; errors: number };
 }
 
-// ── Column type mapping (mirrors generate-drizzle-schema-logic.ts) ───────
+// ── Column type mapping ──────────────────────────────────────────────────
 
+/**
+ * How `information_schema.columns.data_type` spells a planned column type.
+ *
+ * The catalogue's names are its own — `character varying`, not `varchar`;
+ * `ARRAY` for every array whatever its element; `USER-DEFINED` for an enum, a
+ * `vector`, and anything else identified by name rather than by shape. So the
+ * translation has to exist somewhere. What must *not* exist twice is the step
+ * before it: which column a property compiles to.
+ *
+ * This function was that second step — a fourth copy of the property switch,
+ * kept "in sync" with the generators by a comment, and already out of step
+ * (`geopoint` answered `null` here, so the one type that was genuinely
+ * unpersistable was the one the doctor never checked). It reads the schema plan
+ * now.
+ */
+const INFORMATION_SCHEMA_NAMES: Record<PgType["kind"], string> = {
+    text: "text",
+    varchar: "character varying",
+    char: "character",
+    uuid: "uuid",
+    // A `CREATE TYPE … AS ENUM` is a name, not a shape.
+    enum: "USER-DEFINED",
+    smallint: "smallint",
+    integer: "integer",
+    bigint: "bigint",
+    // A serial is an integer with a sequence default; the catalogue reports the
+    // underlying width and nothing about the sequence.
+    smallserial: "smallint",
+    serial: "integer",
+    bigserial: "bigint",
+    real: "real",
+    doublePrecision: "double precision",
+    numeric: "numeric",
+    boolean: "boolean",
+    timestamptz: "timestamp with time zone",
+    date: "date",
+    time: "time without time zone",
+    json: "json",
+    jsonb: "jsonb",
+    // pgvector's type, like every extension type.
+    vector: "USER-DEFINED",
+    bytea: "bytea",
+    tsvector: "USER-DEFINED",
+    array: "ARRAY"
+};
+
+/**
+ * The `data_type` the database should report for a property's column, or `null`
+ * when there is nothing to compare.
+ *
+ * `null` covers the two honest cases: a `relation`, whose column is derived from
+ * the relation rather than from the property, and a configuration the planner
+ * refuses outright — which is a problem the doctor's other phases report with a
+ * message, not a type mismatch to invent one for.
+ */
 export function getExpectedColumnType(prop: Property): string | null {
-    switch (prop.type) {
-        case "string": {
-            const sp = prop as StringProperty;
-            if (sp.enum) return "USER-DEFINED"; // pgEnum → USER-DEFINED in information_schema
-            if ("isId" in sp && sp.isId === "uuid") return "uuid";
-            if (sp.columnType === "uuid") return "uuid";
-            if (sp.columnType === "char") return "character";
-            if (sp.columnType === "varchar") return "character varying";
-            // `text` is the default — see generate-postgres-ddl-logic.
-            return "text";
-        }
-        case "number": {
-            const np = prop as NumberProperty;
-            if (np.columnType) {
-                // The generator passes any columnType straight through to drizzle,
-                // so mirror that rather than enumerating a subset (which reported
-                // drift for anything unlisted, e.g. smallint). Serial types are
-                // integers with a sequence default; information_schema reports the
-                // underlying width.
-                const serialWidths: Record<string, string> = {
-                    serial: "integer",
-                    bigserial: "bigint",
-                    smallserial: "smallint"
-                };
-                return serialWidths[np.columnType] ?? np.columnType;
-            }
-            if (np.validation?.integer || ("isId" in np && np.isId)) return "integer";
-            return "numeric";
-        }
-        case "boolean":
-            return "boolean";
-        case "date": {
-            const dp = prop as DateProperty;
-            if (dp.columnType === "date") return "date";
-            if (dp.columnType === "time") return "time without time zone";
-            return "timestamp with time zone";
-        }
-        case "array": {
-            const ap = prop as ArrayProperty;
-            let colType = ap.columnType;
-            if (!colType && ap.of && !Array.isArray(ap.of)) {
-                const ofProp = ap.of as Property;
-                if (ofProp.type === "string") {
-                    colType = "text[]";
-                } else if (ofProp.type === "number") {
-                    colType = ofProp.validation?.integer ? "integer[]" : "numeric[]";
-                } else if (ofProp.type === "boolean") {
-                    colType = "boolean[]";
-                }
-            }
+    // The FK column a relation owns is planned from the relation, and its type
+    // is the *target's* key — which a bare property cannot resolve.
+    if (prop.type === "relation") return null;
 
-            if (colType === "json") return "json";
-            if (colType === "jsonb") return "jsonb";
-            if (colType && colType.endsWith("[]")) return "ARRAY";
-            return "jsonb";
-        }
-        case "map": {
-            const mp = prop as MapProperty;
-            if (mp.columnType === "json") return "json";
-            return "jsonb";
-        }
-        case "relation":
-            return null; // FK columns are derived from the relation, not from the property
-        case "reference":
-            // A reference FK follows the key it points at, and a string key is
-            // `text` — see generate-postgres-ddl-logic.
-            return "text";
-        case "vector":
-            return "USER-DEFINED";
-        case "binary":
-            return "bytea";
-        default:
-            return null;
+    // A one-property collection, because the planner asks the questions a
+    // column needs in context: is this the primary key, what is the enum type
+    // called, what does the link point at. A `reference` whose target is not
+    // here resolves to `text`, exactly as it does in a real bundle.
+    const collection = {
+        slug: "__doctor__",
+        table: "__doctor__",
+        properties: { __column__: prop }
+    } as unknown as CollectionConfig;
+
+    try {
+        const type = columnPgType("__column__", prop, collection, () => undefined);
+        return INFORMATION_SCHEMA_NAMES[type.kind];
+    } catch {
+        return null;
     }
 }
 
@@ -221,22 +225,22 @@ issues };
     }
 
     try {
-        const expectedSchema = await generateSchema(postgresCollections);
-        const actualSchema = await fsPromises.readFile(schemaFilePath, "utf-8");
+        // Declaration by declaration, not byte by byte. The generated file is a
+        // flat list of `export const`s, each the rendering of one piece of the
+        // schema plan, so comparing them says *which* table or enum moved —
+        // which is what the reader is about to go looking for — and ignores the
+        // formatting and commentary the renderer is free to vary on its own.
+        const differences = compareGeneratedDeclarations(
+            generateSchema(postgresCollections),
+            await fsPromises.readFile(schemaFilePath, "utf-8")
+        );
 
-        // Normalize whitespace for comparison
-        const normalize = (s: string) =>
-            s
-                .replace(/\/\/.*$/gm, "") // strip single-line comments
-                .replace(/\/\*[\s\S]*?\*\//g, "") // strip multi-line comments
-                .replace(/\s+/g, " ")
-                .trim();
-
-        if (normalize(expectedSchema) !== normalize(actualSchema)) {
+        if (differences.length > 0) {
             issues.push({
                 severity: "warning",
                 category: "schema_stale",
-                message: "Generated schema is out of date — collection definitions have changed since last generation.",
+                message: "Generated schema is out of date — collection definitions have changed since last generation. "
+                    + `Differs in: ${describeDeclarationDifferences(differences)}.`,
                 fix: "Run `rebase schema generate`"
             });
         }

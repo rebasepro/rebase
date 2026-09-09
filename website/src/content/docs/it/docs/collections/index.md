@@ -1,5 +1,5 @@
 ---
-sourceHash: e9ad0454af0a8497
+sourceHash: 444566625d7595fb
 title: Collezioni
 sidebar_label: Collezioni
 description: Le collezioni sono i blocchi costitutivi fondamentali di Rebase — ogni collezione mappa una tabella di database e ne definisce lo schema, le relazioni, la sicurezza e il comportamento dell'interfaccia utente.
@@ -133,6 +133,7 @@ Ma un'annotazione si limita a *validare* l'oggetto — non vede i nomi delle tue
 | `relations` | `Relation[]` | Relazioni SQL — chiavi esterne, tabelle di congiunzione. Vedi [Relazioni](/docs/collections/relations). |
 | `securityRules` | `SecurityRule[]` | Policy di Row Level Security. Vedi [Regole di Sicurezza](/docs/collections/security-rules). |
 | `indexes` | `CollectionIndex[]` | Indici Postgres di cui questa tabella ha bisogno. Vedi [Indici](/docs/backend/indexes). |
+| `softDelete` | `boolean \| { field?: string }` | Turn `delete` into a timestamp and hide stamped rows from every read. `true` uses `deletedAt`; the object form renames the field. The collection must declare that `date` property itself. Postgres only — see [Soft delete](/docs/collections/soft-delete) |
 | `search` | `SearchConfig` | Ricerca full-text con ranking sui campi che indichi, inclusi i contenuti JSONB e array. Solo Postgres. Vedi [Ricerca](/docs/backend/search). |
 | `auth` | `boolean \| AuthCollectionConfig` | Contrassegna la collezione come collezione di autenticazione (gestione utenti, reimpostazione password, ecc.) |
 
@@ -178,15 +179,14 @@ Dentro `admin`, tranne `history`, che è una funzionalità del backend e resta a
 | Proprietà | Tipo | Descrizione |
 |----------|------|-------------|
 | `callbacks` | `CollectionCallbacks` | Hook del ciclo di vita (`beforeSave`, `afterSave`, `beforeDelete`, ecc.) |
-| `entityActions` | `EntityAction[]` | Azioni personalizzate sulle entità (archivia, pubblica, ecc.) |
-| `Actions` | `React.ComponentType` | Componente per azioni personalizzate della barra degli strumenti |
-| `entityViews` | `EntityCustomView[]` | Schede personalizzate nella vista dettagli dell'entità |
-| `additionalFields` | `AdditionalFieldDelegate[]` | Colonne calcolate/virtuali |
+| `admin.entityActions` | `EntityAction[]` | Azioni personalizzate sulle entità (archivia, pubblica, ecc.) |
+| `admin.Actions` | `React.ComponentType` | Componente per azioni personalizzate della barra degli strumenti |
+| `admin.entityViews` | `EntityCustomView[]` | Schede personalizzate nella vista dettagli dell'entità |
+| `admin.additionalFields` | `AdditionalFieldDelegate[]` | Colonne calcolate/virtuali |
 | `childCollections` | `() => CollectionConfig[]` | Collezioni figlio annidate |
-| `subcollections` | `() => CollectionConfig[]` | Collezioni annidate (es. ordine → voci d'ordine) |
-| `exportable` | `boolean \| ExportConfig` | Abilita l'esportazione dei dati |
-| `ownerId` | `string` | ID utente proprietario (usato da plugin/codice personalizzato) |
-| `overrides` | `EntityOverrides` | Override per la vista entità |
+| `subcollections` | `() => CollectionConfig[]` | **Firestore only.** Collezioni annidate (es. ordine → voci d'ordine) |
+| `admin.exportable` | `boolean \| ExportConfig` | Abilita l'esportazione dei dati |
+| `ownerId` | `string` | **Admin form only — not enforced by the API or the database.** ID utente proprietario (usato da plugin/codice personalizzato) |
 | `driver` | `string` | Driver di database da usare (predefinito: `"(default)"`) |
 | `databaseId` | `string` | ID database/schema all'interno del driver |
 

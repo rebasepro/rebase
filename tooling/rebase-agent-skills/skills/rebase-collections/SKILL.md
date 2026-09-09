@@ -1678,8 +1678,8 @@ When `display.title` is not set, the property used as the entity's display title
 ### Relation Previews in Tables
 When `propertiesOrder` is explicitly set, relation properties are *not* automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).
 
-### resolveTitleToString Utility
-Rebase provides a `resolveTitleToString(title: any): string` helper to turn complex entity title values (including dates, arrays, or relation shapes like `{ __type: "relation", id, data: { values } }`) into clean, renderable strings. It prioritizes common fields like `name`, `title`, `label`, and `displayName` from nested relation data, falling back to stringified IDs or JSON representations.
+### What a title value renders as
+Whatever the title property holds, the panel renders a string: a date is formatted, an array is joined, and a relation — which arrives as `{ id, data: { values } }` rather than as text — is looked through for the first of `name`, `title`, `label` or `displayName` on the related row, falling back to its id. So a title may name a `relation` property and still read as a name rather than a uuid. This is not an exported helper and there is nothing to import: it is what every surface that draws a record already does.
 
 ## Collection-Scoped Component Overrides
 

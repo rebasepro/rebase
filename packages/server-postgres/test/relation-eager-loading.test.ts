@@ -133,29 +133,46 @@ fkValue: p.userId }));
         });
     });
 
-    it("embeds the related row under `data` so the admin renders without fetching", async () => {
+    it("embeds the related row when the read asks for it", async () => {
+        setupDb(makeProfiles(3), makeCustomers(3));
+
+        const rows = await dataService.fetchCollection("user_profiles", { include: ["*"] });
+
+        // Plain columns under the relation key — the shape the REST list, the
+        // SDK and the admin all already normalise to. It used to be a
+        // `{ __type: "relation", id, path, data }` envelope that every consumer
+        // then unwrapped.
+        expect(rows[0].user).toMatchObject({ id: 100, name: "Customer 100" });
+    });
+
+    /**
+     * The change that makes `listen()` and `find()` agree.
+     *
+     * This method is what the realtime refetch goes through, and it used to
+     * load EVERY relation unconditionally while the REST list loaded none. Same
+     * query, two row shapes — and a client rendering both saw the row change
+     * shape the moment a write landed.
+     */
+    it("loads no relations when the read does not ask for any", async () => {
         setupDb(makeProfiles(3), makeCustomers(3));
 
         const rows = await dataService.fetchCollection("user_profiles", {});
 
-        const relation = rows[0].user as Record<string, unknown>;
-        expect(relation.__type).toBe("relation");
-        expect(relation.id).toBe("100");
-        expect(relation.path).toBe("customers");
-        expect(relation.data).toMatchObject({
-            id: "100",
-            path: "customers",
-            values: { name: "Customer 100" }
-        });
+        // The foreign key's own stub — `{ __type, id, path }`, which
+        // `parseDataFromServer` derives from the column without querying — and
+        // no related row embedded over it.
+        expect(rows[0].user).toEqual({ __type: "relation", id: "100", path: "customers" });
+        // One select: the base rows. No relation was loaded, so none was read.
+        expect(selectCalls).toBe(1);
     });
 
     it("keeps the query count flat as the row count grows", async () => {
         setupDb(makeProfiles(3), makeCustomers(3));
-        await dataService.fetchCollection("user_profiles", {});
+        await dataService.fetchCollection("user_profiles", { include: ["*"] });
         const callsForThreeRows = selectCalls;
 
         setupDb(makeProfiles(30), makeCustomers(30));
-        await dataService.fetchCollection("user_profiles", {});
+        await dataService.fetchCollection("user_profiles", { include: ["*"] });
 
         // One base select plus a fixed pair per relation — never one per row.
         expect(callsForThreeRows).toBe(3);

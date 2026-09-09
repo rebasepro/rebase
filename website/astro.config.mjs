@@ -126,8 +126,10 @@ export default defineConfig({
                     items: [
                         { label: "Headless setup", slug: "docs/getting-started/headless" },
                         { label: "REST API", slug: "docs/backend/api" },
+                        { label: "Writing over REST", slug: "docs/backend/writes" },
                         { label: "Client SDK", slug: "docs/sdk" },
-                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" }
+                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },
+                        { label: "Field access", slug: "docs/collections/field-access" }
                     ]
                 },
                 {
@@ -136,10 +138,14 @@ export default defineConfig({
                     items: [
                         { label: "Defining Collections", slug: "docs/collections" },
                         { label: "Properties", slug: "docs/collections/properties" },
+                        { label: "Arrays and maps", slug: "docs/collections/arrays-and-maps" },
+                        { label: "File uploads", slug: "docs/collections/file-uploads" },
                         { label: "Validation & conditions", slug: "docs/collections/validation-and-conditions" },
                         { label: "Relations", slug: "docs/collections/relations" },
+                        { label: "Soft delete", slug: "docs/collections/soft-delete" },
                         { label: "Entity Callbacks", slug: "docs/collections/callbacks" },
-                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" }
+                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },
+                        { label: "Field access", slug: "docs/collections/field-access" }
                     ]
                 },
                 {
@@ -148,6 +154,7 @@ export default defineConfig({
                     items: [
                         { label: "Backend Setup", slug: "docs/backend" },
                         { label: "REST API", slug: "docs/backend/api" },
+                        { label: "Writing over REST", slug: "docs/backend/writes" },
                         { label: "API keys", slug: "docs/backend/api-keys" },
                         { label: "Error codes", slug: "docs/backend/errors" },
                         { label: "Endpoint index", slug: "docs/backend/endpoints" },
@@ -223,6 +230,7 @@ export default defineConfig({
                     items: [
                         { label: "Getting Started", slug: "docs/sdk" },
                         { label: "Querying Data", slug: "docs/sdk/querying" },
+                        { label: "Writing Data", slug: "docs/sdk/writing" },
                         { label: "Aggregates & search", slug: "docs/sdk/aggregates-and-search" },
                         { label: "Relations", slug: "docs/sdk/relations" },
                         { label: "Authentication", slug: "docs/sdk/authentication" },

@@ -33,7 +33,7 @@ function createMockTransport(): { transport: Transport; mockRequest: jest.Mock<T
 }
 
 /** A page of rows plus the meta the server would send alongside it. */
-function page(rows: JobModel[], meta: { total: number; limit: number; offset: number; hasMore: boolean }) {
+function page(rows: JobModel[], meta: { total: number; limit: number; offset: number; hasMore: boolean; nextCursor?: string }) {
     return { data: rows, meta };
 }
 
@@ -175,10 +175,22 @@ describe("CollectionClient.iterate", () => {
 
     // ── Keyset (cursor) mode ────────────────────────────────────────────────
     describe("cursor mode", () => {
-        it("seeks past the last row instead of paging by offset", async () => {
+        /**
+         * The walk no longer builds a keyset of its own.
+         *
+         * It used to express one as an extra `where` — a single `>`/`<` on a
+         * single column — which threw on any multi-key sort and dropped every
+         * row whose sort value was NULL, because `> value` answers *unknown*
+         * against NULL. The driver has had a NULL-correct multi-key comparison
+         * all along and nothing over HTTP could reach it.
+         *
+         * So what these assert is the handoff: `meta.nextCursor` out, `after`
+         * back in, and no offset anywhere.
+         */
+        it("hands the server's cursor back as `after`, not a where clause", async () => {
             const client = createCollectionClient<JobModel>(transport, "jobs");
             mockRequest
-                .mockResolvedValueOnce(page(rows(1, 2), { total: 3, limit: 2, offset: 0, hasMore: true }))
+                .mockResolvedValueOnce(page(rows(1, 2), { total: 3, limit: 2, offset: 0, hasMore: true, nextCursor: "CUR1" }))
                 .mockResolvedValueOnce(page(rows(3, 1), { total: 3, limit: 2, offset: 0, hasMore: false }));
 
             const seen: number[] = [];
@@ -191,27 +203,30 @@ describe("CollectionClient.iterate", () => {
             // No offset anywhere — the window is defined by the cursor.
             expect(first).not.toContain("offset=");
             expect(second).not.toContain("offset=");
+            expect(first).not.toContain("after=");
             expect(first).toContain("orderBy=id%3Aasc");
-            expect(second).toContain("id=gt.2");
+            expect(second).toContain("after=CUR1");
+            // And no keyset of the client's own invention.
+            expect(second).not.toContain("id=gt.");
         });
 
-        it("seeks downwards when the cursor is descending", async () => {
+        it("names the direction the caller asked to seek in", async () => {
             const client = createCollectionClient<JobModel>(transport, "jobs");
             mockRequest
-                .mockResolvedValueOnce(page([{ id: 9 }, { id: 8 }], { total: 3, limit: 2, offset: 0, hasMore: true }))
+                .mockResolvedValueOnce(page([{ id: 9 }, { id: 8 }], { total: 3, limit: 2, offset: 0, hasMore: true, nextCursor: "CUR8" }))
                 .mockResolvedValueOnce(page([{ id: 7 }], { total: 3, limit: 2, offset: 0, hasMore: false }));
 
             for await (const _row of client.iterate({ pageSize: 2, cursor: { field: "id", direction: "desc" } })) { /* drain */ }
 
             const [first, second] = mockRequest.mock.calls.map((c) => String(c[0]));
             expect(first).toContain("orderBy=id%3Adesc");
-            expect(second).toContain("id=lt.8");
+            expect(second).toContain("after=CUR8");
         });
 
-        it("keeps the caller's own filter on the cursor column", async () => {
+        it("keeps the caller's own filter across the walk", async () => {
             const client = createCollectionClient<JobModel>(transport, "jobs");
             mockRequest
-                .mockResolvedValueOnce(page(rows(5, 1), { total: 2, limit: 1, offset: 0, hasMore: true }))
+                .mockResolvedValueOnce(page(rows(5, 1), { total: 2, limit: 1, offset: 0, hasMore: true, nextCursor: "CUR5" }))
                 .mockResolvedValueOnce(page(rows(6, 1), { total: 2, limit: 1, offset: 0, hasMore: false }));
 
             for await (const _row of client.iterate({
@@ -220,23 +235,62 @@ describe("CollectionClient.iterate", () => {
                 where: { id: ["<", 100] }
             })) { /* drain */ }
 
+            // Dropping it would widen the query, which is the silent
+            // filter-loss failure mode — the reason the old implementation had
+            // to merge its seek into the caller's `where` rather than replace
+            // it. Nothing merges now, so nothing can clobber it either.
             const second = String(mockRequest.mock.calls[1][0]);
             expect(second).toContain("id=lt.100");
-            expect(second).toContain("id=gt.5");
+            expect(second).toContain("after=CUR5");
         });
 
-        it("refuses a cursor that disagrees with orderBy", async () => {
+        /**
+         * The case the old single-column keyset refused outright ("keyset
+         * pagination advances along a single column"). Seeking follows whatever
+         * the query is sorted by now, because the comparison is the driver's
+         * and it is built over every key.
+         */
+        it("walks a multi-key sort instead of refusing it", async () => {
             const client = createCollectionClient<JobModel>(transport, "jobs");
-            await expect((async () => {
-                for await (const _row of client.iterate({ cursor: "id", orderBy: ["status", "asc"] })) { /* drain */ }
-            })()).rejects.toMatchObject({ code: "cursor-order-mismatch" });
-            expect(mockRequest).not.toHaveBeenCalled();
+            mockRequest
+                .mockResolvedValueOnce(page(rows(1, 2), { total: 3, limit: 2, offset: 0, hasMore: true, nextCursor: "CUR2" }))
+                .mockResolvedValueOnce(page(rows(3, 1), { total: 3, limit: 2, offset: 0, hasMore: false }));
+
+            const seen: number[] = [];
+            for await (const row of client.iterate({
+                pageSize: 2,
+                cursor: "id",
+                orderBy: [["status", "asc"], ["id", "desc"]]
+            })) {
+                seen.push(row.id);
+            }
+
+            expect(seen).toEqual([1, 2, 3]);
+            // The caller's sort reaches the server whole, and the cursor
+            // continues it.
+            const [first, second] = mockRequest.mock.calls.map((c) => String(c[0]));
+            expect(decodeURIComponent(first)).toContain("\"field\":\"status\"");
+            expect(second).toContain("after=CUR2");
         });
 
-        it("refuses to loop when the cursor column repeats across a page boundary", async () => {
+        it("says so when the server reports another page but issues no cursor", async () => {
+            // Exactly what a relevance-ordered listing does: `hasMore` is true
+            // and no cursor can describe the page, because a `_score` is
+            // computed per query and stored nowhere to compare against.
+            const client = createCollectionClient<JobModel>(transport, "jobs");
+            mockRequest.mockResolvedValue(
+                page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }) as never
+            );
+
+            await expect((async () => {
+                for await (const _row of client.iterate({ pageSize: 2, cursor: "id" })) { /* drain */ }
+            })()).rejects.toMatchObject({ code: "cursor-missing" });
+        });
+
+        it("refuses to loop when the cursor stops advancing", async () => {
             const client = createCollectionClient<JobModel>(transport, "jobs");
             mockRequest.mockImplementation(async () =>
-                page([{ id: 1 }, { id: 7 }], { total: 99, limit: 2, offset: 0, hasMore: true }) as never);
+                page([{ id: 1 }, { id: 7 }], { total: 99, limit: 2, offset: 0, hasMore: true, nextCursor: "SAME" }) as never);
 
             await expect((async () => {
                 for await (const _row of client.iterate({ pageSize: 2, cursor: "id" })) { /* drain */ }

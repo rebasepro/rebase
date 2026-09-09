@@ -314,6 +314,26 @@ root files. The website's pages are \`verify:docs\`, which knows its routing
 and its locales.`
     },
     {
+        run: "check:doc-examples",
+        why: `A collection example can compile and refuse to boot. \`admin\` arrived in
+0.11 and the panel's keys moved into it, but \`widget\`, \`defaultFilter\`,
+\`sort\`, \`entityActions\` and the rest are still real names one level down,
+so a fence writing one at the top of a collection typechecks, reads well,
+and makes \`assertCollectionConfigs\` exit. Three were live, next to an
+\`overrides: EntityOverrides\` row naming a type that never existed. This
+runs the examples and hands the objects to the boot-time validator.`
+    },
+    {
+        run: "check:schema-sample",
+        why: `The Schema-as-Code page's worked example was hand-written once and never
+re-read: \`serial("id")\`, \`varchar\`, \`.default(true)\`, \`.defaultNow()\` and
+a \`CREATE TABLE products\` with a SERIAL key — against generators that emit
+\`text("id").primaryKey()\`, \`text\`, no column default, a timestamptz and
+\`"public"."products"\`. The page most likely to be read by somebody deciding
+whether to adopt this described a different system. The blocks are now
+generated: \`pnpm check:schema-sample --write\`.`
+    },
+    {
         run: "check:bug-classes",
         why: `docs/bug-classes.md is cited by number — "class 4 in its purest form" —
 and it had two \`## 50.\` sections, added months apart, one of which referred

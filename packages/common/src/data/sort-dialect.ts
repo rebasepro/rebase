@@ -1,4 +1,4 @@
-import type { OrderBySortTuple, OrderBySpec, OrderByTuple } from "@rebasepro/types";
+import type { NullsPlacement, OrderBySortTuple, OrderBySpec, OrderByTuple } from "@rebasepro/types";
 import { isRelationAggregateSort, sortKeyToString } from "@rebasepro/types";
 
 /**
@@ -126,6 +126,17 @@ export function parseOrderBySpecStrict(raw: unknown, order?: "asc" | "desc"): Or
     return raw.map(toStrictTuple);
 }
 
+/** `first`/`last`, or a refusal naming the entry — see {@link NullsPlacement}. */
+function toStrictNulls(raw: unknown, index: number): NullsPlacement | undefined {
+    if (raw === undefined || raw === null) return undefined;
+    if (raw !== "first" && raw !== "last") {
+        throw new OrderBySpecError(
+            `entry ${index} has nulls '${String(raw)}' — expected "first" or "last"`
+        );
+    }
+    return raw;
+}
+
 function toStrictTuple(raw: unknown, index: number): OrderByTuple {
     if (!Array.isArray(raw)) {
         throw new OrderBySpecError(`entry ${index} has no field name`);
@@ -142,7 +153,12 @@ function toStrictTuple(raw: unknown, index: number): OrderByTuple {
     if (direction !== undefined && direction !== "asc" && direction !== "desc") {
         throw new OrderBySpecError(`entry ${index} has direction '${String(direction)}'`);
     }
-    return [key, direction ?? "asc"];
+    const nulls = toStrictNulls(raw[2], index);
+    // Omitted rather than defaulted: absent means "the direction's convention",
+    // and writing one in here would make an explicit `NULLS LAST` on a
+    // descending key indistinguishable from having said nothing — which the
+    // keyset comparison and the ORDER BY both have to agree about.
+    return nulls ? [key, direction ?? "asc", nulls] : [key, direction ?? "asc"];
 }
 
 /**
@@ -177,9 +193,16 @@ export function serializeOrderBy(orderBy?: OrderBySpec | string): string | undef
     // `min(applications.created_at)` nor `count(applications)` contains a `:`.
     const list = normalizeOrderBy(orderBy);
     if (!list) return undefined;
-    if (list.length === 1) return `${list[0][0]}:${list[0][1]}`;
-    return JSON.stringify(list.map(([field, direction]) => ({ field,
-direction })));
+    // `field:direction:nulls` — the third segment appears only when the key
+    // asked for a placement, so every sort written before nulls existed still
+    // serializes to exactly the string it always did.
+    if (list.length === 1) {
+        const [field, direction, nulls] = list[0];
+        return nulls ? `${field}:${direction}:${nulls}` : `${field}:${direction}`;
+    }
+    return JSON.stringify(list.map(([field, direction, nulls]) => (nulls
+        ? { field, direction, nulls }
+        : { field, direction })));
 }
 
 /**
@@ -215,8 +238,18 @@ export function deserializeOrderBy(raw?: string): OrderByTuple | undefined {
     if (idx === -1) return raw.trim() === "" ? undefined : [raw, "asc"];
     const field = raw.slice(0, idx);
     if (field.trim() === "") return undefined;
-    const dir = raw.slice(idx + 1);
-    return [field, dir === "desc" ? "desc" : "asc"];
+    const rest = raw.slice(idx + 1);
+    // `field:direction:nulls`. The nulls segment is optional, and — leniently,
+    // as everything else on this end of the codec is — anything that is not
+    // "first"/"last" is read as "unspecified" rather than refused. The *server*
+    // end (`parseOrderByParam`) refuses it, for the reason in the docblock.
+    const nullsIdx = rest.indexOf(":");
+    const dir = nullsIdx === -1 ? rest : rest.slice(0, nullsIdx);
+    const nulls = nullsIdx === -1 ? undefined : rest.slice(nullsIdx + 1);
+    const direction = dir === "desc" ? "desc" : "asc";
+    return nulls === "first" || nulls === "last"
+        ? [field, direction, nulls]
+        : [field, direction];
 }
 
 /**
@@ -241,7 +274,10 @@ export function deserializeOrderByList(raw?: string): OrderByTuple[] | undefined
                     .map((entry): OrderByTuple | undefined => {
                         if (typeof entry === "string") return deserializeOrderBy(entry);
                         if (entry && typeof entry === "object" && typeof entry.field === "string") {
-                            return [entry.field, entry.direction === "desc" ? "desc" : "asc"];
+                            const direction = entry.direction === "desc" ? "desc" : "asc";
+                            return entry.nulls === "first" || entry.nulls === "last"
+                                ? [entry.field, direction, entry.nulls]
+                                : [entry.field, direction];
                         }
                         return undefined;
                     })

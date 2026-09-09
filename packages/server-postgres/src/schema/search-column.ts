@@ -155,10 +155,10 @@ const columnNameOf = (propName: string, prop?: Property | null): string =>
 /**
  * Classify a property for search purposes.
  *
- * Deliberately narrower than `getSqlColumnType`: search only cares whether a
- * value reaches text, and the mapping from property to *physical* type is
- * asserted against `getSqlColumnType` in the contract test rather than
- * duplicated here.
+ * Deliberately narrower than the schema plan's `PgType`: search only cares
+ * whether a value reaches text, and the mapping from property to *physical*
+ * type is asserted against the plan in the contract test rather than duplicated
+ * here.
  *
  * Returns null for anything that is not text-bearing, which the caller turns
  * into a boot error naming the property.
@@ -429,13 +429,24 @@ export const searchHelperFunctions = (spec: SearchColumnSpec): string[] => {
 export const searchExtensionStatements = (spec: SearchColumnSpec): string[] =>
     spec.extensions.map(e => `CREATE EXTENSION IF NOT EXISTS ${e} WITH SCHEMA ${HELPER_SCHEMA};`);
 
+/**
+ * Everything after the column name — the type and the generation expression.
+ *
+ * Split out because four emitters need it and only two of them have a place to
+ * put the name: `CREATE TABLE` and `ADD COLUMN` write `"col" <this>`, while the
+ * schema plan carries it as the column's SQL definition and the boot-time
+ * rebuild statement interpolates it on its own.
+ */
+export const searchColumnTypeSql = (expression: string, kind: "tsvector" | "text"): string =>
+    `${kind} GENERATED ALWAYS AS (${expression}) STORED`;
+
 /** The column definition as it appears inside `CREATE TABLE`. */
 export const searchColumnDefinition = (spec: SearchColumnSpec): string =>
-    `"${spec.column}" tsvector GENERATED ALWAYS AS (${spec.expression}) STORED`;
+    `"${spec.column}" ${searchColumnTypeSql(spec.expression, "tsvector")}`;
 
 /** The fuzzy column definition, when the spec asks for one. */
 export const fuzzyColumnDefinition = (spec: SearchColumnSpec): string | undefined =>
-    spec.fuzzy ? `"${spec.fuzzy.column}" text GENERATED ALWAYS AS (${spec.fuzzy.expression}) STORED` : undefined;
+    spec.fuzzy ? `"${spec.fuzzy.column}" ${searchColumnTypeSql(spec.fuzzy.expression, "text")}` : undefined;
 
 /**
  * Index statements for the spec.

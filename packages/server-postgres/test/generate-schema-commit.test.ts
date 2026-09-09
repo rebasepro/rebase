@@ -119,6 +119,7 @@ describe("generateSchemaCommit", () => {
             DEFAULT_COMMIT_PATHS.policiesFile,
             DEFAULT_COMMIT_PATHS.schemaFile,
             DEFAULT_COMMIT_PATHS.searchFile,
+            DEFAULT_COMMIT_PATHS.triggersFile,
             DEFAULT_COMMIT_PATHS.vectorFile
         ].sort());
     });
@@ -145,7 +146,7 @@ describe("generateSchemaCommit", () => {
         });
 
         expect(commit.files[0]).toEqual(source);
-        expect(commit.files).toHaveLength(6);
+        expect(commit.files).toHaveLength(7);
     });
 
     it("honours custom paths", async () => {
@@ -171,7 +172,7 @@ describe("generateSchemaCommit", () => {
         const same = [collection("posts", { title: str() })];
         const commit = await generateSchemaCommit({ before: same, after: same });
         expect(commit.statements).toEqual([]);
-        expect(commit.files).toHaveLength(5);
+        expect(commit.files).toHaveLength(6);
     });
 });
 
