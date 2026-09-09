@@ -208,6 +208,17 @@ const productsCollection: PostgresCollectionConfig = {
                 readOnly: true,
                 hideFromCollection: true
             }
+        },
+        __order: {
+            // Not "Order" as on tickets: this is a shop, and a property called
+            // "Order" beside a collection of orders reads as the wrong noun.
+            name: "Board position",
+            type: "string",
+            admin: {
+                disabled: true,
+                hideFromCollection: true
+            },
+            description: "Fractional index maintained by the Kanban board"
         }
     },
     // Headless relation: shows related orders (through order_items) as a subcollection tab
@@ -247,8 +258,19 @@ const productsCollection: PostgresCollectionConfig = {
         icon: "Package",
         group: "E-Commerce",
         defaultViewMode: "cards",
-        enabledViews: ["table", "cards", "gallery"],
         customViews: ["gallery"],
+        // Every view the panel can draw is offered; this only says which enum
+        // the board opens grouped by. Without it the board would pick the first
+        // enum property in declaration order — `category`, eight columns of
+        // shop taxonomy — where the useful gesture is dragging a product from
+        // Draft to Active.
+        kanban: {
+            columnProperty: "status"
+        },
+        // Lexicographic sort keys, so a card dragged within a column keeps its
+        // position. Without it the board runs read-only and says so in a banner
+        // across the top of every column.
+        orderProperty: "__order",
         // The card grid is this collection's default view, so what a card says
         // is what the collection says. `image` names the array and the renderer
         // takes the first frame; `status` and `category` are named so they keep
@@ -311,7 +333,8 @@ const productsCollection: PostgresCollectionConfig = {
             "description",
             "available_locales",
             "created_at",
-            "updated_at"
+            "updated_at",
+            "__order"
         ],
         filterPresets: [
             {

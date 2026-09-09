@@ -319,13 +319,35 @@ const exercisesCollection: PostgresCollectionConfig = {
                 readOnly: true,
                 hideFromCollection: true
             }
+        },
+        __order: {
+            name: "Order",
+            type: "string",
+            admin: {
+                disabled: true,
+                hideFromCollection: true
+            },
+            description: "Fractional index maintained by the Kanban board"
         }
     },
     admin: {
         icon: "Dumbbell",
         group: "Fitness",
         defaultViewMode: "table",
-        enabledViews: ["list", "table", "cards"],
+        // Three columns that all hold something. `category` is the other enum
+        // and it is what the board would have picked on its own — declaration
+        // order — but the catalogue is 18 strength movements against one
+        // flexibility and no balance, and a board whose columns are empty
+        // reads as broken data rather than as a filter that found nothing.
+        // The grouping is still a toolbar control, so `category` is one click
+        // away for anyone who wants it.
+        kanban: {
+            columnProperty: "difficulty"
+        },
+        // Lexicographic sort keys, so a card dragged within a column keeps its
+        // position. Without it the board runs read-only and says so in a banner
+        // across the top of every column.
+        orderProperty: "__order",
         // `body_parts` is an array of enum values, so naming it as the tags path
         // (rather than computing the labels) is what keeps each chip its own
         // colour — the stated advantage of the path arm over a resolver.
@@ -384,7 +406,8 @@ const exercisesCollection: PostgresCollectionConfig = {
             "instructions",
             "is_featured",
             "created_at",
-            "updated_at"
+            "updated_at",
+            "__order"
         ],
         filterPresets: [
             {

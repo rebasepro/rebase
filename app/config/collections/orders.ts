@@ -237,7 +237,6 @@ const ordersCollection: PostgresCollectionConfig = {
         // Explicit because "list" is now enabled and would otherwise take the
         // default slot — orders have always opened on the table.
         defaultViewMode: "table",
-        enabledViews: ["list", "table", "kanban"],
         kanban: {
             columnProperty: "status"
         },

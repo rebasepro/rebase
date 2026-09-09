@@ -86,7 +86,8 @@ export const exercises = pgTable("exercises", {
     is_featured: boolean("is_featured"),
     status: exercisesStatus("status").default(sql`'draft'`).notNull(),
     created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
-    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
+    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
+    __order: text("order")
 }, (table) => ([
     pgPolicy("exercises_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
     pgPolicy("exercises_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
@@ -230,7 +231,8 @@ export const products = pgTable("products", {
     status: productsStatus("status").default(sql`'draft'`).notNull(),
     is_featured: boolean("is_featured"),
     created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
-    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`)
+    updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
+    __order: text("order")
 }, (table) => ([
     pgPolicy("products_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
     pgPolicy("products_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(rebase.roles(), ',') && ARRAY['admin']` }),
