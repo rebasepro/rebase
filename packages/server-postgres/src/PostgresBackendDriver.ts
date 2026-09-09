@@ -314,7 +314,18 @@ export class PostgresBackendDriver implements DataDriver {
             // request-scoped handle this service reads through.
             aggregate: async (collectionPath, options) => {
                 return raw.aggregate(collectionPath, options);
-            }
+            },
+            // Forwarded for the same reason `aggregate` is, and it was missed
+            // the same way: this object is all the route can see, so a method
+            // left off it does not fall back to the real one — it reads as a
+            // driver that cannot do the thing. `readPage` asks `cursorFor` for
+            // the `meta.nextCursor` of every page, so without this the server
+            // accepted `?after=` and never issued a cursor to put in it, and
+            // keyset pagination could not be started by any client.
+            //
+            // No transaction and no afterRead: it derives a string from a row
+            // that has already been fetched and authorized.
+            cursorFor: (collectionPath, row, orderBy) => raw.cursorFor(collectionPath, row, orderBy)
         };
     }
 
@@ -2160,7 +2171,12 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 return this.withTransaction(async (delegate) => {
                     return delegate.restFetchService.aggregate!(collectionPath, options);
                 }, { accessMode: "read only" });
-            }
+            },
+            // Not in a transaction, unlike its neighbours: it reads no rows. It
+            // derives a cursor from a row the caller has already been served,
+            // so there is nothing here for RLS to scope.
+            cursorFor: (collectionPath, row, orderBy) =>
+                this.delegate.restFetchService.cursorFor?.(collectionPath, row, orderBy)
         };
     }
 
