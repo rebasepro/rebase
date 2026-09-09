@@ -1624,9 +1624,19 @@ id: parsed.id });
         );
 
         const offset = queryOptions.offset ?? 0;
+        // A distinct read collapses rows, and `count` counts them — so `total`
+        // describes a different set from the one served, which is the trap
+        // `countRawEntities` documents for `vectorSearch` and soft delete. It
+        // cannot be answered without a `COUNT(DISTINCT …)` the driver does not
+        // have, so it is not answered: no `total`, and `hasMore` from the page
+        // itself. Reporting the row count instead left `hasMore` true beside a
+        // complete two-row result, which is a client paging forever.
+        const distinctRead = queryOptions.distinct === true;
         const hasMore = seeking
             ? (fetched as unknown[]).length > (limit ?? 0)
-            : offset + entities.length < total;
+            : distinctRead
+                ? (limit !== undefined && entities.length === limit)
+                : offset + entities.length < total;
 
         // The cursor for the *next* page, from the last row served. Issued by
         // the driver, which is the only layer that knows which columns address
@@ -1641,7 +1651,7 @@ id: parsed.id });
         return {
             rows,
             meta: {
-                total,
+                ...(distinctRead ? {} : { total }),
                 limit: queryOptions.limit,
                 offset: queryOptions.offset,
                 hasMore,

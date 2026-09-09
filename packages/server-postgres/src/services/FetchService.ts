@@ -327,7 +327,20 @@ target });
      * relation reaches nothing from, which is precisely the "nobody waiting"
      * end of a queue.
      */
-    private buildOrderExpressions(keys: ResolvedOrderKey[], idField: AnyPgColumn): SQL[] {
+    private buildOrderExpressions(
+        keys: ResolvedOrderKey[],
+        idField: AnyPgColumn,
+        /**
+         * Append the primary key as a final tie-breaker.
+         *
+         * Off for a `SELECT DISTINCT`, which does not select the key: Postgres
+         * requires every ORDER BY expression of a distinct read to be in the
+         * select list and answers a bare `42P10` otherwise. There is also
+         * nothing for it to do there — a distinct read returns a set of values,
+         * not rows, so there are no ties between rows to break.
+         */
+        tieBreakOnId = true
+    ): SQL[] {
         // Four literal branches rather than a nested `sql` fragment for the
         // placement: a nested fragment renders as a child SQL node, which is
         // correct in the statement and invisible to anything reading the
@@ -340,7 +353,7 @@ target });
             }
             return nullsLast ? sql`${key.target} DESC NULLS LAST` : sql`${key.target} DESC NULLS FIRST`;
         });
-        expressions.push(desc(idField));
+        if (tieBreakOnId) expressions.push(desc(idField));
         return expressions as SQL[];
     }
 
@@ -739,7 +752,8 @@ target });
      *
      * - the **primary key**, because a row nobody can address cannot be
      *   updated, deleted, or paged past — and `meta.nextCursor` is derived from
-     *   it, so a projection without it would silently disable seeking;
+     *   it, so a projection without it would silently disable seeking. The one
+     *   exception is `distinct`, below;
      * - the exclusions. `excludeFromApi` and the generated search columns are
      *   removed *after* the narrowing, so naming one in `fields` does not
      *   un-hide it. That was the shape of the `?searchString=` leak: a path
@@ -749,12 +763,24 @@ target });
      * An unknown column name is a 400 rather than a silent omission: a caller
      * who mistypes `?fields=titel` otherwise gets rows without titles and no
      * hint why.
+     *
+     * **`distinct` drops the primary key.** Keeping it is what the refusal of
+     * `distinct` beside a search or vector query already describes: a value
+     * that differs on every row makes the whole row distinct by construction,
+     * so the query "would answer 200 having done nothing". A surrogate key does
+     * that more reliably than any score — `?fields=status&distinct=true` came
+     * back with one row per row, every one carrying its `id`. So a distinct
+     * read is a read of the named columns and nothing else. It addresses no
+     * rows, which is the honest shape for one: `cursorFor` finds no key on the
+     * row and issues no cursor, and the result is a set of values rather than a
+     * set of rows to update or delete.
      */
     private columnProjection(
         table: PgTable<any>,
         collection: CollectionConfig,
         fields: string[] | undefined,
-        idInfoArray: { fieldName: string; type: "string" | "number" }[]
+        idInfoArray: { fieldName: string; type: "string" | "number" }[],
+        distinct?: boolean
     ): Record<string, unknown> | undefined {
         const visible = visibleColumnProjection(getTableColumns(table), collection);
         if (!fields || fields.length === 0) return visible;
@@ -770,7 +796,7 @@ target });
         const available = visible ?? tableColumns;
 
         const keep = new Set(fields);
-        for (const pk of idInfoArray) keep.add(pk.fieldName);
+        if (!distinct) for (const pk of idInfoArray) keep.add(pk.fieldName);
 
         const projection: Record<string, unknown> = {};
         for (const name of keep) {
@@ -1893,7 +1919,7 @@ relatedTo: hop }, include
         // would ship it to every caller. The projection is undefined — and the
         // SQL therefore unchanged — for any table without one. `fields`
         // narrows it further, in SQL rather than after the fact.
-        const visible = this.columnProjection(table, collection, options.fields, idInfoArray);
+        const visible = this.columnProjection(table, collection, options.fields, idInfoArray, options.distinct === true);
 
         // Relevance, alongside the row, exactly as `_distance` rides along with
         // a vector search. Present only when the collection opted in and the
@@ -2004,9 +2030,10 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             ? [asc(vectorMeta.orderBy), desc(idField)]
             : this.buildOrderExpressions(
                 this.resolveOrderKeys(table, sortKeys, collection, options.searchString),
-                idField
+                idField,
+                !wantsDistinct
             );
-        query = query.orderBy(...orderExpressions);
+        if (orderExpressions.length > 0) query = query.orderBy(...orderExpressions);
 
         if (options.startAfter) {
             // Keyset seeking on the REST path. `startAfter` arrived on this
