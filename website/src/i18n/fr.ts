@@ -243,6 +243,7 @@ export const fr = {
   "footer.waitlistError": "Une erreur s'est produite. Veuillez réessayer.",
   "footer.tagline": "Le backend Postgres open-source · Conçu en Europe",
   "footer.rights": "© 2026 Rebase. Tous droits réservés.",
+  "footer.builtBy.html": "Conçu et maintenu par <a href=\"https://camberi.com?utm_source=rebase&amp;utm_medium=referral&amp;utm_campaign=built-by\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"hover:underline hover:text-primary-light transition-colors duration-200\">Camberi</a>, un studio d’ingénierie produit à Madrid et Munich qui travaille aussi pour des clients.",
   "kd.title": "Programme Kit Digital — Rebase en tant qu'Agent Digitaliseur",
   "kd.desc": "Rebase est un Agent Digitaliseur adhérant au Programme Kit Digital. Découvrez nos solutions de numérisation subventionnées pour les PME et indépendants en Espagne.",
   "kd.breadcrumb.home": "Accueil",

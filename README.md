@@ -391,6 +391,12 @@ Two more worth knowing before a first pull request:
 
 ---
 
+## Who builds Rebase?
+
+Built and maintained by [Camberi](https://camberi.com?utm_source=rebase&utm_medium=referral&utm_campaign=built-by), a product engineering studio in Madrid and Munich that also builds for clients.
+
+---
+
 ## Support & Community
 
 - 📖 [Documentation](https://rebase.pro/docs)
