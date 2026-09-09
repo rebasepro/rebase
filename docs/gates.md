@@ -98,6 +98,7 @@ this list, in this order.
 | `check:rebase-props` | The `<Rebase>` props table against `RebaseProps` and what `Rebase.tsx` reads, so the table cannot document ten of twenty-four. | — |
 | `check:property-options` | The properties page against every `Admin*Options` interface, so a per-property `admin` option cannot exist in the type and nowhere else. | — |
 | `check:subpath-imports` | Every deep import the docs recommend resolves against that package's `exports` map. | — |
+| `check:config-paths` | Every alias target in every loadable `vite.config.*` exists. Four pointed at nothing: three at a `packages/ui/index.css` that never existed, one at a package deleted from the repo. A dead alias resolves through nothing until a reorder makes it first, and then it is a dev server that will not start. `website/astro.config.mjs` is the known gap — Vite's loader cannot read it. | Delete the entry; it is dead, not broken |
 | `check:studio-tools` | The Studio tools table against the `useMemo` in `RebaseStudio.tsx` that declares each tool's slug and drawer group. | — |
 | `check:ui-string-paths` | A path named in a UI string points at something the reader's project has, not at a file in this repository. | — |
 | `check:glued-code` | Prose glued to an inline tag — "or runrebase dev" — which Astro and JSX produce from a newline and no diff shows. | — |

@@ -76,6 +76,7 @@
     "check:rebase-props": "node tooling/scripts/check-rebase-props-table.mjs",
     "check:property-options": "node tooling/scripts/check-property-options-table.mjs",
     "check:subpath-imports": "node tooling/scripts/check-subpath-imports.mjs",
+    "check:config-paths": "node tooling/scripts/check-config-paths.mjs",
     "check:studio-tools": "node tooling/scripts/check-studio-tools-table.mjs",
     "check:ui-string-paths": "node tooling/scripts/check-ui-string-paths.mjs",
     "check:doc-links": "node tooling/scripts/check-doc-links.mjs",
