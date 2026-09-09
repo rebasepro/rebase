@@ -265,6 +265,7 @@ export const productsCollection = defineCollection({
 | `auth` | `boolean \| AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
 | `schema` | `string` | Postgres schema the table lives in — `"public"`, `"rebase"`, `"auth"`. Defaults to `"public"`. |
 | `disableDefaultPolicies` | `boolean` | Remove the baseline policies the generator injects — an admin/server SELECT, and on an auth collection a self-read plus an admin-only write gate — and take full responsibility for this collection's RLS. `false` by default. See [Security Rules](/docs/collections/security-rules). |
+| `softDelete` | `boolean \| { field?: string }` | Turn `delete` into a timestamp and hide stamped rows from every read. `true` uses `deletedAt`; the object form renames the field. The collection must declare that `date` property itself. Postgres only — see [Soft delete](/docs/collections/soft-delete) |
 | `strictWrites` | `boolean` | Reject a write that names a field this collection does not declare, with a 400. `true` by default. Set it to `false` only where the column genuinely exists and is not declared — filled by a trigger, or introspected rather than written down. |
 
 ### UI Configuration

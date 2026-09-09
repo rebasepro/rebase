@@ -1,0 +1,129 @@
+---
+title: Arrays and maps
+sidebar_label: Arrays and maps
+description: "The two composite property types: repeatable lists, block editors, structured groups and free-form key-value objects, and how each maps to a Postgres column."
+---
+
+import { FieldWidgetPreview } from '../../../../components/docs/FieldWidgetPreview';
+
+An `array` is an ordered list and a `map` is a structured object. Both are
+stored as `jsonb`, except an array of a primitive, which becomes a native
+Postgres array (`text[]`, `integer[]`) so the database can index and search
+inside it.
+
+## Array Properties
+
+### Simple repeat
+
+Use `of` to define a repeatable list of items.
+
+```typescript
+tags: {
+    type: "array",
+    name: "Tags",
+    of: { type: "string" }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="repeat" />
+
+### Multi file upload
+
+An array whose `of` carries the `storage` block is a multi-file upload — see
+[File uploads](/docs/collections/file-uploads).
+
+<FieldWidgetPreview client:only="react" variant="multi_file_upload" />
+
+### Block editor
+
+Use `oneOf` to create a block editor with multiple content types. Each key creates a card type that users can pick from.
+
+```typescript
+content: {
+    type: "array",
+    name: "Content",
+    oneOf: {
+        properties: {
+            text: {
+                type: "map",
+                properties: {
+                    body: { type: "string", name: "Text", admin: { markdown: true } }
+                }
+            },
+            image: {
+                type: "map",
+                properties: {
+                    src: { type: "string", name: "Image", storage: { storagePath: "content" } },
+                    caption: { type: "string", name: "Caption" }
+                }
+            }
+        }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="block" />
+
+### Array Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `of` | `Property \| Property[]` | Property schema for array items |
+| `oneOf` | `object` | Array of typed objects with multiple discriminator types. Takes `properties`, and optionally `propertiesOrder`, `typeField` (default `"type"`) and `valueField` (default `"value"`) |
+| `columnType` | `"json" \| "jsonb" \| "text[]" \| "integer[]" \| "boolean[]" \| "numeric[]"` | The database column. A primitive `of` defaults to the matching native Postgres array; anything else to `jsonb` |
+| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `admin.minimalistView` | `boolean` | Display child properties directly without extendable panel |
+| `admin.sortable` | `boolean` | Can elements be reordered (default: true) |
+| `admin.canAddElements` | `boolean` | Can new elements be added (default: true) |
+
+## Map Properties
+
+### Group (structured)
+
+Use `properties` to define a structured object with named fields.
+
+```typescript
+address: {
+    type: "map",
+    name: "Address",
+    properties: {
+        street: { type: "string", name: "Street" },
+        zip: { type: "string", name: "Postal code" }
+    }
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="group" />
+
+### Key-value (free-form)
+
+Set `keyValue: true` to render an arbitrary key-value pairs editor.
+
+```typescript
+metadata: {
+    type: "map",
+    name: "Key value",
+    keyValue: true
+}
+```
+
+<FieldWidgetPreview client:only="react" variant="key_value" />
+
+### Map Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `properties` | `Properties` | Record of properties included in the map |
+| `propertiesOrder` | `string[]` | Ordered keys for rendering |
+| `admin.previewProperties` | `string[]` | Which properties to show in the table preview |
+| `admin.spreadChildren` | `boolean` | Render child properties as separate columns in table view |
+| `admin.minimalistView` | `boolean` | Display properties without a wrapping panel |
+| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `keyValue` | `boolean` | Render as arbitrary key-value pairs editor. Not presentation despite the wording: it says the map has no declared shape, which is what the OpenAPI schema is generated from |
+| `columnType` | `"json" \| "jsonb"` | The database column. Defaults to `jsonb` |
+
+## Next Steps
+
+- **[Properties](/docs/collections/properties)** — every other property type and the options they share
+- **[Validation and conditions](/docs/collections/validation-and-conditions/)** — the rules that apply to elements and to the list itself
+- **[File uploads](/docs/collections/file-uploads)** — an array of `storage` strings is a multi-file field

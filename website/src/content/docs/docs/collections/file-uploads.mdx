@@ -12,7 +12,9 @@ that — and the block says where the bytes go and what the form will accept.
 
 That split matters more than it looks. Most of `storage` is read by the admin
 panel's uploader on its way to the API, so a write that does not come from a
-form does not go through it. What the *server* enforces is listed as such below.
+form does not go through it — those options carry the label below. The two that
+decide what a file may *be*, `maxSize` and `acceptedFiles`, are the exception:
+the server checks them on every upload.
 
 ## One file
 
@@ -58,8 +60,8 @@ Everything inside `storage`.
 | `fileName` | `string \| function` | The uploaded object's file name, with the same placeholders. **Admin form only — not enforced by the API or the database.** |
 | `storageSource` | `string` | Which registered bucket, when a project has more than one. The `bucket("media")` handle works here too |
 | `public` | `boolean` | Store under the public prefix and serve through a stable, token-less, cacheable URL. `false` by default, which means private objects and short-lived signed URLs |
-| `acceptedFiles` | `FileType[]` | MIME types this property takes. The asterisk form works — `image/*` |
-| `maxSize` | `number` | Largest accepted file, in bytes |
+| `acceptedFiles` | `FileType[]` | MIME types this property takes. The asterisk form works — `image/*`. **Enforced by the server**, not only by the file picker |
+| `maxSize` | `number` | Largest accepted file, in bytes. **Enforced by the server**, on the plain and the resumable upload paths alike |
 | `metadata` | `Record<string, unknown>` | Object metadata to store alongside the file |
 | `includeBucketUrl` | `boolean` | Write `s3://my-bucket/path/to/file.png` into the column instead of `path/to/file.png`. `false` by default |
 | `storeUrl` | `boolean` | Write the download URL into the column instead of the key. `false` by default, and worth leaving that way: a URL that carries a token stops working when the token does, and the original reference is then gone |
@@ -76,6 +78,19 @@ crop), a `format` of `"original"`, `"jpeg"`, `"png"` or `"webp"`, and a
 `quality` between 0 and 100 for the lossy formats — 80 by default. It happens in
 the browser, before the bytes are sent, so an upload that did not come from the
 panel is stored at its original size.
+
+### What the server checks
+
+`maxSize` and `acceptedFiles` used to be enforced by exactly one thing: the
+browser. The upload route knew a single global size cap and nothing about the
+property a file was destined for, so `curl -F file=@payload.exe` past the picker
+put a 40 MB executable in the avatar bucket and the config that said otherwise
+was never consulted.
+
+Both are now checked server-side, against the property the upload names. An
+upload that names no property — an older client, a direct call — still falls
+back to the global cap, because a request with no property context has no
+property rule to check, and refusing it would break clients that predate this.
 
 ### Where the file is allowed to go
 

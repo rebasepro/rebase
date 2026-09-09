@@ -103,6 +103,21 @@ rebase db push
 - Applies your collections' RLS policies, and **removes policies an earlier push superseded**
 - Does **not** create migration files
 
+**The files it generates on the way**, all under `drizzle/`:
+
+| File | Holds |
+|------|-------|
+| `schema.sql` | Tables, columns, constraints and indexes — Atlas's desired state, and the only one it diffs |
+| `policies.sql` | The RLS policies your `securityRules` compile to |
+| `search.sql` | The full-text search functions and generated columns, for collections with a `search` block |
+| `vector.sql` | pgvector extensions and ANN indexes |
+| `triggers.sql` | `rebase.set_updated_at()` and the `BEFORE UPDATE` triggers behind `autoValue: "on_update"` |
+
+Atlas manages the first and nothing else, so `db push` and the boot-time schema
+ensure apply the other four themselves. A **migration-only** deployment — one
+that runs `db migrate` and never `db push` — has to fold those four into a
+migration by hand; `db generate` says so when a change is invisible to Atlas.
+
 :::note[Editing a security rule renames its policy]
 A rule without an explicit `name` compiles to `<table>_<op>_<hash>`, where the hash covers the rule's semantics — so *editing* a rule (rather than adding one) produces a policy under a new name and leaves the old one behind.
 

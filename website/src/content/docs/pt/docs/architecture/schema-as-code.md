@@ -1,5 +1,5 @@
 ---
-sourceHash: 8993ba9020310652
+sourceHash: 69d89e250dd512d5
 title: Schema como Código
 sidebar_label: Schema como Código
 description: Como o Rebase usa coleções TypeScript como a única fonte de verdade para o seu schema de banco de dados, UI e API.
