@@ -178,7 +178,11 @@ describe("resolveRelation", () => {
             expect(normalized.through).toEqual({
                 table: "posts_tags",
                 sourceColumn: "post_id",
-                targetColumn: "tag_id"
+                targetColumn: "tag_id",
+                // Filled in like every other field on a resolved relation: a
+                // junction that declares no payload has an empty one, not an
+                // absent one, so consumers read a single shape.
+                properties: {}
             });
         });
     });

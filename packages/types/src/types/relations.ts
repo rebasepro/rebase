@@ -1,9 +1,29 @@
 import type { AnyCollectionConfig } from "./collections";
+import type { Properties } from "./properties";
 
 /**
  * @group Models
  */
 export type OnAction = "cascade" | "restrict" | "no action" | "set null" | "set default";
+
+/**
+ * The key a junction row's own columns are carried under, in both directions.
+ *
+ * A read that includes a `manyToMany` relation serves each related row with its
+ * link's columns nested here — `{ id: 5, name: "ts", _pivot: { role: "owner" } }`
+ * — and a membership write may name the same key on an element to state what
+ * the link should hold. One constant because the two have to be the same word:
+ * a wire name that differs between the read and the write it round-trips
+ * through is a shape no client can echo back.
+ *
+ * Leading underscore, like `_matches`: it reads as metadata about the row
+ * rather than as one of its columns. A payload property may not be named
+ * `_pivot` either — `checkJunctionPayload` refuses it — so the key means one
+ * thing wherever it appears.
+ *
+ * @group Models
+ */
+export const JUNCTION_PIVOT_KEY = "_pivot";
 
 /**
  * What kind of link a relation is.
@@ -193,6 +213,52 @@ export interface ManyToManyRelation extends RelationBase {
         sourceColumn?: string;
         /** Junction column holding the **target's** key. */
         targetColumn?: string;
+        /**
+         * Extra columns the junction row carries, declared exactly like a
+         * collection's properties.
+         *
+         * A membership is often not only a membership. "This user is in that
+         * organisation" is really "…as an `owner`, since March"; "this tag is
+         * on that post" is really "…in third place". Until this existed the
+         * junction was two key columns and nothing else, so the role and the
+         * position had to become a collection of their own — which is a
+         * different data model, a different set of policies and a different
+         * URL, for what is still one link.
+         *
+         * The properties are read by the same planner that reads a
+         * collection's, so a payload column gets the type, `NOT NULL`,
+         * `DEFAULT`, `UNIQUE` and enum type it would get on a table. What it
+         * does **not** get is `indexes` (declared per collection, and no
+         * collection declares a junction), `search`, `vector`, or anything a
+         * relation would put on it — a payload property may not be a
+         * `relation`, a `reference` or a `vector`, and config validation
+         * refuses one that is.
+         *
+         * On the wire the values travel under {@link JUNCTION_PIVOT_KEY}: a
+         * read serves `{ …target, _pivot: { role } }`, and a membership write
+         * accepts `{ id, _pivot: { role } }` beside the bare ids.
+         *
+         * ```ts
+         * members: {
+         *     kind: "manyToMany",
+         *     target: () => users,
+         *     through: {
+         *         table: "org_members",
+         *         properties: {
+         *             role: { type: "string", enum: ["owner", "admin", "member"],
+         *                     defaultValue: "member", validation: { required: true } },
+         *             joinedAt: { type: "date", autoValue: "on_create" }
+         *         }
+         *     }
+         * }
+         * ```
+         *
+         * Both sides of the same junction may declare it, and both must agree:
+         * `resolveJunctionSpecs` refuses two declarations of the same payload
+         * key that do not describe the same column, because only one of them
+         * could ever be created.
+         */
+        properties?: Properties;
     };
 }
 
@@ -379,6 +445,12 @@ export interface ResolvedManyToMany extends ResolvedRelationBase {
         table: string;
         sourceColumn: string;
         targetColumn: string;
+        /**
+         * The payload columns as authored, or `{}` when there are none —
+         * never `undefined`, so a consumer reads one shape.
+         * See {@link ManyToManyRelation.through}.
+         */
+        properties: Properties;
     };
 }
 
