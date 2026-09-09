@@ -16,12 +16,12 @@ import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import {
     generatePostgresDdl,
     generatePostgresSearchDdl,
-    searchExcludePatterns,
-    getSqlColumnType
+    searchExcludePatterns
 } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
 import { buildSearchColumnSpec } from "../src/schema/search-column";
+import { planColumnTypeFor } from "./helpers/plan-column";
 
 const collection: PostgresCollectionConfig = {
     slug: "talents",
@@ -146,7 +146,7 @@ describe("the helper functions exist before anything that calls them", () => {
 
 describe("the spec's classification matches the physical column type", () => {
     // The spec decides `text` / `text_array` / `jsonb` from the property, and
-    // getSqlColumnType decides the actual column. If those two ever disagree,
+    // the schema plan decides the actual column. If those two ever disagree,
     // the generated expression addresses a column of a type it is not.
     const cases: [string, string][] = [
         ["full_name", "TEXT"],
@@ -155,8 +155,7 @@ describe("the spec's classification matches the physical column type", () => {
     ];
 
     it.each(cases)("%s is %s, and the spec extracts it accordingly", (propName, expectedType) => {
-        const prop = collection.properties[propName];
-        expect(getSqlColumnType(propName, prop, collection, collections)).toBe(expectedType);
+        expect(planColumnTypeFor(collections, collection.slug, propName)).toBe(expectedType);
 
         const field = spec.fields.find(f => f.column === propName)!;
         if (expectedType === "TEXT") expect(field.kind).toBe("text");

@@ -7,8 +7,9 @@
  * tenant, where there is no developer to read the error — and the third was
  * worse, because it succeeded.
  *
- * Refusing in one place is the point. `column-plan-helpers` is what all three
- * read, so a path that forgets to check cannot be the path that ships the
+ * Refusing in one place is the point — and it is now literally one place:
+ * `planSchema` reads the collections and every renderer works from what it
+ * produced, so a path that forgets to check cannot be the path that ships the
  * broken schema.
  */
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
@@ -21,15 +22,14 @@ const emptyDb = (): ExistingSchema => ({ tables: new Map(), enums: new Set(), co
 
 describe("a configuration with no correct column is refused by all three emitters", () => {
     for (const { collection, because } of refused) {
-        it(`${collection.slug}`, async () => {
-            await expect(generateSchema([collection])).rejects.toThrow(because);
-            await expect(generatePostgresDdl([collection])).rejects.toThrow(because);
+        it(`${collection.slug}`, () => {
+            expect(() => generateSchema([collection])).toThrow(because);
+            expect(() => generatePostgresDdl([collection])).toThrow(because);
             expect(() => planCollectionSchemaEnsure([collection], emptyDb())).toThrow(because);
         });
 
-        it(`${collection.slug} — the message names the collection and the property`, async () => {
-            const error = await generateSchema([collection]).catch((e: Error) => e);
-            expect((error as Error).message).toContain(collection.slug!);
+        it(`${collection.slug} — the message names the collection and the property`, () => {
+            expect(() => generateSchema([collection])).toThrow(collection.slug!);
         });
     }
 });

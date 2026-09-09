@@ -384,3 +384,90 @@ export function staleVerdict(input: {
         regenerate: false
     };
 }
+
+
+// ── Is this file what the current collections generate? ──────────────────────
+
+/** One exported declaration that differs between two generated schemas. */
+export interface DeclarationDifference {
+    /** The exported symbol: a table, an enum, a relations block. */
+    name: string;
+    kind: "missing" | "unexpected" | "changed";
+}
+
+/**
+ * `export const NAME = …` → the declaration, with formatting and the
+ * generator's own comments removed.
+ *
+ * Every generated declaration starts at column 0 and runs to the next one, so
+ * splitting on them needs no brace counting and cannot get out of step with a
+ * policy clause that happens to contain a brace.
+ */
+function declarations(source: string): Map<string, string> {
+    const out = new Map<string, string>();
+    const starts = [...source.matchAll(/^export const (\w+) =/gm)];
+    starts.forEach((match, index) => {
+        const from = match.index! + match[0].length;
+        const to = index + 1 < starts.length ? starts[index + 1].index! : source.length;
+        out.set(
+            match[1],
+            source.slice(from, to)
+                // The `// INCLUDE (...)` note on a covering index, and any other
+                // remark the renderer leaves: they describe the declaration,
+                // they are not part of it.
+                .replace(/\/\/[^\n]*/g, "")
+                .replace(/\s+/g, " ")
+                .trim()
+        );
+    });
+    return out;
+}
+
+/**
+ * What differs between the schema the current collections generate and the one
+ * on disk — by declaration, not by byte.
+ *
+ * `rebase doctor` used to whitespace-normalise both files and compare the
+ * strings, which answers "are these the same text" when the question is "does
+ * this file still describe the same schema". The difference is not academic:
+ * the answer was a single yes/no with nothing to act on, so a developer told
+ * their schema was stale had to regenerate and read the diff to find out what
+ * had changed.
+ *
+ * Comparing declarations answers the question the reader actually has. The
+ * generated file is a flat list of `export const`s — one per table, enum and
+ * relations block, each the rendering of a piece of the schema plan — and two
+ * files declaring the same symbols with the same bodies describe the same
+ * database whatever their formatting.
+ *
+ * Not a plan-to-plan comparison, and deliberately not: reading a plan back out
+ * of `schema.generated.ts` means interpreting drizzle-orm builder calls, which
+ * is a second interpreter — the exact thing this area was just rid of. The
+ * rendered declarations are the closest honest proxy, and the renderer is
+ * deterministic, so the only things normalised away are what it is free to vary
+ * independently of the plan: whitespace and its own comments.
+ */
+export function compareGeneratedDeclarations(expected: string, actual: string): DeclarationDifference[] {
+    const want = declarations(expected);
+    const have = declarations(actual);
+    const differences: DeclarationDifference[] = [];
+    for (const [name, body] of want) {
+        if (!have.has(name)) differences.push({ name, kind: "missing" });
+        else if (have.get(name) !== body) differences.push({ name, kind: "changed" });
+    }
+    for (const name of have.keys()) {
+        if (!want.has(name)) differences.push({ name, kind: "unexpected" });
+    }
+    return differences;
+}
+
+/** The differences, as the line a developer reads in `rebase doctor`. */
+export function describeDeclarationDifferences(differences: DeclarationDifference[]): string {
+    const shown = differences.slice(0, 5).map(difference => {
+        if (difference.kind === "missing") return `${difference.name} (not in the file)`;
+        if (difference.kind === "unexpected") return `${difference.name} (in the file, no longer generated)`;
+        return `${difference.name} (differs)`;
+    });
+    const rest = differences.length - shown.length;
+    return shown.join(", ") + (rest > 0 ? `, and ${rest} more` : "");
+}

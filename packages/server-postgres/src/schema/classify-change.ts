@@ -99,7 +99,13 @@ const physicalShapeOf = (prop: Property): string => JSON.stringify([
     (prop as { columnType?: unknown }).columnType ?? null,
     (prop as { dimensions?: unknown }).dimensions ?? null,
     (prop as { isId?: unknown }).isId ?? null,
-    (prop.validation as { max?: unknown } | undefined)?.max ?? null
+    (prop.validation as { max?: unknown } | undefined)?.max ?? null,
+    // `NUMERIC(10, 2)` and a bare `NUMERIC` are the same family and not the
+    // same column: changing the precision is an `ALTER COLUMN … TYPE`, which
+    // the additive ensure cannot do, so it has to be classified with the other
+    // physical changes rather than read as a no-op.
+    (prop as { precision?: unknown }).precision ?? null,
+    (prop as { scale?: unknown }).scale ?? null
 ]);
 
 /**

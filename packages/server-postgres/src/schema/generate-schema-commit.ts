@@ -47,6 +47,7 @@ import {
     generatePostgresDdl,
     generatePostgresPoliciesDdl,
     generatePostgresSearchDdl,
+    generatePostgresTriggersDdl,
     generatePostgresVectorDdl
 } from "./generate-postgres-ddl-logic";
 import { generateSchema } from "./generate-drizzle-schema-logic";
@@ -220,30 +221,30 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
     // refuses to parse at all) and `VECTOR(n)` (which its dev database cannot
     // resolve) — so a live schema edit used to leave behind a desired-state
     // file that `db push` chokes on.
-    const [schema, ddl, policies, search, vector] = await Promise.all([
-        generateSchema(input.after),
-        generatePostgresDdl(input.after, {
-            includePolicies: false,
-            includeSearch: false,
-            includeVector: false
-        }),
-        Promise.resolve(generatePostgresPoliciesDdl(input.after)),
-        Promise.resolve(generatePostgresSearchDdl(input.after)),
-        // The registry, because this runs inside the booted server, which has
-        // already evaluated the project's `resources.ts`. A commit that wrote a
-        // `vector.sql` disagreeing with the one `rebase db generate` produces
-        // would show up as drift in the repository the moment anyone regenerated.
-        Promise.resolve(generatePostgresVectorDdl(input.after, {
-            extensions: declaredDatabaseExtensions()
-        }))
-    ]);
-
     const generated: SchemaCommitFile[] = [
-        { path: paths.schemaFile, contents: schema },
-        { path: paths.ddlFile, contents: ddl },
-        { path: paths.policiesFile, contents: policies },
-        { path: paths.searchFile, contents: search },
-        { path: paths.vectorFile, contents: vector }
+        { path: paths.schemaFile, contents: generateSchema(input.after) },
+        {
+            path: paths.ddlFile,
+            contents: generatePostgresDdl(input.after, {
+                includePolicies: false,
+                includeSearch: false,
+                includeVector: false
+            })
+        },
+        { path: paths.policiesFile, contents: generatePostgresPoliciesDdl(input.after) },
+        { path: paths.searchFile, contents: generatePostgresSearchDdl(input.after) },
+        {
+            path: paths.vectorFile,
+            // The registry, because this runs inside the booted server, which
+            // has already evaluated the project's `resources.ts`. A commit that
+            // wrote a `vector.sql` disagreeing with the one `rebase db
+            // generate` produces would show up as drift in the repository the
+            // moment anyone regenerated.
+            contents: generatePostgresVectorDdl(input.after, {
+                extensions: declaredDatabaseExtensions()
+            })
+        },
+        { path: paths.triggersFile, contents: generatePostgresTriggersDdl(input.after) }
     ];
 
     // Both sides planned once, here, rather than through `additiveStatements` —

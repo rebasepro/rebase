@@ -607,6 +607,27 @@ export interface NumberProperty extends BaseProperty {
      */
     columnType?: "integer" | "real" | "double precision" | "numeric" | "bigint" | "serial" | "bigserial";
     /**
+     * Total significant digits for a `numeric` column — `NUMERIC(precision, scale)`.
+     *
+     * Money is the case this exists for. Without it a price lands as an
+     * *unbounded* `NUMERIC`, which stores `19.999999999999998` as faithfully as
+     * `19.99` and cannot be tightened afterwards without rewriting the column,
+     * so the rounding rule ends up living in whichever caller last touched the
+     * value. `precision: 10, scale: 2` makes the database the one that decides.
+     *
+     * Read only when the column is `numeric` — either declared
+     * ({@link NumberProperty.columnType}) or arrived at by default, which is
+     * what a non-integer `number` gets. Ignored on `integer`, `real`,
+     * `double precision` and the serial types, which have no modifier.
+     *
+     * Changing it on a live column is an `ALTER COLUMN … TYPE`, so `db push`
+     * plans it and the boot-time ensure reports it rather than applying it —
+     * the same treatment every other type change gets.
+     */
+    precision?: number;
+    /** Digits after the decimal point. Requires {@link NumberProperty.precision}. */
+    scale?: number;
+    /**
      * Rules for validating this property
      */
     validation?: NumberPropertyValidationSchema;

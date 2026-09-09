@@ -436,7 +436,11 @@ describe("Doctor — getExpectedColumnType extended coverage", () => {
 
     describe("unknown types", () => {
         it("should return null for geopoint type", () => {
-            expect(getExpectedColumnType({ type: "geopoint" } as Property)).toBeNull();
+            // `jsonb`, not null. `geopoint` used to answer null here — so the
+            // one property type that was genuinely unpersistable was also the
+            // one the doctor never compared. It is a `{ latitude, longitude }`
+            // document and it is stored as one.
+            expect(getExpectedColumnType({ type: "geopoint" } as Property)).toBe("jsonb");
         });
     });
 });

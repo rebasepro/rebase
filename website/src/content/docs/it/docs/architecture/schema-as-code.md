@@ -107,7 +107,7 @@ import { relations as drizzleRelations, sql } from 'drizzle-orm';
 export const products = pgTable("products", {
     name: text("name").notNull(),
     price: numeric("price"),
-    active: boolean("active"),
+    active: boolean("active").default(sql`TRUE`),
     createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     id: text("id").primaryKey()
 }, (table) => ([
@@ -141,13 +141,14 @@ CREATE TABLE "public"."products" (
   "id" TEXT PRIMARY KEY,
   "name" TEXT NOT NULL,
   "price" NUMERIC,
-  "active" BOOLEAN,
+  "active" BOOLEAN DEFAULT TRUE,
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 ```
 
-Policies, search columns and vector indexes are written to files of their own
-and applied by the CLI in their own right — Atlas manages none of the three.
+Policies, search columns, vector indexes and `updated_at` triggers are written to
+files of their own and applied by the CLI in their own right — Atlas manages
+none of the four.
 
 ## Sicurezza e Oggetti di Database Non Mappati
 

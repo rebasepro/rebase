@@ -19,16 +19,22 @@
  * It is deliberately the whole matrix rather than a curated handful:
  * `test/fixtures/property-matrix-collections.ts` is one collection set with
  * every cell in it, and the disagreements above all lived in cells no test
- * happened to cover. When the shared plan (`ColumnPlan`) lands and the three
- * emitters become three renderers, this is the test that says the refactor
- * changed nothing.
+ * happened to cover.
+ *
+ * The three emitters are now three renderers of one `SchemaPlan`, so they agree
+ * by construction — which does not retire this file. It compares the *rendered*
+ * output of all three, and a renderer that spells a constraint differently, or
+ * drops one, is exactly the bug that survives the refactor. The plan is used
+ * only to enumerate the columns; every fact below is read back out of a
+ * generated file or a planned statement.
  */
 import type { CollectionConfig, Property } from "@rebasepro/types";
 import { getTableName, getTableVarName } from "@rebasepro/common";
-import { generateSchema, getDrizzleColumn } from "../src/schema/generate-drizzle-schema-logic";
+import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planCollectionSchemaEnsure, type ExistingSchema } from "../src/schema/ensure-collection-tables";
-import { getPrimaryKeyProp, resolveColumnName } from "../src/schema/column-plan-helpers";
+import { resolveColumnName } from "../src/schema/column-plan-helpers";
+import { planSchema } from "../src/schema/plan/plan-schema";
 import { everything } from "./fixtures/property-matrix-collections";
 
 // ── The common record ────────────────────────────────────────────────────────
@@ -114,6 +120,29 @@ const drizzleReference = (target: string): string => {
     if (!collection) throw new Error(`the matrix test cannot resolve the table variable \`${varName}\``);
     const property = collection.properties?.[field] as Property | undefined;
     return `${qualifiedOf(collection)}.${resolveColumnName(field, property)}`;
+};
+
+/**
+ * `table variable → object key → the line that declares it`, out of the
+ * generated file.
+ *
+ * Read back from the emitted text rather than asked of a per-column function:
+ * there is no per-column function any more, and the thing worth checking is
+ * what actually landed in `schema.generated.ts`.
+ */
+const drizzleColumnLines = (schema: string): Map<string, Map<string, string>> => {
+    const tables = new Map<string, Map<string, string>>();
+    const re = /export const (\w+) = [\w.]+\("[^"]+", \{\n([\s\S]*?)\n\}(?:, \(table\)|\)\.enableRLS)/g;
+    for (const [, varName, body] of schema.matchAll(re)) {
+        const columns = new Map<string, string>();
+        for (const line of body.split("\n")) {
+            const key = line.trim().match(/^(?:"((?:[^"\\]|\\.)*)"|([A-Za-z_$][\w$]*))\s*:/);
+            if (!key) continue;
+            columns.set((key[1] ?? key[2]).replace(/\\(.)/g, "$1"), line.replace(/,\s*$/, ""));
+        }
+        tables.set(varName, columns);
+    }
+    return tables;
 };
 
 const parseDrizzleColumn = (line: string, enums: Map<string, string>): { column: string; facts: ColumnFacts } => {
@@ -259,14 +288,15 @@ describe("the three emitters agree, column by column", () => {
     let ddl: string;
     let ensure: ReturnType<typeof planCollectionSchemaEnsure>;
 
-    beforeAll(async () => {
-        drizzle = await generateSchema(everything);
-        ddl = await generatePostgresDdl(everything);
+    beforeAll(() => {
+        drizzle = generateSchema(everything);
+        ddl = generatePostgresDdl(everything);
         ensure = planCollectionSchemaEnsure(everything, emptyDb(), { databaseExtensions: ["vector"] });
     });
 
-    it("on the type, nullability, default, key, uniqueness and foreign key of every property's column", async () => {
+    it("on the type, nullability, default, key, uniqueness and foreign key of every property's column", () => {
         const enums = enumTypes(drizzle);
+        const fromDrizzleFile = drizzleColumnLines(drizzle);
         const fromDdl = ddlColumns(ddl);
         const fromEnsure = ensureColumns(ensure);
         const ddlKeys = foreignKeys(ddl);
@@ -275,25 +305,33 @@ describe("the three emitters agree, column by column", () => {
         const disagreements: string[] = [];
         let compared = 0;
 
-        for (const collection of everything) {
-            const table = qualifiedOf(collection);
-            for (const [propName, rawProp] of Object.entries(collection.properties ?? {})) {
-                const line = getDrizzleColumn(propName, rawProp as Property, collection, everything);
-                // An inverse relation puts no column on this table, and a
-                // foreign key another property declares is that property's.
-                if (!line) continue;
+        for (const table of planSchema(everything).tables) {
+            if (table.kind !== "collection") continue;
+            for (const plannedColumn of table.columns) {
+                // Only the columns a declared property owns. The implicit id,
+                // the generated search columns and the auth contract's own
+                // columns are compared by the "which columns each table has"
+                // case below; they have no property to name in a failure.
+                if (plannedColumn.source.kind !== "property"
+                    && plannedColumn.source.kind !== "relation"
+                    && plannedColumn.source.kind !== "reference") continue;
+                // A foreign key another property declares is that property's.
+                if (plannedColumn.columnOwnedByProperty) continue;
 
-                const { column, facts: fromDrizzle } = parseDrizzleColumn(line, enums);
-                const key = `${table}.${column}`;
+                const line = fromDrizzleFile.get(table.varName)?.get(plannedColumn.key);
+                expect(line).toBeDefined();
+
+                const { column, facts: fromDrizzle } = parseDrizzleColumn(line!, enums);
+                const key = `${table.qualified}.${column}`;
                 compared++;
 
-                const ddlFacts = { ...(fromDdl.get(table)?.get(column) ?? NO_COLUMN), foreignKey: ddlKeys.get(key) ?? null };
-                const ensureFacts = { ...(fromEnsure.get(table)?.get(column) ?? NO_COLUMN), foreignKey: ensureKeys.get(key) ?? null };
+                const ddlFacts = { ...(fromDdl.get(table.qualified)?.get(column) ?? NO_COLUMN), foreignKey: ddlKeys.get(key) ?? null };
+                const ensureFacts = { ...(fromEnsure.get(table.qualified)?.get(column) ?? NO_COLUMN), foreignKey: ensureKeys.get(key) ?? null };
 
                 const rendered = (facts: ColumnFacts): string => JSON.stringify(facts);
                 if (rendered(fromDrizzle) !== rendered(ddlFacts) || rendered(ddlFacts) !== rendered(ensureFacts)) {
                     disagreements.push(
-                        `${collection.slug}.${propName} → ${key}\n` +
+                        `${table.slug}.${plannedColumn.source.propName} → ${key}\n` +
                         `        drizzle: ${rendered(fromDrizzle)}\n` +
                         `        db push: ${rendered(ddlFacts)}\n` +
                         `        ensure : ${rendered(ensureFacts)}`

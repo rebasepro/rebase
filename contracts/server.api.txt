@@ -380,7 +380,7 @@ const ANONYMOUS_USER_IDS
 const BUNDLE_FORMAT_VERSION
 const CANONICAL_TO_REST
 const DEFAULT_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
-const DEFAULT_COMMIT_PATHS { ddlFile, policiesFile, schemaFile, searchFile, vectorFile }
+const DEFAULT_COMMIT_PATHS { ddlFile, policiesFile, schemaFile, searchFile, triggersFile, vectorFile }
 const DEFAULT_DATA_SOURCE_KEY
 const DEFAULT_FILTERABLE_RELATION_KINDS
 const DEFAULT_FUZZY_THRESHOLD
@@ -627,7 +627,7 @@ interface MongoDBCollectionConfig { auth, callbacks, childCollections, dataSourc
 interface MountableRouter { fetch, routes }
 interface NativeDependency { name, reason }
 interface NotPolicyExpression { kind, operand }
-interface NumberProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, enum, excludeFromApi, isId, metadata, name, propertyConfig, type, validation }
+interface NumberProperty { callbacks, columnName, columnType, conditions, defaultValue, description, dynamicProps, enum, excludeFromApi, isId, metadata, name, precision, propertyConfig, scale, type, validation }
 interface NumberPropertyValidationSchema { integer, lessThan, max, min, moreThan, negative, positive, required, requiredMessage, unique, uniqueInArray }
 interface OrPolicyExpression { kind, operands }
 interface OuterFieldPolicyOperand { kind, name }
@@ -696,7 +696,7 @@ interface SchemaAdmin { fetchTableMetadata, fetchUnmappedTables }
 interface SchemaChange { collection, detail, kind, property, remedy, verdict }
 interface SchemaChangeFile { contents, path }
 interface SchemaChangePlan { classified, files, message, statements, withheldConstraints }
-interface SchemaCommitPaths { ddlFile, policiesFile, schemaFile, searchFile, vectorFile }
+interface SchemaCommitPaths { ddlFile, policiesFile, schemaFile, searchFile, triggersFile, vectorFile }
 interface SchemaEditingAdmin { planSchemaChange }
 interface SearchConfig { column, fields, fuzzy, fuzzyThreshold, language, unaccent }
 interface SearchField { path, weight }
