@@ -128,7 +128,8 @@ export default defineConfig({
                         { label: "REST API", slug: "docs/backend/api" },
                         { label: "Writing over REST", slug: "docs/backend/writes" },
                         { label: "Client SDK", slug: "docs/sdk" },
-                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" }
+                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },
+                        { label: "Field access", slug: "docs/collections/field-access" }
                     ]
                 },
                 {
@@ -141,7 +142,8 @@ export default defineConfig({
                         { label: "Validation & conditions", slug: "docs/collections/validation-and-conditions" },
                         { label: "Relations", slug: "docs/collections/relations" },
                         { label: "Entity Callbacks", slug: "docs/collections/callbacks" },
-                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" }
+                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },
+                        { label: "Field access", slug: "docs/collections/field-access" }
                     ]
                 },
                 {

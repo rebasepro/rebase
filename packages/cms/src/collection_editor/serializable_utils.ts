@@ -224,6 +224,7 @@ function toSerializableBaseFields(property: Property): Omit<SerializableBaseProp
     if (property.propertyConfig) result.propertyConfig = property.propertyConfig;
     if (property.columnName) result.columnName = property.columnName;
     if (property.excludeFromApi !== undefined) result.excludeFromApi = property.excludeFromApi;
+    if (property.access !== undefined) result.access = property.access;
     if (property.defaultValue !== undefined) result.defaultValue = property.defaultValue;
     if (property.conditions) result.conditions = property.conditions;
     if (property.metadata) result.metadata = property.metadata;

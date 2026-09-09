@@ -5,11 +5,13 @@ import {
     CollectionConfig, FilterValues, WhereFilterOp, JoinStep, LogicalCondition, FilterCondition,
     ResolvedRelation, ResolvedBelongsTo, ResolvedHasOne, ResolvedHasMany,
     ResolvedForeignKeyOnTarget, ResolvedManyToMany, hasForeignKeyOnTarget, isManyToMany,
-    encodeRelationAggregateSort, type RelationAggregateFn, type RelationAggregateSort
+    encodeRelationAggregateSort, type Property, type RelationAggregateFn, type RelationAggregateSort
 } from "@rebasepro/types";
 import {
+    canReadField,
     fieldKeyForColumn, getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations, toFilterTuples
 } from "@rebasepro/common";
+import { currentFieldViewer } from "../services/field-viewer";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 /**
  * Postgres's own default for `pg_trgm.word_similarity_threshold`. Named here
@@ -2206,9 +2208,17 @@ whereConditions };
         if (ftsCondition) return [ftsCondition];
 
         let declaredStringProperties = 0;
+        const viewer = currentFieldViewer();
 
         for (const [key, prop] of Object.entries(properties)) {
             const p = prop as Record<string, unknown>;
+            // A field this caller cannot read is not one they may search. The
+            // strip keeps the value out of the response; without this the same
+            // value is still recoverable a substring at a time by watching which
+            // searches return the row, which is the disclosure the read rule
+            // exists to prevent. `excludeFromApi` expands to the same rule, so a
+            // password hash stops being ILIKE-matchable here too.
+            if (!canReadField(prop as Property, viewer)) continue;
             // Only include string properties that don't have enum defined
             // PostgreSQL enum and uuid columns don't support ILIKE, so we skip them
             if (p.type === "string" && !p.enum && p.isId !== "uuid") {

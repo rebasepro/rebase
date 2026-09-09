@@ -208,6 +208,7 @@ const BASE_PROPERTY_KEYS = [
     "defaultValue",
     "validation",
     "excludeFromApi",
+    "access",
     "dynamicProps",
     "conditions",
     "callbacks",
@@ -574,6 +575,85 @@ function checkValidationPattern(
 }
 
 /**
+ * The per-field `access` block: shape, and its one incompatibility.
+ *
+ * Three failures, all of which boot cleanly and all of which are silent:
+ *
+ * - **`access` beside `excludeFromApi`.** They are one mechanism — the flag is
+ *   sugar for `access: { read: [], write: [] }` and `effectiveAccess` expands it
+ *   *before* looking at `access`, so the flag wins and the block is dead. An
+ *   author who wrote `excludeFromApi: true, access: { read: ["admin"] }` meant
+ *   the second line to do something, and it does nothing. Refused rather than
+ *   merged, because there is no reading of the pair that is obviously right.
+ * - **A non-array `read` or `write`.** `access: { read: "admin" }` is the shape
+ *   an author reaches for first, and it is not an empty list — it is a *string*,
+ *   whose `.length` is 5, so it reads as "some roles are allowed" and then
+ *   matches none of them. Every caller loses the field, including the admin.
+ * - **A role that is not a non-empty string.** `[""]`, `[null]`, `[0]` — a list
+ *   entry nothing can hold, which is `[]` written the long way round.
+ *
+ * Nothing checks role *names* against a set: roles are application data, live in
+ * the users table, and are created and deleted while the server runs. A typo in
+ * one is a field nobody can read, which is the safe direction to fail.
+ */
+function checkFieldAccess(
+    property: Record<string, unknown>,
+    path: string,
+    collect: ProblemCollector
+): void {
+    const access = property.access;
+    if (access === undefined) return;
+
+    if (property.excludeFromApi) {
+        collect.error(
+            `${path}.access`,
+            "`access` and `excludeFromApi` cannot both be set. `excludeFromApi: true` IS " +
+            "`access: { read: [], write: [] }` — one mechanism, two spellings — so the block " +
+            "beside it is never read. Keep whichever says what you mean and delete the other."
+        );
+        return;
+    }
+
+    if (!isPlainObject(access)) {
+        collect.error(
+            `${path}.access`,
+            "`access` must be an object with optional `read` and `write` role lists, " +
+            "e.g. `access: { read: [\"hr\"], write: [] }`."
+        );
+        return;
+    }
+
+    for (const direction of ["read", "write"] as const) {
+        const roles = access[direction];
+        if (roles === undefined) continue;
+        if (!Array.isArray(roles)) {
+            collect.error(
+                `${path}.access.${direction}`,
+                `\`access.${direction}\` must be an array of role ids. ` +
+                `\`${JSON.stringify(roles)}\` is not one — a bare string is read as a non-empty ` +
+                "rule that no caller can satisfy, so the field would disappear for everybody. " +
+                `Write \`[${JSON.stringify(roles)}]\`, or \`[]\` if you mean nobody.`
+            );
+            continue;
+        }
+        const bad = roles.filter(role => typeof role !== "string" || role.trim() === "");
+        if (bad.length > 0) {
+            collect.error(
+                `${path}.access.${direction}`,
+                `\`access.${direction}\` contains ${bad.map(r => JSON.stringify(r)).join(", ")}, ` +
+                "which no caller's roles can hold. A role id is a non-empty string; an empty " +
+                "list is how you say nobody."
+            );
+        }
+    }
+
+    const unknownKeys = Object.keys(access).filter(key => key !== "read" && key !== "write");
+    if (unknownKeys.length > 0) {
+        collect.unknown(`${path}.access.${unknownKeys[0]}`, unknownKeys[0], "`access` block", ["read", "write"]);
+    }
+}
+
+/**
  * An enum's ids and labels, which become a Postgres type and a dropdown.
  *
  * The ids are the enum's SQL labels — `CREATE TYPE "posts_status" AS ENUM
@@ -785,6 +865,8 @@ function checkProperty(
     }
 
     checkValidationPattern(property.validation, `${path}.validation`, collect);
+
+    checkFieldAccess(property, path, collect);
 
     // Recurse into the two composites. `of` may be one property or an array of
     // them; `oneOf.properties` is a record like a map's.
@@ -1080,6 +1162,58 @@ function checkPrimaryKeyStrategy(
     }
 }
 
+/**
+ * A field the API withholds must not be in the collection's search index.
+ *
+ * `search` compiles to ONE generated `tsvector` column, built by the database
+ * from the named fields and shared by every caller — there is no per-role
+ * variant of it and there cannot be. So a field with a read rule that is also a
+ * search field is still *matched*: the value never appears in a response, and a
+ * caller can still recover it a term at a time by watching which searches return
+ * the row. That is the whole of the disclosure the read rule exists to prevent,
+ * reached by a different door.
+ *
+ * Refused at boot rather than warned about, because the two declarations
+ * contradict each other and the author has to say which one they meant. The
+ * fallback ILIKE search (no `search` block) has no such problem — it is built
+ * per query and skips the fields the caller cannot read.
+ */
+function checkSearchFieldsAreReadable(
+    collection: Record<string, unknown>,
+    at: string,
+    collect: ProblemCollector
+): void {
+    const search = collection.search;
+    if (!isPlainObject(search) || !Array.isArray(search.fields)) return;
+    const properties = collection.properties;
+    if (!isPlainObject(properties)) return;
+
+    for (const entry of search.fields) {
+        const path = typeof entry === "string"
+            ? entry
+            : isPlainObject(entry) && typeof entry.path === "string" ? entry.path : undefined;
+        if (!path) continue;
+
+        // A path into a map addresses the map property; a rule on that property
+        // covers everything underneath it, which is what the row strip does too.
+        const property = properties[path.split(".")[0]];
+        if (!isPlainObject(property)) continue;
+
+        const access = isPlainObject(property.access) ? property.access : undefined;
+        const restricted = property.excludeFromApi === true || Array.isArray(access?.read);
+        if (!restricted) continue;
+
+        collect.error(
+            `${at}.search.fields`,
+            `\`${path}\` is named in \`search.fields\` and also restricted by ` +
+            `\`${property.excludeFromApi === true ? "excludeFromApi" : "access.read"}\`. ` +
+            "The search index is one generated column shared by every caller, so the field would " +
+            "stay matchable to callers who can never see its value — recoverable a term at a time. " +
+            "Remove it from `search.fields`, or drop the read restriction."
+        );
+    }
+}
+
 function checkCollection(
     collection: unknown,
     index: number,
@@ -1130,6 +1264,7 @@ function checkCollection(
 
     checkBoardConfig(collection, at, collect);
     checkSoftDelete(collection, at, collect);
+    checkSearchFieldsAreReadable(collection, at, collect);
 
     if (Array.isArray(collection.relations)) {
         collection.relations.forEach((relation, i) => {

@@ -1,5 +1,5 @@
 import { CollectionConfig, Property, Properties, MapProperty, ArrayProperty, StringProperty, NumberProperty, ResolvedRelation } from "@rebasepro/types";
-import { fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations, sortCollectionsBySlug } from "@rebasepro/common";
+import { effectiveAccess, fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations, sortCollectionsBySlug } from "@rebasepro/common";
 import { toSafeIdentifier } from "./utils";
 
 /**
@@ -241,7 +241,7 @@ function line(key: string, type: string, optional: boolean): string {
 }
 
 /**
- * The keys `excludeFromApi` takes off the API surface — in *both* directions.
+ * The keys nobody can reach take off the API surface — in *both* directions.
  *
  * `excludeFromApi` means one thing: the API surface does not mention this
  * property. `Row` already honoured that; `Insert` and `Update` deliberately did
@@ -251,15 +251,23 @@ function line(key: string, type: string, optional: boolean): string {
  * *accepts* such a field on a write — this describes the surface, it does not
  * add an enforcement point — but nothing generated advertises it.
  *
+ * Read through `effectiveAccess`, so the flag and its longhand
+ * `access: { read: [], write: [] }` produce the same file. A *role* rule is
+ * deliberately not honoured here and `Row` is unchanged by one: a generated type
+ * is one shape for every caller, and there is no `Row` that is right for both a
+ * reader who holds `hr` and one who does not. The server is the enforcement
+ * point; the types describe the surface a caller may name.
+ *
  * Keyed by the property name *and* by its column name, the same pair the
- * server's `stripExcluded` deletes, so a foreign key or a relation addressed
+ * server's `stripUnreadable` deletes, so a foreign key or a relation addressed
  * under the column name cannot put the property back.
  */
 function excludedApiKeys(properties: Properties): Set<string> {
     const excluded = new Set<string>();
     for (const [key, rawProp] of Object.entries(properties)) {
         const prop = rawProp as Property;
-        if (!prop?.excludeFromApi) continue;
+        const access = effectiveAccess(prop);
+        if (access?.read?.length !== 0 || access?.write?.length !== 0) continue;
         excluded.add(key);
         if (prop.columnName) excluded.add(prop.columnName);
     }

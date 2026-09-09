@@ -413,8 +413,36 @@ securityRules: [
 Avoid the legacy pattern of checking `string_to_array(rebase.roles(), ',')` for anonymous access. The `access: "public"` shortcut is simpler and generates the correct policy automatically.
 :::
 
+## Rows here, fields next door
+
+Security rules answer one question: **which rows** does this caller reach. They
+are enforced by Postgres itself, on every statement, whatever the route — which
+is why they are the authorization model and everything above them is convenience.
+
+They have nothing to say about the *columns* of a row a caller does reach. A
+policy that lets an employee read their team's rows lets them read every field of
+those rows, salary included. That is what per-property
+[`access`](/docs/collections/field-access/) is for:
+
+```typescript
+salary: {
+    type: "number",
+    // Everyone the rules above let read the row; only HR gets this column.
+    access: { read: ["hr"], write: [] }
+}
+```
+
+The two stack and never contradict: a field rule cannot widen row access, and a
+row you cannot read has no fields to talk about. Roles are the same roles —
+`rebase.roles()` inside a policy, `user.roles` on the request — so
+`rolesOverlap(['hr'])` in a rule and `access: { read: ["hr"] }` on a property
+mean the same `hr`. Field rules are applied by the server rather than by
+Postgres, so they cover the API surface; a query run through `rebase.sql()` sees
+every column, exactly as it bypasses RLS.
+
 ## Next Steps
 
+- **[Field access](/docs/collections/field-access)** — Per-field read/write roles
 - **[Relations](/docs/collections/relations)** — Foreign keys and joins
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
 - **[Custom Functions](/docs/backend/custom-functions)** — Custom API endpoints

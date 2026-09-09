@@ -17,7 +17,7 @@ import {
     type PrimaryKeyInfo
 } from "./collection-helpers";
 import { parseDataFromServer } from "../data-transformer";
-import { stripExcluded } from "./row-pipeline";
+import { stripUnreadable } from "./row-pipeline";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ApiError, logger } from "@rebasepro/server";
 import type { NestedPathHop } from "./nested-path";
@@ -169,7 +169,7 @@ export class RelationService {
         // through here. REST was clean and `.listen()` was not, which is the
         // worst version of this to have — the leak is invisible from the surface
         // people test.
-        stripExcluded(values as Record<string, unknown>, targetCollection);
+        stripUnreadable(values as Record<string, unknown>, targetCollection);
 
         return {
             // The whole key: a composite target addressed by its first column

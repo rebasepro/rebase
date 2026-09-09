@@ -11,6 +11,7 @@ import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfi
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { buildPropertyCallbacks, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
+import { withFieldViewer } from "./field-viewer";
 import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
 import { logger, rawQueryLoggingEnabled } from "@rebasepro/server";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
@@ -1003,115 +1004,130 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // driver's read path, so realtime cannot leak rows the initial fetch hid.
             const activeAuth = authContext || { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] };
-            return await this.db.transaction(async (tx) => {
-                await applyAuthContext(
-                    tx,
-                    { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
-                    this.rlsUserRole
-                );
-                const txEntityService = new DataService(tx, this.registry);
-                // The REST pipeline, not the driver's own fetch.
-                //
-                // These are the rows a subscriber receives, and a subscriber
-                // asked the same question a `find()` asks. They used to be
-                // built by a different method, which nests a relation under a
-                // `{ __type: "relation" }` envelope and eagerly loaded every
-                // relation the collection declares — so `find()` and `listen()`
-                // answered one query with two different row shapes, and the
-                // generated types described only one of them. Search included:
-                // it forked to `searchRows` here for no reason other than that
-                // the branch existed.
-                const fetchedEntities = await txEntityService.fetchCollectionForRest(notifyPath, {
-                    filter: collectionRequest.filter as FilterValues<string>,
-                    // The subscription stored a group; the search branch used to
-                    // drop it, so a filtered live search widened to every row
-                    // matching the text.
-                    logical: collectionRequest.logical,
-                    orderBy: collectionRequest.orderBy,
-                    order: collectionRequest.order,
-                    limit: collectionRequest.limit,
-                    offset: collectionRequest.offset,
-                    startAfter: collectionRequest.startAfter,
-                    searchString: collectionRequest.searchString,
-                    searchExplain: collectionRequest.searchExplain,
-                    databaseId: collectionRequest.databaseId,
-                    fields: collectionRequest.fields,
-                    distinct: collectionRequest.distinct
-                }, collectionRequest.include);
+            // The subscriber this frame is for, so per-field `access.read` is
+            // applied to it. A frame is a read like any other and reaches the
+            // same row pipeline; without this the initial `GET` would withhold a
+            // field and the first `.listen()` update would hand it over.
+            return await withFieldViewer({ roles: activeAuth.roles ?? [] }, async () =>
+                await this.db.transaction(async (tx) => {
+                    await applyAuthContext(
+                        tx,
+                        { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
+                        this.rlsUserRole
+                    );
+                    const txEntityService = new DataService(tx, this.registry);
+                    // The REST pipeline, not the driver's own fetch.
+                    //
+                    // These are the rows a subscriber receives, and a subscriber
+                    // asked the same question a `find()` asks. They used to be
+                    // built by a different method, which nests a relation under a
+                    // `{ __type: "relation" }` envelope and eagerly loaded every
+                    // relation the collection declares — so `find()` and `listen()`
+                    // answered one query with two different row shapes, and the
+                    // generated types described only one of them. Search included:
+                    // it forked to `searchRows` here for no reason other than that
+                    // the branch existed.
+                    const fetchedEntities = await txEntityService.fetchCollectionForRest(notifyPath, {
+                        filter: collectionRequest.filter as FilterValues<string>,
+                        // The subscription stored a group; the search branch used to
+                        // drop it, so a filtered live search widened to every row
+                        // matching the text.
+                        logical: collectionRequest.logical,
+                        orderBy: collectionRequest.orderBy,
+                        order: collectionRequest.order,
+                        limit: collectionRequest.limit,
+                        offset: collectionRequest.offset,
+                        startAfter: collectionRequest.startAfter,
+                        searchString: collectionRequest.searchString,
+                        searchExplain: collectionRequest.searchExplain,
+                        databaseId: collectionRequest.databaseId,
+                        fields: collectionRequest.fields,
+                        distinct: collectionRequest.distinct
+                    }, collectionRequest.include);
 
-                // Re-apply `afterRead` lifecycle hooks to ensure consistent data structures
-                // between the initial driver fetch and this RLS-bound refetch.
-                const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                const resolvedCollection = collection ? { ...collection,
-...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
+                    // Re-apply `afterRead` lifecycle hooks to ensure consistent data structures
+                    // between the initial driver fetch and this RLS-bound refetch.
+                    const registryCollection = this.registry.getCollectionByPath(notifyPath);
+                    const resolvedCollection = collection ? { ...collection,
+    ...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
 
-                const callbacks = resolvedCollection?.callbacks;
-                const globalCallbacks = this.registry?.getGlobalCallbacks();
-                const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
+                    const callbacks = resolvedCollection?.callbacks;
+                    const globalCallbacks = this.registry?.getGlobalCallbacks();
+                    const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
-                if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
-                    const contextForCallback = {
-                        user: { uid: activeAuth.uid,
-roles: activeAuth.roles },
-                        driver: this.driver,
-                        data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
-                    } as unknown as RebaseCallContext;
+                    if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
+                        const contextForCallback = {
+                            user: { uid: activeAuth.uid,
+    roles: activeAuth.roles },
+                            driver: this.driver,
+                            data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
+                        } as unknown as RebaseCallContext;
 
-                    return await Promise.all(fetchedEntities.map(async (fetchedRow) => {
-                        let processedEntity = fetchedRow;
-                        // 1. Global callbacks first
-                        if (globalCallbacks?.afterRead) {
-                            processedEntity = await globalCallbacks.afterRead({
-                                collection: resolvedCollection,
-                                path: notifyPath,
-                                row: processedEntity,
-                                context: contextForCallback
-                            }) ?? processedEntity;
-                        }
-                        // 2. Collection callbacks second
-                        if (callbacks?.afterRead) {
-                            processedEntity = await callbacks.afterRead({
-                                collection: resolvedCollection,
-                                path: notifyPath,
-                                row: processedEntity,
-                                context: contextForCallback
-                            }) ?? processedEntity;
-                        }
-                        // 3. Property callbacks third
-                        if (propertyCallbacks?.afterRead) {
-                            processedEntity = await propertyCallbacks.afterRead({
-                                collection: resolvedCollection,
-                                path: notifyPath,
-                                row: processedEntity,
-                                context: contextForCallback
-                            }) ?? processedEntity;
-                        }
-                        return processedEntity;
-                    }));
-                }
+                        return await Promise.all(fetchedEntities.map(async (fetchedRow) => {
+                            let processedEntity = fetchedRow;
+                            // 1. Global callbacks first
+                            if (globalCallbacks?.afterRead) {
+                                processedEntity = await globalCallbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    row: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            // 2. Collection callbacks second
+                            if (callbacks?.afterRead) {
+                                processedEntity = await callbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    row: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            // 3. Property callbacks third
+                            if (propertyCallbacks?.afterRead) {
+                                processedEntity = await propertyCallbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    row: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            return processedEntity;
+                        }));
+                    }
 
-                return fetchedEntities;
-            });
+                    return fetchedEntities;
+                })
+            );
         }
 
         // No driver — use dataService directly (no auth wrapping possible).
         // The `logical` group is carried here as well: this branch answers the
         // same subscription as the one above, and a fallback that drops a
         // condition returns *more* rows than the path it stands in for.
-        return await this.dataService.fetchCollectionForRest(notifyPath, {
-            filter: collectionRequest.filter as FilterValues<string>,
-            logical: collectionRequest.logical,
-            orderBy: collectionRequest.orderBy,
-            order: collectionRequest.order,
-            limit: collectionRequest.limit,
-            offset: collectionRequest.offset,
-            startAfter: collectionRequest.startAfter,
-            searchString: collectionRequest.searchString,
-            searchExplain: collectionRequest.searchExplain,
-            databaseId: collectionRequest.databaseId,
-            fields: collectionRequest.fields,
-            distinct: collectionRequest.distinct
-        }, collectionRequest.include);
+        //
+        // The field viewer IS established, unlike the database's auth context:
+        // the subscriber's roles are in hand either way, and leaving the scope
+        // off would make this the one path where a role-restricted field is
+        // served to everybody — a fallback that hands out *more* than the path
+        // it stands in for, which is the defect the paragraph above describes
+        // one clause at a time.
+        return await withFieldViewer({ roles: authContext?.roles ?? [] }, async () =>
+            await this.dataService.fetchCollectionForRest(notifyPath, {
+                filter: collectionRequest.filter as FilterValues<string>,
+                logical: collectionRequest.logical,
+                orderBy: collectionRequest.orderBy,
+                order: collectionRequest.order,
+                limit: collectionRequest.limit,
+                offset: collectionRequest.offset,
+                startAfter: collectionRequest.startAfter,
+                searchString: collectionRequest.searchString,
+                searchExplain: collectionRequest.searchExplain,
+                databaseId: collectionRequest.databaseId,
+                fields: collectionRequest.fields,
+                distinct: collectionRequest.distinct
+            }, collectionRequest.include)
+        );
     }
 
     /**
@@ -1251,74 +1267,85 @@ roles: activeAuth.roles },
             // Same read isolation as collection refetches: GUCs + reader-role downgrade.
             const activeAuth = authContext || { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] };
-            return await this.db.transaction(async (tx) => {
-                await applyAuthContext(
-                    tx,
-                    { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
-                    this.rlsUserRole
-                );
-                const txEntityService = new DataService(tx, this.registry);
-                // The REST pipeline, for the same reason the collection refetch
-                // uses it: `listenById()` and `findById()` are the same read,
-                // and `fetchOne` renders the admin's view model — every relation
-                // eagerly loaded, each under a `{ __type: "relation" }`
-                // envelope. A subscriber got one shape and a fetch the other.
-                let processedEntity = await txEntityService.fetchOneForRest(
-                    notifyPath, id, undefined, collection?.databaseId
-                ) ?? undefined;
+            // The subscriber this frame is for, so per-field `access.read` is
+            // applied to it. A frame is a read like any other and reaches the
+            // same row pipeline; without this the initial `GET` would withhold a
+            // field and the first `.listen()` update would hand it over.
+            return await withFieldViewer({ roles: activeAuth.roles ?? [] }, async () =>
+                await this.db.transaction(async (tx) => {
+                    await applyAuthContext(
+                        tx,
+                        { uid: activeAuth.uid, roles: activeAuth.roles, isAnonymous: activeAuth.isAnonymous === true },
+                        this.rlsUserRole
+                    );
+                    const txEntityService = new DataService(tx, this.registry);
+                    // The REST pipeline, for the same reason the collection refetch
+                    // uses it: `listenById()` and `findById()` are the same read,
+                    // and `fetchOne` renders the admin's view model — every relation
+                    // eagerly loaded, each under a `{ __type: "relation" }`
+                    // envelope. A subscriber got one shape and a fetch the other.
+                    let processedEntity = await txEntityService.fetchOneForRest(
+                        notifyPath, id, undefined, collection?.databaseId
+                    ) ?? undefined;
 
-                if (processedEntity) {
-                    const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                    const resolvedCollection = collection ? { ...collection,
-...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
+                    if (processedEntity) {
+                        const registryCollection = this.registry.getCollectionByPath(notifyPath);
+                        const resolvedCollection = collection ? { ...collection,
+    ...registryCollection } as CollectionConfig : registryCollection as CollectionConfig;
 
-                    const callbacks = resolvedCollection?.callbacks;
-                    const globalCallbacks = this.registry?.getGlobalCallbacks();
-                    const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
+                        const callbacks = resolvedCollection?.callbacks;
+                        const globalCallbacks = this.registry?.getGlobalCallbacks();
+                        const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
 
-                    if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
-                        const contextForCallback = {
-                            user: { uid: activeAuth.uid,
-roles: activeAuth.roles },
-                            driver: this.driver,
-                            data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
-                        } as unknown as RebaseCallContext;
+                        if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
+                            const contextForCallback = {
+                                user: { uid: activeAuth.uid,
+    roles: activeAuth.roles },
+                                driver: this.driver,
+                                data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
+                            } as unknown as RebaseCallContext;
 
-                        // 1. Global callbacks first
-                        if (globalCallbacks?.afterRead) {
-                            processedEntity = await globalCallbacks.afterRead({
-                                collection: resolvedCollection,
-                                path: notifyPath,
-                                row: processedEntity,
-                                context: contextForCallback
-                            }) ?? processedEntity;
-                        }
-                        // 2. Collection callbacks second
-                        if (callbacks?.afterRead) {
-                            processedEntity = await callbacks.afterRead({
-                                collection: resolvedCollection,
-                                path: notifyPath,
-                                row: processedEntity,
-                                context: contextForCallback
-                            }) ?? processedEntity;
-                        }
-                        // 3. Property callbacks third
-                        if (propertyCallbacks?.afterRead) {
-                            processedEntity = await propertyCallbacks.afterRead({
-                                collection: resolvedCollection,
-                                path: notifyPath,
-                                row: processedEntity,
-                                context: contextForCallback
-                            }) ?? processedEntity;
+                            // 1. Global callbacks first
+                            if (globalCallbacks?.afterRead) {
+                                processedEntity = await globalCallbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    row: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            // 2. Collection callbacks second
+                            if (callbacks?.afterRead) {
+                                processedEntity = await callbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    row: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
+                            // 3. Property callbacks third
+                            if (propertyCallbacks?.afterRead) {
+                                processedEntity = await propertyCallbacks.afterRead({
+                                    collection: resolvedCollection,
+                                    path: notifyPath,
+                                    row: processedEntity,
+                                    context: contextForCallback
+                                }) ?? processedEntity;
+                            }
                         }
                     }
-                }
 
-                return processedEntity;
-            });
+                    return processedEntity;
+                })
+            );
         }
 
-        return await this.dataService.fetchOneForRest(notifyPath, id) ?? undefined;
+        // Same reasoning as the collection fallback above: no database auth
+        // context is available here, but the subscriber's roles are.
+        return await withFieldViewer(
+            { roles: authContext?.roles ?? [] },
+            async () => (await this.dataService.fetchOneForRest(notifyPath, id)) ?? undefined
+        );
     }
 
     private sendCollectionUpdate(

@@ -5,6 +5,7 @@ import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
 import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { cursorToStartAfter, topLevelIncludeNames } from "@rebasepro/common";
+import { assertReadableFields, requestViewer } from "./field-access-query";
 import { assertKnownWriteFields, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "./field-ops";
 import { resolveConflictTarget } from "./conflict-target";
@@ -157,8 +158,20 @@ export class RestApiGenerator {
      * list-pagination bounds (default page size + hard max limit) so no read
      * path can be tricked into buffering an entire table into memory.
      */
-    private parseQuery(queryDict: Record<string, unknown>): QueryOptions {
-        return parseQueryOptions(queryDict, this.listLimits);
+    private parseQuery(
+        queryDict: Record<string, unknown>,
+        /**
+         * The collection this query reads and the caller reading it, so a
+         * `where`, `orderBy` or `fields` naming a field their roles cannot read
+         * is refused here rather than answered. Optional only for the one route
+         * that resolves its collection *after* parsing (see `_batch`).
+         */
+        access?: { collection: CollectionConfig; c: Context<HonoEnv> }
+    ): QueryOptions {
+        return parseQueryOptions(queryDict, this.listLimits, access && {
+            collection: access.collection,
+            viewer: requestViewer(access.c)
+        });
     }
 
 
@@ -241,6 +254,9 @@ export class RestApiGenerator {
             // names — not one check for the request. A key scoped to write
             // `orders` and nothing else must not be able to reach `users`
             // because the two travelled in one body.
+            // One viewer for the whole body: a batch is one request from one
+            // caller, whatever collections it names.
+            const batchViewer = requestViewer(c);
             operations.forEach((operation, index) => {
                 this.enforceApiKeyPermission(
                     { get: (key: string) => c.get(key as never), req: { method: operation.op === "delete" ? "DELETE" : "POST" } },
@@ -249,7 +265,7 @@ export class RestApiGenerator {
                 );
                 const collection = bySlug.get(operation.collection)!;
                 if (!operation.values) return;
-                assertKnownWriteFields(operation.values, collection);
+                assertKnownWriteFields(operation.values, collection, { viewer: batchViewer });
                 assertWriteValuesValid(operation.values, collection);
                 if (operation.op === "update") {
                     assertFieldOpsValid(operation.values, collection, { operationIndex: index });
@@ -615,7 +631,7 @@ export class RestApiGenerator {
         this.router.get(`${basePath}/count`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const queryDict = c.req.queries();
-            const queryOptions = this.parseQuery(queryDict);
+            const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
             const driver = this.getScopedDriver(c);
 
@@ -630,7 +646,7 @@ export class RestApiGenerator {
         this.router.get(`${basePath}/aggregate`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const queryDict = c.req.queries();
-            const queryOptions = this.parseQuery(queryDict);
+            const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
 
             const aggregates = parseAggregateSelect(queryDict.select);
@@ -652,9 +668,19 @@ export class RestApiGenerator {
                     "Aggregates are not implemented for this backend's data driver.");
             }
 
+            // `sum(salary)` and `groupBy=salary` read the column as surely as
+            // selecting it does — an aggregate is the classic way to read a
+            // value you cannot select, one bucket at a time. `parseQuery` above
+            // has already judged `where`/`orderBy`; these two are parsed here,
+            // so they are judged here.
+            const groupBy = parseGroupBy(queryDict.groupBy);
+            const viewer = requestViewer(c);
+            assertReadableFields(aggregates.map(a => a.field), resolvedCollection, viewer, "select");
+            assertReadableFields(groupBy ?? [], resolvedCollection, viewer, "groupBy");
+
             const data = await fetchService.aggregate(collection.slug, {
                 aggregates,
-                groupBy: parseGroupBy(queryDict.groupBy),
+                groupBy,
                 filter: queryOptions.where,
                 logical: queryOptions.logical,
                 searchString,
@@ -671,7 +697,7 @@ export class RestApiGenerator {
         this.router.get(basePath, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const queryDict = c.req.queries();
-            const queryOptions = this.parseQuery(queryDict);
+            const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
             // `?searchExplain=true` asks each row which declared field matched.
             // Opt-in per request because it costs a `ts_headline` per field per
@@ -697,7 +723,7 @@ export class RestApiGenerator {
             this.enforceApiKeyPermission(c, collection.slug);
             const id = c.req.param("id");
             const queryDict = c.req.queries();
-            const queryOptions = this.parseQuery(queryDict);
+            const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
             const driver = this.getScopedDriver(c);
             const fetchService = driver.restFetchService;
 
@@ -813,7 +839,7 @@ export class RestApiGenerator {
             // batch is all-or-nothing, so one bad field in ten thousand rows
             // should not be found by rolling the other 9,999 back.
             rows.forEach((row, rowIndex) => {
-                assertKnownWriteFields(row, resolvedCollection, { rowIndex });
+                assertKnownWriteFields(row, resolvedCollection, { rowIndex, viewer: requestViewer(c) });
                 assertWriteValuesValid(row, resolvedCollection, { rowIndex, status: "new" });
                 // This route inserts (or upserts), and an operation over a
                 // value that is not there yet has nothing to mean. Refused here
@@ -879,7 +905,7 @@ export class RestApiGenerator {
                         "INVALID_BULK_BODY"
                     );
                 }
-                assertKnownWriteFields(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex });
+                assertKnownWriteFields(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex, viewer: requestViewer(c) });
                 assertWriteValuesValid(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex });
                 assertFieldOpsValid(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex });
             });
@@ -984,14 +1010,15 @@ export class RestApiGenerator {
             // to) meant a typo on the users table was silently dropped and
             // answered 201, while the same typo on `posts` was a 400.
             if (!isAuthCollection) {
-                assertKnownWriteFields(body, resolvedCollection);
+                assertKnownWriteFields(body, resolvedCollection, { viewer: requestViewer(c) });
                 assertWriteValuesValid(body, resolvedCollection, { status: "new" });
                 assertNoFieldOpsOnCreate(body, "A create");
             } else {
                 const contract = this.authAdapter?.describeUserCreationContract?.(collectionAuthConfig);
                 if (contract?.validate) {
                     assertKnownWriteFields(body, resolvedCollection, {
-                        extraKnownFields: contract.extraFields
+                        extraKnownFields: contract.extraFields,
+                        viewer: requestViewer(c)
                     });
                     // Same condition as the key check above: with a custom
                     // `onCreateUser` the adapter owns the body's shape, so the
@@ -1075,7 +1102,7 @@ values: entity as Record<string, unknown> },
 
 
             const body = await parseJsonBody(c);
-            assertKnownWriteFields(body, resolvedCollection);
+            assertKnownWriteFields(body, resolvedCollection, { viewer: requestViewer(c) });
             assertWriteValuesValid(body, resolvedCollection);
             // `{ views: { $inc: 1 } }` and the rest. Validated here, against the
             // collection's own property types, so a `$push` on a number is a
@@ -1301,12 +1328,16 @@ id };
 
             this.enforceSubcollectionApiKeyPermission(c, parsed.collectionPath);
 
-
+            // Resolved before the query is parsed, not after: the field-access
+            // refusal is part of parsing, and the branch below already needed
+            // this collection to narrow its response.
+            const nestedCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
+            const nestedAccess = nestedCollection ? { collection: nestedCollection, c } : undefined;
 
             if (parsed.id === "count") {
                 // GET /parent/:parentId/child/count — count child entities
                 const queryDict = c.req.queries();
-                const queryOptions = this.parseQuery(queryDict);
+                const queryOptions = this.parseQuery(queryDict, nestedAccess);
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
 
                 const total = driver.count ? await driver.count({
@@ -1323,7 +1354,7 @@ id };
                 return c.json({ count: total });
             } else if (parsed.id) {
                 // GET /parent/:parentId/child/:id — single entity
-                const queryOptions = this.parseQuery(c.req.queries());
+                const queryOptions = this.parseQuery(c.req.queries(), nestedAccess);
                 const fetchService = driver.restFetchService;
                 const entity = fetchService
                     ? await fetchService.fetchOneForRest(
@@ -1339,7 +1370,6 @@ id: parsed.id });
                 // subcollection read returned every column while the root read
                 // narrowed — the same defect `projectResponseFields` exists to
                 // fix, surviving on the route family it was never wired into.
-                const nestedCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
                 if (!nestedCollection) return c.json(entity);
                 return c.json(projectResponseFields(
                     [entity as Record<string, unknown>],
@@ -1359,14 +1389,16 @@ id: parsed.id });
                 // enough: every parameter added afterwards had to be remembered
                 // in two places, and this is the copy that kept being missed.
                 const queryDict = c.req.queries();
-                const queryOptions = this.parseQuery(queryDict);
+                const queryOptions = this.parseQuery(queryDict, nestedAccess);
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
                 const searchExplainRaw = Array.isArray(queryDict.searchExplain) ? queryDict.searchExplain[queryDict.searchExplain.length - 1] : undefined;
 
-                const listCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
                 const page = await this.readPage(
                     driver,
-                    listCollection ?? ({ slug: parsed.collectionPath } as CollectionConfig),
+                    // The collection hoisted above, not a second lookup of the
+                    // same path: one resolve, so the access check and the read
+                    // are answered about the same collection.
+                    nestedCollection ?? ({ slug: parsed.collectionPath } as CollectionConfig),
                     queryOptions,
                     searchString,
                     searchExplainRaw === "true",
@@ -1396,7 +1428,7 @@ id: parsed.id });
 
             const targetCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
             if (targetCollection) {
-                assertKnownWriteFields(body, targetCollection);
+                assertKnownWriteFields(body, targetCollection, { viewer: requestViewer(c) });
                 assertWriteValuesValid(body, targetCollection, { status: "new" });
             }
 
@@ -1431,7 +1463,7 @@ id: parsed.id });
 
             const targetCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
             if (targetCollection) {
-                assertKnownWriteFields(body, targetCollection);
+                assertKnownWriteFields(body, targetCollection, { viewer: requestViewer(c) });
                 assertWriteValuesValid(body, targetCollection);
             }
 

@@ -1,5 +1,6 @@
 import { CollectionConfig, Property, ResolvedRelation, isManyToMany, type ResolvedVia } from "@rebasepro/types";
-import { resolveCollectionRelations, findRelation, createRelationRefWithData } from "@rebasepro/common";
+import { canReadField, resolveCollectionRelations, findRelation, createRelationRefWithData } from "@rebasepro/common";
+import { currentFieldViewer } from "./field-viewer";
 import { normalizeDbValues } from "../data-transformer";
 import { deriveRowAddress } from "./collection-helpers";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
@@ -93,25 +94,53 @@ function coerceDeclaredNumbers(
 
 /** Render one target row in the requested style. */
 /**
- * Drop every column the collection marked `excludeFromApi`.
+ * Drop every column this caller may not read.
  *
  * Password hashes and verification tokens have to be readable server-side but
  * must never reach a client — and "never" has to mean every exit from this
  * pipeline, including relation targets, or a secret leaks through whichever
  * path was overlooked. Keyed by both the property name and its column name,
  * since a row can arrive keyed either way depending on the caller.
+ *
+ * `excludeFromApi` is the case with no roles in it: `effectiveAccess` expands
+ * the flag to `read: []`, which no caller satisfies, so the flag needs no branch
+ * of its own here and no longer has one. `access.read: ["hr"]` is the same walk
+ * asking a different question of {@link currentFieldViewer}.
+ *
+ * The field is **deleted**, never nulled. A withheld value that arrives as
+ * `null` is indistinguishable from a stored `null`, which turns a permission
+ * boundary into a question a client can answer by counting nulls — and it makes
+ * an `update` that echoes the row back overwrite the real value with the null it
+ * was handed.
+ *
+ * `_matches` is filtered rather than deleted: it is the list of fields a text
+ * search hit, and a field the caller cannot read must not appear in it even
+ * though the array itself is theirs to see.
  */
-export function stripExcluded(
+export function stripUnreadable(
     row: Record<string, unknown>,
     collection: CollectionConfig
 ): Record<string, unknown> {
     const properties = collection.properties as Record<string, Property> | undefined;
     if (!properties) return row;
 
+    const viewer = currentFieldViewer();
+    const hidden = new Set<string>();
+
     for (const [key, property] of Object.entries(properties)) {
-        if (!property?.excludeFromApi) continue;
+        if (canReadField(property, viewer)) continue;
+        hidden.add(key);
         delete row[key];
-        if (property.columnName) delete row[property.columnName];
+        if (property.columnName) {
+            hidden.add(property.columnName);
+            delete row[property.columnName];
+        }
+    }
+
+    if (hidden.size > 0 && Array.isArray(row._matches)) {
+        row._matches = (row._matches as unknown[]).filter(
+            match => !hidden.has(typeof match === "string" ? match : String((match as { field?: unknown })?.field))
+        );
     }
     return row;
 }
@@ -125,7 +154,7 @@ function renderTarget(
     if (style === "inline") {
         // The target's columns, and only those: its address is the consumer's
         // to derive, and merging one in overwrites a real `id` column.
-        return stripExcluded(coerceDeclaredNumbers({ ...targetRow }, targetCollection), targetCollection);
+        return stripUnreadable(coerceDeclaredNumbers({ ...targetRow }, targetCollection), targetCollection);
     }
 
     const address = relationTargetAddress(targetRow, targetCollection, registry);
@@ -139,7 +168,7 @@ function renderTarget(
         // columns attached — and only the first one was filtered. So a password
         // hash that REST correctly withheld rode out on every `.listen()` frame
         // and every WebSocket fetch of anything with a relation to users.
-        values: stripExcluded(
+        values: stripUnreadable(
             normalizeDbValues(targetRow, targetCollection) as Record<string, unknown>,
             targetCollection
         )
@@ -202,7 +231,7 @@ export function toFlatRow(
         }
     }
 
-    return stripExcluded(normalized, collection);
+    return stripUnreadable(normalized, collection);
 }
 
 /**
@@ -245,5 +274,5 @@ export function toRestRow(
         }
     }
 
-    return stripExcluded(flat, collection);
+    return stripUnreadable(flat, collection);
 }

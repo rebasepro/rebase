@@ -300,6 +300,29 @@ export type InferEntityType<P extends Properties> = {
     -readonly [K in OptionalPropertyKeys<P>]?: InferPropertyType<P[K]>;
 };
 
+/**
+ * Per-field read and write permission, by application role.
+ *
+ * An omitted list is not an empty one, and the difference is the whole type:
+ * *omitted* delegates to the row — everyone the collection's security rules let
+ * read (or write) the row gets the field; *`[]`* is nobody, through the API, at
+ * any privilege. `["editor"]` is everyone holding `editor`, plus `admin`.
+ *
+ * @see BaseProperty.access
+ */
+export interface FieldAccess {
+    /**
+     * Roles that may read the field. Omitted = everyone the collection's RLS
+     * lets read the row. `[]` = nobody through the API.
+     */
+    read?: readonly string[];
+    /**
+     * Roles that may write the field. Omitted = everyone the collection's RLS
+     * lets write the row. `[]` = nobody through the API.
+     */
+    write?: readonly string[];
+}
+
 export interface BaseProperty<CustomProps = unknown> {
     /**
      * The label the admin panel shows for this field — a column header, a form
@@ -366,8 +389,46 @@ export interface BaseProperty<CustomProps = unknown> {
      * This is a server-side guarantee, unlike `admin.hideFromCollection`, which
      * only stops the admin panel from *rendering* a field and leaves it in the
      * JSON payload.
+     *
+     * Sugar for `access: { read: [], write: [] }` — the two are one mechanism,
+     * not two, and declaring both on the same property is refused at boot. Write
+     * whichever reads better: the flag says "this is the server's column", the
+     * empty lists say the same thing in the vocabulary of {@link FieldAccess}.
      */
     excludeFromApi?: boolean;
+
+    /**
+     * Who may read and who may write this one field.
+     *
+     * Row access is the collection's `securityRules`; this is the field inside
+     * the row. A caller the row's policies let through still does not receive a
+     * field their roles cannot read — it is *absent* from the response rather
+     * than `null`, so a client cannot tell a withheld value from a stored one by
+     * its shape — and a write naming a field their roles cannot write is a 400
+     * (`FIELD_NOT_WRITABLE`), never a silently dropped key.
+     *
+     * Roles are Rebase application roles, the same ones `policy.rolesOverlap`
+     * compiles against and the same list `rebase.roles()` reads inside a policy:
+     * whatever the call context carries as `user.roles`. `admin` satisfies any
+     * non-empty list, mirroring the `rolesOverlap(['admin'])` arm every baseline
+     * policy carries — a field-level rule must not lock an administrator out of
+     * their own data, and `rebase.dataAsAdmin` holds that role.
+     *
+     * The enforcement point is the API boundary. In-process writes through
+     * `rebase.data` / `rebase.dataAsAdmin` and the framework's own auth paths do
+     * not pass through it — the same exemption `excludeFromApi` has always had,
+     * and the reason it is possible to store a password hash at all.
+     *
+     * @example
+     * ```ts
+     * salary: {
+     *     type: "number",
+     *     // Readable by HR and by admins; writable by nobody through the API.
+     *     access: { read: ["hr"], write: [] }
+     * }
+     * ```
+     */
+    access?: FieldAccess;
 
     // NOTE: `defaultValue` is intentionally NOT on BaseProperty.
     // Each concrete property type (StringProperty, NumberProperty, etc.)
