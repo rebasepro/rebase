@@ -324,8 +324,22 @@ jobs:
           # system libraries, which the other sources carry. Dropping the
           # source is narrower than `|| true` on the update — a genuinely
           # broken index for a package we *do* need should still fail.
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
-          pnpm exec playwright install chromium --with-deps
+          # Matched by CONTENT, not filename: the first attempt removed
+          # `google-chrome.list` and apt fetched the repo anyway, because
+          # ubuntu-24.04 runners declare it in deb822 `.sources` format under a
+          # different name. Grep for the host instead of guessing the file.
+          for f in $(sudo grep -rl 'dl\.google\.com' /etc/apt/sources.list.d 2>/dev/null || true); do
+            echo "Removing apt source that points at Google's CDN: $f"
+            sudo rm -f "$f"
+          done
+
+          # And if apt is still unhappy, take the browser without the system
+          # deps rather than failing the job. The runner image already carries
+          # Chromium's shared libraries — every previous green run launched the
+          # browser fine — so `--with-deps` refreshing them is a nicety, and a
+          # third party's broken index should not gate a release.
+          pnpm exec playwright install chromium --with-deps \
+            || pnpm exec playwright install chromium
 
       - name: Run E2E Test Suite
         run: pnpm exec tsx tests/e2e/tests/cli-init-e2e.ts
@@ -451,8 +465,22 @@ jobs:
           # system libraries, which the other sources carry. Dropping the
           # source is narrower than `|| true` on the update — a genuinely
           # broken index for a package we *do* need should still fail.
-          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
-          pnpm exec playwright install chromium --with-deps
+          # Matched by CONTENT, not filename: the first attempt removed
+          # `google-chrome.list` and apt fetched the repo anyway, because
+          # ubuntu-24.04 runners declare it in deb822 `.sources` format under a
+          # different name. Grep for the host instead of guessing the file.
+          for f in $(sudo grep -rl 'dl\.google\.com' /etc/apt/sources.list.d 2>/dev/null || true); do
+            echo "Removing apt source that points at Google's CDN: $f"
+            sudo rm -f "$f"
+          done
+
+          # And if apt is still unhappy, take the browser without the system
+          # deps rather than failing the job. The runner image already carries
+          # Chromium's shared libraries — every previous green run launched the
+          # browser fine — so `--with-deps` refreshing them is a nicety, and a
+          # third party's broken index should not gate a release.
+          pnpm exec playwright install chromium --with-deps \
+            || pnpm exec playwright install chromium
 
       # The admin panel itself, driven in a browser. `cli-init-e2e` proves a
       # scaffolded project installs and answers HTTP; nothing until now opened
