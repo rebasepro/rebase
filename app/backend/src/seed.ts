@@ -4,6 +4,7 @@
  * Run with: npx tsx src/seed.ts
  */
 import { createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { env } from "./env.js";
 import {
     authors, posts, tags, products, orders,
@@ -184,6 +185,48 @@ function orderKey(index: number): string {
     return ORDER_KEY_ALPHABET[ORDER_KEY_ALPHABET.indexOf("i") + width - 1] + digits.join("");
 }
 
+/**
+ * Give every row a board position, in the order a person would want to read
+ * the column it lands in.
+ *
+ * The keys are one sequence across the whole table, not one per column: a
+ * board sorts the cards it drew for a column by this key and never compares
+ * across columns, so a single sorted run is enough to make every column read
+ * in the same order. What it must not be is the insertion index — the rows are
+ * generated with random dates and picked statuses, so `orderKey(i)` at the
+ * build site ordered each board by nothing at all: an urgent ticket opened
+ * three days ago sat below a low-priority one from last week, and the first
+ * thing a visitor does on a board is read the top of a column.
+ *
+ * Sorting a copy, then writing back through the references, keeps the insert
+ * order (and therefore the ids, which are derived from it) untouched.
+ */
+function assignBoardOrder<T extends { __order: string }>(
+    rows: T[],
+    compare: (a: T, b: T) => number
+): T[] {
+    [...rows].sort(compare).forEach((row, i) => {
+        row.__order = orderKey(i);
+    });
+    return rows;
+}
+
+/** Descending by ISO date string, i.e. newest first. */
+function newestFirst(a: string | null | undefined, b: string | null | undefined): number {
+    return (b ?? "").localeCompare(a ?? "");
+}
+
+/** Ascending by ISO date string, i.e. the one that has been waiting longest. */
+function oldestFirst(a: string | null | undefined, b: string | null | undefined): number {
+    return (a ?? "").localeCompare(b ?? "");
+}
+
+/** Position in a fixed list of enum ids — "urgent before low", not "u before l". */
+function rank<T extends string>(order: readonly T[], value: T | null | undefined): number {
+    const index = value == null ? -1 : order.indexOf(value);
+    return index === -1 ? order.length : index;
+}
+
 // ── Static seed-asset helpers ─────────────────────────────────────────
 /**
  * Copy all files from a seed-assets subdirectory into the uploads directory (local storage).
@@ -298,7 +341,16 @@ export async function runSeed() {
     // connection (bypasses RLS) — the same one the backend uses for admin ops.
     // Falls back to DATABASE_URL for local/manual runs where it is the owner.
     const seedConnectionString = env.ADMIN_CONNECTION_STRING || env.DATABASE_URL;
-    const { db, pool } = createPostgresDatabaseConnection(seedConnectionString, undefined, { max: 1 });
+    const { pool } = createPostgresDatabaseConnection(seedConnectionString, undefined, { max: 1 });
+    // One held connection for the whole seed, rather than the pooled `db`.
+    // The clear and every insert below are one transaction, and a pooled
+    // handle gives the client back after each statement — which this pool
+    // answers by *destroying* a client released mid-transaction, since an open
+    // transaction and its RLS GUCs must not leak into the next request. The
+    // BEGIN would be discarded there and the DELETEs would commit on their
+    // own: exactly the half-wiped demo this transaction exists to prevent.
+    const client = await pool.connect();
+    const db = drizzle(client);
 
     const NUM_AUTHORS = 20;
     const NUM_TAGS = 30;
@@ -474,8 +526,47 @@ export async function runSeed() {
         const orderIds = Array.from({ length: NUM_ORDERS }, (_, i) => generateUUID("order", i));
         const ticketIds = Array.from({ length: 60 }, (_, i) => generateUUID("ticket", i));
 
+        // ── One transaction, from the clear to the last insert ────────
+        //
+        // What this prevents happened to the public demo on 2026-09-09: the
+        // hourly reset truncated all eleven tables, the database connection
+        // died seconds later, and demo.rebase.pro served empty collections for
+        // the rest of the hour, until the next run. A reset that cannot finish
+        // has to leave the data it found. The pool is `max: 1`, so every `db.*`
+        // call between here and the COMMIT runs on this one connection, inside
+        // this transaction, and a failure — the instance being killed included
+        // — rolls all of it back.
+        await db.execute("BEGIN");
+
+        // The other half of that incident: the scheduler's claim check failed
+        // against the same sick database and logged "running uncoordinated",
+        // which for a job that empties every table means two copies clearing at
+        // once. A transaction-scoped advisory lock cannot fail that way — it is
+        // held by this transaction, released when it ends, and released by the
+        // server itself if the instance dies mid-run.
+        const claim = await db.execute("SELECT pg_try_advisory_xact_lock(80741) AS ok");
+        const claimed = (claim as unknown as { rows?: { ok?: boolean }[] }).rows?.[0]?.ok;
+        if (!claimed) {
+            console.log("skipped: another reseed holds the lock");
+            await db.execute("ROLLBACK");
+            return;
+        }
+
         console.log("🧹 Clearing existing data...");
-        await db.execute("TRUNCATE TABLE posts, authors, tags, products, orders, order_items, customers, tickets, posts_tags, product_locales, exercises RESTART IDENTITY CASCADE;");
+        // `DELETE`, not `TRUNCATE`: truncate takes ACCESS EXCLUSIVE for as long
+        // as the transaction runs, so every visitor's request would block until
+        // the reseed committed. A delete takes row locks instead — readers keep
+        // seeing the old rows and flip to the new ones at COMMIT, which is the
+        // point of wrapping this at all. Children first: `order_items →
+        // products` and `orders → customers` are RESTRICT. `RESTART IDENTITY`
+        // is not carried over — nothing here has an identity or serial column,
+        // every id is an explicit uuid.
+        for (const table of [
+            "posts_tags", "order_items", "product_locales", "orders", "tickets",
+            "posts", "products", "customers", "authors", "tags", "exercises"
+        ]) {
+            await db.execute(`DELETE FROM ${table};`);
+        }
 
         // ── Authors ───────────────────────────────────────────────────
         // Authored content lives in demo-authors.json — 20 distinct people, each
@@ -583,7 +674,8 @@ value: section });
                 created_at: randomDate(180, 10),
                 updated_at: randomDate(30, 0),
                 // Posts are written by the author whose specialism matches the theme.
-                authorId: authorIds[theme.authorIndex]
+                authorId: authorIds[theme.authorIndex],
+                __order: ""
             });
 
             // Tags follow the theme rather than being drawn at random.
@@ -592,6 +684,11 @@ value: section });
             for (const t of assigned) ptValues.push({ post_id: postIds[i],
 tag_id: tagIds[t] });
         }
+
+        // The editorial board: most recent at the top of every column. Drafts
+        // have no publish date, so they fall back to when they were written.
+        assignBoardOrder(postValues, (a, b) =>
+            newestFirst(a.publish_date ?? a.created_at, b.publish_date ?? b.created_at));
 
         const BATCH = 50;
         for (let i = 0; i < postValues.length; i += BATCH) {
@@ -680,8 +777,19 @@ tag_id: tagIds[t] });
             is_featured: i % 5 === 0,
             images: p.localImages,
             created_at: randomDate(180, 10),
-            updated_at: randomDate(30, 0)
+            updated_at: randomDate(30, 0),
+            __order: ""
         }));
+
+        // The catalogue board is grouped by status, so within a column this is
+        // the order a merchandiser would want: what is promoted first, then
+        // what customers rate highest, then alphabetically so the tail is
+        // navigable rather than arbitrary.
+        assignBoardOrder(productValues, (a, b) =>
+            Number(b.is_featured) - Number(a.is_featured)
+            || Number(b.rating) - Number(a.rating)
+            || a.name.localeCompare(b.name));
+
         await db.insert(products).values(productValues);
 
         // Real translations live in demo-product-translations.json, keyed by the
@@ -798,9 +906,14 @@ tag_id: tagIds[t] });
                 shipped_date: shippedDate,
                 delivered_date: deliveredDate,
                 created_at: orderDate,
-                updated_at: randomDate(10, 0)
+                updated_at: randomDate(10, 0),
+                __order: ""
             });
         }
+
+        // Fulfilment reads newest first: the order that just landed in Pending
+        // is the one someone has to act on.
+        assignBoardOrder(orderValues, (a, b) => newestFirst(a.order_date, b.order_date));
 
         for (let i = 0; i < orderValues.length; i += BATCH) {
             await db.insert(orders).values(orderValues.slice(i, i + BATCH));
@@ -1081,11 +1194,19 @@ priority: "high" }
                 category: template.category,
                 customerId: hasCustomer ? customerIds[Math.floor(Math.random() * 40)] : null,
                 assigned_to: status === "open" && Math.random() > 0.5 ? null : pick(agentNames),
-                __order: orderKey(i),
+                __order: "",
                 created_at: createdAt,
                 updated_at: status === "open" ? createdAt : randomDate(7, 0)
             });
         }
+
+        // Triage order, which is what a support board is for: urgent at the top
+        // of each column, and the oldest of equal priority first — the ticket
+        // that has been waiting longest is the one about to breach.
+        const PRIORITY_ORDER = ["urgent", "high", "medium", "low"] as const;
+        assignBoardOrder(ticketValues, (a, b) =>
+            rank(PRIORITY_ORDER, a.priority) - rank(PRIORITY_ORDER, b.priority)
+            || oldestFirst(a.created_at, b.created_at));
 
         for (let i = 0; i < ticketValues.length; i += BATCH) {
             await db.insert(tickets).values(ticketValues.slice(i, i + BATCH));
@@ -1648,12 +1769,24 @@ status: "published"
                 is_featured: ex.is_featured,
                 status: ex.status,
                 created_at: randomDate(90, 0),
-                updated_at: randomDate(14, 0)
+                updated_at: randomDate(14, 0),
+                __order: ""
             };
         });
 
+        // The board groups by difficulty, so each column reads like a session:
+        // the featured movement first, then the compound lifts, then the
+        // accessory work alphabetically.
+        assignBoardOrder(exerciseValues, (a, b) =>
+            Number(b.is_featured) - Number(a.is_featured)
+            || Number(b.is_compound) - Number(a.is_compound)
+            || a.name.localeCompare(b.name));
+
         await db.insert(exercises).values(exerciseValues);
         console.log(`  ✅ ${exerciseValues.length} exercises`);
+
+        // Everything above becomes visible to readers here, in one step.
+        await db.execute("COMMIT");
 
         // ── Summary ───────────────────────────────────────────────────
         const statusCounts: Record<string, number> = {};
@@ -1671,7 +1804,18 @@ status: "published"
 
     } catch (e) {
         console.error("❌ Error seeding database:", e);
+        try {
+            await db.execute("ROLLBACK");
+        } catch {
+            // The connection is already gone, which rolls the transaction back
+            // on its own. Nothing left to undo here.
+        }
+        // Rethrown rather than swallowed: this used to resolve, so the cron
+        // logged "Demo data reset complete." over a database it had just
+        // emptied and the failure was invisible until someone opened the demo.
+        throw e;
     } finally {
+        client.release();
         await pool.end();
     }
 }
@@ -1679,5 +1823,8 @@ status: "published"
 // Only self-invoke when executed directly as a CLI (`npx tsx src/seed.ts`),
 // NOT when imported — the reset-demo cron imports runSeed and calls it itself.
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
-    runSeed();
+    // `runSeed` rejects now, and a seed that failed must not exit 0.
+    runSeed().catch(() => {
+        process.exitCode = 1;
+    });
 }
