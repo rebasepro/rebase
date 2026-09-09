@@ -5,16 +5,16 @@ import { Session } from "../../components/Terminal";
 import type { OutputLine } from "../../components/Terminal";
 
 /**
- * OUR terminal, under the agent's — the spine of the story.
+ * OUR terminal, under the agent's — the spine of the story, and PROOF, NOT
+ * PROCEDURE. Three commands, each with the few lines of its output that
+ * carry the point: `init --introspect` finds nine tables and writes nine
+ * files; `db push` applies the policies; `dev` puts the admin app and the
+ * API up. A version that showed the whole session — pnpm's banners, `cd`,
+ * "Next steps:" — was a tutorial, and the film is not one.
  *
- * Four commands: `init` points Rebase at the database the agent left behind
- * and writes a collection file per table; `cd` into what it made; `db push`
- * applies the rule as a policy; `dev` runs it. EVERY LINE IS WHAT THE TOOLS
- * PRINT, in the order they print it: init.ts and introspect-db.ts for the
- * first command (the file list is the real one for these nine tables),
- * pnpm's own script banner and server-postgres/cli.ts for push, dev.ts for
- * the ready banner. Lines are left out — pnpm's install log, the Swagger
- * line — never made up.
+ * Every line is one the tools print (init.ts, introspect-db.ts,
+ * server-postgres/cli.ts, dev.ts), and the file list is the real one for
+ * these nine tables. Lines are left out, never made up.
  *
  * The window is a fixed height and SCROLLS: older lines leave off the top
  * as new ones print, the way a shell behaves.
@@ -24,52 +24,16 @@ const blank = (at: number): OutputLine => ({ text: "", tone: "plain", at });
 
 const FILES = ["authors", "customers", "order_items", "orders", "posts", "products", "tags", "tickets", "users"];
 
-const INIT: OutputLine[] = [
-    { text: "  Copying project files...", tone: "muted", at: 4 },
-    { text: "  Using the blank template: collections will come from your database.", tone: "muted", at: 8 },
-    blank(12),
-    { text: "  Installing dependencies with pnpm...", tone: "muted", at: 14 },
-    blank(16),
-    { text: "Progress: resolved 418, reused 418, downloaded 0, added 418, done", tone: "plain", at: 40 },
-    { text: "Done in 4.2s", tone: "plain", at: 44 },
-    blank(48),
-    { text: "  Introspecting database and generating collections...", tone: "muted", at: 52 },
-    blank(54),
-    { text: "Connected to database: localhost:5432", tone: "muted", at: 58 },
-    { text: "Introspecting schema 'public'...", tone: "muted", at: 62 },
-    { text: "Found 9 tables.", tone: "accent", at: 70 },
-    { text: "  7 entities, 0 join tables (folded into relations), 0 code lists, 2 owned by another table (hidden from navigation).", tone: "muted", at: 74 },
-    { text: "Skipping data inference (non-interactive run; pass --data-inference to enable).", tone: "muted", at: 78 },
-    ...FILES.map((f, i) => ({ text: `../config/collections/${f}.ts`, tone: "ok" as const, at: 84 + i * 3 })),
-    { text: "../config/collections/index.ts", tone: "ok", at: 114 },
-    blank(116),
-    { text: "Introspected 9 tables — generated 9 collection(s).", tone: "ok", at: 120 },
-    { text: "  Review the generated files in ../config/collections and customize properties as needed.", tone: "muted", at: 122 },
-    { text: "  Database successfully introspected!", tone: "green", at: 128 },
-    blank(132),
-    { text: "Project acme created successfully!", tone: "ok", at: 136 },
-    blank(138),
-    { text: "Next steps:", tone: "plain", at: 142 },
-    blank(144),
-    { text: "  cd acme", tone: "accent", at: 146 },
-    blank(148),
-    { text: "  # Database has been introspected & collections generated!", tone: "muted", at: 150 },
-    { text: "  # Start the development server (frontend + backend):", tone: "muted", at: 152 },
-    { text: "  pnpm run dev", tone: "accent", at: 156 },
-];
-
 export const Shell: React.FC<{
     x: number;
     y: number;
     w: number;
     at: number;
-    /** Absolute frame `cd acme` is typed. */
-    cdAt: number;
-    /** Absolute frame `pnpm run db:push` is typed. */
+    /** Absolute frame `rebase db push` is typed. */
     pushAt: number;
-    /** Absolute frame `pnpm run dev` is typed. */
+    /** Absolute frame `rebase dev` is typed. */
     devAt: number;
-}> = ({ x, y, w, at, cdAt, pushAt, devAt }) => (
+}> = ({ x, y, w, at, pushAt, devAt }) => (
     <div style={{ position: "absolute", left: x, top: y, width: w }}>
         <Sequence from={at} layout="none">
             <Frame title="zsh" delay={0} bodyStyle={{ padding: "22px 34px 24px" }}>
@@ -81,38 +45,32 @@ export const Shell: React.FC<{
                     scroll={330}
                     steps={[
                         {
-                            command: "pnpm dlx @rebasepro/cli init acme --database-url $DATABASE_URL --introspect --install",
-                            output: INIT,
-                        },
-                        { command: "cd acme", at: cdAt - at, output: [] },
-                        {
-                            command: "pnpm run db:push",
-                            at: pushAt - at,
+                            command: "rebase init acme --database-url $DATABASE_URL --introspect",
                             output: [
-                                blank(2),
-                                { text: "> acme@0.1.0 db:push /home/dev/acme", tone: "muted", at: 4 },
-                                { text: "> rebase db push", tone: "muted", at: 6 },
-                                blank(8),
-                                { text: "  Step 1/3: Generating Drizzle schema & Postgres DDL from collections...", tone: "muted", at: 10 },
-                                { text: "  Step 2/3: Pushing schema to database with Atlas...", tone: "muted", at: 20 },
-                                { text: "  Step 3/3: Applying RLS policies to database...", tone: "muted", at: 30 },
-                                blank(32),
-                                { text: "  RLS policies applied successfully.", tone: "ok", at: 42 },
+                                { text: "Introspecting schema 'public'...", tone: "muted", at: 4 },
+                                { text: "Found 9 tables.", tone: "accent", at: 10 },
+                                ...FILES.map((f, i) => ({ text: `../config/collections/${f}.ts`, tone: "ok" as const, at: 16 + i * 3 })),
+                                blank(44),
+                                { text: "Introspected 9 tables — generated 9 collection(s).", tone: "ok", at: 48 },
                             ],
                         },
                         {
-                            command: "pnpm run dev",
+                            command: "rebase db push",
+                            at: pushAt - at,
+                            output: [
+                                { text: "  Step 3/3: Applying RLS policies to database...", tone: "muted", at: 10 },
+                                blank(12),
+                                { text: "  RLS policies applied successfully.", tone: "ok", at: 22 },
+                            ],
+                        },
+                        {
+                            command: "rebase dev",
                             at: devAt - at,
                             output: [
                                 blank(2),
-                                { text: "> acme@0.1.0 dev /home/dev/acme", tone: "muted", at: 4 },
-                                { text: "> rebase dev", tone: "muted", at: 6 },
-                                blank(8),
                                 { text: "✦ Rebase Admin App is ready!", tone: "plain", at: 18 },
                                 { text: "➜ Admin:  http://localhost:5173", tone: "plain", at: 22 },
                                 { text: "➜ API:    http://localhost:3001", tone: "plain", at: 26 },
-                                blank(28),
-                                { text: "First login: the first account to register becomes admin", tone: "muted", at: 34 },
                             ],
                         },
                     ]}

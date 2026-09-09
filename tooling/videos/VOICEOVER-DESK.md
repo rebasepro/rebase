@@ -1,41 +1,60 @@
-# Rebase in 100 seconds — voice-over script
+# Rebase — the desk film — voice-over script
+
+**A marketing film, not a tutorial.** The subject of every line is what Rebase
+does for you, never what to type. The commands are on screen as proof that it
+is three of them, not as steps to follow.
+
+**Exciting because it is concrete.** No slogans, no taglines. The excitement
+is in what happens: nine critical findings become a clean scan; one file
+becomes an API, an admin panel and a safe place for agents; "point it at your
+database this afternoon" is a thing the viewer can actually do.
 
 **Friendly and professional.** One engineer showing another something they
-built. Brisk, warm, present tense, second person. Nothing at anyone's
-expense — no jabs at the viewer, no jokes about their code. The register of
-a good conference demo.
+built. Brisk, warm, present tense. Every line is a sentence.
 
-**About 200 words a minute, no dead air.** Nine frames a word, gaps of half
-a second or so. The pictures run under the words; you do not wait for them.
-The one exception is "and it finds nothing" — the green line prints just
-before you say "nothing", and it should feel like you saw it.
+**About 200 words a minute, with room.** Nine frames a word, a breath between
+lines, and a beat after every picture — the montages get five to six seconds
+each. The one joint that is exact: the green line prints just before you say
+"clean", and it should feel like you saw it.
 
 **It opens on you, already talking.** No logo, no pause. You are on screen
 from the first frame and the first word is half a second in.
 
-**Every line is a sentence.** A subject, a verb, and the thing the verb is
-about. Nothing here needs a second reading to parse.
-
-Total: **3000 frames = 100.0 seconds** at 30fps · 303 words · 182 words a
+Total: **3090 frames = 103.0 seconds** at 30fps · 289 words · 168 words a
 minute over the whole run, silences included.
 
 ## The script
 
-| # | Beat | Starts | Words | Line | Gap after |
-|---|------|--------|-------|------|-----------|
+| # | Beat | Starts | Words | Line | After |
+|---|------|--------|-------|------|-------|
 | 01 | You, to camera | 0.5s | 15 | It's 2026. Anyone can build a backend in an afternoon. But can you trust it? | 0.6s |
-| 02 | The evidence | 5.6s | 35 | A coding agent built this one. It says it's done: auth, CRUD for nine tables, a REST API, deployed. And a ten-second scan of the same database finds nine critical issues. Every table is open. | 0.4s |
-| 03 | Point Rebase at it | 16.5s | 28 | So you point Rebase at that same database. It reads the tables that are already there and writes a TypeScript file for each one. That's the first command. | 0.5s |
-| 04 | The rule | 25.4s | 35 | Access rules go in that same file. This one says customers can only see their own orders. It doesn't compile into middleware. It compiles into a Postgres row-level security policy, and the database enforces it. | 0.7s |
-| 05 | Push, and the same scan | 36.6s | 14 | You push it, you run the exact same scan again, and it finds nothing. | 0.6s |
-| 06 | Run it | 41.4s | 4 | Then you run it. | 1.5s — the terminal prints the ports |
-| 07 | Two people | 44.1s | 34 | Robert is a customer, so he gets his own orders. Dana works in support, so she gets all of them. It's the same query. The database decides who gets what, not your application code. | 0.5s |
-| 08 | The agent | 54.8s | 30 | And an agent works the same way. It gets a key with permissions on it, and it cannot get around them. The rules hold no matter what the prompt says. | 0.5s |
-| 09 | The panel | 64.4s | 25 | Your team also gets an admin panel. It is generated from the same files, with the same rules applied, and nobody had to build it. | 0.7s — the montage plays |
-| 10 | Every view | 72.5s | 12 | Every collection gets boards, tables, cards and forms, straight from its schema. | 0.4s |
-| 11 | The schema | 76.5s | 14 | The schema view is read from the live database, so it is always current. | 0.4s |
-| 12 | Studio | 81.1s | 12 | And you can work on the database itself from the same app. | 0.4s |
-| 13 | The whole desk | 85.1s | 45 | So that was three commands. It's open source, MIT licensed, and you can run it on your laptop, on your own servers, or on any cloud that can run a container. The scan works on any Postgres database, so it's a good place to start. | — |
+| 02 | The evidence | 5.6s | 35 | A coding agent built this one. It says it's done: auth, CRUD for nine tables, a REST API, deployed. And a ten-second scan of the same database finds nine critical issues. Every table is open. | 1.5s — the tally sits |
+| 03 | What Rebase does | 17.5s | 28 | Rebase starts from the database you already have. One command reads every table and writes a typed collection file for each one. Your schema, as code, in seconds. | 0.6s |
+| 04 | The rule | 26.5s | 40 | Access rules live in that file, right next to the table they protect. This one says customers only see their own orders. Rebase compiles it into a Postgres policy, so the database enforces it on every query, from every client. | 0.7s |
+| 05 | The same scan | 39.2s | 12 | Push it, run the same scan again, and it comes back clean. | 1.2s — the clean report sits |
+| 06 | Run it → two people | 44.0s | 30 | Then run it, and every request is answered by the database itself. Robert sees his own orders. Dana, in support, sees them all. Same query. Postgres decides who sees what. | 1.2s |
+| 07 | The agent | 54.2s | 26 | Give an agent a key, and it gets exactly the permissions on that key, and nothing more. The rules hold no matter what the prompt says. | 1.2s |
+| 08 | The panel | 63.2s | 24 | And your team gets an admin panel on day one, generated from the same files, with the same rules. Nobody had to build it. | 1.9s — the montage plays |
+| 09 | Every view | 72.3s | 13 | Boards, tables, cards and forms: every collection gets the views that fit it. | 2.1s — the bento plays |
+| 10 | The schema | 78.3s | 12 | The schema, read live from your database, so it is always current. | 1.9s |
+| 11 | Studio | 83.8s | 18 | And a place to work on the database itself: SQL, schema, policies and logs, in the same app. | 0.9s |
+| 12 | Close | 90.1s | 36 | Rebase is open source, MIT licensed, and runs on your laptop, your own servers or any cloud. Three commands, on the Postgres you already have. Point it at your database this afternoon. Then run the scan. | — |
+
+## Timing, beat by beat
+
+| Beat | Length | What has to be seen |
+|------|--------|---------------------|
+| Hook | 17.3s | you; then the agent's session and the scan's tally |
+| What Rebase does | 9.0s | the command, nine files, the done line |
+| The rule | 12.7s | the file, four lines typed into it, the policy |
+| The same scan | 7.2s | push, then the clean report under it |
+| Two people | 7.8s | the query, then both panels |
+| The agent | 9.0s | the key, the list, the 403 |
+| The panel | 9.1s | the montage |
+| Every view | 6.0s | the bento |
+| The schema | 5.5s | the map |
+| Studio | 6.3s | the window and its four labels |
+| Close | 12.8s | the whole desk, then you and the address |
 
 ## The presenter
 
@@ -49,8 +68,8 @@ You are on screen. Three places, one video element (`src/desk/Presenter.tsx`):
 - **Close** — you grow out of the corner into the left column as the desk
   recedes; the address lands beside you. The last line is to camera.
 
-**At "it finds nothing", look at the scan.** Glance left toward the terminal
-as the green line prints, then back to the lens for "Then you run it."
+**At "comes back clean", look at the scan.** Glance left toward the report
+as the green line prints, then back to the lens for "Then run it".
 
 ### Shooting
 
@@ -70,19 +89,20 @@ as the green line prints, then back to the lens for "Then you run it."
    word timestamps and derive the beat starts from where each line actually
    begins, so the film fits the read rather than the other way round.
 
-## Recording notes
+## What is on screen is real
 
-- The prompter lights each word as it should be spoken and shows the line
-  **36 frames early**, so you can read ahead rather than sight-read.
-- A line that starts before the camera has arrived is deliberate. Do not wait
-  for the picture.
-- "The exact same scan" means it: the window from the opening re-runs, same
-  command, same database.
-- The three tour lines (every view, the schema, Studio) are one breath split
-  three ways. Do not stop between them.
-- Every terminal line is what the tools print. MIT, three commands, nine
-  tables, three findings and the container image are all checked against
-  the repo.
-- No line refers to Rebase Cloud. "Any cloud" means the viewer's own.
-- `TEMPO` in `src/desk/beats.ts` stretches the whole sheet — beats, moves and
-  the narration's frames alike. It is 1 now. To slow it, change one number.
+- The scan window prints rls-check 0.18.1's own report, verbatim, captured
+  against a database built to the story's shape (`windows/scan-output.ts`).
+- The terminal prints lines init, push and dev actually print, with the
+  real file list for these nine tables. Lines are left out, never made up.
+- The collection file is the head of the one introspection generates; the
+  policy is the one `db push` writes to `drizzle/policies.sql`.
+- MIT, three commands, nine tables and the container image are checked
+  against the repo. No line refers to Rebase Cloud.
+- **Open:** the clean report was captured with FORCE ROW LEVEL SECURITY set
+  on every table. After `db push` alone, rls-check 0.18.1 reports
+  `rls-enabled-not-forced` on every table. That is a product decision, not
+  a film one — see the note in `windows/Hook.tsx`.
+
+`TEMPO` in `src/desk/beats.ts` stretches the whole sheet — beats, moves and
+the narration's frames alike. It is 1 now. To slow it, change one number.

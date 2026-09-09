@@ -53,11 +53,10 @@ const STUDIO = beat("studio");
    itself — these are its arithmetic (typing at 0.55 frames a character). */
 const SHELL_AT = INIT.start + 8;
 const PUSH_AT = PUSH.start + 14;
-/** The push output is nine lines, the last of them at +42; the scan re-runs
- *  under it, then dev is typed once the clean report has settled. */
-const CD_AT = PUSH_AT - 36;
-const RERUN_AT = PUSH_AT + 56;
-const DEV_AT = RERUN_AT + 70;
+/** The push output's last line lands at +22; the scan re-runs under it and
+ *  its clean report settles by +45; dev is typed as "Then run it" begins. */
+const RERUN_AT = PUSH_AT + 32;
+const DEV_AT = RERUN_AT + 96;
 
 const Chroma: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <ToneOverride.Provider value={TONE.claim}>{children}</ToneOverride.Provider>
@@ -130,7 +129,7 @@ export const Desk: React.FC = () => {
 
                 {/* ── (0,½) THE TERMINAL — init, then push, then dev ─── */}
                 <On beats={["init", "push", "all"]}>
-                    <Shell x={200} y={1000} w={1380} at={SHELL_AT} cdAt={CD_AT} pushAt={PUSH_AT} devAt={DEV_AT} />
+                    <Shell x={200} y={1000} w={1380} at={SHELL_AT} pushAt={PUSH_AT} devAt={DEV_AT} />
                 </On>
 
                 {/* ── (1,0) THE RULE — on the blue field ─────────────── */}
