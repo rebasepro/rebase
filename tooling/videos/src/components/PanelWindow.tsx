@@ -40,9 +40,12 @@ export const PANEL_SHOTS: Shot[] = [
     /* The click-through, and the reason the montage stopped reading as static:
        a product picked out of the grid and the record that opens. The window
        starts on held grid so the cursor is seen travelling to the card — the
-       cut lands about 40 frames in, which is what makes it read as a click
-       rather than as an edit. */
-    { file: "demo/panel.mp4", label: "Open a record", from: 244, frames: 122 },
+       cut lands a beat in, which is what makes it read as a click rather
+       than as an edit. The offset is the 2× capture's: its flow scrolls the
+       grid down and back UP before the click (frames ~210-258), and a window
+       opened during that scroll-up read as the video restarting. 262 is the
+       first settled frame at the top of the grid. */
+    { file: "demo/panel.mp4", label: "Open a record", from: 262, frames: 122 },
     { file: "demo/orders.mp4", label: "Every view", from: 20, frames: 72 },
 ];
 
