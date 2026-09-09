@@ -258,7 +258,7 @@ const productsCollection: PostgresCollectionConfig = {
         icon: "Package",
         group: "E-Commerce",
         defaultViewMode: "cards",
-        customViews: ["gallery"],
+        customViews: ["price-map"],
         // Every view the panel can draw is offered; this only says which enum
         // the board opens grouped by. Without it the board would pick the first
         // enum property in declaration order — `category`, eight columns of

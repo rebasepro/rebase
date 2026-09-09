@@ -23,7 +23,7 @@ import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
 import { BlogEntryPreview } from "./BlogEntryPreview";
-import { ProductGalleryView } from "./ProductGalleryView";
+import { ProductPriceMapView } from "./ProductPriceMapView";
 import { DemoLoginView } from "./DemoLoginView";
 
 // Configuration from environment
@@ -76,13 +76,13 @@ export function App() {
     ], []);
 
     // Custom collection view modes, referenced by key from a collection's
-    // `admin.customViews`. Products names "gallery".
+    // `admin.customViews`. Products names "price-map".
     const collectionViews = React.useMemo(() => [
         {
-            key: "gallery",
-            name: "Gallery",
-            icon: "Image",
-            Builder: ProductGalleryView
+            key: "price-map",
+            name: "Price map",
+            icon: "ChartScatter",
+            Builder: ProductPriceMapView
         }
     ], []);
 
