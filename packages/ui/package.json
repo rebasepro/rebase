@@ -31,10 +31,9 @@
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
-  "//sideEffects": "The stylesheet is the side effect. `index.css` and the CSS the build emits are imported for what they do, not for what they export, so a bundler told this package is side-effect-free would drop them and ship an unstyled admin panel.",
+  "//sideEffects": "The stylesheet is the side effect. The CSS this package emits is imported for what it does, not for what it exports, so a bundler told this package is side-effect-free would drop it and ship an unstyled admin panel. One glob is enough: bundlers match this list against the RESOLVED file path, and `@rebasepro/ui/index.css` resolves through `exports` to `dist/index.css`, which `**/*.css` already claims. A second `./index.css` entry used to sit beside it, naming a package-root file that no tarball has ever contained.",
   "sideEffects": [
-    "**/*.css",
-    "./index.css"
+    "**/*.css"
   ],
   "engines": {
     "node": ">=22.22.0"
@@ -122,8 +121,7 @@
     "vite-plugin-static-copy": "^4.1.1"
   },
   "files": [
-    "dist",
-    "index.css"
+    "dist"
   ],
   "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
   "publishConfig": {

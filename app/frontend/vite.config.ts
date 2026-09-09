@@ -161,9 +161,16 @@ template: "raw-data" })
         alias: {
             "react": path.resolve(__dirname, "./node_modules/react"),
             "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
+            // Package-name aliases, and they cover subpaths too: Vite matches an
+            // alias against the prefix up to a "/" boundary and the FIRST match
+            // wins, so `@rebasepro/ui/index.css` is rewritten to
+            // packages/ui/src/index.css by the `@rebasepro/ui` entry this spread
+            // registers. There used to be a second entry below claiming the
+            // opposite — "subpath exports are not covered" — pointing at
+            // packages/ui/index.css, which does not exist. It was dead, and the
+            // day a reordering made it live it would have broken dev on a
+            // missing file. saas/frontend/vite.config.ts dropped the same pair.
             ...workspaceSourceAliases(),
-            // Subpath exports are not covered by the package-name aliases above.
-            "@rebasepro/ui/index.css": path.resolve(__dirname, "../../packages/ui/index.css"),
             "config": path.resolve(__dirname, "../config")
         }
     }
