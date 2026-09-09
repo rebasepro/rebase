@@ -309,7 +309,23 @@ jobs:
           REBASE_DB_PORT: "5433"
 
       - name: Install Playwright Browsers
-        run: pnpm exec playwright install chromium --with-deps
+        run: |
+          # `--with-deps` runs `apt-get update` first, and the runner image
+          # ships Google's Chrome repo — whose index has been serving a
+          # `Packages.gz` that does not match the hash its own Release file
+          # advertises. apt exits non-zero, Playwright reports "Failed to
+          # install browsers" and exits 100, and the job dies before a single
+          # test runs. It took out e2e-admin and e2e-cli twice in a row on
+          # 2026-09-09, with byte-identical hashes both times, so it is not the
+          # kind of blip a re-run clears.
+          #
+          # Nothing here wants that repo: Playwright downloads its own Chromium
+          # build from its own CDN, and `--with-deps` only needs apt for the
+          # system libraries, which the other sources carry. Dropping the
+          # source is narrower than `|| true` on the update — a genuinely
+          # broken index for a package we *do* need should still fail.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          pnpm exec playwright install chromium --with-deps
 
       - name: Run E2E Test Suite
         run: pnpm exec tsx tests/e2e/tests/cli-init-e2e.ts
@@ -420,7 +436,23 @@ jobs:
           done
 
       - name: Install Playwright Browsers
-        run: pnpm exec playwright install chromium --with-deps
+        run: |
+          # `--with-deps` runs `apt-get update` first, and the runner image
+          # ships Google's Chrome repo — whose index has been serving a
+          # `Packages.gz` that does not match the hash its own Release file
+          # advertises. apt exits non-zero, Playwright reports "Failed to
+          # install browsers" and exits 100, and the job dies before a single
+          # test runs. It took out e2e-admin and e2e-cli twice in a row on
+          # 2026-09-09, with byte-identical hashes both times, so it is not the
+          # kind of blip a re-run clears.
+          #
+          # Nothing here wants that repo: Playwright downloads its own Chromium
+          # build from its own CDN, and `--with-deps` only needs apt for the
+          # system libraries, which the other sources carry. Dropping the
+          # source is narrower than `|| true` on the update — a genuinely
+          # broken index for a package we *do* need should still fail.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          pnpm exec playwright install chromium --with-deps
 
       # The admin panel itself, driven in a browser. `cli-init-e2e` proves a
       # scaffolded project installs and answers HTTP; nothing until now opened
