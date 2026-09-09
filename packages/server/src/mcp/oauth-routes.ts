@@ -27,6 +27,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import type { HonoEnv } from "../api/types.js";
 import { logger } from "../utils/logger.js";
+import { createRateLimiter } from "../auth/rate-limiter.js";
 import { randomHex, constantTimeEqual, sha256Hex } from "../utils/portable-crypto.js";
 import {
     verifyAccessToken,
@@ -96,9 +97,64 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
     const issuer = issuerFor(publicUrl);
     const canonicalResource = canonicalResourceUri(publicUrl, mcpPath);
 
+    // The limiters are created PER ROUTER, not at module scope.
+    //
+    // In production that is the same thing: one process mounts this router once,
+    // so one bucket. It matters everywhere else — a module-level limiter shares
+    // its counter across every instance in the process, so a test suite that
+    // builds twenty apps exhausts the registration limit on the fourth and the
+    // rest fail for a reason that has nothing to do with what they assert. A
+    // limiter whose scope is wider than the thing it protects is a limiter that
+    // will eventually refuse something nobody meant it to.
+    /**
+     * Registration is an unauthenticated write, so it gets the tightest limit here.
+     *
+     * The cap above bounds the *total* damage; this bounds the rate at which one
+     * source can approach it. Without both, a single host can fill five thousand
+     * rows in a few seconds and every legitimate client that arrives afterwards is
+     * refused — the cap turns into the denial of service rather than the defence
+     * against one. Ten registrations in fifteen minutes is generous for the real
+     * pattern, which is a person connecting an application once.
+     */
+    const registrationLimiter = createRateLimiter({
+        windowMs: 15 * 60 * 1000,
+        limit: 10,
+        message: "Too many client registrations from this address. Try again later."
+    });
+
+    /**
+     * The token endpoint, which is where a stolen code or refresh token gets spent.
+     *
+     * Looser than registration because a busy deployment legitimately refreshes
+     * often — one token per client per hour, times however many clients a user has
+     * connected, times however many users share an egress IP. 120 in fifteen
+     * minutes leaves that comfortable while making an offline guessing loop against
+     * a code or a client secret pointless: both are 256 bits, so the limit is
+     * belt-and-braces rather than the actual protection.
+     */
+    const tokenLimiter = createRateLimiter({
+        windowMs: 15 * 60 * 1000,
+        limit: 120,
+        message: "Too many token requests, please try again later."
+    });
+
+    /**
+     * The authorize endpoint and its decision hop.
+     *
+     * Rendering a consent page is cheap, but the decision hop verifies a session
+     * token on every call, and an unauthenticated caller can drive it. Shared
+     * between the two because they are two halves of one flow and a limit that
+     * only covers the cheap half is decorative.
+     */
+    const authorizeLimiter = createRateLimiter({
+        windowMs: 15 * 60 * 1000,
+        limit: 60,
+        message: "Too many authorization requests, please try again later."
+    });
+
     /* ── Dynamic client registration (RFC 7591) ───────────────────── */
 
-    router.post("/register", async (c) => {
+    router.post("/register", registrationLimiter, async (c) => {
         if (!config.allowDynamicRegistration) {
             // 403 rather than 404: the endpoint exists and is advertised in the
             // metadata, it is this deployment that has switched it off. A 404
@@ -198,7 +254,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
 
     /* ── Authorization endpoint ───────────────────────────────────── */
 
-    router.get("/authorize", async (c) => {
+    router.get("/authorize", authorizeLimiter, async (c) => {
         const q = c.req.query();
 
         const clientId = q.client_id;
@@ -284,7 +340,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
      * What the consent page posts once the person has signed in and pressed
      * Allow. Mints the authorization code and sends it home.
      */
-    router.post("/authorize/decision", async (c) => {
+    router.post("/authorize/decision", authorizeLimiter, async (c) => {
         const form = await c.req.parseBody();
         const requestToken = String(form.request_token ?? "");
         const sessionToken = String(form.session_token ?? "");
@@ -351,7 +407,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
 
     /* ── Token endpoint ───────────────────────────────────────────── */
 
-    router.post("/token", async (c) => {
+    router.post("/token", tokenLimiter, async (c) => {
         const form = await c.req.parseBody();
         const grantType = String(form.grant_type ?? "");
 
@@ -524,6 +580,95 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             scope: grant.scope
         });
     }
+
+    /* ── Connected applications, for the person who connected them ── */
+
+    /**
+     * Who is asking, from an ORDINARY session token.
+     *
+     * Deliberately not an MCP token. These endpoints are how a person governs
+     * the applications they have authorized, and letting one of those
+     * applications present its own token here would let it enumerate the
+     * others — or revoke them. A grant to read your data is not a grant to
+     * manage your grants.
+     */
+    async function sessionUser(c: Context<HonoEnv>): Promise<{ uid: string } | null> {
+        const header = c.req.header("authorization") ?? "";
+        if (!header.toLowerCase().startsWith("bearer ")) return null;
+        // `verifyAccessToken` refuses any purpose-scoped token, so an MCP access
+        // token fails here by construction rather than by a check that could be
+        // forgotten.
+        const session = await verifyAccessToken(header.slice(7).trim());
+        return session ? { uid: session.uid } : null;
+    }
+
+    router.get("/grants", async (c) => {
+        const user = await sessionUser(c);
+        if (!user) {
+            return c.json({ error: "unauthorized", error_description: "Sign in to see connected applications." }, 401);
+        }
+        return c.json({ grants: await store.listGrants(user.uid) });
+    });
+
+    router.delete("/grants/:clientId", async (c) => {
+        const user = await sessionUser(c);
+        if (!user) {
+            return c.json({ error: "unauthorized", error_description: "Sign in to disconnect an application." }, 401);
+        }
+
+        // Scoped to the caller's own uid in the STORE query, not filtered here.
+        // A revoke that took a uid from anywhere but the verified session would
+        // let one user disconnect another's applications.
+        const revoked = await store.revokeGrant(user.uid, c.req.param("clientId"));
+        if (!revoked) {
+            return c.json({ error: "not_found", error_description: "You have not connected that application." }, 404);
+        }
+
+        return c.json({
+            revoked: true,
+            // Said plainly rather than implied. Access tokens are self-contained
+            // JWTs checked without a database round trip — that is what makes
+            // `/mcp` cheap — so an already-issued one keeps working until it
+            // expires. Claiming an instant cut-off would be the same class of
+            // promise as the consent screen's vanished revocation line.
+            note: "Refresh tokens are revoked immediately. An access token already issued keeps working until it expires, at most one hour."
+        });
+    });
+
+    /**
+     * RFC 7009 token revocation, for a client retiring its own credential.
+     *
+     * Separate from `/grants` above and answering a different question: this is
+     * a client saying "I am done with this token", where that one is a person
+     * saying "I am done with this application". A client cannot revoke another
+     * client's token — the family it names has to belong to it — and the
+     * response is 200 either way, which RFC 7009 §2.2 requires: an error would
+     * turn this endpoint into an oracle for which tokens exist.
+     */
+    router.post("/revoke", tokenLimiter, async (c) => {
+        const form = await c.req.parseBody();
+        const clientId = String(form.client_id ?? "") || basicAuthClientId(c.req.header("authorization"));
+        const token = String(form.token ?? "");
+
+        if (clientId && token) {
+            const client = await store.getClient(clientId);
+            if (client) {
+                if (client.clientSecretHash) {
+                    const presented = String(form.client_secret ?? "") || basicAuthSecret(c.req.header("authorization"));
+                    if (!presented || !constantTimeEqual(await sha256Hex(presented), client.clientSecretHash)) {
+                        return c.json({ error: "invalid_client" }, 401);
+                    }
+                }
+                const record = await store.consumeRefreshToken(token);
+                if (record && record.clientId === clientId) {
+                    await store.revokeFamily(record.family);
+                }
+            }
+        }
+
+        // 200 regardless — including for a token that was never valid.
+        return c.body(null, 200);
+    });
 
     return router;
 }

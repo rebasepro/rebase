@@ -161,7 +161,18 @@
     // `RebaseAuthConfig`, and its own docblock says "the real value is that tsc
     // validates the @ts-expect-error annotations"; nothing had.
     "packages/server/src/cron/define-cron.test.ts",
-    "packages/server/test/auth-config-types.test.ts"
+    "packages/server/test/auth-config-types.test.ts",
+    // The MCP surface's tests, listed the day they were written rather than
+    // after the drift — because the drift had already started. `mcp-oauth-flow`
+    // builds an in-memory `OAuthStore` to drive the protocol against, and when
+    // two methods were added to that interface and one removed, the fake went
+    // on satisfying an interface it no longer implemented and all 26 tests kept
+    // passing. A fake that has quietly stopped matching the thing it stands in
+    // for is worse than no fake: every assertion still passes, against a shape
+    // production does not have.
+    "packages/server/src/mcp",
+    "packages/server/test/mcp-oauth-flow.test.ts",
+    "packages/server/test/mcp-token-separation.test.ts"
   ],
   "exclude": [
     "**/node_modules",

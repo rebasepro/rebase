@@ -112,8 +112,48 @@ export interface OAuthStore {
     consumeRefreshToken(token: string): Promise<RefreshTokenRecord | null>;
     revokeFamily(family: string): Promise<void>;
 
-    hasConsent(uid: string, clientId: string, scope: string): Promise<boolean>;
+    /**
+     * Remember that this person approved this client for this scope.
+     *
+     * Written, listed and revoked — but never *read* to skip the consent
+     * screen, and that omission is deliberate. Skipping requires knowing who
+     * the user is at `GET /authorize`, before they have signed in, and the only
+     * thing this server has there is the refresh cookie. Reading it means
+     * consuming and rotating a refresh token on a GET, which would disturb the
+     * user's ordinary application session to save them one click — and would
+     * put an auto-approval path on an endpoint any site can navigate a browser
+     * to. The screen is shown every time. If that is ever revisited, the guard
+     * is that only a client with a PRIOR interactive consent may be
+     * auto-approved, or the endpoint mints codes for an attacker's client.
+     */
     recordConsent(uid: string, clientId: string, scope: string): Promise<void>;
+
+    /** Every application this person has connected, for a "connected apps" list. */
+    listGrants(uid: string): Promise<GrantSummary[]>;
+    /**
+     * Disconnect one application, completely.
+     *
+     * Revokes every refresh token this person holds for that client and forgets
+     * the consent, so the next authorization asks again. Returns false when
+     * there was nothing to revoke, which lets the route answer 404 rather than
+     * reporting success for a client the user never connected.
+     *
+     * Access tokens already issued are NOT invalidated — they are self-contained
+     * JWTs with no per-request database lookup, which is what makes `/mcp` cheap.
+     * The window is therefore one access-token lifetime (an hour), and the
+     * route's response says so rather than implying an instant cut-off.
+     */
+    revokeGrant(uid: string, clientId: string): Promise<boolean>;
+}
+
+/** One row of the "applications you have connected" list. */
+export interface GrantSummary {
+    clientId: string;
+    clientName: string;
+    scope: string;
+    grantedAt: string;
+    /** Live refresh tokens for this grant. Zero means it has lapsed on its own. */
+    activeTokens: number;
 }
 
 /**
@@ -208,6 +248,31 @@ export function createOAuthStore(driver: DataDriver): OAuthStore | null {
                 exec(`DELETE FROM ${CODES} WHERE expires_at < now() - interval '1 hour'`));
             await ddl.step("sweep expired refresh tokens", () =>
                 exec(`DELETE FROM ${REFRESH} WHERE expires_at < now() - interval '30 days'`));
+
+            // Ask the database whether the work actually happened.
+            //
+            // `createDdlBootstrapper` catches and LOGS a failed statement rather
+            // than throwing — the right trade for the cron log table, where a
+            // failure should not stop a server from serving. It is the wrong
+            // trade here: an authorization server whose tables do not exist
+            // still mounts, still answers `/register`, and issues credentials it
+            // has nowhere to check against. Every call then 500s, and the only
+            // evidence is one line in a boot log nobody re-reads.
+            //
+            // So this is the difference between "we ran some DDL" and "the
+            // tables are there". The caller declines to mount on a throw.
+            const missing: string[] = [];
+            for (const table of OAUTH_TABLES) {
+                const rows = await exec(`SELECT to_regclass($1) AS present`, [table]);
+                if (rows[0]?.present == null) missing.push(table);
+            }
+            if (missing.length > 0) {
+                throw new Error(
+                    `The OAuth tables were not created: ${missing.join(", ")}. `
+                    + "The MCP surface cannot be served without them — check the boot log above for the "
+                    + "statement that failed, which is usually a permissions problem on the `rebase` schema."
+                );
+            }
         },
 
         async registerClient(client) {
@@ -373,20 +438,6 @@ export function createOAuthStore(driver: DataDriver): OAuthStore | null {
             );
         },
 
-        async hasConsent(uid, clientId, scope) {
-            const rows = await exec(
-                `SELECT scope FROM ${CONSENTS} WHERE uid = $1 AND client_id = $2`,
-                [uid, clientId]
-            );
-            const granted = rows[0]?.scope;
-            if (granted == null) return false;
-            // Consent is per scope SET, and a request for more than was granted
-            // is a new decision. Subset rather than equality so a client asking
-            // for less than it was granted is not re-prompted.
-            const have = new Set(String(granted).split(" ").filter(Boolean));
-            return scope.split(" ").filter(Boolean).every(s => have.has(s));
-        },
-
         async recordConsent(uid, clientId, scope) {
             await exec(
                 `INSERT INTO ${CONSENTS} (uid, client_id, scope)
@@ -395,6 +446,65 @@ export function createOAuthStore(driver: DataDriver): OAuthStore | null {
                  DO UPDATE SET scope = EXCLUDED.scope, granted_at = now()`,
                 [uid, clientId, scope]
             );
+        },
+
+        async listGrants(uid) {
+            // LEFT JOIN on the client, so a consent whose client row has been
+            // deleted still lists — as an unnamed entry the user can revoke.
+            // An INNER JOIN would hide exactly the grants nobody can account
+            // for, which are the ones worth showing.
+            const rows = await exec(
+                `SELECT c.client_id,
+                        COALESCE(cl.client_name, '(unknown application)') AS client_name,
+                        c.scope,
+                        c.granted_at,
+                        (SELECT count(*)::int
+                           FROM ${REFRESH} r
+                          WHERE r.uid = c.uid
+                            AND r.client_id = c.client_id
+                            AND r.revoked_at IS NULL
+                            AND r.consumed_at IS NULL
+                            AND r.expires_at > now()) AS active_tokens
+                   FROM ${CONSENTS} c
+                   LEFT JOIN ${CLIENTS} cl ON cl.client_id = c.client_id
+                  WHERE c.uid = $1
+                  ORDER BY c.granted_at DESC`,
+                [uid]
+            );
+            return rows.map(row => ({
+                clientId: String(row.client_id),
+                clientName: String(row.client_name),
+                scope: String(row.scope),
+                grantedAt: new Date(String(row.granted_at)).toISOString(),
+                activeTokens: Number(row.active_tokens ?? 0)
+            }));
+        },
+
+        async revokeGrant(uid, clientId) {
+            // Tokens first, then the consent. If this is interrupted between the
+            // two, the user is left with a consent row and no live tokens —
+            // which re-prompts on the next authorization and grants nothing in
+            // the meantime. The other order would leave live tokens behind with
+            // no record that the user had ever approved them.
+            const revoked = await exec(
+                `UPDATE ${REFRESH}
+                    SET revoked_at = now()
+                  WHERE uid = $1 AND client_id = $2 AND revoked_at IS NULL
+              RETURNING token_hash`,
+                [uid, clientId]
+            );
+            const consent = await exec(
+                `DELETE FROM ${CONSENTS} WHERE uid = $1 AND client_id = $2 RETURNING client_id`,
+                [uid, clientId]
+            );
+
+            const found = revoked.length > 0 || consent.length > 0;
+            if (found) {
+                logger.info("[oauth] Grant revoked by the user", {
+                    uid, clientId, refreshTokensRevoked: revoked.length
+                });
+            }
+            return found;
         }
     };
 }

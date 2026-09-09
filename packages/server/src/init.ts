@@ -1901,41 +1901,59 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             if (!store) {
                 logger.error("[mcp] Surface enabled but the driver cannot persist OAuth state — not mounting.");
             } else {
-                await store.ensureTables();
+                // `ensureTables` verifies its own work and throws when the
+                // tables are not there. Caught here rather than left to reach
+                // the boot, because this is one opt-in surface: an operator who
+                // switched on `mcp` should get a server that runs everything
+                // else and one loud line explaining what did not mount, not a
+                // process that refuses to start.
+                let ready = true;
+                try {
+                    await store.ensureTables();
+                } catch (error) {
+                    ready = false;
+                    logger.error("[mcp] Could not prepare the OAuth tables — not mounting.", { error });
+                }
 
-                const mcpPath = "/mcp";
-                const oauthBasePath = `${basePath}/oauth`;
-                const mcpConfig = {
-                    publicUrl,
-                    mcpPath,
-                    oauthBasePath,
-                    getDriver: () => defaultDriver,
-                    // The RESOLVED set, not `config.collections` — a project
-                    // that declares its collections in a directory has an empty
-                    // `config.collections`, and the MCP client would be told
-                    // this project has no data at all.
-                    getCollections: () => activeCollections,
-                    serverInfo: {
-                        name: "rebase",
-                        version: readRuntimeVersion([process.cwd()]) ?? "unknown"
-                    }
-                };
+                // Guarding the mount rather than returning early: everything
+                // after this block is the rest of the server's boot, and one
+                // opt-in surface failing must not take the admin gate, the
+                // schema editor and the request logger with it.
+                if (ready) {
+                    const mcpPath = "/mcp";
+                    const oauthBasePath = `${basePath}/oauth`;
+                    const mcpConfig = {
+                        publicUrl,
+                        mcpPath,
+                        oauthBasePath,
+                        getDriver: () => defaultDriver,
+                        // The RESOLVED set, not `config.collections` — a project
+                        // that declares its collections in a directory has an empty
+                        // `config.collections`, and the MCP client would be told
+                        // this project has no data at all.
+                        getCollections: () => activeCollections,
+                        serverInfo: {
+                            name: "rebase",
+                            version: readRuntimeVersion([process.cwd()]) ?? "unknown"
+                        }
+                    };
 
-                config.app.route("/", createMcpWellKnownRoutes(mcpConfig));
-                config.app.route(mcpPath, createMcpRoutes(mcpConfig));
-                config.app.route(oauthBasePath, createOAuthRoutes({
-                    store,
-                    publicUrl,
-                    mcpPath,
-                    authBasePath: `${basePath}/auth`,
-                    // Open registration is what makes the Claude connector flow
-                    // work at all — there is nobody to hand a client ID to in
-                    // advance. A deployment that would rather pre-register can
-                    // switch it off and issue IDs itself.
-                    allowDynamicRegistration: process.env.REBASE_MCP_OPEN_REGISTRATION !== "false"
-                }));
+                    config.app.route("/", createMcpWellKnownRoutes(mcpConfig));
+                    config.app.route(mcpPath, createMcpRoutes(mcpConfig));
+                    config.app.route(oauthBasePath, createOAuthRoutes({
+                        store,
+                        publicUrl,
+                        mcpPath,
+                        authBasePath: `${basePath}/auth`,
+                        // Open registration is what makes the Claude connector flow
+                        // work at all — there is nobody to hand a client ID to in
+                        // advance. A deployment that would rather pre-register can
+                        // switch it off and issue IDs itself.
+                        allowDynamicRegistration: process.env.REBASE_MCP_OPEN_REGISTRATION !== "false"
+                    }));
 
-                logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);
+                    logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);
+                }
             }
         }
     }

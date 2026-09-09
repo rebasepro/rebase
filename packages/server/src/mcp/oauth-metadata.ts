@@ -109,6 +109,8 @@ export interface AuthorizationServerMetadata {
     authorization_endpoint: string;
     token_endpoint: string;
     registration_endpoint: string;
+    revocation_endpoint: string;
+    revocation_endpoint_auth_methods_supported: string[];
     scopes_supported: string[];
     response_types_supported: string[];
     grant_types_supported: string[];
@@ -129,6 +131,11 @@ export function authorizationServerMetadata(
         authorization_endpoint: `${base}/authorize`,
         token_endpoint: `${base}/token`,
         registration_endpoint: `${base}/register`,
+        // RFC 7009. Advertised because it is implemented — a client that reads
+        // this and retires its token on sign-out leaves nothing behind, and one
+        // that finds no such endpoint keeps a live refresh token forever.
+        revocation_endpoint: `${base}/revoke`,
+        revocation_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic", "none"],
         scopes_supported: [...MCP_SCOPES],
         response_types_supported: ["code"],
         // No implicit, no password, no client_credentials. OAuth 2.1 removes the
