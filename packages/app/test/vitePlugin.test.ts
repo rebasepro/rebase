@@ -510,3 +510,40 @@ describe("server callbacks are stripped from the browser bundle", () => {
         expect(result).toBeNull();
     });
 });
+
+/**
+ * The collection editor writes a new collection as a new FILE. Whether the
+ * admin ever sees it comes down to whether Vite's watcher raises an event for
+ * that file — and for the directory layout every scaffold ships, it did not.
+ */
+describe("rebaseCollectionsPlugin — dev server watcher", () => {
+
+    function watchedPaths(collectionsDir: string, root = "/project/frontend"): string[] {
+        const plugin = rebaseCollectionsPlugin({ collectionsDir });
+        (plugin as { configResolved: (c: { root: string }) => void }).configResolved({ root });
+
+        const added: string[] = [];
+        (plugin as unknown as {
+            configureServer: (server: { watcher: { add: (p: string) => void } }) => void
+        }).configureServer({ watcher: { add: (p) => added.push(p) } });
+
+        return added;
+    }
+
+    it("watches a collections directory outside the Vite root", () => {
+        // Vite watches its root, plus the individual files the module graph
+        // already reached. A file that does not exist yet is in neither, so
+        // without this the collection lands on disk and the virtual module is
+        // never invalidated — the admin keeps the list it booted with, and a
+        // reload does not help because the stale glob is already cached.
+        expect(watchedPaths("../config/collections")).toEqual(["/project/config/collections"]);
+    });
+
+    it("resolves the watched directory against the root, like the transform hook", () => {
+        expect(watchedPaths("src/collections")).toEqual(["/project/frontend/src/collections"]);
+    });
+
+    it("watches an absolute collections directory as given", () => {
+        expect(watchedPaths("/elsewhere/collections")).toEqual(["/elsewhere/collections"]);
+    });
+});
