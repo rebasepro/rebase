@@ -25,9 +25,11 @@
  *     It says it again now that `DELETE ${basePath}/oauth/grants/:clientId`
  *     exists — and says *where*, because "at any time" with no route to it is
  *     the sentence that makes saying yes feel safe while meaning nothing.
- *  4. **Never post the password anywhere but the existing login endpoint.**
+ *  5. **Never post the password anywhere but the existing login endpoint.**
  *     The form below sends credentials to `${basePath}/auth/login` and nowhere
  *     else; this file's own endpoint receives only the resulting session token.
+ *  6. **Refuse to be framed.** See {@link consentPageHeaders} — a consent screen
+ *     that can be iframed is a consent screen an attacker can have clicked.
  */
 
 export interface ConsentPageParams {
@@ -40,8 +42,52 @@ export interface ConsentPageParams {
     loginUrl: string;
     /** Where the decision is posted. */
     decisionUrl: string;
-    /** The canonical resource, shown so the user can see which server this is. */
+    /** The canonical resource, shown so the user can see which person this is. */
     resource: string;
+    /**
+     * A per-response nonce for the inline script.
+     *
+     * The page carries its own behaviour inline — it has no build step and no
+     * asset host to load from — so a CSP that forbids inline script would
+     * forbid the page. A nonce keeps the policy strict for everything the page
+     * did NOT emit, which is the part an injection would need.
+     */
+    nonce: string;
+}
+
+/**
+ * The headers a consent screen must carry.
+ *
+ * `frame-ancestors 'none'` and `X-Frame-Options` are the ones that matter, and
+ * they were missing. A consent screen is the single page in an OAuth flow that
+ * must not be frameable: an attacker who can iframe it, make it transparent and
+ * float a button under the user's cursor gets "Allow" pressed for a client they
+ * registered — clickjacking, with the prize being the victim's data. The user
+ * sees nothing, because the page they consented on was never visible.
+ *
+ * The rest follows from what the page is. `no-store`, because the HTML embeds a
+ * signed authorization request. `no-referrer`, so the `client_id` and `state`
+ * in this URL do not travel to whatever the redirect target loads. `form-action
+ * 'self'`, so an injection cannot repoint the form at its own collector.
+ */
+export function consentPageHeaders(nonce: string): Record<string, string> {
+    return {
+        "Content-Type": "text/html; charset=utf-8",
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": [
+            "default-src 'none'",
+            `script-src 'nonce-${nonce}'`,
+            "style-src 'unsafe-inline'",
+            // The sign-in form posts to this origin's own login endpoint.
+            "connect-src 'self'",
+            "form-action 'self'",
+            "frame-ancestors 'none'",
+            "base-uri 'none'"
+        ].join("; "),
+        "Referrer-Policy": "no-referrer",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+    };
 }
 
 export function renderConsentPage(params: ConsentPageParams): string {
@@ -140,7 +186,7 @@ export function renderConsentPage(params: ConsentPageParams): string {
   </form>
 </main>
 
-<script>
+<script nonce="${escapeAttr(params.nonce)}">
 (function () {
   var form = document.getElementById("consent");
   var email = document.getElementById("email");

@@ -118,6 +118,30 @@ A scope decides whether a tool is *offered*. It is not the access-control
 mechanism — a `mcp:write` token still cannot write a row the user could not
 write themselves.
 
+## The consent screen
+
+One page, self-contained HTML with no build step and no external asset, because
+the backend may be running with no frontend deployed at all — and a consent
+screen that renders unstyled is one people click through without reading.
+
+It carries `X-Frame-Options: DENY` and `frame-ancestors 'none'`, which is not
+boilerplate: a consent screen that can be iframed is a consent screen an
+attacker can have clicked. Make it transparent, float a button under the
+cursor, and the user presses Allow for a client the attacker registered, having
+never seen the page. The rest of the policy follows from what the page is —
+`default-src 'none'` with a fresh per-response nonce for its own inline script,
+`form-action 'self'` so an injection cannot repoint the credential form,
+`no-store` because the HTML embeds a signed authorization request, and
+`no-referrer` so the `client_id` and `state` do not travel onward.
+
+The password never reaches this surface. The form posts to the existing
+`${basePath}/auth/login` — the same endpoint, password policy, rate limits and
+MFA the application already has — and only the resulting session token is handed
+to the decision endpoint. There is no second credential path here to get wrong.
+
+The client's name is attacker-controlled, since anyone may register, so it is
+escaped, length-capped and always rendered as a quoted, untrusted string.
+
 ## What a person can do about it
 
 `GET ${basePath}/oauth/grants` lists the applications they have connected;

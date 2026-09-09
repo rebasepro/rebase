@@ -46,7 +46,7 @@ import {
     verifyPkce,
     MCP_SCOPES
 } from "./oauth-metadata.js";
-import { renderConsentPage } from "./consent-page.js";
+import { renderConsentPage, consentPageHeaders } from "./consent-page.js";
 
 /** How long an issued MCP access token lives. */
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
@@ -277,7 +277,15 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
                 "redirect_uri does not match a registered redirect URI for this client.");
         }
 
+        // `state` is opaque to us and echoed back verbatim, but it is not
+        // unbounded: it goes into a signed token that goes into an HTML page
+        // that goes into a redirect URL. A megabyte of it would be a megabyte
+        // in all three. 512 bytes is far above any real client's nonce.
         const state = q.state;
+        if (state !== undefined && state.length > 512) {
+            return authorizeInputError(c, "invalid_request", "state is too long (512 characters maximum).");
+        }
+
         const fail = (error: string, description: string) =>
             c.redirect(errorRedirect(redirectUri, error, description, state, issuer), 302);
 
@@ -325,15 +333,19 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             AUTHORIZE_REQUEST_TTL_SECONDS
         );
 
-        return c.html(renderConsentPage({
+        // One nonce per response, never reused: a fixed value is the same as no
+        // nonce at all, because an injection could simply quote it.
+        const nonce = randomHex(16);
+        return c.body(renderConsentPage({
             clientName: client.clientName,
             scope,
             scopeDescriptions: describeScopes(scope),
             requestToken,
             loginUrl: `${config.authBasePath}/login`,
             decisionUrl: `${c.req.path}/decision`,
-            resource: canonicalResource
-        }));
+            resource: canonicalResource,
+            nonce
+        }), 200, consentPageHeaders(nonce));
     });
 
     /**

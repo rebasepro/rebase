@@ -968,3 +968,94 @@ describe("list_collections reports a real schema", () => {
         expect(names).not.toContain("internalScore");
     });
 });
+
+describe("the consent screen refuses to be framed", () => {
+    async function consentResponse() {
+        const { app } = buildApp();
+        const { body } = await registerClient(app);
+        const { challenge } = await pkcePair();
+        return app.request(`/api/oauth/authorize?${new URLSearchParams({
+            response_type: "code", client_id: String(body.client_id), redirect_uri: REDIRECT,
+            code_challenge: challenge, code_challenge_method: "S256", resource: RESOURCE
+        })}`);
+    }
+
+    it("sets frame-ancestors 'none' and X-Frame-Options", async () => {
+        // The attack: iframe the consent screen, make it transparent, float a
+        // button under the cursor, and the user presses Allow for a client the
+        // attacker registered — having never seen the page they consented on.
+        const res = await consentResponse();
+        expect(res.headers.get("X-Frame-Options")).toBe("DENY");
+        expect(res.headers.get("Content-Security-Policy")).toContain("frame-ancestors 'none'");
+    });
+
+    it("pins form-action to this origin", async () => {
+        // So an injection cannot repoint the credential form at its own
+        // collector.
+        expect((await consentResponse()).headers.get("Content-Security-Policy"))
+            .toContain("form-action 'self'");
+    });
+
+    it("allows no script except the one it emitted", async () => {
+        const res = await consentResponse();
+        const csp = res.headers.get("Content-Security-Policy") ?? "";
+        expect(csp).toContain("default-src 'none'");
+        expect(csp).toMatch(/script-src 'nonce-[0-9a-f]{32}'/);
+        expect(csp).not.toContain("script-src 'unsafe-inline'");
+    });
+
+    it("uses a fresh nonce on every response", async () => {
+        // A fixed nonce is the same as no nonce: an injection could quote it.
+        const first = await consentResponse();
+        const second = await consentResponse();
+        const nonceOf = (r: Response) =>
+            /script-src 'nonce-([0-9a-f]+)'/.exec(r.headers.get("Content-Security-Policy") ?? "")?.[1];
+
+        expect(nonceOf(first)).toBeTruthy();
+        expect(nonceOf(first)).not.toBe(nonceOf(second));
+    });
+
+    it("puts the same nonce on the script tag, or the page is broken", async () => {
+        // A CSP whose nonce does not match the tag is not "strict", it is a
+        // blank screen — and the deny button would stop working.
+        const res = await consentResponse();
+        const nonce = /script-src 'nonce-([0-9a-f]+)'/.exec(res.headers.get("Content-Security-Policy") ?? "")?.[1];
+        expect(await res.text()).toContain(`<script nonce="${nonce}">`);
+    });
+
+    it("is not cached, and leaks no referrer", async () => {
+        // The HTML embeds a signed authorization request; the URL carries the
+        // client_id and state.
+        const res = await consentResponse();
+        expect(res.headers.get("Cache-Control")).toBe("no-store");
+        expect(res.headers.get("Referrer-Policy")).toBe("no-referrer");
+        expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    });
+
+    it("is served as HTML", async () => {
+        expect((await consentResponse()).headers.get("Content-Type")).toContain("text/html");
+    });
+});
+
+describe("state is bounded", () => {
+    it("refuses a state past 512 characters", async () => {
+        // It goes into a signed token, into an HTML page, into a redirect URL.
+        const { app } = buildApp();
+        const { body } = await registerClient(app);
+        const { challenge } = await pkcePair();
+
+        const res = await app.request(`/api/oauth/authorize?${new URLSearchParams({
+            response_type: "code", client_id: String(body.client_id), redirect_uri: REDIRECT,
+            code_challenge: challenge, code_challenge_method: "S256", resource: RESOURCE,
+            state: "x".repeat(513)
+        })}`);
+        expect(res.status).toBe(400);
+        expect(res.headers.get("location")).toBeNull();
+    });
+
+    it("accepts a state a real client would send", async () => {
+        const { app } = buildApp();
+        const { decision } = await authorize(app);
+        expect(new URL(decision.headers.get("location")!).searchParams.get("state")).toBe("xyz");
+    });
+});
