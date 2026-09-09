@@ -30,13 +30,13 @@ minute over the whole run, silences included.
 
 | # | Beat | Starts | Words | Line | After |
 |---|------|--------|-------|------|-------|
-| 01 | You, to camera | 0.5s | 15 | It's 2026. Anyone can build a backend in an afternoon. But can you trust it? | 0.6s |
+| 01 | You, to camera | 0.5s | 13 | Anyone can build a backend in an afternoon. But can you trust it? | 0.6s |
 | 02 | The evidence | 5.6s | 35 | A coding agent built this one. It says it's done: auth, CRUD for nine tables, a REST API, deployed. And a ten-second scan of the same database finds nine critical issues. Every table is open. | 1.5s — the tally sits |
 | 03 | What Rebase does | 17.5s | 28 | Rebase starts from the database you already have. One command reads every table and writes a typed collection file for each one. Your schema becomes code, in seconds. | 0.6s |
 | 04 | The rule | 26.5s | 40 | Access rules live in that file, right next to the table they protect. This one says customers only see their own orders. Rebase compiles it into a Postgres policy, so the database enforces it on every query, from every client. | 0.7s |
-| 05 | The same scan | 39.2s | 14 | You push it, you run the same scan again, and it comes back clean. | 1.2s — the clean report sits |
+| 05 | The same scan | 39.2s | 10 | You push it, and the same scan comes back clean. | 1.2s — the clean report sits |
 | 06 | Run it → two people | 44.0s | 33 | Then you run it, and every request is answered by the database itself. Robert sees his own orders. Dana, in support, sees them all. It is the same query. Postgres decides who sees what. | 1.2s |
-| 07 | The agent | 54.2s | 27 | You give an agent a key, and it gets exactly the permissions on that key, and nothing more. The rules hold no matter what the prompt says. | 1.2s |
+| 07 | The agent | 54.2s | 25 | You give an agent a key, and it gets exactly those permissions, and nothing more. The rules hold no matter what the prompt says. | 1.2s |
 | 08 | The panel | 63.2s | 24 | And your team gets an admin panel on day one, generated from the same files, with the same rules. Nobody had to build it. | 1.9s — the montage plays |
 | 09 | Every view | 72.3s | 13 | Every collection gets the views that fit it: boards, tables, cards and forms. | 2.1s — the bento plays |
 | 10 | The schema | 78.3s | 13 | The schema is read live from your database, so it is always current. | 1.9s |
