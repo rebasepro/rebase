@@ -528,6 +528,20 @@ function collectMissingRequired(
     collection: CollectionConfig,
     into: WriteViolation[]
 ): void {
+    // A `beforeSave` can supply a required field, and this runs before it. The
+    // canonical case is a slug derived from a title — the reference app's own
+    // `posts` does exactly that — and demanding `slug` in the request refuses a
+    // write that was always going to be complete by the time it reached the
+    // INSERT.
+    //
+    // There is no way to know *which* fields a hook fills, so the whole check
+    // steps aside for a collection that declares one and `NOT NULL` is the
+    // backstop — which is what this function's own docblock already says for
+    // the symmetric case of a hook that *nulls* a column. A collection with no
+    // hook, which is the majority, keeps the boundary error that names the
+    // field rather than the column.
+    if ((collection as { callbacks?: { beforeSave?: unknown } }).callbacks?.beforeSave) return;
+
     const properties = (collection.properties ?? {}) as Record<string, Property>;
 
     /** Relation property name → the FK wire key that also satisfies it. */

@@ -16,7 +16,7 @@ export function VirtualTableDateField(props: {
     locale?: string;
     onBlur?: React.FocusEventHandler<HTMLInputElement | HTMLTextAreaElement>;
 }) {
-    const { disabled, error, mode, timezone, internalValue, updateValue, small = false, locale } = props;
+    const { name, disabled, error, mode, timezone, internalValue, updateValue, small = false, locale } = props;
 
     return (
         <DateTimeField
@@ -29,6 +29,12 @@ export function VirtualTableDateField(props: {
             // destructure.
             disabled={disabled}
             error={Boolean(error)}
+            // Third prop this component declared and dropped. A table cell
+            // draws no visible label — the column header is the only thing
+            // naming it, and a header is not an accessible name for the input
+            // underneath — so without this every date cell reads as an unnamed
+            // "date entry" to a screen reader, one per row per date column.
+            aria-label={name}
             invisible={true}
             // Without this the field falls back to DateTimeField's own default of
             // `size="large"` (min-h-64px), which overflows a table cell and makes

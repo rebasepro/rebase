@@ -244,6 +244,35 @@ describe("required on create", () => {
         expect(() => assertWriteValuesValid({ title: "Hi" }, posts)).not.toThrow();
     });
 
+    it("steps aside for a collection whose `beforeSave` may supply the value", () => {
+        // The reference app's `posts` derives a required `slug` from `title` in
+        // `beforeSave`, and this check runs before that hook. Demanding `slug`
+        // in the request refused a write that was always going to be complete
+        // by the time it reached the INSERT — it broke the realtime e2e, and it
+        // would have broken every project using the same pattern on upgrade.
+        //
+        // There is no way to know which fields a hook fills, so the check steps
+        // aside entirely and `NOT NULL` is the backstop.
+        const withHook: CollectionConfig = {
+            ...posts,
+            properties: {
+                ...posts.properties,
+                // No `defaultValue` here: the hook is the only thing that fills it.
+                slug: { type: "string", validation: { required: true } }
+            },
+            callbacks: {
+                beforeSave: ({ values }: { values: Record<string, unknown> }) => values
+            }
+        } as CollectionConfig;
+
+        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, withHook, { status: "new" })).not.toThrow();
+
+        // The same collection without the hook still answers at the boundary.
+        const { callbacks: _dropped, ...withoutHook } = withHook as CollectionConfig & { callbacks?: unknown };
+        const error = thrown(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, withoutHook as CollectionConfig, { status: "new" }));
+        expect(details(error).violations?.[0]).toMatchObject({ field: "slug", code: "required" });
+    });
+
     it("uses the author's own requiredMessage when there is one", () => {
         const collection: CollectionConfig = {
             slug: "t", name: "T", table: "t",
